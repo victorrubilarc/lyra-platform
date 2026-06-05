@@ -1,0 +1,71 @@
+import { Injectable, Logger } from "@nestjs/common";
+import type { Prisma } from "@prisma/client";
+import { PrismaService } from "../prisma/prisma.service";
+
+/** Contexto del actor y la petición para anexar a un evento de auditoría. */
+export interface AuditContext {
+  actorId?: string | null;
+  actorEmail?: string | null;
+  ip?: string | null;
+  userAgent?: string | null;
+}
+
+/** Datos de un evento de auditoría. */
+export interface AuditEvent extends AuditContext {
+  /** Acción en notación punteada, ej. "auth.login.success", "role.updated". */
+  action: string;
+  entityType?: string | null;
+  entityId?: string | null;
+  before?: Prisma.InputJsonValue | null;
+  after?: Prisma.InputJsonValue | null;
+  metadata?: Prisma.InputJsonValue | null;
+}
+
+/**
+ * Escribe en el AuditLog (append-only). La tabla es inmutable a nivel de base
+ * (trigger que rechaza UPDATE/DELETE), así que aquí solo se inserta.
+ *
+ * Auditar NUNCA debe tumbar la operación de negocio: si la inserción falla, se
+ * registra el error y se continúa (la pérdida de un log se trata como incidente
+ * operacional, no como fallo de la transacción del usuario).
+ */
+@Injectable()
+export class AuditService {
+  private readonly logger = new Logger(AuditService.name);
+
+  constructor(private readonly prisma: PrismaService) {}
+
+  /** Lista eventos de auditoría (más recientes primero), con paginación simple. */
+  async list(params: { take?: number; cursor?: string } = {}) {
+    const take = Math.min(Math.max(params.take ?? 50, 1), 200);
+    return this.prisma.auditLog.findMany({
+      take,
+      orderBy: { occurredAt: "desc" },
+      ...(params.cursor ? { skip: 1, cursor: { id: params.cursor } } : {}),
+    });
+  }
+
+  async record(event: AuditEvent): Promise<void> {
+    try {
+      await this.prisma.auditLog.create({
+        data: {
+          action: event.action,
+          actorId: event.actorId ?? null,
+          actorEmail: event.actorEmail ?? null,
+          entityType: event.entityType ?? null,
+          entityId: event.entityId ?? null,
+          before: event.before ?? undefined,
+          after: event.after ?? undefined,
+          ip: event.ip ?? null,
+          userAgent: event.userAgent ?? null,
+          metadata: event.metadata ?? undefined,
+        },
+      });
+    } catch (err) {
+      this.logger.error(
+        `No se pudo registrar el evento de auditoría "${event.action}"`,
+        err instanceof Error ? err.stack : String(err),
+      );
+    }
+  }
+}

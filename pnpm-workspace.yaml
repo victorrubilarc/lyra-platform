@@ -2,6 +2,9 @@ packages:
   - "apps/*"
   - "packages/*"
 
+allowBuilds:
+  esbuild: set this to true or false
+
 # Scripts de build nativos aprobados explícitamente (pnpm 10+ los bloquea por
 # defecto por seguridad). Estos los necesitamos para compilar binarios.
 onlyBuiltDependencies:

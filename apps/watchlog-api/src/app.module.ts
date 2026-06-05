@@ -4,6 +4,13 @@ import { LoggerModule } from "nestjs-pino";
 import { validateEnv } from "./config/env.schema";
 import { PrismaModule } from "./prisma/prisma.module";
 import { HealthModule } from "./health/health.module";
+import { CryptoModule } from "./crypto/crypto.module";
+import { CacheModule } from "./redis/cache.module";
+import { AuditModule } from "./audit/audit.module";
+import { AuthzModule } from "./authz/authz.module";
+import { AuthModule } from "./auth/auth.module";
+import { StructureModule } from "./structure/structure.module";
+import { SecurityModule } from "./security/security.module";
 
 @Module({
   imports: [
@@ -26,6 +33,13 @@ import { HealthModule } from "./health/health.module";
       },
     }),
     PrismaModule,
+    CryptoModule,
+    CacheModule,
+    AuditModule,
+    AuthzModule,
+    AuthModule,
+    StructureModule,
+    SecurityModule,
     HealthModule,
   ],
 })

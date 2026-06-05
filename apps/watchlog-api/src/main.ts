@@ -5,6 +5,7 @@ import {
   type NestFastifyApplication,
 } from "@nestjs/platform-fastify";
 import helmet from "@fastify/helmet";
+import cookie from "@fastify/cookie";
 import { Logger } from "nestjs-pino";
 import { AppModule } from "./app.module";
 
@@ -20,6 +21,15 @@ async function bootstrap(): Promise<void> {
 
   // Cabeceras de seguridad por defecto.
   await app.register(helmet);
+
+  // Lectura/escritura de cookies (refresh token httpOnly + CSRF).
+  await app.register(cookie);
+
+  // CORS con credenciales en desarrollo (la web corre en otro puerto vía Vite).
+  // En producción todo va same-origin detrás de Caddy, así que no se necesita.
+  if (process.env.NODE_ENV !== "production") {
+    app.enableCors({ origin: true, credentials: true });
+  }
 
   // Todas las rutas bajo /api.
   app.setGlobalPrefix("api");

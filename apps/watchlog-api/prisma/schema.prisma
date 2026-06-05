@@ -1,9 +1,11 @@
 // Lyra WatchLog — esquema de base de datos (Prisma)
 //
-// Fase 0: solo datasource + generator. Los modelos (usuarios, roles,
-// permisos, estructura organizacional, plantillas, bitácoras, incidencias,
-// turnos, orígenes de datos, base de conocimiento, auditoría) se incorporan
-// a partir de la Fase 1, con migraciones versionadas. Ver docs/DATA_MODEL.md.
+// Fase 1: identidad, RBAC/ABAC, estructura organizacional y auditoría.
+// Las plantillas, bitácoras, incidencias, turnos, orígenes y base de
+// conocimiento se incorporan en fases posteriores. Ver docs/DATA_MODEL.md.
+//
+// Convenciones: PK `id` cuid; createdAt/updatedAt donde aplique; borrado
+// lógico (deletedAt) en entidades de negocio; nada de secretos en claro.
 
 generator client {
   provider = "prisma-client-js"
@@ -12,4 +14,282 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+// ===========================================================================
+//  Identidad
+// ===========================================================================
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+  LOCKED
+  INVITED
+}
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique // siempre normalizado a minúsculas
+  displayName  String
+  // Hash Argon2id. Nullable para usuarios solo-OIDC a futuro (sin password local).
+  passwordHash String?
+  status       UserStatus @default(ACTIVE)
+  mfaEnabled   Boolean    @default(false)
+  // Obliga a cambiar la contraseña antes de operar (admin de arranque, reset admin).
+  forcePasswordChange Boolean @default(false)
+  // Lockout por fuerza bruta: contador persistente + bloqueo temporal. Redis
+  // se usa solo como acelerador opcional de rate-limit, no como fuente de verdad.
+  failedLoginCount Int      @default(0)
+  lockedUntil      DateTime?
+  lastLoginAt      DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  roles           UserRole[]
+  scopes          Scope[]
+  sessions        Session[]
+  refreshTokens   RefreshToken[]
+  mfaSecret       MfaSecret?
+  passwordHistory PasswordHistory[]
+
+  @@index([status])
+}
+
+model PasswordHistory {
+  id           String   @id @default(cuid())
+  userId       String
+  passwordHash String
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+// ===========================================================================
+//  Autorización — RBAC (roles/permisos) + ABAC (alcance de datos)
+// ===========================================================================
+
+enum PermissionDimension {
+  MODULE
+  ACTION
+  WORKFLOW
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  key         String   @unique // estable, ej. "admin"
+  name        String
+  description String?
+  // Los roles de sistema no se pueden eliminar (p. ej. Administrador).
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users       UserRole[]
+  permissions RolePermission[]
+  scopes      Scope[]
+}
+
+model Permission {
+  id          String              @id @default(cuid())
+  key         String              @unique // ej. "entry:create" (catálogo en @lyra/contracts)
+  dimension   PermissionDimension
+  group       String // agrupación para la UI de roles
+  description String
+
+  roles RolePermission[]
+
+  @@index([dimension])
+}
+
+model UserRole {
+  userId       String
+  roleId       String
+  assignedAt   DateTime @default(now())
+  assignedById String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@index([roleId])
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+}
+
+// Alcance de datos (dimensión 4, ABAC). Sujeto polimórfico: exactamente uno de
+// userId/roleId está presente (check constraint añadido en la migración).
+// El alcance efectivo de un usuario = unión de sus scopes + los de sus roles.
+model Scope {
+  id                 String  @id @default(cuid())
+  userId             String?
+  roleId             String?
+  orgNodeId          String
+  // Si true, el alcance cubre también los descendientes del nodo.
+  includeDescendants Boolean @default(true)
+
+  user    User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role    Role?   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  orgNode OrgNode @relation(fields: [orgNodeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, orgNodeId])
+  @@unique([roleId, orgNodeId])
+  @@index([orgNodeId])
+}
+
+// ===========================================================================
+//  Sesiones y credenciales
+// ===========================================================================
+
+model Session {
+  id        String    @id @default(cuid())
+  userId    String
+  createdAt DateTime  @default(now())
+  expiresAt DateTime
+  lastSeenAt DateTime @default(now())
+  ip        String?
+  userAgent String?
+  revokedAt DateTime?
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokens RefreshToken[]
+
+  @@index([userId])
+}
+
+// Refresh tokens rotativos. Se guarda solo el hash; la familia (familyId)
+// permite detectar reuso: si un token ya rotado se vuelve a presentar, se
+// revoca toda la familia.
+model RefreshToken {
+  id           String    @id @default(cuid())
+  sessionId    String
+  userId       String
+  tokenHash    String    @unique // SHA-256 del token en claro
+  familyId     String // linaje de rotación
+  issuedAt     DateTime  @default(now())
+  expiresAt    DateTime
+  usedAt       DateTime? // marca de rotación
+  revokedAt    DateTime?
+  replacedById String?   @unique
+
+  session     Session       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  replacedBy  RefreshToken? @relation("TokenRotation", fields: [replacedById], references: [id])
+  replaces    RefreshToken? @relation("TokenRotation")
+
+  @@index([userId])
+  @@index([familyId])
+  @@index([sessionId])
+}
+
+model MfaSecret {
+  id            String    @id @default(cuid())
+  userId        String    @unique
+  // Secreto TOTP cifrado en reposo (AES-256-GCM con APP_ENC_KEY).
+  secret        String
+  confirmedAt   DateTime?
+  createdAt     DateTime  @default(now())
+
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recoveryCodes MfaRecoveryCode[]
+}
+
+model MfaRecoveryCode {
+  id          String    @id @default(cuid())
+  mfaSecretId String
+  // Hash del código de recuperación (nunca en claro). De un solo uso.
+  codeHash    String
+  usedAt      DateTime?
+
+  mfaSecret MfaSecret @relation(fields: [mfaSecretId], references: [id], onDelete: Cascade)
+
+  @@index([mfaSecretId])
+}
+
+// Política de contraseñas: fila singleton (id fijo). Configurable desde la UI.
+model PasswordPolicy {
+  id                String   @id @default("singleton")
+  minLength         Int      @default(12)
+  requireUppercase  Boolean  @default(true)
+  requireNumber     Boolean  @default(true)
+  requireSymbol     Boolean  @default(false)
+  expiryDays        Int? // null = sin expiración
+  historyCount      Int      @default(5)
+  maxFailedAttempts Int      @default(5)
+  lockoutMinutes    Int      @default(15)
+  updatedAt         DateTime @updatedAt
+  updatedById       String?
+}
+
+// ===========================================================================
+//  Estructura organizacional
+// ===========================================================================
+
+model OrgLevel {
+  id        String   @id @default(cuid())
+  name      String // configurable: "Área", "Proceso", "Equipo"…
+  order     Int // profundidad en la jerarquía (0 = raíz)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  nodes OrgNode[]
+
+  @@unique([order])
+}
+
+model OrgNode {
+  id        String    @id @default(cuid())
+  name      String
+  code      String?
+  parentId  String?
+  levelId   String
+  // Ruta materializada de ancestros incluyéndose: "/<id>/<id>/.../". Permite
+  // consultar descendientes con `path LIKE '<prefijo>%'` en una sola query.
+  path      String    @default("")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? // borrado lógico
+
+  level    OrgLevel  @relation(fields: [levelId], references: [id])
+  parent   OrgNode?  @relation("OrgHierarchy", fields: [parentId], references: [id])
+  children OrgNode[] @relation("OrgHierarchy")
+  scopes   Scope[]
+
+  @@index([parentId])
+  @@index([levelId])
+  @@index([path])
+}
+
+// ===========================================================================
+//  Auditoría — append-only / inmutable (trigger en la migración)
+// ===========================================================================
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  occurredAt DateTime @default(now())
+  // Snapshot del actor (puede haberse borrado el usuario; por eso no es FK dura).
+  actorId    String?
+  actorEmail String?
+  action     String // ej. "auth.login.success", "user.role.assigned"
+  entityType String? // ej. "User", "Role", "OrgNode"
+  entityId   String?
+  before     Json?
+  after      Json?
+  ip         String?
+  userAgent  String?
+  metadata   Json?
+
+  @@index([occurredAt])
+  @@index([actorId])
+  @@index([entityType, entityId])
 }
