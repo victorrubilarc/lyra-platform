@@ -1,15 +1,18 @@
 import { Controller, Get } from "@nestjs/common";
 import type { HealthStatus } from "@lyra/contracts";
+import { Public } from "../authz/authz.decorators";
 import { PrismaService } from "../prisma/prisma.service";
 
 const SERVICE = "watchlog-api";
 const VERSION = process.env.npm_package_version ?? "0.0.0";
 
 /**
- * Endpoints de salud:
+ * Endpoints de salud (PÚBLICOS: los usan los healthchecks de Docker y no deben
+ * exigir token):
  *  - GET /api/health        → liveness (¿el proceso responde?)
  *  - GET /api/health/ready  → readiness (¿las dependencias están sanas?)
  */
+@Public()
 @Controller("health")
 export class HealthController {
   constructor(private readonly prisma: PrismaService) {}
