@@ -1,0 +1,33 @@
+# syntax=docker/dockerfile:1
+# ----------- Backend NestJS (watchlog-api) -----------
+FROM node:22-bookworm-slim AS base
+ENV PNPM_HOME="/pnpm" PATH="/pnpm:$PATH"
+RUN corepack enable
+WORKDIR /repo
+
+# ---- Instala dependencias (cacheable por manifiestos) ----
+FROM base AS deps
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml .npmrc ./
+COPY packages/config/package.json packages/config/
+COPY packages/contracts/package.json packages/contracts/
+COPY packages/ui/package.json packages/ui/
+COPY apps/watchlog-api/package.json apps/watchlog-api/
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+    pnpm install --frozen-lockfile --ignore-scripts
+
+# ---- Compila contratos + API y genera cliente Prisma ----
+FROM deps AS build
+COPY . .
+RUN pnpm --filter @lyra/contracts build \
+ && pnpm --filter @lyra/watchlog-api exec prisma generate \
+ && pnpm --filter @lyra/watchlog-api build
+# Empaqueta el API con solo sus dependencias de producción.
+RUN pnpm --filter @lyra/watchlog-api deploy --prod /app
+
+# ---- Imagen final ----
+FROM base AS runtime
+ENV NODE_ENV=production
+WORKDIR /app
+COPY --from=build /app ./
+EXPOSE 3000
+CMD ["node", "dist/main.js"]

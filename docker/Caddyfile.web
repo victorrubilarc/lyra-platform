@@ -1,0 +1,15 @@
+# Caddy sirve la SPA y proxea las llamadas /api al backend.
+# SITE_ADDRESS: dominio (TLS automático) o `:80`. Definido por compose.
+{$SITE_ADDRESS::80} {
+	encode gzip zstd
+
+	handle /api/* {
+		reverse_proxy api:3000
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}
