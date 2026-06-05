@@ -50,4 +50,8 @@ Keycloak **descartado** para el MVP (complejidad operacional); si un cliente lo 
 - Logs redactan `authorization`, `cookie`, `set-cookie`.
 
 ## Estado
-Fase 0: cabeceras (Helmet) y validación de entorno activas. El módulo de seguridad completo (auth + RBAC/ABAC + auditoría) es el núcleo de la **Fase 1**.
+- **Fase 0:** cabeceras (Helmet) y validación de entorno activas.
+- **Fase 1 (backend, ✅):** auth local Argon2id; access JWT (15 min) + refresh rotativo httpOnly con detección de reuso por familia; CSRF de doble envío en refresh/logout; lockout por fuerza bruta (contador en BD); **MFA TOTP** completo (enrolamiento + recovery codes, secreto cifrado en reposo); `PermissionsGuard` + `@RequirePermission` (dims. 1–3) globales; `ScopeService` (dim. 4) con ruta materializada; catálogo de permisos en `@lyra/contracts`; `AuditLog` append-only con **trigger Postgres** que rechaza UPDATE/DELETE; política de contraseñas configurable + historial; seed idempotente con admin de arranque (forzado a cambiar contraseña).
+  - Endpoints: `/auth/{login,mfa/challenge,refresh,logout,me,change-password,mfa/setup,mfa/verify,mfa/disable}`, `/security/{users,roles,permissions,password-policy,audit}`, `/structure/{levels,nodes}`.
+  - Tests: crypto (Argon2/AES), guard de permisos, scope ABAC, rotación/reuso de refresh, login/lockout/MFA. Verificado en vivo (login → /me → CSRF → estructura).
+- **Pendiente Fase 1:** UI (pantalla de Login, administración de usuarios/roles/permisos, estructura). El backend ya expone todo lo necesario.
