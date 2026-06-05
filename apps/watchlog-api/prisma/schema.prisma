@@ -1,0 +1,15 @@
+// Lyra WatchLog — esquema de base de datos (Prisma)
+//
+// Fase 0: solo datasource + generator. Los modelos (usuarios, roles,
+// permisos, estructura organizacional, plantillas, bitácoras, incidencias,
+// turnos, orígenes de datos, base de conocimiento, auditoría) se incorporan
+// a partir de la Fase 1, con migraciones versionadas. Ver docs/DATA_MODEL.md.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
