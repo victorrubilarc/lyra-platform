@@ -1,0 +1,119 @@
+/* ============================================================
+   LYRA DESIGN SYSTEM — Tokens (v1.0)
+   Fuente de verdad del sistema. NUNCA usar valores en duro:
+   siempre referenciar estos tokens.
+   Compatible con Tailwind v4 (@theme expone cada token como
+   variable CSS en :root y, donde aplica, como utilidad).
+   ============================================================ */
+
+@theme {
+  /* ---- Fondos (escala de profundidad) ---- */
+  --color-bg-base: #06061a;
+  --color-bg-surface-1: #0c1124;
+  --color-bg-surface-2: #111827;
+  --color-bg-surface-3: #1a2235;
+
+  /* ---- Bordes ---- */
+  --color-border-subtle: rgba(255, 255, 255, 0.08);
+  --color-border-default: rgba(255, 255, 255, 0.12);
+  --color-border-strong: rgba(255, 255, 255, 0.2);
+  --color-border-accent: rgba(99, 102, 241, 0.4);
+  --color-border-brand: rgba(99, 102, 241, 0.6);
+
+  /* ---- Texto ---- */
+  --color-text-primary: #e7eaf3;
+  --color-text-secondary: #9aa3b8;
+  --color-text-muted: #6b7280;
+  --color-text-inverse: #06061a;
+
+  /* ---- Acentos de marca ---- */
+  --color-accent-primary: #6366f1;
+  --color-accent-secondary: #06b6d4;
+  --color-accent-primary-hover: #4f46e5;
+  --color-accent-secondary-hover: #0891b2;
+
+  /* ---- Colores funcionales ---- */
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+  --color-info: #06b6d4;
+
+  /* ---- Escala de severidad operacional (1–5) ---- */
+  --color-sev-1: #22c55e;
+  --color-sev-2: #84cc16;
+  --color-sev-3: #eab308;
+  --color-sev-4: #f97316;
+  --color-sev-5: #ef4444;
+
+  /* ---- Tipografía ---- */
+  --font-brand: "Sora", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, sans-serif;
+  --font-mono: ui-monospace, "Menlo", "Monaco", monospace;
+
+  /* ---- Radios ---- */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 18px;
+  --radius-2xl: 24px;
+  --radius-full: 9999px;
+
+  /* ---- Espaciado (base 4px) ---- */
+  --spacing-1: 4px;
+  --spacing-2: 8px;
+  --spacing-3: 12px;
+  --spacing-4: 16px;
+  --spacing-5: 20px;
+  --spacing-6: 24px;
+  --spacing-8: 32px;
+  --spacing-10: 40px;
+  --spacing-12: 48px;
+  --spacing-16: 64px;
+
+  /* ---- Sombras y glow (sin negros duros) ---- */
+  --shadow-card: 0 4px 24px -4px rgba(0, 0, 0, 0.4);
+  --shadow-modal: 0 16px 48px -8px rgba(0, 0, 0, 0.6);
+}
+
+/* ------------------------------------------------------------
+   Tokens que no generan utilidades pero sí variables CSS de uso
+   directo (gradientes, glow compuestos, glassmorphism).
+   ------------------------------------------------------------ */
+:root {
+  --color-success-bg: rgba(34, 197, 94, 0.12);
+  --color-warning-bg: rgba(245, 158, 11, 0.12);
+  --color-error-bg: rgba(239, 68, 68, 0.12);
+  --color-info-bg: rgba(6, 182, 212, 0.12);
+
+  --gradient-brand: linear-gradient(135deg, #6366f1, #06b6d4);
+  --gradient-brand-subtle: linear-gradient(
+    135deg,
+    rgba(99, 102, 241, 0.15),
+    rgba(6, 182, 212, 0.1)
+  );
+
+  --glow-brand: 0 0 0 1px rgba(99, 102, 241, 0.25), 0 12px 40px -12px rgba(99, 102, 241, 0.35);
+  --glow-success: 0 0 0 1px rgba(34, 197, 94, 0.25), 0 8px 24px -8px rgba(34, 197, 94, 0.25);
+  --glow-error: 0 0 0 1px rgba(239, 68, 68, 0.25), 0 8px 24px -8px rgba(239, 68, 68, 0.25);
+
+  --glass-blur: blur(14px);
+  --glass-bg: rgba(255, 255, 255, 0.045);
+  --glass-border: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+/* ------------------------------------------------------------
+   Base — dark mode como modo principal (terreno industrial).
+   ------------------------------------------------------------ */
+@layer base {
+  body {
+    margin: 0;
+    background:
+      radial-gradient(1200px 800px at 80% -10%, #1b2550 0%, transparent 60%),
+      radial-gradient(900px 600px at -10% 110%, #0e3a3a 0%, transparent 55%),
+      var(--color-bg-base);
+    color: var(--color-text-primary);
+    font-family: var(--font-body);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+}
