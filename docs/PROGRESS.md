@@ -1,6 +1,6 @@
 # Progreso — Lyra WatchLog
 
-Última actualización: 2026-06-05.
+Última actualización: 2026-06-05 (Fase 0 cerrada y verificada en vivo).
 
 ## Estado por fase
 
@@ -41,9 +41,24 @@
 - `watchlog-web`: React + Vite + Tailwind v4 + TanStack Query; pantalla Fase 0 que consume el health del API vía el contrato compartido.
 - Docker: `compose.dev` (Postgres/Redis/MinIO/Mailpit), `compose.prod` (stack completo), Dockerfiles multi-stage, Caddy (TLS + reverse proxy).
 - Docs de memoria: ARCHITECTURE, DATA_MODEL, SECURITY, PROGRESS, DECISIONS.
+- Commiteado y pusheado a `origin/main` (github.com/victorrubilarc/lyra-platform), 5 commits por capa.
+
+## Verificación de la Fase 0 (todo ✅)
+- `pnpm install` (545 paquetes) + cliente Prisma generado.
+- `pnpm build` → contracts (tsc) · API (nest build) · web (vite, 1640 módulos).
+- `pnpm typecheck` → 4 paquetes OK.
+- `pnpm test` → contracts 2/2 · API 2/2.
+- `pnpm lint` → 0 errores, 0 warnings.
+- **Smoke test en vivo**: `pnpm infra:up` + `pnpm dev` → la web consume `/api/health/ready`
+  contra Postgres real en Docker y muestra el estado en verde. Cadena web↔API↔BD validada
+  con el contrato Zod compartido. **Sin pendientes en la Fase 0.**
+
+## Fuera de alcance de la Fase 0 (planificado para más adelante)
+- Build de imágenes de producción (`docker-compose.prod.yml`) — se ejerce en la fase de
+  endurecimiento (Fase 7); el camino de desarrollo (infra + apps locales) es el primario.
 
 ## Próximo paso
-Presentar el **enfoque detallado de la Fase 1** (esquema de tablas de seguridad, catálogo de permisos, flujo de login) para visto bueno antes de codear.
-
-## Pendiente de validar
-- `docker compose -f docker-compose.prod.yml build` (imágenes de producción) — se ejerce en la fase de endurecimiento; el camino de desarrollo (infra + apps locales) es el primario.
+Iniciar la **Fase 1 — Seguridad + Estructura**. Antes de codear, presentar para visto bueno:
+esquema de tablas (User/Role/Permission/UserScope, OrgLevel/OrgNode, Session/RefreshToken,
+AuditLog), catálogo de permisos 4D (en `@lyra/contracts`) y flujo de login (Argon2id +
+access/refresh rotativo + lockout + MFA opcional) con la ranura OIDC enchufable.
