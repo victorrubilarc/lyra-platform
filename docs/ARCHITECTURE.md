@@ -32,8 +32,9 @@
 │  ├─ watchlog-api/     # Backend NestJS (Fastify, Prisma)
 │  └─ watchlog-web/     # Frontend React (Vite, Tailwind)
 ├─ packages/
-│  ├─ ui/               # Design System Lyra: tokens (CSS) + componentes (próx. fases)
+│  ├─ ui/               # Design System Lyra: tokens (CSS) + componentes (CSS Modules)
 │  ├─ contracts/        # Tipos TS + esquemas Zod compartidos (build con tsc → dist)
+│  ├─ permissions/      # Cliente de permisos (can/canAll/canAny) — TS puro, sin React
 │  └─ config/           # ESLint (flat) + Prettier compartidos
 ├─ docker/              # Dockerfile.api, Dockerfile.web, Caddyfile.web
 ├─ docs/                # Memoria técnica (este directorio)
@@ -42,8 +43,12 @@
 └─ docker-compose.prod.yml  # Stack completo on-premise
 ```
 
-- **`apps/`** = desplegables. **`packages/`** = reutilizable. Empezamos con **3 paquetes** (anti-sobre-ingeniería); se extraen más solo cuando un segundo producto los necesite.
+- **`apps/`** = desplegables. **`packages/`** = reutilizable. Hoy **4 paquetes** (`ui`, `contracts`, `permissions`, `config`); se extraen más solo cuando un segundo producto los necesite.
 - `@lyra/contracts` es la pieza que materializa el "compartir tipos": el API tipa sus respuestas y la Web las consume con el mismo esquema Zod (ej. `HealthStatus`).
+- `@lyra/contracts` se consume **compilado** (`dist`); `@lyra/ui` y `@lyra/permissions` se consumen **como fuente** (los transpila Vite/tsc del consumidor), por eso no tienen paso de `build`.
+
+### Frontend (`apps/watchlog-web`)
+Capas: `lib/` (api-client con Bearer+refresh+CSRF, custodia del token en memoria) → `auth/` (store Zustand, `AuthProvider`, `ProtectedRoute`, `usePermissions`/`<Can>`) → `routes/` (react-router 7 + `AppLayout`) → `features/` (pantallas: `auth/`, `home/`). El access token vive **solo en memoria**; el refresh va en cookie httpOnly. La autorización en UI **solo oculta/deshabilita** vía `@lyra/permissions`; la decisión real es del backend.
 
 ## 3. Capas (backend)
 

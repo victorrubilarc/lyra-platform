@@ -268,6 +268,11 @@ Todos los componentes viven en `packages/ui/components/`.
 Cada componente tiene su propio archivo, estilos con tokens,
 y documentación de variantes y props.
 
+> **Implementados (Fase 1 · UI Login):** `Button`, `Input`, `FormField`, `Card`,
+> `Spinner`, `Toast` (`ToastProvider`/`useToast`) — con **CSS Modules** sobre los
+> tokens. Pendientes para Estructura/Seguridad: `Table`, `Drawer`, `Chip`/`NodeTag`,
+> `Modal`, `Toggle`, `EmptyState`, `Stepper`, `Sidebar` (hoy inline en `apps/watchlog-web`).
+
 ### 3.1 Botones
 
 **Primary** — Una sola acción principal por pantalla.

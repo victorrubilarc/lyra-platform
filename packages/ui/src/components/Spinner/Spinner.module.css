@@ -1,0 +1,22 @@
+.spinner {
+  display: inline-block;
+  border-radius: 50%;
+  border-style: solid;
+  border-color: currentColor;
+  /* La pista es el color actual atenuado; el "diente" es opaco. */
+  border-top-color: transparent;
+  animation: lyra-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes lyra-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 1.4s;
+  }
+}

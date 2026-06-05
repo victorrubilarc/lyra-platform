@@ -1,0 +1,83 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.title {
+  font-family: var(--font-brand);
+  font-weight: 800;
+  font-size: var(--text-display-size);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.subtitle {
+  font-size: var(--text-body-lg-size);
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-4);
+}
+
+.module {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.moduleHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.moduleIcon {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-md);
+  background: rgba(99, 102, 241, 0.14);
+  color: var(--color-accent-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.moduleName {
+  font-family: var(--font-brand);
+  font-weight: 700;
+  font-size: var(--text-h2-size);
+  color: var(--color-text-primary);
+}
+
+.moduleDesc {
+  font-size: var(--text-body-sm-size);
+  color: var(--color-text-muted);
+}
+
+.statusChip {
+  font-size: var(--text-caption-size);
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+}
+
+.statusReady {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.statusSoon {
+  background: rgba(6, 182, 212, 0.15);
+  color: var(--color-accent-secondary);
+}

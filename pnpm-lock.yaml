@@ -120,6 +120,9 @@ importers:
       '@lyra/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@lyra/permissions':
+        specifier: workspace:*
+        version: link:../../packages/permissions
       '@lyra/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -225,7 +228,11 @@ importers:
         specifier: ^3.0.0
         version: 3.2.6(@types/node@22.19.19)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.22.4)
 
-  packages/ui:
+  packages/permissions:
+    dependencies:
+      '@lyra/contracts':
+        specifier: workspace:*
+        version: link:../contracts
     devDependencies:
       '@lyra/config':
         specifier: workspace:*
@@ -233,6 +240,40 @@ importers:
       eslint:
         specifier: ^9.18.0
         version: 9.39.4(jiti@2.7.0)
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.6(@types/node@22.19.19)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.22.4)
+
+  packages/ui:
+    dependencies:
+      lucide-react:
+        specifier: ^0.471.0
+        version: 0.471.2(react@19.2.7)
+      react-dom:
+        specifier: ^19
+        version: 19.2.7(react@19.2.7)
+    devDependencies:
+      '@lyra/config':
+        specifier: workspace:*
+        version: link:../config
+      '@types/react':
+        specifier: ^19.0.7
+        version: 19.2.16
+      '@types/react-dom':
+        specifier: ^19.0.3
+        version: 19.2.3(@types/react@19.2.16)
+      eslint:
+        specifier: ^9.18.0
+        version: 9.39.4(jiti@2.7.0)
+      globals:
+        specifier: ^15.14.0
+        version: 15.15.0
+      react:
+        specifier: ^19.0.0
+        version: 19.2.7
       typescript:
         specifier: ^5.7.3
         version: 5.9.3

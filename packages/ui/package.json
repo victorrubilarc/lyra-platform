@@ -11,9 +11,20 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint ."
   },
+  "peerDependencies": {
+    "react": "^19",
+    "react-dom": "^19"
+  },
+  "dependencies": {
+    "lucide-react": "^0.471.0"
+  },
   "devDependencies": {
     "@lyra/config": "workspace:*",
+    "@types/react": "^19.0.7",
+    "@types/react-dom": "^19.0.3",
     "eslint": "^9.18.0",
+    "globals": "^15.14.0",
+    "react": "^19.0.0",
     "typescript": "^5.7.3"
   }
 }

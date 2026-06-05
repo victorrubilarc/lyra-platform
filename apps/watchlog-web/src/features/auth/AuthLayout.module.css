@@ -1,0 +1,151 @@
+.screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Halo sutil de marca al fondo (no es el gradiente a pantalla completa). */
+.screen::before {
+  content: "";
+  position: absolute;
+  top: -20%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 720px;
+  height: 720px;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.16), transparent 60%);
+  pointer-events: none;
+}
+
+.panel {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brandLogo {
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  background: var(--gradient-brand);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.brandWordmark {
+  font-family: var(--font-brand);
+  font-weight: 800;
+  font-size: 22px;
+  color: var(--color-text-primary);
+  line-height: 1.05;
+}
+
+.brandProduct {
+  background: var(--gradient-brand);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.brandSubtitle {
+  font-size: 10.5px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-8);
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.title {
+  font-family: var(--font-brand);
+  font-weight: 700;
+  font-size: var(--text-h1-size);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.subtitle {
+  font-size: var(--text-body-sm-size);
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* Banner de error a nivel de formulario. */
+.formError {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--color-error-bg);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  font-size: var(--text-body-sm-size);
+  color: var(--color-error);
+}
+
+.footnote {
+  font-size: var(--text-body-sm-size);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.linkButton {
+  background: none;
+  border: none;
+  color: var(--color-accent-secondary);
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+.linkButton:hover {
+  text-decoration: underline;
+}
+
+/* Botón para mostrar/ocultar contraseña dentro del input. */
+.reveal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.reveal:hover {
+  color: var(--color-text-secondary);
+}

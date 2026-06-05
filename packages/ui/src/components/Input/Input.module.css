@@ -1,0 +1,60 @@
+.wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.input {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  padding: 10px 14px;
+  font-family: var(--font-body);
+  font-size: var(--text-body-size);
+  min-height: 44px;
+  outline: none;
+  transition: var(--transition-border), box-shadow 0.2s ease;
+}
+
+.input::placeholder {
+  color: var(--color-text-muted);
+}
+
+.input:focus {
+  border-color: var(--color-accent-primary);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.18);
+}
+
+.input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Deja sitio al slot derecho (p. ej. botón de mostrar/ocultar contraseña). */
+.hasRightSlot {
+  padding-right: 46px;
+}
+
+.invalid {
+  border-color: var(--color-error);
+}
+.invalid:focus {
+  border-color: var(--color-error);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18);
+}
+
+.rightSlot {
+  position: absolute;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Texto monoespaciado para códigos (TOTP, recovery). */
+.mono {
+  font-family: var(--font-mono);
+  letter-spacing: 0.15em;
+}

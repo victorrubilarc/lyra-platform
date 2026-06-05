@@ -1,13 +1,13 @@
 # Progreso — Lyra WatchLog
 
-Última actualización: 2026-06-05 (Fase 1 — **backend completo y verificado**; falta la UI).
+Última actualización: 2026-06-05 (Fase 1 — backend ✅; **UI: Login + cimientos del frontend ✅**; faltan UI de Estructura y Seguridad).
 
 ## Estado por fase
 
 | Fase | Módulo | Estado |
 |---|---|---|
 | 0 | **Cimientos** (monorepo, Docker, Design System tokens, contratos, API health) | ✅ Hecho |
-| 1 | Seguridad (auth + RBAC/ABAC) + Estructura organizacional + AuditLog | 🟦 Backend ✅ · UI ⬜ |
+| 1 | Seguridad (auth + RBAC/ABAC) + Estructura organizacional + AuditLog | 🟦 Backend ✅ · UI: Login ✅ · Estructura/Seguridad ⬜ |
 | 2 | Plantillas / Form Builder + Bitácoras | ⬜ Pendiente |
 | 3 | Orígenes de datos | ⬜ Pendiente |
 | 4 | Motor de incidencias | ⬜ Pendiente |
@@ -19,7 +19,7 @@
 
 | Pantalla del prototipo | Fase | Estado |
 |---|---|---|
-| Login | 1 | 🟦 API ✅ · UI ⬜ |
+| Login (+ MFA TOTP + cambio forzado) | 1 | ✅ API + UI |
 | Estructura organizacional | 1 | 🟦 API ✅ · UI ⬜ |
 | Seguridad / roles / permisos (nueva) | 1 | 🟦 API ✅ · UI ⬜ |
 | Plantillas (Form Builder) | 2 | ⬜ |
@@ -84,16 +84,47 @@
   con permisos efectivos, 401 sin token, 403 de refresh sin CSRF, 200 con CSRF, y creación de
   estructura validando la ruta materializada (`/<root>/` → `/<root>/<hijo>/`).
 
+## Hecho en Fase 1 (UI — Login + cimientos del frontend)
+- **`@lyra/permissions`** (paquete nuevo, TS puro): `can`/`canAll`/`canAny`/`createPermissionChecker`
+  tipados con `PermissionKey`. 5 tests. La UI solo oculta/deshabilita; el backend decide.
+- **`@lyra/ui`** (antes solo tokens): componentes premium con **CSS Modules sobre tokens** —
+  `Button` (primary/secondary/danger/icon + loading), `Input` (con slot derecho/mono), `FormField`
+  (label+error+aria), `Card` (glass + glow), `Spinner`, `Toast` (`ToastProvider`/`useToast`).
+  Área táctil 44px, dark-mode, Lucide. `cx` helper.
+- **Cimientos web** (`apps/watchlog-web`):
+  - `lib/session-token.ts` — access token **en memoria** (+ expiración); handler de expiración.
+  - `lib/api-client.ts` — fetch central (Bearer + `credentials`), **refresh transparente en 401**
+    (coalescido) + CSRF de doble envío; `ApiError` con `issues` de Zod.
+  - `auth/` — `auth-store` (Zustand), `auth-api` (`/auth/*`), `AuthProvider` (bootstrap por refresh
+    al arrancar + refresh proactivo ~30 s antes de expirar), `ProtectedRoute` (auth + desvío a
+    cambio forzado), `useAuth`, `usePermissions`, `<Can>`.
+  - `routes/` — router (react-router 7) + `AppLayout` (sidebar Lyra; ítems de módulo ocultos por
+    permiso, módulos no construidos con badge "Pronto").
+- **Pantallas**: `LoginPage` (paso 1 credenciales → paso 2 **MFA TOTP**, con mostrar/ocultar
+  contraseña y manejo del `LoginResponse` discriminado), `ForcePasswordChangePage` (cambio forzado
+  en primer ingreso), `HomePage` (landing autenticada con mapa de módulos). RHF + Zod del contrato.
+
+## Verificación de la Fase 1 (UI — Login)
+- `pnpm typecheck` (6 paquetes) · `pnpm lint` (0 errores, 0 warnings) · `pnpm build`
+  (web: 1695 módulos, CSS 17 KB / JS 435 KB) → OK.
+- `pnpm test` → **+5 tests** de `@lyra/permissions` (total: API 32 · permissions 5 · contracts).
+- **Smoke en vivo** (infra + seed + API): login del admin de arranque ⇒ `authenticated` con
+  `forcePasswordChange=true`, sin MFA, **19 permisos**, `scope.orgNodeIds=null`, cookies
+  `wl_refresh`+`wl_csrf`; `/auth/me` con Bearer OK; **401** sin token; refresh **403** sin CSRF /
+  **200** con CSRF; login con contraseña errónea ⇒ **401** "Credenciales inválidas". Es la cadena
+  exacta que consume el Login. (No se mutó la contraseña del admin documentado.)
+
 ## Fuera de alcance de la Fase 0/1 (planificado para más adelante)
 - Build de imágenes de producción (`docker-compose.prod.yml`) — Fase 7 (endurecimiento).
 - Ranura OIDC/LDAP: diseñada y con el `AuthProvider` listo para enchufar; se activa cuando un
   cliente lo pida.
 
 ## Próximo paso
-**Fase 1 — UI de Seguridad + Estructura** (sesión nueva). El backend ya expone todo:
-1. Pantalla de **Login** (con flujo MFA y cambio de contraseña forzado) consumiendo `/auth/*`.
-2. **Estructura organizacional**: árbol de nodos (CRUD) sobre `/structure/*`.
-3. **Seguridad**: usuarios, roles/permisos (usando el catálogo de `/security/permissions`) y
-   alcance de datos, sobre `/security/*`.
-Construir el cliente de permisos en `packages/` (helpers para ocultar/deshabilitar en UI según
-`SessionInfo.permissions`) y los componentes premium en `@lyra/ui`.
+**Fase 1 — UI de Estructura organizacional** (sesión nueva). El Login y los cimientos del frontend
+(api-client, AuthProvider, router, AppLayout, `@lyra/permissions`, `@lyra/ui`) ya están listos.
+1. **Estructura organizacional**: árbol de nodos (CRUD) sobre `/structure/*` (niveles + nodos con
+   reparentado). Ruta `/estructura` (hoy con badge "Pronto" en el sidebar) gateada por
+   `module:structure:view`; acciones por `orgnode:create/edit/delete` y `orglevel:manage`.
+2. Ampliar `@lyra/ui` con los componentes que falten (Table, Drawer, Chip/NodeTag, Modal,
+   EmptyState, Toggle) — todos con CSS Modules sobre tokens.
+Luego, en otra sesión: **Seguridad** (usuarios, roles/permisos, alcance de datos) sobre `/security/*`.

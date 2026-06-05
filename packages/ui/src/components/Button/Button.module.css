@@ -1,0 +1,92 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  padding: 10px 18px;
+  min-height: 44px; /* táctil obligatorio (terreno / tablet) */
+  font-family: var(--font-body);
+  font-size: var(--text-body-size);
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: var(--transition-default);
+  user-select: none;
+}
+
+.button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.35);
+}
+
+.button:disabled,
+.button[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Ocupa todo el ancho del contenedor. */
+.block {
+  width: 100%;
+}
+
+/* --- Variante primaria: gradiente de marca (una por pantalla) --- */
+.primary {
+  background: var(--gradient-brand);
+  color: #ffffff;
+}
+.primary:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--glow-brand);
+}
+
+/* --- Variante secundaria (ghost) --- */
+.secondary {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: var(--color-border-default);
+  color: var(--color-text-primary);
+}
+.secondary:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* --- Variante de peligro (acciones destructivas) --- */
+.danger {
+  background: var(--color-error-bg);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: var(--color-error);
+}
+.danger:hover {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+/* --- Botón de ícono (sin texto; siempre con aria-label/tooltip) --- */
+.icon {
+  padding: 8px;
+  min-width: 44px;
+  gap: 0;
+}
+
+.label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* El contenido se atenúa mientras carga, manteniendo el ancho del botón. */
+.contentLoading {
+  opacity: 0;
+}
+
+.spinnerOverlay {
+  position: absolute;
+  display: inline-flex;
+}
+
+.button {
+  position: relative;
+}
