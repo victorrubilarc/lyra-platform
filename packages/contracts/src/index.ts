@@ -7,3 +7,12 @@
 export const WATCHLOG_CONTRACTS_VERSION = "0.0.0";
 
 export * from "./health.js";
+
+// Seguridad (Fase 1)
+export * from "./security/permissions.js";
+export * from "./security/auth.js";
+export * from "./security/users.js";
+export * from "./security/roles.js";
+
+// Estructura organizacional (Fase 1)
+export * from "./structure/org.js";
