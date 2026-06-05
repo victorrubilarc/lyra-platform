@@ -1,0 +1,8 @@
+/* Fuentes del Design System Lyra (Sora + Inter). */
+@import url("https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap");
+
+/* Tailwind v4. */
+@import "tailwindcss";
+
+/* Tokens del Design System Lyra (define @theme + base). */
+@import "@lyra/ui/tokens.css";
