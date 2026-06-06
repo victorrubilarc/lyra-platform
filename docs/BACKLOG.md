@@ -48,7 +48,19 @@ nunca queda más de una sesión atrás.
 ## 2. Pendiente por HACER (módulos / submódulos)
 
 ### Fase 1 — Seguridad + Estructura (en curso)
-- [ ] **UI Estructura organizacional** ← *siguiente sesión*. Árbol de nodos + CRUD sobre
+- [ ] **App Shell / Workspace premium** ← *siguiente sesión* (decidido 2026-06-06; ver DECISIONS).
+      Marco donde viven todos los módulos. Incluye:
+  - [ ] `AppShell` (layout): sidebar **colapsable** (completo ↔ riel, persistido) + top bar.
+  - [ ] **Pestañas de trabajo acotadas** (tope ~6, fijables, cada una = ruta; estado por caché TanStack).
+  - [ ] **Command palette ⌘K** (módulos/acciones/nodos) — `cmdk` estilizado con tokens.
+  - [ ] Top bar: breadcrumbs + búsqueda + notificaciones + **menú de perfil** (Mi seguridad/MFA,
+        Preferencias, Logout) + **cambio de idioma** + **toggle de densidad**.
+  - [ ] **Favoritos + Recientes** (persistidos en localStorage).
+  - [ ] **i18n-ready** (`react-i18next`, es-CL por defecto, strings como claves; catálogos extra en F7).
+  - [ ] Primitivos `@lyra/ui`: `Tabs`, `Drawer`, `Modal`, `Menu`/`Dropdown`, `Tooltip`, `Skeleton`,
+        `Breadcrumb`, `EmptyState`, `Toggle`. (`Table` puede ir con Estructura.)
+  - [ ] Estado de UI en `localStorage` (sidebar/densidad/idioma/pestañas/favoritos) — nunca tokens.
+- [ ] **UI Estructura organizacional** (después del shell). Árbol de nodos + CRUD sobre
       `/structure/*` (niveles + nodos con reparentado). Ruta `/estructura` gateada por
       `module:structure:view`; acciones por `orgnode:create/edit/delete`, `orglevel:manage`.
 - [ ] **UI Seguridad** (sesión posterior) sobre `/security/*`:

@@ -4,6 +4,30 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-06 · Fase 1 (UI): App Shell / Workspace premium ANTES de los módulos
+Antes de construir la UI de Estructura/Seguridad se construye un **shell de aplicación premium**
+(el "área de trabajo"), porque es el marco donde viven todos los módulos y retrofitearlo después
+obliga a re-alojar pantallas y, sobre todo, a meter i18n y pestañas en todo lo ya hecho.
+- **Secuencia:** shell primero (una sesión enfocada) → luego Estructura nace dentro de él. Los
+  primitivos de `@lyra/ui` que faltan (Tabs, Drawer, Modal, Menu, Tooltip, Skeleton, Breadcrumb,
+  EmptyState, Toggle) se construyen aquí y se reutilizan en todos los módulos (no es trabajo perdido).
+- **Paradigma de navegación: pestañas de trabajo ACOTADAS** (no MDI ilimitado). Tira de pestañas
+  fijables (tope ~6); **cada pestaña es una ruta** y el estado se preserva por la **caché de TanStack
+  Query** (con `staleTime`), no manteniendo árboles de componentes vivos. Logra el "no salir y entrar"
+  sin **datos rancios/memoria** (el "ojo con los refrescos" del usuario) ni la hostilidad del MDI en
+  **tablet/terreno con guantes**. Colapsa con gracia en pantallas chicas.
+  - **Descartado:** MDI completo (memoria creciente, estancamiento, malo en tablet).
+- **i18n-ready desde ahora** (no diferido a Fase 7): capa ligera con **es-CL por defecto** + selector
+  de idioma visible; **todos los strings como claves**. Los catálogos de otros idiomas se llenan en
+  Fase 7, pero no hay que retrofitear pantallas. On-prem, sin SaaS.
+- **Recursos premium del shell:** sidebar colapsable (completo ↔ riel de íconos, persistido),
+  **command palette ⌘K** (saltar a módulos/acciones/nodos), top bar con breadcrumbs + búsqueda +
+  notificaciones + **menú de perfil** (Mi seguridad/MFA, Preferencias, Logout) + cambio de idioma +
+  **toggle de densidad** (cómodo/compacto), **favoritos + recientes**, skeleton loaders + updates
+  optimistas. Estado de UI (sidebar/densidad/idioma/pestañas) en `localStorage` (nunca tokens/secretos).
+- **Tooling propuesto (a confirmar al implementar):** `react-i18next` (estándar, offline, plural/
+  interpolación) y `cmdk` (headless, lo estilizamos con tokens Lyra) — ambos locales, sin SaaS.
+
 ### 2026-06-06 · Fase 1 (Auth): MFA self-service — política por rol + enrolamiento forzado
 Segundo factor TOTP con enrolamiento **self-service** (el secreto solo lo conoce el dispositivo del
 usuario; el admin NUNCA enrola por él). Estándar NIST 800-63B / OWASP ASVS v4 §2. Decisiones:
