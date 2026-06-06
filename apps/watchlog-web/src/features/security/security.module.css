@@ -1,0 +1,228 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  max-width: 760px;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.title {
+  font-family: var(--font-brand);
+  font-weight: 800;
+  font-size: var(--text-display-size);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.subtitle {
+  font-size: var(--text-body-lg-size);
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.cardHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.cardTitleWrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cardIcon {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: var(--radius-md);
+  background: rgba(99, 102, 241, 0.14);
+  color: var(--color-accent-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cardTitle {
+  font-family: var(--font-brand);
+  font-weight: 700;
+  font-size: var(--text-h2-size);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.cardDesc {
+  font-size: var(--text-body-sm-size);
+  color: var(--color-text-muted);
+  margin: 2px 0 0;
+}
+
+/* --- Insignia de estado --- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-caption-size);
+  font-weight: 600;
+  padding: 5px 11px;
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+}
+
+.badgeOn {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.badgeOff {
+  background: rgba(107, 114, 128, 0.18);
+  color: var(--color-text-secondary);
+}
+
+.badgeRequired {
+  background: rgba(245, 158, 11, 0.16);
+  color: var(--color-warning);
+}
+
+/* --- Bloque informativo (aviso) --- */
+.notice {
+  display: flex;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-body-sm-size);
+  line-height: 1.45;
+}
+
+.noticeWarn {
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  color: var(--color-text-secondary);
+}
+
+.noticeInfo {
+  background: rgba(6, 182, 212, 0.08);
+  border: 1px solid rgba(6, 182, 212, 0.22);
+  color: var(--color-text-secondary);
+}
+
+.noticeIcon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* --- Paso de enrolamiento: QR + secreto --- */
+.enrollGrid {
+  display: flex;
+  gap: var(--space-5);
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.qrPlate {
+  background: #ffffff;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  line-height: 0;
+  flex-shrink: 0;
+}
+
+.enrollSteps {
+  flex: 1;
+  min-width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.stepText {
+  font-size: var(--text-body-sm-size);
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.secretLabel {
+  font-size: var(--text-caption-size);
+  color: var(--color-text-muted);
+  margin-bottom: 4px;
+}
+
+.secret {
+  font-family: var(--font-mono, ui-monospace, Menlo, monospace);
+  font-size: var(--text-body-size);
+  letter-spacing: 2px;
+  color: var(--color-text-primary);
+  background: var(--color-bg-surface-2);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  word-break: break-all;
+}
+
+/* --- Códigos de recuperación --- */
+.codesGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.code {
+  font-family: var(--font-mono, ui-monospace, Menlo, monospace);
+  font-size: var(--text-body-size);
+  letter-spacing: 1px;
+  color: var(--color-text-primary);
+  background: var(--color-bg-surface-2);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  text-align: center;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.inlineForm {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+.formError {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-body-sm-size);
+  color: var(--color-error);
+}
+
+.divider {
+  height: 1px;
+  background: var(--color-border-subtle);
+  border: 0;
+  margin: 0;
+}
+
+.metaRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}

@@ -139,6 +139,17 @@
   border: 1px solid var(--color-border-subtle);
 }
 
+.userCardLink {
+  text-decoration: none;
+  color: var(--color-text-muted);
+  transition: border-color var(--transition-fast, 0.15s ease), background var(--transition-fast, 0.15s ease);
+}
+
+.userCardLink:hover {
+  border-color: var(--color-border-active, rgba(99, 102, 241, 0.4));
+  background: rgba(255, 255, 255, 0.06);
+}
+
 .avatar {
   width: 32px;
   height: 32px;

@@ -34,8 +34,19 @@ export function ProtectedRoute() {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
 
-  if (session?.user.forcePasswordChange && location.pathname !== "/cambiar-contrasena") {
-    return <Navigate to="/cambiar-contrasena" replace />;
+  // 1) El cambio forzado de contraseña tiene prioridad: hasta completarlo, no se
+  //    evalúa el gate de MFA (evita desviar a /activar-mfa a mitad del cambio).
+  if (session?.user.forcePasswordChange) {
+    return location.pathname === "/cambiar-contrasena" ? (
+      <Outlet />
+    ) : (
+      <Navigate to="/cambiar-contrasena" replace />
+    );
+  }
+
+  // 2) Enrolamiento forzado de MFA (el backend además lo hace cumplir vía guard).
+  if (session?.user.mfaEnrollmentRequired && location.pathname !== "/activar-mfa") {
+    return <Navigate to="/activar-mfa" replace />;
   }
 
   return <Outlet />;

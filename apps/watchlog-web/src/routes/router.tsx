@@ -5,6 +5,8 @@ import { LoginPage } from "../features/auth/LoginPage.js";
 import { ForgotPasswordPage } from "../features/auth/ForgotPasswordPage.js";
 import { ResetPasswordPage } from "../features/auth/ResetPasswordPage.js";
 import { ForcePasswordChangePage } from "../features/auth/ForcePasswordChangePage.js";
+import { ForceMfaEnrollPage } from "../features/auth/ForceMfaEnrollPage.js";
+import { ProfileSecurityPage } from "../features/security/ProfileSecurityPage.js";
 import { HomePage } from "../features/home/HomePage.js";
 
 /**
@@ -20,9 +22,13 @@ export const router = createBrowserRouter([
     element: <ProtectedRoute />,
     children: [
       { path: "/cambiar-contrasena", element: <ForcePasswordChangePage /> },
+      { path: "/activar-mfa", element: <ForceMfaEnrollPage /> },
       {
         element: <AppLayout />,
-        children: [{ index: true, element: <HomePage /> }],
+        children: [
+          { index: true, element: <HomePage /> },
+          { path: "/perfil/seguridad", element: <ProfileSecurityPage /> },
+        ],
       },
     ],
   },

@@ -5,6 +5,7 @@ import {
   LogOut,
   Network,
   ShieldCheck,
+  UserCog,
   type LucideIcon,
 } from "lucide-react";
 import { Button, cx } from "@lyra/ui";
@@ -102,13 +103,20 @@ export function AppLayout() {
 
         <div className={styles.sidebarFooter}>
           {user && (
-            <div className={styles.userCard}>
+            <NavLink
+              to="/perfil/seguridad"
+              className={({ isActive }) =>
+                cx(styles.userCard, styles.userCardLink, isActive && styles.navItemActive)
+              }
+              title="Seguridad de mi cuenta"
+            >
               <div className={styles.avatar}>{initials(user.displayName)}</div>
               <div className={styles.userMeta}>
                 <div className={styles.userName}>{user.displayName}</div>
                 <div className={styles.userEmail}>{user.email}</div>
               </div>
-            </div>
+              <UserCog size={16} aria-hidden="true" />
+            </NavLink>
           )}
           <Button
             variant="secondary"

@@ -3,14 +3,18 @@ import {
   forgotPasswordRequestSchema,
   forgotPasswordResponseSchema,
   loginResponseSchema,
+  mfaActivatedResponseSchema,
   mfaChallengeRequestSchema,
+  mfaSetupResponseSchema,
   resetPasswordRequestSchema,
   sessionInfoSchema,
   type ChangePasswordRequest,
   type ForgotPasswordRequest,
   type LoginRequest,
   type LoginResponse,
+  type MfaActivatedResponse,
   type MfaChallengeRequest,
+  type MfaSetupResponse,
   type ResetPasswordRequest,
   type SessionInfo,
 } from "@lyra/contracts";
@@ -76,4 +80,32 @@ export async function forgotPassword(dto: ForgotPasswordRequest): Promise<void> 
 export function resetPassword(dto: ResetPasswordRequest): Promise<void> {
   resetPasswordRequestSchema.parse(dto);
   return apiVoid("/auth/reset-password", { method: "POST", body: dto });
+}
+
+// --- MFA (enrolamiento self-service del propio usuario) ---
+
+/** Paso 1 del enrolamiento: genera el secreto TOTP y el URI `otpauth://` (para el QR). */
+export function setupMfa(): Promise<MfaSetupResponse> {
+  return apiJson("/auth/mfa/setup", mfaSetupResponseSchema, { method: "POST" });
+}
+
+/** Paso 2: confirma con un código del autenticador y devuelve los recovery codes. */
+export function verifyMfa(totp: string): Promise<MfaActivatedResponse> {
+  return apiJson("/auth/mfa/verify", mfaActivatedResponseSchema, {
+    method: "POST",
+    body: { totp },
+  });
+}
+
+/** Desactiva MFA (reconfirma la contraseña). */
+export function disableMfa(password: string): Promise<void> {
+  return apiVoid("/auth/mfa/disable", { method: "POST", body: { password } });
+}
+
+/** Regenera los códigos de recuperación (reconfirma la contraseña). */
+export function regenerateRecoveryCodes(password: string): Promise<MfaActivatedResponse> {
+  return apiJson("/auth/mfa/recovery-codes/regenerate", mfaActivatedResponseSchema, {
+    method: "POST",
+    body: { password },
+  });
 }
