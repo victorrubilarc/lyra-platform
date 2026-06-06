@@ -296,7 +296,35 @@ sueles mirar. Para verlo:
 
 ---
 
-## 12. Mapa de archivos
+## 12. ¿Se cierra la sesión al cerrar la pestaña o el navegador?
+
+**No.** Que el access token viva "en memoria" **no** significa que pierdas la sesión
+al cerrar la pestaña. Hay dos piezas con persistencia distinta:
+
+- **Access token** → memoria JS. Al cerrar la pestaña **se pierde** (deseable: nada
+  sensible queda en disco).
+- **Refresh token** → cookie `wl_refresh` emitida con **`Max-Age` = 30 días**, es decir
+  una cookie **persistente** que **sobrevive** a cerrar la pestaña y el navegador.
+
+Al reabrir la app, el bootstrap (sección 8) hace un `/auth/refresh` silencioso con esa
+cookie y restaura la sesión **sin pedir credenciales**.
+
+```
+Cierras pestaña ─▶ access (memoria) se borra
+                   refresh (cookie wl_refresh, 30 días) PERSISTE
+Reabres app     ─▶ /auth/refresh con la cookie ─▶ access nuevo ─▶ sesión restaurada
+```
+
+**Sí hay que volver a iniciar sesión si:** pasaron >30 días sin uso (caduca la cookie),
+hiciste **logout**, se **revocaron las sesiones** (p. ej. tras un reset de contraseña o
+por detección de reuso del refresh), o el navegador está en incógnito / configurado para
+**borrar cookies al cerrar**.
+
+> En resumen: la *persistencia* de la sesión la da el **refresh en cookie** (larga vida),
+> no el access en memoria (corta vida). Lo mejor de ambos: resistencia a XSS **y**
+> comodidad de no re-loguear en cada visita.
+
+## 13. Mapa de archivos
 
 | Pieza | Archivo |
 |---|---|
