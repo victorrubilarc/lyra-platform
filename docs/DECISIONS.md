@@ -4,6 +4,24 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-06 · Fase 1 (UI): tema claro / oscuro / auto en el workspace (revierte "dark-only v1")
+A pedido del producto se incorpora **modo claro/oscuro/auto** en el workspace, **revirtiendo** la regla
+de identidad "Dark mode … No hay modo claro en v1" (actualizada en `CLAUDE.md`). Implementación:
+- **Token-first, sin tocar componentes**: el tema EFECTIVO se aplica como `data-theme="dark|light"` en
+  `<html>`; los tokens se redefinen por tema en `packages/ui/src/tokens/index.css`
+  (`[data-theme="dark"]` / `[data-theme="light"]`). Se definió una **paleta clara completa** (fondos,
+  bordes, texto, glass, glows, sombras) y dos tokens de interacción nuevos: `--color-hover` (superficies
+  hover/activas) y `--color-chrome` (fondo translúcido de sidebar/topbar/pestañas). Se barrieron los
+  `rgba(255,255,255,…)` en duro de los componentes del workspace y se reemplazaron por tokens.
+- **Preferencia** (`dark`/`light`/`auto`) en `theme-store` (Zustand + persist, `localStorage`,
+  no secreto). `auto` resuelve con `prefers-color-scheme` y reacciona a cambios del sistema
+  (`use-theme-controller`). Default = **oscuro**. Selector en el top bar y en la command palette (⌘K).
+- **La entrada/login es SIEMPRE oscura** (experiencia de marca): `AuthLayout` fuerza `data-theme="dark"`
+  en su raíz, por eso el tema solo afecta al workspace.
+- **Pestañas de trabajo**: más estilo + animación sobria (línea de acento de marca al activarse,
+  entrada `tabIn` fade/slide, se "conectan" al contenido); respeta `prefers-reduced-motion`.
+**Pendiente:** QA visual del modo claro en navegador (BACKLOG §4). El default sigue oscuro.
+
 ### 2026-06-06 · Fase 1 (UI): App Shell / Workspace premium ANTES de los módulos
 Antes de construir la UI de Estructura/Seguridad se construye un **shell de aplicación premium**
 (el "área de trabajo"), porque es el marco donde viven todos los módulos y retrofitearlo después

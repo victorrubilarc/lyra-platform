@@ -110,8 +110,11 @@ probatoria (hash+timestamp). Ref: `DECISIONS.md` (sección de recomendaciones).
 
 - [ ] **App Shell — smoke VISUAL en navegador** (se verificó typecheck/lint/build/test + que el dev
       sirve; falta el clic): colapsar/expandir sidebar, abrir/cerrar/fijar pestañas (sin refrescos),
-      ⌘K (saltar, densidad, idioma, logout), cambiar idioma y densidad, menú de perfil, favoritos.
+      ⌘K (saltar, densidad, idioma, tema, logout), cambiar idioma y densidad, menú de perfil, favoritos.
       App en `:5173`.
+- [ ] **Modo claro — QA visual** (nuevo): revisar que TODO el workspace se vea premium en **claro**
+      (contraste WCAG, glass, glows, severidades, tablas futuras, drawers/modales) y que `auto` siga al
+      sistema. El default es oscuro; el login es siempre oscuro. Ref: DECISIONS 2026-06-06.
 - [ ] **MFA en el navegador real** (se probó por API/curl, no la UI): escanear el
       QR con una app real, copiar/descargar recovery codes, ver el **redirect del gate**
       `/activar-mfa`, y `/perfil/seguridad` (activar/regenerar/desactivar). *Backend ✅ en vivo.*

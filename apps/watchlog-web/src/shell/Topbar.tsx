@@ -1,12 +1,19 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Bell, Check, Languages, LogOut, Rows3, Search, UserCog } from "lucide-react";
+import { Bell, Check, Languages, LogOut, Monitor, Moon, Rows3, Search, Sun, UserCog } from "lucide-react";
 import { Breadcrumb, Menu, MenuItem, MenuLabel, MenuSeparator, Tooltip, type Crumb } from "@lyra/ui";
 import { useAuth } from "../auth/use-auth.js";
 import { useUIStore } from "./ui-store.js";
+import { useThemeStore, type ThemePreference } from "./theme-store.js";
 import { routeByPath } from "./navigation.js";
 import { SUPPORTED_LANGUAGES, setLanguage } from "../i18n/i18n.js";
 import styles from "./AppShell.module.css";
+
+const THEME_OPTIONS: { value: ThemePreference; icon: typeof Sun }[] = [
+  { value: "dark", icon: Moon },
+  { value: "light", icon: Sun },
+  { value: "auto", icon: Monitor },
+];
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).slice(0, 2);
@@ -25,6 +32,9 @@ export function Topbar({ onOpenSearch }: TopbarProps) {
   const { user, signOut } = useAuth();
   const density = useUIStore((s) => s.density);
   const toggleDensity = useUIStore((s) => s.toggleDensity);
+  const themePref = useThemeStore((s) => s.preference);
+  const setThemePref = useThemeStore((s) => s.setPreference);
+  const ThemeIcon = THEME_OPTIONS.find((o) => o.value === themePref)?.icon ?? Moon;
 
   const route = routeByPath(pathname);
   const crumbs: Crumb[] = [{ label: t("nav.home"), onClick: () => navigate("/") }];
@@ -56,6 +66,30 @@ export function Topbar({ onOpenSearch }: TopbarProps) {
             <Rows3 size={18} />
           </button>
         </Tooltip>
+
+        <Menu
+          ariaLabel={t("topbar.theme")}
+          trigger={
+            <span className={styles.iconBtn}>
+              <ThemeIcon size={18} aria-hidden="true" />
+            </span>
+          }
+        >
+          <MenuLabel>{t("topbar.theme")}</MenuLabel>
+          {THEME_OPTIONS.map((o) => {
+            const Icon = o.icon;
+            return (
+              <MenuItem
+                key={o.value}
+                icon={<Icon size={16} />}
+                trailing={themePref === o.value ? <Check size={14} /> : undefined}
+                onSelect={() => setThemePref(o.value)}
+              >
+                {t(`theme.${o.value}`)}
+              </MenuItem>
+            );
+          })}
+        </Menu>
 
         <Menu
           ariaLabel={t("topbar.language")}

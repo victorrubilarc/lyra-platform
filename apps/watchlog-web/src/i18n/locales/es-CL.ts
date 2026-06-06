@@ -49,6 +49,12 @@ export const esCL = {
     density: "Densidad",
     densityComfortable: "Cómoda",
     densityCompact: "Compacta",
+    theme: "Tema",
+  },
+  theme: {
+    dark: "Oscuro",
+    light: "Claro",
+    auto: "Automático",
   },
   palette: {
     placeholder: "Escribe un comando o busca…",
@@ -58,6 +64,7 @@ export const esCL = {
     noResults: "Sin resultados.",
     toggleDensity: "Cambiar densidad",
     toggleSidebar: "Colapsar/expandir menú",
+    theme: "Tema",
     signOut: "Cerrar sesión",
   },
   languages: {

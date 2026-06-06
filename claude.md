@@ -110,7 +110,10 @@ No es una app genérica: es software industrial de alto estándar.
   @import url('https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap')
 
 ### Principios visuales (obligatorios)
-- Dark mode como modo principal. No hay modo claro en v1.
+- **Dark mode es el modo por defecto** y la identidad de marca (la entrada/login es SIEMPRE oscura).
+  El **workspace soporta claro / oscuro / auto** (auto sigue al sistema), conmutado por `data-theme`
+  sobre tokens (decisión 2026-06-06, reemplaza el "dark-only v1"). El modo claro debe verse igual de
+  premium: usar tokens, nunca valores en duro, y cuidar el contraste.
 - Glassmorphism sutil en cards: backdrop-filter blur(14px),
   background rgba(255,255,255,0.045). No abusivo.
 - Gradiente de marca reservado para: logo, botón primario principal,
@@ -127,12 +130,13 @@ No es una app genérica: es software industrial de alto estándar.
 ### Componentes premium (viven en packages/ui)
 - Mantén y evoluciona el sistema de componentes del prototipo.
 - Cada componente nuevo debe respetar esta paleta y estos principios.
-- Los componentes deben funcionar en dark mode, ser responsivos,
+- Los componentes deben funcionar en **ambos temas (claro/oscuro)** vía tokens, ser responsivos,
   y tener áreas táctiles mínimas de 44px (uso en terreno / tablet).
 - Documenta cada componente nuevo con sus variantes y props.
 
 ### Lo que NO hacer visualmente
-- No usar fondos blancos o claros.
+- No usar fondos blancos o claros **en modo oscuro** (en modo claro las superficies claras son válidas;
+  el modo oscuro sigue siendo el default y la base del diseño).
 - No usar sombras negras duras (usar glow con color del acento).
 - No mezclar familias tipográficas fuera de las definidas.
 - No usar el gradiente de marca como fondo de pantalla completa.

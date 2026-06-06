@@ -1,11 +1,12 @@
 import { Command } from "cmdk";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Check, Languages, LogOut, PanelLeft, Rows3, Search } from "lucide-react";
+import { Check, Languages, LogOut, Monitor, Moon, PanelLeft, Rows3, Search, Sun } from "lucide-react";
 import { cx } from "@lyra/ui";
 import { usePermissions } from "../auth/use-permissions.js";
 import { useAuth } from "../auth/use-auth.js";
 import { useUIStore } from "./ui-store.js";
+import { useThemeStore } from "./theme-store.js";
 import { ROUTES } from "./navigation.js";
 import { SUPPORTED_LANGUAGES, setLanguage } from "../i18n/i18n.js";
 import styles from "./CommandPalette.module.css";
@@ -23,6 +24,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const { signOut } = useAuth();
   const toggleDensity = useUIStore((s) => s.toggleDensity);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
+  const setThemePref = useThemeStore((s) => s.setPreference);
 
   const go = (path: string) => {
     onOpenChange(false);
@@ -74,6 +76,18 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
           <Command.Item className={styles.item} value="menu sidebar" onSelect={() => run(toggleSidebar)}>
             <PanelLeft size={16} aria-hidden="true" />
             <span>{t("palette.toggleSidebar")}</span>
+          </Command.Item>
+          <Command.Item className={styles.item} value="tema oscuro dark theme" onSelect={() => run(() => setThemePref("dark"))}>
+            <Moon size={16} aria-hidden="true" />
+            <span>{`${t("palette.theme")}: ${t("theme.dark")}`}</span>
+          </Command.Item>
+          <Command.Item className={styles.item} value="tema claro light theme" onSelect={() => run(() => setThemePref("light"))}>
+            <Sun size={16} aria-hidden="true" />
+            <span>{`${t("palette.theme")}: ${t("theme.light")}`}</span>
+          </Command.Item>
+          <Command.Item className={styles.item} value="tema auto automatico theme" onSelect={() => run(() => setThemePref("auto"))}>
+            <Monitor size={16} aria-hidden="true" />
+            <span>{`${t("palette.theme")}: ${t("theme.auto")}`}</span>
           </Command.Item>
           {SUPPORTED_LANGUAGES.filter((l) => l.ready).map((l) => (
             <Command.Item

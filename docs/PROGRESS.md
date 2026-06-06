@@ -198,6 +198,9 @@ Marco donde viven todos los módulos (ver DECISIONS 2026-06-06). Reemplaza el `A
   de rutas (label i18n + ícono + permiso).
 - **i18n-ready** (`react-i18next`): `es-CL` por defecto, **strings como claves**, selector de idioma
   (inglés marcado "Próximamente"); preferencia persistida. Catálogos extra → Fase 7.
+- **Tema claro / oscuro / auto** (revierte "dark-only v1"): token-first vía `data-theme`, paleta clara
+  completa + tokens `--color-hover`/`--color-chrome`, `theme-store` (auto = sistema), selector en topbar
+  y ⌘K. La entrada/login queda SIEMPRE oscura. **Pestañas** con acento de marca + animación sobria.
 - **Caché compartida** (TanStack Query, `staleTime` 30s): las pestañas preservan estado sin refrescos.
 - **Verificación**: `typecheck`/`lint`/`build` (web 1829 módulos) verdes · `pnpm test` 58 (API) ·
   dev sirve y transforma el shell + optimiza `cmdk`/`i18next`. **Pendiente: smoke VISUAL en navegador**

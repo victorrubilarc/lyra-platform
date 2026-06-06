@@ -78,7 +78,9 @@ function LicenseeMark({ variant }: { variant: "panel" | "card" }) {
  */
 export function AuthLayout({ title, subtitle, children, footer }: AuthLayoutProps) {
   return (
-    <div className={styles.screen}>
+    // La entrada co-marcada es siempre OSCURA (experiencia de marca), sin importar
+    // el tema del workspace.
+    <div className={styles.screen} data-theme="dark">
       <aside className={styles.brandPane}>
         <BrandScene />
         <div className={styles.productLockup}>
