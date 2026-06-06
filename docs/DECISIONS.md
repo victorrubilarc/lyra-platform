@@ -4,6 +4,36 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-05 · Fase 1 (UI): co-branding de la empresa licenciataria + entrada premium
+La pantalla de acceso co-marca **producto (Lyra WatchLog) + empresa licenciataria**. Como es
+single-tenant on-premise, la identidad del cliente (nombre, rubro, logo) se configura **por entorno**
+(`VITE_LICENSEE_NAME/INDUSTRY/LOGO_URL`, `envDir` apunta al `.env` raíz), nunca hardcodeada; sin logo
+se usa un **monograma** de iniciales (con fallback automático si el logo falla al cargar). El logo se
+muestra sobre **placa clara** para legibilidad de cualquier color. Se añadió un gráfico vectorial
+animado propio (constelación Lyra + telemetría operacional) y animaciones de entrada
+(`prefers-reduced-motion` respetado).
+**Bug corregido en tokens:** los componentes usaban `--space-*`, `--text-*`, `--transition-*` que NO
+existían en `@lyra/ui/tokens` (solo `--spacing-*`), por lo que el espaciado y la tipografía colapsaban.
+Se agregaron esos tokens (fuente de verdad), mejorando toda la app.
+
+### 2026-06-05 · Fase 1 (UI): login estándar y recuperación asistida (reset self-service PENDIENTE)
+El login incorpora lo estándar: mostrar/ocultar contraseña, **recordar correo** (nunca la contraseña),
+**¿olvidaste tu contraseña?** y, en el segundo factor, opción de **código de recuperación** (fiel:
+`assertSecondFactor` ya acepta TOTP o recovery code). La recuperación de contraseña es **asistida por
+administrador** (patrón on-premise estándar) porque el **reset self-service por correo es backend no
+implementado** (endpoints + SMTP) y, por regla, requiere aprobación antes de codear. No se simula envío
+de correo.
+**Decisión de diseño MFA (estándar de industria):** el enrolamiento de MFA es **self-service del
+usuario** (el secreto TOTP solo lo conoce su dispositivo); el administrador NO "activa" MFA por usuario
+con un booleano, sino que define la **política de requerimiento** (deshabilitado/opcional/requerido,
+idealmente por rol) y puede **resetear** el MFA de un usuario (dispositivo perdido). Ver NIST 800-63B y
+OWASP ASVS v4 (§2). Pendiente de implementar (próxima sesión de auth).
+
+### 2026-06-05 · Regla permanente: criterio y honestidad técnica
+Se añadió a `CLAUDE.md` la regla de **no complacer a la primera**: contrastar mis propuestas con el
+estándar de la industria y objetar con fundamento cuando convenga. Motivo: mejores decisiones de
+producto/seguridad.
+
 ### 2026-06-05 · Fase 1 (UI): arquitectura del frontend de autenticación
 Sesión enfocada **solo en Login + cimientos** (no las 3 pantallas a la vez), para cerrar por módulo según CLAUDE.md. Decisiones:
 - **Access token en memoria** (`src/lib/session-token.ts`, módulo plano sin React, nunca en localStorage) + **refresh proactivo** ~30 s antes de expirar (`AuthProvider`). El refresh token va en cookie httpOnly; al arrancar la app se intenta un refresh silencioso para rehidratar la sesión.

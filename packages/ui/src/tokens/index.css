@@ -99,6 +99,67 @@
   --glass-blur: blur(14px);
   --glass-bg: rgba(255, 255, 255, 0.045);
   --glass-border: 1px solid rgba(255, 255, 255, 0.09);
+
+  /* ---- Espaciado: alias --space-* (base 4px).
+     El DESIGN_SYSTEM y los componentes usan esta nomenclatura; Tailwind v4
+     reserva --spacing-* para generar sus utilidades. Mantener ambos en sync. ---- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* ---- Tipografía (tamaño/peso/familia por rol) ---- */
+  --text-display-size: 28px;
+  --text-display-weight: 800;
+  --text-display-family: var(--font-brand);
+
+  --text-h1-size: 22px;
+  --text-h1-weight: 700;
+  --text-h1-family: var(--font-brand);
+
+  --text-h2-size: 17px;
+  --text-h2-weight: 700;
+  --text-h2-family: var(--font-brand);
+
+  --text-h3-size: 14px;
+  --text-h3-weight: 600;
+  --text-h3-family: var(--font-brand);
+
+  --text-body-lg-size: 15px;
+  --text-body-lg-weight: 400;
+  --text-body-lg-family: var(--font-body);
+
+  --text-body-size: 14px;
+  --text-body-weight: 400;
+  --text-body-family: var(--font-body);
+
+  --text-body-sm-size: 13px;
+  --text-body-sm-weight: 400;
+  --text-body-sm-family: var(--font-body);
+
+  --text-caption-size: 11.5px;
+  --text-caption-weight: 500;
+  --text-caption-family: var(--font-body);
+
+  --text-label-size: 13px;
+  --text-label-weight: 600;
+  --text-label-family: var(--font-body);
+
+  --text-mono-size: 13px;
+  --text-mono-family: var(--font-mono);
+
+  /* ---- Transiciones (animaciones funcionales) ---- */
+  --transition-fast: all 0.15s ease;
+  --transition-default: all 0.2s ease;
+  --transition-slow: all 0.25s ease;
+  --transition-border: border 0.2s ease;
+  --transition-width: width 0.3s ease;
 }
 
 /* ------------------------------------------------------------

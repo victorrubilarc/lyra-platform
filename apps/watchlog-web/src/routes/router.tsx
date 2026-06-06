@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate } from "react-router-dom";
 import { ProtectedRoute } from "../auth/ProtectedRoute.js";
 import { AppLayout } from "./AppLayout.js";
 import { LoginPage } from "../features/auth/LoginPage.js";
+import { ForgotPasswordPage } from "../features/auth/ForgotPasswordPage.js";
 import { ForcePasswordChangePage } from "../features/auth/ForcePasswordChangePage.js";
 import { HomePage } from "../features/home/HomePage.js";
 
@@ -12,6 +13,7 @@ import { HomePage } from "../features/home/HomePage.js";
  */
 export const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
+  { path: "/recuperar-contrasena", element: <ForgotPasswordPage /> },
   {
     element: <ProtectedRoute />,
     children: [

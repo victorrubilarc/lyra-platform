@@ -4,6 +4,9 @@ import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // El .env vive en la raíz del monorepo (compartido con el API). Vite solo
+  // expone al cliente las variables con prefijo VITE_ (branding, no secretos).
+  envDir: "../../",
   server: {
     port: 5173,
     proxy: {

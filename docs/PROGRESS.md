@@ -104,6 +104,20 @@
   contraseña y manejo del `LoginResponse` discriminado), `ForcePasswordChangePage` (cambio forzado
   en primer ingreso), `HomePage` (landing autenticada con mapa de módulos). RHF + Zod del contrato.
 
+## Pulido de la entrada (Login) — branding + estándar
+- **Co-branding configurable por instalación** (`src/branding.ts` + `VITE_LICENSEE_*`, `envDir` al
+  `.env` raíz): producto Lyra WatchLog + empresa licenciataria (nombre/rubro/logo), con monograma de
+  iniciales como fallback. Logo sobre placa clara. Cliente real configurado: **Eagon Lautaro Ltda.**
+  (logo en `apps/watchlog-web/public/branding/eagon.svg`).
+- **Entrada premium**: layout split-screen, tarjeta estilizada (radio 24px, sombra en capas, barra de
+  acento), **gráfico vectorial animado** propio (`BrandScene.tsx`: constelación Lyra + telemetría) y
+  animaciones de entrada (respetando `prefers-reduced-motion`). Favicon de marca + `<title>`.
+- **Fix de tokens**: se agregaron `--space-*`, `--text-*`, `--transition-*` que faltaban en
+  `@lyra/ui/tokens` (mejora el espaciado/tipografía de toda la app).
+- **Login estándar**: recordar correo, ¿olvidaste tu contraseña?, y en MFA opción de **código de
+  recuperación**. Pantalla `/recuperar-contrasena` **asistida por administrador** (el reset
+  self-service por correo queda pendiente de backend; ver Próximo paso).
+
 ## Verificación de la Fase 1 (UI — Login)
 - `pnpm typecheck` (6 paquetes) · `pnpm lint` (0 errores, 0 warnings) · `pnpm build`
   (web: 1695 módulos, CSS 17 KB / JS 435 KB) → OK.
@@ -120,7 +134,20 @@
   cliente lo pida.
 
 ## Próximo paso
-**Fase 1 — UI de Estructura organizacional** (sesión nueva). El Login y los cimientos del frontend
+**Auth — Recuperación de contraseña (self-service) + Gestión de MFA** (sesión nueva, requiere aprobar
+el enfoque antes de codear por ser auth). Estándar a seguir (NIST 800-63B / OWASP ASVS):
+- **Reset de contraseña self-service**: `POST /auth/forgot-password` (respuesta neutra siempre) +
+  `POST /auth/reset-password` con **token de un solo uso hasheado y con expiración corta**, enviado por
+  correo (SMTP; Mailpit ya está en infra dev, tras la interfaz de correo). Invalida sesiones al cambiar.
+  UI: completar `/recuperar-contrasena` (pedir correo) + pantalla de nueva contraseña con token.
+- **MFA**: enrolamiento **self-service** del usuario (pantalla de seguridad del perfil: setup QR →
+  verify → recovery codes → disable), que el backend ya soporta. **Política de requerimiento** de MFA
+  (deshabilitado/opcional/requerido, idealmente por rol) en la política de seguridad, con **enrolamiento
+  forzado** análogo a `forcePasswordChange`. En el CRUD de usuarios (Seguridad): ver estado de MFA y
+  **resetear** MFA de un usuario (dispositivo perdido); el admin NUNCA enrola por el usuario.
+
+Después: **Fase 1 — UI de Estructura organizacional** (árbol de nodos + CRUD sobre `/structure/*`), y
+luego **Seguridad** (usuarios, roles/permisos, alcance) sobre `/security/*`. Los cimientos del frontend
 (api-client, AuthProvider, router, AppLayout, `@lyra/permissions`, `@lyra/ui`) ya están listos.
 1. **Estructura organizacional**: árbol de nodos (CRUD) sobre `/structure/*` (niveles + nodos con
    reparentado). Ruta `/estructura` (hoy con badge "Pronto" en el sidebar) gateada por

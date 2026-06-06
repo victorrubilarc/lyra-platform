@@ -1,97 +1,474 @@
 .screen {
   min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
+  display: grid;
+  grid-template-columns: 1fr;
+  background: var(--color-bg-base);
+}
+
+@media (min-width: 960px) {
+  .screen {
+    grid-template-columns: 1.05fr 0.95fr;
+  }
+}
+
+/* ============================================================
+   Panel de marca (izquierda)
+   ============================================================ */
+.brandPane {
+  display: none;
   position: relative;
   overflow: hidden;
+  padding: 52px 56px 40px;
+  flex-direction: column;
+  gap: 36px;
+  color: var(--color-text-primary);
+  isolation: isolate;
 }
 
-/* Halo sutil de marca al fondo (no es el gradiente a pantalla completa). */
-.screen::before {
+@media (min-width: 960px) {
+  .brandPane {
+    display: flex;
+  }
+}
+
+.brandPane::before {
   content: "";
   position: absolute;
-  top: -20%;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 720px;
-  height: 720px;
-  background: radial-gradient(circle, rgba(99, 102, 241, 0.16), transparent 60%);
-  pointer-events: none;
+  inset: 0;
+  z-index: -2;
+  background:
+    radial-gradient(900px 620px at 12% -5%, rgba(99, 102, 241, 0.32), transparent 55%),
+    radial-gradient(820px 640px at 95% 105%, rgba(6, 182, 212, 0.24), transparent 55%),
+    linear-gradient(160deg, #0a0f24 0%, #06061a 62%);
 }
 
-.panel {
-  position: relative;
-  width: 100%;
-  max-width: 420px;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
+.brandPane::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 52px 52px;
+  mask-image: radial-gradient(circle at 28% 25%, black, transparent 78%);
+  -webkit-mask-image: radial-gradient(circle at 28% 25%, black, transparent 78%);
 }
 
-.brand {
+/* Lockup del producto (arriba) */
+.productLockup {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 13px;
+  position: relative;
+  z-index: 1;
+  animation: lyraFade 0.6s ease both;
 }
 
-.brandLogo {
-  width: 44px;
-  height: 44px;
-  border-radius: 13px;
+.logoTile {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
   background: var(--gradient-brand);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  box-shadow: var(--glow-brand);
 }
 
-.brandWordmark {
+.wordmark {
   font-family: var(--font-brand);
   font-weight: 800;
   font-size: 22px;
-  color: var(--color-text-primary);
   line-height: 1.05;
+  letter-spacing: -0.01em;
 }
 
-.brandProduct {
+.wordmarkAccent {
+  background: linear-gradient(90deg, #a5b4fc, #67e8f9);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.wordmarkSub {
+  font-size: 10.5px;
+  letter-spacing: 1.3px;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+
+/* Hero */
+.brandHero {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 480px;
+  margin-top: auto;
+  position: relative;
+  z-index: 1;
+}
+
+.brandHero > * {
+  animation: lyraRise 0.6s ease both;
+}
+.brandHero > *:nth-child(1) {
+  animation-delay: 0.05s;
+}
+.brandHero > *:nth-child(2) {
+  animation-delay: 0.13s;
+}
+.brandHero > *:nth-child(3) {
+  animation-delay: 0.21s;
+}
+.brandHero > *:nth-child(4) {
+  animation-delay: 0.29s;
+}
+
+.heroEyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  padding: 6px 13px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--color-border-subtle);
+  font-size: var(--text-caption-size);
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: var(--color-text-secondary);
+}
+
+.heroDot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background: var(--color-success);
+  box-shadow: 0 0 10px var(--color-success);
+}
+
+.heroTitle {
+  font-family: var(--font-brand);
+  font-weight: 800;
+  font-size: 39px;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.heroTitleAccent {
   background: var(--gradient-brand);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 
-.brandSubtitle {
-  font-size: 10.5px;
-  letter-spacing: 1px;
+.heroLead {
+  font-size: var(--text-body-lg-size);
+  line-height: 1.6;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.features {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 22px;
+  margin-top: 4px;
+}
+
+.feature {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+
+.featureIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--color-border-subtle);
+  color: var(--color-accent-secondary);
+}
+
+.featureText {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.featureTitle {
+  font-size: var(--text-body-size);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.featureDesc {
+  font-size: var(--text-body-sm-size);
+  color: var(--color-text-muted);
+  line-height: 1.35;
+}
+
+/* Lockup de la empresa licenciataria (abajo) */
+.licenseeLockup {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: auto;
+  padding: 15px 18px;
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--color-border-subtle);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  max-width: 400px;
+  position: relative;
+  z-index: 1;
+  animation: lyraRise 0.6s 0.34s ease both;
+}
+
+.licenseeInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.licenseeLabel {
+  font-size: 9.5px;
+  letter-spacing: 1.4px;
   text-transform: uppercase;
   color: var(--color-text-muted);
+  font-weight: 700;
+}
+
+.licenseeName {
+  font-family: var(--font-brand);
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--color-text-primary);
+  line-height: 1.15;
+}
+
+.licenseeIndustry {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.brandFoot {
+  position: absolute;
+  bottom: 18px;
+  left: 56px;
+  z-index: 1;
+  font-size: var(--text-caption-size);
+  color: rgba(107, 114, 128, 0.7);
+  letter-spacing: 0.3px;
+}
+
+/* ============================================================
+   Monograma / logo de la empresa
+   ============================================================ */
+.mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.22), rgba(6, 182, 212, 0.14));
+  border: 1px solid var(--color-border-accent);
+  color: var(--color-text-primary);
+  font-family: var(--font-brand);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.markImg {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.markLg {
+  width: 54px;
+  height: 54px;
+  border-radius: 14px;
+  font-size: 19px;
+}
+
+.markSm {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  font-size: 15px;
+}
+
+/* Placa para el logo real de la empresa: fondo claro para que cualquier logo
+   (oscuro, color o monocromo) sea legible sobre el tema oscuro. */
+.logoPlate {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  background: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow: 0 2px 10px -2px rgba(0, 0, 0, 0.35);
+}
+
+.logoPlatePanel {
+  height: 58px;
+  max-width: 210px;
+  padding: 9px 15px;
+  border-radius: 14px;
+}
+
+.logoPlateCard {
+  height: 44px;
+  max-width: 168px;
+  padding: 6px 12px;
+  border-radius: 11px;
+}
+
+.logoImg {
+  display: block;
+  max-height: 100%;
+  max-width: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+
+/* ============================================================
+   Panel de formulario (derecha)
+   ============================================================ */
+.formPane {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+  overflow: hidden;
+}
+
+.formPane::before {
+  content: "";
+  position: absolute;
+  top: -12%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 680px;
+  height: 680px;
+  z-index: 0;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.14), transparent 62%);
+  pointer-events: none;
+}
+
+@media (min-width: 960px) {
+  .formPane::before {
+    display: none;
+  }
+}
+
+.panel {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 412px;
 }
 
 .card {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
   padding: var(--space-8);
+  border-radius: var(--radius-2xl);
+  background: linear-gradient(180deg, rgba(20, 26, 44, 0.92), rgba(10, 14, 28, 0.94));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  overflow: hidden;
+  box-shadow:
+    0 30px 70px -24px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 0 90px -50px rgba(99, 102, 241, 0.55);
+  animation: lyraRise 0.55s ease both;
+}
+
+/* Barra de acento de marca en el borde superior. */
+.card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--gradient-brand);
+  opacity: 0.9;
+}
+
+/* Co-brand dentro de la tarjeta (visible en todos los tamaños).
+   El logo ya identifica a la empresa: el texto solo aparece como apoyo
+   (rubro), y nunca compite por el espacio truncando el nombre. */
+.cardBrand {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  min-height: 44px;
+}
+
+.cardBrandText {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.cardBrandName {
+  font-family: var(--font-brand);
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--color-text-primary);
+  line-height: 1.2;
+}
+
+.cardBrandIndustry {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.divider {
+  height: 1px;
+  background: var(--color-border-subtle);
 }
 
 .header {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .title {
   font-family: var(--font-brand);
   font-weight: 700;
   font-size: var(--text-h1-size);
+  letter-spacing: -0.01em;
   color: var(--color-text-primary);
   margin: 0;
 }
 
 .subtitle {
   font-size: var(--text-body-sm-size);
+  line-height: 1.55;
   color: var(--color-text-secondary);
   margin: 0;
 }
@@ -102,7 +479,6 @@
   gap: var(--space-4);
 }
 
-/* Banner de error a nivel de formulario. */
 .formError {
   display: flex;
   align-items: center;
@@ -110,12 +486,84 @@
   background: var(--color-error-bg);
   border: 1px solid rgba(239, 68, 68, 0.3);
   border-radius: var(--radius-md);
-  padding: 10px 14px;
+  padding: 11px 14px;
   font-size: var(--text-body-sm-size);
   color: var(--color-error);
 }
 
+.footerMeta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.secureNote {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.poweredBy {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  letter-spacing: 0.2px;
+  color: var(--color-text-muted);
+}
+
+.poweredBy strong {
+  color: var(--color-text-secondary);
+  font-weight: 700;
+}
+
+.poweredDot {
+  width: 15px;
+  height: 15px;
+  border-radius: 5px;
+  background: var(--gradient-brand);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+@keyframes lyraRise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes lyraFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .productLockup,
+  .brandHero > *,
+  .licenseeLockup {
+    animation: none;
+  }
+}
+
 .footnote {
+  margin-top: var(--space-4);
   font-size: var(--text-body-sm-size);
   color: var(--color-text-muted);
   text-align: center;
@@ -126,6 +574,7 @@
   border: none;
   color: var(--color-accent-secondary);
   font: inherit;
+  font-weight: 600;
   cursor: pointer;
   padding: 0;
 }
@@ -133,7 +582,85 @@
   text-decoration: underline;
 }
 
-/* Botón para mostrar/ocultar contraseña dentro del input. */
+/* Enlace/acción de texto (olvidé contraseña, cambiar a recovery code…). */
+.link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--color-accent-secondary);
+  font-size: var(--text-body-sm-size);
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+.link:hover {
+  text-decoration: underline;
+}
+
+/* Fila de opciones: recordar correo · ¿olvidaste tu contraseña? */
+.optionsRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-body-sm-size);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.checkboxInput {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--color-accent-primary);
+  cursor: pointer;
+}
+
+/* Acción centrada para alternar el modo del segundo factor. */
+.mfaSwitch {
+  display: flex;
+  justify-content: center;
+}
+
+/* Bloques de ayuda (pantalla de recuperación de acceso). */
+.helpText {
+  font-size: var(--text-body-sm-size);
+  line-height: 1.6;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.helpList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.helpItem {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+  font-size: var(--text-body-sm-size);
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+}
+
+.helpItemIcon {
+  color: var(--color-accent-secondary);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
 .reveal {
   display: inline-flex;
   align-items: center;
@@ -145,7 +672,9 @@
   color: var(--color-text-muted);
   border-radius: var(--radius-sm);
   cursor: pointer;
+  transition: var(--transition-fast);
 }
 .reveal:hover {
   color: var(--color-text-secondary);
+  background: rgba(255, 255, 255, 0.06);
 }

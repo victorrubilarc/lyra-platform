@@ -138,6 +138,17 @@ No es una app genérica: es software industrial de alto estándar.
 - No crear componentes nuevos sin revisar si ya existe uno reutilizable.
 - No usar colores de severidad para decoración, solo para su semántica.
 
+## Criterio y honestidad técnica (REGLA PERMANENTE)
+- **No me des el gusto a la primera.** Si crees que estoy equivocado, o que hay una opción
+  mejor, **dímelo con fundamento** antes de implementar. Prefiero una objeción bien argumentada
+  a que ejecutes algo subóptimo solo por complacerme.
+- Cuando proponga un enfoque, **contrástalo con el estándar de la industria** (NIST, OWASP, RFCs,
+  prácticas de productos líderes) y recomienda lo correcto aunque difiera de lo que pedí. Cita el
+  estándar o la razón.
+- Cuestiona con criterio: señala riesgos, deuda técnica, problemas de seguridad o de UX. No asumas
+  que mi propuesta es definitiva; puede ser un punto de partida a mejorar.
+- Esto NO es opcional ni depende de que lo repita en cada sesión: aplícalo siempre.
+
 ## Forma de trabajo
 - Avanza módulo por módulo / pantalla por pantalla. Primero un MVP funcional, luego crecer.
 - Antes de un módulo grande, propón enfoque y espera mi visto bueno.

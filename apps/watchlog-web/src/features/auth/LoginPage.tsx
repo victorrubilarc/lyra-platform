@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Navigate, useLocation } from "react-router-dom";
+import { Link, Navigate, useLocation } from "react-router-dom";
 import { AlertTriangle, Eye, EyeOff, LogIn, ShieldCheck } from "lucide-react";
 import { Button, FormField, Input, useToast } from "@lyra/ui";
 import { emailSchema, totpCodeSchema } from "@lyra/contracts";
@@ -11,6 +11,17 @@ import { completeMfaChallenge, login } from "../../auth/auth-api.js";
 import { useAuthStore } from "../../auth/auth-store.js";
 import { AuthLayout } from "./AuthLayout.js";
 import styles from "./AuthLayout.module.css";
+
+/** Clave para recordar el correo (NO la contraseña) entre sesiones. */
+const REMEMBER_EMAIL_KEY = "wl_remember_email";
+
+function rememberedEmail(): string {
+  try {
+    return localStorage.getItem(REMEMBER_EMAIL_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
 
 /** Esquema del paso 1 (sin TOTP: el segundo factor va en su propio paso). */
 const credentialsSchema = z.object({
@@ -31,12 +42,15 @@ export function LoginPage() {
 
   const [serverError, setServerError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [remember, setRemember] = useState(() => rememberedEmail() !== "");
   /** mfaToken presente ⇒ estamos en el segundo paso (TOTP). */
   const [mfaToken, setMfaToken] = useState<string | null>(null);
+  /** En el paso MFA, alterna entre código de la app y código de recuperación. */
+  const [useRecoveryCode, setUseRecoveryCode] = useState(false);
 
   const credForm = useForm<CredentialsForm>({
     resolver: zodResolver(credentialsSchema),
-    defaultValues: { email: "", password: "" },
+    defaultValues: { email: rememberedEmail(), password: "" },
   });
   const mfaForm = useForm<MfaForm>({
     resolver: zodResolver(mfaSchema),
@@ -50,8 +64,19 @@ export function LoginPage() {
     return <Navigate to={from && from !== "/login" ? from : "/"} replace />;
   }
 
+  /** Persiste o borra el correo recordado según la preferencia. */
+  const persistEmail = (email: string) => {
+    try {
+      if (remember) localStorage.setItem(REMEMBER_EMAIL_KEY, email);
+      else localStorage.removeItem(REMEMBER_EMAIL_KEY);
+    } catch {
+      /* almacenamiento no disponible: se ignora */
+    }
+  };
+
   const onCredentials = credForm.handleSubmit(async (values) => {
     setServerError(null);
+    persistEmail(values.email);
     try {
       const res = await login(values);
       if (res.result === "mfa_required") {
@@ -69,7 +94,7 @@ export function LoginPage() {
     if (!mfaToken) return;
     setServerError(null);
     try {
-      const res = await completeMfaChallenge({ mfaToken, totp: values.totp });
+      const res = await completeMfaChallenge({ mfaToken, totp: values.totp.trim() });
       if (res.result === "authenticated") setSession(res.session);
     } catch (err) {
       setServerError(err instanceof ApiError ? err.message : "Código inválido");
@@ -81,7 +106,11 @@ export function LoginPage() {
     return (
       <AuthLayout
         title="Verificación en dos pasos"
-        subtitle="Introduce el código de 6 dígitos de tu aplicación de autenticación."
+        subtitle={
+          useRecoveryCode
+            ? "Introduce uno de los códigos de recuperación que guardaste al activar el segundo factor."
+            : "Introduce el código de 6 dígitos de tu aplicación de autenticación."
+        }
         footer={
           <button
             type="button"
@@ -89,6 +118,8 @@ export function LoginPage() {
             onClick={() => {
               setMfaToken(null);
               setServerError(null);
+              setUseRecoveryCode(false);
+              mfaForm.reset({ totp: "" });
             }}
           >
             Volver al inicio de sesión
@@ -102,17 +133,21 @@ export function LoginPage() {
               {serverError}
             </div>
           )}
-          <FormField label="Código de verificación" required error={mfaForm.formState.errors.totp?.message}>
+          <FormField
+            label={useRecoveryCode ? "Código de recuperación" : "Código de verificación"}
+            required
+            error={mfaForm.formState.errors.totp?.message}
+          >
             {({ id, describedBy, invalid }) => (
               <Input
                 id={id}
                 aria-describedby={describedBy}
                 invalid={invalid}
                 mono
-                inputMode="numeric"
+                inputMode={useRecoveryCode ? "text" : "numeric"}
                 autoComplete="one-time-code"
                 autoFocus
-                placeholder="123456"
+                placeholder={useRecoveryCode ? "XXXXX-XXXXX" : "123456"}
                 {...mfaForm.register("totp")}
               />
             )}
@@ -126,13 +161,31 @@ export function LoginPage() {
           >
             Verificar
           </Button>
+          <div className={styles.mfaSwitch}>
+            <button
+              type="button"
+              className={styles.link}
+              onClick={() => {
+                setUseRecoveryCode((v) => !v);
+                setServerError(null);
+                mfaForm.reset({ totp: "" });
+              }}
+            >
+              {useRecoveryCode
+                ? "Usar el código de la aplicación"
+                : "¿Perdiste tu dispositivo? Usa un código de recuperación"}
+            </button>
+          </div>
         </form>
       </AuthLayout>
     );
   }
 
   return (
-    <AuthLayout title="Iniciar sesión" subtitle="Accede a la plataforma de bitácoras operacionales.">
+    <AuthLayout
+      title="Iniciar sesión"
+      subtitle="Ingresa con tu cuenta corporativa para acceder a las bitácoras de tu operación."
+    >
       <form className={styles.form} onSubmit={onCredentials} noValidate>
         {serverError && (
           <div className={styles.formError} role="alert">
@@ -177,6 +230,22 @@ export function LoginPage() {
             />
           )}
         </FormField>
+
+        <div className={styles.optionsRow}>
+          <label className={styles.checkbox}>
+            <input
+              type="checkbox"
+              className={styles.checkboxInput}
+              checked={remember}
+              onChange={(e) => setRemember(e.target.checked)}
+            />
+            Recordar mi correo
+          </label>
+          <Link className={styles.link} to="/recuperar-contrasena">
+            ¿Olvidaste tu contraseña?
+          </Link>
+        </div>
+
         <Button
           type="submit"
           variant="primary"

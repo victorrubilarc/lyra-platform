@@ -1,0 +1,112 @@
+.scene {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* Estrellas de la constelación (Lyra). */
+.star {
+  fill: #cdd5f5;
+  animation: twinkle 3.6s ease-in-out infinite;
+}
+
+.starBright {
+  fill: #ffffff;
+  filter: drop-shadow(0 0 7px rgba(165, 180, 252, 0.9));
+  animation: twinkle 4.2s ease-in-out infinite;
+}
+
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Líneas de la constelación: se dibujan solas (pathLength normalizado a 1). */
+.line {
+  fill: none;
+  stroke: rgba(165, 180, 252, 0.35);
+  stroke-width: 1;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: draw 2.4s ease forwards;
+}
+
+/* Área bajo la telemetría (sutil, tipo gráfico operacional). */
+.area {
+  opacity: 0.22;
+}
+
+/* Trazo de telemetría operacional que se dibuja. */
+.telemetry {
+  fill: none;
+  stroke: url(#lyraTelemetryGrad);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: draw 2.8s 0.3s ease forwards;
+}
+
+/* Punto que recorre la telemetría (dato en vivo). */
+.telemetryDot {
+  fill: #22d3ee;
+  filter: drop-shadow(0 0 6px rgba(34, 211, 238, 0.9));
+}
+
+/* Pulso tipo radar (vigilancia del turno). */
+.radar {
+  fill: none;
+  stroke: rgba(34, 211, 238, 0.5);
+  stroke-width: 1.5;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ping 4.4s ease-out infinite;
+}
+
+@keyframes draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes ping {
+  0% {
+    transform: scale(0.25);
+    opacity: 0.7;
+  }
+  80%,
+  100% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .star,
+  .starBright,
+  .line,
+  .telemetry,
+  .radar {
+    animation: none;
+  }
+  .line,
+  .telemetry {
+    stroke-dashoffset: 0;
+  }
+  .star,
+  .starBright {
+    opacity: 0.7;
+  }
+  .radar {
+    opacity: 0;
+  }
+}
