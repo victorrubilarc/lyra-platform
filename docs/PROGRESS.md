@@ -134,8 +134,11 @@
   cliente lo pida.
 
 ## Próximo paso
-**Auth — Recuperación de contraseña (self-service) + Gestión de MFA** (sesión nueva, requiere aprobar
-el enfoque antes de codear por ser auth). Estándar a seguir (NIST 800-63B / OWASP ASVS):
+**Decidido (2026-06-05):** se implementan en **sesiones separadas** — (1) recuperación de contraseña,
+(2) MFA — y el requerimiento de MFA será **por rol** (requerido a admins, configurable para el resto).
+
+**Sesión siguiente = Auth · Recuperación de contraseña self-service** (requiere aprobar el enfoque al
+inicio por ser auth). Luego, en otra sesión, **MFA**. Estándar a seguir (NIST 800-63B / OWASP ASVS):
 - **Reset de contraseña self-service**: `POST /auth/forgot-password` (respuesta neutra siempre) +
   `POST /auth/reset-password` con **token de un solo uso hasheado y con expiración corta**, enviado por
   correo (SMTP; Mailpit ya está en infra dev, tras la interfaz de correo). Invalida sesiones al cambiar.
