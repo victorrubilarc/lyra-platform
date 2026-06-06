@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { AlertTriangle, Eye, EyeOff, KeyRound, ShieldX } from "lucide-react";
-import { Button, FormField, Input, useToast } from "@lyra/ui";
+import { Button, FormField, Input } from "@lyra/ui";
 import { ApiError } from "../../lib/api-client.js";
 import { resetPassword } from "../../auth/auth-api.js";
 import { AuthLayout } from "./AuthLayout.js";
@@ -36,7 +36,6 @@ type FormValues = z.infer<typeof schema>;
 export function ResetPasswordPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const toast = useToast();
 
   // Captura el token al montar; luego lo quitamos de la URL.
   const [token] = useState(() => searchParams.get("token") ?? "");
@@ -58,8 +57,14 @@ export function ResetPasswordPage() {
     setServerError(null);
     try {
       await resetPassword({ token, newPassword: values.newPassword });
-      toast.success("Contraseña restablecida. Inicia sesión con tu nueva contraseña.");
-      navigate("/login", { replace: true });
+      // El aviso viaja en el state de la ruta: el login muestra un banner
+      // persistente (un toast efímero se perdería al cambiar de pantalla).
+      navigate("/login", {
+        replace: true,
+        state: {
+          notice: "Tu contraseña se restableció correctamente. Inicia sesión con tu nueva contraseña.",
+        },
+      });
     } catch (err) {
       setServerError(
         err instanceof ApiError ? err.message : "No se pudo restablecer la contraseña.",

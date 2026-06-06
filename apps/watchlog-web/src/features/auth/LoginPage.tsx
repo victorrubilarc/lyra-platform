@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Link, Navigate, useLocation } from "react-router-dom";
-import { AlertTriangle, Eye, EyeOff, LogIn, ShieldCheck } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Eye, EyeOff, LogIn, ShieldCheck } from "lucide-react";
 import { Button, FormField, Input, useToast } from "@lyra/ui";
 import { emailSchema, totpCodeSchema } from "@lyra/contracts";
 import { ApiError } from "../../lib/api-client.js";
@@ -39,6 +39,8 @@ export function LoginPage() {
   const setSession = useAuthStore((s) => s.setSession);
   const toast = useToast();
   const location = useLocation();
+  /** Aviso persistente tras una redirección (ej. contraseña restablecida). */
+  const notice = (location.state as { notice?: string } | null)?.notice ?? null;
 
   const [serverError, setServerError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
@@ -187,6 +189,12 @@ export function LoginPage() {
       subtitle="Ingresa con tu cuenta corporativa para acceder a las bitácoras de tu operación."
     >
       <form className={styles.form} onSubmit={onCredentials} noValidate>
+        {notice && !serverError && (
+          <div className={styles.formNotice} role="status">
+            <CheckCircle2 size={16} aria-hidden="true" />
+            {notice}
+          </div>
+        )}
         {serverError && (
           <div className={styles.formError} role="alert">
             <AlertTriangle size={16} aria-hidden="true" />
