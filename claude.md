@@ -6,11 +6,12 @@ Este archivo define cómo debes trabajar en este repositorio. Léelo al inicio d
 Plataforma de bitácoras operacionales para industria (minería, manufactura, energía, etc.). On-premise, dockerizada, PostgreSQL, multi-módulo: estructura organizacional, plantillas/form builder, entradas por turno, cambio de turno, incidencias con workflow, orígenes de datos externos y base de conocimiento.
 
 ## Rutina obligatoria de cada sesión
-1. Al EMPEZAR: lee `docs/PROGRESS.md`, `docs/ARCHITECTURE.md`, `docs/DATA_MODEL.md`, `docs/SECURITY.md` y `docs/DECISIONS.md`.
+1. Al EMPEZAR: lee `docs/PROGRESS.md`, `docs/ARCHITECTURE.md`, `docs/DATA_MODEL.md`, `docs/SECURITY.md`, `docs/DECISIONS.md`, `docs/AUTH_FLOW.md` y **`docs/BACKLOG.md`** (el registro de todo lo abierto: por hacer, por probar y por publicar). Si el backlog muestra trabajo de la sesión anterior **sin publicar** (commits/ramas que no están en `origin`), resuélvelo ANTES de empezar lo nuevo.
 2. Confirma en dos líneas dónde estamos y qué vamos a hacer en esta sesión antes de escribir cualquier código.
-3. Durante el trabajo: si tomas una decisión de diseño, regístrala en `docs/DECISIONS.md` con fecha y motivo.
-4. Al TERMINAR: actualiza `docs/PROGRESS.md` (qué quedó hecho, qué falta, próximos pasos exactos) y cualquier doc afectado.
-5. No asumas contexto que no esté en los docs o en el código. Si falta información, pregúntame.
+3. Durante el trabajo: si tomas una decisión de diseño, regístrala en `docs/DECISIONS.md` con fecha y motivo. Si detectas deuda o algo que queda fuera de alcance, anótalo en `docs/BACKLOG.md` (no lo dejes solo "en la cabeza").
+4. Al TERMINAR: actualiza `docs/PROGRESS.md` (qué quedó hecho) y **`docs/BACKLOG.md`** (qué queda por hacer/probar/publicar), más cualquier doc afectado.
+5. **Publica siempre antes de cerrar** (regla "nada se queda atrás"): haz push de la rama y/o merge a `main` + push de `main`. Un commit que solo vive en el disco local es trabajo en riesgo. Si por instrucción explícita no se publica, queda registrado en `docs/BACKLOG.md` §1 como pendiente.
+6. No asumas contexto que no esté en los docs o en el código. Si falta información, pregúntame.
 
 ## Stack (completar tras aprobación del plan)
 - Backend: <pendiente — propuesto y justificado por el agente>
@@ -158,11 +159,14 @@ No es una app genérica: es software industrial de alto estándar.
 ## Gestión de sesiones y contexto
 - Cada sesión tiene UN solo objetivo concreto (un módulo, una funcionalidad, un problema). No avances al siguiente sin cerrar el actual.
 - Cuando un módulo o tarea quede completo, haz lo siguiente ANTES de terminar la sesión:
-  1. Actualiza `docs/PROGRESS.md` con lo completado, el estado actual y los próximos pasos exactos.
-  2. Actualiza cualquier otro doc afectado (`ARCHITECTURE.md`, `DATA_MODEL.md`, etc.).
-  3. Haz un commit descriptivo con todo el trabajo de la sesión.
-  4. Muéstrame un resumen de lo que se completó y lo que viene.
-  5. Dime explícitamente: **"Esta sesión está completa. Por favor abre una sesión nueva para continuar con: [nombre del siguiente módulo]."**
+  1. Verifica en verde: `pnpm typecheck && pnpm lint && pnpm build && pnpm test` + smoke en vivo de lo construido (registrando qué se probó y qué NO).
+  2. Actualiza `docs/PROGRESS.md` con lo completado, el estado actual y los próximos pasos exactos.
+  3. Actualiza `docs/BACKLOG.md`: tacha lo cerrado y registra lo que quede por hacer/probar/publicar.
+  4. Actualiza cualquier otro doc afectado (`ARCHITECTURE.md`, `DATA_MODEL.md`, etc.).
+  5. Haz un commit descriptivo con todo el trabajo de la sesión.
+  6. **Publica** (regla "nada se queda atrás"): push de la rama y/o merge a `main` + push de `main`. Verifica con `git status` / `git log origin/main..` que no quede nada solo en local. Si no se publica por instrucción mía, anótalo en `docs/BACKLOG.md` §1.
+  7. Muéstrame un resumen de lo que se completó y lo que viene.
+  8. Dime explícitamente: **"Esta sesión está completa. Por favor abre una sesión nueva para continuar con: [nombre del siguiente módulo]."**
 - No empieces el siguiente módulo en la misma sesión aunque parezca pequeño. Cierra siempre.
 - Si el contexto empieza a llenarse ANTES de terminar el módulo (respuestas más lentas, olvidos, incoherencias), avísame con: **"El contexto de esta sesión está llegando a su límite. Voy a consolidar el progreso para que puedas abrir una sesión nueva."** Luego actualiza los docs, commitea lo hecho y para.
 
@@ -173,4 +177,5 @@ No es una app genérica: es software industrial de alto estándar.
 - No avanzar varios módulos a la vez ni hacer refactors masivos sin acordarlo.
 - No duplicar lógica o UI entre apps cuando deba estar en `packages/`.
 - No dejar los docs de memoria desactualizados al cerrar sesión.
+- No cerrar una sesión dejando commits o ramas **sin publicar** (sin push) salvo que yo lo pida explícitamente; si así fuera, queda registrado en `docs/BACKLOG.md` §1.
 - No continuar en la misma sesión una vez que el módulo actual esté completo.
