@@ -71,4 +71,4 @@ pnpm dev                # API (watch) + Web (Vite) en paralelo
 - **IA y llamadas a orígenes externos SIEMPRE en el backend** (el prototipo llamaba a la IA desde el navegador: corregido).
 - **Autorización forzada en el servidor**; la UI solo oculta.
 
-Detalle de datos en `DATA_MODEL.md`; seguridad en `SECURITY.md`; estado en `PROGRESS.md`; bitácora de decisiones en `DECISIONS.md`.
+Detalle de datos en `DATA_MODEL.md`; seguridad en `SECURITY.md`; **flujo de autenticación y tokens (con diagramas) en `AUTH_FLOW.md`**; estado en `PROGRESS.md`; bitácora de decisiones en `DECISIONS.md`.

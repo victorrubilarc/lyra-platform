@@ -4,6 +4,9 @@
 
 Objetivo: pasar auditorías de ciberseguridad. Referencia: **OWASP ASVS**.
 
+> **Flujo de autenticación y tokens (access/refresh, almacenamiento, rotación, CSRF) con diagramas:
+> ver [`AUTH_FLOW.md`](./AUTH_FLOW.md).**
+
 ## 1. Autenticación
 
 Construida **detrás de una abstracción con métodos enchufables**, para que cada instalación on-premise active lo que el cliente necesite **sin reescribir código**:
