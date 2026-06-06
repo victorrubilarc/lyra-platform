@@ -29,6 +29,27 @@ export const envSchema = z.object({
     .transform((v) => v === "true"),
   COOKIE_DOMAIN: z.string().optional(),
 
+  // URL pública de la web (single-tenant). Se usa para construir enlaces que se
+  // envían por correo (ej. restablecimiento de contraseña). En prod, el dominio
+  // real detrás de Caddy; en dev, el servidor de Vite.
+  APP_PUBLIC_URL: z.string().url().default("http://localhost:5173"),
+  // Vida del token de restablecimiento de contraseña, en segundos (def. 30 min).
+  PASSWORD_RESET_TTL: z.coerce.number().int().positive().default(1800),
+
+  // --- Correo saliente (SMTP) ---
+  // Interfaz abstracta EmailService → implementación SMTP (nodemailer). En dev se
+  // usa Mailpit (localhost:1025). On-premise: cualquier relay SMTP del cliente.
+  SMTP_HOST: z.string().default("localhost"),
+  SMTP_PORT: z.coerce.number().int().positive().default(1025),
+  // TLS implícito (puerto 465). Para STARTTLS (587) o Mailpit (1025) va en false.
+  SMTP_SECURE: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASSWORD: z.string().optional(),
+  SMTP_FROM: z.string().default("Lyra WatchLog <no-reply@watchlog.local>"),
+
   // --- Admin de arranque (seed idempotente) ---
   BOOTSTRAP_ADMIN_EMAIL: z.string().email().optional(),
   BOOTSTRAP_ADMIN_PASSWORD: z.string().optional(),

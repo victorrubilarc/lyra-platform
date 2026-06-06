@@ -20,6 +20,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { LocalAuthProvider } from "./providers/local-auth.provider";
 import { MfaService } from "./mfa.service";
 import { PasswordPolicyService } from "./password-policy.service";
+import { PasswordResetService } from "./password-reset.service";
 import { TokenService, type RequestMeta } from "./token.service";
 
 const GENERIC_INVALID = "Credenciales inválidas";
@@ -43,6 +44,7 @@ export class AuthService {
     private readonly tokens: TokenService,
     private readonly mfa: MfaService,
     private readonly policy: PasswordPolicyService,
+    private readonly resets: PasswordResetService,
     private readonly passwords: PasswordService,
     private readonly permissions: PermissionService,
     private readonly scope: ScopeService,
@@ -192,6 +194,8 @@ export class AuthService {
       data: { passwordHash, forcePasswordChange: false },
     });
     await this.policy.recordHistory(userId, passwordHash);
+    // Cualquier enlace de restablecimiento emitido antes queda invalidado.
+    await this.resets.invalidatePending(userId);
     await this.audit.record({ ...ctx, action: "auth.password.changed" });
   }
 

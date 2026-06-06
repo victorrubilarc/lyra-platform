@@ -80,11 +80,46 @@ async function seedBootstrapAdmin(): Promise<void> {
   console.log(`✔ Admin de arranque creado: ${email} (debe cambiar la contraseña al ingresar)`);
 }
 
+/**
+ * Usuario de prueba (SOLO fuera de producción) para ejercitar flujos como la
+ * recuperación de contraseña sin tocar el admin de arranque. Idempotente.
+ * Su contraseña cumple la política por defecto (≥12, mayúscula, número).
+ */
+async function seedDemoUser(): Promise<void> {
+  if (process.env.NODE_ENV === "production") return;
+  const email = "demo@watchlog.local";
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) {
+    console.log(`• Usuario de prueba ${email} ya existe: no se recrea`);
+    return;
+  }
+  const role = await prisma.role.findUniqueOrThrow({ where: { key: ADMIN_ROLE_KEY } });
+  const password = "Demo!Pass2026";
+  const passwordHash = await argon2.hash(password, {
+    type: argon2.argon2id,
+    memoryCost: 19_456,
+    timeCost: 2,
+    parallelism: 1,
+  });
+  const user = await prisma.user.create({
+    data: {
+      email,
+      displayName: "Usuario Demo",
+      passwordHash,
+      forcePasswordChange: false,
+      roles: { create: { roleId: role.id } },
+    },
+  });
+  await prisma.passwordHistory.create({ data: { userId: user.id, passwordHash } });
+  console.log(`✔ Usuario de prueba (dev) creado: ${email} / ${password}`);
+}
+
 async function main(): Promise<void> {
   await seedPermissions();
   await seedAdminRole();
   await seedPasswordPolicy();
   await seedBootstrapAdmin();
+  await seedDemoUser();
 }
 
 main()

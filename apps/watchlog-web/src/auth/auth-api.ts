@@ -1,12 +1,17 @@
 import {
   changePasswordRequestSchema,
+  forgotPasswordRequestSchema,
+  forgotPasswordResponseSchema,
   loginResponseSchema,
   mfaChallengeRequestSchema,
+  resetPasswordRequestSchema,
   sessionInfoSchema,
   type ChangePasswordRequest,
+  type ForgotPasswordRequest,
   type LoginRequest,
   type LoginResponse,
   type MfaChallengeRequest,
+  type ResetPasswordRequest,
   type SessionInfo,
 } from "@lyra/contracts";
 import { apiJson, apiVoid } from "../lib/api-client.js";
@@ -53,4 +58,22 @@ export async function logout(): Promise<void> {
 export function changePassword(dto: ChangePasswordRequest): Promise<void> {
   changePasswordRequestSchema.parse(dto);
   return apiVoid("/auth/change-password", { method: "POST", body: dto });
+}
+
+/**
+ * Paso 1 de la recuperación: solicita el enlace de restablecimiento. El backend
+ * SIEMPRE responde igual (neutro), exista o no el correo; aquí no se distingue.
+ */
+export async function forgotPassword(dto: ForgotPasswordRequest): Promise<void> {
+  forgotPasswordRequestSchema.parse(dto);
+  await apiJson("/auth/forgot-password", forgotPasswordResponseSchema, {
+    method: "POST",
+    body: dto,
+  });
+}
+
+/** Paso 2: fija la nueva contraseña con el token recibido por correo. */
+export function resetPassword(dto: ResetPasswordRequest): Promise<void> {
+  resetPasswordRequestSchema.parse(dto);
+  return apiVoid("/auth/reset-password", { method: "POST", body: dto });
 }

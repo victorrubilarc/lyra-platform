@@ -146,6 +146,25 @@ export class TokenService {
     ]);
   }
 
+  /**
+   * Revoca TODAS las sesiones y refresh tokens vigentes de un usuario. Se usa al
+   * restablecer la contraseña (posible recuperación de un compromiso): cualquier
+   * sesión existente queda invalidada de inmediato.
+   */
+  async revokeAllForUser(userId: string): Promise<void> {
+    const now = new Date();
+    await this.prisma.$transaction([
+      this.prisma.refreshToken.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: now },
+      }),
+      this.prisma.session.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: now },
+      }),
+    ]);
+  }
+
   /** Revoca toda una familia de refresh tokens y su sesión (reuso detectado). */
   async revokeFamily(familyId: string): Promise<void> {
     const now = new Date();

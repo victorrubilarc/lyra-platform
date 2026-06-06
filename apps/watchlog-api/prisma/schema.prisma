@@ -51,6 +51,7 @@ model User {
   refreshTokens   RefreshToken[]
   mfaSecret       MfaSecret?
   passwordHistory PasswordHistory[]
+  resetTokens     PasswordResetToken[]
 
   @@index([status])
 }
@@ -214,6 +215,27 @@ model MfaRecoveryCode {
   mfaSecret MfaSecret @relation(fields: [mfaSecretId], references: [id], onDelete: Cascade)
 
   @@index([mfaSecretId])
+}
+
+// Token de restablecimiento de contraseña (self-service). Se guarda SOLO el
+// hash SHA-256 del token; el secreto en claro viaja una única vez en el enlace
+// enviado por correo. De un solo uso (usedAt) y con expiración corta. Al pedir
+// uno nuevo, o al cambiar la contraseña por cualquier vía, los pendientes se
+// invalidan. Ver docs/SECURITY.md.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique // SHA-256 del token en claro
+  expiresAt DateTime
+  usedAt    DateTime? // single-use: se sella al consumir
+  createdAt DateTime  @default(now())
+  ip        String?
+  userAgent String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 // Política de contraseñas: fila singleton (id fijo). Configurable desde la UI.

@@ -43,6 +43,7 @@ function build(overrides: { user?: Record<string, unknown> | null; maxFailed?: n
   const policy = {
     getPolicy: vi.fn().mockResolvedValue({ maxFailedAttempts: overrides.maxFailed ?? 5, lockoutMinutes: 15 }),
   };
+  const resets = { invalidatePending: vi.fn().mockResolvedValue(undefined) };
   const passwords = {};
   const permissions = { getEffectivePermissions: vi.fn().mockResolvedValue(new Set(["user:read"])) };
   const scope = { getAccessibleNodeIds: vi.fn().mockResolvedValue(null) };
@@ -56,6 +57,7 @@ function build(overrides: { user?: Record<string, unknown> | null; maxFailed?: n
     tokens as never,
     mfa as never,
     policy as never,
+    resets as never,
     passwords as never,
     permissions as never,
     scope as never,

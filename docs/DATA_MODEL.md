@@ -2,7 +2,7 @@
 
 Última actualización: 2026-06-05 (Fase 1 — esquema de identidad, RBAC/ABAC, estructura y auditoría **implementado** en Prisma; el resto sigue siendo diseño de alto nivel).
 
-> **Estado Fase 1 (implementado):** ver `apps/watchlog-api/prisma/schema.prisma` y migraciones `20260605211220_init_security_structure` + `20260605211546_add_failed_login_count`. Modelos vivos: `User` (con `failedLoginCount`/`lockedUntil`/`forcePasswordChange`), `PasswordHistory`, `Role`, `Permission` (dims. MODULE/ACTION/WORKFLOW), `UserRole`, `RolePermission`, `Scope` (sujeto polimórfico user|role, *check constraint*), `Session`, `RefreshToken` (hash + familia + rotación), `MfaSecret`, `MfaRecoveryCode`, `PasswordPolicy` (singleton), `OrgLevel`, `OrgNode` (ruta materializada `path`), `AuditLog` (trigger de inmutabilidad). El resto de entidades de abajo es diseño pendiente para fases posteriores.
+> **Estado Fase 1 (implementado):** ver `apps/watchlog-api/prisma/schema.prisma` y migraciones `20260605211220_init_security_structure` + `20260605211546_add_failed_login_count`. Modelos vivos: `User` (con `failedLoginCount`/`lockedUntil`/`forcePasswordChange`), `PasswordHistory`, `Role`, `Permission` (dims. MODULE/ACTION/WORKFLOW), `UserRole`, `RolePermission`, `Scope` (sujeto polimórfico user|role, *check constraint*), `Session`, `RefreshToken` (hash + familia + rotación), `MfaSecret`, `MfaRecoveryCode`, `PasswordResetToken` (hash SHA-256 + single-use + TTL, migración `20260606021713_add_password_reset_token`), `PasswordPolicy` (singleton), `OrgLevel`, `OrgNode` (ruta materializada `path`), `AuditLog` (trigger de inmutabilidad). El resto de entidades de abajo es diseño pendiente para fases posteriores.
 
 > Single-tenant: **no** hay `tenant_id`. Cada instalación es de un cliente. Convenciones generales: PK `id` (cuid/uuid), `createdAt`/`updatedAt`, autor (`createdById`/`updatedById`) donde aplique, borrado lógico (`deletedAt`) en entidades de negocio.
 
@@ -13,6 +13,7 @@
 - **Role** *N—N* **Permission** (vía **RolePermission**). Permisos atómicos de 4 dimensiones (ver `SECURITY.md`).
 - **UserScope** — alcance de datos: liga `User`/`Role` a uno o más `OrgNode` (con herencia a descendientes) y/o a `Template` específicos.
 - **Session / RefreshToken** — sesiones y refresh tokens rotativos. **MfaSecret** (TOTP).
+- **PasswordResetToken** — recuperación self-service: se guarda solo el hash del token; single-use y con TTL corto (ver `SECURITY.md` §6).
 - **PasswordPolicy** — política configurable (longitud, expiración, etc.).
 - **AuthIdentity** (Fase futura) — vínculo a proveedor externo OIDC/LDAP cuando se active.
 

@@ -1,6 +1,6 @@
 # Progreso — Lyra WatchLog
 
-Última actualización: 2026-06-05 (Fase 1 — backend ✅; **UI: Login + cimientos del frontend ✅**; faltan UI de Estructura y Seguridad).
+Última actualización: 2026-06-06 (Fase 1 — backend ✅; **UI: Login + cimientos ✅**; **Auth · Recuperación de contraseña self-service ✅**; faltan MFA self-service, UI de Estructura y Seguridad).
 
 ## Estado por fase
 
@@ -20,6 +20,7 @@
 | Pantalla del prototipo | Fase | Estado |
 |---|---|---|
 | Login (+ MFA TOTP + cambio forzado) | 1 | ✅ API + UI |
+| Recuperación de contraseña (self-service) | 1 | ✅ API + UI |
 | Estructura organizacional | 1 | 🟦 API ✅ · UI ⬜ |
 | Seguridad / roles / permisos (nueva) | 1 | 🟦 API ✅ · UI ⬜ |
 | Plantillas (Form Builder) | 2 | ⬜ |
@@ -128,21 +129,43 @@
   **200** con CSRF; login con contraseña errónea ⇒ **401** "Credenciales inválidas". Es la cadena
   exacta que consume el Login. (No se mutó la contraseña del admin documentado.)
 
+## Hecho en Fase 1 (Auth — Recuperación de contraseña self-service)
+- **Backend** (NIST 800-63B / OWASP ASVS §2.5):
+  - **`@lyra/contracts`**: `forgotPasswordRequest/Response`, `resetPasswordRequest`.
+  - **Prisma**: modelo `PasswordResetToken` (hash SHA-256, `usedAt` single-use, `expiresAt`),
+    migración `20260606021713_add_password_reset_token`.
+  - **`EmailService`** (clase abstracta = token DI, patrón tipo `LlmProvider`) + **`SmtpEmailService`**
+    (nodemailer; Mailpit en dev) + plantillas (enlace de reset y notificación de cambio). `EmailModule`
+    global. Variables SMTP/`APP_PUBLIC_URL`/`PASSWORD_RESET_TTL` en `env.schema` y `.env.example`.
+  - **`PasswordResetService`**: `requestReset` (respuesta neutra, envío en 2.º plano anti-*timing*,
+    rate-limit por correo+IP en `CacheService`, invalida pendientes) y `resetPassword` (token
+    hasheado/single-use/TTL, política, **revoca todas las sesiones**, limpia lockout/`forcePasswordChange`,
+    notificación; **no toca MFA**, no auto-loguea, mensaje genérico). Endpoints públicos
+    `POST /auth/forgot-password` (200 neutro) y `POST /auth/reset-password` (204).
+  - `TokenService.revokeAllForUser`; `AuthService.changePassword` invalida tokens de reset pendientes.
+  - Auditoría: `auth.password.reset_requested|completed|failed|throttled`.
+- **Frontend**: `/recuperar-contrasena` (pedir correo + confirmación neutra) y nueva
+  `/restablecer-contrasena?token=…` (`ResetPasswordPage`), reusando `@lyra/ui`, RHF+Zod del contrato y
+  el api-client. **Endurecimiento del token en URL**: se borra de la URL al montar (`history.replaceState`)
+  y `<meta name="referrer">` en `index.html`. `auth-api`: `forgotPassword`/`resetPassword`.
+- **Seed**: usuario de prueba `demo@watchlog.local` / `Demo!Pass2026` (solo fuera de producción).
+- **Verificación**: `typecheck`/`lint`/`build` OK (6 paquetes). `pnpm test` → **53** (API **43**, con
+  **11 nuevos** de `PasswordResetService`; permissions 5; contracts). **Smoke en vivo con Mailpit**:
+  respuesta neutra (un solo correo al usuario real), token single-use (reuso ⇒ 400), política aplicada
+  (débil ⇒ 400), login con nueva contraseña ⇒ 200 y con la vieja ⇒ 401, notificación de cambio enviada.
+
 ## Fuera de alcance de la Fase 0/1 (planificado para más adelante)
 - Build de imágenes de producción (`docker-compose.prod.yml`) — Fase 7 (endurecimiento).
 - Ranura OIDC/LDAP: diseñada y con el `AuthProvider` listo para enchufar; se activa cuando un
   cliente lo pida.
 
 ## Próximo paso
-**Decidido (2026-06-05):** se implementan en **sesiones separadas** — (1) recuperación de contraseña,
-(2) MFA — y el requerimiento de MFA será **por rol** (requerido a admins, configurable para el resto).
+**Decidido (2026-06-05):** se implementan en **sesiones separadas** — (1) recuperación de contraseña
+✅ **hecha**, (2) MFA ← **siguiente** — y el requerimiento de MFA será **por rol** (requerido a admins,
+configurable para el resto).
 
-**Sesión siguiente = Auth · Recuperación de contraseña self-service** (requiere aprobar el enfoque al
-inicio por ser auth). Luego, en otra sesión, **MFA**. Estándar a seguir (NIST 800-63B / OWASP ASVS):
-- **Reset de contraseña self-service**: `POST /auth/forgot-password` (respuesta neutra siempre) +
-  `POST /auth/reset-password` con **token de un solo uso hasheado y con expiración corta**, enviado por
-  correo (SMTP; Mailpit ya está en infra dev, tras la interfaz de correo). Invalida sesiones al cambiar.
-  UI: completar `/recuperar-contrasena` (pedir correo) + pantalla de nueva contraseña con token.
+**Sesión siguiente = Auth · MFA self-service (enrolamiento + política por rol)** (requiere aprobar el
+enfoque al inicio por ser auth). Estándar a seguir (NIST 800-63B / OWASP ASVS v4 §2):
 - **MFA**: enrolamiento **self-service** del usuario (pantalla de seguridad del perfil: setup QR →
   verify → recovery codes → disable), que el backend ya soporta. **Política de requerimiento** de MFA
   (deshabilitado/opcional/requerido, idealmente por rol) en la política de seguridad, con **enrolamiento

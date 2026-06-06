@@ -3,6 +3,7 @@ import { AuthController } from "./auth.controller";
 import { AuthService } from "./auth.service";
 import { MfaService } from "./mfa.service";
 import { PasswordPolicyService } from "./password-policy.service";
+import { PasswordResetService } from "./password-reset.service";
 import { TokenService } from "./token.service";
 import { CsrfGuard } from "./csrf.guard";
 import { LocalAuthProvider } from "./providers/local-auth.provider";
@@ -19,6 +20,7 @@ import { LocalAuthProvider } from "./providers/local-auth.provider";
     TokenService,
     MfaService,
     PasswordPolicyService,
+    PasswordResetService,
     CsrfGuard,
     LocalAuthProvider,
   ],

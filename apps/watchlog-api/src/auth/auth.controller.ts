@@ -13,11 +13,15 @@ import { ConfigService } from "@nestjs/config";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import {
   changePasswordRequestSchema,
+  forgotPasswordRequestSchema,
   loginRequestSchema,
   mfaChallengeRequestSchema,
   mfaDisableRequestSchema,
   mfaVerifyRequestSchema,
+  resetPasswordRequestSchema,
   type ChangePasswordRequest,
+  type ForgotPasswordRequest,
+  type ForgotPasswordResponse,
   type LoginRequest,
   type LoginResponse,
   type MfaActivatedResponse,
@@ -26,6 +30,7 @@ import {
   type MfaSetupResponse,
   type MfaVerifyRequest,
   type RefreshResponse,
+  type ResetPasswordRequest,
   type SessionInfo,
 } from "@lyra/contracts";
 import type { Env } from "../config/env.schema";
@@ -34,6 +39,7 @@ import { CurrentUser, Public } from "../authz/authz.decorators";
 import type { RequestUser } from "../authz/auth-user";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { AuthService, type LoginResult } from "./auth.service";
+import { PasswordResetService } from "./password-reset.service";
 import { clearAuthCookies, REFRESH_COOKIE, setAuthCookies } from "./auth.cookies";
 import { CsrfGuard } from "./csrf.guard";
 import type { RequestMeta } from "./token.service";
@@ -44,6 +50,7 @@ type ReqWithCookies = FastifyRequest & { cookies?: Record<string, string>; user?
 export class AuthController {
   constructor(
     private readonly auth: AuthService,
+    private readonly resets: PasswordResetService,
     private readonly config: ConfigService<Env, true>,
   ) {}
 
@@ -120,6 +127,30 @@ export class AuthController {
       dto.newPassword,
       this.auditCtx(user, req),
     );
+  }
+
+  // --- Recuperación de contraseña self-service (público) ---
+
+  @Public()
+  @Post("forgot-password")
+  @HttpCode(200)
+  async forgotPassword(
+    @Body(new ZodValidationPipe(forgotPasswordRequestSchema)) dto: ForgotPasswordRequest,
+    @Req() req: FastifyRequest,
+  ): Promise<ForgotPasswordResponse> {
+    // Respuesta neutra SIEMPRE (no se revela si el correo existe).
+    await this.resets.requestReset(dto.email, this.meta(req));
+    return { ok: true };
+  }
+
+  @Public()
+  @Post("reset-password")
+  @HttpCode(204)
+  async resetPassword(
+    @Body(new ZodValidationPipe(resetPasswordRequestSchema)) dto: ResetPasswordRequest,
+    @Req() req: FastifyRequest,
+  ): Promise<void> {
+    await this.resets.resetPassword(dto.token, dto.newPassword, this.meta(req));
   }
 
   // --- MFA (enrolamiento del propio usuario) ---

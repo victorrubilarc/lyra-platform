@@ -4,6 +4,30 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-06 · Fase 1 (Auth): recuperación de contraseña self-service
+Reset por correo siguiendo NIST 800-63B y OWASP ASVS §2.5 / Forgot Password Cheat Sheet.
+- **Token**: aleatorio de 256 bits, se guarda **solo el hash SHA-256** (`PasswordResetToken`),
+  **single-use** (`usedAt`) y **TTL corto** (`PASSWORD_RESET_TTL`, def. 30 min). Al pedir uno nuevo
+  —o al cambiar la contraseña por cualquier vía— los pendientes se invalidan.
+- **`POST /auth/forgot-password`**: respuesta **neutra siempre** (`{ok:true}`), sin enumeración de
+  usuarios; el correo se envía **en segundo plano** para no filtrar por *timing*. **Rate-limit** por
+  correo y por IP (contadores en `CacheService`); superar el tope no cambia la respuesta.
+- **`POST /auth/reset-password`**: valida token (hash, no usado, no expirado) con **mensaje genérico**
+  ("inválido o expirado"), impone la **política** (complejidad + historial), **revoca TODAS las
+  sesiones** (`TokenService.revokeAllForUser`), limpia lockout/`forcePasswordChange`, **no toca MFA**
+  (quien controle el correo sigue sin pasar el 2º factor) y **no auto-loguea** (redirige a `/login`).
+- **Correo tras una interfaz abstracta `EmailService`** (token DI, patrón tipo `LlmProvider`) con
+  implementación SMTP (**nodemailer**); en dev usa **Mailpit**. Sin SaaS obligatorio (on-premise).
+  Se envía además una **notificación de seguridad** "tu contraseña fue cambiada".
+- **Frontend**: `/recuperar-contrasena` (pedir correo + confirmación neutra) y nueva
+  `/restablecer-contrasena?token=…`. **Endurecimiento del token en URL**: se borra de la URL al montar
+  (`history.replaceState`) y `<meta name="referrer">` para no filtrarlo por *referer*.
+- **Auditoría** append-only: `reset_requested` (con `delivered`), `reset_completed`, `reset_failed`,
+  `reset_throttled`.
+**Pendiente registrado (mejora transversal, NO en esta sesión):** rechazo de **contraseñas
+comprometidas** (NIST 800-63B §5.1.1.2, ej. HIBP k-anonymity o lista local). Aplica a todo seteo de
+contraseña (change/force/reset); se diseñará pluggable y apagado por defecto para respetar on-premise.
+
 ### 2026-06-05 · Fase 1 (UI): co-branding de la empresa licenciataria + entrada premium
 La pantalla de acceso co-marca **producto (Lyra WatchLog) + empresa licenciataria**. Como es
 single-tenant on-premise, la identidad del cliente (nombre, rubro, logo) se configura **por entorno**

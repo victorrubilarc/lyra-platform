@@ -3,6 +3,7 @@ import { ProtectedRoute } from "../auth/ProtectedRoute.js";
 import { AppLayout } from "./AppLayout.js";
 import { LoginPage } from "../features/auth/LoginPage.js";
 import { ForgotPasswordPage } from "../features/auth/ForgotPasswordPage.js";
+import { ResetPasswordPage } from "../features/auth/ResetPasswordPage.js";
 import { ForcePasswordChangePage } from "../features/auth/ForcePasswordChangePage.js";
 import { HomePage } from "../features/home/HomePage.js";
 
@@ -14,6 +15,7 @@ import { HomePage } from "../features/home/HomePage.js";
 export const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
   { path: "/recuperar-contrasena", element: <ForgotPasswordPage /> },
+  { path: "/restablecer-contrasena", element: <ResetPasswordPage /> },
   {
     element: <ProtectedRoute />,
     children: [

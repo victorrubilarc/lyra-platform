@@ -7,6 +7,7 @@ import { HealthModule } from "./health/health.module";
 import { CryptoModule } from "./crypto/crypto.module";
 import { CacheModule } from "./redis/cache.module";
 import { AuditModule } from "./audit/audit.module";
+import { EmailModule } from "./email/email.module";
 import { AuthzModule } from "./authz/authz.module";
 import { AuthModule } from "./auth/auth.module";
 import { StructureModule } from "./structure/structure.module";
@@ -36,6 +37,7 @@ import { SecurityModule } from "./security/security.module";
     CryptoModule,
     CacheModule,
     AuditModule,
+    EmailModule,
     AuthzModule,
     AuthModule,
     StructureModule,

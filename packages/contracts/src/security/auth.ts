@@ -125,3 +125,30 @@ export const changePasswordRequestSchema = z.object({
   newPassword: z.string().min(1),
 });
 export type ChangePasswordRequest = z.infer<typeof changePasswordRequestSchema>;
+
+// --- Recuperación de contraseña self-service ---
+
+/**
+ * Paso 1: solicitar un enlace de restablecimiento. El backend SIEMPRE responde
+ * de forma neutra (no revela si el correo existe) → sin enumeración de usuarios.
+ */
+export const forgotPasswordRequestSchema = z.object({
+  email: emailSchema,
+});
+export type ForgotPasswordRequest = z.infer<typeof forgotPasswordRequestSchema>;
+
+/** Respuesta neutra de `/auth/forgot-password`: siempre la misma, exista o no. */
+export const forgotPasswordResponseSchema = z.object({
+  ok: z.literal(true),
+});
+export type ForgotPasswordResponse = z.infer<typeof forgotPasswordResponseSchema>;
+
+/**
+ * Paso 2: fijar la nueva contraseña con el token del enlace. La complejidad real
+ * la valida el backend contra la política vigente (el cliente solo da feedback).
+ */
+export const resetPasswordRequestSchema = z.object({
+  token: z.string().min(1, "Token de restablecimiento ausente"),
+  newPassword: z.string().min(1, "La nueva contraseña es obligatoria"),
+});
+export type ResetPasswordRequest = z.infer<typeof resetPasswordRequestSchema>;
