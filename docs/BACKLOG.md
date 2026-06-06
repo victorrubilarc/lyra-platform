@@ -28,17 +28,16 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 
 ## 1. Git: ramas y commits SIN publicar (riesgo de pérdida) 🔴
 
-> Estado al 2026-06-06 (tras publicar `main`). Verificar con:
-> `git rev-list --count origin/main..main` y `git branch --no-merged main`.
+> Estado al 2026-06-06 (todo publicado). Verificar con:
+> `git rev-list --count origin/main..main` (debe dar 0) y `git branch --no-merged main`.
 
-| Qué | Dónde | Commits | Estado | Acción pendiente |
-|---|---|---|---|---|
-| **Fase 1: Login + branding + reset de contraseña + docs + BACKLOG + rutina** | rama `main` | — | ✅ **publicado en `origin/main`** (`67e493a`) | ninguna |
-| **Fase 1: MFA self-service** | rama `feat/auth-mfa-self-service` | **3** (+ syncs de `main`) | local por decisión tuya; **sin fusionar** a `main`, **sin pushear** | Cuando decidas: `git checkout main && git merge feat/auth-mfa-self-service && git push` (o push de la rama + PR) |
+| Qué | Dónde | Estado | Acción pendiente |
+|---|---|---|---|
+| **Fase 1: Login + branding + reset de contraseña + docs + rutina** | `main` | ✅ publicado en `origin/main` | ninguna |
+| **Fase 1: MFA self-service** | `main` (fusionado desde `feat/auth-mfa-self-service`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 
-**Nota:** `main` ya está respaldado en el remoto. Lo único que vive solo en este disco
-es la rama **`feat/auth-mfa-self-service`** (MFA), por decisión explícita de no publicarla
-aún. Es el único punto de "trabajo en riesgo" pendiente de publicar.
+**Estado:** **nada vive solo en local.** `main` = `origin/main`. La rama
+`feat/auth-mfa-self-service` quedó fusionada por fast-forward; puede borrarse.
 
 **Convención propuesta (a confirmar):** trabajar cada módulo en rama `feat/<modulo>`;
 al cerrar la sesión → push de la rama + merge a `main` + push de `main`. Así `origin/main`
