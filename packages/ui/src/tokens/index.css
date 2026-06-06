@@ -163,6 +163,81 @@
 }
 
 /* ------------------------------------------------------------
+   TEMAS — claro / oscuro / auto.
+   El tema EFECTIVO se aplica como `data-theme="dark|light"` en <html>
+   (un controlador resuelve "auto" con prefers-color-scheme). Los valores por
+   defecto (arriba) son OSCUROS; aquí se redefinen los tokens "temáticos" para
+   cada tema. Como casi todo usa tokens, los componentes cambian solos.
+   Token de interacción `--color-hover` para superficies hover/activas.
+   ------------------------------------------------------------ */
+:root {
+  --color-hover: rgba(255, 255, 255, 0.06);
+  /* Fondo translúcido del "chrome" (sidebar / top bar / tira de pestañas). */
+  --color-chrome: rgba(7, 10, 20, 0.6);
+}
+
+[data-theme="dark"] {
+  --color-bg-base: #06061a;
+  --color-bg-surface-1: #0c1124;
+  --color-bg-surface-2: #111827;
+  --color-bg-surface-3: #1a2235;
+  --color-border-subtle: rgba(255, 255, 255, 0.08);
+  --color-border-default: rgba(255, 255, 255, 0.12);
+  --color-border-strong: rgba(255, 255, 255, 0.2);
+  --color-text-primary: #e7eaf3;
+  --color-text-secondary: #9aa3b8;
+  --color-text-muted: #6b7280;
+  --color-text-inverse: #06061a;
+  --color-success-bg: rgba(34, 197, 94, 0.12);
+  --color-warning-bg: rgba(245, 158, 11, 0.12);
+  --color-error-bg: rgba(239, 68, 68, 0.12);
+  --color-info-bg: rgba(6, 182, 212, 0.12);
+  --gradient-brand-subtle: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(6, 182, 212, 0.1));
+  --glass-bg: rgba(255, 255, 255, 0.045);
+  --glass-border: 1px solid rgba(255, 255, 255, 0.09);
+  --shadow-card: 0 4px 24px -4px rgba(0, 0, 0, 0.4);
+  --shadow-modal: 0 16px 48px -8px rgba(0, 0, 0, 0.6);
+  --color-hover: rgba(255, 255, 255, 0.06);
+}
+
+[data-theme="light"] {
+  --color-bg-base: #eef1f7;
+  --color-bg-surface-1: #ffffff;
+  --color-bg-surface-2: #f4f6fb;
+  --color-bg-surface-3: #e9edf5;
+  --color-border-subtle: rgba(15, 23, 42, 0.08);
+  --color-border-default: rgba(15, 23, 42, 0.13);
+  --color-border-strong: rgba(15, 23, 42, 0.22);
+  --color-border-accent: rgba(99, 102, 241, 0.45);
+  --color-text-primary: #0c1124;
+  --color-text-secondary: #475569;
+  --color-text-muted: #8b95a7;
+  --color-text-inverse: #ffffff;
+  --color-success-bg: rgba(34, 197, 94, 0.16);
+  --color-warning-bg: rgba(245, 158, 11, 0.18);
+  --color-error-bg: rgba(239, 68, 68, 0.14);
+  --color-info-bg: rgba(6, 182, 212, 0.16);
+  --gradient-brand-subtle: linear-gradient(135deg, rgba(99, 102, 241, 0.14), rgba(6, 182, 212, 0.1));
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-border: 1px solid rgba(15, 23, 42, 0.08);
+  --glow-brand: 0 0 0 1px rgba(99, 102, 241, 0.25), 0 12px 32px -12px rgba(99, 102, 241, 0.3);
+  --glow-success: 0 0 0 1px rgba(34, 197, 94, 0.3), 0 8px 24px -8px rgba(34, 197, 94, 0.22);
+  --glow-error: 0 0 0 1px rgba(239, 68, 68, 0.3), 0 8px 24px -8px rgba(239, 68, 68, 0.22);
+  --shadow-card: 0 4px 20px -6px rgba(15, 23, 42, 0.12);
+  --shadow-modal: 0 16px 48px -12px rgba(15, 23, 42, 0.22);
+  --color-hover: rgba(15, 23, 42, 0.05);
+  --color-chrome: rgba(255, 255, 255, 0.72);
+}
+
+/* Fondo de la app en claro (el oscuro lo da @layer base). */
+[data-theme="light"] body {
+  background:
+    radial-gradient(1100px 700px at 85% -10%, rgba(99, 102, 241, 0.1) 0%, transparent 55%),
+    radial-gradient(900px 600px at -10% 110%, rgba(6, 182, 212, 0.1) 0%, transparent 55%),
+    var(--color-bg-base);
+}
+
+/* ------------------------------------------------------------
    Base — dark mode como modo principal (terreno industrial).
    ------------------------------------------------------------ */
 @layer base {

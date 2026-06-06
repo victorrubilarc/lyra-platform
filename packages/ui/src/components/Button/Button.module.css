@@ -46,12 +46,12 @@
 
 /* --- Variante secundaria (ghost) --- */
 .secondary {
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--color-hover);
   border-color: var(--color-border-default);
   color: var(--color-text-primary);
 }
 .secondary:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--color-border-default);
 }
 
 /* --- Variante de peligro (acciones destructivas) --- */
