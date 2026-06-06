@@ -48,19 +48,11 @@ nunca queda más de una sesión atrás.
 ## 2. Pendiente por HACER (módulos / submódulos)
 
 ### Fase 1 — Seguridad + Estructura (en curso)
-- [ ] **App Shell / Workspace premium** ← *siguiente sesión* (decidido 2026-06-06; ver DECISIONS).
-      Marco donde viven todos los módulos. Incluye:
-  - [ ] `AppShell` (layout): sidebar **colapsable** (completo ↔ riel, persistido) + top bar.
-  - [ ] **Pestañas de trabajo acotadas** (tope ~6, fijables, cada una = ruta; estado por caché TanStack).
-  - [ ] **Command palette ⌘K** (módulos/acciones/nodos) — `cmdk` estilizado con tokens.
-  - [ ] Top bar: breadcrumbs + búsqueda + notificaciones + **menú de perfil** (Mi seguridad/MFA,
-        Preferencias, Logout) + **cambio de idioma** + **toggle de densidad**.
-  - [ ] **Favoritos + Recientes** (persistidos en localStorage).
-  - [ ] **i18n-ready** (`react-i18next`, es-CL por defecto, strings como claves; catálogos extra en F7).
-  - [ ] Primitivos `@lyra/ui`: `Tabs`, `Drawer`, `Modal`, `Menu`/`Dropdown`, `Tooltip`, `Skeleton`,
-        `Breadcrumb`, `EmptyState`, `Toggle`. (`Table` puede ir con Estructura.)
-  - [ ] Estado de UI en `localStorage` (sidebar/densidad/idioma/pestañas/favoritos) — nunca tokens.
-- [ ] **UI Estructura organizacional** (después del shell). Árbol de nodos + CRUD sobre
+- [x] **App Shell / Workspace premium** ✅ (2026-06-06). Sidebar colapsable, top bar (breadcrumbs/
+      búsqueda ⌘K/densidad/idioma/notificaciones/perfil), pestañas de trabajo acotadas, command palette
+      (cmdk), favoritos/recientes, i18n-ready (react-i18next, es-CL), estado en localStorage, +9 primitivos
+      `@lyra/ui`. **Pendiente solo el smoke visual** (ver §4).
+- [ ] **UI Estructura organizacional** ← *siguiente sesión*. Árbol de nodos + CRUD sobre
       `/structure/*` (niveles + nodos con reparentado). Ruta `/estructura` gateada por
       `module:structure:view`; acciones por `orgnode:create/edit/delete`, `orglevel:manage`.
 - [ ] **UI Seguridad** (sesión posterior) sobre `/security/*`:
@@ -116,7 +108,11 @@ probatoria (hash+timestamp). Ref: `DECISIONS.md` (sección de recomendaciones).
 
 > Lo construido puede estar "verde en tests" pero no ejercido en condiciones reales.
 
-- [ ] **MFA en el navegador real** (esta sesión se probó por API/curl, no la UI): escanear el
+- [ ] **App Shell — smoke VISUAL en navegador** (se verificó typecheck/lint/build/test + que el dev
+      sirve; falta el clic): colapsar/expandir sidebar, abrir/cerrar/fijar pestañas (sin refrescos),
+      ⌘K (saltar, densidad, idioma, logout), cambiar idioma y densidad, menú de perfil, favoritos.
+      App en `:5173`.
+- [ ] **MFA en el navegador real** (se probó por API/curl, no la UI): escanear el
       QR con una app real, copiar/descargar recovery codes, ver el **redirect del gate**
       `/activar-mfa`, y `/perfil/seguridad` (activar/regenerar/desactivar). *Backend ✅ en vivo.*
 - [ ] **`COOKIE_SECURE` solo-HTTPS en producción**: no ejercido (dev es HTTP en localhost).

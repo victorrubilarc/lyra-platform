@@ -1,6 +1,6 @@
 # Progreso — Lyra WatchLog
 
-Última actualización: 2026-06-06 (Fase 1 — backend ✅; **UI: Login + cimientos ✅**; **Auth · Recuperación de contraseña self-service ✅**; **Auth · MFA self-service ✅**; faltan UI de Estructura y de Seguridad).
+Última actualización: 2026-06-06 (Fase 1 — backend ✅; **UI: Login + cimientos ✅**; **Recuperación de contraseña ✅**; **MFA self-service ✅**; **App Shell / Workspace premium ✅**; faltan UI de Estructura y de Seguridad).
 
 ## Estado por fase
 
@@ -22,6 +22,7 @@
 | Login (+ MFA TOTP + cambio forzado) | 1 | ✅ API + UI |
 | Recuperación de contraseña (self-service) | 1 | ✅ API + UI |
 | MFA self-service (perfil) + gate de enrolamiento forzado | 1 | ✅ API + UI |
+| App Shell / Workspace premium (sidebar, topbar, pestañas, ⌘K, i18n) | 1 | ✅ UI |
 | Estructura organizacional | 1 | 🟦 API ✅ · UI ⬜ |
 | Seguridad / roles / permisos (nueva) | 1 | 🟦 API ✅ · UI ⬜ (incluye reset MFA de admin: API ✅, UI ⬜) |
 | Plantillas (Form Builder) | 2 | ⬜ |
@@ -182,6 +183,25 @@
 - **Pendiente (registrado, no en esta sesión)**: la **UI de admin** (ver estado / resetear MFA en el CRUD
   de usuarios) llega con la pantalla de Seguridad; igualar `forcePasswordChange` con enforcement de
   backend; anti-replay de OTP.
+
+## Hecho en Fase 1 (UI — App Shell / Workspace premium)
+Marco donde viven todos los módulos (ver DECISIONS 2026-06-06). Reemplaza el `AppLayout` básico.
+- **`@lyra/ui` (+9 primitivos)**: `Toggle`, `Tooltip`, `Menu`/`MenuItem`/`MenuSeparator`/`MenuLabel`,
+  `Modal`, `Drawer`, `Skeleton`, `Breadcrumb`, `EmptyState` — CSS Modules sobre tokens, a11y, área 44px,
+  `prefers-reduced-motion`. (`Table` queda para Estructura.)
+- **Shell** (`apps/watchlog-web/src/shell/`): `AppShell` (sidebar colapsable completo↔riel + top bar +
+  pestañas + Outlet), `Sidebar` (gated por permiso, favoritos, tooltips en riel), `Topbar` (breadcrumbs,
+  búsqueda ⌘K, densidad, idioma, notificaciones, **menú de perfil** con Mi seguridad/MFA + logout),
+  `WorkspaceTabs` (**pestañas acotadas** tope 6, fijables, cada una = ruta), `CommandPalette` (cmdk).
+- **Estado de UI persistido** (`localStorage`, nunca secretos): `ui-store` (sidebar/densidad),
+  `workspace-store` (pestañas), `favorites-store` (favoritos/recientes). `navigation.ts` = registro único
+  de rutas (label i18n + ícono + permiso).
+- **i18n-ready** (`react-i18next`): `es-CL` por defecto, **strings como claves**, selector de idioma
+  (inglés marcado "Próximamente"); preferencia persistida. Catálogos extra → Fase 7.
+- **Caché compartida** (TanStack Query, `staleTime` 30s): las pestañas preservan estado sin refrescos.
+- **Verificación**: `typecheck`/`lint`/`build` (web 1829 módulos) verdes · `pnpm test` 58 (API) ·
+  dev sirve y transforma el shell + optimiza `cmdk`/`i18next`. **Pendiente: smoke VISUAL en navegador**
+  (colapsar, pestañas, ⌘K, idioma, densidad) — ver BACKLOG §4.
 
 ## Fuera de alcance de la Fase 0/1 (planificado para más adelante)
 - Build de imágenes de producción (`docker-compose.prod.yml`) — Fase 7 (endurecimiento).

@@ -1,18 +1,20 @@
 import { createBrowserRouter, Navigate } from "react-router-dom";
 import { ProtectedRoute } from "../auth/ProtectedRoute.js";
-import { AppLayout } from "./AppLayout.js";
+import { AppShell } from "../shell/AppShell.js";
 import { LoginPage } from "../features/auth/LoginPage.js";
 import { ForgotPasswordPage } from "../features/auth/ForgotPasswordPage.js";
 import { ResetPasswordPage } from "../features/auth/ResetPasswordPage.js";
 import { ForcePasswordChangePage } from "../features/auth/ForcePasswordChangePage.js";
 import { ForceMfaEnrollPage } from "../features/auth/ForceMfaEnrollPage.js";
 import { ProfileSecurityPage } from "../features/security/ProfileSecurityPage.js";
+import { ComingSoonPage } from "../features/placeholder/ComingSoonPage.js";
 import { HomePage } from "../features/home/HomePage.js";
 
 /**
  * Mapa de rutas. `/login` es pública; todo lo demás cuelga de `ProtectedRoute`
- * (exige sesión y desvía al cambio forzado de contraseña cuando aplica). El
- * cambio de contraseña va fuera del `AppLayout` (pantalla completa, sin sidebar).
+ * (exige sesión y desvía a cambio forzado de contraseña / enrolamiento MFA). Las
+ * pantallas full-screen (cambio de contraseña, activar MFA) van FUERA del
+ * `AppShell`; los módulos cuelgan del shell premium (sidebar + topbar + pestañas).
  */
 export const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
@@ -24,9 +26,11 @@ export const router = createBrowserRouter([
       { path: "/cambiar-contrasena", element: <ForcePasswordChangePage /> },
       { path: "/activar-mfa", element: <ForceMfaEnrollPage /> },
       {
-        element: <AppLayout />,
+        element: <AppShell />,
         children: [
           { index: true, element: <HomePage /> },
+          { path: "/estructura", element: <ComingSoonPage /> },
+          { path: "/seguridad", element: <ComingSoonPage /> },
           { path: "/perfil/seguridad", element: <ProfileSecurityPage /> },
         ],
       },
