@@ -24,7 +24,7 @@ navegador, más un **refresh token opaco de vida larga** que viaja en una **cook
 | | **Access token** | **Refresh token** |
 |---|---|---|
 | Formato | JWT firmado (HS256) | Cadena opaca aleatoria (32 bytes, base64url) |
-| Contenido | `sub` (userId), `email`, `sid` (sessionId), `exp` | Nada legible: es un secreto aleatorio |
+| Contenido | `sub` (userId), `email`, `sid` (sessionId), `exp` (+ `mfaPending` solo si debe enrolar MFA) | Nada legible: es un secreto aleatorio |
 | Vida (`.env`) | **15 min** (`JWT_ACCESS_TTL=900`) | **30 días** (`JWT_REFRESH_TTL=2592000`) |
 | Dónde se guarda en el navegador | **Memoria JS** (variable en `session-token.ts`) | **Cookie `httpOnly`** `wl_refresh` |
 | ¿JS puede leerlo? | Sí (la app lo pone en el header) | **No** (`httpOnly`) |
@@ -132,6 +132,29 @@ Set-Cookie: wl_csrf=<aleatorio>; SameSite=Strict; Path=/; Max-Age=2592000
 ```
 
 ---
+
+## 4.1 Gate de enrolamiento forzado de MFA
+
+Si el **rol** del usuario **exige MFA** (`mfaMode = REQUIRED_BY_ROLE` con un rol `requireMfa`, o
+`REQUIRED_FOR_ALL`) y **aún no lo tiene activo**, el login **sí** emite sesión, pero el access token
+lleva el claim **`mfaPending`** y la sesión queda **limitada al enrolamiento**:
+
+- En el **backend**, el `MfaEnrollmentGuard` (global) responde **403 `MFA_ENROLLMENT_REQUIRED`** a todo
+  endpoint que no esté marcado con `@AllowPendingEnrollment` (ver perfil, logout, `mfa/setup`,
+  `mfa/verify`, cambio de contraseña). No es solo cosmético: impide operar con AAL1.
+- En el **frontend**, `ProtectedRoute` desvía a `/activar-mfa` (después del cambio forzado de
+  contraseña, que tiene prioridad). `SessionInfo.user.mfaEnrollmentRequired` lo señala.
+- Al **verificar** el enrolamiento, el cliente hace un **`/auth/refresh`**: el claim se recalcula
+  (ahora `mfaEnabled = true`) y el token nuevo **ya no trae `mfaPending`** → acceso pleno.
+
+```
+login (rol exige MFA, sin enrolar) ─▶ token con mfaPending ─▶ 403 en la API salvo enrolar
+   └─ setup (QR) ─▶ verify (TOTP) ─▶ /auth/refresh ─▶ token SIN mfaPending ─▶ acceso pleno
+```
+
+El **segundo factor** (login normal y challenge) está **rate-limited**: tras `maxFailedAttempts`
+intentos errados se bloquea `lockoutMinutes` (contador propio `mfaFailedCount`/`mfaLockedUntil`,
+separado del de contraseña). El **reset de MFA por un admin** revoca todas las sesiones del objetivo.
 
 ## 5. Petición autenticada y **refresh transparente** ante un 401
 
@@ -399,6 +422,10 @@ por detección de reuso del refresh), o el navegador está en incógnito / confi
 | Ciclo de vida (bootstrap + refresh proactivo) | `apps/watchlog-web/src/auth/AuthProvider.tsx` |
 | Estado de sesión para la UI | `apps/watchlog-web/src/auth/auth-store.ts` |
 | Orquestación de login/MFA/cambio | `apps/watchlog-api/src/auth/auth.service.ts` |
+| Política de requerimiento de MFA (derivada) | `apps/watchlog-api/src/auth/mfa-requirement.service.ts` |
+| Gate de enrolamiento forzado (backend) | `apps/watchlog-api/src/authz/mfa-enrollment.guard.ts` |
+| Enrolamiento MFA self-service (UI) | `apps/watchlog-web/src/features/security/MfaEnrollFlow.tsx` |
+| Gate de enrolamiento (UI, full-screen) | `apps/watchlog-web/src/features/auth/ForceMfaEnrollPage.tsx` |
 | Emisión/rotación/revocación de tokens | `apps/watchlog-api/src/auth/token.service.ts` |
 | Cookies (refresh httpOnly + CSRF) | `apps/watchlog-api/src/auth/auth.cookies.ts` |
 | Validación del access (Bearer) | `apps/watchlog-api/src/authz/jwt-access.guard.ts` |

@@ -4,6 +4,41 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-06 · Fase 1 (Auth): MFA self-service — política por rol + enrolamiento forzado
+Segundo factor TOTP con enrolamiento **self-service** (el secreto solo lo conoce el dispositivo del
+usuario; el admin NUNCA enrola por él). Estándar NIST 800-63B / OWASP ASVS v4 §2. Decisiones:
+- **Política de requerimiento** en dos piezas: campo **`Role.requireMfa`** (granularidad por rol) +
+  modo global **`PasswordPolicy.mfaMode`** = `OPTIONAL | REQUIRED_BY_ROLE | REQUIRED_FOR_ALL`. El piso
+  es **OPCIONAL** (nadie forzado, pero cualquiera puede auto-enrolarse): **se descartó un modo
+  "deshabilitado"** que impidiera el enrolamiento voluntario por ser un anti-feature de seguridad.
+  Requerimiento **derivado**: `required = ALL || (BY_ROLE && algúnRol.requireMfa)`.
+- **Enrolamiento forzado con enforcement en backend (no solo UI).** Análogo a `forcePasswordChange`,
+  pero `forcePasswordChange` hoy solo redirige en la UI; para MFA eso **degradaría el AAL** (operar con
+  solo-contraseña vía API). Se añadió un claim **`mfaPending`** al access token (recalculado en cada
+  emisión/rotación) y un **`MfaEnrollmentGuard`** global que bloquea (**403 `MFA_ENROLLMENT_REQUIRED`**)
+  todo salvo lo marcado con **`@AllowPendingEnrollment`** (me, logout, mfa/setup, mfa/verify,
+  change-password). Al verificar, un `/auth/refresh` limpia el claim. *Pendiente registrado:* dar el
+  mismo enforcement de backend a `forcePasswordChange` (hoy solo UI).
+- **Throttle del 2.º factor** (faltaba; NIST §5.2.2 / ASVS §2.2.1): contador **propio** en
+  `User.mfaFailedCount`/`mfaLockedUntil`, **separado** del lockout de contraseña (si se compartiera, una
+  contraseña correcta reiniciaría el tope del 2.º factor). Tras `maxFailedAttempts` bloquea
+  `lockoutMinutes`. Se fijó **ventana TOTP ±1** (RFC 6238) para desfase de reloj.
+- **Reset de MFA por admin** (dispositivo perdido): `POST /security/users/:id/mfa/reset`, permiso nuevo
+  **`user:reset-mfa`** (catálogo, no hardcodeado). Borra el factor y **revoca TODAS las sesiones** del
+  objetivo (evita sesión rancia con el AAL anterior); si el rol sigue exigiendo MFA, cae al gate en el
+  próximo login. El admin **no** enrola por el usuario.
+- **Sesiones:** auto-activar / auto-desactivar mantienen la sesión actual; **reset de admin revoca
+  todo**. Un factor **exigido por política no se puede auto-desactivar** (`disableMfa` lanza 403 si el
+  rol lo requiere; solo el admin lo restablece). El reset de **contraseña** sigue sin tocar MFA.
+- **Recovery codes:** 10, hasheados, single-use (ya existían); se añadió **regenerar** con
+  reconfirmación de contraseña (invalida los anteriores). Se muestran **una sola vez** (copiar/descargar).
+- **Frontend:** página de seguridad del perfil (`/perfil/seguridad`) y gate full-screen `/activar-mfa`
+  comparten un `MfaEnrollFlow` (QR con **`qrcode.react`** desde el `otpauth://` del backend → verificar →
+  códigos). `ProtectedRoute` prioriza cambio de contraseña y luego enrolamiento de MFA.
+**Alcance:** el **reset de admin y la lectura de estado** se entregan como **backend + contratos** ahora;
+su **UI vive en la pantalla de Seguridad/usuarios** (sesión posterior), para no construir UI desechable.
+**Residual honesto:** no se implementa anti-replay del mismo OTP dentro de su ventana (deuda menor).
+
 ### 2026-06-06 · Fase 1 (Auth): recuperación de contraseña self-service
 Reset por correo siguiendo NIST 800-63B y OWASP ASVS §2.5 / Forgot Password Cheat Sheet.
 - **Token**: aleatorio de 256 bits, se guarda **solo el hash SHA-256** (`PasswordResetToken`),

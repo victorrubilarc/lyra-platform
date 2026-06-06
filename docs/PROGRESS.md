@@ -1,6 +1,6 @@
 # Progreso — Lyra WatchLog
 
-Última actualización: 2026-06-06 (Fase 1 — backend ✅; **UI: Login + cimientos ✅**; **Auth · Recuperación de contraseña self-service ✅**; faltan MFA self-service, UI de Estructura y Seguridad).
+Última actualización: 2026-06-06 (Fase 1 — backend ✅; **UI: Login + cimientos ✅**; **Auth · Recuperación de contraseña self-service ✅**; **Auth · MFA self-service ✅**; faltan UI de Estructura y de Seguridad).
 
 ## Estado por fase
 
@@ -21,8 +21,9 @@
 |---|---|---|
 | Login (+ MFA TOTP + cambio forzado) | 1 | ✅ API + UI |
 | Recuperación de contraseña (self-service) | 1 | ✅ API + UI |
+| MFA self-service (perfil) + gate de enrolamiento forzado | 1 | ✅ API + UI |
 | Estructura organizacional | 1 | 🟦 API ✅ · UI ⬜ |
-| Seguridad / roles / permisos (nueva) | 1 | 🟦 API ✅ · UI ⬜ |
+| Seguridad / roles / permisos (nueva) | 1 | 🟦 API ✅ · UI ⬜ (incluye reset MFA de admin: API ✅, UI ⬜) |
 | Plantillas (Form Builder) | 2 | ⬜ |
 | Nueva entrada / Llenado | 2 | ⬜ |
 | Bitácoras (listado + detalle + log de cambios) | 2 | ⬜ |
@@ -154,25 +155,44 @@
   respuesta neutra (un solo correo al usuario real), token single-use (reuso ⇒ 400), política aplicada
   (débil ⇒ 400), login con nueva contraseña ⇒ 200 y con la vieja ⇒ 401, notificación de cambio enviada.
 
+## Hecho en Fase 1 (Auth — MFA self-service: política por rol + enrolamiento forzado)
+- **Política de requerimiento** (NIST 800-63B / OWASP ASVS §2): `Role.requireMfa` + modo global
+  `PasswordPolicy.mfaMode` (`OPTIONAL`/`REQUIRED_BY_ROLE`/`REQUIRED_FOR_ALL`; piso = OPCIONAL, sin modo
+  "deshabilitado"). `MfaRequirementService` deriva `required`/`enrollmentPending`. Migración
+  `20260606041921_add_mfa_policy_requirement` (+ `User.mfaFailedCount`/`mfaLockedUntil`).
+- **Enrolamiento forzado con enforcement en backend**: claim **`mfaPending`** en el access token
+  (recalculado en cada emisión/rotación) + **`MfaEnrollmentGuard`** global → **403
+  `MFA_ENROLLMENT_REQUIRED`** salvo `@AllowPendingEnrollment` (me, logout, setup/verify, change-password).
+  No degrada AAL. `SessionInfo.user` gana `mfaRequired` y `mfaEnrollmentRequired`.
+- **Throttle del 2.º factor** (faltaba): contador propio en BD, separado del de contraseña; bloqueo tras
+  `maxFailedAttempts`. Ventana TOTP ±1 (RFC 6238).
+- **Reset de admin** `POST /security/users/:id/mfa/reset` (permiso nuevo `user:reset-mfa`): borra el
+  factor y **revoca todas las sesiones** del objetivo. Un factor exigido **no** se auto-desactiva (403).
+  **Regenerar recovery codes** (`/auth/mfa/recovery-codes/regenerate`, reconfirma contraseña).
+  `requireMfa` editable en el CRUD de roles; `mfaRequired` en el detalle de usuario.
+- **Frontend**: `MfaEnrollFlow` reutilizable (setup → QR con `qrcode.react` → verify → recovery codes
+  copiar/descargar), página **`/perfil/seguridad`** (activar/regenerar/desactivar) y gate full-screen
+  **`/activar-mfa`**. `ProtectedRoute` prioriza cambio de contraseña y luego enrolamiento de MFA. Enlace
+  "Mi seguridad" en el sidebar.
+- **Verificación**: `typecheck`/`lint`/`build` OK (6 paquetes). `pnpm test` → API **58** (+15:
+  `MfaRequirementService` 7, `MfaEnrollmentGuard` 5, throttle 3) + permissions 5 + contracts.
+  **Smoke en vivo** (demo, admin): gate (403 `MFA_ENROLLMENT_REQUIRED` → enrolar con TOTP real → 200),
+  throttle (bloqueo al 5.º intento, mensaje al 6.º, código correcto rechazado estando bloqueado), admin
+  reset (revoca sesiones: refresh post-reset = 401). Estado del demo restaurado (mfaMode OPTIONAL, sin MFA).
+- **Pendiente (registrado, no en esta sesión)**: la **UI de admin** (ver estado / resetear MFA en el CRUD
+  de usuarios) llega con la pantalla de Seguridad; igualar `forcePasswordChange` con enforcement de
+  backend; anti-replay de OTP.
+
 ## Fuera de alcance de la Fase 0/1 (planificado para más adelante)
 - Build de imágenes de producción (`docker-compose.prod.yml`) — Fase 7 (endurecimiento).
 - Ranura OIDC/LDAP: diseñada y con el `AuthProvider` listo para enchufar; se activa cuando un
   cliente lo pida.
 
 ## Próximo paso
-**Decidido (2026-06-05):** se implementan en **sesiones separadas** — (1) recuperación de contraseña
-✅ **hecha**, (2) MFA ← **siguiente** — y el requerimiento de MFA será **por rol** (requerido a admins,
-configurable para el resto).
+**Decidido (2026-06-05):** las piezas de auth se hicieron en **sesiones separadas** — (1) recuperación de
+contraseña ✅, (2) MFA self-service ✅ (esta sesión).
 
-**Sesión siguiente = Auth · MFA self-service (enrolamiento + política por rol)** (requiere aprobar el
-enfoque al inicio por ser auth). Estándar a seguir (NIST 800-63B / OWASP ASVS v4 §2):
-- **MFA**: enrolamiento **self-service** del usuario (pantalla de seguridad del perfil: setup QR →
-  verify → recovery codes → disable), que el backend ya soporta. **Política de requerimiento** de MFA
-  (deshabilitado/opcional/requerido, idealmente por rol) en la política de seguridad, con **enrolamiento
-  forzado** análogo a `forcePasswordChange`. En el CRUD de usuarios (Seguridad): ver estado de MFA y
-  **resetear** MFA de un usuario (dispositivo perdido); el admin NUNCA enrola por el usuario.
-
-Después: **Fase 1 — UI de Estructura organizacional** (árbol de nodos + CRUD sobre `/structure/*`), y
+**Sesión siguiente = Fase 1 · UI de Estructura organizacional** (árbol de nodos + CRUD sobre `/structure/*`), y
 luego **Seguridad** (usuarios, roles/permisos, alcance) sobre `/security/*`. Los cimientos del frontend
 (api-client, AuthProvider, router, AppLayout, `@lyra/permissions`, `@lyra/ui`) ya están listos.
 1. **Estructura organizacional**: árbol de nodos (CRUD) sobre `/structure/*` (niveles + nodos con
