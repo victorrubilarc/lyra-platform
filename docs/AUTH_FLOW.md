@@ -296,7 +296,73 @@ sueles mirar. Para verlo:
 
 ---
 
-## 12. ¿Se cierra la sesión al cerrar la pestaña o el navegador?
+## 12. Riesgos de robo de tokens y mitigaciones
+
+> **Aclaración clave:** el **access token NO vive en una cookie**, vive en **memoria
+> JS**. En la cookie (`wl_refresh`, `httpOnly`) vive el **refresh token**. Son piezas
+> con riesgos distintos.
+
+Toda forma de guardar credenciales tiene algún riesgo; lo relevante es cuál y qué lo
+mitiga. La cookie `httpOnly` es la opción **más segura** para el refresh frente a
+`localStorage`/`sessionStorage`.
+
+| Vector de robo | ¿Aplica? | Mitigación en el código |
+|---|---|---|
+| **XSS lee el token** | El mayor riesgo de `localStorage` | **`httpOnly`** → JS no puede leer `wl_refresh`. El access, al estar en memoria, tampoco es un token persistente que robar. |
+| **CSRF** (la cookie se manda sola) | Sí | **`SameSite=Strict`** + **CSRF de doble envío** (`x-csrf-token` debe igualar `wl_csrf`) en `/auth/refresh` y `/auth/logout`. |
+| **Sniffing de red** | En HTTP plano | **`Secure`** en producción (`COOKIE_SECURE=true`) → solo HTTPS. |
+| **Filtración de la BD** | Sí | En la BD **solo el hash SHA-256** del refresh; irreversible. |
+| **Reuso de un refresh robado** | Sí | **Rotación + detección de reuso** → revoca toda la familia + la sesión. |
+| **Exposición innecesaria** | — | Cookie con **`path=/api/auth`** → no se envía a toda la API. |
+
+**El access token (memoria) es lo más seguro de los dos:** no está en disco (se borra al
+cerrar la pestaña), no es cookie (no es vulnerable a CSRF) y dura **15 min** (caduca solo).
+
+**Riesgos residuales (honestidad técnica):**
+1. **XSS sigue siendo crítico.** `httpOnly` impide *exfiltrar* el refresh, pero un XSS
+   podría **abusar de la sesión desde dentro** de la página. La defensa real es **no tener
+   XSS** (CSP, sanitización, validación, Helmet). El almacenamiento limita el daño, no lo
+   elimina.
+2. **Compromiso del dispositivo** (malware con acceso al almacén de cookies, equipo
+   desbloqueado) escapa a cualquier flag web.
+
+**Comparación con "todo en `localStorage`":** ahí un único XSS roba un token persistente y
+exfiltrable, usable desde otra máquina por mucho tiempo. El esquema de aquí (access efímero
+en memoria + refresh `httpOnly` rotativo con detección de reuso) es estrictamente mejor y es
+el patrón recomendado por OWASP para SPAs.
+
+### 12.1 Verificación (qué está probado y cómo)
+
+Niveles de evidencia, sin sobrevender:
+
+| Propiedad | Evidencia | Resultado |
+|---|---|---|
+| `wl_refresh` es `HttpOnly; SameSite=Strict; Path=/api/auth; Max-Age=2592000` | **Vivo** — `Set-Cookie` del login (curl `-D`) | ✅ confirmado |
+| `wl_csrf` legible (sin HttpOnly) para el doble envío | **Vivo** — `Set-Cookie` del login | ✅ confirmado |
+| CSRF: `refresh` sin `x-csrf-token` → 403; con → 200 | **Vivo** — curl con/sin header | ✅ 403 / 200 |
+| Rotación + **detección de reuso** revoca la familia | **Vivo** + **unit** (`token.service.spec.ts`) | ✅ R1 reusado → 401 y R2 legítimo → 401 |
+| En la BD **solo el hash** del refresh | **Vivo** — `sha256(token)` vs `RefreshToken.tokenHash` en Postgres | ✅ token en claro: 0 filas · su hash: 1 fila |
+| Login OK / credencial inválida 401 | **Vivo** (smoke) | ✅ 200 / 401 |
+| Reset: neutro, single-use, **caducidad**, política, rate-limit | **Vivo** (smoke con Mailpit) | ✅ ver `SECURITY.md` §6 |
+| `Secure` solo-HTTPS en producción | **Config** (`COOKIE_SECURE`); en dev es `false` (localhost) | ⚠️ no ejercido (requiere entorno HTTPS) |
+| `httpOnly` impide `document.cookie` en el navegador | **Flag presente** (lo enforce el navegador) | ⚠️ no ejecutado como ataque en navegador |
+| Access 15 min → refresh transparente al expirar | **Código + unit**; no se esperó 15 min en vivo | ⚠️ no cronometrado en vivo |
+
+Comandos usados (reproducibles con la infra dev + API arriba):
+
+```bash
+# Atributos de cookie
+curl -s -c jar -D headers -o /dev/null -X POST localhost:3000/api/auth/login \
+  -H 'Content-Type: application/json' -d '{"email":"…","password":"…"}'; grep -i set-cookie headers
+# CSRF
+curl -s -o /dev/null -w '%{http_code}\n' -b jar         -X POST localhost:3000/api/auth/refresh   # 403
+curl -s -o /dev/null -w '%{http_code}\n' -b jar -H "x-csrf-token: <wl_csrf>" -X POST …/refresh     # 200
+# Reuso: reenviar el wl_refresh ya rotado → 401 (y la familia queda revocada)
+# Solo-hash en BD
+printf '%s' "<refresh_en_claro>" | sha256sum   # == RefreshToken.tokenHash en Postgres
+```
+
+## 13. ¿Se cierra la sesión al cerrar la pestaña o el navegador?
 
 **No.** Que el access token viva "en memoria" **no** significa que pierdas la sesión
 al cerrar la pestaña. Hay dos piezas con persistencia distinta:
@@ -324,7 +390,7 @@ por detección de reuso del refresh), o el navegador está en incógnito / confi
 > no el access en memoria (corta vida). Lo mejor de ambos: resistencia a XSS **y**
 > comodidad de no re-loguear en cada visita.
 
-## 13. Mapa de archivos
+## 14. Mapa de archivos
 
 | Pieza | Archivo |
 |---|---|
