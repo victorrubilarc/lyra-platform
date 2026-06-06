@@ -5,6 +5,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import type { Env } from "../config/env.schema";
 import { EncryptionService } from "../crypto/encryption.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { MfaRequirementService } from "./mfa-requirement.service";
 
 /** Contexto de petición para sesiones y auditoría. */
 export interface RequestMeta {
@@ -33,6 +34,7 @@ export class TokenService {
     private readonly jwt: JwtService,
     private readonly enc: EncryptionService,
     private readonly config: ConfigService<Env, true>,
+    private readonly mfaRequirement: MfaRequirementService,
   ) {}
 
   private get accessTtl(): number {
@@ -43,8 +45,19 @@ export class TokenService {
     return this.config.get("JWT_REFRESH_TTL", { infer: true }) * 1000;
   }
 
-  private signAccess(userId: string, email: string, sessionId: string): Promise<string> {
-    return this.jwt.signAsync({ sub: userId, email, sid: sessionId });
+  private signAccess(
+    userId: string,
+    email: string,
+    sessionId: string,
+    mfaPending: boolean,
+  ): Promise<string> {
+    // El claim solo se incluye cuando aplica, para no engordar el token.
+    return this.jwt.signAsync({
+      sub: userId,
+      email,
+      sid: sessionId,
+      ...(mfaPending ? { mfaPending: true } : {}),
+    });
   }
 
   private newRawToken(): string {
@@ -76,7 +89,8 @@ export class TokenService {
       },
     });
 
-    const accessToken = await this.signAccess(user.id, user.email, session.id);
+    const mfaPending = await this.mfaRequirement.isEnrollmentPending({ id: user.id });
+    const accessToken = await this.signAccess(user.id, user.email, session.id, mfaPending);
     return { accessToken, refreshToken: raw, expiresIn: this.accessTtl, sessionId: session.id };
   }
 
@@ -125,7 +139,13 @@ export class TokenService {
       data: { lastSeenAt: new Date() },
     });
 
-    const accessToken = await this.signAccess(token.user.id, token.user.email, token.sessionId);
+    const mfaPending = await this.mfaRequirement.isEnrollmentPending({ id: token.user.id });
+    const accessToken = await this.signAccess(
+      token.user.id,
+      token.user.email,
+      token.sessionId,
+      mfaPending,
+    );
     return {
       accessToken,
       refreshToken: raw,

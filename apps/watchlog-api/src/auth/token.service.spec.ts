@@ -23,7 +23,8 @@ function build() {
   const config = {
     get: (key: string) => (key === "JWT_ACCESS_TTL" ? 900 : 2_592_000),
   } as unknown as ConfigService<never, true>;
-  const service = new TokenService(prisma, jwt, enc, config);
+  const mfaRequirement = { isEnrollmentPending: vi.fn().mockResolvedValue(false) };
+  const service = new TokenService(prisma, jwt, enc, config, mfaRequirement as never);
   return { service, prisma, refreshToken, session, jwt };
 }
 

@@ -75,6 +75,17 @@ export class UsersController {
     return this.users.assignScope(id, dto, this.ctx(user, req));
   }
 
+  /** Restablece el MFA del usuario (dispositivo perdido). El admin nunca enrola por él. */
+  @Post(":id/mfa/reset")
+  @RequirePermission("user:reset-mfa")
+  resetMfa(
+    @Param("id") id: string,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.users.resetMfa(id, this.ctx(user, req));
+  }
+
   private ctx(user: RequestUser, req: FastifyRequest): AuditContext {
     return { actorId: user.id, actorEmail: user.email, ip: req.ip, userAgent: req.headers["user-agent"] ?? null };
   }

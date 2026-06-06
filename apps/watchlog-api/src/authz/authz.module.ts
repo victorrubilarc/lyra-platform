@@ -5,13 +5,15 @@ import { JwtModule } from "@nestjs/jwt";
 import type { Env } from "../config/env.schema";
 import { JwtAccessGuard } from "./jwt-access.guard";
 import { PermissionsGuard } from "./permissions.guard";
+import { MfaEnrollmentGuard } from "./mfa-enrollment.guard";
 import { PermissionService } from "./permission.service";
 import { ScopeService } from "./scope.service";
 
 /**
- * Autorización transversal. Registra dos guards GLOBALES en orden:
+ * Autorización transversal. Registra tres guards GLOBALES en orden:
  *  1. JwtAccessGuard      — exige access token válido (salvo @Public()).
  *  2. PermissionsGuard    — exige los permisos de @RequirePermission.
+ *  3. MfaEnrollmentGuard  — limita la sesión al enrolamiento si MFA está pendiente.
  * Expone PermissionService y ScopeService para usarse en services de negocio.
  */
 @Global()
@@ -30,6 +32,7 @@ import { ScopeService } from "./scope.service";
     ScopeService,
     { provide: APP_GUARD, useClass: JwtAccessGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
+    { provide: APP_GUARD, useClass: MfaEnrollmentGuard },
   ],
   exports: [PermissionService, ScopeService, JwtModule],
 })

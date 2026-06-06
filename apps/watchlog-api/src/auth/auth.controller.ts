@@ -17,6 +17,7 @@ import {
   loginRequestSchema,
   mfaChallengeRequestSchema,
   mfaDisableRequestSchema,
+  mfaRegenerateRequestSchema,
   mfaVerifyRequestSchema,
   resetPasswordRequestSchema,
   type ChangePasswordRequest,
@@ -27,6 +28,7 @@ import {
   type MfaActivatedResponse,
   type MfaChallengeRequest,
   type MfaDisableRequest,
+  type MfaRegenerateRequest,
   type MfaSetupResponse,
   type MfaVerifyRequest,
   type RefreshResponse,
@@ -35,7 +37,7 @@ import {
 } from "@lyra/contracts";
 import type { Env } from "../config/env.schema";
 import type { AuditContext } from "../audit/audit.service";
-import { CurrentUser, Public } from "../authz/authz.decorators";
+import { AllowPendingEnrollment, CurrentUser, Public } from "../authz/authz.decorators";
 import type { RequestUser } from "../authz/auth-user";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { AuthService, type LoginResult } from "./auth.service";
@@ -95,6 +97,7 @@ export class AuthController {
     return { accessToken: issued.accessToken, expiresIn: issued.expiresIn };
   }
 
+  @AllowPendingEnrollment()
   @UseGuards(CsrfGuard)
   @Post("logout")
   @HttpCode(204)
@@ -107,6 +110,7 @@ export class AuthController {
     clearAuthCookies(reply, { domain: this.config.get("COOKIE_DOMAIN", { infer: true }) });
   }
 
+  @AllowPendingEnrollment()
   @Get("me")
   async me(@CurrentUser() user: RequestUser): Promise<SessionInfo> {
     return this.auth.getSessionInfo(user.id);
@@ -114,6 +118,7 @@ export class AuthController {
 
   // --- Contraseña propia ---
 
+  @AllowPendingEnrollment()
   @Post("change-password")
   @HttpCode(204)
   async changePassword(
@@ -155,12 +160,14 @@ export class AuthController {
 
   // --- MFA (enrolamiento del propio usuario) ---
 
+  @AllowPendingEnrollment()
   @Post("mfa/setup")
   @HttpCode(200)
   async mfaSetup(@CurrentUser() user: RequestUser): Promise<MfaSetupResponse> {
     return this.auth.setupMfa(user.id, user.email);
   }
 
+  @AllowPendingEnrollment()
   @Post("mfa/verify")
   @HttpCode(200)
   async mfaVerify(
@@ -180,6 +187,21 @@ export class AuthController {
     @Req() req: FastifyRequest,
   ): Promise<void> {
     await this.auth.disableMfa(user.id, dto.password, this.auditCtx(user, req));
+  }
+
+  @Post("mfa/recovery-codes/regenerate")
+  @HttpCode(200)
+  async mfaRegenerate(
+    @CurrentUser() user: RequestUser,
+    @Body(new ZodValidationPipe(mfaRegenerateRequestSchema)) dto: MfaRegenerateRequest,
+    @Req() req: FastifyRequest,
+  ): Promise<MfaActivatedResponse> {
+    const recoveryCodes = await this.auth.regenerateRecoveryCodes(
+      user.id,
+      dto.password,
+      this.auditCtx(user, req),
+    );
+    return { recoveryCodes };
   }
 
   // --- helpers ---

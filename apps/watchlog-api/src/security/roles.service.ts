@@ -28,6 +28,7 @@ export class RolesService {
       name: r.name,
       description: r.description,
       isSystem: r.isSystem,
+      requireMfa: r.requireMfa,
       permissionCount: r._count.permissions,
       userCount: r._count.users,
     }));
@@ -48,6 +49,7 @@ export class RolesService {
       name: role.name,
       description: role.description,
       isSystem: role.isSystem,
+      requireMfa: role.requireMfa,
       permissionCount: role._count.permissions,
       userCount: role._count.users,
       permissionKeys: role.permissions.map((p) => p.permission.key),
@@ -64,6 +66,7 @@ export class RolesService {
         key: dto.key,
         name: dto.name,
         description: dto.description ?? null,
+        requireMfa: dto.requireMfa,
         permissions: { create: permissionIds.map((permissionId) => ({ permissionId })) },
       },
     });
@@ -83,6 +86,7 @@ export class RolesService {
         data: {
           name: dto.name ?? undefined,
           description: dto.description === undefined ? undefined : dto.description,
+          requireMfa: dto.requireMfa ?? undefined,
         },
       });
       if (dto.permissionKeys) {

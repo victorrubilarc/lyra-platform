@@ -29,6 +29,8 @@ export type UserSummary = z.infer<typeof userSummarySchema>;
 /** Detalle de usuario, incluido su alcance de datos. */
 export const userDetailSchema = userSummarySchema.extend({
   forcePasswordChange: z.boolean(),
+  /** El rol del usuario exige MFA (según el modo global). Derivado en el backend. */
+  mfaRequired: z.boolean(),
   scopes: z.array(scopeEntrySchema),
 });
 export type UserDetail = z.infer<typeof userDetailSchema>;

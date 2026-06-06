@@ -25,6 +25,18 @@ export const loginRequestSchema = z.object({
 });
 export type LoginRequest = z.infer<typeof loginRequestSchema>;
 
+/**
+ * Modo global de requerimiento de MFA (control maestro en la política de
+ * seguridad). El piso es OPCIONAL: nadie es forzado, pero cualquiera puede
+ * auto-enrolarse. No existe un modo que impida el enrolamiento voluntario.
+ *  - `OPTIONAL`          — nadie forzado.
+ *  - `REQUIRED_BY_ROLE`  — forzado a quienes tengan un rol con `requireMfa`.
+ *  - `REQUIRED_FOR_ALL`  — forzado a todos los usuarios.
+ */
+export const MFA_MODES = ["OPTIONAL", "REQUIRED_BY_ROLE", "REQUIRED_FOR_ALL"] as const;
+export const mfaModeSchema = z.enum(MFA_MODES);
+export type MfaMode = z.infer<typeof mfaModeSchema>;
+
 /** Resumen del usuario autenticado que consume la UI. */
 export const authUserSchema = z.object({
   id: z.string(),
@@ -33,6 +45,13 @@ export const authUserSchema = z.object({
   mfaEnabled: z.boolean(),
   /** Obliga a cambiar la contraseña antes de operar (admin de arranque, reset). */
   forcePasswordChange: z.boolean(),
+  /** El rol del usuario exige MFA (según el modo global). Derivado en el backend. */
+  mfaRequired: z.boolean(),
+  /**
+   * El rol del usuario exige MFA y aún no lo tiene activo: debe enrolarse antes
+   * de operar (gate análogo a `forcePasswordChange`). = `mfaRequired && !mfaEnabled`.
+   */
+  mfaEnrollmentRequired: z.boolean(),
 });
 export type AuthUser = z.infer<typeof authUserSchema>;
 
@@ -118,6 +137,12 @@ export const mfaDisableRequestSchema = z.object({
   password: z.string().min(1),
 });
 export type MfaDisableRequest = z.infer<typeof mfaDisableRequestSchema>;
+
+/** Regenerar los códigos de recuperación exige reconfirmar la contraseña. */
+export const mfaRegenerateRequestSchema = z.object({
+  password: z.string().min(1),
+});
+export type MfaRegenerateRequest = z.infer<typeof mfaRegenerateRequestSchema>;
 
 /** Cambio de contraseña del propio usuario. */
 export const changePasswordRequestSchema = z.object({

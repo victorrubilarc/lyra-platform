@@ -4,12 +4,16 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { randomBytes } from "node:crypto";
-import { authenticator } from "otplib";
+import { authenticator as baseAuthenticator } from "otplib";
 import { EncryptionService } from "../crypto/encryption.service";
 import { PrismaService } from "../prisma/prisma.service";
 
 const RECOVERY_CODE_COUNT = 10;
 const ISSUER = "Lyra WatchLog";
+// Tolerancia de ±1 paso (±30 s) para desfase de reloj del autenticador, como
+// recomienda RFC 6238 §5.2. No se amplía más para no agrandar el espacio de
+// adivinación del segundo factor.
+const TOTP_WINDOW = 1;
 
 /**
  * MFA TOTP. El secreto se guarda cifrado en reposo (AES-256-GCM). El segundo
@@ -17,6 +21,9 @@ const ISSUER = "Lyra WatchLog";
  * de un solo uso. El enrolamiento es en dos pasos: setup (genera) + verify
  * (confirma con un código del autenticador y entrega los recovery codes).
  */
+// Instancia local con tolerancia de ventana; no muta la configuración global.
+const authenticator = baseAuthenticator.clone({ window: TOTP_WINDOW });
+
 @Injectable()
 export class MfaService {
   constructor(
@@ -58,6 +65,24 @@ export class MfaService {
       }),
       this.prisma.user.update({ where: { id: userId }, data: { mfaEnabled: true } }),
       this.prisma.mfaRecoveryCode.deleteMany({ where: { mfaSecret: { userId } } }),
+      this.prisma.mfaRecoveryCode.createMany({
+        data: codes.map((c) => ({ mfaSecretId: record.id, codeHash: this.enc.sha256(c) })),
+      }),
+    ]);
+    return codes;
+  }
+
+  /**
+   * Regenera los códigos de recuperación (invalida los anteriores). Solo para un
+   * MFA ya confirmado; la verificación de contraseña la hace el orquestador.
+   */
+  async regenerateRecoveryCodes(userId: string): Promise<string[]> {
+    const record = await this.prisma.mfaSecret.findUnique({ where: { userId } });
+    if (!record?.confirmedAt) throw new BadRequestException("MFA no está activo");
+
+    const codes = this.generateRecoveryCodes();
+    await this.prisma.$transaction([
+      this.prisma.mfaRecoveryCode.deleteMany({ where: { mfaSecretId: record.id } }),
       this.prisma.mfaRecoveryCode.createMany({
         data: codes.map((c) => ({ mfaSecretId: record.id, codeHash: this.enc.sha256(c) })),
       }),

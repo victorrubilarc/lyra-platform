@@ -39,7 +39,12 @@ export class JwtAccessGuard implements CanActivate {
       const claims = await this.jwt.verifyAsync<AccessTokenClaims>(token, {
         secret: this.config.get("JWT_ACCESS_SECRET", { infer: true }),
       });
-      req.user = { id: claims.sub, email: claims.email, sessionId: claims.sid };
+      req.user = {
+        id: claims.sub,
+        email: claims.email,
+        sessionId: claims.sid,
+        mfaPending: claims.mfaPending === true,
+      };
       return true;
     } catch {
       throw new UnauthorizedException("Token de acceso inválido o expirado");

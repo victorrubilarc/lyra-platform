@@ -98,6 +98,12 @@ export const PERMISSION_CATALOG = [
     group: "users",
     description: "Definir el alcance de datos (nodos) de un usuario.",
   },
+  {
+    key: "user:reset-mfa",
+    dimension: "ACTION",
+    group: "users",
+    description: "Restablecer el segundo factor (MFA) de un usuario (dispositivo perdido).",
+  },
 
   // --- Dimensión 2: acciones — roles y permisos ---
   {

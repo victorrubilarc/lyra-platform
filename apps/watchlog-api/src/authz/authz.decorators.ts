@@ -11,6 +11,16 @@ export const IS_PUBLIC_KEY = "isPublic";
 export const Public = (): MethodDecorator & ClassDecorator => SetMetadata(IS_PUBLIC_KEY, true);
 
 /**
+ * Permite el acceso aunque la sesión esté pendiente de enrolar MFA. Solo deben
+ * marcarse los endpoints imprescindibles para resolver el gate (ver perfil,
+ * cerrar sesión, enrolar/verificar MFA, cambiar contraseña). El resto recibe
+ * 403 mientras el enrolamiento esté pendiente. Ver `MfaEnrollmentGuard`.
+ */
+export const ALLOW_PENDING_ENROLLMENT_KEY = "allowPendingEnrollment";
+export const AllowPendingEnrollment = (): MethodDecorator =>
+  SetMetadata(ALLOW_PENDING_ENROLLMENT_KEY, true);
+
+/**
  * Exige uno o más permisos para acceder al handler. Semántica AND: el usuario
  * debe tener TODOS los permisos listados. Para OR, usar @RequireAnyPermission.
  */

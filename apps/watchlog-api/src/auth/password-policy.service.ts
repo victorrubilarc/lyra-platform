@@ -16,6 +16,7 @@ const DEFAULT_POLICY = {
   historyCount: 5,
   maxFailedAttempts: 5,
   lockoutMinutes: 15,
+  mfaMode: "OPTIONAL" as const,
 };
 
 @Injectable()

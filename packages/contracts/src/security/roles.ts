@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { mfaModeSchema } from "./auth.js";
 
 /** Clave de rol: minúsculas, números y guiones (ej. `supervisor-turno`). */
 export const roleKeySchema = z
@@ -15,6 +16,8 @@ export const roleSummarySchema = z.object({
   name: z.string(),
   description: z.string().nullable(),
   isSystem: z.boolean(),
+  /** Si true, los usuarios con este rol deben tener MFA activo (cuando el modo global lo honra). */
+  requireMfa: z.boolean(),
   permissionCount: z.number().int().nonnegative(),
   userCount: z.number().int().nonnegative(),
 });
@@ -32,6 +35,8 @@ export const createRoleRequestSchema = z.object({
   name: z.string().trim().min(1).max(80),
   description: z.string().trim().max(280).optional(),
   permissionKeys: z.array(z.string()).default([]),
+  /** Exigir MFA a los usuarios con este rol (cuando el modo global lo honra). */
+  requireMfa: z.boolean().default(false),
 });
 export type CreateRoleRequest = z.infer<typeof createRoleRequestSchema>;
 
@@ -40,6 +45,7 @@ export const updateRoleRequestSchema = z.object({
   name: z.string().trim().min(1).max(80).optional(),
   description: z.string().trim().max(280).nullable().optional(),
   permissionKeys: z.array(z.string()).optional(),
+  requireMfa: z.boolean().optional(),
 });
 export type UpdateRoleRequest = z.infer<typeof updateRoleRequestSchema>;
 
@@ -57,6 +63,8 @@ export const passwordPolicySchema = z.object({
   maxFailedAttempts: z.number().int().min(1).max(20),
   /** Minutos de bloqueo tras superar los intentos. */
   lockoutMinutes: z.number().int().min(1).max(1440),
+  /** Modo global de requerimiento de MFA (ver `mfaModeSchema`). */
+  mfaMode: mfaModeSchema,
 });
 export type PasswordPolicy = z.infer<typeof passwordPolicySchema>;
 

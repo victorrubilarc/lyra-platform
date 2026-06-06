@@ -11,6 +11,8 @@ import type { Prisma } from "@prisma/client";
 import { AuditService, type AuditContext } from "../audit/audit.service";
 import { PermissionService } from "../authz/permission.service";
 import { PasswordService } from "../crypto/password.service";
+import { AuthService } from "../auth/auth.service";
+import { MfaRequirementService } from "../auth/mfa-requirement.service";
 import { PasswordPolicyService } from "../auth/password-policy.service";
 import { PrismaService } from "../prisma/prisma.service";
 
@@ -25,6 +27,8 @@ export class UsersService {
     private readonly passwords: PasswordService,
     private readonly policy: PasswordPolicyService,
     private readonly permissions: PermissionService,
+    private readonly mfaRequirement: MfaRequirementService,
+    private readonly auth: AuthService,
     private readonly audit: AuditService,
   ) {}
 
@@ -42,11 +46,22 @@ export class UsersService {
       include: { ...userInclude, scopes: { where: { userId: id } } },
     });
     if (!user) throw new NotFoundException("Usuario no encontrado");
+    const mfaRequired = await this.mfaRequirement.isRequiredForUser(id);
     return {
       ...this.toSummary(user),
       forcePasswordChange: user.forcePasswordChange,
+      mfaRequired,
       scopes: user.scopes.map((s) => ({ orgNodeId: s.orgNodeId, includeDescendants: s.includeDescendants })),
     };
+  }
+
+  /**
+   * RESET del MFA de un usuario (acción de administrador, dispositivo perdido).
+   * Delega en AuthService (borra factor, revoca sesiones del objetivo, audita).
+   */
+  async resetMfa(id: string, ctx: AuditContext): Promise<UserDetail> {
+    await this.auth.adminResetMfa(id, ctx);
+    return this.get(id);
   }
 
   async create(dto: CreateUserRequest, ctx: AuditContext): Promise<UserDetail> {

@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { AuthController } from "./auth.controller";
 import { AuthService } from "./auth.service";
 import { MfaService } from "./mfa.service";
+import { MfaRequirementService } from "./mfa-requirement.service";
 import { PasswordPolicyService } from "./password-policy.service";
 import { PasswordResetService } from "./password-reset.service";
 import { TokenService } from "./token.service";
@@ -19,11 +20,12 @@ import { LocalAuthProvider } from "./providers/local-auth.provider";
     AuthService,
     TokenService,
     MfaService,
+    MfaRequirementService,
     PasswordPolicyService,
     PasswordResetService,
     CsrfGuard,
     LocalAuthProvider,
   ],
-  exports: [AuthService, PasswordPolicyService],
+  exports: [AuthService, PasswordPolicyService, MfaRequirementService],
 })
 export class AuthModule {}

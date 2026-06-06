@@ -40,6 +40,10 @@ function build(overrides: { user?: Record<string, unknown> | null; maxFailed?: n
       .mockResolvedValue({ accessToken: "a", refreshToken: "r", expiresIn: 900, sessionId: "s1" }),
   };
   const mfa = { assertSecondFactor: vi.fn() };
+  const mfaRequirement = {
+    isEnrollmentPending: vi.fn().mockResolvedValue(false),
+    isRequiredForUser: vi.fn().mockResolvedValue(false),
+  };
   const policy = {
     getPolicy: vi.fn().mockResolvedValue({ maxFailedAttempts: overrides.maxFailed ?? 5, lockoutMinutes: 15 }),
   };
@@ -56,6 +60,7 @@ function build(overrides: { user?: Record<string, unknown> | null; maxFailed?: n
     local as never,
     tokens as never,
     mfa as never,
+    mfaRequirement as never,
     policy as never,
     resets as never,
     passwords as never,
@@ -65,7 +70,7 @@ function build(overrides: { user?: Record<string, unknown> | null; maxFailed?: n
     config as never,
     audit as never,
   );
-  return { service, prisma, local, tokens, audit };
+  return { service, prisma, local, tokens, mfa, audit };
 }
 
 const meta = { ip: "127.0.0.1", userAgent: "test" };
@@ -130,5 +135,50 @@ describe("AuthService.login", () => {
     const c = build({ user: { id: "u1", email: "op@x.cl", passwordHash: "h", status: "ACTIVE", mfaEnabled: true, failedLoginCount: 0, lockedUntil: null } });
     const result = await c.service.login({ email: "op@x.cl", password: "ok" }, meta);
     expect(result.kind).toBe("mfa_required");
+  });
+});
+
+describe("AuthService — throttle del segundo factor", () => {
+  const mfaUser = (over: Record<string, unknown> = {}) => ({
+    id: "u1",
+    email: "op@x.cl",
+    passwordHash: "h",
+    status: "ACTIVE",
+    mfaEnabled: true,
+    failedLoginCount: 0,
+    lockedUntil: null,
+    mfaFailedCount: 0,
+    mfaLockedUntil: null,
+    ...over,
+  });
+
+  it("TOTP inválido incrementa el contador PROPIO de MFA (no el de contraseña)", async () => {
+    const c = build({ user: mfaUser() });
+    c.mfa.assertSecondFactor.mockRejectedValue(new UnauthorizedException("x"));
+    await expect(
+      c.service.login({ email: "op@x.cl", password: "ok", totp: "000000" }, meta),
+    ).rejects.toThrow(UnauthorizedException);
+    const call = c.prisma.user.update.mock.calls.at(-1)![0];
+    expect(call.data.mfaFailedCount).toBe(1);
+    expect(call.data.failedLoginCount).toBeUndefined();
+  });
+
+  it("al alcanzar el máximo de intentos de MFA, bloquea (mfaLockedUntil)", async () => {
+    const c = build({ user: mfaUser({ mfaFailedCount: 4 }), maxFailed: 5 });
+    c.mfa.assertSecondFactor.mockRejectedValue(new UnauthorizedException("x"));
+    await expect(
+      c.service.login({ email: "op@x.cl", password: "ok", totp: "000000" }, meta),
+    ).rejects.toThrow();
+    const call = c.prisma.user.update.mock.calls.at(-1)![0];
+    expect(call.data.mfaLockedUntil).toBeInstanceOf(Date);
+    expect(call.data.mfaFailedCount).toBe(0);
+  });
+
+  it("rechaza la verificación si el segundo factor está bloqueado temporalmente", async () => {
+    const c = build({ user: mfaUser({ mfaLockedUntil: new Date(Date.now() + 60_000) }) });
+    await expect(
+      c.service.login({ email: "op@x.cl", password: "ok", totp: "000000" }, meta),
+    ).rejects.toThrow(/Demasiados intentos/);
+    expect(c.mfa.assertSecondFactor).not.toHaveBeenCalled();
   });
 });
