@@ -2,89 +2,108 @@
   padding: var(--space-2) 0;
 }
 
-/* ---- Fila de nodo ---- */
+/* ── Fila de nodo ── */
 .nodeRow {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  min-height: 44px;
-  cursor: default;
-  transition: background 0.12s ease;
-  position: relative;
+  padding: 6px var(--space-2);
+  min-height: 38px;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  margin: 1px var(--space-2);
+  transition: background 0.1s ease;
+  user-select: none;
 }
 
 .nodeRow:hover {
   background: var(--color-hover);
 }
 
-/* Indentación: var(--indent) se inyecta inline */
-.nodeIndent {
-  flex-shrink: 0;
+.nodeRowSelected {
+  background: rgba(99, 102, 241, 0.12);
 }
 
-/* Botón de expandir / colapsar */
+.nodeRowSelected:hover {
+  background: rgba(99, 102, 241, 0.18);
+}
+
+/* Chevron */
 .chevronBtn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   flex-shrink: 0;
   border: none;
   background: none;
   color: var(--color-text-muted);
   cursor: pointer;
   border-radius: var(--radius-sm);
-  transition: color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+  transition: color 0.12s ease, transform 0.15s ease;
   padding: 0;
 }
 
 .chevronBtn:hover {
   color: var(--color-text-secondary);
-  background: var(--color-hover);
 }
 
 .chevronOpen {
   transform: rotate(90deg);
 }
 
-/* Placeholder cuando no hay hijos (para mantener alineación) */
 .noChevron {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+/* Dot de nivel (coloreado por nivel) */
+.levelDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
   flex-shrink: 0;
 }
 
 /* Nombre y código */
 .nodeName {
   flex: 1;
-  font-size: var(--text-body-size);
+  font-size: var(--text-body-sm-size);
   font-weight: 500;
   color: var(--color-text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.nodeRowSelected .nodeName {
+  color: var(--color-accent-primary);
 }
 
 .nodeCode {
-  font-size: var(--text-caption-size);
+  font-size: 10px;
   font-family: var(--font-mono);
   color: var(--color-text-muted);
+  background: var(--color-bg-surface-2);
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
   flex-shrink: 0;
 }
 
-/* Acciones: siempre visibles (tablet / guantes — no hover-only) */
-.nodeActions {
+/* Badge de hijos */
+.childCount {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  background: var(--color-bg-surface-2);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 10px;
+  padding: 0 6px;
+  min-width: 18px;
+  text-align: center;
   flex-shrink: 0;
-  margin-left: auto;
-}
-
-/* Línea divisoria entre root nodes */
-.nodeChildren {
-  border-top: 1px solid var(--color-border-subtle);
-}
-
-.nodeChildren .nodeRow:first-child {
-  border-top: none;
+  line-height: 16px;
 }

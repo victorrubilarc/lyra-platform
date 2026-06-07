@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Building2, Layers, Lock, Plus, TriangleAlert } from "lucide-react";
 import { Button, EmptyState, Skeleton } from "@lyra/ui";
@@ -6,7 +6,8 @@ import type { OrgNodeTree } from "@lyra/contracts";
 import { Can } from "../../auth/Can.js";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { useOrgLevels, useOrgTree } from "./structure-queries.js";
-import { OrgTree, type OrgTreeActions } from "./OrgTree.js";
+import { OrgTree } from "./OrgTree.js";
+import { NodeDetail } from "./NodeDetail.js";
 import { NodeDrawer, type NodeDrawerMode } from "./NodeDrawer.js";
 import { LevelsDrawer } from "./LevelsDrawer.js";
 import { DeleteNodeModal } from "./DeleteNodeModal.js";
@@ -19,10 +20,16 @@ interface NodeDrawerState {
   node: OrgNodeTree | null;
 }
 
-/**
- * Pantalla de Estructura organizacional. Gateada por `module:structure:view`.
- * CRUD de nodos sobre el árbol; gestión de niveles vía LevelsDrawer.
- */
+function flattenTree(nodes: OrgNodeTree[]): Map<string, OrgNodeTree> {
+  const map = new Map<string, OrgNodeTree>();
+  function walk(n: OrgNodeTree) {
+    map.set(n.id, n);
+    n.children.forEach(walk);
+  }
+  nodes.forEach(walk);
+  return map;
+}
+
 export function StructurePage() {
   const { t } = useTranslation();
   const perms = usePermissions();
@@ -30,16 +37,19 @@ export function StructurePage() {
   const { data: tree = [], isLoading: treeLoading, isError: treeError } = useOrgTree();
   const { data: levels = [], isLoading: levelsLoading } = useOrgLevels();
 
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [nodeDrawer, setNodeDrawer] = useState<NodeDrawerState>({
     open: false,
     mode: "create-root",
     node: null,
   });
-  const [levelsOpen, setLevelsOpen] = useState(false);
-  const [moveNode, setMoveNode] = useState<OrgNodeTree | null>(null);
-  const [deleteNode, setDeleteNode] = useState<OrgNodeTree | null>(null);
+  const [levelsOpen, setLevelsOpen]   = useState(false);
+  const [moveNode, setMoveNode]       = useState<OrgNodeTree | null>(null);
+  const [deleteNode, setDeleteNode]   = useState<OrgNodeTree | null>(null);
 
-  // Permiso de módulo: sin acceso → EmptyState con candado
+  const flatMap      = useMemo(() => flattenTree(tree), [tree]);
+  const selectedNode = selectedNodeId ? (flatMap.get(selectedNodeId) ?? null) : null;
+
   if (!perms.can("module:structure:view")) {
     return (
       <div className={styles.page}>
@@ -52,15 +62,14 @@ export function StructurePage() {
     );
   }
 
-  const treeActions: OrgTreeActions = {
-    onCreateChild: (parent) =>
-      setNodeDrawer({ open: true, mode: "create-child", node: parent }),
-    onEdit: (node) => setNodeDrawer({ open: true, mode: "edit", node }),
-    onMove: (node) => setMoveNode(node),
-    onDelete: (node) => setDeleteNode(node),
-  };
-
   const isLoading = treeLoading || levelsLoading;
+
+  function openEditNode(node: OrgNodeTree) {
+    setNodeDrawer({ open: true, mode: "edit", node });
+  }
+  function openDeleteNode(node: OrgNodeTree) {
+    setDeleteNode(node);
+  }
 
   return (
     <div className={styles.page}>
@@ -90,7 +99,6 @@ export function StructurePage() {
         </div>
       </div>
 
-      {/* Aviso si no hay niveles y tiene permiso para crearlos */}
       {!isLoading && levels.length === 0 && perms.can("orglevel:manage") && (
         <div className={styles.noLevelsWarning}>
           <TriangleAlert size={16} />
@@ -98,48 +106,64 @@ export function StructurePage() {
         </div>
       )}
 
-      {/* Árbol de nodos */}
-      <div className={styles.treeCard}>
-        {isLoading ? (
-          <div className={styles.loadingSkeleton}>
-            <Skeleton height={28} width="45%" />
-            <div style={{ paddingLeft: 24 }}><Skeleton height={28} width="30%" /></div>
-            <div style={{ paddingLeft: 48 }}><Skeleton height={28} width="38%" /></div>
-            <Skeleton height={28} width="50%" />
-            <div style={{ paddingLeft: 24 }}><Skeleton height={28} width="35%" /></div>
+      {/* Workspace de dos paneles */}
+      <div className={styles.workspace}>
+        {/* Panel izquierdo — árbol de navegación */}
+        <div className={styles.treePanel}>
+          <div className={styles.treePanelHeader}>
+            <span className={styles.treePanelTitle}>{t("structure.tree.panelTitle")}</span>
           </div>
-        ) : treeError ? (
-          <div style={{ padding: 32 }}>
-            <EmptyState
-              icon={<TriangleAlert size={32} />}
-              title={t("structure.loadError")}
-              description={t("structure.loadErrorDesc")}
+
+          {isLoading ? (
+            <div className={styles.loadingSkeleton}>
+              <Skeleton height={26} width="60%" />
+              <div style={{ paddingLeft: 18 }}><Skeleton height={26} width="50%" /></div>
+              <div style={{ paddingLeft: 36 }}><Skeleton height={26} width="55%" /></div>
+              <Skeleton height={26} width="65%" />
+              <div style={{ paddingLeft: 18 }}><Skeleton height={26} width="45%" /></div>
+            </div>
+          ) : treeError ? (
+            <div style={{ padding: 16 }}>
+              <EmptyState
+                icon={<TriangleAlert size={28} />}
+                title={t("structure.loadError")}
+              />
+            </div>
+          ) : tree.length === 0 ? (
+            <div style={{ padding: 16 }}>
+              <EmptyState
+                icon={<Building2 size={36} />}
+                title={t("structure.noNodes")}
+                description={t("structure.noNodesDesc")}
+              />
+            </div>
+          ) : (
+            <OrgTree
+              nodes={tree}
+              levels={levels}
+              selectedId={selectedNodeId}
+              onSelect={(node) => setSelectedNodeId(node.id)}
             />
-          </div>
-        ) : tree.length === 0 ? (
-          <div style={{ padding: 32 }}>
-            <EmptyState
-              icon={<Building2 size={40} />}
-              title={t("structure.noNodes")}
-              description={t("structure.noNodesDesc")}
-              action={
-                perms.can("orgnode:create") && levels.length > 0 ? (
-                  <Button
-                    variant="primary"
-                    onClick={() =>
-                      setNodeDrawer({ open: true, mode: "create-root", node: null })
-                    }
-                  >
-                    <Plus size={15} />
-                    {t("structure.node.createRoot")}
-                  </Button>
-                ) : undefined
-              }
-            />
-          </div>
-        ) : (
-          <OrgTree nodes={tree} levels={levels} actions={treeActions} />
-        )}
+          )}
+        </div>
+
+        {/* Panel derecho — detalle del nodo seleccionado */}
+        <div className={styles.detailPanel}>
+          <NodeDetail
+            node={selectedNode}
+            allNodes={tree}
+            levels={levels}
+            onCreateChild={() =>
+              setNodeDrawer({ open: true, mode: "create-child", node: selectedNode })
+            }
+            onEdit={() => selectedNode && openEditNode(selectedNode)}
+            onMove={() => selectedNode && setMoveNode(selectedNode)}
+            onDelete={() => selectedNode && openDeleteNode(selectedNode)}
+            onNavigateTo={(n) => setSelectedNodeId(n.id)}
+            onEditChild={(child) => openEditNode(child)}
+            onDeleteChild={(child) => openDeleteNode(child)}
+          />
+        </div>
       </div>
 
       {/* Drawers y modales */}

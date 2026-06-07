@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 import { cx } from "../../cx.js";
 import styles from "./Menu.module.css";
 
@@ -25,16 +26,26 @@ export interface MenuProps {
   children: ReactNode;
 }
 
-/** Menú desplegable con cierre por click-fuera y Escape. */
+/** Menú desplegable. El panel se renderiza via portal para escapar overflow:hidden. */
 export function Menu({ trigger, align = "end", minWidth = 210, ariaLabel, children }: MenuProps) {
   const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [rect, setRect] = useState<DOMRect | null>(null);
   const close = useCallback(() => setOpen(false), []);
+
+  function handleToggle() {
+    if (!triggerRef.current) return;
+    setRect(triggerRef.current.getBoundingClientRect());
+    setOpen((o) => !o);
+  }
 
   useEffect(() => {
     if (!open) return;
     const onDoc = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+      const inTrigger = triggerRef.current?.contains(e.target as Node);
+      const inPanel = panelRef.current?.contains(e.target as Node);
+      if (!inTrigger && !inPanel) setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
@@ -48,27 +59,37 @@ export function Menu({ trigger, align = "end", minWidth = 210, ariaLabel, childr
   }, [open]);
 
   return (
-    <div className={styles.root} ref={rootRef}>
+    <div className={styles.root}>
       <button
         type="button"
+        ref={triggerRef}
         className={styles.trigger}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={ariaLabel}
-        onClick={() => setOpen((o) => !o)}
+        onClick={handleToggle}
       >
         {trigger}
       </button>
-      {open && (
+      {open && rect && createPortal(
         <Ctx.Provider value={{ close }}>
           <div
-            className={cx(styles.panel, align === "end" ? styles.alignEnd : styles.alignStart)}
+            ref={panelRef}
+            className={cx(styles.panel)}
             role="menu"
-            style={{ minWidth }}
+            style={{
+              position: "fixed",
+              top: rect.bottom + 6,
+              ...(align === "end"
+                ? { right: window.innerWidth - rect.right }
+                : { left: rect.left }),
+              minWidth,
+            }}
           >
             {children}
           </div>
-        </Ctx.Provider>
+        </Ctx.Provider>,
+        document.body
       )}
     </div>
   );

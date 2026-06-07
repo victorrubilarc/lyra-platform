@@ -1,0 +1,229 @@
+/* ── Panel vacío ── */
+.emptyPanel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 340px;
+  padding: var(--space-8);
+}
+
+/* ── Panel de detalle ── */
+.panel {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-5) var(--space-6);
+  gap: var(--space-4);
+  overflow-y: auto;
+  height: 100%;
+}
+
+/* Breadcrumb */
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+.breadcrumbItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.breadcrumbSep {
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.breadcrumbLink {
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  font-size: var(--text-caption-size);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: color 0.12s ease;
+}
+
+.breadcrumbLink:hover {
+  color: var(--color-accent-primary);
+}
+
+.breadcrumbCurrent {
+  font-size: var(--text-caption-size);
+  color: var(--color-text-secondary);
+  font-weight: 500;
+  padding: 2px 4px;
+}
+
+/* ── Cabecera del nodo ── */
+.nodeHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.nodeIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface-2);
+  border: 1px solid var(--color-border-subtle);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.nodeInfo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.nodeName {
+  font-family: var(--font-brand);
+  font-size: var(--text-h2-size);
+  font-weight: var(--text-h2-weight);
+  color: var(--color-text-primary);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nodeMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+/* ── Divider ── */
+.divider {
+  height: 1px;
+  background: var(--color-border-subtle);
+  flex-shrink: 0;
+}
+
+/* ── Sección de hijos / equipos ── */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  flex: 1;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.sectionTitle {
+  font-family: var(--font-brand);
+  font-size: var(--text-body-size);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 11px;
+}
+
+/* Celda nombre en la tabla de hijos */
+.childNameBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: var(--font-body);
+  font-size: var(--text-body-sm-size);
+  font-weight: 500;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  text-align: left;
+  min-width: 0;
+}
+
+.childNameBtn:hover {
+  color: var(--color-accent-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.childDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.childNameText {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.childBadge {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  background: var(--color-bg-surface-2);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 10px;
+  padding: 0 5px;
+  line-height: 16px;
+  flex-shrink: 0;
+}
+
+.rowActions {
+  display: inline-flex;
+  gap: 4px;
+}
+
+/* Monospace para códigos */
+.code {
+  font-family: var(--font-mono);
+  font-size: var(--text-caption-size);
+  color: var(--color-text-secondary);
+  background: var(--color-bg-surface-2);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-subtle);
+}
+
+.nullText {
+  color: var(--color-text-muted);
+  font-size: var(--text-caption-size);
+}
+
+/* Placeholder de equipos */
+.equipmentPlaceholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 220px;
+  border: 1px dashed var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface-2);
+}

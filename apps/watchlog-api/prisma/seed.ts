@@ -114,12 +114,151 @@ async function seedDemoUser(): Promise<void> {
   console.log(`✔ Usuario de prueba (dev) creado: ${email} / ${password}`);
 }
 
+/**
+ * Estructura organizacional de referencia para desarrollo (2 plantas de ejemplo).
+ * Idempotente: salta si ya existen nodos.
+ */
+async function seedDemoStructure(): Promise<void> {
+  if (process.env.NODE_ENV === "production") return;
+
+  const existingNodes = await prisma.orgNode.count();
+  if (existingNodes > 0) {
+    console.log("• Estructura organizacional ya existe: no se recrea");
+    return;
+  }
+
+  // Sin nodos, puede haber niveles sueltos de pruebas manuales — limpiar para evitar
+  // conflictos en el @@unique([order]) de OrgLevel.
+  await prisma.orgLevel.deleteMany();
+
+  // ── Niveles ──────────────────────────────────────────────────────────────
+  const levelPlanta  = await prisma.orgLevel.create({ data: { id: "level-planta",  name: "Planta",  order: 0 } });
+  const levelArea    = await prisma.orgLevel.create({ data: { id: "level-area",    name: "Area",    order: 1 } });
+  const levelProceso = await prisma.orgLevel.create({ data: { id: "level-proceso", name: "Proceso", order: 2 } });
+
+  // ── Función auxiliar ──────────────────────────────────────────────────────
+  async function createNode(
+    id: string,
+    name: string,
+    code: string | null,
+    levelId: string,
+    parentId: string | null,
+    parentPath: string,
+  ) {
+    const path = `${parentPath}${id}/`;
+    return prisma.orgNode.create({
+      data: { id, name, code, levelId, parentId, path },
+    });
+  }
+
+  // ── PLANTA 1: REMANUFACTURE PLANT ────────────────────────────────────────
+  const p1 = await createNode("p1", "REMANUFACTURE PLANT", "REMA", levelPlanta.id, null, "/");
+
+  // Areas de Planta 1
+  const a_patio      = await createNode("a-patio",   "PATIO",       "PATIO",  levelArea.id, p1.id, p1.path);
+  const a_secado     = await createNode("a-secado",  "SECADO",      "SECA",   levelArea.id, p1.id, p1.path);
+  const a_prep       = await createNode("a-prep",    "PREPARACION", "PREP",   levelArea.id, p1.id, p1.path);
+  const a_elab       = await createNode("a-elab",    "ELABORACION", "ELAB",   levelArea.id, p1.id, p1.path);
+
+  // Procesos de PATIO
+  const patio_procs = [
+    ["pr-patio-rec",    "RECEPCION",               "REC"],
+    ["pr-patio-emp",    "EMPALILLADO",              "EMP"],
+    ["pr-patio-imp",    "IMPREGNADO",               "IMP"],
+    ["pr-patio-recv",   "RECEPCION VERDE",          "RECV"],
+    ["pr-patio-recs",   "RECEPCION SECO",           "RECS"],
+    ["pr-patio-recb",   "RECEPCION BLOCK",          "RECB"],
+    ["pr-patio-recbl",  "RECEPCION BLANKS",         "RECBL"],
+    ["pr-patio-recrip", "RECEPCION RIP CEPILLADO",  "RECRIP"],
+  ] as [string, string, string][];
+  for (const [id, name, code] of patio_procs) {
+    await createNode(id, name, code, levelProceso.id, a_patio.id, a_patio.path);
+  }
+
+  // Procesos de SECADO
+  for (const [id, name, code] of [
+    ["pr-seca-seca",  "SECADO",        "SECA"],
+    ["pr-seca-flash", "FLASH OFF Rema","FLASH"],
+  ] as [string, string, string][]) {
+    await createNode(id, name, code, levelProceso.id, a_secado.id, a_secado.path);
+  }
+
+  // Procesos de PREPARACION
+  for (const [id, name, code] of [
+    ["pr-prep-cep",    "CEPILLADO",     "CEP"],
+    ["pr-prep-troz",   "TROZADO",       "TROZ"],
+    ["pr-prep-finger", "FINGER",        "FINGER"],
+    ["pr-prep-huin",   "HUINCHA",       "HUIN"],
+    ["pr-prep-prens",  "PRENSA",        "PREN"],
+    ["pr-prep-rip",    "RIP SAW",       "RIP"],
+    ["pr-prep-imp",    "IMPREGNADO Rema","IMPR"],
+  ] as [string, string, string][]) {
+    await createNode(id, name, code, levelProceso.id, a_prep.id, a_prep.path);
+  }
+
+  // Procesos de ELABORACION
+  for (const [id, name, code] of [
+    ["pr-elab-part",  "PARTIDO",        "PART"],
+    ["pr-elab-mold",  "MOLDURERA",      "MOLD"],
+    ["pr-elab-lij",   "LIJADO",         "LIJ"],
+    ["pr-elab-cola",  "LINEA DE COLA",  "COLA"],
+    ["pr-elab-esc",   "ESCUADRADO",     "ESC"],
+    ["pr-elab-dim",   "DIMENSIONADO",   "DIM"],
+    ["pr-elab-rep",   "REPARADO",       "REP"],
+    ["pr-elab-raj",   "RAJADO",         "RAJ"],
+    ["pr-elab-deb",   "DESBASTE",       "DEB"],
+  ] as [string, string, string][]) {
+    await createNode(id, name, code, levelProceso.id, a_elab.id, a_elab.path);
+  }
+
+  // ── PLANTA 2: TREATMENT PLANT ────────────────────────────────────────────
+  const p2 = await createNode("p2", "TREATMENT PLANT", "TRAT", levelPlanta.id, null, "/");
+
+  // Areas de Planta 2
+  const a_trat   = await createNode("a-trat",   "TRATAMIENTO", "TRAT",  levelArea.id, p2.id, p2.path);
+  const a_rec2   = await createNode("a-rec2",   "RECEPCION",   "REC",   levelArea.id, p2.id, p2.path);
+  const a_pint   = await createNode("a-pint",   "PINTADO",     "PINT",  levelArea.id, p2.id, p2.path);
+  const a_p2     = await createNode("a-p2",     "PLANTA P2",   "P2",    levelArea.id, p2.id, p2.path);
+
+  // Procesos de TRATAMIENTO
+  for (const [id, name, code] of [
+    ["pr-trat-impp",  "IMPREGNADO Pintado",  "IMPP"],
+    ["pr-trat-flash", "FLASH OFF Pintado",   "FLASHP"],
+    ["pr-trat-boro",  "IMPREGNADO BORO",     "BORO"],
+  ] as [string, string, string][]) {
+    await createNode(id, name, code, levelProceso.id, a_trat.id, a_trat.path);
+  }
+
+  // RECEPCION Planta 2 no tiene procesos visibles en la referencia — queda vacía
+
+  // Procesos de PINTADO
+  for (const [id, name, code] of [
+    ["pr-pint-air",  "AIRLESS",              "AIR"],
+    ["pr-pint-vac",  "VACÍO",                "VAC"],
+    ["pr-pint-arm",  "ARMADO",               "ARM"],
+    ["pr-pint-br1",  "BAJADA RACK (1eraM)",  "BR1"],
+    ["pr-pint-br2",  "BAJADA RACK (2daM)",   "BR2"],
+    ["pr-pint-brl",  "BAJADA RACK (Latex)",  "BRL"],
+    ["pr-pint-brm",  "BAJADA RACK (Manual)", "BRM"],
+    ["pr-pint-brs",  "BAJADA RACK SELLANTE", "BRS"],
+    ["pr-pint-brlfx","BAJADA RACK (Latex FFX)","BRLFX"],
+  ] as [string, string, string][]) {
+    await createNode(id, name, code, levelProceso.id, a_pint.id, a_pint.path);
+  }
+
+  // Procesos de PLANTA P2
+  await createNode("pr-p2-pint2", "PINTADO 2", "PINT2", levelProceso.id, a_p2.id, a_p2.path);
+
+  console.log("✔ Estructura organizacional de demo (2 plantas) creada");
+}
+
 async function main(): Promise<void> {
   await seedPermissions();
   await seedAdminRole();
   await seedPasswordPolicy();
   await seedBootstrapAdmin();
   await seedDemoUser();
+  await seedDemoStructure();
 }
 
 main()

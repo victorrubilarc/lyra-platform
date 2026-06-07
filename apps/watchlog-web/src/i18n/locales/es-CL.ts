@@ -9,6 +9,7 @@ export const esCL = {
     close: "Cerrar",
     cancel: "Cancelar",
     save: "Guardar",
+    add: "Agregar",
     edit: "Editar",
     delete: "Eliminar",
     loading: "Cargando…",
@@ -88,6 +89,19 @@ export const esCL = {
     loadErrorDesc: "No se pudo obtener el árbol de nodos.",
     collapse: "Colapsar",
     expand: "Expandir",
+    tree: {
+      panelTitle: "Jerarquía",
+    },
+    detail: {
+      emptyTitle: "Selecciona un nodo",
+      emptyDesc: "Haz clic en cualquier elemento del árbol para ver su detalle y gestionar sus hijos.",
+      children: "Hijos",
+      noChildren: "Sin hijos",
+      noChildrenCreate: "Usa el botón para agregar el primer elemento.",
+      equipment: "Equipos",
+      equipmentSoon: "Módulo de equipos — próximamente",
+      equipmentSoonDesc: "Aquí podrás registrar y gestionar los equipos asociados a este proceso.",
+    },
     node: {
       actions: "Acciones del nodo",
       createRoot: "Nuevo nodo raíz",

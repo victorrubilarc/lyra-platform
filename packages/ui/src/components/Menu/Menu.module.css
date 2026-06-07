@@ -19,9 +19,8 @@
 }
 
 .panel {
-  position: absolute;
-  top: calc(100% + 6px);
-  z-index: 90;
+  /* position:fixed + top/right|left se inyectan inline desde el componente (portal) */
+  z-index: 1100;
   background: var(--color-bg-surface-2);
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-md);
@@ -31,13 +30,6 @@
   flex-direction: column;
   gap: 2px;
   animation: menuIn 0.14s ease;
-}
-
-.alignEnd {
-  right: 0;
-}
-.alignStart {
-  left: 0;
 }
 
 @keyframes menuIn {
