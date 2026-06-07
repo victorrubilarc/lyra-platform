@@ -287,17 +287,19 @@ model OrgLevel {
 }
 
 model OrgNode {
-  id        String    @id @default(cuid())
-  name      String
-  code      String?
-  parentId  String?
-  levelId   String
+  id           String    @id @default(cuid())
+  name         String
+  code         String?
+  /// Código de identificación en sistemas externos (ERP, CMMS, SCADA, etc.)
+  externalCode String?
+  parentId     String?
+  levelId      String
   // Ruta materializada de ancestros incluyéndose: "/<id>/<id>/.../". Permite
   // consultar descendientes con `path LIKE '<prefijo>%'` en una sola query.
-  path      String    @default("")
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime? // borrado lógico
+  path         String    @default("")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime? // borrado lógico
 
   level    OrgLevel  @relation(fields: [levelId], references: [id])
   parent   OrgNode?  @relation("OrgHierarchy", fields: [parentId], references: [id])

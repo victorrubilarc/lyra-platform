@@ -28,16 +28,16 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 
 ## 1. Git: ramas y commits SIN publicar (riesgo de pérdida) 🔴
 
-> Estado al 2026-06-06 (todo publicado). Verificar con:
+> Estado al 2026-06-07 (todo publicado). Verificar con:
 > `git rev-list --count origin/main..main` (debe dar 0) y `git branch --no-merged main`.
 
 | Qué | Dónde | Estado | Acción pendiente |
 |---|---|---|---|
 | **Fase 1: Login + branding + reset de contraseña + docs + rutina** | `main` | ✅ publicado en `origin/main` | ninguna |
 | **Fase 1: MFA self-service** | `main` (fusionado desde `feat/auth-mfa-self-service`) | ✅ fusionado y publicado en `origin/main` | ninguna |
+| **Estructura v2 + externalCode + Table fix** | `main` | 🔴 **pendiente de push** | `git push origin main` |
 
-**Estado:** **nada vive solo en local.** `main` = `origin/main`. La rama
-`feat/auth-mfa-self-service` quedó fusionada por fast-forward; puede borrarse.
+**Estado:** último commit de externalCode pendiente de publicar.
 
 **Convención propuesta (a confirmar):** trabajar cada módulo en rama `feat/<modulo>`;
 al cerrar la sesión → push de la rama + merge a `main` + push de `main`. Así `origin/main`
@@ -54,6 +54,8 @@ nunca queda más de una sesión atrás.
       `@lyra/ui`. **Pendiente solo el smoke visual** (ver §4).
 - [x] **UI Estructura organizacional** ✅ (2026-06-07). Árbol expandible con CRUD de nodos y gestión de
       niveles. `@lyra/ui` ampliado con `Chip`, `Table`, `Select`. Backend: `DELETE /structure/levels/:id`.
+- [x] **externalCode en OrgNode** ✅ (2026-06-07). Campo de integración ERP/CMMS/SCADA: migración,
+      contratos, backend (service + buildTree), UI (drawer + detalle). i18n. Build limpio.
 - [ ] **UI Seguridad** ← *siguiente sesión* sobre `/security/*`:
   - [ ] Usuarios: listado, alta/edición, asignar roles, asignar alcance (scope).
   - [ ] Roles/permisos: CRUD de roles + matriz de permisos (catálogo de `@lyra/contracts`),

@@ -1,8 +1,33 @@
-import { useEffect, useState } from "react";
-import { ChevronRight } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
+import { Building2, ChevronRight, Cog, FolderOpen, Layers, Wrench } from "lucide-react";
 import { cx } from "@lyra/ui";
 import type { OrgLevel, OrgNodeTree } from "@lyra/contracts";
 import styles from "./OrgTree.module.css";
+
+// ── Helpers de nivel (exportados para reutilización en NodeDetail) ────────────
+
+export function levelColor(order: number | undefined): string {
+  switch (order) {
+    case 0:  return "var(--color-accent-primary)";
+    case 1:  return "var(--color-accent-secondary)";
+    case 2:  return "var(--color-success)";
+    case 3:  return "var(--color-warning)";
+    default: return "var(--color-text-muted)";
+  }
+}
+
+export function LevelIcon({ order, size = 16 }: { order: number | undefined; size?: number }): ReactNode {
+  const color = levelColor(order);
+  switch (order) {
+    case 0:  return <Building2  size={size} color={color} />;
+    case 1:  return <Layers     size={size} color={color} />;
+    case 2:  return <Cog        size={size} color={color} />;
+    case 3:  return <Wrench     size={size} color={color} />;
+    default: return <FolderOpen size={size} color={color} />;
+  }
+}
+
+// ── Componente ────────────────────────────────────────────────────────────────
 
 interface OrgTreeProps {
   nodes: OrgNodeTree[];
@@ -15,16 +40,6 @@ function buildLevelMap(levels: OrgLevel[]): Map<string, OrgLevel> {
   return new Map(levels.map((l) => [l.id, l]));
 }
 
-export function levelColor(order: number | undefined): string {
-  switch (order) {
-    case 0:  return "var(--color-accent-primary)";
-    case 1:  return "var(--color-accent-secondary)";
-    case 2:  return "var(--color-success)";
-    default: return "var(--color-text-muted)";
-  }
-}
-
-/** Árbol de navegación. La selección y las acciones viven en el panel de detalle. */
 export function OrgTree({ nodes, levels, selectedId, onSelect }: OrgTreeProps) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set);
   const levelMap = buildLevelMap(levels);
@@ -90,9 +105,9 @@ interface NodeBranchProps {
 }
 
 function NodeBranch({ node, depth, expanded, toggle, levelMap, selectedId, onSelect }: NodeBranchProps) {
-  const isOpen = expanded.has(node.id);
+  const isOpen     = expanded.has(node.id);
   const hasChildren = node.children.length > 0;
-  const level = levelMap.get(node.levelId);
+  const level      = levelMap.get(node.levelId);
   const isSelected = node.id === selectedId;
 
   return (
@@ -100,8 +115,10 @@ function NodeBranch({ node, depth, expanded, toggle, levelMap, selectedId, onSel
       <div
         className={cx(styles.nodeRow, isSelected && styles.nodeRowSelected)}
         style={{ paddingLeft: `calc(var(--space-2) + ${depth * 18}px)` }}
+        title={node.name}
         onClick={() => onSelect(node)}
       >
+        {/* Chevron expandir/colapsar */}
         {hasChildren ? (
           <button
             type="button"
@@ -115,12 +132,20 @@ function NodeBranch({ node, depth, expanded, toggle, levelMap, selectedId, onSel
           <span className={styles.noChevron} />
         )}
 
-        <span className={styles.levelDot} style={{ background: levelColor(level?.order) }} />
+        {/* Ícono de nivel */}
+        <span className={styles.levelIcon}>
+          <LevelIcon order={level?.order} size={14} />
+        </span>
 
-        <span className={styles.nodeName}>{node.name}</span>
+        {/* Nombre */}
+        <span className={cx(styles.nodeName, isSelected && styles.nodeNameSelected)}>
+          {node.name}
+        </span>
 
+        {/* Código */}
         {node.code && <span className={styles.nodeCode}>{node.code}</span>}
 
+        {/* Badge de hijos */}
         {hasChildren && (
           <span className={styles.childCount}>{node.children.length}</span>
         )}

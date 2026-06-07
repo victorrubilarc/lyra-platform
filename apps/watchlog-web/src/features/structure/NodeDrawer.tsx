@@ -12,6 +12,7 @@ import { useCreateNode, useUpdateNode } from "./structure-queries.js";
 const nodeFormSchema = z.object({
   name: z.string().trim().min(1, "El nombre es obligatorio").max(120),
   code: z.string().trim().max(40).optional(),
+  externalCode: z.string().trim().max(80).optional(),
   levelId: z.string().min(1, "Selecciona un nivel"),
 });
 type NodeFormValues = z.infer<typeof nodeFormSchema>;
@@ -54,9 +55,9 @@ export function NodeDrawer({ open, mode, node, levels, onClose }: NodeDrawerProp
   useEffect(() => {
     if (!open) return;
     if (isEdit && node) {
-      form.reset({ name: node.name, code: node.code ?? "", levelId: node.levelId });
+      form.reset({ name: node.name, code: node.code ?? "", externalCode: node.externalCode ?? "", levelId: node.levelId });
     } else {
-      form.reset({ name: "", code: "", levelId: levels[0]?.id ?? "" });
+      form.reset({ name: "", code: "", externalCode: "", levelId: levels[0]?.id ?? "" });
     }
   }, [open, isEdit, node, levels, form]);
 
@@ -70,6 +71,7 @@ export function NodeDrawer({ open, mode, node, levels, onClose }: NodeDrawerProp
           dto: {
             name: values.name,
             code: values.code?.trim() || null,
+            externalCode: values.externalCode?.trim() || null,
             levelId: values.levelId,
           },
         });
@@ -78,6 +80,7 @@ export function NodeDrawer({ open, mode, node, levels, onClose }: NodeDrawerProp
         await createNode.mutateAsync({
           name: values.name,
           code: values.code?.trim() || undefined,
+          externalCode: values.externalCode?.trim() || undefined,
           levelId: values.levelId,
           parentId: mode === "create-child" ? (node?.id ?? null) : null,
         });
@@ -143,6 +146,21 @@ export function NodeDrawer({ open, mode, node, levels, onClose }: NodeDrawerProp
               {...field}
               {...form.register("code")}
               placeholder={t("structure.node.codePlaceholder")}
+              mono
+            />
+          )}
+        </FormField>
+
+        <FormField
+          label={t("structure.node.externalCode")}
+          error={form.formState.errors.externalCode?.message}
+          hint={t("structure.node.externalCodeDesc")}
+        >
+          {(field) => (
+            <Input
+              {...field}
+              {...form.register("externalCode")}
+              placeholder={t("structure.node.externalCodePlaceholder")}
               mono
             />
           )}

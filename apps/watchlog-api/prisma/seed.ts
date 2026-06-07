@@ -216,7 +216,7 @@ async function seedDemoStructure(): Promise<void> {
 
   // Areas de Planta 2
   const a_trat   = await createNode("a-trat",   "TRATAMIENTO", "TRAT",  levelArea.id, p2.id, p2.path);
-  const a_rec2   = await createNode("a-rec2",   "RECEPCION",   "REC",   levelArea.id, p2.id, p2.path);
+  const _a_rec2  = await createNode("a-rec2",   "RECEPCION",   "REC",   levelArea.id, p2.id, p2.path);
   const a_pint   = await createNode("a-pint",   "PINTADO",     "PINT",  levelArea.id, p2.id, p2.path);
   const a_p2     = await createNode("a-p2",     "PLANTA P2",   "P2",    levelArea.id, p2.id, p2.path);
 

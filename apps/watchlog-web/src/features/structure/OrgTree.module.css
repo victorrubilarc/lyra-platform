@@ -6,9 +6,9 @@
 .nodeRow {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  padding: 6px var(--space-2);
-  min-height: 38px;
+  gap: 6px;
+  padding: 7px var(--space-2);
+  min-height: 40px;
   cursor: pointer;
   border-radius: var(--radius-sm);
   margin: 1px var(--space-2);
@@ -21,11 +21,11 @@
 }
 
 .nodeRowSelected {
-  background: rgba(99, 102, 241, 0.12);
+  background: rgba(99, 102, 241, 0.1);
 }
 
 .nodeRowSelected:hover {
-  background: rgba(99, 102, 241, 0.18);
+  background: rgba(99, 102, 241, 0.15);
 }
 
 /* Chevron */
@@ -33,8 +33,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   flex-shrink: 0;
   border: none;
   background: none;
@@ -54,35 +54,37 @@
 }
 
 .noChevron {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   flex-shrink: 0;
 }
 
-/* Dot de nivel (coloreado por nivel) */
-.levelDot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
+/* Ícono de nivel */
+.levelIcon {
+  display: inline-flex;
+  align-items: center;
   flex-shrink: 0;
 }
 
-/* Nombre y código */
+/* Nombre */
 .nodeName {
   flex: 1;
-  font-size: var(--text-body-sm-size);
+  font-size: 13px;
   font-weight: 500;
-  color: var(--color-text-primary);
+  color: var(--color-text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
+  transition: color 0.1s ease;
 }
 
-.nodeRowSelected .nodeName {
+.nodeNameSelected {
   color: var(--color-accent-primary);
+  font-weight: 600;
 }
 
+/* Código */
 .nodeCode {
   font-size: 10px;
   font-family: var(--font-mono);
@@ -91,6 +93,7 @@
   padding: 1px 5px;
   border-radius: var(--radius-sm);
   flex-shrink: 0;
+  letter-spacing: 0.03em;
 }
 
 /* Badge de hijos */

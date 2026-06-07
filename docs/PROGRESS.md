@@ -253,13 +253,30 @@ Pantalla `/estructura` completamente funcional dentro del shell premium.
     hijos directos con CRUD inline, placeholder "Equipos — próximamente" para el nivel final.
   - No más menú ⋮ por nodo: las acciones están en el panel, con contexto y espacio suficiente.
 - **Seed de 2 plantas reales** (REMANUFACTURE PLANT + TREATMENT PLANT): 3 niveles
-  (Planta/Area/Proceso) y 40+ nodos reales del sistema de referencia. Idempotente: solo crea si
+  (Planta/Area/Proceso) y 49 nodos reales del sistema de referencia. Idempotente: solo crea si
   no existen nodos; limpia niveles huérfanos si el árbol está vacío.
 - **i18n**: claves `structure.tree.*`, `structure.detail.*`, `common.add`.
 - **Verificación**: `typecheck`/`lint`/`build` (1851 módulos) OK. Pusheado a `origin/main`.
 - **Pendiente:** smoke VISUAL en el navegador (seleccionar nodo, navegar breadcrumb, CRUD inline
   desde detalle, verificar botón Equipos placeholder, modo claro y oscuro) — ver BACKLOG §4.
 
+## Hecho en Fase 1 (Estructura — externalCode + Table fix)
+
+- **`externalCode` en OrgNode**: campo nullable para integración con ERP/CMMS/SCADA.
+  - Migración `20260607212602_add_org_node_external_code` (columna `externalCode String?`).
+  - `@lyra/contracts`: campo en `orgNodeSchema`, `createOrgNodeRequestSchema`, `updateOrgNodeRequestSchema`.
+  - `structure.service.ts`: pasa `externalCode` en create/update, lo incluye en `buildTree` DTO.
+  - `NodeDrawer.tsx`: campo "Cód. externo" opcional (después de `code`), i18n + hint.
+  - `NodeDetail.tsx`: badge "EXT + código" en el header del nodo; columna "Cód. ext." en la tabla de hijos.
+  - `es-CL.ts`: claves `externalCode`, `externalCodeDesc`, `externalCodePlaceholder`.
+- **`@lyra/ui — Table`**: fix TypeScript `Object is possibly 'undefined'` en `getPageNumbers`.
+- **Verificación**: `typecheck`/`lint`/`build` (API + web + contracts) OK en todos los paquetes.
+
 ## Próximo paso
 **Sesión siguiente = Fase 1 · UI de Seguridad** (usuarios/roles/permisos + reset MFA de admin) sobre `/security/*`.
 **Sesión después = Fase 1 · Módulo Equipos** (modelo `Equipment`, migration, CRUD en NodeDetail).
+
+**Puntos B/C/D de integración pendientes de análisis** (ver memoria `integration-pending.md`):
+- B: CSV import/export de estructura
+- C: API Keys (m2m para sistemas externos)
+- D: Webhooks en cambios de estructura

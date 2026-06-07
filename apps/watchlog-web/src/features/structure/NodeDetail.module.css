@@ -201,6 +201,21 @@
   gap: 4px;
 }
 
+/* Badge de código externo */
+.externalCodeBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.externalCodeLabel {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--color-accent-secondary);
+  opacity: 0.75;
+}
+
 /* Monospace para códigos */
 .code {
   font-family: var(--font-mono);

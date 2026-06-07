@@ -1,11 +1,8 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  Building2,
-  Cog,
   ChevronRight,
   FolderOpen,
-  Layers,
   MoveRight,
   Pencil,
   Plus,
@@ -16,21 +13,8 @@ import { Button, Chip, EmptyState, Table } from "@lyra/ui";
 import type { OrgLevel, OrgNodeTree } from "@lyra/contracts";
 import type { TableColumn } from "@lyra/ui";
 import { usePermissions } from "../../auth/use-permissions.js";
-import { levelColor } from "./OrgTree.js";
+import { levelColor, LevelIcon } from "./OrgTree.js";
 import styles from "./NodeDetail.module.css";
-
-// ── Helpers visuales ──────────────────────────────────────────────────────────
-
-function LevelIcon({ order, size = 20 }: { order: number | undefined; size?: number }) {
-  const color = levelColor(order);
-  switch (order) {
-    case 0:  return <Building2 size={size} color={color} />;
-    case 1:  return <Layers    size={size} color={color} />;
-    case 2:  return <Cog       size={size} color={color} />;
-    case 3:  return <Wrench    size={size} color={color} />;
-    default: return <FolderOpen size={size} color={color} />;
-  }
-}
 
 function flattenTree(nodes: OrgNodeTree[]): Map<string, OrgNodeTree> {
   const map = new Map<string, OrgNodeTree>();
@@ -157,6 +141,15 @@ export function NodeDetail({
         row.code ? <code className={styles.code}>{row.code}</code> : <span className={styles.nullText}>—</span>,
     },
     {
+      key: "externalCode",
+      header: t("structure.node.externalCode"),
+      width: 110,
+      render: (row) =>
+        row.externalCode
+          ? <code className={styles.code}>{row.externalCode}</code>
+          : <span className={styles.nullText}>—</span>,
+    },
+    {
       key: "level",
       header: t("structure.node.level"),
       width: 100,
@@ -226,7 +219,7 @@ export function NodeDetail({
       {/* Cabecera del nodo */}
       <div className={styles.nodeHeader}>
         <span className={styles.nodeIcon}>
-          <LevelIcon order={currentLevel?.order} size={22} />
+          <LevelIcon order={currentLevel?.order} size={20} />
         </span>
         <div className={styles.nodeInfo}>
           <h2 className={styles.nodeName}>{node.name}</h2>
@@ -235,6 +228,12 @@ export function NodeDetail({
               <Chip label={currentLevel.name} variant="primary" size="sm" />
             )}
             {node.code && <code className={styles.code}>{node.code}</code>}
+            {node.externalCode && (
+              <span className={styles.externalCodeBadge} title={t("structure.node.externalCode")}>
+                <span className={styles.externalCodeLabel}>EXT</span>
+                <code className={styles.code}>{node.externalCode}</code>
+              </span>
+            )}
           </div>
         </div>
         <div className={styles.headerActions}>
@@ -283,6 +282,8 @@ export function NodeDetail({
             columns={childColumns}
             data={node.children}
             rowKey={(n) => n.id}
+            paginated
+            defaultPageSize={10}
             emptyState={
               <EmptyState
                 title={t("structure.detail.noChildren")}
