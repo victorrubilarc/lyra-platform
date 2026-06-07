@@ -66,6 +66,12 @@ nunca queda más de una sesión atrás.
 - [x] **Ampliar `@lyra/ui`** ✅ Fase Shell: Toggle/Tooltip/Menu/Modal/Drawer/Skeleton/Breadcrumb/EmptyState.
       ✅ Fase Estructura (2026-06-07): Chip, Table, Select. Pendiente: nada para esta fase.
 
+### Módulos intermedios (antes de Fase 2)
+- [ ] **Módulo Equipos** (post-Seguridad): modelo `Equipment` (name, code, externalCode, type,
+      abbreviation, active, sortOrder, processId FK a OrgNode de nivel Proceso), migración,
+      endpoints `GET/POST/PATCH/DELETE /structure/equipment`, grid CRUD en `NodeDetail` al
+      seleccionar nodo de último nivel. Reemplaza el placeholder "Equipos — próximamente".
+
 ### Fases siguientes (roadmap, ver PROGRESS §tabla)
 - [ ] **Fase 2** — Plantillas / Form Builder + Bitácoras.
 - [ ] **Fase 3** — Orígenes de datos.
@@ -110,10 +116,11 @@ probatoria (hash+timestamp). Ref: `DECISIONS.md` (sección de recomendaciones).
 - [ ] **App Shell — smoke VISUAL en navegador** (se verificó typecheck/lint/build/test + que el dev
       sirve; falta el clic): colapsar/expandir sidebar, abrir/cerrar/fijar pestañas (sin refrescos),
       ⌘K (saltar, densidad, idioma, tema, logout), cambiar idioma y densidad, menú de perfil, favoritos.
-- [ ] **Estructura — smoke VISUAL en navegador**: navegar a `/estructura`, abrir `LevelsDrawer`
-      (crear / editar / eliminar nivel), crear nodo raíz, expandir/colapsar árbol, editar nodo,
-      mover nodo (MoveNodeModal: árbol picker, seleccionar padre, confirmar), eliminar nodo hoja
-      (204) y nodo con hijos (400 → Toast). Modo claro y oscuro. App en `:5174`.
+- [ ] **Estructura — smoke VISUAL en navegador** (actualizado tras master-detail v2): navegar a
+      `/estructura`, seleccionar un nodo (panel derecho aparece con breadcrumb + hijos), navegar
+      via breadcrumb, usar acciones del header (editar/mover/eliminar), CRUD de hijos inline desde
+      la tabla del panel derecho, verificar botón "Equipos — próximamente" en el nivel Proceso,
+      abrir `LevelsDrawer`, modo claro y oscuro. App en `:5174`.
 - [ ] **Modo claro — QA visual** (nuevo): revisar que TODO el workspace se vea premium en **claro**
       (contraste WCAG, glass, glows, severidades, tablas futuras, drawers/modales) y que `auto` siga al
       sistema. El default es oscuro; el login es siempre oscuro. Ref: DECISIONS 2026-06-06.

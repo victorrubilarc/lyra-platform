@@ -1,6 +1,6 @@
 # Progreso — Lyra WatchLog
 
-Última actualización: 2026-06-07 (Fase 1 — backend ✅; **UI: Login + cimientos ✅**; **Recuperación de contraseña ✅**; **MFA self-service ✅**; **App Shell / Workspace premium ✅**; **UI Estructura organizacional ✅**; falta UI de Seguridad).
+Última actualización: 2026-06-07 (Fase 1 — backend ✅; **UI: Login + cimientos ✅**; **Recuperación de contraseña ✅**; **MFA self-service ✅**; **App Shell / Workspace premium ✅**; **UI Estructura organizacional ✅** — layout master-detail premium; falta UI de Seguridad).
 
 ## Estado por fase
 
@@ -240,5 +240,26 @@ Pantalla `/estructura` completamente funcional dentro del shell premium.
 - **Smoke via API** completo (ver arriba). **Pendiente:** smoke VISUAL en el navegador (abrir
   `/estructura`, crear nodo, abrir drawer, cambiar niveles, mover nodo, eliminar) — ver BACKLOG §4.
 
+## Hecho en Fase 1 (UI — Estructura v2: master-detail premium + seed real)
+
+- **@lyra/ui — Menu portal**: el panel del `Menu` se renderiza via `createPortal` en `document.body`
+  con `position:fixed`. Soluciona definitivamente el recorte por `overflow:hidden` en cualquier
+  contenedor padre. El detector de click-fuera usa refs separados (trigger + panel).
+- **Layout master-detail de dos paneles** (patrón SAP PM / Maximo):
+  - Panel izquierdo (260 px): árbol de navegación puro — selección + expandir/colapso,
+    dot de color por nivel (índigo/cián/verde), badge de hijos, auto-expand del path al navegar.
+  - Panel derecho: `NodeDetail` con breadcrumb clicable, header (icono de nivel + nombre + Chip
+    + código), acciones de la barra (Editar / Mover / Eliminar gateados por permiso), tabla de
+    hijos directos con CRUD inline, placeholder "Equipos — próximamente" para el nivel final.
+  - No más menú ⋮ por nodo: las acciones están en el panel, con contexto y espacio suficiente.
+- **Seed de 2 plantas reales** (REMANUFACTURE PLANT + TREATMENT PLANT): 3 niveles
+  (Planta/Area/Proceso) y 40+ nodos reales del sistema de referencia. Idempotente: solo crea si
+  no existen nodos; limpia niveles huérfanos si el árbol está vacío.
+- **i18n**: claves `structure.tree.*`, `structure.detail.*`, `common.add`.
+- **Verificación**: `typecheck`/`lint`/`build` (1851 módulos) OK. Pusheado a `origin/main`.
+- **Pendiente:** smoke VISUAL en el navegador (seleccionar nodo, navegar breadcrumb, CRUD inline
+  desde detalle, verificar botón Equipos placeholder, modo claro y oscuro) — ver BACKLOG §4.
+
 ## Próximo paso
 **Sesión siguiente = Fase 1 · UI de Seguridad** (usuarios/roles/permisos + reset MFA de admin) sobre `/security/*`.
+**Sesión después = Fase 1 · Módulo Equipos** (modelo `Equipment`, migration, CRUD en NodeDetail).
