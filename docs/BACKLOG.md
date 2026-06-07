@@ -35,9 +35,9 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 |---|---|---|---|
 | **Fase 1: Login + branding + reset de contraseña + docs + rutina** | `main` | ✅ publicado en `origin/main` | ninguna |
 | **Fase 1: MFA self-service** | `main` (fusionado desde `feat/auth-mfa-self-service`) | ✅ fusionado y publicado en `origin/main` | ninguna |
-| **Estructura v2 + externalCode + Table fix** | `main` | 🔴 **pendiente de push** | `git push origin main` |
+| **Estructura v2 + externalCode + Table fix** | `main` | ✅ publicado (`f84cbd8`) | ninguna |
 
-**Estado:** último commit de externalCode pendiente de publicar.
+**Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
 **Convención propuesta (a confirmar):** trabajar cada módulo en rama `feat/<modulo>`;
 al cerrar la sesión → push de la rama + merge a `main` + push de `main`. Así `origin/main`
