@@ -1,0 +1,84 @@
+.treeWrapper {
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface-2);
+}
+
+.makeRootOption {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+  font-size: var(--text-body-size);
+  color: var(--color-text-secondary);
+  border-bottom: 1px solid var(--color-border-subtle);
+  transition: background 0.12s ease;
+  min-height: 44px;
+  border: none;
+  width: 100%;
+  background: none;
+  text-align: left;
+}
+
+.makeRootOption:hover {
+  background: var(--color-hover);
+}
+
+.makeRootSelected {
+  background: rgba(99, 102, 241, 0.1);
+  color: var(--color-accent-primary);
+}
+
+.treeRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  min-height: 40px;
+  cursor: pointer;
+  font-size: var(--text-body-size);
+  color: var(--color-text-primary);
+  transition: background 0.12s ease;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+}
+
+.treeRow:hover:not(.disabled) {
+  background: var(--color-hover);
+}
+
+.treeRow.selected {
+  background: rgba(99, 102, 241, 0.1);
+  color: var(--color-accent-primary);
+}
+
+.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.disabledHint {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-left: auto;
+}
+
+.selectionLabel {
+  font-size: var(--text-body-sm-size);
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-2);
+}
+
+.selectedInfo {
+  font-size: var(--text-body-sm-size);
+  color: var(--color-text-secondary);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-hover);
+  border-radius: var(--radius-md);
+  margin-top: var(--space-3);
+}

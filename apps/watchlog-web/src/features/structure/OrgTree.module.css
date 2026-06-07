@@ -1,0 +1,90 @@
+.tree {
+  padding: var(--space-2) 0;
+}
+
+/* ---- Fila de nodo ---- */
+.nodeRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  min-height: 44px;
+  cursor: default;
+  transition: background 0.12s ease;
+  position: relative;
+}
+
+.nodeRow:hover {
+  background: var(--color-hover);
+}
+
+/* Indentación: var(--indent) se inyecta inline */
+.nodeIndent {
+  flex-shrink: 0;
+}
+
+/* Botón de expandir / colapsar */
+.chevronBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+  padding: 0;
+}
+
+.chevronBtn:hover {
+  color: var(--color-text-secondary);
+  background: var(--color-hover);
+}
+
+.chevronOpen {
+  transform: rotate(90deg);
+}
+
+/* Placeholder cuando no hay hijos (para mantener alineación) */
+.noChevron {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+/* Nombre y código */
+.nodeName {
+  flex: 1;
+  font-size: var(--text-body-size);
+  font-weight: 500;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nodeCode {
+  font-size: var(--text-caption-size);
+  font-family: var(--font-mono);
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+/* Acciones: siempre visibles (tablet / guantes — no hover-only) */
+.nodeActions {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* Línea divisoria entre root nodes */
+.nodeChildren {
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.nodeChildren .nodeRow:first-child {
+  border-top: none;
+}

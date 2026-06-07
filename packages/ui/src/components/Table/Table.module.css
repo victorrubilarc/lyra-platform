@@ -1,0 +1,96 @@
+.wrapper {
+  overflow-x: auto;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-surface-1);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-body);
+  font-size: var(--text-body-size);
+}
+
+/* --- Cabecera --- */
+.thead {
+  background: var(--color-bg-surface-2);
+}
+
+.th {
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  font-size: var(--text-label-size);
+  font-weight: var(--text-label-weight);
+  font-family: var(--font-body);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  border-bottom: 1px solid var(--color-border-subtle);
+  user-select: none;
+}
+
+.thSortable {
+  cursor: pointer;
+}
+
+.thSortable:hover {
+  color: var(--color-text-secondary);
+}
+
+.thInner {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.sortIcon {
+  flex-shrink: 0;
+  opacity: 0.35;
+}
+
+.sortActive {
+  opacity: 1;
+  color: var(--color-accent-primary);
+}
+
+.thRight { text-align: right; }
+.thCenter { text-align: center; }
+
+/* --- Cuerpo --- */
+.tbody tr {
+  border-bottom: 1px solid var(--color-border-subtle);
+  transition: background 0.12s ease;
+}
+
+.tbody tr:last-child {
+  border-bottom: none;
+}
+
+.tbody tr:hover {
+  background: var(--color-hover);
+}
+
+.clickable {
+  cursor: pointer;
+}
+
+.td {
+  padding: var(--space-3) var(--space-4);
+  color: var(--color-text-primary);
+  vertical-align: middle;
+}
+
+.tdRight  { text-align: right; }
+.tdCenter { text-align: center; }
+
+/* --- Skeleton rows (carga) --- */
+.skeletonTd {
+  padding: var(--space-3) var(--space-4);
+}
+
+/* --- Fila vacía --- */
+.emptyTd {
+  padding: var(--space-12) var(--space-4);
+  text-align: center;
+  color: var(--color-text-muted);
+}

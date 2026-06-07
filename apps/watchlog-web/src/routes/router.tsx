@@ -9,6 +9,7 @@ import { ForceMfaEnrollPage } from "../features/auth/ForceMfaEnrollPage.js";
 import { ProfileSecurityPage } from "../features/security/ProfileSecurityPage.js";
 import { ComingSoonPage } from "../features/placeholder/ComingSoonPage.js";
 import { HomePage } from "../features/home/HomePage.js";
+import { StructurePage } from "../features/structure/StructurePage.js";
 
 /**
  * Mapa de rutas. `/login` es pública; todo lo demás cuelga de `ProtectedRoute`
@@ -29,7 +30,7 @@ export const router = createBrowserRouter([
         element: <AppShell />,
         children: [
           { index: true, element: <HomePage /> },
-          { path: "/estructura", element: <ComingSoonPage /> },
+          { path: "/estructura", element: <StructurePage /> },
           { path: "/seguridad", element: <ComingSoonPage /> },
           { path: "/perfil/seguridad", element: <ProfileSecurityPage /> },
         ],

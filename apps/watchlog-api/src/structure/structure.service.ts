@@ -42,6 +42,19 @@ export class StructureService {
     return level;
   }
 
+  async deleteLevel(id: string, ctx: AuditContext): Promise<void> {
+    const level = await this.prisma.orgLevel.findUnique({ where: { id } });
+    if (!level) throw new NotFoundException("Nivel no encontrado");
+    const nodeCount = await this.prisma.orgNode.count({ where: { levelId: id, deletedAt: null } });
+    if (nodeCount > 0) {
+      throw new BadRequestException(
+        `No se puede eliminar el nivel: hay ${nodeCount} nodo${nodeCount === 1 ? "" : "s"} activo${nodeCount === 1 ? "" : "s"} con este nivel.`,
+      );
+    }
+    await this.prisma.orgLevel.delete({ where: { id } });
+    await this.audit.record({ ...ctx, action: "structure.level.deleted", entityType: "OrgLevel", entityId: id, before: { ...level } });
+  }
+
   // --- Nodos ---
 
   /** Devuelve el árbol completo de nodos vivos. */

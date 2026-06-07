@@ -52,10 +52,9 @@ nunca queda más de una sesión atrás.
       búsqueda ⌘K/densidad/idioma/notificaciones/perfil), pestañas de trabajo acotadas, command palette
       (cmdk), favoritos/recientes, i18n-ready (react-i18next, es-CL), estado en localStorage, +9 primitivos
       `@lyra/ui`. **Pendiente solo el smoke visual** (ver §4).
-- [ ] **UI Estructura organizacional** ← *siguiente sesión*. Árbol de nodos + CRUD sobre
-      `/structure/*` (niveles + nodos con reparentado). Ruta `/estructura` gateada por
-      `module:structure:view`; acciones por `orgnode:create/edit/delete`, `orglevel:manage`.
-- [ ] **UI Seguridad** (sesión posterior) sobre `/security/*`:
+- [x] **UI Estructura organizacional** ✅ (2026-06-07). Árbol expandible con CRUD de nodos y gestión de
+      niveles. `@lyra/ui` ampliado con `Chip`, `Table`, `Select`. Backend: `DELETE /structure/levels/:id`.
+- [ ] **UI Seguridad** ← *siguiente sesión* sobre `/security/*`:
   - [ ] Usuarios: listado, alta/edición, asignar roles, asignar alcance (scope).
   - [ ] Roles/permisos: CRUD de roles + matriz de permisos (catálogo de `@lyra/contracts`),
         editar `requireMfa` por rol.
@@ -64,8 +63,8 @@ nunca queda más de una sesión atrás.
         MFA** por usuario y **resetear MFA** (`POST /security/users/:id/mfa/reset`, permiso
         `user:reset-mfa`). *Backend ✅, UI ⬜.*
   - [ ] Lectura de auditoría (`/security/audit`).
-- [ ] **Ampliar `@lyra/ui`** con los componentes que faltan: `Table`, `Drawer`,
-      `Chip`/`NodeTag`, `Modal`, `EmptyState`, `Toggle` (CSS Modules sobre tokens).
+- [x] **Ampliar `@lyra/ui`** ✅ Fase Shell: Toggle/Tooltip/Menu/Modal/Drawer/Skeleton/Breadcrumb/EmptyState.
+      ✅ Fase Estructura (2026-06-07): Chip, Table, Select. Pendiente: nada para esta fase.
 
 ### Fases siguientes (roadmap, ver PROGRESS §tabla)
 - [ ] **Fase 2** — Plantillas / Form Builder + Bitácoras.
@@ -111,7 +110,10 @@ probatoria (hash+timestamp). Ref: `DECISIONS.md` (sección de recomendaciones).
 - [ ] **App Shell — smoke VISUAL en navegador** (se verificó typecheck/lint/build/test + que el dev
       sirve; falta el clic): colapsar/expandir sidebar, abrir/cerrar/fijar pestañas (sin refrescos),
       ⌘K (saltar, densidad, idioma, tema, logout), cambiar idioma y densidad, menú de perfil, favoritos.
-      App en `:5173`.
+- [ ] **Estructura — smoke VISUAL en navegador**: navegar a `/estructura`, abrir `LevelsDrawer`
+      (crear / editar / eliminar nivel), crear nodo raíz, expandir/colapsar árbol, editar nodo,
+      mover nodo (MoveNodeModal: árbol picker, seleccionar padre, confirmar), eliminar nodo hoja
+      (204) y nodo con hijos (400 → Toast). Modo claro y oscuro. App en `:5174`.
 - [ ] **Modo claro — QA visual** (nuevo): revisar que TODO el workspace se vea premium en **claro**
       (contraste WCAG, glass, glows, severidades, tablas futuras, drawers/modales) y que `auto` siga al
       sistema. El default es oscuro; el login es siempre oscuro. Ref: DECISIONS 2026-06-06.

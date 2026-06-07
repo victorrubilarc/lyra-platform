@@ -53,3 +53,12 @@ export type { ModalProps } from "./components/Modal/Modal.js";
 
 export { Drawer } from "./components/Drawer/Drawer.js";
 export type { DrawerProps } from "./components/Drawer/Drawer.js";
+
+export { Chip } from "./components/Chip/Chip.js";
+export type { ChipProps, ChipVariant } from "./components/Chip/Chip.js";
+
+export { Select } from "./components/Select/Select.js";
+export type { SelectProps } from "./components/Select/Select.js";
+
+export { Table } from "./components/Table/Table.js";
+export type { TableProps, TableColumn, TableSort } from "./components/Table/Table.js";

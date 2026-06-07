@@ -49,6 +49,17 @@ export class StructureController {
     return this.structure.updateLevel(id, dto, this.ctx(user, req));
   }
 
+  @Delete("levels/:id")
+  @HttpCode(204)
+  @RequirePermission("orglevel:manage")
+  async deleteLevel(
+    @Param("id") id: string,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ): Promise<void> {
+    await this.structure.deleteLevel(id, this.ctx(user, req));
+  }
+
   // --- Nodos ---
 
   @Get("nodes")

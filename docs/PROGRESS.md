@@ -1,13 +1,13 @@
 # Progreso — Lyra WatchLog
 
-Última actualización: 2026-06-06 (Fase 1 — backend ✅; **UI: Login + cimientos ✅**; **Recuperación de contraseña ✅**; **MFA self-service ✅**; **App Shell / Workspace premium ✅**; faltan UI de Estructura y de Seguridad).
+Última actualización: 2026-06-07 (Fase 1 — backend ✅; **UI: Login + cimientos ✅**; **Recuperación de contraseña ✅**; **MFA self-service ✅**; **App Shell / Workspace premium ✅**; **UI Estructura organizacional ✅**; falta UI de Seguridad).
 
 ## Estado por fase
 
 | Fase | Módulo | Estado |
 |---|---|---|
 | 0 | **Cimientos** (monorepo, Docker, Design System tokens, contratos, API health) | ✅ Hecho |
-| 1 | Seguridad (auth + RBAC/ABAC) + Estructura organizacional + AuditLog | 🟦 Backend ✅ · UI: Login ✅ · Estructura/Seguridad ⬜ |
+| 1 | Seguridad (auth + RBAC/ABAC) + Estructura organizacional + AuditLog | 🟦 Backend ✅ · UI: Login ✅ · **Estructura ✅** · Seguridad ⬜ |
 | 2 | Plantillas / Form Builder + Bitácoras | ⬜ Pendiente |
 | 3 | Orígenes de datos | ⬜ Pendiente |
 | 4 | Motor de incidencias | ⬜ Pendiente |
@@ -23,7 +23,7 @@
 | Recuperación de contraseña (self-service) | 1 | ✅ API + UI |
 | MFA self-service (perfil) + gate de enrolamiento forzado | 1 | ✅ API + UI |
 | App Shell / Workspace premium (sidebar, topbar, pestañas, ⌘K, i18n) | 1 | ✅ UI |
-| Estructura organizacional | 1 | 🟦 API ✅ · UI ⬜ |
+| Estructura organizacional | 1 | ✅ API + UI |
 | Seguridad / roles / permisos (nueva) | 1 | 🟦 API ✅ · UI ⬜ (incluye reset MFA de admin: API ✅, UI ⬜) |
 | Plantillas (Form Builder) | 2 | ⬜ |
 | Nueva entrada / Llenado | 2 | ⬜ |
@@ -211,16 +211,34 @@ Marco donde viven todos los módulos (ver DECISIONS 2026-06-06). Reemplaza el `A
 - Ranura OIDC/LDAP: diseñada y con el `AuthProvider` listo para enchufar; se activa cuando un
   cliente lo pida.
 
-## Próximo paso
-**Decidido (2026-06-05):** las piezas de auth se hicieron en **sesiones separadas** — (1) recuperación de
-contraseña ✅, (2) MFA self-service ✅ (esta sesión).
+## Hecho en Fase 1 (UI — Estructura organizacional)
+Pantalla `/estructura` completamente funcional dentro del shell premium.
+- **`@lyra/ui` (+3 componentes):** `Chip` (badge semántico, 6 variantes, dual theme), `Table`
+  (sortable, skeleton rows, slot vacío, dual theme, CSS Modules), `Select` (mismo patrón que Input).
+- **Backend**: `DELETE /structure/levels/:id` añadido (bloquea si hay nodos activos con ese nivel;
+  auditoría append-only).
+- **Capa de datos** (`structure-api.ts` + `structure-queries.ts`): 7 llamadas tipadas contra
+  `@lyra/contracts` + hooks TanStack Query para niveles y árbol, con mutaciones e invalidación de caché.
+- **StructurePage**: gateada por `module:structure:view`; header con acciones gateadas por permiso;
+  skeleton de carga; EmptyState para árbol vacío; aviso si no hay niveles configurados.
+- **OrgTree**: árbol recursivo expandible/colapsable (estado local), `Chip` de nivel, menú `⋮`
+  por nodo con acciones gateadas por permiso (`orgnode:create/edit/delete`).
+- **NodeDrawer**: crear nodo raíz / hijo / editar — RHF + Zod del contrato; select de niveles; campo
+  código opcional.
+- **LevelsDrawer**: tabla de niveles con edición inline + crear + eliminar (gateado por
+  `orglevel:manage`).
+- **DeleteNodeModal**: confirmación con aviso si el nodo tiene hijos.
+- **MoveNodeModal**: árbol compacto para reparentar; pre-deshabilita el propio nodo y sus
+  descendientes usando `path.startsWith()` (misma lógica que el backend).
+- **i18n**: namespace `structure` completo (es-CL); `common` consolidado con claves `edit/delete/errorGeneric`.
+- **Smoke en vivo**: API health ✅, GET tree ✅, POST node ✅, PATCH rename ✅, DELETE 204 ✅,
+  DELETE level bloqueado con 400 ✅, DELETE level vacío 204 ✅.
 
-**Sesión siguiente = Fase 1 · UI de Estructura organizacional** (árbol de nodos + CRUD sobre `/structure/*`), y
-luego **Seguridad** (usuarios, roles/permisos, alcance) sobre `/security/*`. Los cimientos del frontend
-(api-client, AuthProvider, router, AppLayout, `@lyra/permissions`, `@lyra/ui`) ya están listos.
-1. **Estructura organizacional**: árbol de nodos (CRUD) sobre `/structure/*` (niveles + nodos con
-   reparentado). Ruta `/estructura` (hoy con badge "Pronto" en el sidebar) gateada por
-   `module:structure:view`; acciones por `orgnode:create/edit/delete` y `orglevel:manage`.
-2. Ampliar `@lyra/ui` con los componentes que falten (Table, Drawer, Chip/NodeTag, Modal,
-   EmptyState, Toggle) — todos con CSS Modules sobre tokens.
-Luego, en otra sesión: **Seguridad** (usuarios, roles/permisos, alcance de datos) sobre `/security/*`.
+## Verificación de la Fase 1 (UI — Estructura)
+- `pnpm typecheck` · `pnpm lint` · `pnpm build` (1849 módulos) → OK en 6 paquetes.
+- `pnpm test` → 63 tests (API 58, permissions 5, contracts) — sin cambios en tests.
+- **Smoke via API** completo (ver arriba). **Pendiente:** smoke VISUAL en el navegador (abrir
+  `/estructura`, crear nodo, abrir drawer, cambiar niveles, mover nodo, eliminar) — ver BACKLOG §4.
+
+## Próximo paso
+**Sesión siguiente = Fase 1 · UI de Seguridad** (usuarios/roles/permisos + reset MFA de admin) sobre `/security/*`.

@@ -1,0 +1,45 @@
+.select {
+  width: 100%;
+  background: var(--color-hover);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  padding: 10px 36px 10px 14px;
+  font-family: var(--font-body);
+  font-size: var(--text-body-size);
+  min-height: 44px;
+  outline: none;
+  appearance: none;
+  cursor: pointer;
+  transition: var(--transition-border), box-shadow 0.2s ease;
+
+  /* Chevron SVG como background (color adapta al tema) */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+}
+
+.select:focus {
+  border-color: var(--color-accent-primary);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.18);
+}
+
+.select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.invalid {
+  border-color: var(--color-error);
+}
+
+.invalid:focus {
+  border-color: var(--color-error);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18);
+}
+
+/* Opciones: hereda el fondo del sistema para compatibilidad cross-browser */
+.select option {
+  background: var(--color-bg-surface-2);
+  color: var(--color-text-primary);
+}
