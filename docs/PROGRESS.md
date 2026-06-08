@@ -373,6 +373,11 @@ Consume el backend de seguridad ya existente. Ver DECISIONS 2026-06-08. La UI so
   contraseña temporal + cambio forzado + revoca sesiones + audita, **sin tocar MFA**. Permiso nuevo
   `user:reset-password` (catálogo **26**), endpoint `POST /security/users/:id/reset-password`, UI en la
   pestaña *Seguridad*. **3 tests** nuevos del `AuthService`.
+- **Pulido UX post-revisión**: `ScopeTreePicker` con **buscador** (poda el árbol a coincidencias + ancestros,
+  auto-expande, sin acentos/mayúsculas) + **resumen de seleccionados** (chips removibles + limpiar), para
+  árboles extensos. Pestaña *Alcance* preparada como **multi-dimensión** (encabezado "Estructura
+  organizacional"; las plantillas se sumarán como sección hermana en Fase 2). **Buscador** en la pestaña de
+  *Roles* (filtra por nombre/clave/descripción).
 - **Roles**: `RolesPage` (tabla + borrado gateado, system no borrable) + `RoleDrawer` + `PermissionMatrix`
   (agrupada por `group` del catálogo, checkbox de grupo con indeterminado, `requireMfa`).
 - **Política**: `PolicyPage` (RHF+Zod): contraseñas (longitud/complejidad/historial/expiración), bloqueo por

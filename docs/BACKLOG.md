@@ -92,6 +92,12 @@ nunca queda más de una sesión atrás.
       ✅ Fase Estructura (2026-06-07): Chip, Table, Select. Pendiente: nada para esta fase.
 
 ### Mejoras futuras de Estructura (enterprise, post-Seguridad)
+- [ ] **Alcance por plantillas (2.ª dimensión ABAC).** El modelo de seguridad contempla limitar el alcance
+      a **plantillas/bitácoras** además de nodos (SECURITY §2.4). Hoy solo hay nodos porque Plantillas es
+      Fase 2. La pestaña *Alcance* del detalle de usuario ya quedó **preparada como multi-dimensión**
+      (encabezado "Estructura organizacional"); cuando exista el módulo de Plantillas se suma una sección
+      hermana "Plantillas" (mismo patrón: selector + guardado por `PUT :id/scope` extendido). Pedido del
+      usuario (2026-06-08). **Prioridad: con Fase 2.**
 - [ ] **Seguridad a nivel de nodo en el mantenedor de Estructura (ABAC enterprise).** Volver a
       `/estructura` para incorporar gestión de **alcance de datos por nodo** (asignar usuarios/roles a
       nodos con herencia a descendientes) desde el propio árbol/detalle, al estilo de los grandes

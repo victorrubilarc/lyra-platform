@@ -291,6 +291,9 @@ export function UserDetail({ userId }: UserDetailProps) {
           <p className={shared.panelDesc} style={{ margin: 0 }}>
             {scope.length === 0 ? t("security.users.scope.fullAccess") : t("security.users.scope.desc")}
           </p>
+          {/* Dimensión: estructura organizacional. Futuras dimensiones (p. ej. plantillas,
+              Fase 2) se suman como secciones hermanas dentro de esta misma pestaña. */}
+          <div className={styles.scopeSectionLabel}>{t("security.users.scope.structureSection")}</div>
           <ScopeTreePicker
             tree={tree}
             value={scope}

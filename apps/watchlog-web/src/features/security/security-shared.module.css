@@ -140,6 +140,12 @@
   color: var(--color-text-muted);
 }
 
+/* Campo de búsqueda acotado en una barra de acciones. */
+.searchField {
+  width: 240px;
+  max-width: 100%;
+}
+
 /* Botón-ícono fantasma (para slots dentro de inputs). */
 .iconGhost {
   display: inline-flex;

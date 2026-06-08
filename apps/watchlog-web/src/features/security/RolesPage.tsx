@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Pencil, Plus, ShieldCheck, Trash2, TriangleAlert } from "lucide-react";
-import { Button, Chip, EmptyState, Modal, Table, useToast, type TableColumn } from "@lyra/ui";
+import { Pencil, Plus, Search, ShieldCheck, Trash2, TriangleAlert } from "lucide-react";
+import { Button, Chip, EmptyState, Input, Modal, Table, useToast, type TableColumn } from "@lyra/ui";
 import type { RoleSummary } from "@lyra/contracts";
 import { Can } from "../../auth/Can.js";
 import { usePermissions } from "../../auth/use-permissions.js";
@@ -24,6 +24,18 @@ export function RolesPage() {
     roleId: null,
   });
   const [toDelete, setToDelete] = useState<RoleSummary | null>(null);
+  const [query, setQuery] = useState("");
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return roles;
+    return roles.filter(
+      (r) =>
+        r.name.toLowerCase().includes(q) ||
+        r.key.toLowerCase().includes(q) ||
+        (r.description?.toLowerCase().includes(q) ?? false),
+    );
+  }, [roles, query]);
 
   async function confirmDelete() {
     if (!toDelete) return;
@@ -134,18 +146,26 @@ export function RolesPage() {
           <h2 className={shared.toolbarTitle}>{t("security.roles.title")}</h2>
           <p className={shared.toolbarSubtitle}>{t("security.roles.subtitle")}</p>
         </div>
-        <Can perform="role:manage">
-          <div className={shared.toolbarActions}>
+        <div className={shared.toolbarActions}>
+          <div className={shared.searchField}>
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t("security.roles.search")}
+              rightSlot={<Search size={15} aria-hidden="true" />}
+            />
+          </div>
+          <Can perform="role:manage">
             <Button variant="primary" leftIcon={<Plus size={16} />} onClick={() => setDrawer({ open: true, roleId: null })}>
               {t("security.roles.new")}
             </Button>
-          </div>
-        </Can>
+          </Can>
+        </div>
       </div>
 
       <Table
         columns={columns}
-        data={roles}
+        data={filtered}
         rowKey={(r) => r.id}
         loading={isLoading}
         onRowClick={canManage ? (r) => setDrawer({ open: true, roleId: r.id }) : undefined}
