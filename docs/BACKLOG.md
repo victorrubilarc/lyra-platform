@@ -82,6 +82,16 @@ nunca queda más de una sesión atrás.
 - [x] **Ampliar `@lyra/ui`** ✅ Fase Shell: Toggle/Tooltip/Menu/Modal/Drawer/Skeleton/Breadcrumb/EmptyState.
       ✅ Fase Estructura (2026-06-07): Chip, Table, Select. Pendiente: nada para esta fase.
 
+### Mejoras futuras de Estructura (enterprise, post-Seguridad)
+- [ ] **Seguridad a nivel de nodo en el mantenedor de Estructura (ABAC enterprise).** Volver a
+      `/estructura` para incorporar gestión de **alcance de datos por nodo** (asignar usuarios/roles a
+      nodos con herencia a descendientes) desde el propio árbol/detalle, al estilo de los grandes
+      softwares industriales (SAP PM, Maximo): permisos efectivos por rama, vista de "quién tiene acceso
+      a este nodo", scoping visual. El **modelo backend ya existe** (`Scope` polimórfico user|role +
+      `includeDescendants` + ruta materializada; ver DECISIONS 2026-06-05). Falta la **UI** y conectarla
+      con la pantalla de Seguridad. Pedido explícito del usuario (2026-06-08). **Prioridad: media**, tras
+      la UI de Seguridad base.
+
 ### Módulos intermedios (antes de Fase 2)
 - [x] **Módulo Equipos** ✅ (2026-06-08) — ver el ítem cerrado arriba en "Fase 1 — Seguridad + Estructura"
       y DECISIONS 2026-06-08. La descripción original (decisiones a tomar) se conserva abajo como
