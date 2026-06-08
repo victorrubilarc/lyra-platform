@@ -27,6 +27,7 @@ import {
   fetchUser,
   fetchUsers,
   resetUserMfa,
+  resetUserPassword,
   updatePasswordPolicy,
   updateRole,
   updateUser,
@@ -104,6 +105,14 @@ export function useResetUserMfa() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => resetUserMfa(id),
+    onSuccess: (u) => invalidateUser(qc, u.id),
+  });
+}
+
+export function useResetUserPassword() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, password }: { id: string; password: string }) => resetUserPassword(id, password),
     onSuccess: (u) => invalidateUser(qc, u.id),
   });
 }

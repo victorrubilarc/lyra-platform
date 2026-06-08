@@ -289,6 +289,18 @@ export const esCL = {
         includeDescendants: "Incluye descendientes",
         noNodes: "No hay nodos en la estructura para asignar.",
       },
+      password: {
+        title: "Contraseña",
+        desc: "Asigna una contraseña temporal; el usuario deberá cambiarla en su próximo ingreso.",
+        reset: "Restablecer contraseña",
+        resetTitle: "Restablecer contraseña",
+        resetConfirm: "Asignar una contraseña temporal a «{{name}}». Entrégasela por un canal seguro.",
+        tempPassword: "Contraseña temporal",
+        tempHint: "Debe cumplir la política vigente. El usuario la cambiará al primer ingreso.",
+        resetWarning:
+          "Se cerrarán todas las sesiones del usuario y deberá cambiar la contraseña al ingresar. No afecta su segundo factor (MFA).",
+        resetDone: "Contraseña restablecida; se revocaron las sesiones del usuario.",
+      },
       mfa: {
         title: "Segundo factor (MFA)",
         on: "MFA activo",

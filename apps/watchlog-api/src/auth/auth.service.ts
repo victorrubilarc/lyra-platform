@@ -254,6 +254,37 @@ export class AuthService {
     });
   }
 
+  /**
+   * RESET de contraseña por un administrador (estilo AD: contraseña temporal).
+   * Fija una contraseña temporal validada contra la política, **fuerza el cambio**
+   * en el próximo ingreso, **revoca TODAS las sesiones** del objetivo (la cuenta
+   * pudo verse comprometida) e invalida enlaces de reset pendientes. **No toca el
+   * MFA** (la contraseña y el segundo factor son factores distintos). El admin ve
+   * la temporal un instante; es de un solo uso efectivo por el cambio forzado.
+   */
+  async adminResetPassword(targetUserId: string, tempPassword: string, ctx: AuditContext): Promise<void> {
+    const target = await this.prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: { id: true },
+    });
+    if (!target) throw new NotFoundException("Usuario no encontrado");
+    await this.policy.assertComplexity(tempPassword);
+    const passwordHash = await this.passwords.hash(tempPassword);
+    await this.prisma.user.update({
+      where: { id: targetUserId },
+      data: { passwordHash, forcePasswordChange: true },
+    });
+    await this.policy.recordHistory(targetUserId, passwordHash);
+    await this.resets.invalidatePending(targetUserId);
+    await this.tokens.revokeAllForUser(targetUserId);
+    await this.audit.record({
+      ...ctx,
+      action: "auth.password.admin_reset",
+      entityType: "User",
+      entityId: targetUserId,
+    });
+  }
+
   /** Regenera los códigos de recuperación (reconfirmando contraseña). */
   async regenerateRecoveryCodes(userId: string, password: string, ctx: AuditContext): Promise<string[]> {
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });

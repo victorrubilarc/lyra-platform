@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Info, KeyRound, Mail, ShieldAlert, UserCircle2 } from "lucide-react";
+import { Info, KeyRound, Mail, RotateCcw, ShieldAlert, UserCircle2 } from "lucide-react";
 import { Button, Checkbox, Chip, FormField, Input, Select, Skeleton, cx, useToast, type ChipVariant } from "@lyra/ui";
 import { USER_STATUSES, type ScopeEntry, type UserStatus } from "@lyra/contracts";
 import { Can } from "../../auth/Can.js";
@@ -11,12 +11,14 @@ import {
   useAssignUserRoles,
   useAssignUserScope,
   useResetUserMfa,
+  useResetUserPassword,
   useRoles,
   useUpdateUser,
   useUser,
 } from "./security-queries.js";
 import { ScopeTreePicker } from "./ScopeTreePicker.js";
 import { ResetMfaModal } from "./ResetMfaModal.js";
+import { ResetPasswordModal } from "./ResetPasswordModal.js";
 import shared from "./security-shared.module.css";
 import styles from "./UsersPage.module.css";
 
@@ -63,6 +65,7 @@ export function UserDetail({ userId }: UserDetailProps) {
   const assignRoles = useAssignUserRoles();
   const assignScope = useAssignUserScope();
   const resetMfa = useResetUserMfa();
+  const resetPassword = useResetUserPassword();
 
   const [tab, setTab] = useState<DetailTab>("basic");
 
@@ -72,6 +75,7 @@ export function UserDetail({ userId }: UserDetailProps) {
   const [roleIds, setRoleIds] = useState<string[]>([]);
   const [scope, setScope] = useState<ScopeEntry[]>([]);
   const [resetOpen, setResetOpen] = useState(false);
+  const [pwdResetOpen, setPwdResetOpen] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -141,6 +145,17 @@ export function UserDetail({ userId }: UserDetailProps) {
       await resetMfa.mutateAsync(user.id);
       toast.success(t("security.users.mfa.resetDone"));
       setResetOpen(false);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : t("common.errorGeneric"));
+    }
+  }
+
+  async function doResetPassword(password: string) {
+    if (!user) return;
+    try {
+      await resetPassword.mutateAsync({ id: user.id, password });
+      toast.success(t("security.users.password.resetDone"));
+      setPwdResetOpen(false);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : t("common.errorGeneric"));
     }
@@ -295,6 +310,24 @@ export function UserDetail({ userId }: UserDetailProps) {
       {/* ── Seguridad (MFA) ── */}
       {tab === "security" && (
         <div className={styles.detailTabPanel}>
+          {/* Contraseña (reset por admin) */}
+          <Can perform="user:reset-password">
+            <div>
+              <h3 className={shared.panelTitle} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <KeyRound size={15} aria-hidden="true" />
+                {t("security.users.password.title")}
+              </h3>
+              <p className={shared.panelDesc}>{t("security.users.password.desc")}</p>
+              <Button
+                variant="secondary"
+                leftIcon={<RotateCcw size={16} />}
+                onClick={() => setPwdResetOpen(true)}
+              >
+                {t("security.users.password.reset")}
+              </Button>
+            </div>
+          </Can>
+
           <div className={styles.infoNote}>
             <Info size={16} aria-hidden="true" />
             <span>{t("security.users.mfa.selfServiceNote")}</span>
@@ -351,6 +384,14 @@ export function UserDetail({ userId }: UserDetailProps) {
         loading={resetMfa.isPending}
         onConfirm={doResetMfa}
         onClose={() => setResetOpen(false)}
+      />
+
+      <ResetPasswordModal
+        open={pwdResetOpen}
+        userName={user.displayName}
+        loading={resetPassword.isPending}
+        onConfirm={doResetPassword}
+        onClose={() => setPwdResetOpen(false)}
       />
     </div>
   );

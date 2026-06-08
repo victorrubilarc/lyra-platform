@@ -68,3 +68,13 @@ export const assignScopeRequestSchema = z.object({
   scopes: z.array(scopeEntrySchema),
 });
 export type AssignScopeRequest = z.infer<typeof assignScopeRequestSchema>;
+
+/**
+ * Reset de contraseña por un administrador: fija una contraseña temporal. El
+ * backend valida la complejidad contra la política, fuerza el cambio en el
+ * próximo ingreso y revoca las sesiones del usuario (no toca el MFA).
+ */
+export const adminResetPasswordRequestSchema = z.object({
+  password: z.string().min(1),
+});
+export type AdminResetPasswordRequest = z.infer<typeof adminResetPasswordRequestSchema>;

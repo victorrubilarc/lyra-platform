@@ -7,6 +7,7 @@ import { Eye, EyeOff, RefreshCw, UserPlus } from "lucide-react";
 import { Button, Checkbox, Drawer, FormField, Input, useToast } from "@lyra/ui";
 import { emailSchema } from "@lyra/contracts";
 import { ApiError } from "../../lib/api-client.js";
+import { generateTempPassword } from "./password-gen.js";
 import { useCreateUser, useRoles } from "./security-queries.js";
 import shared from "./security-shared.module.css";
 
@@ -16,15 +17,6 @@ const userFormSchema = z.object({
   password: z.string().min(1),
 });
 type UserFormValues = z.infer<typeof userFormSchema>;
-
-/** Genera una contraseña temporal robusta (el usuario la cambiará al primer ingreso). */
-function generatePassword(): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
-  const symbols = "!@#$%&*?";
-  const pick = (set: string, n: number) =>
-    Array.from({ length: n }, () => set[Math.floor(Math.random() * set.length)]).join("");
-  return `${pick(chars, 12)}${pick(symbols, 2)}`;
-}
 
 interface UserDrawerProps {
   open: boolean;
@@ -151,7 +143,7 @@ export function UserDrawer({ open, onClose }: UserDrawerProps) {
                     type="button"
                     className={shared.iconGhost}
                     onClick={() => {
-                      const pwd = generatePassword();
+                      const pwd = generateTempPassword();
                       form.setValue("password", pwd, { shouldValidate: true });
                       setShowPassword(true);
                     }}

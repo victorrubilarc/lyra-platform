@@ -104,6 +104,12 @@ export const PERMISSION_CATALOG = [
     group: "users",
     description: "Restablecer el segundo factor (MFA) de un usuario (dispositivo perdido).",
   },
+  {
+    key: "user:reset-password",
+    dimension: "ACTION",
+    group: "users",
+    description: "Restablecer la contraseña de un usuario (asigna una temporal y fuerza el cambio).",
+  },
 
   // --- Dimensión 2: acciones — roles y permisos ---
   {

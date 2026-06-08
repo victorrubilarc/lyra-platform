@@ -1,4 +1,5 @@
 import {
+  adminResetPasswordRequestSchema,
   assignRolesRequestSchema,
   assignScopeRequestSchema,
   auditLogEntrySchema,
@@ -62,6 +63,11 @@ export function assignUserScope(id: string, dto: AssignScopeRequest): Promise<Us
 
 export function resetUserMfa(id: string): Promise<UserDetail> {
   return apiJson(`/security/users/${id}/mfa/reset`, userDetailSchema, { method: "POST" });
+}
+
+export function resetUserPassword(id: string, password: string): Promise<UserDetail> {
+  const dto = adminResetPasswordRequestSchema.parse({ password });
+  return apiJson(`/security/users/${id}/reset-password`, userDetailSchema, { method: "POST", body: dto });
 }
 
 // ─── Roles ───────────────────────────────────────────────────────────────────

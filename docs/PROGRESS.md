@@ -365,9 +365,14 @@ Consume el backend de seguridad ya existente. Ver DECISIONS 2026-06-08. La UI so
   ser `soon`; Home la marca "Disponible".
 - **Capa de datos** (`security-api.ts` + `security-queries.ts`): llamadas tipadas contra contracts + hooks
   TanStack Query (usuarios, roles, catálogo de permisos, política, auditoría con `useInfiniteQuery`).
-- **Usuarios** (master-detail con `ResizableSplit`): `UsersPage` (lista buscable) + `UserDetail` (secciones
-  con guardado independiente: datos básicos, **roles**, **alcance de datos** vía `ScopeTreePicker`, **MFA**
-  con reset) + `UserDrawer` (alta con contraseña temporal + generador) + `ResetMfaModal`.
+- **Usuarios** (master-detail con `ResizableSplit`): `UsersPage` (lista buscable) + `UserDetail`
+  (**pestañas** Datos/Roles/Alcance/Seguridad, cada una con guardado independiente: datos básicos, **roles**,
+  **alcance de datos** vía `ScopeTreePicker`, **Seguridad** = reset de contraseña + estado/reset de MFA) +
+  `UserDrawer` (alta con contraseña temporal + generador) + `ResetMfaModal` + `ResetPasswordModal`.
+- **Reset de contraseña por admin** (post-revisión, ver DECISIONS 2026-06-08): variante A estilo AD —
+  contraseña temporal + cambio forzado + revoca sesiones + audita, **sin tocar MFA**. Permiso nuevo
+  `user:reset-password` (catálogo **26**), endpoint `POST /security/users/:id/reset-password`, UI en la
+  pestaña *Seguridad*. **3 tests** nuevos del `AuthService`.
 - **Roles**: `RolesPage` (tabla + borrado gateado, system no borrable) + `RoleDrawer` + `PermissionMatrix`
   (agrupada por `group` del catálogo, checkbox de grupo con indeterminado, `requireMfa`).
 - **Política**: `PolicyPage` (RHF+Zod): contraseñas (longitud/complejidad/historial/expiración), bloqueo por
@@ -376,10 +381,13 @@ Consume el backend de seguridad ya existente. Ver DECISIONS 2026-06-08. La UI so
   detalle con diff `before`/`after`/`metadata`).
 - **i18n**: namespace `security` completo (es-CL).
 - **Verificación**: `typecheck`/`lint` (0 errores; 1 warning preexistente en OrgTree)/`build` (web 1882
-  módulos)/`test` (**contracts 8** +3 audit · permissions 5 · **API 67**) en verde. **Smoke en vivo** (API,
-  usuario demo con 25 permisos): `GET users/roles/permissions(25)/password-policy` → 200; **auditoría con la
-  nueva forma de contrato** (`occurredAt` ISO string, claves `before/after/metadata` presentes, `take`/cursor);
-  **round-trip de rol** crear→leer (permissionKeys resueltos)→borrar 204→404.
+  módulos)/`test` (**contracts 8** +3 audit · permissions 5 · **API 70** +3 del reset de contraseña por admin)
+  en verde. **Smoke en vivo** (usuario demo con **26** permisos): `GET users/roles/permissions(26)/password-policy`
+  → 200; **auditoría con la nueva forma de contrato** (`occurredAt` ISO string, `before/after/metadata`,
+  `take`/cursor); **round-trip de rol** crear→leer→borrar 204→404; **reset de contraseña por admin** end-to-end
+  (reset 201 · débil 400 · `forcePasswordChange=true` · vieja 401 · temporal autentica con cambio forzado ·
+  `auth.password.admin_reset` auditado). *Nota:* el reset se probó contra una instancia **fresca** del API
+  (la que corría en :3000 era un build previo sin la ruta nueva).
 - **Pendiente**: smoke **VISUAL** en navegador (ver BACKLOG §4): navegar sub-tabs, alta/edición de usuario,
   asignar roles/scope, reset MFA, CRUD de roles + matriz, editar política, leer auditoría + diff, modo claro.
 

@@ -97,6 +97,11 @@ Implementado en Fase 1 según **NIST 800-63B** (AAL2) y **OWASP ASVS v4 §2.2 / 
 - **Reset de admin** (dispositivo perdido): `POST /security/users/:id/mfa/reset` (permiso
   `user:reset-mfa`) borra el factor y **revoca TODAS las sesiones** del objetivo. Un factor **exigido**
   no se puede **auto-desactivar** (`disableMfa` → 403). El reset de **contraseña no toca MFA**.
+- **Reset de contraseña por admin** (estilo AD, NIST 800-63B): `POST /security/users/:id/reset-password`
+  (permiso `user:reset-password`, **separado** de `user:edit`) fija una **contraseña temporal** validada
+  contra la política, marca `forcePasswordChange`, **revoca todas las sesiones**, invalida resets pendientes
+  y audita `auth.password.admin_reset`. **No toca el MFA.** El admin nunca conoce la contraseña definitiva
+  (el usuario la cambia al primer ingreso). Ver `DECISIONS.md` 2026-06-08.
 - **Recovery codes**: 10, **hasheados** (SHA-256), **single-use**; regenerables (invalida los previos);
   se muestran **una sola vez**.
 - **Auditoría** append-only: `auth.mfa.enabled|disabled|recovery_regenerated|admin_reset`,

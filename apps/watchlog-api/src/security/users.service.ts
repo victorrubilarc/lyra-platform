@@ -64,6 +64,16 @@ export class UsersService {
     return this.get(id);
   }
 
+  /**
+   * RESET de contraseña por un administrador (contraseña temporal). Delega en
+   * AuthService (valida política, fuerza cambio, revoca sesiones, audita; no
+   * toca el MFA).
+   */
+  async resetPassword(id: string, password: string, ctx: AuditContext): Promise<UserDetail> {
+    await this.auth.adminResetPassword(id, password, ctx);
+    return this.get(id);
+  }
+
   async create(dto: CreateUserRequest, ctx: AuditContext): Promise<UserDetail> {
     const email = dto.email.trim().toLowerCase();
     const existing = await this.prisma.user.findUnique({ where: { email } });

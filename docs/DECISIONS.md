@@ -4,6 +4,32 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-08 · Reset de contraseña por administrador (contraseña temporal, estilo AD)
+
+Hueco detectado en la UI de Seguridad: no había forma de que un admin restableciera la contraseña de un
+usuario existente (solo existía el self-service por correo y el alta con temporal). Se implementó la
+**variante A** (aprobada por el usuario), que es el patrón de **Active Directory / helpdesk** y el más
+adecuado para terreno industrial (no asume que el operador tenga correo):
+
+**El admin fija/genera una contraseña temporal** → el backend la valida contra la política, marca
+`forcePasswordChange = true` (el usuario la cambia al primer ingreso), **revoca TODAS las sesiones** del
+objetivo (la cuenta pudo verse comprometida), invalida enlaces de reset pendientes y **audita**
+(`auth.password.admin_reset`). **No toca el MFA** — contraseña y segundo factor son factores distintos
+(coherente con el reset self-service y con el reset de MFA, que tampoco se cruzan). El admin ve la temporal
+un instante; es de un solo uso efectivo por el cambio forzado. Fundamento: NIST 800-63B + práctica AD.
+
+- **Permiso nuevo `user:reset-password`** (catálogo 25→**26**), **separado** de `user:edit` — igual que
+  `user:reset-mfa` está separado — para poder dar "reset" a soporte sin edición completa. Asignación = dato
+  en BD (seed lo agrega al rol admin).
+- **Backend**: `AuthService.adminResetPassword` (reusa `policy`/`passwords`/`tokens`/`resets`/`audit`) +
+  `POST /security/users/:id/reset-password` (`AdminResetPasswordRequest`). **3 tests** nuevos.
+- **UI**: subsección "Contraseña" en la pestaña *Seguridad* del detalle (gateada por `user:reset-password`)
+  + `ResetPasswordModal` (temporal con generador/mostrar-una-vez + aviso de revocación de sesiones y cambio
+  forzado). Helper `generateTempPassword` compartido con el alta (sin duplicar).
+- **Variante B (enlace por correo) descartada como default**, registrada como opción futura cuando haya SMTP
+  y el usuario tenga correo: preserva privacidad (el admin no ve la clave) pero no sirve a operadores sin
+  buzón. Ver BACKLOG.
+
 ### 2026-06-08 · Modelo de usuario alineado a SCIM + costura de federación (diseño; implementación diferida a v2)
 
 Decisión de **diseño** (sin migraciones aún) sobre qué datos tendrá `User` y cómo dejar lista la

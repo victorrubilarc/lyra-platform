@@ -38,6 +38,7 @@ function build(overrides: { user?: Record<string, unknown> | null; maxFailed?: n
     issueSession: vi
       .fn()
       .mockResolvedValue({ accessToken: "a", refreshToken: "r", expiresIn: 900, sessionId: "s1" }),
+    revokeAllForUser: vi.fn().mockResolvedValue(undefined),
   };
   const mfa = { assertSecondFactor: vi.fn() };
   const mfaRequirement = {
@@ -46,9 +47,11 @@ function build(overrides: { user?: Record<string, unknown> | null; maxFailed?: n
   };
   const policy = {
     getPolicy: vi.fn().mockResolvedValue({ maxFailedAttempts: overrides.maxFailed ?? 5, lockoutMinutes: 15 }),
+    assertComplexity: vi.fn().mockResolvedValue(undefined),
+    recordHistory: vi.fn().mockResolvedValue(undefined),
   };
   const resets = { invalidatePending: vi.fn().mockResolvedValue(undefined) };
-  const passwords = {};
+  const passwords = { hash: vi.fn().mockResolvedValue("new-hash") };
   const permissions = { getEffectivePermissions: vi.fn().mockResolvedValue(new Set(["user:read"])) };
   const scope = { getAccessibleNodeIds: vi.fn().mockResolvedValue(null) };
   const jwt = { signAsync: vi.fn().mockResolvedValue("mfa.jwt") };
@@ -70,7 +73,7 @@ function build(overrides: { user?: Record<string, unknown> | null; maxFailed?: n
     config as never,
     audit as never,
   );
-  return { service, prisma, local, tokens, mfa, audit };
+  return { service, prisma, local, tokens, mfa, policy, passwords, resets, audit };
 }
 
 const meta = { ip: "127.0.0.1", userAgent: "test" };
@@ -180,5 +183,43 @@ describe("AuthService — throttle del segundo factor", () => {
       c.service.login({ email: "op@x.cl", password: "ok", totp: "000000" }, meta),
     ).rejects.toThrow(/Demasiados intentos/);
     expect(c.mfa.assertSecondFactor).not.toHaveBeenCalled();
+  });
+});
+
+describe("AuthService.adminResetPassword", () => {
+  it("fija temporal, fuerza cambio, revoca sesiones y audita (sin tocar MFA)", async () => {
+    const c = build({ user: { id: "u9" } });
+    await c.service.adminResetPassword("u9", "Temp!Pass2026", meta);
+
+    expect(c.policy.assertComplexity).toHaveBeenCalledWith("Temp!Pass2026");
+    expect(c.passwords.hash).toHaveBeenCalledWith("Temp!Pass2026");
+    const update = c.prisma.user.update.mock.calls.at(-1)![0];
+    expect(update.where).toEqual({ id: "u9" });
+    expect(update.data).toMatchObject({ passwordHash: "new-hash", forcePasswordChange: true });
+    expect(c.policy.recordHistory).toHaveBeenCalledWith("u9", "new-hash");
+    expect(c.resets.invalidatePending).toHaveBeenCalledWith("u9");
+    expect(c.tokens.revokeAllForUser).toHaveBeenCalledWith("u9");
+    expect(c.audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "auth.password.admin_reset", entityId: "u9" }),
+    );
+    // No toca el MFA.
+    expect(c.mfa.assertSecondFactor).not.toHaveBeenCalled();
+  });
+
+  it("usuario inexistente: 404 y no aplica cambios", async () => {
+    const c = build({ user: null });
+    await expect(c.service.adminResetPassword("nope", "Temp!Pass2026", meta)).rejects.toThrow(
+      /no encontrado/,
+    );
+    expect(c.tokens.revokeAllForUser).not.toHaveBeenCalled();
+    expect(c.prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  it("contraseña débil: propaga el error de la política y no revoca sesiones", async () => {
+    const c = build({ user: { id: "u9" } });
+    c.policy.assertComplexity.mockRejectedValue(new Error("débil"));
+    await expect(c.service.adminResetPassword("u9", "123", meta)).rejects.toThrow(/débil/);
+    expect(c.prisma.user.update).not.toHaveBeenCalled();
+    expect(c.tokens.revokeAllForUser).not.toHaveBeenCalled();
   });
 });

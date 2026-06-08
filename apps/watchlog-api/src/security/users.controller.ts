@@ -1,10 +1,12 @@
 import { Body, Controller, Get, Param, Patch, Post, Put, Req } from "@nestjs/common";
 import type { FastifyRequest } from "fastify";
 import {
+  adminResetPasswordRequestSchema,
   assignRolesRequestSchema,
   assignScopeRequestSchema,
   createUserRequestSchema,
   updateUserRequestSchema,
+  type AdminResetPasswordRequest,
   type AssignRolesRequest,
   type AssignScopeRequest,
   type CreateUserRequest,
@@ -84,6 +86,18 @@ export class UsersController {
     @Req() req: FastifyRequest,
   ) {
     return this.users.resetMfa(id, this.ctx(user, req));
+  }
+
+  /** Restablece la contraseña del usuario (temporal + cambio forzado + revoca sesiones). */
+  @Post(":id/reset-password")
+  @RequirePermission("user:reset-password")
+  resetPassword(
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(adminResetPasswordRequestSchema)) dto: AdminResetPasswordRequest,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.users.resetPassword(id, dto.password, this.ctx(user, req));
   }
 
   private ctx(user: RequestUser, req: FastifyRequest): AuditContext {

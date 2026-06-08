@@ -79,6 +79,12 @@ nunca queda más de una sesión atrás.
   - [x] Política de seguridad: editar contraseñas + bloqueo + **`mfaMode`** global.
   - [x] **MFA de admin**: estado de MFA por usuario + **resetear MFA**
         (`POST /security/users/:id/mfa/reset`, permiso `user:reset-mfa`). *Backend ✅ + UI ✅.*
+  - [x] **Reset de contraseña por admin** ✅ (2026-06-08, variante A estilo AD): contraseña temporal +
+        cambio forzado + revoca sesiones + auditoría, sin tocar MFA. Permiso nuevo `user:reset-password`
+        (catálogo 26), `POST /security/users/:id/reset-password`, UI en pestaña *Seguridad*. Ver DECISIONS.
+  - [ ] **Reset de contraseña por enlace (variante B)** — opción futura: el admin dispara el flujo
+        self-service por correo (el admin no ve la clave). Requiere SMTP + buzón del usuario. **Prioridad: baja**
+        (complementa la variante A ya entregada).
   - [x] Lectura de auditoría (`/security/audit`) con paginación por cursor y diff before/after.
   - **Añadidos**: contrato `auditLogEntrySchema`, primitivo `@lyra/ui` `Checkbox`, navegación por sub-rutas
     anidadas (`routeForPath`/`isRouteActive`). **Pendiente solo el smoke visual** (ver §4).
