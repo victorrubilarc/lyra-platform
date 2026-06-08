@@ -63,6 +63,7 @@
 .nodeHeader {
   display: flex;
   align-items: flex-start;
+  flex-wrap: wrap;
   gap: var(--space-3);
 }
 
@@ -80,8 +81,12 @@
 }
 
 .nodeInfo {
-  flex: 1;
-  min-width: 0;
+  /* Ancho mínimo de la columna de info: si junto a las acciones no caben,
+     estas envuelven a su propia fila (flexbox lo resuelve sin breakpoint).
+     Evita que la descripción se aplaste a "una palabra por línea" en paneles
+     angostos (tablet o splitter arrastrado). */
+  flex: 1 1 240px;
+  min-width: 220px;
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
