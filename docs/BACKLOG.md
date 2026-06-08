@@ -89,6 +89,21 @@ nunca queda más de una sesión atrás.
       `NodeDrawer`-style para alta/edición, descripción como 2ª línea. Seed/backfill de equipos de
       ejemplo opcional. **Antes de codear: confirmar el modelo de `Equipment` con el usuario**
       (¿qué `type`/categorías?, ¿abbreviation obligatoria?, ¿activo/baja lógica?).
+  - **Integración (diseño integration-ready, decisión a tomar antes de codear):** la plataforma es
+    industrial y conversará con historiadores/MES/EAM (PI System vía **PI Web API**: *WebID* opaco +
+    *PI AF path*; **OPC UA**: *NodeId* + namespace/BrowseName; **SAP PM**: Equipment Number / Functional
+    Location; **IBM Maximo**: Asset Num; lenguaje de intercambio **ISA-95** Physical Asset). Un equipo
+    mapea a **varios** sistemas a la vez ⇒ el `externalCode` único **no basta**. Propuesta a evaluar:
+    entidad genérica **`ExternalReference`** (o `SystemLink`) **polimórfica** (dueño `orgNodeId?` **o**
+    `equipmentId?` con check constraint, **mismo patrón que `Scope`**) con campos `systemType`/`systemKey`
+    (catálogo configurable, NO enum hardcodeado), `externalId` (WebID/NodeId/EquipmentNumber, estable),
+    `externalPath` (AF/browse path, legible pero frágil), `endpoint`/namespace, `metadata jsonb`,
+    `enabled`/`syncDirection`. Identidad estable de Lyra hacia afuera: el `id` (cuid) ya es inmutable;
+    evaluar además un `tag`/assetTag de negocio estable. **El MOTOR de integración (conectar/leer/sync)
+    es Fase 3 (Orígenes de datos), NO esta sesión** — aquí solo el modelo de datos + (opcional) UI mínima
+    de referencias, para no migrar después. Decidir con el usuario: ¿se crea `ExternalReference` ahora
+    (modelo + UI mínima) o solo se deja diseñada y se difiere a Fase 3? Refs: PI Web API WebID, OPC UA
+    NodeId, ISA-95/OPC UA companion, ISO 14224 (taxonomía de equipos para confiabilidad).
 
 ### Fases siguientes (roadmap, ver PROGRESS §tabla)
 - [ ] **Fase 2** — Plantillas / Form Builder + Bitácoras.
