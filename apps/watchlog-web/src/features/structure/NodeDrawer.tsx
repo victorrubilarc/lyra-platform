@@ -13,6 +13,7 @@ const nodeFormSchema = z.object({
   name: z.string().trim().min(1, "El nombre es obligatorio").max(120),
   code: z.string().trim().max(40).optional(),
   description: z.string().trim().max(500).optional(),
+  reportOrder: z.coerce.number().int().min(0).max(100000),
   externalCode: z.string().trim().max(80).optional(),
   levelId: z.string().min(1, "Selecciona un nivel"),
 });
@@ -49,16 +50,16 @@ export function NodeDrawer({ open, mode, node, levels, onClose }: NodeDrawerProp
 
   const form = useForm<NodeFormValues>({
     resolver: zodResolver(nodeFormSchema),
-    defaultValues: { name: "", code: "", description: "", externalCode: "", levelId: "" },
+    defaultValues: { name: "", code: "", description: "", reportOrder: 0, externalCode: "", levelId: "" },
   });
 
   // Precarga el formulario al abrir
   useEffect(() => {
     if (!open) return;
     if (isEdit && node) {
-      form.reset({ name: node.name, code: node.code ?? "", description: node.description ?? "", externalCode: node.externalCode ?? "", levelId: node.levelId });
+      form.reset({ name: node.name, code: node.code ?? "", description: node.description ?? "", reportOrder: node.reportOrder ?? 0, externalCode: node.externalCode ?? "", levelId: node.levelId });
     } else {
-      form.reset({ name: "", code: "", description: "", externalCode: "", levelId: levels[0]?.id ?? "" });
+      form.reset({ name: "", code: "", description: "", reportOrder: 0, externalCode: "", levelId: levels[0]?.id ?? "" });
     }
   }, [open, isEdit, node, levels, form]);
 
@@ -73,6 +74,7 @@ export function NodeDrawer({ open, mode, node, levels, onClose }: NodeDrawerProp
             name: values.name,
             code: values.code?.trim() || null,
             description: values.description?.trim() || null,
+            reportOrder: values.reportOrder,
             externalCode: values.externalCode?.trim() || null,
             levelId: values.levelId,
           },
@@ -83,6 +85,7 @@ export function NodeDrawer({ open, mode, node, levels, onClose }: NodeDrawerProp
           name: values.name,
           code: values.code?.trim() || undefined,
           description: values.description?.trim() || undefined,
+          reportOrder: values.reportOrder,
           externalCode: values.externalCode?.trim() || undefined,
           levelId: values.levelId,
           parentId: mode === "create-child" ? (node?.id ?? null) : null,
@@ -183,6 +186,23 @@ export function NodeDrawer({ open, mode, node, levels, onClose }: NodeDrawerProp
               }}
               onFocus={(e) => { e.currentTarget.style.borderColor = "var(--color-accent-primary)"; }}
               onBlur={(e) => { e.currentTarget.style.borderColor = "var(--color-border-default)"; }}
+            />
+          )}
+        </FormField>
+
+        <FormField
+          label={t("structure.node.reportOrder")}
+          error={form.formState.errors.reportOrder?.message}
+          hint={t("structure.node.reportOrderDesc")}
+        >
+          {(field) => (
+            <Input
+              {...field}
+              {...form.register("reportOrder")}
+              type="number"
+              min={0}
+              step={10}
+              placeholder="0"
             />
           )}
         </FormField>

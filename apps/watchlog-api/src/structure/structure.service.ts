@@ -61,7 +61,8 @@ export class StructureService {
   async getTree(): Promise<OrgNodeTree[]> {
     const nodes = await this.prisma.orgNode.findMany({
       where: { deletedAt: null },
-      orderBy: { name: "asc" },
+      // Orden en informes (asc) con desempate alfabético; aplica a árbol y grilla.
+      orderBy: [{ reportOrder: "asc" }, { name: "asc" }],
     });
     return this.buildTree(nodes);
   }
@@ -76,6 +77,7 @@ export class StructureService {
         name: dto.name,
         code: dto.code ?? null,
         description: dto.description ?? null,
+        reportOrder: dto.reportOrder ?? 0,
         externalCode: dto.externalCode ?? null,
         parentId: dto.parentId ?? null,
         levelId: dto.levelId,
@@ -104,6 +106,7 @@ export class StructureService {
           name: dto.name ?? undefined,
           code: dto.code === undefined ? undefined : dto.code,
           description: dto.description === undefined ? undefined : dto.description,
+          reportOrder: dto.reportOrder === undefined ? undefined : dto.reportOrder,
           externalCode: dto.externalCode === undefined ? undefined : dto.externalCode,
           levelId: dto.levelId ?? undefined,
           parentId: reparenting ? (dto.parentId ?? null) : undefined,
@@ -178,6 +181,7 @@ export class StructureService {
       name: n.name,
       code: n.code,
       description: n.description,
+      reportOrder: n.reportOrder,
       externalCode: n.externalCode,
       parentId: n.parentId,
       levelId: n.levelId,

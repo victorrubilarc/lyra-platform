@@ -153,6 +153,55 @@
   font-size: 11px;
 }
 
+/* Celda nombre (nombre + descripción en 2da línea) */
+.childNameCell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.childDesc {
+  font-size: 11.5px;
+  color: var(--color-text-muted);
+  /* Alinea con el texto tras el punto de color (6px punto + 8px gap). */
+  padding-left: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 560px;
+}
+
+/* Input inline del orden en informes */
+.orderInput {
+  width: 56px;
+  height: 30px;
+  padding: 0 6px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: var(--text-body-sm-size);
+  color: var(--color-text-primary);
+  background: var(--color-bg-surface-2);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.orderInput:hover {
+  border-color: var(--color-border-strong);
+}
+
+.orderInput:focus {
+  border-color: var(--color-accent-primary);
+}
+
+.orderReadonly {
+  font-family: var(--font-mono);
+  font-size: var(--text-body-sm-size);
+  color: var(--color-text-secondary);
+}
+
 /* Celda nombre en la tabla de hijos */
 .childNameBtn {
   display: inline-flex;

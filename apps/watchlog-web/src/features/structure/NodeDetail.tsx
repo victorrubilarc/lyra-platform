@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ChevronRight,
@@ -11,10 +11,74 @@ import {
 } from "lucide-react";
 import { Button, Chip, EmptyState, Table } from "@lyra/ui";
 import type { OrgLevel, OrgNodeTree } from "@lyra/contracts";
-import type { TableColumn } from "@lyra/ui";
+import type { TableColumn, TableSort } from "@lyra/ui";
 import { usePermissions } from "../../auth/use-permissions.js";
+import { useUpdateNode } from "./structure-queries.js";
 import { levelColor, LevelIcon } from "./OrgTree.js";
 import styles from "./NodeDetail.module.css";
+
+/** Celda editable inline del orden en informes de un nodo hijo. */
+function ReportOrderCell({ node, editable }: { node: OrgNodeTree; editable: boolean }) {
+  const updateNode = useUpdateNode();
+  const [value, setValue] = useState(String(node.reportOrder));
+
+  // Re-sincroniza si el valor cambia por fuera (otra edición, refetch).
+  useEffect(() => {
+    setValue(String(node.reportOrder));
+  }, [node.reportOrder]);
+
+  function commit() {
+    const n = Math.trunc(Number(value));
+    if (!Number.isFinite(n) || n < 0 || n === node.reportOrder) {
+      setValue(String(node.reportOrder));
+      return;
+    }
+    updateNode.mutate({ id: node.id, dto: { reportOrder: n } });
+  }
+
+  if (!editable) return <span className={styles.orderReadonly}>{node.reportOrder}</span>;
+
+  return (
+    <input
+      className={styles.orderInput}
+      type="number"
+      min={0}
+      step={10}
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") e.currentTarget.blur();
+      }}
+      onClick={(e) => e.stopPropagation()}
+      aria-label="Orden en informes"
+    />
+  );
+}
+
+/** Ordena los hijos según la columna/dirección activas. */
+function sortChildren(children: OrgNodeTree[], sort: TableSort): OrgNodeTree[] {
+  const dir = sort.direction === "asc" ? 1 : -1;
+  return [...children].sort((a, b) => {
+    let cmp: number;
+    switch (sort.key) {
+      case "reportOrder":
+        cmp = a.reportOrder - b.reportOrder;
+        break;
+      case "code":
+        cmp = (a.code ?? "").localeCompare(b.code ?? "");
+        break;
+      case "externalCode":
+        cmp = (a.externalCode ?? "").localeCompare(b.externalCode ?? "");
+        break;
+      default:
+        cmp = a.name.localeCompare(b.name);
+    }
+    // Desempate estable por nombre.
+    if (cmp === 0 && sort.key !== "name") cmp = a.name.localeCompare(b.name);
+    return cmp * dir;
+  });
+}
 
 function flattenTree(nodes: OrgNodeTree[]): Map<string, OrgNodeTree> {
   const map = new Map<string, OrgNodeTree>();
@@ -69,6 +133,13 @@ export function NodeDetail({
   const canEdit   = perms.can("orgnode:edit");
   const canDelete = perms.can("orgnode:delete");
 
+  // Orden de la grilla de hijos. Por defecto: orden en informes (asc).
+  const [sort, setSort] = useState<TableSort>({ key: "reportOrder", direction: "asc" });
+  const sortedChildren = useMemo(
+    () => (node ? sortChildren(node.children, sort) : []),
+    [node, sort],
+  );
+
   const levelMap = useMemo(() => new Map(levels.map((l) => [l.id, l])), [levels]);
   const flatMap  = useMemo(() => flattenTree(allNodes), [allNodes]);
 
@@ -113,30 +184,43 @@ export function NodeDetail({
     {
       key: "name",
       header: t("structure.node.name"),
+      sortable: true,
       render: (row) => {
         const cl = levelMap.get(row.levelId);
         return (
-          <button
-            type="button"
-            className={styles.childNameBtn}
-            onClick={() => onNavigateTo(row)}
-          >
-            <span
-              className={styles.childDot}
-              style={{ background: levelColor(cl?.order) }}
-            />
-            <span className={styles.childNameText}>{row.name}</span>
-            {row.children.length > 0 && (
-              <span className={styles.childBadge}>{row.children.length}</span>
-            )}
-          </button>
+          <div className={styles.childNameCell}>
+            <button
+              type="button"
+              className={styles.childNameBtn}
+              onClick={() => onNavigateTo(row)}
+            >
+              <span
+                className={styles.childDot}
+                style={{ background: levelColor(cl?.order) }}
+              />
+              <span className={styles.childNameText}>{row.name}</span>
+              {row.children.length > 0 && (
+                <span className={styles.childBadge}>{row.children.length}</span>
+              )}
+            </button>
+            {row.description && <span className={styles.childDesc}>{row.description}</span>}
+          </div>
         );
       },
+    },
+    {
+      key: "reportOrder",
+      header: t("structure.node.reportOrder"),
+      width: 96,
+      sortable: true,
+      align: "center",
+      render: (row) => <ReportOrderCell node={row} editable={canEdit} />,
     },
     {
       key: "code",
       header: t("structure.node.code"),
       width: 90,
+      sortable: true,
       render: (row) =>
         row.code ? <code className={styles.code}>{row.code}</code> : <span className={styles.nullText}>—</span>,
     },
@@ -144,6 +228,7 @@ export function NodeDetail({
       key: "externalCode",
       header: t("structure.node.externalCode"),
       width: 110,
+      sortable: true,
       render: (row) =>
         row.externalCode
           ? <code className={styles.code}>{row.externalCode}</code>
@@ -283,8 +368,10 @@ export function NodeDetail({
           </div>
           <Table
             columns={childColumns}
-            data={node.children}
+            data={sortedChildren}
             rowKey={(n) => n.id}
+            sort={sort}
+            onSort={(key, direction) => setSort({ key, direction })}
             paginated
             defaultPageSize={10}
             emptyState={

@@ -10,6 +10,7 @@ import { PERMISSION_CATALOG } from "@lyra/contracts";
 import { PrismaClient } from "@prisma/client";
 import * as argon2 from "argon2";
 import { NODE_DESCRIPTIONS } from "./structure-descriptions.js";
+import { assignReportOrderBySiblings } from "./report-order.js";
 
 const prisma = new PrismaClient();
 
@@ -249,6 +250,9 @@ async function seedDemoStructure(): Promise<void> {
 
   // Procesos de PLANTA P2
   await createNode("pr-p2-pint2", "PINTADO 2", "PINT2", levelProceso.id, a_p2.id, a_p2.path);
+
+  // Orden inicial en informes: escalonado por grupo de hermanos.
+  await assignReportOrderBySiblings(prisma);
 
   console.log("✔ Estructura organizacional de demo (2 plantas) creada");
 }

@@ -292,6 +292,8 @@ model OrgNode {
   code         String?
   /// Descripción de uso o propósito del nodo (planta, área, unidad, etc.)
   description  String?
+  /// Orden del nodo en informes/reportes, relativo a sus hermanos (asc).
+  reportOrder  Int       @default(0)
   /// Código de identificación en sistemas externos (ERP, CMMS, SCADA, etc.)
   externalCode String?
   parentId     String?

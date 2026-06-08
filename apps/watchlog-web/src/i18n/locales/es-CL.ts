@@ -126,6 +126,8 @@ export const esCL = {
       description: "Descripción",
       descriptionDesc: "Propósito o uso de esta unidad (opcional, máx. 500 caracteres).",
       descriptionPlaceholder: "ej. Gestiona las operaciones del sector norte de la planta…",
+      reportOrder: "Orden",
+      reportOrderDesc: "Posición del nodo en informes, respecto a sus hermanos (menor = primero).",
       externalCode: "Cód. externo",
       externalCodeDesc: "Clave en sistema externo: ERP, CMMS, SCADA, etc. (opcional).",
       externalCodePlaceholder: "ej. SAP-1020 / LOC-0042",
