@@ -7,6 +7,7 @@ import {
 import type {
   AssignRolesRequest,
   AssignScopeRequest,
+  AuditFilters,
   CreateRoleRequest,
   CreateUserRequest,
   UpdatePasswordPolicyRequest,
@@ -182,11 +183,11 @@ export function useUpdatePasswordPolicy() {
 
 // ─── Auditoría (paginación por cursor) ───────────────────────────────────────
 
-export function useAudit() {
+export function useAudit(filters: AuditFilters = {}) {
   return useInfiniteQuery({
-    queryKey: SECURITY_KEYS.audit,
+    queryKey: [...SECURITY_KEYS.audit, filters],
     queryFn: ({ pageParam }) =>
-      fetchAudit({ take: AUDIT_PAGE_SIZE, cursor: pageParam ?? undefined }),
+      fetchAudit({ take: AUDIT_PAGE_SIZE, cursor: pageParam ?? undefined, ...filters }),
     initialPageParam: undefined as string | undefined,
     // Si la última página vino llena, hay más; el cursor es el id del último registro.
     getNextPageParam: (lastPage) =>

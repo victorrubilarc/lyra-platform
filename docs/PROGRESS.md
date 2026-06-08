@@ -378,6 +378,12 @@ Consume el backend de seguridad ya existente. Ver DECISIONS 2026-06-08. La UI so
   árboles extensos. Pestaña *Alcance* preparada como **multi-dimensión** (encabezado "Estructura
   organizacional"; las plantillas se sumarán como sección hermana en Fase 2). **Buscador** en la pestaña de
   *Roles* (filtra por nombre/clave/descripción).
+- **Auditoría filtrable (para auditores)**: backend `GET /security/audit` extendido con filtros **rango de
+  fechas** (`from`/`to`), **acción**, **actor** y **tipo de entidad** (coincidencia parcial insensible a
+  mayúsculas, vía `where` de Prisma). UI con barra de filtros (fechas + texto + select de entidad), **atajos
+  de rango** (24 h / 7 d / 30 d), conteo de resultados y debounce; la query de TanStack se rekeyea por
+  filtros. Contrato `AuditFilters`. Smoke en vivo: `action=login` → todos con "login"; `entityType=Role` →
+  todos Role; `from=hoy` acota; rango futuro → 0.
 - **Roles**: `RolesPage` (tabla + borrado gateado, system no borrable) + `RoleDrawer` + `PermissionMatrix`
   (agrupada por `group` del catálogo, checkbox de grupo con indeterminado, `requireMfa`).
 - **Política**: `PolicyPage` (RHF+Zod): contraseñas (longitud/complejidad/historial/expiración), bloqueo por

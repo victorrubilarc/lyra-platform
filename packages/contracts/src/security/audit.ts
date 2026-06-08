@@ -30,11 +30,24 @@ export const auditLogEntrySchema = z.object({
 });
 export type AuditLogEntry = z.infer<typeof auditLogEntrySchema>;
 
-/** Parámetros de consulta de la auditoría (paginación por cursor de `id`). */
+/** Parámetros de consulta de la auditoría (paginación por cursor + filtros). */
 export const auditQuerySchema = z.object({
   /** Cuántos registros traer (1–200, def. 50 en el backend). */
   take: z.number().int().min(1).max(200).optional(),
   /** `id` del último registro de la página anterior (paginación hacia atrás en el tiempo). */
   cursor: z.string().optional(),
+  /** Desde (ISO 8601 inclusive). */
+  from: z.string().optional(),
+  /** Hasta (ISO 8601 inclusive). */
+  to: z.string().optional(),
+  /** Coincidencia parcial en la acción (insensible a mayúsculas). */
+  action: z.string().optional(),
+  /** Coincidencia parcial en el correo del actor. */
+  actor: z.string().optional(),
+  /** Coincidencia parcial en el tipo de entidad (User, Role, OrgNode…). */
+  entityType: z.string().optional(),
 });
 export type AuditQuery = z.infer<typeof auditQuerySchema>;
+
+/** Filtros de auditoría que maneja la UI (sin paginación). */
+export type AuditFilters = Omit<AuditQuery, "take" | "cursor">;

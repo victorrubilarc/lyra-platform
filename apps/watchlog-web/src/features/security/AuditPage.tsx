@@ -1,11 +1,41 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ScrollText, TriangleAlert } from "lucide-react";
-import { Button, Chip, EmptyState, Modal, Table, type TableColumn } from "@lyra/ui";
-import type { AuditLogEntry } from "@lyra/contracts";
+import { FilterX, ScrollText, TriangleAlert } from "lucide-react";
+import { Button, Chip, EmptyState, Input, Modal, Select, Table, type TableColumn } from "@lyra/ui";
+import type { AuditFilters, AuditLogEntry } from "@lyra/contracts";
 import { useAudit } from "./security-queries.js";
 import shared from "./security-shared.module.css";
 import styles from "./AuditPage.module.css";
+
+/** Tipos de entidad conocidos para el filtro (coincidencia parcial en el backend). */
+const ENTITY_TYPES = ["User", "Role", "OrgNode", "OrgLevel", "Equipment", "EquipmentCategory"] as const;
+
+interface FilterForm {
+  from: string;
+  to: string;
+  action: string;
+  actor: string;
+  entityType: string;
+}
+
+const EMPTY_FILTERS: FilterForm = { from: "", to: "", action: "", actor: "", entityType: "" };
+
+/** Convierte el formulario (fechas locales) a filtros ISO para el backend. */
+function toFilters(f: FilterForm): AuditFilters {
+  return {
+    from: f.from ? new Date(`${f.from}T00:00:00`).toISOString() : undefined,
+    to: f.to ? new Date(`${f.to}T23:59:59.999`).toISOString() : undefined,
+    action: f.action.trim() || undefined,
+    actor: f.actor.trim() || undefined,
+    entityType: f.entityType || undefined,
+  };
+}
+
+/** Fecha local en formato YYYY-MM-DD (para `<input type="date">`). */
+function isoDay(d: Date): string {
+  const tz = d.getTimezoneOffset() * 60000;
+  return new Date(d.getTime() - tz).toISOString().slice(0, 10);
+}
 
 /** Formatea una fecha ISO a hora local es-CL. */
 function formatDateTime(iso: string): string {
@@ -27,10 +57,31 @@ function actionVariant(action: string): "success" | "warning" | "error" | "info"
 
 export function AuditPage() {
   const { t } = useTranslation();
-  const { data, isLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage } = useAudit();
+  const [form, setForm] = useState<FilterForm>(EMPTY_FILTERS);
+  const [applied, setApplied] = useState<AuditFilters>({});
   const [selected, setSelected] = useState<AuditLogEntry | null>(null);
 
+  // Debounce: aplica los filtros 400 ms después del último cambio.
+  useEffect(() => {
+    const id = setTimeout(() => setApplied(toFilters(form)), 400);
+    return () => clearTimeout(id);
+  }, [form]);
+
+  const { data, isLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage } = useAudit(applied);
+
   const rows = useMemo(() => data?.pages.flat() ?? [], [data]);
+  const hasFilters = Object.values(form).some((v) => v !== "");
+
+  function setField<K extends keyof FilterForm>(key: K, value: string) {
+    setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  function presetDays(days: number) {
+    const to = new Date();
+    const from = new Date();
+    from.setDate(from.getDate() - days);
+    setForm((f) => ({ ...f, from: isoDay(from), to: isoDay(to) }));
+  }
 
   const columns: TableColumn<AuditLogEntry>[] = [
     {
@@ -91,6 +142,50 @@ export function AuditPage() {
           <h2 className={shared.toolbarTitle}>{t("security.audit.title")}</h2>
           <p className={shared.toolbarSubtitle}>{t("security.audit.subtitle")}</p>
         </div>
+        <div className={styles.presets}>
+          <Button variant="secondary" onClick={() => presetDays(1)}>{t("security.audit.preset24h")}</Button>
+          <Button variant="secondary" onClick={() => presetDays(7)}>{t("security.audit.preset7d")}</Button>
+          <Button variant="secondary" onClick={() => presetDays(30)}>{t("security.audit.preset30d")}</Button>
+        </div>
+      </div>
+
+      {/* Barra de filtros para auditores */}
+      <div className={styles.filters}>
+        <label className={styles.filterField}>
+          <span className={styles.filterLabel}>{t("security.audit.from")}</span>
+          <Input type="date" value={form.from} max={form.to || undefined} onChange={(e) => setField("from", e.target.value)} />
+        </label>
+        <label className={styles.filterField}>
+          <span className={styles.filterLabel}>{t("security.audit.to")}</span>
+          <Input type="date" value={form.to} min={form.from || undefined} onChange={(e) => setField("to", e.target.value)} />
+        </label>
+        <label className={styles.filterField}>
+          <span className={styles.filterLabel}>{t("security.audit.action")}</span>
+          <Input value={form.action} placeholder={t("security.audit.actionPlaceholder")} onChange={(e) => setField("action", e.target.value)} />
+        </label>
+        <label className={styles.filterField}>
+          <span className={styles.filterLabel}>{t("security.audit.actor")}</span>
+          <Input value={form.actor} placeholder={t("security.audit.actorPlaceholder")} onChange={(e) => setField("actor", e.target.value)} />
+        </label>
+        <label className={styles.filterField}>
+          <span className={styles.filterLabel}>{t("security.audit.entity")}</span>
+          <Select value={form.entityType} onChange={(e) => setField("entityType", e.target.value)}>
+            <option value="">{t("security.audit.allEntities")}</option>
+            {ENTITY_TYPES.map((e) => (
+              <option key={e} value={e}>{e}</option>
+            ))}
+          </Select>
+        </label>
+        {hasFilters && (
+          <Button variant="secondary" leftIcon={<FilterX size={16} />} onClick={() => setForm(EMPTY_FILTERS)}>
+            {t("security.audit.clear")}
+          </Button>
+        )}
+      </div>
+
+      <div className={styles.resultInfo}>
+        {t("security.audit.resultCount", { count: rows.length })}
+        {hasNextPage ? "+" : ""}
       </div>
 
       <Table

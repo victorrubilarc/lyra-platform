@@ -35,10 +35,40 @@ export class AuditService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Lista eventos de auditoría (más recientes primero), con paginación simple. */
-  async list(params: { take?: number; cursor?: string } = {}) {
+  /**
+   * Lista eventos de auditoría (más recientes primero), con paginación por cursor
+   * y filtros para auditores: rango de fechas, acción, actor y tipo de entidad.
+   * Los filtros de texto son por coincidencia parcial e insensibles a mayúsculas.
+   */
+  async list(
+    params: {
+      take?: number;
+      cursor?: string;
+      from?: Date;
+      to?: Date;
+      action?: string;
+      actor?: string;
+      entityType?: string;
+    } = {},
+  ) {
     const take = Math.min(Math.max(params.take ?? 50, 1), 200);
+
+    const occurredAt =
+      params.from || params.to
+        ? { ...(params.from ? { gte: params.from } : {}), ...(params.to ? { lte: params.to } : {}) }
+        : undefined;
+
+    const where: Prisma.AuditLogWhereInput = {
+      ...(occurredAt ? { occurredAt } : {}),
+      ...(params.action ? { action: { contains: params.action, mode: "insensitive" } } : {}),
+      ...(params.actor ? { actorEmail: { contains: params.actor, mode: "insensitive" } } : {}),
+      ...(params.entityType
+        ? { entityType: { contains: params.entityType, mode: "insensitive" } }
+        : {}),
+    };
+
     return this.prisma.auditLog.findMany({
+      where,
       take,
       orderBy: { occurredAt: "desc" },
       ...(params.cursor ? { skip: 1, cursor: { id: params.cursor } } : {}),

@@ -15,6 +15,7 @@ import {
   userSummarySchema,
   type AssignRolesRequest,
   type AssignScopeRequest,
+  type AuditFilters,
   type AuditLogEntry,
   type CreateRoleRequest,
   type CreateUserRequest,
@@ -121,10 +122,17 @@ export function updatePasswordPolicy(dto: UpdatePasswordPolicyRequest): Promise<
 
 // ─── Auditoría ───────────────────────────────────────────────────────────────
 
-export function fetchAudit(params: { take?: number; cursor?: string } = {}): Promise<AuditLogEntry[]> {
+export function fetchAudit(
+  params: { take?: number; cursor?: string } & AuditFilters = {},
+): Promise<AuditLogEntry[]> {
   const q = new URLSearchParams();
   if (params.take != null) q.set("take", String(params.take));
   if (params.cursor) q.set("cursor", params.cursor);
+  if (params.from) q.set("from", params.from);
+  if (params.to) q.set("to", params.to);
+  if (params.action) q.set("action", params.action);
+  if (params.actor) q.set("actor", params.actor);
+  if (params.entityType) q.set("entityType", params.entityType);
   const qs = q.toString();
   return apiJson(`/security/audit${qs ? `?${qs}` : ""}`, z.array(auditLogEntrySchema));
 }

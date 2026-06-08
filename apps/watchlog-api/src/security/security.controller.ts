@@ -46,8 +46,26 @@ export class SecurityController {
   async audit_(
     @Query("take") take?: string,
     @Query("cursor") cursor?: string,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
+    @Query("action") action?: string,
+    @Query("actor") actor?: string,
+    @Query("entityType") entityType?: string,
   ): Promise<AuditLogEntry[]> {
-    const rows = await this.audit.list({ take: take ? Number(take) : undefined, cursor });
+    const parseDate = (v?: string): Date | undefined => {
+      if (!v) return undefined;
+      const d = new Date(v);
+      return Number.isNaN(d.getTime()) ? undefined : d;
+    };
+    const rows = await this.audit.list({
+      take: take ? Number(take) : undefined,
+      cursor,
+      from: parseDate(from),
+      to: parseDate(to),
+      action: action?.trim() || undefined,
+      actor: actor?.trim() || undefined,
+      entityType: entityType?.trim() || undefined,
+    });
     return rows.map((r) => ({
       id: r.id,
       occurredAt: r.occurredAt.toISOString(),
