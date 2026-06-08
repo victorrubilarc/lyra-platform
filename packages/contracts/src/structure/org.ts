@@ -32,6 +32,8 @@ export const orgNodeSchema = z.object({
   name: z.string(),
   /** Código interno corto, p. ej. "REMA", "AIR1". */
   code: z.string().nullable(),
+  /** Descripción de uso o propósito del nodo. */
+  description: z.string().nullable(),
   /** Código en sistemas externos (ERP, CMMS, SCADA). Clave de integración. */
   externalCode: z.string().nullable(),
   parentId: z.string().nullable(),
@@ -51,6 +53,8 @@ export const orgNodeTreeSchema: z.ZodType<OrgNodeTree> = orgNodeSchema.extend({
 export const createOrgNodeRequestSchema = z.object({
   name: z.string().trim().min(1).max(120),
   code: z.string().trim().max(40).optional(),
+  /** Descripción de uso o propósito del nodo. */
+  description: z.string().trim().max(500).optional(),
   /** Código de identificación en sistemas externos (ERP, CMMS, SCADA). */
   externalCode: z.string().trim().max(80).optional(),
   /** Padre en la jerarquía; `null`/ausente = nodo raíz. */
@@ -62,6 +66,8 @@ export type CreateOrgNodeRequest = z.infer<typeof createOrgNodeRequestSchema>;
 export const updateOrgNodeRequestSchema = z.object({
   name: z.string().trim().min(1).max(120).optional(),
   code: z.string().trim().max(40).nullable().optional(),
+  /** Descripción de uso o propósito del nodo; `null` la borra. */
+  description: z.string().trim().max(500).nullable().optional(),
   externalCode: z.string().trim().max(80).nullable().optional(),
   /** Reparentar el nodo; `null` lo convierte en raíz. */
   parentId: z.string().nullable().optional(),

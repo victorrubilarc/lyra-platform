@@ -235,6 +235,9 @@ export function NodeDetail({
               </span>
             )}
           </div>
+          {node.description && (
+            <p className={styles.nodeDescription}>{node.description}</p>
+          )}
         </div>
         <div className={styles.headerActions}>
           {canEdit && (

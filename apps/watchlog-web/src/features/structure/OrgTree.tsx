@@ -137,9 +137,24 @@ function NodeBranch({ node, depth, expanded, toggle, levelMap, selectedId, onSel
           <LevelIcon order={level?.order} size={14} />
         </span>
 
-        {/* Nombre */}
-        <span className={cx(styles.nodeName, isSelected && styles.nodeNameSelected)}>
-          {node.name}
+        {/* Nombre + subnota */}
+        <span className={styles.nodeText}>
+          <span className={cx(styles.nodeName, isSelected && styles.nodeNameSelected)}>
+            {node.name}
+          </span>
+          {(node.description || node.externalCode) && (
+            <span className={styles.nodeSubline}>
+              {node.description
+                ? node.description.length > 60
+                  ? node.description.slice(0, 57) + "…"
+                  : node.description
+                : null}
+              {node.description && node.externalCode && " · "}
+              {node.externalCode && (
+                <span className={styles.nodeSublineCode}>{node.externalCode}</span>
+              )}
+            </span>
+          )}
         </span>
 
         {/* Código */}

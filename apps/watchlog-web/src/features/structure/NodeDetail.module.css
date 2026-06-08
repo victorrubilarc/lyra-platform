@@ -105,6 +105,13 @@
   flex-wrap: wrap;
 }
 
+.nodeDescription {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-body-sm-size);
+  color: var(--color-text-secondary);
+  line-height: 1.55;
+}
+
 .headerActions {
   display: flex;
   align-items: center;

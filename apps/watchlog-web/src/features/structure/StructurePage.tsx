@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from "react-resizable-panels";
 import { Building2, Layers, Lock, Plus, TriangleAlert } from "lucide-react";
 import { Button, EmptyState, Skeleton } from "@lyra/ui";
 import type { OrgNodeTree } from "@lyra/contracts";
@@ -106,10 +107,18 @@ export function StructurePage() {
         </div>
       )}
 
-      {/* Workspace de dos paneles */}
-      <div className={styles.workspace}>
+      {/* Workspace de dos paneles redimensionables */}
+      <PanelGroup
+        orientation="horizontal"
+        className={styles.workspace}
+      >
         {/* Panel izquierdo — árbol de navegación */}
-        <div className={styles.treePanel}>
+        <Panel
+          defaultSize={22}
+          minSize={15}
+          maxSize={45}
+          className={styles.treePanel}
+        >
           <div className={styles.treePanelHeader}>
             <span className={styles.treePanelTitle}>{t("structure.tree.panelTitle")}</span>
           </div>
@@ -145,10 +154,12 @@ export function StructurePage() {
               onSelect={(node) => setSelectedNodeId(node.id)}
             />
           )}
-        </div>
+        </Panel>
+
+        <PanelResizeHandle className={styles.resizeHandle} />
 
         {/* Panel derecho — detalle del nodo seleccionado */}
-        <div className={styles.detailPanel}>
+        <Panel className={styles.detailPanel}>
           <NodeDetail
             node={selectedNode}
             allNodes={tree}
@@ -163,8 +174,8 @@ export function StructurePage() {
             onEditChild={(child) => openEditNode(child)}
             onDeleteChild={(child) => openDeleteNode(child)}
           />
-        </div>
-      </div>
+        </Panel>
+      </PanelGroup>
 
       {/* Drawers y modales */}
       <NodeDrawer

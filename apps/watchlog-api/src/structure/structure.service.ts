@@ -75,6 +75,7 @@ export class StructureService {
       data: {
         name: dto.name,
         code: dto.code ?? null,
+        description: dto.description ?? null,
         externalCode: dto.externalCode ?? null,
         parentId: dto.parentId ?? null,
         levelId: dto.levelId,
@@ -102,6 +103,7 @@ export class StructureService {
         data: {
           name: dto.name ?? undefined,
           code: dto.code === undefined ? undefined : dto.code,
+          description: dto.description === undefined ? undefined : dto.description,
           externalCode: dto.externalCode === undefined ? undefined : dto.externalCode,
           levelId: dto.levelId ?? undefined,
           parentId: reparenting ? (dto.parentId ?? null) : undefined,
@@ -175,6 +177,7 @@ export class StructureService {
       id: n.id,
       name: n.name,
       code: n.code,
+      description: n.description,
       externalCode: n.externalCode,
       parentId: n.parentId,
       levelId: n.levelId,
