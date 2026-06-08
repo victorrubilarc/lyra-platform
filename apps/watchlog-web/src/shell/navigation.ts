@@ -27,7 +27,6 @@ export const ROUTES: readonly NavRoute[] = [
     icon: Network,
     permission: "module:structure:view",
     inSidebar: true,
-    soon: true,
   },
   {
     path: "/seguridad",

@@ -340,6 +340,11 @@ Reemplaza el placeholder "Equipos — próximamente" del nivel final por un CRUD
   verificado en BD** (ambos-nulos→falla, uno→OK, ambos→falla).
 - **Pendiente:** smoke **VISUAL** en navegador (seleccionar nodo de nivel Proceso → grilla de equipos,
   alta/edición vía drawer, orden inline, gestión de categorías, modo claro) — ver BACKLOG §4.
+- **Home — tarjetas navegables:** el mapa de módulos del `HomePage` ahora **enlaza** las tarjetas con
+  pantalla disponible (Estructura → `/estructura`, "Disponible") o en construcción (Seguridad →
+  `/seguridad`, "En construcción"), gateadas por permiso de módulo; las no iniciadas siguen como
+  "Pronto" no clicables. `navigation.ts`: Estructura deja de marcarse `soon` (ya construida), así el
+  sidebar tampoco la muestra como "Pronto".
 
 ## Próximo paso
 **Sesión siguiente = Fase 1 · UI de Seguridad** (usuarios/roles/permisos + reset MFA de admin) sobre
