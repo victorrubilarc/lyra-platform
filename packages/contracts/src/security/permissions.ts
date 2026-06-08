@@ -164,6 +164,38 @@ export const PERMISSION_CATALOG = [
     group: "structure",
     description: "Eliminar (borrado lógico) nodos de la estructura.",
   },
+
+  // --- Dimensión 2: acciones — equipos ---
+  {
+    key: "equipment:view",
+    dimension: "ACTION",
+    group: "structure",
+    description: "Listar y ver equipos de un nodo de la estructura.",
+  },
+  {
+    key: "equipment:create",
+    dimension: "ACTION",
+    group: "structure",
+    description: "Crear equipos.",
+  },
+  {
+    key: "equipment:edit",
+    dimension: "ACTION",
+    group: "structure",
+    description: "Editar equipos.",
+  },
+  {
+    key: "equipment:delete",
+    dimension: "ACTION",
+    group: "structure",
+    description: "Eliminar (borrado lógico) equipos.",
+  },
+  {
+    key: "equipmentcategory:manage",
+    dimension: "ACTION",
+    group: "structure",
+    description: "Configurar el catálogo de categorías/clases de equipo.",
+  },
 ] as const satisfies readonly PermissionDef[];
 
 /** Unión literal de todas las claves de permiso conocidas. */

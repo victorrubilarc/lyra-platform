@@ -4,6 +4,25 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-08 · Módulo Equipos: modelo `Equipment` integration-ready + `ExternalReference` polimórfica (modelo) + catálogo de categorías
+
+Cierre del módulo de Estructura. Reemplaza el placeholder "Equipos — próximamente" del nivel final por un CRUD real. Decisiones (aprobadas por el usuario tras propuesta):
+
+**Modelo `Equipment` integration-ready (entidad separada, NO 4.º nivel de OrgNode).** Patrón SAP PM: Functional Location (OrgNode) 1:N Equipment. Campos: identidad (`name`, `code?` corto interno, **`tag?` @unique** = assetTag estable, clave de negocio/reportes), clasificación (`categoryId?` → catálogo configurable), `manufacturer/model/serialNumber`, `criticality?` (Int **1–5**, RCM/ISO 14224, reusa la escala Severidad 1–5 del DS), `active` (estado operacional) **+** `deletedAt` (borrado lógico — son conceptos distintos), `reportOrder` (orden en informes por nodo), y **`orgNodeId`** (FK a OrgNode). Decisiones de criterio que difieren del enunciado inicial y fueron aceptadas:
+- **`orgNodeId`, no `processId`:** el DB no puede forzar "último nivel" (los niveles son configurables y un Proceso podría ganar hijos); el modelo admite cualquier nodo y la **UI** muestra la sección Equipos solo en el nivel final. Nombre consistente con `Scope.orgNodeId` / `ExternalReference`.
+- **Sin `abbreviation`** (redundante con `code`) y **sin `externalCode` plano** en Equipment: los mapeos van por `ExternalReference`. El `externalCode` plano de OrgNode queda como deuda a migrar a `ExternalReference` (BACKLOG §3).
+- **`criticality` acotada por check constraint** (`1..5` o NULL), análogo al check del Scope.
+
+**Clasificación = catálogo configurable `EquipmentCategory`, NO enum ni texto libre.** Mismo espíritu que `OrgLevel`: `name`, `code?`, `isoRef?` (alineación **opcional** a ISO 14224, sin forzarla), `description?`, `reportOrder`, `active`. Texto libre rompería consistencia/reportes; un enum hardcodeado violaría "nunca hardcodear lo configurable" (madera ≠ minería) y obligaría a migrar por cliente. Se entrega con seed inicial editable **+ drawer de gestión** (molde `LevelsDrawer`) gateado por permiso nuevo `equipmentcategory:manage`, para que "configurable" sea real desde ya.
+
+**`ExternalReference` polimórfica: modelo ahora, UI/motor en Fase 3.** Dueño `orgNodeId?` **XOR** `equipmentId?` (**check constraint raw SQL**, mismo patrón que `Scope` — validado en BD: ambos-nulos→falla, uno→OK, ambos→falla). Campos `systemType` (String, catálogo configurable que se define en Fase 3 — no enum), `externalId` (WebID/NodeId/Equipment Number), `externalPath` (PI AF/OPC browse path), `endpoint`, `metadata jsonb`, `enabled`. **Se descartó construir UI de mapeos esta sesión:** sin el motor de Fase 3 no se puede validar un WebID/NodeId ni probar conectividad → sería UI desechable (lo que CLAUDE.md prohíbe). El costo real a evitar era el modelo polimórfico + backfill, que queda resuelto. Un equipo mapea a varios sistemas a la vez ⇒ el `externalCode` único no bastaba.
+
+**Permisos nuevos** (catálogo `@lyra/contracts`, asignación = dato en BD): `equipment:view/create/edit/delete` + `equipmentcategory:manage` (total catálogo: 20→25).
+
+**Guard nuevo en `deleteNode`:** bloquea borrar un nodo con equipos activos (simétrico al bloqueo por hijos), evitando equipos huérfanos.
+
+**Equipos NO es módulo de sidebar:** vive dentro de `/estructura` (en `NodeDetail` del nivel final), gateado por `module:structure:view`; las acciones gatean el CRUD interno. Sin cambios de navegación.
+
 ### 2026-06-08 · Estructura: UX de layout responsivo, splitter propio, `description` y `reportOrder`
 
 Sesión de pulido de UX del mantenedor de Estructura (continuación). Decisiones:

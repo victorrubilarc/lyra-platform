@@ -5,8 +5,8 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-08** (cierre de la sesión de UX de Estructura: layout responsivo,
-> splitter reutilizable, `description` y `reportOrder`; smoke visual ✅; **siguiente: Equipos**).
+> actualización: **2026-06-08** (cierre del **Módulo Equipos**: CRUD + categorías configurables +
+> `ExternalReference` integration-ready a nivel de modelo; **Estructura CERRADA**; **siguiente: UI de Seguridad**).
 
 ---
 
@@ -39,8 +39,9 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Estructura v2 + externalCode + Table fix** | `main` | ✅ publicado (`f84cbd8`) | ninguna |
 | **Estructura UX: layout responsivo, ResizableSplit, description, reportOrder, fix puerto** | `main` | ✅ publicado (`5170f70`) | ninguna |
 | **Docs cierre + fix header responsivo del detalle** | `main` | ✅ publicado (`91a4bd6`) | ninguna |
+| **Módulo Equipos** (CRUD + categorías + `ExternalReference` modelo) | `feat/equipos` → `main` | ⏳ a publicar al cerrar | push de rama + merge a `main` + push |
 
-**Estado:** **nada vive solo en local.** `main` = `origin/main`.
+**Estado:** **al cerrar esta sesión**, fusionar `feat/equipos` a `main` y hacer push (ver checklist §0).
 
 **Convención propuesta (a confirmar):** trabajar cada módulo en rama `feat/<modulo>`;
 al cerrar la sesión → push de la rama + merge a `main` + push de `main`. Así `origin/main`
@@ -64,9 +65,12 @@ nunca queda más de una sesión atrás.
       **`description`** y **`reportOrder`** en `OrgNode` (full-stack, con backfills no destructivos);
       grilla de hijos ordenable + edición inline del orden; densidad de tabla; dev server fijado a 5173;
       fix responsivo del header del detalle. **Smoke visual ✅** (confirmado por el usuario).
-- [ ] **Módulo Equipos** ← *siguiente sesión* (cierra Estructura antes de Seguridad). Ver detalle en
-      "Módulos intermedios" abajo y DECISIONS 2026-06-07 (Equipos ≠ 4.º nivel de OrgNode).
-- [ ] **UI Seguridad** ← *sesión posterior* sobre `/security/*`:
+- [x] **Módulo Equipos** ✅ (2026-06-08). CRUD de `Equipment` integration-ready (tag único, categoría,
+      criticidad 1–5, estado/baja lógica, orden), catálogo configurable `EquipmentCategory` + drawer de
+      gestión, `ExternalReference` polimórfica (modelo + contratos; UI/motor en Fase 3). Migración con
+      check constraints, 5 permisos nuevos, guard en `deleteNode`, grilla en `NodeDetail`, seed demo.
+      **Estructura organizacional CERRADA.** Ver DECISIONS 2026-06-08.
+- [ ] **UI Seguridad** ← *SIGUIENTE SESIÓN* sobre `/security/*`:
   - [ ] Usuarios: listado, alta/edición, asignar roles, asignar alcance (scope).
   - [ ] Roles/permisos: CRUD de roles + matriz de permisos (catálogo de `@lyra/contracts`),
         editar `requireMfa` por rol.
@@ -79,7 +83,10 @@ nunca queda más de una sesión atrás.
       ✅ Fase Estructura (2026-06-07): Chip, Table, Select. Pendiente: nada para esta fase.
 
 ### Módulos intermedios (antes de Fase 2)
-- [ ] **Módulo Equipos** ← *SIGUIENTE SESIÓN* (cierra Estructura antes de Seguridad). Modelo `Equipment`
+- [x] **Módulo Equipos** ✅ (2026-06-08) — ver el ítem cerrado arriba en "Fase 1 — Seguridad + Estructura"
+      y DECISIONS 2026-06-08. La descripción original (decisiones a tomar) se conserva abajo como
+      referencia histórica de lo decidido.
+- [ ] ~~**Módulo Equipos**~~ *(cerrado — texto original conservado como referencia)* Modelo `Equipment`
       (name, code, externalCode, description, reportOrder, type, abbreviation, active, processId FK a
       OrgNode de nivel Proceso/último), migración, contratos (schema + create/update DTOs), service +
       endpoints `GET/POST/PATCH/DELETE /structure/equipment` (gateados por permisos nuevos
@@ -119,6 +126,13 @@ nunca queda más de una sesión atrás.
 
 > Items con fundamento ya discutidos; aquí para que no se diluyan en `DECISIONS.md`.
 
+- [ ] **`OrgNode.externalCode` plano → migrar a `ExternalReference`.** El campo único `externalCode`
+      de OrgNode (Fase Estructura) quedó como atajo de un solo sistema; con `ExternalReference`
+      polimórfica ya disponible, debe unificarse ahí (un nodo puede mapear a varios sistemas). Migración
+      de datos no destructiva + ajustar UI del nodo. **Hacer junto con el motor de integración (Fase 3).**
+- [ ] **`ExternalReference`: UI de mapeos + catálogo de `systemType`.** Modelo y contratos ya existen
+      (2026-06-08); la **UI** de gestión de referencias externas y el catálogo configurable de sistemas
+      (`systemType`) se construyen en **Fase 3 (Orígenes de datos)** junto al motor de conexión/sync.
 - [ ] **`forcePasswordChange` con enforcement solo en UI.** Hoy `ProtectedRoute` redirige,
       pero el backend no bloquea otros endpoints. Igualarlo al gate de MFA (claim + guard).
       Ref: `SECURITY.md` §7 (residual). **Prioridad: media-alta** (auditoría).
@@ -159,6 +173,11 @@ probatoria (hash+timestamp). Ref: `DECISIONS.md` (sección de recomendaciones).
       comportamiento en iPad (tras el fix del header que aplastaba la descripción). Pendiente menor no
       bloqueante: QA explícito de **modo claro** en esta pantalla (se cubre en el ítem "Modo claro — QA
       visual" más abajo).
+- [ ] **Equipos — smoke VISUAL en navegador** (se verificó typecheck/lint/build/test + smoke por API;
+      falta el clic): seleccionar un nodo de nivel Proceso → aparece la grilla de equipos; alta/edición vía
+      `EquipmentDrawer` (tag, categoría, criticidad, toggle de estado); edición inline del orden; abrir
+      `CategoriesDrawer` (crear/editar/activar/eliminar categoría); borrar equipo (modal); chips de
+      criticidad (colores Severidad 1–5) y de estado; modo claro y oscuro. App en `:5173`.
 - [ ] **Modo claro — QA visual** (nuevo): revisar que TODO el workspace se vea premium en **claro**
       (contraste WCAG, glass, glows, severidades, tablas futuras, drawers/modales) y que `auto` siga al
       sistema. El default es oscuro; el login es siempre oscuro. Ref: DECISIONS 2026-06-06.

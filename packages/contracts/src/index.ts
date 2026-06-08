@@ -16,3 +16,4 @@ export * from "./security/roles.js";
 
 // Estructura organizacional (Fase 1)
 export * from "./structure/org.js";
+export * from "./structure/equipment.js";
