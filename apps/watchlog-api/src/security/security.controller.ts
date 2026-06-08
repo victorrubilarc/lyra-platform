@@ -2,6 +2,7 @@ import { Body, Controller, Get, Put, Query } from "@nestjs/common";
 import {
   PERMISSION_CATALOG,
   updatePasswordPolicyRequestSchema,
+  type AuditLogEntry,
   type UpdatePasswordPolicyRequest,
 } from "@lyra/contracts";
 import { AuditService } from "../audit/audit.service";
@@ -42,7 +43,24 @@ export class SecurityController {
 
   @Get("audit")
   @RequirePermission("audit:read")
-  audit_(@Query("take") take?: string, @Query("cursor") cursor?: string) {
-    return this.audit.list({ take: take ? Number(take) : undefined, cursor });
+  async audit_(
+    @Query("take") take?: string,
+    @Query("cursor") cursor?: string,
+  ): Promise<AuditLogEntry[]> {
+    const rows = await this.audit.list({ take: take ? Number(take) : undefined, cursor });
+    return rows.map((r) => ({
+      id: r.id,
+      occurredAt: r.occurredAt.toISOString(),
+      actorId: r.actorId,
+      actorEmail: r.actorEmail,
+      action: r.action,
+      entityType: r.entityType,
+      entityId: r.entityId,
+      before: r.before ?? null,
+      after: r.after ?? null,
+      ip: r.ip,
+      userAgent: r.userAgent,
+      metadata: r.metadata ?? null,
+    }));
   }
 }

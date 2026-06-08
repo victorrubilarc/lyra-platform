@@ -6,10 +6,15 @@ export const USER_STATUSES = ["ACTIVE", "DISABLED", "LOCKED", "INVITED"] as cons
 export const userStatusSchema = z.enum(USER_STATUSES);
 export type UserStatus = z.infer<typeof userStatusSchema>;
 
-/** Una entrada de alcance de datos (nodo + si hereda a descendientes). */
+/**
+ * Una entrada de alcance de datos (nodo + si hereda a descendientes). El campo
+ * `includeDescendants` es explícito (sin default) para que el tipo de entrada y
+ * salida coincidan: así el cliente lo envía siempre y los consumidores tipados no
+ * caen en la ambigüedad input/output de Zod.
+ */
 export const scopeEntrySchema = z.object({
   orgNodeId: z.string().min(1),
-  includeDescendants: z.boolean().default(true),
+  includeDescendants: z.boolean(),
 });
 export type ScopeEntry = z.infer<typeof scopeEntrySchema>;
 

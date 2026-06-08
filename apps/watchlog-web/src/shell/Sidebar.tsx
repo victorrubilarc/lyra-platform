@@ -5,7 +5,7 @@ import { Tooltip, cx } from "@lyra/ui";
 import { usePermissions } from "../auth/use-permissions.js";
 import { useUIStore } from "./ui-store.js";
 import { useFavoritesStore } from "./favorites-store.js";
-import { SIDEBAR_ROUTES, routeByPath, type NavRoute } from "./navigation.js";
+import { SIDEBAR_ROUTES, isRouteActive, routeByPath, type NavRoute } from "./navigation.js";
 import styles from "./AppShell.module.css";
 
 /** Menú lateral colapsable (completo ↔ riel de íconos) con favoritos. */
@@ -27,7 +27,7 @@ export function Sidebar() {
   function renderItem(route: NavRoute) {
     const Icon = route.icon;
     const label = t(route.labelKey);
-    const isActive = pathname === route.path;
+    const isActive = isRouteActive(route.path, pathname);
     const isFav = favorites.includes(route.path);
 
     const row = (

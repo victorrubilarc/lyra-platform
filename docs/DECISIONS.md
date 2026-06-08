@@ -4,6 +4,22 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-08 · UI de Seguridad (usuarios/roles/política/auditoría) sobre `/security/*`
+
+Consume el backend de seguridad ya existente (RBAC/ABAC, política, MFA, reset de admin, auditoría). Decisiones (aprobadas tras propuesta):
+
+**Navegación: sub-rutas anidadas + match por prefijo (UNA pestaña por módulo).** `/seguridad` es un `SecurityLayout` con barra de sub-tabs y `Outlet`; las sub-secciones son rutas anidadas reales (`/seguridad/{usuarios,roles,politica,auditoria}`), deep-linkables y gateadas cada una por su permiso (`user:read`/`role:read`/`security:policy:manage`/`audit:read`). El índice redirige a la primera sub-tab permitida. Para que el shell (pestañas/breadcrumb/sidebar) trate todo `/seguridad/*` como **un** módulo se añadieron helpers `routeForPath` (coincidencia por prefijo más largo) e `isRouteActive` en `navigation.ts`, y se ajustaron AppShell/WorkspaceTabs/Topbar/Sidebar. **Motivo:** deep-linking y breadcrumbs por área sin ensuciar la tira de pestañas con 4 entradas; patrón reutilizable para futuros módulos con sub-secciones (Plantillas, etc.).
+
+**UX de usuarios: master-detail** (mismo patrón que Estructura, `ResizableSplit`). Lista a la izquierda; panel derecho con secciones independientes que guardan por separado contra los endpoints atómicos del backend: datos básicos (`PATCH :id`), roles (`PUT :id/roles`), alcance de datos (`PUT :id/scope`) y MFA (estado + reset `POST :id/mfa/reset`). **Selector de alcance (ABAC dim. 4):** árbol de la estructura con checkbox por nodo + toggle "incluye descendientes" por entrada. La vista node-centric/por-rol (asignar desde el propio árbol, "quién accede a este nodo") queda como ítem ABAC enterprise futuro (BACKLOG §2).
+
+**Contrato de auditoría añadido** (`auditLogEntrySchema` + `AuditLogEntry` en `@lyra/contracts`): el `GET /security/audit` retornaba filas Prisma crudas sin tipo compartido. Se tipó el controller y se mapea `occurredAt`→ISO string (forma de respuesta idéntica en el cable; solo se formaliza). `before`/`after`/`metadata` son `unknown` (snapshots JSON). Paginación por cursor de `id` (UI con `useInfiniteQuery` + "cargar más").
+
+**`scopeEntrySchema`: se quitó `.default(true)` de `includeDescendants` (campo explícito).** El default hacía que el tipo de **entrada** Zod (`includeDescendants?`) difiriera del de **salida**, y los helpers tipados del cliente (`apiJson`) infieren el de entrada → conflicto "dos tipos distintos con el mismo nombre". Hacerlo explícito (la UI siempre lo envía) alinea input/output y es más estricto. **Motivo:** correctitud de tipos extremo a extremo sin castings.
+
+**Nuevo primitivo `@lyra/ui`: `Checkbox`** (CSS Module sobre tokens, dual theme, área táctil 44px, estado **indeterminado** para selección de grupo). Lo exige la matriz de permisos (agrupada por `group`/`dimension` del catálogo) y reutilizado en scope/roles.
+
+**Hallazgo (honestidad técnica): el permiso `user:disable` no está enforced.** El cambio de `status` (ACTIVE↔DISABLED) viaja por `PATCH :id`, gateado por `user:edit`, no por `user:disable`; el permiso del catálogo queda sin guard que lo exija. La UI gatea el control de estado por `user:edit`; `user:disable` se registra como deuda en BACKLOG §3 (decidir: separar endpoint o retirar la clave). No se tocó el backend "cerrado" en esta sesión más allá del tipado de auditoría.
+
 ### 2026-06-08 · Módulo Equipos: modelo `Equipment` integration-ready + `ExternalReference` polimórfica (modelo) + catálogo de categorías
 
 Cierre del módulo de Estructura. Reemplaza el placeholder "Equipos — próximamente" del nivel final por un CRUD real. Decisiones (aprobadas por el usuario tras propuesta):

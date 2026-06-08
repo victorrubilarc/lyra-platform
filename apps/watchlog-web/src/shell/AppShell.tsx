@@ -7,7 +7,7 @@ import { CommandPalette } from "./CommandPalette.js";
 import { useUIStore } from "./ui-store.js";
 import { useWorkspaceStore } from "./workspace-store.js";
 import { useFavoritesStore } from "./favorites-store.js";
-import { routeByPath } from "./navigation.js";
+import { routeForPath } from "./navigation.js";
 import styles from "./AppShell.module.css";
 
 /**
@@ -36,10 +36,12 @@ export function AppShell() {
   }, []);
 
   // Sincroniza la ruta actual con pestañas y recientes (la Home no genera pestaña).
+  // Las sub-rutas se atribuyen a su módulo padre → UNA sola pestaña por módulo.
   useEffect(() => {
-    if (pathname !== "/" && routeByPath(pathname)) {
-      openTab({ path: pathname });
-      pushRecent(pathname);
+    const route = routeForPath(pathname);
+    if (route && route.path !== "/") {
+      openTab({ path: route.path });
+      pushRecent(route.path);
     }
   }, [pathname, openTab, pushRecent]);
 

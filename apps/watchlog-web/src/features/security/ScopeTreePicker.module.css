@@ -1,0 +1,53 @@
+.tree {
+  display: flex;
+  flex-direction: column;
+  max-height: 320px;
+  overflow: auto;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-2);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.twisty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.twisty:hover {
+  color: var(--color-text-primary);
+}
+
+.inherit {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: var(--space-2);
+}
+
+.inheritLabel {
+  font-size: var(--text-body-sm-size);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.empty {
+  font-size: var(--text-body-sm-size);
+  color: var(--color-text-muted);
+  margin: 0;
+}
