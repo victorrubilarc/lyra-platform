@@ -40,9 +40,9 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Estructura UX: layout responsivo, ResizableSplit, description, reportOrder, fix puerto** | `main` | ✅ publicado (`5170f70`) | ninguna |
 | **Docs cierre + fix header responsivo del detalle** | `main` | ✅ publicado (`91a4bd6`) | ninguna |
 | **Módulo Equipos** (CRUD + categorías + `ExternalReference` modelo) | `main` (fusionado desde `feat/equipos`) | ✅ fusionado y publicado en `origin/main` (`a299ab6`) | ninguna |
-| **UI de Seguridad** (usuarios/roles/política/auditoría + reset MFA) | `feat/seguridad-ui` → `main` | ⏳ por fusionar + push al cerrar la sesión | merge a `main` + push |
+| **UI de Seguridad** (usuarios/roles/política/auditoría + reset MFA) | `main` (fusionado desde `feat/seguridad-ui`) | ✅ fusionado y publicado en `origin/main` (`a6f8b10`) | ninguna |
 
-**Estado:** **nada vive solo en local.** `main` = `origin/main` (la rama `feat/seguridad-ui` se fusiona y publica al cerrar).
+**Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
 **Convención propuesta (a confirmar):** trabajar cada módulo en rama `feat/<modulo>`;
 al cerrar la sesión → push de la rama + merge a `main` + push de `main`. Así `origin/main`
