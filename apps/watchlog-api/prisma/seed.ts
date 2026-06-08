@@ -11,6 +11,7 @@ import { PrismaClient } from "@prisma/client";
 import * as argon2 from "argon2";
 import { NODE_DESCRIPTIONS } from "./structure-descriptions.js";
 import { assignReportOrderBySiblings } from "./report-order.js";
+import { DEMO_EQUIPMENT, EQUIPMENT_CATEGORIES } from "./equipment-seed-data.js";
 
 const prisma = new PrismaClient();
 
@@ -257,6 +258,62 @@ async function seedDemoStructure(): Promise<void> {
   console.log("✔ Estructura organizacional de demo (2 plantas) creada");
 }
 
+/**
+ * Catálogo de categorías/clases de equipo. Idempotente: upsert por id fijo.
+ * El catálogo es editable desde la UI; esto solo asegura un punto de partida.
+ */
+async function seedEquipmentCategories(): Promise<void> {
+  let order = 0;
+  for (const cat of EQUIPMENT_CATEGORIES) {
+    order += 10;
+    await prisma.equipmentCategory.upsert({
+      where: { id: cat.id },
+      create: { id: cat.id, name: cat.name, code: cat.code, isoRef: cat.isoRef ?? null, reportOrder: order },
+      update: { name: cat.name, code: cat.code, isoRef: cat.isoRef ?? null },
+    });
+  }
+  console.log(`✔ Categorías de equipo sincronizadas: ${EQUIPMENT_CATEGORIES.length}`);
+}
+
+/**
+ * Equipos de ejemplo (SOLO desarrollo). Idempotente: salta si ya hay equipos.
+ * El orden en informes se asigna escalonado por nodo (10, 20, 30…).
+ */
+async function seedDemoEquipment(): Promise<void> {
+  if (process.env.NODE_ENV === "production") return;
+
+  const existing = await prisma.equipment.count();
+  if (existing > 0) {
+    console.log("• Equipos de demo ya existen: no se recrean");
+    return;
+  }
+
+  const orderByNode = new Map<string, number>();
+  let created = 0;
+  for (const eq of DEMO_EQUIPMENT) {
+    // Solo sembrar si el nodo destino existe (la estructura de demo puede no estar).
+    const node = await prisma.orgNode.count({ where: { id: eq.orgNodeId, deletedAt: null } });
+    if (node === 0) continue;
+    const next = (orderByNode.get(eq.orgNodeId) ?? 0) + 10;
+    orderByNode.set(eq.orgNodeId, next);
+    await prisma.equipment.create({
+      data: {
+        name: eq.name,
+        code: eq.code ?? null,
+        tag: eq.tag ?? null,
+        categoryId: eq.categoryId ?? null,
+        manufacturer: eq.manufacturer ?? null,
+        model: eq.model ?? null,
+        criticality: eq.criticality ?? null,
+        reportOrder: next,
+        orgNodeId: eq.orgNodeId,
+      },
+    });
+    created++;
+  }
+  console.log(`✔ Equipos de demo creados: ${created}`);
+}
+
 async function main(): Promise<void> {
   await seedPermissions();
   await seedAdminRole();
@@ -264,6 +321,8 @@ async function main(): Promise<void> {
   await seedBootstrapAdmin();
   await seedDemoUser();
   await seedDemoStructure();
+  await seedEquipmentCategories();
+  await seedDemoEquipment();
 }
 
 main()

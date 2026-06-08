@@ -305,14 +305,101 @@ model OrgNode {
   updatedAt    DateTime  @updatedAt
   deletedAt    DateTime? // borrado lógico
 
-  level    OrgLevel  @relation(fields: [levelId], references: [id])
-  parent   OrgNode?  @relation("OrgHierarchy", fields: [parentId], references: [id])
-  children OrgNode[] @relation("OrgHierarchy")
-  scopes   Scope[]
+  level     OrgLevel  @relation(fields: [levelId], references: [id])
+  parent    OrgNode?  @relation("OrgHierarchy", fields: [parentId], references: [id])
+  children  OrgNode[] @relation("OrgHierarchy")
+  scopes    Scope[]
+  equipment Equipment[]
+  externalRefs ExternalReference[]
 
   @@index([parentId])
   @@index([levelId])
   @@index([path])
+}
+
+// ===========================================================================
+//  Equipos (Equipment) y su catálogo de clasificación
+// ===========================================================================
+
+// Catálogo configurable de categorías/clases de equipo (NO enum hardcodeado).
+// Mismo espíritu que OrgLevel: lo nombran y administran los clientes. `isoRef`
+// permite alinear opcionalmente con una taxonomía externa (ej. clase ISO 14224).
+model EquipmentCategory {
+  id          String   @id @default(cuid())
+  name        String
+  code        String?
+  isoRef      String?
+  description String?
+  reportOrder Int      @default(0)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  equipment Equipment[]
+}
+
+// Equipo industrial (máquina) anclado a un nodo de la estructura (patrón SAP PM:
+// Functional Location 1:N Equipment). `deletedAt` = borrado lógico; `active` =
+// estado operacional (en servicio / fuera). Integración: vía ExternalReference.
+model Equipment {
+  id           String    @id @default(cuid())
+  name         String
+  code         String?
+  // assetTag estable y único: clave de negocio e identidad hacia reportes.
+  tag          String?   @unique
+  description  String?
+  categoryId   String?
+  manufacturer String?
+  model        String?
+  serialNumber String?
+  // Criticidad 1–5 (RCM / ISO 14224); reusa la escala de severidad del DS.
+  criticality  Int?
+  active       Boolean   @default(true)
+  // Orden en informes, relativo a los equipos del mismo nodo (asc).
+  reportOrder  Int       @default(0)
+  orgNodeId    String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime? // borrado lógico
+
+  category     EquipmentCategory?  @relation(fields: [categoryId], references: [id])
+  orgNode      OrgNode             @relation(fields: [orgNodeId], references: [id])
+  externalRefs ExternalReference[]
+
+  @@index([orgNodeId])
+  @@index([categoryId])
+  @@index([deletedAt])
+}
+
+// ===========================================================================
+//  Referencias externas (integration-ready) — modelo solamente (Fase 1)
+// ===========================================================================
+
+// Mapeo polimórfico de una entidad de Lyra hacia un sistema externo
+// (historiador/MES/EAM). Dueño: exactamente uno de orgNodeId/equipmentId
+// (check constraint en la migración — mismo patrón que Scope). Un equipo mapea a
+// VARIOS sistemas a la vez. El MOTOR de sincronización es Fase 3 (Orígenes de
+// datos); aquí solo vive el modelo para no migrar después. `systemType` es una
+// cadena (catálogo configurable que se define en Fase 3), no un enum.
+model ExternalReference {
+  id           String   @id @default(cuid())
+  orgNodeId    String?
+  equipmentId  String?
+  systemType   String // ej. "PI_WEB_API", "OPC_UA", "SAP_PM", "MAXIMO"
+  externalId   String? // WebID / NodeId / Equipment Number (estable)
+  externalPath String? // PI AF path / OPC browse path (legible, frágil)
+  endpoint     String? // base URL / server / namespace
+  metadata     Json?
+  enabled      Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  orgNode   OrgNode?   @relation(fields: [orgNodeId], references: [id], onDelete: Cascade)
+  equipment Equipment? @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+
+  @@index([orgNodeId])
+  @@index([equipmentId])
+  @@index([systemType])
 }
 
 // ===========================================================================

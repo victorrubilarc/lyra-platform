@@ -11,6 +11,7 @@ import { EmailModule } from "./email/email.module";
 import { AuthzModule } from "./authz/authz.module";
 import { AuthModule } from "./auth/auth.module";
 import { StructureModule } from "./structure/structure.module";
+import { EquipmentModule } from "./equipment/equipment.module";
 import { SecurityModule } from "./security/security.module";
 
 @Module({
@@ -41,6 +42,7 @@ import { SecurityModule } from "./security/security.module";
     AuthzModule,
     AuthModule,
     StructureModule,
+    EquipmentModule,
     SecurityModule,
     HealthModule,
   ],

@@ -7,7 +7,6 @@ import {
   Pencil,
   Plus,
   Trash2,
-  Wrench,
 } from "lucide-react";
 import { Button, Chip, EmptyState, Table } from "@lyra/ui";
 import type { OrgLevel, OrgNodeTree } from "@lyra/contracts";
@@ -15,6 +14,7 @@ import type { TableColumn, TableSort } from "@lyra/ui";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { useUpdateNode } from "./structure-queries.js";
 import { levelColor, LevelIcon } from "./OrgTree.js";
+import { EquipmentSection } from "./EquipmentSection.js";
 import styles from "./NodeDetail.module.css";
 
 /** Celda editable inline del orden en informes de un nodo hijo. */
@@ -395,18 +395,7 @@ export function NodeDetail({
           />
         </section>
       ) : (
-        <section className={styles.section}>
-          <div className={styles.sectionHeader}>
-            <h3 className={styles.sectionTitle}>{t("structure.detail.equipment")}</h3>
-          </div>
-          <div className={styles.equipmentPlaceholder}>
-            <EmptyState
-              icon={<Wrench size={32} color="var(--color-text-muted)" />}
-              title={t("structure.detail.equipmentSoon")}
-              description={t("structure.detail.equipmentSoonDesc")}
-            />
-          </div>
-        </section>
+        <EquipmentSection orgNodeId={node.id} />
       )}
     </div>
   );

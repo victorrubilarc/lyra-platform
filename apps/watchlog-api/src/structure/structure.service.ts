@@ -144,6 +144,12 @@ export class StructureService {
     if (childCount > 0) {
       throw new BadRequestException("No se puede eliminar un nodo con hijos. Elimina los hijos primero.");
     }
+    const equipmentCount = await this.prisma.equipment.count({ where: { orgNodeId: id, deletedAt: null } });
+    if (equipmentCount > 0) {
+      throw new BadRequestException(
+        `No se puede eliminar el nodo: tiene ${equipmentCount} equipo${equipmentCount === 1 ? "" : "s"} activo${equipmentCount === 1 ? "" : "s"}. Elimina o reasigna los equipos primero.`,
+      );
+    }
     await this.prisma.orgNode.update({ where: { id }, data: { deletedAt: new Date() } });
     await this.audit.record({ ...ctx, action: "structure.node.deleted", entityType: "OrgNode", entityId: id, before: { ...node } });
   }

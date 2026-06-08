@@ -1,13 +1,13 @@
 # Progreso — Lyra WatchLog
 
-Última actualización: 2026-06-08 (Fase 1 — backend ✅; **UI: Login + cimientos ✅**; **Recuperación de contraseña ✅**; **MFA self-service ✅**; **App Shell / Workspace premium ✅**; **UI Estructura organizacional ✅** — layout master-detail premium + **UX responsivo / splitter reutilizable / `description` / `reportOrder`** (smoke visual ✅); **siguiente: Módulo Equipos** para cerrar Estructura, luego UI de Seguridad).
+Última actualización: 2026-06-08 (Fase 1 — backend ✅; **UI: Login + cimientos ✅**; **Recuperación de contraseña ✅**; **MFA self-service ✅**; **App Shell / Workspace premium ✅**; **UI Estructura organizacional ✅** — layout master-detail premium + UX responsivo + `description`/`reportOrder`; **Módulo Equipos ✅** (CRUD + categorías configurables + `ExternalReference` integration-ready a nivel de modelo) → **Estructura CERRADA**; **siguiente: UI de Seguridad**).
 
 ## Estado por fase
 
 | Fase | Módulo | Estado |
 |---|---|---|
 | 0 | **Cimientos** (monorepo, Docker, Design System tokens, contratos, API health) | ✅ Hecho |
-| 1 | Seguridad (auth + RBAC/ABAC) + Estructura organizacional + AuditLog | 🟦 Backend ✅ · UI: Login ✅ · **Estructura ✅** · Seguridad ⬜ |
+| 1 | Seguridad (auth + RBAC/ABAC) + Estructura organizacional + AuditLog | 🟦 Backend ✅ · UI: Login ✅ · **Estructura ✅ (+ Equipos ✅)** · Seguridad ⬜ |
 | 2 | Plantillas / Form Builder + Bitácoras | ⬜ Pendiente |
 | 3 | Orígenes de datos | ⬜ Pendiente |
 | 4 | Motor de incidencias | ⬜ Pendiente |
@@ -24,6 +24,7 @@
 | MFA self-service (perfil) + gate de enrolamiento forzado | 1 | ✅ API + UI |
 | App Shell / Workspace premium (sidebar, topbar, pestañas, ⌘K, i18n) | 1 | ✅ UI |
 | Estructura organizacional | 1 | ✅ API + UI |
+| Equipos (CRUD + categorías + refs externas modelo) | 1 | ✅ API + UI |
 | Seguridad / roles / permisos (nueva) | 1 | 🟦 API ✅ · UI ⬜ (incluye reset MFA de admin: API ✅, UI ⬜) |
 | Plantillas (Form Builder) | 2 | ⬜ |
 | Nueva entrada / Llenado | 2 | ⬜ |
@@ -308,12 +309,41 @@ Sesión de pulido de UX del mantenedor de Estructura (ver DECISIONS 2026-06-08).
   navegador ✅** (el usuario confirmó: splitter, 2ª línea en árbol y grilla, orden de columnas, edición
   inline del orden, full-width y comportamiento en iPad tras el fix del header).
 
+## Hecho en Fase 1 (Módulo Equipos — cierra Estructura)
+
+Reemplaza el placeholder "Equipos — próximamente" del nivel final por un CRUD real. Ver DECISIONS
+2026-06-08 (modelo integration-ready + alcance de integración).
+
+- **`@lyra/contracts`**: `structure/equipment.ts` (schemas Zod + DTOs de `Equipment`,
+  `EquipmentCategory` y tipos de `ExternalReference`); **5 permisos nuevos** en el catálogo
+  (`equipment:view/create/edit/delete`, `equipmentcategory:manage`) → 25 claves totales.
+- **Prisma** (migración `20260608195838_add_equipment_and_external_reference`): modelos `Equipment`,
+  `EquipmentCategory`, `ExternalReference` + relaciones en `OrgNode`. Check constraints raw SQL:
+  dueño polimórfico exclusivo en `ExternalReference` (orgNodeId XOR equipmentId) y criticidad 1–5.
+- **API**: `EquipmentModule` (service + controller) → `GET/POST/PATCH/DELETE /structure/equipment`
+  (filtro `?orgNodeId=`) + CRUD de categorías (`/structure/equipment/categories`), todo gateado por
+  permiso y auditado. Mapeo de tag duplicado (P2002) → 400. **Guard nuevo en `deleteNode`**: bloquea
+  borrar un nodo con equipos activos. **9 tests** del service.
+- **Seed** (dev): catálogo de 12 categorías (madera) idempotente + 9 equipos de ejemplo en procesos
+  reales, con orden escalonado. `equipment-seed-data.ts` como fuente única.
+- **Web** (`features/structure/`): `equipment-api`/`equipment-queries` (TanStack Query); `EquipmentDrawer`
+  (molde NodeDrawer: tag, categoría, fabricante/modelo/serie, criticidad, toggle de estado, orden,
+  descripción); `CategoriesDrawer` (molde LevelsDrawer, edición inline + toggle activo); **`EquipmentSection`**
+  reemplaza el placeholder en `NodeDetail` (grilla `Table` sortable + edición inline del orden + chip
+  de criticidad por severidad + chip de estado + descripción 2ª línea + delete modal). i18n namespace
+  `equipment` (es-CL).
+- **Verificación**: `typecheck`/`lint` (0 errores)/`build` (web 1859 módulos)/`test` (**API 67**, +9;
+  permissions 5; contracts) en verde. **Smoke en vivo** (API + demo): listar categorías (12) y equipos
+  seed; crear/editar/borrar (lógico) equipo; **400** sin `orgNodeId`, tag duplicado, criticidad fuera de
+  rango (check de BD) y nodo inexistente; **deleteNode** bloqueado con equipos activos (400); categoría
+  en uso no borrable (400), CRUD de categoría OK; **check constraint polimórfico de `ExternalReference`
+  verificado en BD** (ambos-nulos→falla, uno→OK, ambos→falla).
+- **Pendiente:** smoke **VISUAL** en navegador (seleccionar nodo de nivel Proceso → grilla de equipos,
+  alta/edición vía drawer, orden inline, gestión de categorías, modo claro) — ver BACKLOG §4.
+
 ## Próximo paso
-**Sesión siguiente = Fase 1 · Módulo Equipos** (cierra Estructura organizacional antes de Seguridad):
-modelo `Equipment`, migración, endpoints CRUD, grid en `NodeDetail` al seleccionar un nodo de último
-nivel (reemplaza el placeholder "Equipos — próximamente"). Ver BACKLOG §2 (Módulos intermedios) y
-DECISIONS 2026-06-07 (Equipos ≠ 4.º nivel de OrgNode).
-**Sesión después = Fase 1 · UI de Seguridad** (usuarios/roles/permisos + reset MFA de admin) sobre `/security/*`.
+**Sesión siguiente = Fase 1 · UI de Seguridad** (usuarios/roles/permisos + reset MFA de admin) sobre
+`/security/*`. Con Equipos, **Estructura organizacional queda cerrada**.
 
 **Puntos B/C/D de integración pendientes de análisis** (ver memoria `integration-pending.md`):
 - B: CSV import/export de estructura
