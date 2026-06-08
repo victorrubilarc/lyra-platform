@@ -6,7 +6,7 @@
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
 > actualización: **2026-06-08** (cierre de la sesión de UX de Estructura: layout responsivo,
-> splitter reutilizable, `description` y `reportOrder`).
+> splitter reutilizable, `description` y `reportOrder`; smoke visual ✅; **siguiente: Equipos**).
 
 ---
 
@@ -38,6 +38,7 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Fase 1: MFA self-service** | `main` (fusionado desde `feat/auth-mfa-self-service`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Estructura v2 + externalCode + Table fix** | `main` | ✅ publicado (`f84cbd8`) | ninguna |
 | **Estructura UX: layout responsivo, ResizableSplit, description, reportOrder, fix puerto** | `main` | ✅ publicado (`5170f70`) | ninguna |
+| **Docs cierre + fix header responsivo del detalle** | `main` | ✅ publicado (`91a4bd6`) | ninguna |
 
 **Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
@@ -61,8 +62,11 @@ nunca queda más de una sesión atrás.
 - [x] **Estructura UX** ✅ (2026-06-08). Workspace full-width + responsivo (tokens de layout +
       breakpoints); **`ResizableSplit`** propio en `@lyra/ui` (reemplaza `react-resizable-panels`);
       **`description`** y **`reportOrder`** en `OrgNode` (full-stack, con backfills no destructivos);
-      grilla de hijos ordenable + edición inline del orden; densidad de tabla; dev server fijado a 5173.
-- [ ] **UI Seguridad** ← *siguiente sesión* sobre `/security/*`:
+      grilla de hijos ordenable + edición inline del orden; densidad de tabla; dev server fijado a 5173;
+      fix responsivo del header del detalle. **Smoke visual ✅** (confirmado por el usuario).
+- [ ] **Módulo Equipos** ← *siguiente sesión* (cierra Estructura antes de Seguridad). Ver detalle en
+      "Módulos intermedios" abajo y DECISIONS 2026-06-07 (Equipos ≠ 4.º nivel de OrgNode).
+- [ ] **UI Seguridad** ← *sesión posterior* sobre `/security/*`:
   - [ ] Usuarios: listado, alta/edición, asignar roles, asignar alcance (scope).
   - [ ] Roles/permisos: CRUD de roles + matriz de permisos (catálogo de `@lyra/contracts`),
         editar `requireMfa` por rol.
@@ -75,10 +79,16 @@ nunca queda más de una sesión atrás.
       ✅ Fase Estructura (2026-06-07): Chip, Table, Select. Pendiente: nada para esta fase.
 
 ### Módulos intermedios (antes de Fase 2)
-- [ ] **Módulo Equipos** (post-Seguridad): modelo `Equipment` (name, code, externalCode, type,
-      abbreviation, active, sortOrder, processId FK a OrgNode de nivel Proceso), migración,
-      endpoints `GET/POST/PATCH/DELETE /structure/equipment`, grid CRUD en `NodeDetail` al
-      seleccionar nodo de último nivel. Reemplaza el placeholder "Equipos — próximamente".
+- [ ] **Módulo Equipos** ← *SIGUIENTE SESIÓN* (cierra Estructura antes de Seguridad). Modelo `Equipment`
+      (name, code, externalCode, description, reportOrder, type, abbreviation, active, processId FK a
+      OrgNode de nivel Proceso/último), migración, contratos (schema + create/update DTOs), service +
+      endpoints `GET/POST/PATCH/DELETE /structure/equipment` (gateados por permisos nuevos
+      `equipment:view/create/edit/delete` en el catálogo de `@lyra/contracts`), y **grid CRUD en
+      `NodeDetail`** al seleccionar un nodo de último nivel — reemplaza el placeholder
+      "Equipos — próximamente". Reusar `Table` (sortable + edición inline de orden, igual que hijos),
+      `NodeDrawer`-style para alta/edición, descripción como 2ª línea. Seed/backfill de equipos de
+      ejemplo opcional. **Antes de codear: confirmar el modelo de `Equipment` con el usuario**
+      (¿qué `type`/categorías?, ¿abbreviation obligatoria?, ¿activo/baja lógica?).
 
 ### Fases siguientes (roadmap, ver PROGRESS §tabla)
 - [ ] **Fase 2** — Plantillas / Form Builder + Bitácoras.
@@ -129,12 +139,11 @@ probatoria (hash+timestamp). Ref: `DECISIONS.md` (sección de recomendaciones).
       via breadcrumb, usar acciones del header (editar/mover/eliminar), CRUD de hijos inline desde
       la tabla del panel derecho, verificar botón "Equipos — próximamente" en el nivel Proceso,
       abrir `LevelsDrawer`, modo claro y oscuro. App en `:5173`.
-- [ ] **Estructura UX 2026-06-08 — smoke VISUAL** (typecheck/build verdes + backfills verificados por
-      consulta a BD; falta el clic): arrastrar el divisor `ResizableSplit` (mouse, flechas de teclado,
-      doble clic resetea) y verificar que el ancho persiste al recargar; ver la **2ª línea de descripción**
-      en árbol y grilla; **ordenar la grilla** por cada columna; **editar el orden inline** en la grilla y
-      confirmar que árbol+grilla se reordenan; full-width en monitor ancho y apilado en móvil/tablet;
-      modo claro y oscuro.
+- [x] **Estructura UX 2026-06-08 — smoke VISUAL** ✅ (confirmado por el usuario): splitter, 2ª línea de
+      descripción en árbol y grilla, orden de columnas, edición inline del orden, full-width y
+      comportamiento en iPad (tras el fix del header que aplastaba la descripción). Pendiente menor no
+      bloqueante: QA explícito de **modo claro** en esta pantalla (se cubre en el ítem "Modo claro — QA
+      visual" más abajo).
 - [ ] **Modo claro — QA visual** (nuevo): revisar que TODO el workspace se vea premium en **claro**
       (contraste WCAG, glass, glows, severidades, tablas futuras, drawers/modales) y que `auto` siga al
       sistema. El default es oscuro; el login es siempre oscuro. Ref: DECISIONS 2026-06-06.

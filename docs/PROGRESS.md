@@ -1,6 +1,6 @@
 # Progreso — Lyra WatchLog
 
-Última actualización: 2026-06-08 (Fase 1 — backend ✅; **UI: Login + cimientos ✅**; **Recuperación de contraseña ✅**; **MFA self-service ✅**; **App Shell / Workspace premium ✅**; **UI Estructura organizacional ✅** — layout master-detail premium + **UX responsivo / splitter reutilizable / `description` / `reportOrder`**; falta UI de Seguridad).
+Última actualización: 2026-06-08 (Fase 1 — backend ✅; **UI: Login + cimientos ✅**; **Recuperación de contraseña ✅**; **MFA self-service ✅**; **App Shell / Workspace premium ✅**; **UI Estructura organizacional ✅** — layout master-detail premium + **UX responsivo / splitter reutilizable / `description` / `reportOrder`** (smoke visual ✅); **siguiente: Módulo Equipos** para cerrar Estructura, luego UI de Seguridad).
 
 ## Estado por fase
 
@@ -299,13 +299,21 @@ Sesión de pulido de UX del mantenedor de Estructura (ver DECISIONS 2026-06-08).
 - **Dev server fijado a 5173:** `strictPort:true` + `predev` `scripts/free-port.mjs` (libera el puerto
   antes de arrancar, cross-platform).
 - **i18n:** claves `structure.node.description*` y `structure.node.reportOrder*`.
+- **Fix responsivo del header del detalle** (post smoke visual): en paneles angostos (tablet / splitter
+  arrastrado) los botones Editar/Mover/Eliminar aplastaban la columna de info y la descripción caía
+  "una palabra por línea". `.nodeInfo` con `min-width:220px` + `.nodeHeader` con `flex-wrap`: las
+  acciones bajan a su propia fila cuando no caben (flexbox, sin breakpoint mágico).
 - **Verificación:** `typecheck` (web/api/contracts/ui) + build de producción OK; backfills verificados
-  por consulta directa a BD (ELABORACION: reportOrder 10–90, descripciones pobladas). **Pendiente: smoke
-  VISUAL en navegador** (arrastrar splitter, ordenar columnas, editar orden inline, ver 2ª línea) — §4.
+  por consulta directa a BD (ELABORACION: reportOrder 10–90, descripciones pobladas). **Smoke VISUAL en
+  navegador ✅** (el usuario confirmó: splitter, 2ª línea en árbol y grilla, orden de columnas, edición
+  inline del orden, full-width y comportamiento en iPad tras el fix del header).
 
 ## Próximo paso
-**Sesión siguiente = Fase 1 · UI de Seguridad** (usuarios/roles/permisos + reset MFA de admin) sobre `/security/*`.
-**Sesión después = Fase 1 · Módulo Equipos** (modelo `Equipment`, migration, CRUD en NodeDetail).
+**Sesión siguiente = Fase 1 · Módulo Equipos** (cierra Estructura organizacional antes de Seguridad):
+modelo `Equipment`, migración, endpoints CRUD, grid en `NodeDetail` al seleccionar un nodo de último
+nivel (reemplaza el placeholder "Equipos — próximamente"). Ver BACKLOG §2 (Módulos intermedios) y
+DECISIONS 2026-06-07 (Equipos ≠ 4.º nivel de OrgNode).
+**Sesión después = Fase 1 · UI de Seguridad** (usuarios/roles/permisos + reset MFA de admin) sobre `/security/*`.
 
 **Puntos B/C/D de integración pendientes de análisis** (ver memoria `integration-pending.md`):
 - B: CSV import/export de estructura
