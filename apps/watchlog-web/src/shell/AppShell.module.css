@@ -441,15 +441,28 @@
 /* ===================== CONTENT ===================== */
 .content {
   flex: 1;
-  padding: 26px 32px;
-  max-width: 1320px;
-  width: 100%;
-  margin: 0 auto;
+  min-width: 0;
+  padding: var(--layout-content-pad-y) var(--layout-content-pad-x);
+}
+
+@media (min-width: 1920px) {
+  .content {
+    --layout-content-pad-x: 32px;
+    --layout-content-pad-y: 28px;
+  }
+}
+
+@media (max-width: 767px) {
+  .content {
+    --layout-content-pad-x: 16px;
+    --layout-content-pad-y: 16px;
+  }
 }
 
 /* Densidad compacta: menos aire para usuarios con mucha data. */
 .shell[data-density="compact"] .content {
-  padding: 16px 22px;
+  --layout-content-pad-x: 18px;
+  --layout-content-pad-y: 14px;
 }
 .shell[data-density="compact"] .navItem {
   min-height: 38px;

@@ -154,6 +154,11 @@
   --text-mono-size: 13px;
   --text-mono-family: var(--font-mono);
 
+  /* ---- Layout (fuente de verdad dimensional) ---- */
+  --layout-tree-width: 260px;
+  --layout-content-pad-x: 24px;
+  --layout-content-pad-y: 20px;
+
   /* ---- Transiciones (animaciones funcionales) ---- */
   --transition-fast: all 0.15s ease;
   --transition-default: all 0.2s ease;
