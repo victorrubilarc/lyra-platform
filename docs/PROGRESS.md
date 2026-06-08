@@ -1,6 +1,6 @@
 # Progreso — Lyra WatchLog
 
-Última actualización: 2026-06-07 (Fase 1 — backend ✅; **UI: Login + cimientos ✅**; **Recuperación de contraseña ✅**; **MFA self-service ✅**; **App Shell / Workspace premium ✅**; **UI Estructura organizacional ✅** — layout master-detail premium; falta UI de Seguridad).
+Última actualización: 2026-06-08 (Fase 1 — backend ✅; **UI: Login + cimientos ✅**; **Recuperación de contraseña ✅**; **MFA self-service ✅**; **App Shell / Workspace premium ✅**; **UI Estructura organizacional ✅** — layout master-detail premium + **UX responsivo / splitter reutilizable / `description` / `reportOrder`**; falta UI de Seguridad).
 
 ## Estado por fase
 
@@ -271,6 +271,37 @@ Pantalla `/estructura` completamente funcional dentro del shell premium.
   - `es-CL.ts`: claves `externalCode`, `externalCodeDesc`, `externalCodePlaceholder`.
 - **`@lyra/ui — Table`**: fix TypeScript `Object is possibly 'undefined'` en `getPageNumbers`.
 - **Verificación**: `typecheck`/`lint`/`build` (API + web + contracts) OK en todos los paquetes.
+
+## Hecho en Fase 1 (Estructura — UX: layout responsivo, splitter, description, reportOrder)
+
+Sesión de pulido de UX del mantenedor de Estructura (ver DECISIONS 2026-06-08). 4 commits en `origin/main`.
+
+- **Workspace full-width y responsivo (token-first):** se eliminaron `max-width` (1320/1400px) +
+  `margin:0 auto` + doble padding. Tokens de layout nuevos en `@lyra/ui` (`--layout-content-pad-x/y`,
+  `--layout-tree-width`) + breakpoints mobile <768 / tablet-desktop / wide >1920. El árbol crece
+  260→300→320px y el detalle usa todo el resto.
+- **`ResizableSplit` en `@lyra/ui`** (reemplaza `react-resizable-panels`, que recortaba el contenido y
+  ponía topes): split horizontal propio sin dependencia — ancho izq. en px (contenido con ellipsis, no
+  recorte), divisor con mouse/teclado/táctil, doble clic resetea, persistencia en `localStorage`,
+  re-clamp con `ResizeObserver`. Bundle −32 KB. Reutilizable en cualquier pantalla de dos paneles.
+- **`description` en `OrgNode` (full-stack):** migración `…_add_orgnode_description`, contratos,
+  service (create/update/buildTree), `NodeDrawer` (textarea), segunda línea en árbol y grilla, y en el
+  header del detalle. Descripciones de demo (remanufactura de madera) en `prisma/structure-descriptions.ts`
+  (fuente única) + backfill no destructivo (`db:backfill-descriptions`, 49 nodos).
+- **`reportOrder` en `OrgNode` (orden en informes, relativo a hermanos):** migración
+  `…_add_orgnode_report_order` (`Int @default(0)`), contratos, service; `getTree` ordena por
+  `(reportOrder asc, name asc)` (árbol + grilla). `NodeDrawer` campo numérico; **edición inline** en la
+  grilla (persiste con `useUpdateNode` en blur/Enter). Orden inicial escalonado (10,20,30…) por hermanos
+  vía helper único `prisma/report-order.ts` (seed + backfill `db:backfill-report-order`, 49 nodos).
+- **Grilla de hijos ordenable:** `NodeDetail` mantiene estado de sort y ordena hijos localmente
+  (nombre/orden/código/cód. externo); el `Table` ya era controlado. Densidad de tabla reducida
+  (padding 14→10, th 10→8) con `min-height:44px` por fila (área táctil).
+- **Dev server fijado a 5173:** `strictPort:true` + `predev` `scripts/free-port.mjs` (libera el puerto
+  antes de arrancar, cross-platform).
+- **i18n:** claves `structure.node.description*` y `structure.node.reportOrder*`.
+- **Verificación:** `typecheck` (web/api/contracts/ui) + build de producción OK; backfills verificados
+  por consulta directa a BD (ELABORACION: reportOrder 10–90, descripciones pobladas). **Pendiente: smoke
+  VISUAL en navegador** (arrastrar splitter, ordenar columnas, editar orden inline, ver 2ª línea) — §4.
 
 ## Próximo paso
 **Sesión siguiente = Fase 1 · UI de Seguridad** (usuarios/roles/permisos + reset MFA de admin) sobre `/security/*`.

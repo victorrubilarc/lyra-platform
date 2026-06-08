@@ -5,7 +5,8 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-06** (cierre de la sesión de MFA self-service).
+> actualización: **2026-06-08** (cierre de la sesión de UX de Estructura: layout responsivo,
+> splitter reutilizable, `description` y `reportOrder`).
 
 ---
 
@@ -28,7 +29,7 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 
 ## 1. Git: ramas y commits SIN publicar (riesgo de pérdida) 🔴
 
-> Estado al 2026-06-07 (todo publicado). Verificar con:
+> Estado al 2026-06-08 (todo publicado). Verificar con:
 > `git rev-list --count origin/main..main` (debe dar 0) y `git branch --no-merged main`.
 
 | Qué | Dónde | Estado | Acción pendiente |
@@ -36,6 +37,7 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Fase 1: Login + branding + reset de contraseña + docs + rutina** | `main` | ✅ publicado en `origin/main` | ninguna |
 | **Fase 1: MFA self-service** | `main` (fusionado desde `feat/auth-mfa-self-service`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Estructura v2 + externalCode + Table fix** | `main` | ✅ publicado (`f84cbd8`) | ninguna |
+| **Estructura UX: layout responsivo, ResizableSplit, description, reportOrder, fix puerto** | `main` | ✅ publicado (`5170f70`) | ninguna |
 
 **Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
@@ -56,6 +58,10 @@ nunca queda más de una sesión atrás.
       niveles. `@lyra/ui` ampliado con `Chip`, `Table`, `Select`. Backend: `DELETE /structure/levels/:id`.
 - [x] **externalCode en OrgNode** ✅ (2026-06-07). Campo de integración ERP/CMMS/SCADA: migración,
       contratos, backend (service + buildTree), UI (drawer + detalle). i18n. Build limpio.
+- [x] **Estructura UX** ✅ (2026-06-08). Workspace full-width + responsivo (tokens de layout +
+      breakpoints); **`ResizableSplit`** propio en `@lyra/ui` (reemplaza `react-resizable-panels`);
+      **`description`** y **`reportOrder`** en `OrgNode` (full-stack, con backfills no destructivos);
+      grilla de hijos ordenable + edición inline del orden; densidad de tabla; dev server fijado a 5173.
 - [ ] **UI Seguridad** ← *siguiente sesión* sobre `/security/*`:
   - [ ] Usuarios: listado, alta/edición, asignar roles, asignar alcance (scope).
   - [ ] Roles/permisos: CRUD de roles + matriz de permisos (catálogo de `@lyra/contracts`),
@@ -122,7 +128,13 @@ probatoria (hash+timestamp). Ref: `DECISIONS.md` (sección de recomendaciones).
       `/estructura`, seleccionar un nodo (panel derecho aparece con breadcrumb + hijos), navegar
       via breadcrumb, usar acciones del header (editar/mover/eliminar), CRUD de hijos inline desde
       la tabla del panel derecho, verificar botón "Equipos — próximamente" en el nivel Proceso,
-      abrir `LevelsDrawer`, modo claro y oscuro. App en `:5174`.
+      abrir `LevelsDrawer`, modo claro y oscuro. App en `:5173`.
+- [ ] **Estructura UX 2026-06-08 — smoke VISUAL** (typecheck/build verdes + backfills verificados por
+      consulta a BD; falta el clic): arrastrar el divisor `ResizableSplit` (mouse, flechas de teclado,
+      doble clic resetea) y verificar que el ancho persiste al recargar; ver la **2ª línea de descripción**
+      en árbol y grilla; **ordenar la grilla** por cada columna; **editar el orden inline** en la grilla y
+      confirmar que árbol+grilla se reordenan; full-width en monitor ancho y apilado en móvil/tablet;
+      modo claro y oscuro.
 - [ ] **Modo claro — QA visual** (nuevo): revisar que TODO el workspace se vea premium en **claro**
       (contraste WCAG, glass, glows, severidades, tablas futuras, drawers/modales) y que `auto` siga al
       sistema. El default es oscuro; el login es siempre oscuro. Ref: DECISIONS 2026-06-06.
