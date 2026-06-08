@@ -1,14 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  KeyRound,
-  Mail,
-  ShieldAlert,
-  ShieldCheck,
-  UserCircle2,
-  Users as UsersIcon,
-} from "lucide-react";
-import { Button, Checkbox, Chip, FormField, Input, Select, Skeleton, useToast, type ChipVariant } from "@lyra/ui";
+import { Info, KeyRound, Mail, ShieldAlert, UserCircle2 } from "lucide-react";
+import { Button, Checkbox, Chip, FormField, Input, Select, Skeleton, cx, useToast, type ChipVariant } from "@lyra/ui";
 import { USER_STATUSES, type ScopeEntry, type UserStatus } from "@lyra/contracts";
 import { Can } from "../../auth/Can.js";
 import { usePermissions } from "../../auth/use-permissions.js";
@@ -34,6 +27,8 @@ const STATUS_VARIANT: Record<UserStatus, ChipVariant> = {
   INVITED: "info",
 };
 
+type DetailTab = "basic" | "roles" | "scope" | "security";
+
 interface UserDetailProps {
   userId: string | null;
 }
@@ -50,6 +45,11 @@ function sameScope(a: ScopeEntry[], b: ScopeEntry[]): boolean {
   return a.every((e) => map.get(e.orgNodeId) === e.includeDescendants);
 }
 
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).slice(0, 2);
+  return parts.map((p) => p[0]?.toUpperCase() ?? "").join("") || "?";
+}
+
 export function UserDetail({ userId }: UserDetailProps) {
   const { t } = useTranslation();
   const toast = useToast();
@@ -64,6 +64,8 @@ export function UserDetail({ userId }: UserDetailProps) {
   const assignScope = useAssignUserScope();
   const resetMfa = useResetUserMfa();
 
+  const [tab, setTab] = useState<DetailTab>("basic");
+
   // Borradores locales por sección.
   const [displayName, setDisplayName] = useState("");
   const [status, setStatus] = useState<UserStatus>("ACTIVE");
@@ -77,6 +79,7 @@ export function UserDetail({ userId }: UserDetailProps) {
     setStatus(user.status);
     setRoleIds(user.roles.map((r) => r.id));
     setScope(user.scopes);
+    setTab("basic");
   }, [user]);
 
   if (!userId) {
@@ -92,8 +95,8 @@ export function UserDetail({ userId }: UserDetailProps) {
     return (
       <div className={styles.detail}>
         <Skeleton height={80} />
-        <Skeleton height={140} />
-        <Skeleton height={140} />
+        <Skeleton height={44} />
+        <Skeleton height={200} />
       </div>
     );
   }
@@ -147,9 +150,16 @@ export function UserDetail({ userId }: UserDetailProps) {
     setRoleIds((prev) => (checked ? [...prev, id] : prev.filter((x) => x !== id)));
   }
 
+  const TABS: { key: DetailTab; label: string }[] = [
+    { key: "basic", label: t("security.users.tabs.basic") },
+    { key: "roles", label: t("security.users.tabs.roles") },
+    { key: "scope", label: t("security.users.tabs.scope") },
+    { key: "security", label: t("security.users.tabs.security") },
+  ];
+
   return (
     <div className={styles.detail}>
-      {/* Cabecera */}
+      {/* Cabecera (siempre visible) */}
       <header className={styles.detailHeader}>
         <div className={styles.avatar}>{initials(user.displayName)}</div>
         <div className={styles.detailHeaderInfo}>
@@ -173,129 +183,167 @@ export function UserDetail({ userId }: UserDetailProps) {
         </div>
       </header>
 
-      {/* Datos básicos */}
-      <section className={shared.panel}>
-        <h3 className={shared.panelTitle}>{t("security.users.basicTitle")}</h3>
-        <div className={shared.formGrid} style={{ marginTop: 12 }}>
-          <FormField label={t("security.users.displayName")}>
-            {(field) => (
-              <Input
-                {...field}
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                disabled={!perms.can("user:edit")}
-              />
-            )}
-          </FormField>
-          <FormField label={t("security.users.statusLabel")}>
-            {(field) => (
-              <Select
-                {...field}
-                value={status}
-                onChange={(e) => setStatus(e.target.value as UserStatus)}
-                disabled={!perms.can("user:edit")}
-              >
-                {USER_STATUSES.map((s) => (
-                  <option key={s} value={s}>
-                    {t(`security.users.status.${s}`)}
-                  </option>
-                ))}
-              </Select>
-            )}
-          </FormField>
+      {/* Pestañas del detalle */}
+      <nav className={styles.detailTabs} role="tablist" aria-label={user.displayName}>
+        {TABS.map((tb) => (
+          <button
+            key={tb.key}
+            type="button"
+            role="tab"
+            aria-selected={tab === tb.key}
+            className={cx(styles.detailTab, tab === tb.key && styles.detailTabActive)}
+            onClick={() => setTab(tb.key)}
+          >
+            {tb.label}
+          </button>
+        ))}
+      </nav>
+
+      {/* ── Datos básicos ── */}
+      {tab === "basic" && (
+        <div className={styles.detailTabPanel}>
+          <div className={shared.formGrid}>
+            <FormField label={t("security.users.displayName")}>
+              {(field) => (
+                <Input
+                  {...field}
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  disabled={!perms.can("user:edit")}
+                />
+              )}
+            </FormField>
+            <FormField label={t("security.users.statusLabel")}>
+              {(field) => (
+                <Select
+                  {...field}
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value as UserStatus)}
+                  disabled={!perms.can("user:edit")}
+                >
+                  {USER_STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {t(`security.users.status.${s}`)}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </FormField>
+          </div>
+          <Can perform="user:edit">
+            <div className={shared.actionsFooter}>
+              <Button variant="primary" onClick={saveBasic} loading={updateUser.isPending} disabled={!basicDirty || !displayName.trim()}>
+                {t("common.save")}
+              </Button>
+            </div>
+          </Can>
         </div>
-        <Can perform="user:edit">
-          <div className={shared.actionsFooter}>
-            <Button variant="primary" onClick={saveBasic} loading={updateUser.isPending} disabled={!basicDirty || !displayName.trim()}>
-              {t("common.save")}
-            </Button>
-          </div>
-        </Can>
-      </section>
+      )}
 
-      {/* Roles */}
-      <section className={shared.panel}>
-        <h3 className={shared.panelTitle}>
-          <ShieldCheck size={15} style={{ verticalAlign: "-2px", marginRight: 6 }} />
-          {t("security.users.rolesTitle")}
-        </h3>
-        <p className={shared.panelDesc}>{t("security.users.rolesDesc")}</p>
-        {roles.length === 0 ? (
-          <p className={shared.muted} style={{ fontSize: 13 }}>{t("security.users.noRoles")}</p>
-        ) : (
-          <div className={styles.roleList}>
-            {roles.map((r) => (
-              <Checkbox
-                key={r.id}
-                checked={roleIds.includes(r.id)}
-                onChange={(v) => toggleRole(r.id, v)}
-                label={r.name}
-                aria-label={r.name}
-                disabled={!perms.can("user:assign-roles")}
-              />
-            ))}
-          </div>
-        )}
-        <Can perform="user:assign-roles">
-          <div className={shared.actionsFooter}>
-            <Button variant="primary" onClick={saveRoles} loading={assignRoles.isPending} disabled={!rolesDirty}>
-              {t("common.save")}
-            </Button>
-          </div>
-        </Can>
-      </section>
+      {/* ── Roles ── */}
+      {tab === "roles" && (
+        <div className={styles.detailTabPanel}>
+          <p className={shared.panelDesc} style={{ margin: 0 }}>{t("security.users.rolesDesc")}</p>
+          {roles.length === 0 ? (
+            <p className={shared.muted} style={{ fontSize: 13 }}>{t("security.users.noRoles")}</p>
+          ) : (
+            <div className={styles.roleList}>
+              {roles.map((r) => (
+                <Checkbox
+                  key={r.id}
+                  checked={roleIds.includes(r.id)}
+                  onChange={(v) => toggleRole(r.id, v)}
+                  label={r.name}
+                  aria-label={r.name}
+                  disabled={!perms.can("user:assign-roles")}
+                />
+              ))}
+            </div>
+          )}
+          <Can perform="user:assign-roles">
+            <div className={shared.actionsFooter}>
+              <Button variant="primary" onClick={saveRoles} loading={assignRoles.isPending} disabled={!rolesDirty}>
+                {t("common.save")}
+              </Button>
+            </div>
+          </Can>
+        </div>
+      )}
 
-      {/* Alcance de datos (ABAC) */}
-      <section className={shared.panel}>
-        <h3 className={shared.panelTitle}>
-          <UsersIcon size={15} style={{ verticalAlign: "-2px", marginRight: 6 }} />
-          {t("security.users.scope.title")}
-        </h3>
-        <p className={shared.panelDesc}>
-          {scope.length === 0 ? t("security.users.scope.fullAccess") : t("security.users.scope.desc")}
-        </p>
-        <ScopeTreePicker
-          tree={tree}
-          value={scope}
-          onChange={setScope}
-          disabled={!perms.can("user:assign-scope")}
-        />
-        <Can perform="user:assign-scope">
-          <div className={shared.actionsFooter}>
-            <Button variant="primary" onClick={saveScope} loading={assignScope.isPending} disabled={!scopeDirty}>
-              {t("common.save")}
-            </Button>
-          </div>
-        </Can>
-      </section>
-
-      {/* MFA */}
-      <Can perform="user:reset-mfa">
-        <section className={shared.panel}>
-          <h3 className={shared.panelTitle}>
-            <KeyRound size={15} style={{ verticalAlign: "-2px", marginRight: 6 }} />
-            {t("security.users.mfa.title")}
-          </h3>
-          <p className={shared.panelDesc}>
-            {user.mfaEnabled ? t("security.users.mfa.enabledDesc") : t("security.users.mfa.disabledDesc")}
+      {/* ── Alcance de datos (ABAC) ── */}
+      {tab === "scope" && (
+        <div className={styles.detailTabPanel}>
+          <p className={shared.panelDesc} style={{ margin: 0 }}>
+            {scope.length === 0 ? t("security.users.scope.fullAccess") : t("security.users.scope.desc")}
           </p>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            {user.mfaEnabled ? (
-              <Chip label={t("security.users.mfa.on")} variant="success" />
-            ) : (
-              <Chip label={t("security.users.mfa.off")} variant="default" />
-            )}
-            <Button
-              variant="danger"
-              leftIcon={<ShieldAlert size={16} />}
-              onClick={() => setResetOpen(true)}
-              disabled={!user.mfaEnabled}
-            >
-              {t("security.users.mfa.reset")}
-            </Button>
+          <ScopeTreePicker
+            tree={tree}
+            value={scope}
+            onChange={setScope}
+            disabled={!perms.can("user:assign-scope")}
+          />
+          <Can perform="user:assign-scope">
+            <div className={shared.actionsFooter}>
+              <Button variant="primary" onClick={saveScope} loading={assignScope.isPending} disabled={!scopeDirty}>
+                {t("common.save")}
+              </Button>
+            </div>
+          </Can>
+        </div>
+      )}
+
+      {/* ── Seguridad (MFA) ── */}
+      {tab === "security" && (
+        <div className={styles.detailTabPanel}>
+          <div className={styles.infoNote}>
+            <Info size={16} aria-hidden="true" />
+            <span>{t("security.users.mfa.selfServiceNote")}</span>
           </div>
-        </section>
-      </Can>
+
+          <div>
+            <h3 className={shared.panelTitle} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <KeyRound size={15} aria-hidden="true" />
+              {t("security.users.mfa.title")}
+            </h3>
+            <p className={shared.panelDesc}>
+              {user.mfaEnabled ? t("security.users.mfa.enabledDesc") : t("security.users.mfa.disabledDesc")}
+            </p>
+
+            <div className={styles.mfaStatusRow}>
+              {user.mfaEnabled ? (
+                <Chip label={t("security.users.mfa.on")} variant="success" />
+              ) : (
+                <Chip label={t("security.users.mfa.off")} variant="default" />
+              )}
+              {user.mfaRequired && (
+                <Chip
+                  label={user.mfaEnabled ? t("security.users.mfa.requiredOk") : t("security.users.mfa.enrollmentPending")}
+                  variant={user.mfaEnabled ? "info" : "warning"}
+                />
+              )}
+            </div>
+
+            {user.mfaRequired && !user.mfaEnabled && (
+              <p className={shared.muted} style={{ fontSize: 13, marginTop: 8 }}>
+                {t("security.users.mfa.requiredByRole")}
+              </p>
+            )}
+
+            <Can perform="user:reset-mfa">
+              <div style={{ marginTop: 16 }}>
+                <Button
+                  variant="danger"
+                  leftIcon={<ShieldAlert size={16} />}
+                  onClick={() => setResetOpen(true)}
+                  disabled={!user.mfaEnabled}
+                >
+                  {t("security.users.mfa.reset")}
+                </Button>
+              </div>
+            </Can>
+          </div>
+        </div>
+      )}
 
       <ResetMfaModal
         open={resetOpen}
@@ -306,9 +354,4 @@ export function UserDetail({ userId }: UserDetailProps) {
       />
     </div>
   );
-}
-
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).slice(0, 2);
-  return parts.map((p) => p[0]?.toUpperCase() ?? "").join("") || "?";
 }

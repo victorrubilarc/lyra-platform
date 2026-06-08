@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Plus, Search, TriangleAlert, Users as UsersIcon } from "lucide-react";
-import { Button, Chip, EmptyState, Input, ResizableSplit, Table, type TableColumn } from "@lyra/ui";
+import { Button, Chip, EmptyState, Input, ResizableSplit, Table, cx, type TableColumn } from "@lyra/ui";
 import type { UserStatus, UserSummary } from "@lyra/contracts";
 import { Can } from "../../auth/Can.js";
 import { useUsers } from "./security-queries.js";
@@ -38,27 +38,18 @@ export function UsersPage() {
       key: "user",
       header: t("security.users.colUser"),
       render: (u) => (
-        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          <span style={{ fontWeight: 500, color: "var(--color-text-primary)" }}>{u.displayName}</span>
-          <span className={shared.mono} style={{ color: "var(--color-text-muted)", fontSize: 12 }}>
-            {u.email}
-          </span>
+        <div className={styles.userCell}>
+          <span className={styles.userName}>{u.displayName}</span>
+          <span className={cx(shared.mono, styles.userMail)}>{u.email}</span>
         </div>
       ),
     },
     {
       key: "status",
       header: t("security.users.colStatus"),
-      width: 110,
+      width: 92,
+      align: "right",
       render: (u) => <Chip label={t(`security.users.status.${u.status}`)} variant={STATUS_VARIANT[u.status]} />,
-    },
-    {
-      key: "mfa",
-      header: t("security.users.colMfa"),
-      align: "center",
-      width: 70,
-      render: (u) =>
-        u.mfaEnabled ? <Chip label="MFA" variant="success" /> : <span className={shared.muted}>—</span>,
     },
   ];
 
@@ -90,6 +81,8 @@ export function UsersPage() {
       <div className={styles.split}>
         <ResizableSplit
           storageKey="wl_security_users_split"
+          defaultLeftWidth={380}
+          minLeftWidth={280}
           left={
             <div className={styles.listPanel}>
               <div className={styles.searchBar}>

@@ -270,6 +270,12 @@ export const esCL = {
       rolesTitle: "Roles",
       rolesDesc: "Los permisos del usuario son la unión de los permisos de sus roles.",
       forcePassword: "Debe cambiar contraseña",
+      tabs: {
+        basic: "Datos",
+        roles: "Roles",
+        scope: "Alcance",
+        security: "Seguridad",
+      },
       status: {
         ACTIVE: "Activo",
         DISABLED: "Deshabilitado",
@@ -288,6 +294,11 @@ export const esCL = {
         on: "MFA activo",
         off: "Sin MFA",
         required: "MFA requerido",
+        requiredOk: "Requerido · activo",
+        requiredByRole: "El rol de este usuario exige MFA: deberá activarlo en su próximo ingreso (gate de enrolamiento).",
+        enrollmentPending: "Requerido · pendiente",
+        selfServiceNote:
+          "El segundo factor es self-service: cada usuario lo activa desde su perfil («Mi seguridad») escaneando el QR con su app autenticadora. El administrador no enrola por otra persona; solo puede restablecerlo si pierde el dispositivo o exigirlo desde Roles/Política.",
         enabledDesc: "El usuario tiene un segundo factor activo.",
         disabledDesc: "El usuario no tiene un segundo factor configurado.",
         reset: "Restablecer MFA",
