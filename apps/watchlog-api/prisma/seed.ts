@@ -9,6 +9,7 @@
 import { PERMISSION_CATALOG } from "@lyra/contracts";
 import { PrismaClient } from "@prisma/client";
 import * as argon2 from "argon2";
+import { NODE_DESCRIPTIONS } from "./structure-descriptions.js";
 
 const prisma = new PrismaClient();
 
@@ -147,7 +148,7 @@ async function seedDemoStructure(): Promise<void> {
   ) {
     const path = `${parentPath}${id}/`;
     return prisma.orgNode.create({
-      data: { id, name, code, levelId, parentId, path },
+      data: { id, name, code, description: NODE_DESCRIPTIONS[id] ?? null, levelId, parentId, path },
     });
   }
 

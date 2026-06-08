@@ -14,6 +14,7 @@
     "db:deploy": "dotenv -e ../../.env -- prisma migrate deploy",
     "db:studio": "dotenv -e ../../.env -- prisma studio",
     "db:seed": "dotenv -e ../../.env -- tsx prisma/seed.ts",
+    "db:backfill-descriptions": "dotenv -e ../../.env -- tsx prisma/backfill-node-descriptions.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

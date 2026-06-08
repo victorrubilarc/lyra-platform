@@ -1,14 +1,13 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Building2, Layers, Lock, Plus, TriangleAlert } from "lucide-react";
-import { Button, EmptyState, Skeleton } from "@lyra/ui";
+import { Button, EmptyState, ResizableSplit, Skeleton } from "@lyra/ui";
 import type { OrgNodeTree } from "@lyra/contracts";
 import { Can } from "../../auth/Can.js";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { useOrgLevels, useOrgTree } from "./structure-queries.js";
 import { OrgTree } from "./OrgTree.js";
 import { NodeDetail } from "./NodeDetail.js";
-import { ResizableSplit } from "./ResizableSplit.js";
 import { NodeDrawer, type NodeDrawerMode } from "./NodeDrawer.js";
 import { LevelsDrawer } from "./LevelsDrawer.js";
 import { DeleteNodeModal } from "./DeleteNodeModal.js";

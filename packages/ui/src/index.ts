@@ -62,3 +62,6 @@ export type { SelectProps } from "./components/Select/Select.js";
 
 export { Table } from "./components/Table/Table.js";
 export type { TableProps, TableColumn, TableSort } from "./components/Table/Table.js";
+
+export { ResizableSplit } from "./components/ResizableSplit/ResizableSplit.js";
+export type { ResizableSplitProps } from "./components/ResizableSplit/ResizableSplit.js";

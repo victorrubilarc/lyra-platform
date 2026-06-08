@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
-import { cx } from "@lyra/ui";
+import { cx } from "../../cx.js";
 import styles from "./ResizableSplit.module.css";
 
-interface ResizableSplitProps {
+export interface ResizableSplitProps {
   left: ReactNode;
   right: ReactNode;
   /** Clave de localStorage para persistir el ancho. Si se omite, no persiste. */
