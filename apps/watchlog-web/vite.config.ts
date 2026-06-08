@@ -9,6 +9,9 @@ export default defineConfig({
   envDir: "../../",
   server: {
     port: 5173,
+    // No derivar a 5174+ si 5173 está ocupado: el script predev (free-port)
+    // libera el puerto antes de arrancar, así que aquí exigimos quedarnos en él.
+    strictPort: true,
     proxy: {
       // En desarrollo, /api se redirige al backend NestJS.
       "/api": {
