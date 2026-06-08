@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from "react-resizable-panels";
 import { Building2, Layers, Lock, Plus, TriangleAlert } from "lucide-react";
 import { Button, EmptyState, Skeleton } from "@lyra/ui";
 import type { OrgNodeTree } from "@lyra/contracts";
@@ -9,6 +8,7 @@ import { usePermissions } from "../../auth/use-permissions.js";
 import { useOrgLevels, useOrgTree } from "./structure-queries.js";
 import { OrgTree } from "./OrgTree.js";
 import { NodeDetail } from "./NodeDetail.js";
+import { ResizableSplit } from "./ResizableSplit.js";
 import { NodeDrawer, type NodeDrawerMode } from "./NodeDrawer.js";
 import { LevelsDrawer } from "./LevelsDrawer.js";
 import { DeleteNodeModal } from "./DeleteNodeModal.js";
@@ -108,58 +108,48 @@ export function StructurePage() {
       )}
 
       {/* Workspace de dos paneles redimensionables */}
-      <PanelGroup
-        orientation="horizontal"
-        className={styles.workspace}
-      >
-        {/* Panel izquierdo — árbol de navegación */}
-        <Panel
-          defaultSize={22}
-          minSize={15}
-          maxSize={45}
-          className={styles.treePanel}
-        >
-          <div className={styles.treePanelHeader}>
-            <span className={styles.treePanelTitle}>{t("structure.tree.panelTitle")}</span>
-          </div>
-
-          {isLoading ? (
-            <div className={styles.loadingSkeleton}>
-              <Skeleton height={26} width="60%" />
-              <div style={{ paddingLeft: 18 }}><Skeleton height={26} width="50%" /></div>
-              <div style={{ paddingLeft: 36 }}><Skeleton height={26} width="55%" /></div>
-              <Skeleton height={26} width="65%" />
-              <div style={{ paddingLeft: 18 }}><Skeleton height={26} width="45%" /></div>
+      <ResizableSplit
+        storageKey="wl_structure_split"
+        left={
+          <>
+            <div className={styles.treePanelHeader}>
+              <span className={styles.treePanelTitle}>{t("structure.tree.panelTitle")}</span>
             </div>
-          ) : treeError ? (
-            <div style={{ padding: 16 }}>
-              <EmptyState
-                icon={<TriangleAlert size={28} />}
-                title={t("structure.loadError")}
+
+            {isLoading ? (
+              <div className={styles.loadingSkeleton}>
+                <Skeleton height={26} width="60%" />
+                <div style={{ paddingLeft: 18 }}><Skeleton height={26} width="50%" /></div>
+                <div style={{ paddingLeft: 36 }}><Skeleton height={26} width="55%" /></div>
+                <Skeleton height={26} width="65%" />
+                <div style={{ paddingLeft: 18 }}><Skeleton height={26} width="45%" /></div>
+              </div>
+            ) : treeError ? (
+              <div style={{ padding: 16 }}>
+                <EmptyState
+                  icon={<TriangleAlert size={28} />}
+                  title={t("structure.loadError")}
+                />
+              </div>
+            ) : tree.length === 0 ? (
+              <div style={{ padding: 16 }}>
+                <EmptyState
+                  icon={<Building2 size={36} />}
+                  title={t("structure.noNodes")}
+                  description={t("structure.noNodesDesc")}
+                />
+              </div>
+            ) : (
+              <OrgTree
+                nodes={tree}
+                levels={levels}
+                selectedId={selectedNodeId}
+                onSelect={(node) => setSelectedNodeId(node.id)}
               />
-            </div>
-          ) : tree.length === 0 ? (
-            <div style={{ padding: 16 }}>
-              <EmptyState
-                icon={<Building2 size={36} />}
-                title={t("structure.noNodes")}
-                description={t("structure.noNodesDesc")}
-              />
-            </div>
-          ) : (
-            <OrgTree
-              nodes={tree}
-              levels={levels}
-              selectedId={selectedNodeId}
-              onSelect={(node) => setSelectedNodeId(node.id)}
-            />
-          )}
-        </Panel>
-
-        <PanelResizeHandle className={styles.resizeHandle} />
-
-        {/* Panel derecho — detalle del nodo seleccionado */}
-        <Panel className={styles.detailPanel}>
+            )}
+          </>
+        }
+        right={
           <NodeDetail
             node={selectedNode}
             allNodes={tree}
@@ -174,8 +164,8 @@ export function StructurePage() {
             onEditChild={(child) => openEditNode(child)}
             onDeleteChild={(child) => openDeleteNode(child)}
           />
-        </Panel>
-      </PanelGroup>
+        }
+      />
 
       {/* Drawers y modales */}
       <NodeDrawer

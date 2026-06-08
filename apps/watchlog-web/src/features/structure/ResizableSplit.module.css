@@ -1,0 +1,86 @@
+.container {
+  display: flex;
+  min-height: 520px;
+  background: var(--color-bg-surface-1);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+}
+
+/* Panel izquierdo: ancho explícito (lo fija el componente vía style inline). */
+.left {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  border-right: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg) 0 0 var(--radius-lg);
+}
+
+/* Panel derecho: ocupa todo el espacio restante. */
+.right {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+}
+
+/* Divisor arrastrable. */
+.handle {
+  flex-shrink: 0;
+  width: 7px;
+  cursor: col-resize;
+  position: relative;
+  background: transparent;
+  touch-action: none;
+}
+
+.handle::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 2px;
+  height: 36px;
+  border-radius: 1px;
+  background: var(--color-border-default);
+  transition: background 0.15s ease, height 0.15s ease;
+}
+
+.handle:hover::after,
+.handleActive::after {
+  background: var(--color-accent-primary);
+  height: 56px;
+}
+
+.handle:focus-visible {
+  outline: none;
+}
+
+.handle:focus-visible::after {
+  background: var(--color-accent-primary);
+  height: 56px;
+  box-shadow: 0 0 0 3px var(--color-border-accent);
+}
+
+/* Móvil: apilar y ocultar el divisor. */
+@media (max-width: 767px) {
+  .container {
+    flex-direction: column;
+  }
+  .left {
+    width: 100% !important;
+    border-right: none;
+    border-bottom: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    max-height: 320px;
+  }
+  .handle {
+    display: none;
+  }
+  .right {
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  }
+}
