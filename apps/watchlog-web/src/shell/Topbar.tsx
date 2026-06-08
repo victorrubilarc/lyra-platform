@@ -5,7 +5,7 @@ import { Breadcrumb, Menu, MenuItem, MenuLabel, MenuSeparator, Tooltip, type Cru
 import { useAuth } from "../auth/use-auth.js";
 import { useUIStore } from "./ui-store.js";
 import { useThemeStore, type ThemePreference } from "./theme-store.js";
-import { routeByPath } from "./navigation.js";
+import { routeForPath } from "./navigation.js";
 import { SUPPORTED_LANGUAGES, setLanguage } from "../i18n/i18n.js";
 import styles from "./AppShell.module.css";
 
@@ -36,9 +36,15 @@ export function Topbar({ onOpenSearch }: TopbarProps) {
   const setThemePref = useThemeStore((s) => s.setPreference);
   const ThemeIcon = THEME_OPTIONS.find((o) => o.value === themePref)?.icon ?? Moon;
 
-  const route = routeByPath(pathname);
+  const route = routeForPath(pathname);
   const crumbs: Crumb[] = [{ label: t("nav.home"), onClick: () => navigate("/") }];
-  if (route && pathname !== "/") crumbs.push({ label: t(route.labelKey) });
+  if (route && pathname !== "/") {
+    const onModuleRoot = pathname === route.path;
+    crumbs.push({
+      label: t(route.labelKey),
+      onClick: onModuleRoot ? undefined : () => navigate(route.path),
+    });
+  }
 
   return (
     <header className={styles.topbar}>

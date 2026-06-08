@@ -7,7 +7,12 @@ import { ResetPasswordPage } from "../features/auth/ResetPasswordPage.js";
 import { ForcePasswordChangePage } from "../features/auth/ForcePasswordChangePage.js";
 import { ForceMfaEnrollPage } from "../features/auth/ForceMfaEnrollPage.js";
 import { ProfileSecurityPage } from "../features/security/ProfileSecurityPage.js";
-import { ComingSoonPage } from "../features/placeholder/ComingSoonPage.js";
+import { SecurityLayout } from "../features/security/SecurityLayout.js";
+import { SecurityIndexRedirect } from "../features/security/SecurityIndexRedirect.js";
+import { UsersPage } from "../features/security/UsersPage.js";
+import { RolesPage } from "../features/security/RolesPage.js";
+import { PolicyPage } from "../features/security/PolicyPage.js";
+import { AuditPage } from "../features/security/AuditPage.js";
 import { HomePage } from "../features/home/HomePage.js";
 import { StructurePage } from "../features/structure/StructurePage.js";
 
@@ -31,7 +36,17 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <HomePage /> },
           { path: "/estructura", element: <StructurePage /> },
-          { path: "/seguridad", element: <ComingSoonPage /> },
+          {
+            path: "/seguridad",
+            element: <SecurityLayout />,
+            children: [
+              { index: true, element: <SecurityIndexRedirect /> },
+              { path: "usuarios", element: <UsersPage /> },
+              { path: "roles", element: <RolesPage /> },
+              { path: "politica", element: <PolicyPage /> },
+              { path: "auditoria", element: <AuditPage /> },
+            ],
+          },
           { path: "/perfil/seguridad", element: <ProfileSecurityPage /> },
         ],
       },

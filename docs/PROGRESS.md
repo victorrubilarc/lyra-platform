@@ -1,13 +1,13 @@
 # Progreso — Lyra WatchLog
 
-Última actualización: 2026-06-08 (Fase 1 — backend ✅; **UI: Login + cimientos ✅**; **Recuperación de contraseña ✅**; **MFA self-service ✅**; **App Shell / Workspace premium ✅**; **UI Estructura organizacional ✅** — layout master-detail premium + UX responsivo + `description`/`reportOrder`; **Módulo Equipos ✅** (CRUD + categorías configurables + `ExternalReference` integration-ready a nivel de modelo) → **Estructura CERRADA**; **siguiente: UI de Seguridad**).
+Última actualización: 2026-06-08 (Fase 1 — backend ✅; **UI: Login + cimientos ✅**; **Recuperación de contraseña ✅**; **MFA self-service ✅**; **App Shell / Workspace premium ✅**; **UI Estructura organizacional ✅** — layout master-detail premium + UX responsivo + `description`/`reportOrder`; **Módulo Equipos ✅** (CRUD + categorías configurables + `ExternalReference` integration-ready a nivel de modelo) → **Estructura CERRADA**; **UI de Seguridad ✅** (usuarios/roles/política/auditoría + reset MFA de admin) → **Fase 1 funcionalmente completa**; **siguiente: Fase 2 — Plantillas / Form Builder**).
 
 ## Estado por fase
 
 | Fase | Módulo | Estado |
 |---|---|---|
 | 0 | **Cimientos** (monorepo, Docker, Design System tokens, contratos, API health) | ✅ Hecho |
-| 1 | Seguridad (auth + RBAC/ABAC) + Estructura organizacional + AuditLog | 🟦 Backend ✅ · UI: Login ✅ · **Estructura ✅ (+ Equipos ✅)** · Seguridad ⬜ |
+| 1 | Seguridad (auth + RBAC/ABAC) + Estructura organizacional + AuditLog | ✅ Backend ✅ · UI: Login ✅ · **Estructura ✅ (+ Equipos ✅)** · **Seguridad ✅** |
 | 2 | Plantillas / Form Builder + Bitácoras | ⬜ Pendiente |
 | 3 | Orígenes de datos | ⬜ Pendiente |
 | 4 | Motor de incidencias | ⬜ Pendiente |
@@ -25,7 +25,7 @@
 | App Shell / Workspace premium (sidebar, topbar, pestañas, ⌘K, i18n) | 1 | ✅ UI |
 | Estructura organizacional | 1 | ✅ API + UI |
 | Equipos (CRUD + categorías + refs externas modelo) | 1 | ✅ API + UI |
-| Seguridad / roles / permisos (nueva) | 1 | 🟦 API ✅ · UI ⬜ (incluye reset MFA de admin: API ✅, UI ⬜) |
+| Seguridad / roles / permisos (nueva) | 1 | ✅ API + UI (usuarios/roles/política/auditoría + reset MFA de admin) |
 | Plantillas (Form Builder) | 2 | ⬜ |
 | Nueva entrada / Llenado | 2 | ⬜ |
 | Bitácoras (listado + detalle + log de cambios) | 2 | ⬜ |
@@ -346,9 +346,50 @@ Reemplaza el placeholder "Equipos — próximamente" del nivel final por un CRUD
   "Pronto" no clicables. `navigation.ts`: Estructura deja de marcarse `soon` (ya construida), así el
   sidebar tampoco la muestra como "Pronto".
 
+## Hecho en Fase 1 (UI — Seguridad: usuarios/roles/política/auditoría)
+
+Consume el backend de seguridad ya existente. Ver DECISIONS 2026-06-08. La UI solo oculta/deshabilita
+(el backend decide), permisos desde el catálogo de `@lyra/contracts` (nunca hardcodeados), dual theme, i18n es-CL.
+
+- **`@lyra/contracts`**: nuevo `auditLogEntrySchema` + `AuditLogEntry` (+ test de consistencia, 8 tests en
+  contracts). `scopeEntrySchema.includeDescendants` pasa a explícito (sin `.default`) por correctitud de
+  tipos input/output en el cliente.
+- **API (solo tipado)**: `GET /security/audit` ahora retorna `AuditLogEntry[]` tipado (mapeo `occurredAt`→ISO).
+  Sin cambio de comportamiento en el cable.
+- **`@lyra/ui` (+1 primitivo)**: `Checkbox` (CSS Module sobre tokens, dual theme, área 44px, **estado
+  indeterminado** para selección de grupo).
+- **Navegación (sub-rutas anidadas, una pestaña por módulo)**: `/seguridad` = `SecurityLayout` (sub-tabs +
+  `Outlet`); sub-rutas reales `/seguridad/{usuarios,roles,politica,auditoria}` deep-linkables, cada una
+  gateada por permiso; índice redirige a la 1.ª permitida. Helpers `routeForPath`/`isRouteActive` en
+  `navigation.ts` + ajustes en AppShell/WorkspaceTabs/Topbar/Sidebar (match por prefijo). Seguridad deja de
+  ser `soon`; Home la marca "Disponible".
+- **Capa de datos** (`security-api.ts` + `security-queries.ts`): llamadas tipadas contra contracts + hooks
+  TanStack Query (usuarios, roles, catálogo de permisos, política, auditoría con `useInfiniteQuery`).
+- **Usuarios** (master-detail con `ResizableSplit`): `UsersPage` (lista buscable) + `UserDetail` (secciones
+  con guardado independiente: datos básicos, **roles**, **alcance de datos** vía `ScopeTreePicker`, **MFA**
+  con reset) + `UserDrawer` (alta con contraseña temporal + generador) + `ResetMfaModal`.
+- **Roles**: `RolesPage` (tabla + borrado gateado, system no borrable) + `RoleDrawer` + `PermissionMatrix`
+  (agrupada por `group` del catálogo, checkbox de grupo con indeterminado, `requireMfa`).
+- **Política**: `PolicyPage` (RHF+Zod): contraseñas (longitud/complejidad/historial/expiración), bloqueo por
+  intentos y **`mfaMode` global** con descripción por modo.
+- **Auditoría**: `AuditPage` (tabla solo-lectura, chip por verbo de acción, "cargar más" por cursor, modal de
+  detalle con diff `before`/`after`/`metadata`).
+- **i18n**: namespace `security` completo (es-CL).
+- **Verificación**: `typecheck`/`lint` (0 errores; 1 warning preexistente en OrgTree)/`build` (web 1882
+  módulos)/`test` (**contracts 8** +3 audit · permissions 5 · **API 67**) en verde. **Smoke en vivo** (API,
+  usuario demo con 25 permisos): `GET users/roles/permissions(25)/password-policy` → 200; **auditoría con la
+  nueva forma de contrato** (`occurredAt` ISO string, claves `before/after/metadata` presentes, `take`/cursor);
+  **round-trip de rol** crear→leer (permissionKeys resueltos)→borrar 204→404.
+- **Pendiente**: smoke **VISUAL** en navegador (ver BACKLOG §4): navegar sub-tabs, alta/edición de usuario,
+  asignar roles/scope, reset MFA, CRUD de roles + matriz, editar política, leer auditoría + diff, modo claro.
+
 ## Próximo paso
-**Sesión siguiente = Fase 1 · UI de Seguridad** (usuarios/roles/permisos + reset MFA de admin) sobre
-`/security/*`. Con Equipos, **Estructura organizacional queda cerrada**.
+**Fase 1 funcionalmente completa** (auth + RBAC/ABAC + Estructura + Equipos + UI de Seguridad).
+**Sesión siguiente = Fase 2 · Plantillas / Form Builder + Bitácoras.**
+
+**Mejora futura registrada (BACKLOG §2):** seguridad a nivel de nodo en el mantenedor de Estructura (ABAC
+enterprise: asignar usuarios/roles a nodos desde el propio árbol, "quién accede a este nodo"). El modelo ya
+existe; falta la UI node-centric, complementaria a la asignación de scope por usuario ya entregada.
 
 **Puntos B/C/D de integración pendientes de análisis** (ver memoria `integration-pending.md`):
 - B: CSV import/export de estructura

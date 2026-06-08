@@ -1,0 +1,161 @@
+/* Estilos compartidos por las sub-páginas de Seguridad. */
+
+.subpage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-height: 0;
+}
+
+/* Barra de acciones de una sub-página (título + botones). */
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.toolbarInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.toolbarTitle {
+  font-family: var(--font-brand);
+  font-size: var(--text-h2-size);
+  font-weight: var(--text-h2-weight);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.toolbarSubtitle {
+  font-size: var(--text-body-sm-size);
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.toolbarActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+/* Panel tipo tarjeta (glass) para formularios y bloques. */
+.panel {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+}
+
+.panelTitle {
+  font-family: var(--font-brand);
+  font-size: var(--text-h3-size);
+  font-weight: var(--text-h3-weight);
+  color: var(--color-text-primary);
+  margin: 0 0 var(--space-1);
+}
+
+.panelDesc {
+  font-size: var(--text-body-sm-size);
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-4);
+}
+
+/* Fila de control con label + descripción a la izquierda y control a la derecha. */
+.controlRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.controlRow:first-of-type {
+  border-top: none;
+}
+
+.controlLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.controlName {
+  font-size: var(--text-body-size);
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.controlHint {
+  font-size: var(--text-body-sm-size);
+  color: var(--color-text-muted);
+}
+
+.controlInput {
+  flex-shrink: 0;
+  width: 120px;
+}
+
+/* Rejilla de formulario en columnas. */
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-4);
+}
+
+/* Estado de error de carga. */
+.errorBox {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-error-bg);
+  border: 1px solid rgba(239, 68, 68, 0.22);
+  border-radius: var(--radius-md);
+  font-size: var(--text-body-sm-size);
+  color: var(--color-error);
+}
+
+/* Pie de acciones (guardar / cancelar). */
+.actionsFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+/* Texto mono pequeño (emails, ids, claves). */
+.mono {
+  font-family: var(--font-mono);
+  font-size: var(--text-body-sm-size);
+}
+
+.muted {
+  color: var(--color-text-muted);
+}
+
+/* Botón-ícono fantasma (para slots dentro de inputs). */
+.iconGhost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: var(--transition-default);
+}
+
+.iconGhost:hover {
+  color: var(--color-text-primary);
+}

@@ -34,13 +34,36 @@ export const ROUTES: readonly NavRoute[] = [
     icon: ShieldCheck,
     permission: "module:security:view",
     inSidebar: true,
-    soon: true,
   },
   { path: "/perfil/seguridad", labelKey: "topbar.mySecurity", icon: UserCog },
 ] as const;
 
 export function routeByPath(path: string): NavRoute | undefined {
   return ROUTES.find((r) => r.path === path);
+}
+
+/**
+ * Ruta de módulo que "posee" un pathname, por coincidencia exacta o de prefijo.
+ * Permite que sub-rutas anidadas (ej. `/seguridad/usuarios`) se atribuyan al
+ * módulo padre (`/seguridad`) para pestañas, breadcrumbs y estado activo del
+ * sidebar, manteniendo UNA sola pestaña por módulo. Devuelve la coincidencia más
+ * larga (la más específica).
+ */
+export function routeForPath(path: string): NavRoute | undefined {
+  let best: NavRoute | undefined;
+  for (const r of ROUTES) {
+    if (r.path === "/") continue; // la Home solo casa exacto (la trata el caller)
+    if (path === r.path || path.startsWith(`${r.path}/`)) {
+      if (!best || r.path.length > best.path.length) best = r;
+    }
+  }
+  return path === "/" ? routeByPath("/") : best;
+}
+
+/** ¿El pathname pertenece a esta ruta de módulo (exacto o sub-ruta)? */
+export function isRouteActive(routePath: string, pathname: string): boolean {
+  if (routePath === "/") return pathname === "/";
+  return pathname === routePath || pathname.startsWith(`${routePath}/`);
 }
 
 /** Ítems del sidebar (módulos). */

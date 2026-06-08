@@ -1,0 +1,54 @@
+.wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  /* Área táctil generosa para terreno (uso con guantes), sin agrandar la caja visual. */
+  min-height: 44px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.wrapper.disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  padding: 0;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-surface-2);
+  color: #fff;
+  cursor: pointer;
+  transition: var(--transition-default);
+}
+
+.box:hover:not(:disabled) {
+  border-color: var(--color-border-accent);
+}
+
+.box.on {
+  background: var(--gradient-brand);
+  border-color: transparent;
+}
+
+.box:disabled {
+  cursor: not-allowed;
+}
+
+.box:focus-visible {
+  outline: 2px solid var(--color-accent-primary);
+  outline-offset: 2px;
+}
+
+.label {
+  font-size: var(--text-body-sm-size);
+  color: var(--color-text-primary);
+  line-height: 1.3;
+}

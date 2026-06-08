@@ -13,6 +13,7 @@ export * from "./security/permissions.js";
 export * from "./security/auth.js";
 export * from "./security/users.js";
 export * from "./security/roles.js";
+export * from "./security/audit.js";
 
 // Estructura organizacional (Fase 1)
 export * from "./structure/org.js";

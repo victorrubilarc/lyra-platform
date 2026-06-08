@@ -2,7 +2,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { Pin, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cx } from "@lyra/ui";
-import { routeByPath } from "./navigation.js";
+import { isRouteActive, routeByPath } from "./navigation.js";
 import { useWorkspaceStore } from "./workspace-store.js";
 import styles from "./AppShell.module.css";
 
@@ -27,7 +27,7 @@ export function WorkspaceTabs() {
         const route = routeByPath(tab.path);
         const Icon = route?.icon;
         const label = tab.title ?? (route ? t(route.labelKey) : tab.path);
-        const active = pathname === tab.path;
+        const active = isRouteActive(tab.path, pathname);
         return (
           <div key={tab.path} className={cx(styles.tab, active && styles.tabActive)} role="presentation">
             <button

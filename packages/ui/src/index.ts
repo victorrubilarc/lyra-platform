@@ -33,6 +33,9 @@ export type { ToastVariant } from "./components/Toast/ToastProvider.js";
 export { Toggle } from "./components/Toggle/Toggle.js";
 export type { ToggleProps } from "./components/Toggle/Toggle.js";
 
+export { Checkbox } from "./components/Checkbox/Checkbox.js";
+export type { CheckboxProps } from "./components/Checkbox/Checkbox.js";
+
 export { Skeleton } from "./components/Skeleton/Skeleton.js";
 export type { SkeletonProps } from "./components/Skeleton/Skeleton.js";
 

@@ -113,4 +113,8 @@ Implementado en Fase 1 según **NIST 800-63B** (AAL2) y **OWASP ASVS v4 §2.2 / 
     neutra, rate-limit, revocación de sesiones, `EmailService` SMTP (Mailpit en dev). Ver §6. Tests +
     smoke en vivo con Mailpit.
   - Tests: crypto (Argon2/AES), guard de permisos, scope ABAC, rotación/reuso de refresh, login/lockout/MFA. Verificado en vivo (login → /me → CSRF → estructura).
-- **Pendiente Fase 1:** UI (pantalla de Login, administración de usuarios/roles/permisos, estructura). El backend ya expone todo lo necesario.
+- **Fase 1 (UI, ✅):** Login + MFA, Estructura + Equipos, y **administración de Seguridad** (usuarios,
+  roles + matriz de permisos, política con `mfaMode`, auditoría, reset de MFA de admin) sobre `/security/*`.
+  La UI solo oculta/deshabilita según permisos efectivos; el backend sigue siendo la única fuente de verdad.
+  Contrato de auditoría (`auditLogEntrySchema`) añadido para tipar la lectura. Pendiente: smoke visual
+  (BACKLOG §4) y la vista ABAC node-centric (BACKLOG §2).

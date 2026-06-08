@@ -33,7 +33,7 @@ const MODULES: ModuleCard[] = [
     name: "Seguridad",
     description: "Usuarios, roles, permisos y alcance de datos",
     icon: ShieldCheck,
-    status: "building",
+    status: "ready",
     path: "/seguridad",
     permission: "module:security:view",
   },
