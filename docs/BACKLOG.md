@@ -39,9 +39,9 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Estructura v2 + externalCode + Table fix** | `main` | ✅ publicado (`f84cbd8`) | ninguna |
 | **Estructura UX: layout responsivo, ResizableSplit, description, reportOrder, fix puerto** | `main` | ✅ publicado (`5170f70`) | ninguna |
 | **Docs cierre + fix header responsivo del detalle** | `main` | ✅ publicado (`91a4bd6`) | ninguna |
-| **Módulo Equipos** (CRUD + categorías + `ExternalReference` modelo) | `feat/equipos` → `main` | ⏳ a publicar al cerrar | push de rama + merge a `main` + push |
+| **Módulo Equipos** (CRUD + categorías + `ExternalReference` modelo) | `main` (fusionado desde `feat/equipos`) | ✅ fusionado y publicado en `origin/main` (`a299ab6`) | ninguna |
 
-**Estado:** **al cerrar esta sesión**, fusionar `feat/equipos` a `main` y hacer push (ver checklist §0).
+**Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
 **Convención propuesta (a confirmar):** trabajar cada módulo en rama `feat/<modulo>`;
 al cerrar la sesión → push de la rama + merge a `main` + push de `main`. Así `origin/main`
