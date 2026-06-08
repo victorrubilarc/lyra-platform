@@ -4,6 +4,49 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-08 · Modelo de usuario alineado a SCIM + costura de federación (diseño; implementación diferida a v2)
+
+Decisión de **diseño** (sin migraciones aún) sobre qué datos tendrá `User` y cómo dejar lista la
+identidad federada (AD / OIDC / SAML) para la próxima versión, de modo que activarla sea **aditivo** y no
+un refactor. Anclado a estándares: **SCIM 2.0** (RFC 7643/7644 — el esquema que Entra ID/Okta/Google/
+JumpCloud usan para aprovisionar), **OIDC Core §5.1** (claims) e **inetOrgPerson** (LDAP/AD).
+
+**Catálogo de datos de usuario (referencia SCIM, priorizado para este producto industrial):** identidad/login
+(`userName` login estable + `externalId` del IdP, separados del email de contacto que puede cambiar), nombre
+(`givenName`/`familyName` además de `displayName`), contacto (`emails[]` con primario, `phoneNumbers[]` —
+clave para notificaciones/escalamiento HSE), empleo/organización (`employeeNumber`, `title`/cargo,
+`department`, `manager`, `costCenter`), ubicación/sitio (encaja con el **scope ABAC** = nodo de estructura),
+locale/i18n (`preferredLanguage`, `timezone` — sellos de tiempo por turno), ciclo de vida (`active` —ya
+existe `status`—, validez `validFrom`/`validTo` para contratistas, `userType`), avatar y auditoría
+(`created`/`lastLogin`, ya presentes).
+
+**Costura de federación (lo crítico, decidido a nivel de diseño):**
+1. **`User` = principal canónico; identidades enganchadas aparte.** Patrón Keycloak/Auth0/Entra: tabla
+   **`UserIdentity`** (`userId`, `provider` ∈ {LOCAL, OIDC, SAML, LDAP}, `providerKey` = instancia,
+   `subject`/`externalId` estable del IdP, `claims jsonb`, `linkedAt`). Permite **account linking** (password
+   local + cuenta OIDC del mismo usuario) sin duplicar. Es la contraparte de datos de la "auth enchufable"
+   (DECISIONS 2026-06-05).
+2. **Atribución de origen + *mastering* de atributos.** Cuando el IdP es dueño de `displayName`/`email`/
+   `department`, esos campos pasan a **solo-lectura** en la UI (sincronizados por SCIM/JIT). Marca por
+   usuario/campo quién manda (`authProvider`/`managedExternally`) para que un sync no pise ediciones locales.
+3. **Password y MFA opcionales/delegados.** Usuario federado **sin `passwordHash`** (debe ser nullable) y su
+   AAL/MFA puede venir del IdP → `mfaMode` debe poder **deferir** al proveedor (no exigir TOTP propio si el
+   IdP ya hizo MFA).
+4. **Grupos del IdP → roles** vía tabla de mapeo (el RBAC ya es 100% dato).
+
+**Plan de implementación (cuándo):**
+- **No ahora:** SCIM completo sería sobre-ingeniería (CLAUDE.md) — la mitad de los campos no los consume
+  ningún módulo todavía.
+- **Set lean a agregar cuando se justifique (barato, alto valor, ya usable por bitácoras/notificaciones):**
+  `username` (login estable, opcional, ≠ email), `firstName`/`lastName`, `phone`, `jobTitle`, `employeeId`,
+  `preferredLanguage`/`timezone`. Mapean 1:1 a SCIM/OIDC.
+- **Diseñar listo, implementar en v2:** `UserIdentity` + `authProvider` en `User` (default `LOCAL`) +
+  `passwordHash` nullable + reglas de mastering → activar un proveedor = migración aditiva, sin tocar `User`.
+- **Diferir a v2:** SCIM inbound, JIT provisioning, mapeo grupo→rol, validez por fechas de contratistas,
+  multi-email/multi-phone, MFA delegada.
+
+Registrado en BACKLOG §2 (Identidad/Federación v2) y §3 (deuda: `passwordHash` nullable, separar login de email).
+
 ### 2026-06-08 · UI de Seguridad (usuarios/roles/política/auditoría) sobre `/security/*`
 
 Consume el backend de seguridad ya existente (RBAC/ABAC, política, MFA, reset de admin, auditoría). Decisiones (aprobadas tras propuesta):

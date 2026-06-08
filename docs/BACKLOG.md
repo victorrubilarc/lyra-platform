@@ -95,6 +95,23 @@ nunca queda más de una sesión atrás.
       con la pantalla de Seguridad. Pedido explícito del usuario (2026-06-08). **Prioridad: media**, tras
       la UI de Seguridad base.
 
+### Identidad / Federación (v2 — diseño aprobado, implementación diferida)
+> Diseño registrado el 2026-06-08 (ver DECISIONS). El objetivo es que activar proveedores externos
+> (AD/OIDC/SAML) sea **aditivo**. Anclado a **SCIM 2.0** (RFC 7643/7644), **OIDC Core §5.1**, inetOrgPerson.
+- [ ] **Set lean de campos de usuario (SCIM-alineado), a agregar cuando se justifique.** `username`
+      (login estable, opcional, ≠ email), `firstName`/`lastName`, `phone`, `jobTitle`, `employeeId`,
+      `preferredLanguage`/`timezone`. Migración + contratos + UI (pestaña *Datos* del detalle de usuario).
+      Alto valor para bitácoras/notificaciones; mapean 1:1 a SCIM/OIDC. **Prioridad: media** (su propia sesión).
+- [ ] **Costura de federación (v2): tabla `UserIdentity`** (`userId`, `provider` LOCAL|OIDC|SAML|LDAP,
+      `providerKey`, `subject`/`externalId`, `claims jsonb`, `linkedAt`) + `authProvider` en `User`
+      (default LOCAL) + reglas de *mastering* de atributos (campos gobernados por el IdP = solo-lectura en UI).
+      Permite account linking. **No tocar la tabla `User` ahora**; es migración aditiva al activar un IdP.
+- [ ] **SCIM inbound + JIT provisioning + mapeo grupo→rol** (el RBAC ya es 100% dato). **v2.**
+- [ ] **MFA delegada al IdP**: `mfaMode` debe poder *deferir* al proveedor (no exigir TOTP propio si el IdP
+      ya hizo MFA / AAL suficiente). **v2.**
+- [ ] **Validez por fechas para contratistas** (`validFrom`/`validTo`, `userType`) + multi-email/multi-phone.
+      **v2 / cuando lo pida un cliente.**
+
 ### Módulos intermedios (antes de Fase 2)
 - [x] **Módulo Equipos** ✅ (2026-06-08) — ver el ítem cerrado arriba en "Fase 1 — Seguridad + Estructura"
       y DECISIONS 2026-06-08. La descripción original (decisiones a tomar) se conserva abajo como
@@ -146,6 +163,11 @@ nunca queda más de una sesión atrás.
 - [ ] **`ExternalReference`: UI de mapeos + catálogo de `systemType`.** Modelo y contratos ya existen
       (2026-06-08); la **UI** de gestión de referencias externas y el catálogo configurable de sistemas
       (`systemType`) se construyen en **Fase 3 (Orígenes de datos)** junto al motor de conexión/sync.
+- [ ] **`User.passwordHash` debe ser nullable + separar login de email (preparación de federación).** Hoy
+      el login es el email y la contraseña local es obligatoria; un usuario federado (AD/OIDC) no tendrá
+      contraseña local y su login estable puede no ser el email. Hacer `passwordHash` nullable y prever
+      `username` como login estable evita una migración dolorosa en v2. Ref: DECISIONS 2026-06-08
+      (federación). **Prioridad: media**, junto con el set lean de campos.
 - [ ] **`user:disable` sin enforcement.** El cambio de `status` (ACTIVE↔DISABLED) viaja por
       `PATCH /security/users/:id` gateado por `user:edit`; el permiso `user:disable` del catálogo no lo
       exige ningún guard. Decidir: (a) separar endpoint/guard de habilitar/deshabilitar, o (b) retirar la
