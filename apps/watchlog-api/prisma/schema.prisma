@@ -105,6 +105,8 @@ model Role {
   users       UserRole[]
   permissions RolePermission[]
   scopes      Scope[]
+  templateSectionRoles TemplateSectionRole[]
+  templateFieldRoles   TemplateFieldRole[]
 }
 
 model Permission {
@@ -311,6 +313,7 @@ model OrgNode {
   scopes    Scope[]
   equipment Equipment[]
   externalRefs ExternalReference[]
+  templates Template[]
 
   @@index([parentId])
   @@index([levelId])
@@ -400,6 +403,199 @@ model ExternalReference {
   @@index([orgNodeId])
   @@index([equipmentId])
   @@index([systemType])
+}
+
+// ===========================================================================
+//  Plantillas / Form Builder (Fase 2.1) — lado DEFINICIÓN
+// ===========================================================================
+//
+// Paradigma (ver docs/DECISIONS.md 2026-06-09): un formulario es un proceso =
+// documento vivo de SECCIONES, no una lista plana. La maquinaria enterprise
+// (flujo, firma Part 11, recurrencia) es OPT-IN: una plantilla de 1 sección /
+// 1 estado / sin firma se comporta como un form simple.
+//
+// Definición (config) vs Ejecución (registros auditados): aquí vive solo la
+// DEFINICIÓN. `Template` es el contenedor lógico mutable; `TemplateVersion` es
+// la versión INMUTABLE al publicar (patrón MMR de 21 CFR Part 11) — las
+// entradas futuras referenciarán una versión concreta, por lo que editar la
+// plantilla luego NO altera registros históricos.
+//
+// Las referencias a flujo/firma/recurrencia se modelan como columnas para no
+// re-migrar; sus EDITORES llegan en 2.2/2.3 y las tablas de EJECUCIÓN (LogEntry…)
+// en 2.4. La entidad `WorkflowDefinition` y su FK se incorporan en 2.2.
+
+enum TemplateStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum TemplateVersionStatus {
+  DRAFT
+  PUBLISHED
+}
+
+// Tipos de campo. En 2.1 tienen editor completo los 8 núcleo; SEVERITY y
+// SIGNATURE quedan modelados (su comportamiento enterprise pleno —Part 11— es
+// 2.5). El resto de tipos del prototipo se suma con su editor cuando toque
+// (agregar valores al enum en Postgres es aditivo, no re-migra).
+enum FieldType {
+  NUMBER
+  TEXT
+  TEXTAREA
+  SELECT
+  MULTISELECT
+  BOOLEAN
+  DATE
+  DATETIME
+  SEVERITY
+  SIGNATURE
+}
+
+// Recurrencia (rondas/lecturas programadas). Modelada para no re-migrar; su
+// editor y la generación de ocurrencias llegan en 2.3. NONE = sin recurrencia.
+enum RecurrenceKind {
+  NONE
+  SHIFT
+  INTERVAL
+  CALENDAR
+}
+
+model Template {
+  id               String         @id @default(cuid())
+  name             String
+  description      String?
+  // Ancla en la estructura (null = global). La visibilidad se filtra por scope ABAC.
+  orgNodeId        String?
+  status           TemplateStatus @default(DRAFT)
+  // Versión publicada "viva". Null mientras solo exista borrador.
+  currentVersionId String?        @unique
+  // Autoría (referencia blanda, sin FK: el usuario pudo borrarse — igual que AuditLog).
+  createdById      String?
+  updatedById      String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  deletedAt        DateTime? // borrado lógico
+
+  orgNode        OrgNode?          @relation(fields: [orgNodeId], references: [id], onDelete: SetNull)
+  versions       TemplateVersion[] @relation("TemplateVersions")
+  currentVersion TemplateVersion?  @relation("TemplateCurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+
+  @@index([orgNodeId])
+  @@index([status])
+  @@index([deletedAt])
+}
+
+model TemplateVersion {
+  id            String                @id @default(cuid())
+  templateId    String
+  versionNumber Int
+  status        TemplateVersionStatus @default(DRAFT)
+  // Snapshot del nombre/descripción al publicar (inmutabilidad histórica).
+  name          String
+  description   String?
+
+  // --- Referencias futuras (modeladas; editores en 2.2/2.3) -----------------
+  // Flujo reutilizable congelado por la versión. La entidad WorkflowDefinition
+  // y su FK se añaden en 2.2; aquí van como cadenas para no re-migrar.
+  workflowDefinitionId        String?
+  workflowDefinitionVersionId String?
+  // Firma electrónica estilo Part 11 (opt-in a nivel de versión).
+  requireSignature            Boolean        @default(false)
+  // Recurrencia (rondas/turnos). Config libre validada por contrato (editor 2.3).
+  recurrenceKind              RecurrenceKind @default(NONE)
+  recurrenceConfig            Json?
+
+  publishedAt   DateTime?
+  publishedById String?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  template  Template          @relation("TemplateVersions", fields: [templateId], references: [id], onDelete: Cascade)
+  currentOf Template?         @relation("TemplateCurrentVersion")
+  sections  TemplateSection[]
+
+  @@unique([templateId, versionNumber])
+  @@index([templateId])
+  @@index([status])
+}
+
+// La SECCIÓN es la unidad atómica de permiso de llenado, asignación a estado del
+// flujo, completitud, bloqueo y firma. `editableInStateKey` (qué estado la
+// habilita) y `requireSignature` son opt-in; null/false ⇒ comportamiento simple.
+model TemplateSection {
+  id                 String   @id @default(cuid())
+  templateVersionId  String
+  // Clave estable dentro de la versión (mapeo de valores/permeabilidad).
+  key                String
+  title              String
+  description        String?
+  order              Int      @default(0)
+  // Opt-in Part 11: exige firma al completar la sección (ejecución en 2.5).
+  requireSignature   Boolean  @default(false)
+  // Estado del flujo en que la sección es editable (referencia por clave; el
+  // flujo se modela como entidad en 2.2). Null = editable siempre (form simple).
+  editableInStateKey String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  version TemplateVersion       @relation(fields: [templateVersionId], references: [id], onDelete: Cascade)
+  fields  TemplateField[]
+  // Permiso por sección: roles que pueden llenarla (asignación = dato).
+  roles   TemplateSectionRole[]
+
+  @@unique([templateVersionId, key])
+  @@index([templateVersionId])
+}
+
+model TemplateField {
+  id          String    @id @default(cuid())
+  sectionId   String
+  key         String
+  type        FieldType
+  label       String
+  help        String?
+  required    Boolean   @default(false)
+  order       Int       @default(0)
+  // Config por tipo (unidad/umbral/opciones/regex…), validada por la unión Zod
+  // de @lyra/contracts contra la versión. Patrón JSONB de DATA_MODEL.md.
+  config      Json      @default("{}")
+  // Visibilidad condicional (estilo `showIf` del prototipo): { fieldKey, equals }.
+  visibleWhen Json?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  section TemplateSection     @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  // Override por campo del permiso de la sección (cuando existe, manda él).
+  roles   TemplateFieldRole[]
+
+  @@unique([sectionId, key])
+  @@index([sectionId])
+}
+
+// Roles autorizados a llenar una sección (granularidad por defecto).
+model TemplateSectionRole {
+  sectionId String
+  roleId    String
+
+  section TemplateSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  role    Role            @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([sectionId, roleId])
+  @@index([roleId])
+}
+
+// Override por campo: cuando un campo declara roles, sustituyen a los de la
+// sección para ese campo (editor en 2.2; aquí solo el modelo).
+model TemplateFieldRole {
+  fieldId String
+  roleId  String
+
+  field TemplateField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  role  Role          @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([fieldId, roleId])
+  @@index([roleId])
 }
 
 // ===========================================================================

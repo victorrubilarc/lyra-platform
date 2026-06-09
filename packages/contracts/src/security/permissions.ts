@@ -202,6 +202,52 @@ export const PERMISSION_CATALOG = [
     group: "structure",
     description: "Configurar el catálogo de categorías/clases de equipo.",
   },
+
+  // --- Dimensión 1: módulo de plantillas (Fase 2) ---
+  {
+    key: "module:templates:view",
+    dimension: "MODULE",
+    group: "templates",
+    description: "Ver el módulo de plantillas (Form Builder).",
+  },
+  {
+    key: "module:templates:manage",
+    dimension: "MODULE",
+    group: "templates",
+    description: "Administrar el módulo de plantillas.",
+  },
+
+  // --- Dimensión 2: acciones — plantillas (Fase 2) ---
+  {
+    key: "template:view",
+    dimension: "ACTION",
+    group: "templates",
+    description: "Listar y ver plantillas y sus versiones.",
+  },
+  {
+    key: "template:create",
+    dimension: "ACTION",
+    group: "templates",
+    description: "Crear plantillas.",
+  },
+  {
+    key: "template:edit",
+    dimension: "ACTION",
+    group: "templates",
+    description: "Editar plantillas en borrador (estructura, secciones y campos).",
+  },
+  {
+    key: "template:publish",
+    dimension: "ACTION",
+    group: "templates",
+    description: "Publicar una plantilla (congela la versión, inmutable).",
+  },
+  {
+    key: "template:delete",
+    dimension: "ACTION",
+    group: "templates",
+    description: "Eliminar (borrado lógico) plantillas.",
+  },
 ] as const satisfies readonly PermissionDef[];
 
 /** Unión literal de todas las claves de permiso conocidas. */
