@@ -1,0 +1,226 @@
+.root {
+  position: relative;
+  width: 100%;
+}
+
+.trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--color-hover);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  padding: 7px 12px;
+  font-family: var(--font-body);
+  font-size: var(--text-body-size);
+  min-height: 44px;
+  cursor: pointer;
+  text-align: left;
+  transition: var(--transition-border), box-shadow 0.2s ease;
+}
+
+.trigger:focus-visible {
+  outline: none;
+  border-color: var(--color-accent-primary);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.18);
+}
+
+.trigger.disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.triggerContent {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+  min-width: 0;
+}
+
+.placeholder {
+  color: var(--color-text-muted);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--color-text-primary);
+  background: var(--color-bg-surface-2);
+  border: 1px solid var(--color-border-default);
+  border-radius: 99px;
+  padding: 2px 4px 2px 9px;
+  max-width: 100%;
+}
+
+.chipRemove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 99px;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.chipRemove:hover {
+  background: var(--color-hover);
+  color: var(--color-text-primary);
+}
+
+.more {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  padding: 2px 4px;
+}
+
+.caret {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+/* ── Panel (portal) ─────────────────────────────────────────────────────── */
+.panel {
+  z-index: 60;
+  background: var(--color-bg-surface-2);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg, 0 12px 32px rgba(0, 0, 0, 0.35));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.searchRow {
+  padding: 8px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.search {
+  width: 100%;
+  background: var(--color-hover);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm, 8px);
+  color: var(--color-text-primary);
+  padding: 8px 10px;
+  font-family: var(--font-body);
+  font-size: var(--text-body-sm-size);
+  outline: none;
+  min-height: 36px;
+}
+
+.search:focus {
+  border-color: var(--color-accent-primary);
+}
+
+.list {
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm, 8px);
+  padding: 8px 10px;
+  min-height: 40px;
+  cursor: pointer;
+  text-align: left;
+  color: var(--color-text-secondary);
+}
+
+.option:hover {
+  background: var(--color-hover);
+}
+
+.optionOn {
+  color: var(--color-text-primary);
+}
+
+.box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border: 1px solid var(--color-border-strong, var(--color-border-default));
+  border-radius: 5px;
+  font-size: 12px;
+  color: #fff;
+  line-height: 1;
+}
+
+.boxOn {
+  background: var(--color-accent-primary);
+  border-color: var(--color-accent-primary);
+}
+
+.optLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.optHint {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+
+.empty {
+  padding: 16px;
+  text-align: center;
+  font-size: var(--text-body-sm-size);
+  color: var(--color-text-muted);
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.action {
+  background: none;
+  border: none;
+  color: var(--color-accent-primary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+
+.action:hover:not(:disabled) {
+  background: var(--color-hover);
+}
+
+.action:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.count {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
