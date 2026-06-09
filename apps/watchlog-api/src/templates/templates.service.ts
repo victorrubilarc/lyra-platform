@@ -232,6 +232,9 @@ export class TemplatesService {
     const targetNode = dto.orgNodeId === undefined ? template.orgNodeId : dto.orgNodeId;
     if (targetNode) await this.assertNodeExists(targetNode);
     await this.assertRolesExist(dto);
+    // Valida el binding del flujo (existe/publicado/versión congelada) y que las
+    // claves de estado de sección pertenezcan a esa versión de flujo.
+    const workflowBinding = await this.resolveWorkflowBinding(dto);
 
     const draft = await this.ensureDraft(id);
 
@@ -259,6 +262,9 @@ export class TemplatesService {
               : dto.recurrenceConfig === null
                 ? Prisma.DbNull
                 : (dto.recurrenceConfig as Prisma.InputJsonValue),
+          // Flujo asignado (null = sin flujo). Solo se toca si el cliente lo envía.
+          workflowDefinitionId: workflowBinding === undefined ? undefined : workflowBinding.definitionId,
+          workflowDefinitionVersionId: workflowBinding === undefined ? undefined : workflowBinding.versionId,
         },
       });
 
@@ -383,6 +389,9 @@ export class TemplatesService {
         description: source?.description ?? template.description,
         requireSignature: source?.requireSignature ?? false,
         recurrenceKind: source?.recurrenceKind ?? "NONE",
+        // Preserva el flujo congelado al clonar (editar publicada → nuevo borrador).
+        workflowDefinitionId: source?.workflowDefinitionId ?? null,
+        workflowDefinitionVersionId: source?.workflowDefinitionVersionId ?? null,
       },
     });
 
@@ -502,5 +511,55 @@ export class TemplatesService {
     if (ids.size === 0) return;
     const found = await this.prisma.role.count({ where: { id: { in: [...ids] } } });
     if (found !== ids.size) throw new BadRequestException("Uno o más roles indicados no existen");
+  }
+
+  /**
+   * Resuelve y valida el binding del flujo (Fase 2.2): que exista, esté
+   * PUBLICADO, que la versión a congelar sea la publicada vigente y que cada
+   * `editableInStateKey` de sección sea una clave de estado de esa versión.
+   *
+   * Retorna `undefined` si el cliente no envió el binding (no se toca), o
+   * `{ definitionId, versionId }` con null para "sin flujo" (degradación elegante).
+   */
+  private async resolveWorkflowBinding(
+    dto: SaveTemplateDraftRequest,
+  ): Promise<{ definitionId: string | null; versionId: string | null } | undefined> {
+    if (dto.workflowDefinitionId === undefined && dto.workflowDefinitionVersionId === undefined) {
+      return undefined;
+    }
+    const defId = dto.workflowDefinitionId ?? null;
+
+    if (defId === null) {
+      // Sin flujo: ninguna sección puede declarar un estado editable.
+      const withState = dto.sections.find((s) => s.editableInStateKey);
+      if (withState) {
+        throw new BadRequestException("No se puede asignar un estado a una sección sin un flujo");
+      }
+      return { definitionId: null, versionId: null };
+    }
+
+    const def = await this.prisma.workflowDefinition.findFirst({ where: { id: defId, deletedAt: null } });
+    if (!def) throw new BadRequestException("El flujo indicado no existe");
+    if (def.status !== "PUBLISHED" || !def.currentVersionId) {
+      throw new BadRequestException("El flujo debe estar publicado para asignarse a una plantilla");
+    }
+    const versionId = dto.workflowDefinitionVersionId ?? def.currentVersionId;
+    if (versionId !== def.currentVersionId) {
+      throw new BadRequestException("Solo puede asignarse la versión publicada vigente del flujo");
+    }
+
+    const states = await this.prisma.workflowState.findMany({
+      where: { workflowDefinitionVersionId: versionId },
+      select: { key: true },
+    });
+    const keys = new Set(states.map((s) => s.key));
+    for (const s of dto.sections) {
+      if (s.editableInStateKey && !keys.has(s.editableInStateKey)) {
+        throw new BadRequestException(
+          `La sección "${s.key}" referencia un estado inexistente del flujo: ${s.editableInStateKey}`,
+        );
+      }
+    }
+    return { definitionId: defId, versionId };
   }
 }
