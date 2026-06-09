@@ -25,3 +25,6 @@ export * from "./templates/templates.js";
 
 // Flujos reutilizables (Fase 2.2)
 export * from "./workflows/workflows.js";
+
+// Datos de referencia / Listas (Fase 2.x)
+export * from "./reference-data/reference-data.js";

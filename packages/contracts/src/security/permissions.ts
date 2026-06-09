@@ -279,6 +279,34 @@ export const PERMISSION_CATALOG = [
     group: "workflows",
     description: "Crear, editar, publicar y eliminar flujos.",
   },
+
+  // --- Dimensión 1: módulo de datos de referencia / listas (Fase 2.x) ---
+  {
+    key: "module:referencedata:view",
+    dimension: "MODULE",
+    group: "referencedata",
+    description: "Ver el módulo de datos de referencia (listas de valores).",
+  },
+  {
+    key: "module:referencedata:manage",
+    dimension: "MODULE",
+    group: "referencedata",
+    description: "Administrar el módulo de datos de referencia.",
+  },
+
+  // --- Dimensión 2: acciones — datos de referencia (Fase 2.x) ---
+  {
+    key: "referencelist:view",
+    dimension: "ACTION",
+    group: "referencedata",
+    description: "Listar, ver y resolver listas de referencia y sus ítems.",
+  },
+  {
+    key: "referencelist:manage",
+    dimension: "ACTION",
+    group: "referencedata",
+    description: "Crear, editar y eliminar listas de referencia y sus ítems.",
+  },
 ] as const satisfies readonly PermissionDef[];
 
 /** Unión literal de todas las claves de permiso conocidas. */
