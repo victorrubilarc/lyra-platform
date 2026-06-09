@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { AlertTriangle } from "lucide-react";
 import { Input, Select, Textarea, Toggle } from "@lyra/ui";
 import type { OptionInlineItem } from "@lyra/contracts";
+import { useResolvedReferenceList } from "../reference-data/reference-data-queries.js";
 import type { EditField, EditState } from "./builder-model.js";
 import styles from "./TemplateBuilder.module.css";
 
@@ -30,6 +31,16 @@ function numberState(field: EditField, value: unknown): "ok" | "warn" | "crit" {
 function PreviewField({ field, values, setValue }: { field: EditField; values: Values; setValue: (k: string, v: unknown) => void }) {
   const { t } = useTranslation();
   const v = values[field.key];
+
+  // Opciones del campo: inline en el config, o resueltas desde una Lista de
+  // Referencia (muestra label, guarda code). El hook se llama siempre; con
+  // listKey null la query queda deshabilitada.
+  const src = field.config.optionSource as { kind?: string; listKey?: string } | undefined;
+  const listKey = src?.kind === "referenceList" ? src.listKey || null : null;
+  const resolved = useResolvedReferenceList(listKey);
+  const opts: OptionInlineItem[] = listKey
+    ? (resolved.data ?? []).map((o) => ({ code: o.code, label: o.label }))
+    : options(field);
 
   const label = (
     <label className={styles.previewLabel}>
@@ -79,7 +90,7 @@ function PreviewField({ field, values, setValue }: { field: EditField; values: V
       control = (
         <Select value={(v as string) ?? ""} onChange={(e) => setValue(field.key, e.target.value)}>
           <option value="">—</option>
-          {options(field).map((o) => (
+          {opts.map((o) => (
             <option key={o.code} value={o.code}>
               {o.label}
             </option>
@@ -90,7 +101,7 @@ function PreviewField({ field, values, setValue }: { field: EditField; values: V
     case "MULTISELECT":
       control = (
         <div className={styles.previewChips}>
-          {options(field).map((o) => {
+          {opts.map((o) => {
             const arr = (v as string[]) ?? [];
             const on = arr.includes(o.code);
             return (
