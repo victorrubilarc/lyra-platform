@@ -48,6 +48,7 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Fase 2.x Datos de referencia** (`ReferenceList`/`ReferenceItem` + mantenedor + binding) | `main` (fusionado desde `feat/datos-referencia`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Datos de referencia — UX enterprise** (grilla orden/búsqueda/paginación + `Combobox` + selectores premium) | `main` (fusionado desde `feat/datos-referencia-ux`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Fix recorte de paneles + `LookupPicker`** (flip-up/clamp + diálogo tabla con tokens) | `main` (fusionado desde `feat/datos-referencia-lookup`) | ✅ fusionado y publicado en `origin/main` | ninguna |
+| **Import/Export CSV de Listas** (dry-run→commit + export `;` es-CL) | `main` (fusionado desde `feat/listas-csv`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 
 **Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
@@ -196,9 +197,11 @@ nunca queda más de una sesión atrás.
         cuando exista `LogEntry` (2.4). Ver DECISIONS/PROGRESS 2026-06-09. **Pendiente: smoke VISUAL** (§4).
   - [ ] **Datos de referencia — roadmap industrial** (análisis crítico 2026-06-09, ver DECISIONS; todo ADITIVO,
         cada ítem en su sesión):
-    - [ ] **Import/export CSV masivo de ítems** — **prioridad ALTA**, primer quick-win (upsert por `code`,
-          dry-run/reporte de difs; export con el patrón RFC 4180 de Auditoría). Sin esto el mantenedor no escala
-          más allá de decenas de codes.
+    - [x] **Import/export CSV masivo de ítems** ✅ (2026-06-09). Export `;` es-CL + metadata aplanada
+          `metadata.<clave>`; import dry-run→commit con upsert por `code`, errores por línea, `deactivateMissing`
+          opt-in (nunca borra), tope `REFERENCE_IMPORT_MAX_ROWS` (env), transaccional + auditado. Parser RFC 4180
+          propio con auto-detección de delimitador. Web: Exportar/Importar + modal con preview del diff. Tests:
+          contracts 46, API 110. Ver DECISIONS/PROGRESS 2026-06-09. **Pendiente: smoke VISUAL** (§4).
     - [ ] **Jerarquía de ítems** (`parentId` self-FK) — ALTA-MEDIA (ISO 14224 es jerárquico; áreas→subáreas;
           especies→productos). El picker gana agrupación/árbol.
     - [ ] **Listas dependientes / cascada** (`optionSource.referenceList.filter {byFieldKey, metadataKey}`) —
@@ -395,7 +398,10 @@ probatoria (hash+timestamp). Ref: `DECISIONS.md` (sección de recomendaciones).
       vista previa** sean buscables y escalen con una lista larga. **(Lookup 2026-06-09)** verificar además: el
       `Combobox` cerca del borde inferior abre **hacia arriba** (no se corta); el MULTISELECT con Lista abre el
       **`LookupPicker`** (diálogo con tabla código/etiqueta/metadata, búsqueda, selección con checkbox + confirmar,
-      single clic en fila; tokens removibles con × bajo el campo).
+      single clic en fila; tokens removibles con × bajo el campo). **(CSV 2026-06-09)** verificar además:
+      **Exportar** descarga un CSV que Excel es-CL abre en columnas (`;` + BOM, metadata aplanada); **Importar**
+      (elegir archivo → analizar → reporte con chips/tabla, error con nº de línea → aplicar; checkbox de
+      desactivar ausentes; con errores el botón Aplicar queda deshabilitado).
 - [ ] **Modo claro — QA visual** (nuevo): revisar que TODO el workspace se vea premium en **claro**
       (contraste WCAG, glass, glows, severidades, tablas futuras, drawers/modales) y que `auto` siga al
       sistema. El default es oscuro; el login es siempre oscuro. Ref: DECISIONS 2026-06-06.

@@ -562,11 +562,22 @@ Plantillas/Flujos): valor = **code estable, no label** (patrón dimensión DW / 
   crítico industrial** del módulo (ISO 14224 / RDM / FHIR ConceptMap): base correcta, gaps aditivos registrados como
   **roadmap priorizado** en BACKLOG §2 (CSV import/export = primer quick-win; jerarquía; metadata tipada; cascada y
   resolve paginado con 2.4; crosswalks con Fase 3). Ver DECISIONS 2026-06-09 (2 entradas nuevas).
+- **Import/Export CSV de ítems (sesión 2026-06-09, quick-win 1 del roadmap industrial):** export server-side
+  (BOM UTF-8, **`;` para Excel es-CL**, metadata **aplanada** `metadata.<clave>`, nombre fechado) + import en
+  **2 fases dry-run→commit** (patrón SAP LSMW / Salesforce Data Loader): upsert por `code`, validación por fila con
+  nº de línea (longitudes, duplicados, active/sortOrder, metadata con inferencia de tipos), `deactivateMissing`
+  opt-in (desactiva ausentes, nunca borra), tope `REFERENCE_IMPORT_MAX_ROWS` (env, 5000), commit **transaccional
+  re-validado** (con errores no aplica) y **auditado** con el resumen. Parser RFC 4180 propio (`csv-parse.ts`) con
+  auto-detección de delimitador; `toCsv` ganó parámetro de delimitador (Auditoría intacta). Web: botones
+  Exportar/Importar + modal con preview del diff (chips de summary + tabla paginada). Tests: **contracts 46** ·
+  **API 110** (+13). Smoke en vivo completo (export con metadata; dry-run con error → BD intacta; commit;
+  re-import → unchanged; deactivateMissing). Ver DECISIONS 2026-06-09.
 - **Pendiente**: smoke **VISUAL** en navegador (ver BACKLOG §4): `/datos-referencia` (crear lista, ítems con
   metadata, **buscar/ordenar/paginar** la grilla, filtro de estado, activar/desactivar, orden inline, eliminar) y en
   el Form Builder elegir una Lista en un SELECT (selector buscable) y ver la **vista previa resolver** (SELECT
   `Combobox` con flip-up cerca del borde; MULTISELECT con **`LookupPicker`**: diálogo, tabla, confirmación, tokens
-  con ×); modo claro.
+  con ×); **CSV**: Exportar (abre en Excel es-CL en columnas), Importar (elegir archivo → analizar → reporte →
+  aplicar); modo claro.
 
 ## Próximo paso
 **Fase 2.1 + 2.1.1 + 2.2 + 2.x completas.** **Sesión siguiente = Fase 2.3 · Rondas/`LogPeriod`** (plantilla

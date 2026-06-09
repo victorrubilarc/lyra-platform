@@ -4,6 +4,37 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-09 · Datos de referencia — Import/Export CSV de ítems (implementado)
+
+Primer quick-win del roadmap industrial (ver entrada "mirada crítica"). Patrón **dry-run enterprise** (SAP LSMW /
+Salesforce Data Loader): el archivo NUNCA se aplica a ciegas. Forks confirmados por el usuario (4/4 con la opción
+recomendada):
+
+- **Metadata APLANADA en columnas `metadata.<clave>`** (Excel-friendly; la unión de claves de todos los ítems,
+  orden alfabético; valores no-string → JSON en la celda). Round-trip: lo exportado se reimporta tal cual.
+- **Upsert por `code` + `deactivateMissing` OPT-IN**: por defecto solo crea/actualiza (ausentes intactos); con el
+  checkbox los ítems activos ausentes del archivo se **desactivan** (nunca DELETE — gobernanza del catálogo).
+- **Export con `;` / import auto-detecta `;` o `,`**: Excel es-CL usa `;` como separador de listas; `toCsv` ganó
+  parámetro de delimitador (default `,` → el export de Auditoría queda intacto). Parser RFC 4180 propio
+  (`common/csv-parse.ts`, sin dependencias): comillas dobladas, delimitadores/saltos DENTRO de celda, BOM, CRLF/LF.
+- **Tope `REFERENCE_IMPORT_MAX_ROWS=5000` por env** (env.schema + .env.example): 5k filas ≈ 400 KB < bodyLimit
+  1 MB de Fastify; catálogos mayores van por el sync de Fase 3. El CSV viaja como TEXTO en el body JSON (el cliente
+  lo lee con FileReader) → **sin dependencia multipart**.
+- **Flujo en 2 fases**: `POST /reference-lists/:id/import` con `dryRun:true` parsea + valida (cabecera: code/label
+  requeridos, columnas desconocidas → 400 claro; por fila: longitudes, duplicados en archivo, active/sortOrder,
+  metadata con inferencia de tipos y JSON inválido → error con **nº de línea**) y devuelve el **reporte de diff**
+  (create/update/unchanged/deactivate/error + `changes` por campo) SIN escribir. El commit **re-valida todo** (no
+  confía en ningún preview), con errores **no aplica nada**, escribe en **transacción** y audita
+  (`referencelist.imported` con el summary). Comparación de metadata por **JSON canónico** (claves ordenadas).
+- **Export** `GET /reference-lists/:id/export` (gate `referencelist:view`; el import gate `referencelist:manage`):
+  CSV BOM UTF-8 + `Content-Disposition` fechado, mismo molde que Auditoría.
+- **Web**: botones Exportar/Importar en el panel de detalle; modal de 2 pasos (archivo + checkbox → analizar →
+  summary en chips + tabla paginada del reporte → aplicar, deshabilitado con errores).
+- **Verificado**: typecheck/lint/build web (1927 módulos)/test (**contracts 46** +2 · **API 110** +13: 6 del parser,
+  7 de import/export) + **smoke en vivo** (export de `failure-modes` con metadata aplanada; dry-run con fila errónea
+  → BD intacta; commit → metadata persistida; re-import idéntico → todo `unchanged`; `deactivateMissing` desactiva
+  el ausente). Datos de prueba limpiados (hard-delete de la lista smoke).
+
 ### 2026-06-09 · Datos de referencia — mirada crítica industrial (roadmap; análisis pedido por el usuario)
 
 Revisión contra lo que exige la industria multi-rubro (minería, madera/remanufactura, energía, manufactura),
