@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Checkbox, FormField, Input, Select, Textarea, Toggle } from "@lyra/ui";
+import { Checkbox, FormField, Input, MultiSelect, Select, Textarea, Toggle } from "@lyra/ui";
 import type { OptionInlineItem, RoleSummary, WorkflowStateDto } from "@lyra/contracts";
 import { fieldTypeMeta, slugifyKey, type EditField, type EditSection } from "./builder-model.js";
 import styles from "./TemplateBuilder.module.css";
@@ -204,23 +204,18 @@ export function BuilderConfigPanel({
           {roles.length === 0 ? (
             <p className={styles.modeledNote}>{t("templates.builder.noRoles")}</p>
           ) : (
-            <div className={styles.rolesList}>
-              {roles.map((r) => (
-                <div key={r.id} className={styles.inlineCheck}>
-                  <Checkbox
-                    checked={field.roleIds.includes(r.id)}
-                    label={r.name}
-                    onChange={(checked) =>
-                      onUpdateField({
-                        roleIds: checked
-                          ? [...field.roleIds, r.id]
-                          : field.roleIds.filter((x) => x !== r.id),
-                      })
-                    }
-                  />
-                </div>
-              ))}
-            </div>
+            <MultiSelect
+              options={roles.map((r) => ({ value: r.id, label: r.name, hint: r.key }))}
+              value={field.roleIds}
+              onChange={(ids) => onUpdateField({ roleIds: ids })}
+              ariaLabel={t("templates.builder.fieldRoles")}
+              placeholder={t("templates.builder.fieldRolesPlaceholder")}
+              searchPlaceholder={t("common.search")}
+              selectAllLabel={t("common.selectAll")}
+              clearLabel={t("common.clear")}
+              noMatchText={t("common.noResults")}
+              emptyText={t("templates.builder.noRoles")}
+            />
           )}
         </div>
       </div>
@@ -252,26 +247,18 @@ export function BuilderConfigPanel({
           {roles.length === 0 ? (
             <p className={styles.modeledNote}>{t("templates.builder.noRoles")}</p>
           ) : (
-            <div className={styles.rolesList}>
-              {roles.map((r) => {
-                const on = section.roleIds.includes(r.id);
-                return (
-                  <div key={r.id} className={styles.inlineCheck}>
-                    <Checkbox
-                      checked={on}
-                      label={r.name}
-                      onChange={(checked) =>
-                        onUpdateSection({
-                          roleIds: checked
-                            ? [...section.roleIds, r.id]
-                            : section.roleIds.filter((x) => x !== r.id),
-                        })
-                      }
-                    />
-                  </div>
-                );
-              })}
-            </div>
+            <MultiSelect
+              options={roles.map((r) => ({ value: r.id, label: r.name, hint: r.key }))}
+              value={section.roleIds}
+              onChange={(ids) => onUpdateSection({ roleIds: ids })}
+              ariaLabel={t("templates.builder.sectionRoles")}
+              placeholder={t("templates.builder.rolesPlaceholder")}
+              searchPlaceholder={t("common.search")}
+              selectAllLabel={t("common.selectAll")}
+              clearLabel={t("common.clear")}
+              noMatchText={t("common.noResults")}
+              emptyText={t("templates.builder.noRoles")}
+            />
           )}
         </div>
 

@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, ArrowRight, ChevronDown, ChevronRight, Info, ListChecks, PlayCircle, Plus, Save, Trash2, TriangleAlert } from "lucide-react";
-import { Button, Card, Checkbox, Chip, FormField, Input, Modal, Select, Textarea, Toggle, useToast } from "@lyra/ui";
+import { Button, Card, Checkbox, Chip, FormField, Input, Modal, MultiSelect, Select, Textarea, Toggle, useToast } from "@lyra/ui";
 import { validateWorkflowMachine, type WorkflowDetail } from "@lyra/contracts";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { fetchRoles } from "../security/security-api.js";
@@ -33,7 +33,7 @@ export function WorkflowBuilder({ detail }: { detail: WorkflowDetail }) {
   const [wf, setWf] = useState<EditWorkflow>(() => detailToEditWorkflow(detail));
   const [dirty, setDirty] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
-  const [summaryOpen, setSummaryOpen] = useState(true);
+  const [summaryOpen, setSummaryOpen] = useState(false);
 
   const save = useSaveWorkflowDraft();
   const publish = usePublishWorkflow();
@@ -424,21 +424,19 @@ export function WorkflowBuilder({ detail }: { detail: WorkflowDetail }) {
                   {roles.length === 0 ? (
                     <p className={styles.modeledNote}>{t("workflows.builder.noRoles")}</p>
                   ) : (
-                    <div className={styles.rolesList}>
-                      {roles.map((r) => (
-                        <Checkbox
-                          key={r.id}
-                          checked={tr.roleIds.includes(r.id)}
-                          disabled={!canEdit}
-                          label={r.name}
-                          onChange={(checked) =>
-                            updateTransition(tr.uid, {
-                              roleIds: checked ? [...tr.roleIds, r.id] : tr.roleIds.filter((x) => x !== r.id),
-                            })
-                          }
-                        />
-                      ))}
-                    </div>
+                    <MultiSelect
+                      options={roles.map((r) => ({ value: r.id, label: r.name, hint: r.key }))}
+                      value={tr.roleIds}
+                      disabled={!canEdit}
+                      onChange={(ids) => updateTransition(tr.uid, { roleIds: ids })}
+                      ariaLabel={t("workflows.builder.allowedRoles")}
+                      placeholder={t("workflows.builder.rolesPlaceholder")}
+                      searchPlaceholder={t("common.search")}
+                      selectAllLabel={t("common.selectAll")}
+                      clearLabel={t("common.clear")}
+                      noMatchText={t("common.noResults")}
+                      emptyText={t("workflows.builder.noRoles")}
+                    />
                   )}
                 </div>
               </div>
