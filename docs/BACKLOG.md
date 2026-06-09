@@ -45,6 +45,7 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Fase 2.1 Plantillas** (modelo definición + contratos + Form Builder) | `main` (fusionado desde `feat/plantillas`) | ✅ fusionado y publicado en `origin/main` (`a440f54`) | ninguna |
 | **Fase 2.1.1 Endurecimiento de modelo** (campo en 3 capas + `optionSource`) | `main` (fusionado desde `feat/plantillas-2.1.1`) | ✅ fusionado y publicado en `origin/main` (`365e31f`) | ninguna |
 | **Fase 2.2 Flujos reutilizables** (`WorkflowDefinition` + mantenedor + binding) | `main` (fusionado desde `feat/workflows`) | ✅ fusionado y publicado en `origin/main` | ninguna |
+| **Fase 2.x Datos de referencia** (`ReferenceList`/`ReferenceItem` + mantenedor + binding) | `main` (fusionado desde `feat/datos-referencia`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 
 **Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
@@ -181,12 +182,16 @@ nunca queda más de una sesión atrás.
         desde `type`). Form Builder: editor inline `code/label` + toggle "Fecha efectiva". **`LogEntry` diferido 100%
         a 2.4** (solo diseño en DATA_MODEL/DECISIONS; crear tablas nuevas es aditivo). Tests: contracts 23, API 78.
         Smoke en vivo OK. **Pendiente: smoke VISUAL** (§4). Ver PROGRESS y DECISIONS 2026-06-09.
-  - [ ] **2.x Datos de referencia / Listas (módulo nuevo, hermano de Estructura/Seguridad).** Mantenedor de
-        **`ReferenceList`** + **`ReferenceItem`** (`code` estable + `label` + `active` + `sortOrder` +
-        **`metadata` jsonb** enriquecido), permiso `referencelist:manage`, auditado. Binding de SELECT/MULTISELECT
-        a una lista (`optionSource.referenceList`). El **sync desde APIs externas** (alimentar/persistir una lista
-        desde ERP/MES/RRHH) es **Fase 3 (Orígenes de datos)**. Ubicar antes o junto al llenado (2.4 guarda codes).
-        Ver DECISIONS 2026-06-09 (patrón FHIR ValueSet / dimensión de DW; guardar code, no label).
+  - [x] **2.x Datos de referencia / Listas (módulo nuevo, hermano de Estructura/Seguridad).** ✅ (2026-06-09).
+        Mantenedor de **`ReferenceList`** + **`ReferenceItem`** (`code` estable + `label` + `active` + `sortOrder` +
+        **`metadata` jsonb**), catálogo **gobernado** (NO versionado-inmutable). 4 permisos nuevos
+        (`module:referencedata:view/manage` + `referencelist:view/manage`, catálogo **41**), auditado. Binding REAL
+        de SELECT/MULTISELECT a una lista (`optionSource.referenceList.listKey` por clave, validado en
+        `saveDraft`); la vista previa **resuelve** opciones (muestra label, guarda code). Guard "en uso" al borrar
+        lista. Mantenedor master-detail `/datos-referencia` + Form Builder (selector de fuente inline↔lista). Seed
+        demo `failure-modes` (ISO 14224) + `shifts`. Tests: contracts 44, API 97. El **sync desde APIs externas**
+        sigue en **Fase 3** (`source=EXTERNAL` solo modelado); el **hard-delete de ítem con code en uso** se guarda
+        cuando exista `LogEntry` (2.4). Ver DECISIONS/PROGRESS 2026-06-09. **Pendiente: smoke VISUAL** (§4).
   - [x] **2.2 Flujos reutilizables (`WorkflowDefinition`):** ✅ (2026-06-09). Mantenedor propio (catálogo estilo
         Plantillas) — `WorkflowDefinition` 1—N `WorkflowDefinitionVersion` (inmutable) → estados + transiciones +
         **roles por transición (dato)** + firma/`signatureMeaning`/MFA opt-in; versionado/congelable. `validateWorkflowMachine`
@@ -357,6 +362,13 @@ probatoria (hash+timestamp). Ref: `DECISIONS.md` (sección de recomendaciones).
       **Guardar borrador** y **Publicar** (congela versión), editar publicada (clona borrador), borrar (bloqueado si
       en uso); en el **Form Builder**: asignar un flujo publicado, mapear secciones→estados editables, editar el
       **override de rol por campo**; modo claro. App en `:5173`.
+- [ ] **Datos de referencia 2.x — smoke VISUAL en navegador** (se verificó typecheck/lint/build/test + smoke por
+      API; falta el clic): `/datos-referencia` (lista de Listas + buscador), crear lista (drawer: key/nombre/descr/
+      activo/orden), seleccionar lista → grilla de ítems; agregar ítem (code/label/orden + **metadata key-value**),
+      **activar/desactivar** ítem, **orden inline**, editar, eliminar (modal); editar/eliminar lista (bloqueada si en
+      uso). En el **Form Builder**: en un SELECT/MULTISELECT cambiar la fuente a **Lista de Referencia**, elegir
+      `failure-modes`, y verificar que la **vista previa resuelve** las opciones (muestra label, guarda code); guardar/
+      publicar; modo claro. App en `:5173`.
 - [ ] **Modo claro — QA visual** (nuevo): revisar que TODO el workspace se vea premium en **claro**
       (contraste WCAG, glass, glows, severidades, tablas futuras, drawers/modales) y que `auto` siga al
       sistema. El default es oscuro; el login es siempre oscuro. Ref: DECISIONS 2026-06-06.

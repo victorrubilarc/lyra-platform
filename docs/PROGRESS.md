@@ -1,10 +1,10 @@
 # Progreso — Lyra WatchLog
 
-Última actualización: 2026-06-09 (**Fase 1 completa**; **Fase 2.1 ✅** + **Fase 2.1.1 ✅** + **Fase 2.2 ✅** —
-Plantillas: modelo de DEFINICIÓN + campo en 3 capas + `optionSource` + Form Builder; **Flujos reutilizables
-`WorkflowDefinition`**: máquina de estados versionable/congelable + mantenedor propio + binding a versiones de
-plantilla y secciones→estados + override de rol por campo). **Siguiente: Fase 2.x — Datos de referencia / Listas
-(`ReferenceList`/`ReferenceItem`)** (o 2.3 Rondas, según prioridad).
+Última actualización: 2026-06-09 (**Fase 1 completa**; **Fase 2.1 ✅** + **Fase 2.1.1 ✅** + **Fase 2.2 ✅** +
+**Fase 2.x ✅** — Plantillas: modelo de DEFINICIÓN + campo en 3 capas + `optionSource` + Form Builder; **Flujos
+reutilizables `WorkflowDefinition`**; **Datos de referencia `ReferenceList`/`ReferenceItem`**: catálogo gobernado +
+mantenedor propio `/datos-referencia` + binding real de `optionSource.referenceList`). **Siguiente: Fase 2.3 — Rondas
+(`LogPeriod`)** o **2.4 Llenado**, según prioridad.
 
 ## Estado por fase
 
@@ -12,7 +12,7 @@ plantilla y secciones→estados + override de rol por campo). **Siguiente: Fase 
 |---|---|---|
 | 0 | **Cimientos** (monorepo, Docker, Design System tokens, contratos, API health) | ✅ Hecho |
 | 1 | Seguridad (auth + RBAC/ABAC) + Estructura organizacional + AuditLog | ✅ Backend ✅ · UI: Login ✅ · **Estructura ✅ (+ Equipos ✅)** · **Seguridad ✅** |
-| 2 | Plantillas / Form Builder + Bitácoras | 🔄 **2.1 ✅** + **2.1.1 ✅** + **2.2 ✅** (Form Builder + Flujos reutilizables) · 2.3–2.7 pendientes |
+| 2 | Plantillas / Form Builder + Bitácoras | 🔄 **2.1 ✅** + **2.1.1 ✅** + **2.2 ✅** + **2.x ✅** (Form Builder + Flujos + Datos de referencia) · 2.3–2.7 pendientes |
 | 3 | Orígenes de datos | ⬜ Pendiente |
 | 4 | Motor de incidencias | ⬜ Pendiente |
 | 5 | Cambio de turno + IA (resumen) | ⬜ Pendiente |
@@ -513,10 +513,48 @@ DEFINICIÓN (la ejecución sigue diferida a 2.4/2.5). Ver DECISIONS 2026-06-09 (
   transiciones/roles/firma/MFA, validación en vivo, publicar), y en el Form Builder asignar flujo + mapear
   secciones→estados + override de rol por campo; modo claro.
 
+## Hecho en Fase 2.x (Datos de referencia / Listas — `ReferenceList`/`ReferenceItem`)
+
+Hace REAL el `optionSource.referenceList` de 2.1.1. Catálogo **gobernado** (NO versionado-inmutable como
+Plantillas/Flujos): valor = **code estable, no label** (patrón dimensión DW / FHIR Coding). Ver DECISIONS
+2026-06-09 ("Fase 2.x implementado"). Rama `feat/datos-referencia`, 5 commits.
+
+- **Contratos** (`@lyra/contracts/reference-data`): `ReferenceList`/`ReferenceListDetail`/`ReferenceItem` +
+  `ReferenceSource` (MANUAL|EXTERNAL) + `key` slug estable + `metadata` jsonb freeform + DTOs/requests CRUD +
+  **`ResolvedOption`** (code/label/metadata) para el preview/llenado. **+5 specs**.
+- **Permisos** (catálogo **37→41**): `module:referencedata:view/manage` + `referencelist:view/manage`. El seed los
+  asigna al rol admin (itera el catálogo, sin código nuevo).
+- **Prisma** (migración aditiva `20260609205303_add_reference_data`): `ReferenceList` (key único + active + sortOrder
+  + `deletedAt` lógico) 1—N `ReferenceItem` (`@@unique([listId, code])` + metadata jsonb, FK `onDelete: Cascade`).
+  Aplicada con `migrate deploy` (esquiva el EPERM del DLL con el watch).
+- **Backend** `ReferenceListsModule` (`/reference-lists`): CRUD de listas e ítems gateado/auditado (molde
+  `EquipmentService`, NO Template); `GET :idOrKey/resolve` (ítems activos ordenados); **guard "en uso"** al borrar
+  lista (consulta JSONB de `TemplateField.config`); P2002 → 400 (key/code duplicado). `TemplatesService.saveDraft`
+  **valida el binding** (cada `optionSource.referenceList.listKey` apunta a una lista viva), espejo del binding de
+  flujo. **+8 tests** (`ReferenceListsService`).
+- **Web** `features/reference-data`: capa de datos TanStack Query + **mantenedor master-detail** (`ResizableSplit`):
+  lista de Listas + panel de detalle con grilla de ítems (activar/desactivar, **orden inline**, editar, eliminar);
+  **drawers** de lista e ítem (con **editor de metadata key-value** que infiere número/booleano/texto). Navegación
+  `/datos-referencia` gateada por `module:referencedata:view`, i18n namespace `referenceData`. **Form Builder**
+  ampliado: SELECT/MULTISELECT con selector de **fuente** (inline ↔ Lista de Referencia); la **vista previa resuelve**
+  opciones desde la lista (muestra label, guarda code). **Degradación elegante:** un SELECT inline sigue idéntico.
+- **Seed demo** (dev): `failure-modes` (8 modos ISO 14224 con metadata `isoCategory`) + `shifts` (3 turnos),
+  idempotente. Fuente única `prisma/reference-data-seed.ts`.
+- **Verificación**: typecheck (6 paquetes)/lint (0 errores; 1 warning preexistente en OrgTree)/build web (**1921**
+  módulos; API NO se buildea por el watch)/test (**contracts 44** +5 · permissions 5 · **API 97** +8) en verde.
+  **Smoke en vivo** (demo): CRUD lista/ítem; key duplicada 400; code duplicado por lista 400; resolve excluye
+  inactivos y conserva metadata; binding en `saveDraft` (listKey inexistente 400 / válido 200); lista EN USO no se
+  borra 400; seed resuelve (failure-modes 8 ítems + metadata, shifts 3). Datos ad-hoc limpiados; listas del seed
+  quedan como demo dev-only.
+- **Pendiente**: smoke **VISUAL** en navegador (ver BACKLOG §4): `/datos-referencia` (crear lista, ítems con
+  metadata, activar/desactivar, orden inline, eliminar) y en el Form Builder elegir una Lista en un SELECT y ver la
+  vista previa resolver; modo claro.
+
 ## Próximo paso
-**Fase 2.1 + 2.1.1 + 2.2 completas.** **Sesión siguiente = Fase 2.x · Datos de referencia / Listas
-(`ReferenceList`/`ReferenceItem`)** — mantenedor hermano de Estructura/Seguridad + binding del `optionSource.referenceList`
-(o **2.3 Rondas/`LogPeriod`** según prioridad). Ver BACKLOG §2.
+**Fase 2.1 + 2.1.1 + 2.2 + 2.x completas.** **Sesión siguiente = Fase 2.3 · Rondas/`LogPeriod`** (plantilla
+recurrente turno/intervalo/calendario; cada ocurrencia abre un `LogEntry`) **o 2.4 Llenado** (Nueva entrada
+multi-actor: secciones por estado+rol, guarda codes/refs + campos de sistema + `effectiveAt`), según prioridad.
+Ver BACKLOG §2.
 
 **Mejora futura registrada (BACKLOG §2):** seguridad a nivel de nodo en el mantenedor de Estructura (ABAC
 enterprise: asignar usuarios/roles a nodos desde el propio árbol, "quién accede a este nodo"). El modelo ya
