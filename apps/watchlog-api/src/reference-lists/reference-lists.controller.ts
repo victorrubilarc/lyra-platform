@@ -8,15 +8,18 @@ import {
   Patch,
   Post,
   Req,
+  Res,
 } from "@nestjs/common";
-import type { FastifyRequest } from "fastify";
+import type { FastifyReply, FastifyRequest } from "fastify";
 import {
   createReferenceItemRequestSchema,
   createReferenceListRequestSchema,
+  referenceImportRequestSchema,
   updateReferenceItemRequestSchema,
   updateReferenceListRequestSchema,
   type CreateReferenceItemRequest,
   type CreateReferenceListRequest,
+  type ReferenceImportRequest,
   type UpdateReferenceItemRequest,
   type UpdateReferenceListRequest,
 } from "@lyra/contracts";
@@ -49,6 +52,29 @@ export class ReferenceListsController {
   @RequirePermission("referencelist:view")
   resolve(@Param("idOrKey") idOrKey: string) {
     return this.lists.resolve(idOrKey);
+  }
+
+  /** Exporta los ítems de la lista a CSV (";" para Excel es-CL, BOM UTF-8). */
+  @Get(":id/export")
+  @RequirePermission("referencelist:view")
+  async exportCsv(@Param("id") id: string, @Res() reply: FastifyReply): Promise<void> {
+    const { filename, csv } = await this.lists.exportCsv(id);
+    await reply
+      .header("Content-Type", "text/csv; charset=utf-8")
+      .header("Content-Disposition", `attachment; filename="${filename}"`)
+      .send(csv);
+  }
+
+  /** Import CSV con upsert por code: dry-run (reporte sin escribir) o commit. */
+  @Post(":id/import")
+  @RequirePermission("referencelist:manage")
+  importCsv(
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(referenceImportRequestSchema)) dto: ReferenceImportRequest,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.lists.importCsv(id, dto, this.ctx(user, req));
   }
 
   @Post()
