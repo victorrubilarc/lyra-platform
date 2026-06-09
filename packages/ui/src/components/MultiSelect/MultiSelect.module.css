@@ -124,6 +124,8 @@
 }
 
 .list {
+  flex: 1;
+  min-height: 0;
   max-height: 240px;
   overflow-y: auto;
   padding: 4px;

@@ -1,0 +1,163 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+/* ── Trigger (estilo input con icono de búsqueda) ───────────────────────── */
+.trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--color-hover);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  padding: 7px 12px;
+  font-family: var(--font-body);
+  font-size: var(--text-body-size);
+  min-height: 44px;
+  cursor: pointer;
+  text-align: left;
+  transition: var(--transition-border), box-shadow 0.2s ease;
+}
+
+.trigger:focus-visible {
+  outline: none;
+  border-color: var(--color-accent-primary);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.18);
+}
+
+.trigger.disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.triggerLabel {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.placeholder {
+  color: var(--color-text-muted);
+}
+
+.triggerIcon {
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+/* ── Tokens (selección vigente, removibles) ─────────────────────────────── */
+.tokens {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.token {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-text-primary);
+  background: var(--color-bg-surface-2);
+  border: 1px solid var(--color-border-default);
+  border-radius: 99px;
+  padding: 3px 6px 3px 10px;
+  max-width: 100%;
+}
+
+.tokenCode {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 10px;
+  color: var(--color-text-muted);
+}
+
+.tokenRemove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 99px;
+  background: none;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tokenRemove:hover {
+  background: var(--color-hover);
+  color: var(--color-text-primary);
+}
+
+/* ── Diálogo ────────────────────────────────────────────────────────────── */
+.dialogBody {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.codeCell {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  color: var(--color-text-primary);
+}
+
+.detailCell {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.empty {
+  padding: 24px;
+  text-align: center;
+  font-size: var(--text-body-sm-size);
+  color: var(--color-text-muted);
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.footerDraft {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.footerActions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.clearAll {
+  background: none;
+  border: none;
+  color: var(--color-accent-primary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+
+.clearAll:hover {
+  background: var(--color-hover);
+}

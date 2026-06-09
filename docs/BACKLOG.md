@@ -47,6 +47,7 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Fase 2.2 Flujos reutilizables** (`WorkflowDefinition` + mantenedor + binding) | `main` (fusionado desde `feat/workflows`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Fase 2.x Datos de referencia** (`ReferenceList`/`ReferenceItem` + mantenedor + binding) | `main` (fusionado desde `feat/datos-referencia`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Datos de referencia — UX enterprise** (grilla orden/búsqueda/paginación + `Combobox` + selectores premium) | `main` (fusionado desde `feat/datos-referencia-ux`) | ✅ fusionado y publicado en `origin/main` | ninguna |
+| **Fix recorte de paneles + `LookupPicker`** (flip-up/clamp + diálogo tabla con tokens) | `main` (fusionado desde `feat/datos-referencia-lookup`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 
 **Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
@@ -193,6 +194,25 @@ nunca queda más de una sesión atrás.
         demo `failure-modes` (ISO 14224) + `shifts`. Tests: contracts 44, API 97. El **sync desde APIs externas**
         sigue en **Fase 3** (`source=EXTERNAL` solo modelado); el **hard-delete de ítem con code en uso** se guarda
         cuando exista `LogEntry` (2.4). Ver DECISIONS/PROGRESS 2026-06-09. **Pendiente: smoke VISUAL** (§4).
+  - [ ] **Datos de referencia — roadmap industrial** (análisis crítico 2026-06-09, ver DECISIONS; todo ADITIVO,
+        cada ítem en su sesión):
+    - [ ] **Import/export CSV masivo de ítems** — **prioridad ALTA**, primer quick-win (upsert por `code`,
+          dry-run/reporte de difs; export con el patrón RFC 4180 de Auditoría). Sin esto el mantenedor no escala
+          más allá de decenas de codes.
+    - [ ] **Jerarquía de ítems** (`parentId` self-FK) — ALTA-MEDIA (ISO 14224 es jerárquico; áreas→subáreas;
+          especies→productos). El picker gana agrupación/árbol.
+    - [ ] **Listas dependientes / cascada** (`optionSource.referenceList.filter {byFieldKey, metadataKey}`) —
+          MEDIA, **diseñar con 2.4** (subárea según área; modo de falla según clase de equipo).
+    - [ ] **Atributos tipados por lista** (`ReferenceList.metadataSchema` jsonb que valida ítems) — MEDIA
+          (gobierno RDM: metadata consistente para reportes).
+    - [ ] **Vigencia por ítem** (`validFrom`/`validTo`; resolve filtra por fecha) — MEDIA (contratistas, normativas).
+    - [ ] **Mapeo de códigos externos por ítem** (crosswalk/ConceptMap; `systemKey`+`externalCode`) — con **Fase 3**
+          (motor de sync `source=EXTERNAL`).
+    - [ ] **Deprecación con reemplazo** (`replacedByCode`) — BAJA-MEDIA (reportes puente al sucesor).
+    - [ ] **Resolve server-side con búsqueda+paginación** para listas 5k+ — MEDIA, con 2.4/Fase 3 (hoy el resolve
+          completo es correcto hasta ~1k ítems).
+    - [ ] **i18n de labels** (Fase 7) · **presentación semántica por ítem** (color/icono/abreviatura) — formalizar
+          si el patrón se repite (la metadata ya puede llevarlo).
   - [x] **2.2 Flujos reutilizables (`WorkflowDefinition`):** ✅ (2026-06-09). Mantenedor propio (catálogo estilo
         Plantillas) — `WorkflowDefinition` 1—N `WorkflowDefinitionVersion` (inmutable) → estados + transiciones +
         **roles por transición (dato)** + firma/`signatureMeaning`/MFA opt-in; versionado/congelable. `validateWorkflowMachine`
@@ -372,7 +392,10 @@ probatoria (hash+timestamp). Ref: `DECISIONS.md` (sección de recomendaciones).
       publicar; modo claro. App en `:5173`. **(UX enterprise 2026-06-09)** verificar además: en la grilla de ítems el
       **buscador**, el **filtro de estado**, el **ordenamiento por columnas**, la **paginación** y la metadata en
       chips; en el Form Builder el **selector de Lista buscable (`Combobox`)** y que el **SELECT/MULTISELECT de la
-      vista previa** sean buscables y escalen con una lista larga.
+      vista previa** sean buscables y escalen con una lista larga. **(Lookup 2026-06-09)** verificar además: el
+      `Combobox` cerca del borde inferior abre **hacia arriba** (no se corta); el MULTISELECT con Lista abre el
+      **`LookupPicker`** (diálogo con tabla código/etiqueta/metadata, búsqueda, selección con checkbox + confirmar,
+      single clic en fila; tokens removibles con × bajo el campo).
 - [ ] **Modo claro — QA visual** (nuevo): revisar que TODO el workspace se vea premium en **claro**
       (contraste WCAG, glass, glows, severidades, tablas futuras, drawers/modales) y que `auto` siga al
       sistema. El default es oscuro; el login es siempre oscuro. Ref: DECISIONS 2026-06-06.

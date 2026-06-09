@@ -4,6 +4,60 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-09 · Datos de referencia — mirada crítica industrial (roadmap; análisis pedido por el usuario)
+
+Revisión contra lo que exige la industria multi-rubro (minería, madera/remanufactura, energía, manufactura),
+anclada en **ISO 14224** (taxonomías jerárquicas de equipos/fallas), **Reference Data Management** (IBM/Informatica:
+atributos tipados, jerarquías, mapeos, vigencia), **FHIR ValueSet/ConceptMap** (codes inactivos, crosswalks) y la
+práctica de SAP/Oracle (LOVs dependientes, validez por fechas). Conclusión: **la base es correcta** (code estable +
+metadata jsonb + gobernanza activar/desactivar cubren el 80%), y los gaps reales son **aditivos** (no exigen
+re-migrar). Prioridades fijadas (implementación: cada una en su sesión, BACKLOG §2):
+
+1. **Import/export CSV masivo de ítems** (ALTA — el gap más real): una planta carga cientos/miles de codes desde
+   Excel/ERP; el alta uno-a-uno no escala. Export ya tiene patrón (Auditoría RFC 4180); import = upsert por `code`
+   con dry-run/reporte de difs. **Primer quick-win candidato.**
+2. **Jerarquía de ítems** (`parentId` self-FK, ALTA-MEDIA): ISO 14224 es jerárquico (categoría→subcategoría→modo);
+   áreas→subáreas; especies→productos madereros. Aditivo; el picker gana agrupación/árbol.
+3. **Listas dependientes / cascada** (MEDIA, **diseñar con 2.4**): filtrar opciones por el valor de OTRO campo
+   (subárea según área; modo de falla según clase del equipo). Modelable como
+   `optionSource.referenceList.filter: { byFieldKey, metadataKey }` — necesita el motor de llenado para validarse.
+4. **Atributos tipados por lista** (MEDIA): hoy la metadata es key-value libre (flexible pero sin gobierno);
+   RDM define el **esquema de atributos por dominio**. `ReferenceList.metadataSchema` (jsonb) que valida los ítems
+   al guardar → reportes consistentes sin basura.
+5. **Vigencia por ítem** (`validFrom`/`validTo`, MEDIA): contratistas, normativas, reactivos con caducidad. Aditivo;
+   el resolve filtra por fecha efectiva.
+6. **Mapeo de códigos externos por ítem** (MEDIA-ALTA pero **atada a Fase 3**): el code interno ≠ el ID de SAP/MES
+   (patrón ConceptMap/crosswalk). Tabla `ReferenceItemMapping(systemKey, externalCode)` o reuso de
+   `ExternalReference`; se decide junto al motor de sync (`source=EXTERNAL`).
+7. **Deprecación con reemplazo** (`replacedByCode`, BAJA-MEDIA): cuando un code se retira, los reportes puentean al
+   sucesor (patrón SCD/ConceptMap).
+8. **Resolve server-side con búsqueda+paginación** (MEDIA, con 2.4/Fase 3): hoy el resolve trae la lista completa
+   (correcto hasta ~1k ítems); para 5k+ el picker debe buscar en servidor.
+9. **i18n de labels** (Fase 7) y **presentación semántica por ítem** (color/icono/abreviatura — la metadata ya puede
+   llevarlo hoy; se formaliza si se repite el patrón).
+
+**Decisión:** NO se migra nada ahora (todo es aditivo cuando toque); se registra el roadmap priorizado en BACKLOG §2.
+El orden recomendado: CSV import/export (sesión propia) → jerarquía → tipado de metadata; cascada y resolve paginado
+se diseñan con 2.4; mapeos externos con Fase 3.
+
+### 2026-06-09 · UI — fix de recorte de paneles flotantes + primitivo `LookupPicker` (patrón Value Help)
+
+Hallazgo del smoke visual del usuario: el panel del `Combobox` en la **vista previa** del Form Builder se salía del
+viewport (siempre abría hacia abajo). Fix en `@lyra/ui`: **`panelPlacement`** compartido — el panel abre hacia
+**arriba** cuando no hay espacio debajo y **acota su altura** al espacio disponible; aplicado a `Combobox` y
+`MultiSelect` (mismo defecto latente).
+
+Además, segundo pedido: un objeto de selección **más potente que un combo** para listas grandes. Investigado el
+patrón de las grandes plataformas — **SAP Fiori "Value Help Dialog"**, **Salesforce Lookup**, **Oracle popup LOV**,
+Dynamics lookup — el patrón común es: trigger compacto → **diálogo con búsqueda + tabla** (columnas ricas, paginada)
+→ selección **borrador** con checkbox que se aplica **al confirmar** (en single, el clic confirma y cierra) →
+selección vigente visible como **tokens removibles con ×** bajo el campo. Nuevo primitivo **`LookupPicker`** en
+`@lyra/ui` (compone Modal + Table + Input + Checkbox existentes; columnas código/etiqueta/detalle, sortable +
+paginada + búsqueda sin acentos). **Aplicación:** en la vista previa, un MULTISELECT ligado a una **Lista de
+Referencia** usa `LookupPicker` (la metadata aparece como columna de detalle — ahí se justifica la tabla); el
+MULTISELECT inline corto mantiene el `MultiSelect` y el SELECT mantiene `Combobox` (más ágil para selección única).
+En 2.4, la elección del widget podrá hacerse configurable por campo (capa de presentación).
+
 ### 2026-06-09 · Datos de referencia — endurecimiento UX (grilla enterprise + `Combobox`)
 
 Pulido pedido por el usuario tras 2.x, antes de avanzar de fase. Decisiones:

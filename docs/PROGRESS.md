@@ -553,10 +553,20 @@ Plantillas/Flujos): valor = **code estable, no label** (patrón dimensión DW / 
   MULTISELECT→`MultiSelect`) pasan a objetos premium que **escalan a listas largas**. Ver DECISIONS 2026-06-09
   ("endurecimiento UX"). Verificado: typecheck/lint (0 errores)/build web (**1923** módulos)/test (contracts 44 ·
   permissions 5 · API 97) + resolve en vivo OK.
+- **Fix + LookupPicker (mismo día, hallazgo del smoke visual del usuario):** los paneles de `Combobox`/`MultiSelect`
+  se **cortaban** al borde del viewport (siempre abrían hacia abajo) → `panelPlacement` compartido con **flip-up**
+  + clamp de altura. Nuevo primitivo **`@lyra/ui` `LookupPicker`** (patrón **SAP Value Help / Salesforce Lookup**):
+  diálogo con búsqueda + **tabla paginada/sortable** (código/etiqueta/detalle) + selección borrador con checkbox
+  aplicada al confirmar + **tokens removibles con ×** bajo el campo. La vista previa de un MULTISELECT ligado a una
+  Lista usa `LookupPicker` (metadata como columna detalle); inline corto mantiene `MultiSelect`. Además, **análisis
+  crítico industrial** del módulo (ISO 14224 / RDM / FHIR ConceptMap): base correcta, gaps aditivos registrados como
+  **roadmap priorizado** en BACKLOG §2 (CSV import/export = primer quick-win; jerarquía; metadata tipada; cascada y
+  resolve paginado con 2.4; crosswalks con Fase 3). Ver DECISIONS 2026-06-09 (2 entradas nuevas).
 - **Pendiente**: smoke **VISUAL** en navegador (ver BACKLOG §4): `/datos-referencia` (crear lista, ítems con
   metadata, **buscar/ordenar/paginar** la grilla, filtro de estado, activar/desactivar, orden inline, eliminar) y en
-  el Form Builder elegir una Lista en un SELECT (selector buscable) y ver la **vista previa resolver** (SELECT y
-  MULTISELECT buscables); modo claro.
+  el Form Builder elegir una Lista en un SELECT (selector buscable) y ver la **vista previa resolver** (SELECT
+  `Combobox` con flip-up cerca del borde; MULTISELECT con **`LookupPicker`**: diálogo, tabla, confirmación, tokens
+  con ×); modo claro.
 
 ## Próximo paso
 **Fase 2.1 + 2.1.1 + 2.2 + 2.x completas.** **Sesión siguiente = Fase 2.3 · Rondas/`LogPeriod`** (plantilla
