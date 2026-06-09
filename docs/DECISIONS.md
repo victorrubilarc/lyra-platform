@@ -4,6 +4,43 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-09 · Fase 2.1.1 — Endurecimiento de modelo (ADITIVO): campo en 3 capas + `optionSource` (implementado)
+
+Implementación del endurecimiento de modelo fijado el mismo día (ver entrada siguiente), ANTES del llenado (2.4)
+y mientras no hay datos de ejecución. Todo aditivo/no destructivo. Decisiones de ejecución (aprobadas por el usuario):
+
+- **`dataType` (capa 2) DERIVADO, no editable.** Enum Prisma `FieldDataType` (12 valores, MAYÚSCULAS coherente con
+  `FieldType`; incluye TIME/FILE/GEO/COMPUTED sin productor aún, forward-compat de la taxonomía). El backend lo deriva
+  del `type` al guardar (fuente única `deriveDataType` en `@lyra/contracts`); la UI no lo muestra ni lo envía. Mapeo:
+  NUMBER→NUMBER, TEXT/TEXTAREA→STRING, SELECT→**CODE**, MULTISELECT→**CODE_ARRAY**, BOOLEAN→BOOLEAN, DATE→DATE,
+  DATETIME→DATETIME, **SEVERITY→CODE** (escala cerrada {1..5} = dimensión reportable, lista de sistema implícita),
+  **SIGNATURE→REFERENCE** (el valor referencia la firma/identidad del firmante; ejecución en 2.5).
+- **`semanticRole` (capa 3) nullable, sin miembro `NONE`.** Enum `FieldSemanticRole?` (EFFECTIVE_DATE/TITLE/
+  PRIMARY_EQUIPMENT/SEVERITY_DRIVER); null = sin rol (más limpio que un `NONE` redundante). En 2.1.1 **solo
+  `EFFECTIVE_DATE` tiene editor y comportamiento** (promueve `LogEntry.effectiveAt` en 2.4). **A lo sumo un campo
+  por versión** puede ser `EFFECTIVE_DATE`: validado en el contrato (`saveTemplateDraftRequestSchema.superRefine`) y
+  en el backend; la UI desmarca los demás al marcar uno.
+- **`optionSource` discriminado reemplaza `options[]`** en SELECT/MULTISELECT: `inline` (`{code,label}[]`, único
+  editable hoy — `value`→`code`), `referenceList` (`listKey` string; entidad `ReferenceList` + FK en 2.x, mismo patrón
+  que `WorkflowDefinition` en 2.2) y `external` (`sourceKey`; Orígenes de Datos Fase 3) **modelados** sin resolución.
+  **Sin migración SQL:** los `config` son JSONB; el helper `upgradeFieldConfig` (en contracts) sube el shape legacy
+  `{options:[{value,label}]}` → `{optionSource:{kind:'inline',items:[{code,label}]}}` al **leer** (`mapVersion`),
+  **escribir** (`preprocess` Zod + en `saveDraft`) y **clonar** (`ensureDraft`). Idempotente. **El valor de una
+  referencia se persiste como `code` estable, no el label** (reportabilidad = dimensión DW / FHIR Coding).
+- **Migración aditiva `20260609155007_add_field_layers`:** crea los 2 enums, agrega `dataType`/`semanticRole` a
+  `TemplateField` **nullable**, **backfillea `dataType` desde el `type`** existente (CASE), y luego `dataType SET NOT
+  NULL`. No altera ni borra datos (había 14 filas de smokes visuales previos; quedaron backfilleadas). Aplicada con
+  `migrate deploy` (no regenera cliente → evita el EPERM del rename del DLL del engine con el watch del API vivo).
+- **`LogEntry` se DIFIERE 100% a 2.4** (recomendación del agente, aprobada). Crear tablas nuevas es aditivo; un
+  esqueleto sin la lógica de llenado se validaría mal (riesgo de re-migrar). Los campos de sistema + `effectiveAt`
+  quedan como **diseño** en DATA_MODEL/DECISIONS; 2.1.1 endurece solo el lado DEFINICIÓN.
+- **Form Builder (cambios mínimos):** el editor de opciones inline ahora escribe `optionSource.inline.items`
+  (`code`/`label`); toggle **"Fecha efectiva del registro"** (`Checkbox`) en campos DATE/DATETIME que conmuta
+  `semanticRole`; `dataType` oculto/derivado. Dual theme, i18n es-CL, 44px. **Verificado:** typecheck/lint/build/test
+  (contracts 23, API 78) en verde + **smoke en vivo** (crear → guardar con SELECT optionSource + DATE effectiveDate →
+  leer `dataType` derivado/`semanticRole`/`optionSource` normalizado → legacy `options[]` se sube a inline → 2×
+  EFFECTIVE_DATE ⇒ 400 → borrar 204; datos de prueba limpiados).
+
 ### 2026-06-09 · Fase 2 — Modelo de campo en 3 capas, campos de sistema, y DATOS DE REFERENCIA (dirección aprobada)
 
 Sesión de diseño pedida por el usuario antes de seguir, con investigación de industria (FHIR Questionnaire/SDC,

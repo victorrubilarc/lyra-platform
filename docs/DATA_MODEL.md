@@ -39,10 +39,33 @@
 - **TemplateSection** *(implementado)* — unidad atómica de permiso/llenado/firma: `key` (estable), `title`,
   `description?`, `order`, `requireSignature` (opt-in), `editableInStateKey?` (estado del flujo que la
   habilita; null = siempre). *N—N* `Role` vía **TemplateSectionRole** (permiso de llenado por sección).
-- **TemplateField** *(implementado)* — `key`, `type` (enum `FieldType`: 8 núcleo + SEVERITY/SIGNATURE),
-  `label`, `help?`, `required`, `order`, `config` (JSONB validado por unión Zod: unidad/umbral ISA-18.2/
-  opciones/regex…), `visibleWhen?` (condicional). *N—N* `Role` vía **TemplateFieldRole** (override por campo).
-- **Entry / LogEntry** (bitácora, **Fase 2.4**) — valores con FK a `TemplateVersion`, `OrgNode`, periodo, autor.
+- **TemplateField** *(implementado — modelo de 3 capas desde 2.1.1, migración `20260609155007_add_field_layers`)* —
+  un campo son **3 capas separadas** (ver DECISIONS 2026-06-09):
+  - **Capa 1 — presentación/widget:** `type` (enum `FieldType`: 8 núcleo + SEVERITY/SIGNATURE). Cómo se ve.
+  - **Capa 2 — tipo de dato:** `dataType` (enum `FieldDataType`: STRING/NUMBER/BOOLEAN/DATE/DATETIME/TIME/
+    **CODE**/**CODE_ARRAY**/**REFERENCE**/FILE/GEO/COMPUTED). Cómo se almacena/valida/reporta. Es **derivado del
+    `type`** en backend (fuente única `deriveDataType` en `@lyra/contracts`); la UI no lo edita. Mapeo: NUMBER→NUMBER,
+    TEXT/TEXTAREA→STRING, SELECT→CODE, MULTISELECT→CODE_ARRAY, BOOLEAN→BOOLEAN, DATE→DATE, DATETIME→DATETIME,
+    SEVERITY→CODE (escala cerrada {1..5}), SIGNATURE→REFERENCE.
+  - **Capa 3 — rol semántico:** `semanticRole?` (enum `FieldSemanticRole?`: EFFECTIVE_DATE/TITLE/PRIMARY_EQUIPMENT/
+    SEVERITY_DRIVER; null = ninguno). Qué significa para la plataforma. En 2.1.1 solo `EFFECTIVE_DATE` actúa
+    (promueve `LogEntry.effectiveAt`, 2.4); **a lo sumo uno por versión** (validado en contrato + backend).
+  - Además: `key`, `label`, `help?`, `required`, `order`, `config` (JSONB validado por unión Zod), `visibleWhen?`
+    (condicional). *N—N* `Role` vía **TemplateFieldRole** (override por campo).
+  - **`config` de SELECT/MULTISELECT = `optionSource` discriminado** (desde 2.1.1, reemplaza `options[]`):
+    `inline` (`items:[{code,label}]`, único editable hoy) · `referenceList` (`listKey` → Lista de Referencia
+    gobernada, entidad y FK en 2.x) · `external` (`sourceKey` → Orígenes de Datos, Fase 3). El shape `options[]`
+    legacy se **sube** a `inline` al leer/escribir (helper `upgradeFieldConfig`; configs son JSONB ⇒ sin migración SQL).
+  - **Regla de reportabilidad:** el valor que se persiste al llenar (2.4) para una referencia es el **`code` estable,
+    NO el label** (patrón dimensión de DW / FHIR Coding). Labels cambian sin romper histórico.
+- **Entry / LogEntry** (bitácora, **Fase 2.4** — solo DISEÑO, sin tabla aún):
+  - **Campos de SISTEMA intrínsecos** (columnas indexadas, inmutables/auditadas, capturados SIEMPRE): `recordedAt`
+    (commit), `createdBy`, `orgNodeId`, `equipmentId?`, `templateVersionId` (FK), `currentState`, periodo/turno?,
+    firmas. La trazabilidad temporal es **estructural**, no un campo que se agrega.
+  - **`effectiveAt`** (columna indexada) = fecha efectiva de negocio (hora del evento/lectura ≠ captura). Se promueve
+    del valor del campo con `semanticRole = EFFECTIVE_DATE`; si la plantilla no marca ninguno, cae a `recordedAt`.
+  - Valores con historial por campo + transiciones de flujo. **Las tablas se crean en 2.4** (aditivo/no destructivo;
+    su forma se valida con la lógica real del llenado). En 2.1.1 quedan solo como diseño aquí y en DECISIONS.
 - **EntryChangeLog** — diffs antes/después + motivo (auditoría de edición).
 - **AutoIncidentRule** — reglas que disparan incidencias desde campos (umbral, severidad ≥ N).
 

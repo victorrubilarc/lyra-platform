@@ -325,6 +325,9 @@ export const esCL = {
       critHigh: "Crít. alto",
       options: "Opciones (una por línea)",
       optionsPlaceholder: "Opción 1\nOpción 2",
+      effectiveDate: "Fecha efectiva del registro",
+      effectiveDateHint:
+        "La hora del evento/lectura (no la de captura). La plataforma usa este campo como fecha de referencia del registro para reportes (Fase 2.4).",
       visibleWhen: "Mostrar solo si",
       visibleAlways: "(siempre visible)",
       visibleWhenSuffix: "= Sí",

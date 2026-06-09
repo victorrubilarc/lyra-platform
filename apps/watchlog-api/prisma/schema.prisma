@@ -461,6 +461,34 @@ enum RecurrenceKind {
   CALENDAR
 }
 
+// Capa 2 del campo: tipo de dato (cómo se almacena/valida/reporta), derivado del
+// `type` de presentación (ver DECISIONS 2026-06-09). Enum aditivo: incluye
+// valores sin productor aún (TIME/FILE/GEO/COMPUTED) para la taxonomía futura.
+enum FieldDataType {
+  STRING
+  NUMBER
+  BOOLEAN
+  DATE
+  DATETIME
+  TIME
+  CODE // un code estable de una lista (dimensión reportable)
+  CODE_ARRAY // varios codes
+  REFERENCE // id de una entidad (equipo/usuario/nodo/firma)
+  FILE
+  GEO
+  COMPUTED
+}
+
+// Capa 3 del campo: rol semántico opcional (qué significa para la plataforma).
+// En 2.1.1 solo EFFECTIVE_DATE tiene comportamiento (promueve LogEntry.effectiveAt
+// en 2.4); el resto queda modelado. Nullable: null = sin rol.
+enum FieldSemanticRole {
+  EFFECTIVE_DATE
+  TITLE
+  PRIMARY_EQUIPMENT
+  SEVERITY_DRIVER
+}
+
 model Template {
   id               String         @id @default(cuid())
   name             String
@@ -552,7 +580,13 @@ model TemplateField {
   id          String    @id @default(cuid())
   sectionId   String
   key         String
+  // Capa 1: presentación/widget.
   type        FieldType
+  // Capa 2: tipo de dato (almacenamiento/validación/reporte). Derivado del `type`
+  // en backend al guardar (fuente única deriveDataType en @lyra/contracts).
+  dataType    FieldDataType
+  // Capa 3: rol semántico opcional. null = ninguno. Solo EFFECTIVE_DATE actúa en 2.1.1.
+  semanticRole FieldSemanticRole?
   label       String
   help        String?
   required    Boolean   @default(false)

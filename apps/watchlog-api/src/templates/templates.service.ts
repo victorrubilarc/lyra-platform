@@ -9,6 +9,7 @@ import type {
   TemplateVersionDto,
   UpdateTemplateRequest,
 } from "@lyra/contracts";
+import { deriveDataType, upgradeFieldConfig } from "@lyra/contracts";
 import { Prisma } from "@prisma/client";
 import { AuditService, type AuditContext } from "../audit/audit.service";
 import { ScopeService } from "../authz/scope.service";
@@ -288,11 +289,14 @@ export class TemplatesService {
               sectionId: createdSection.id,
               key: field.key,
               type: field.type,
+              // Capa 2: derivada del tipo (el cliente no la envía). Capa 3: opcional.
+              dataType: deriveDataType(field.type),
+              semanticRole: field.semanticRole ?? null,
               label: field.label,
               help: field.help ?? null,
               required: field.required ?? false,
               order: fOrder,
-              config: (field.config ?? {}) as Prisma.InputJsonValue,
+              config: upgradeFieldConfig(field.type, field.config ?? {}) as Prisma.InputJsonValue,
               visibleWhen: field.visibleWhen
                 ? (field.visibleWhen as Prisma.InputJsonValue)
                 : Prisma.DbNull,
@@ -403,11 +407,13 @@ export class TemplatesService {
               sectionId: createdSection.id,
               key: field.key,
               type: field.type,
+              dataType: field.dataType,
+              semanticRole: field.semanticRole,
               label: field.label,
               help: field.help,
               required: field.required,
               order: field.order,
-              config: field.config as Prisma.InputJsonValue,
+              config: upgradeFieldConfig(field.type, (field.config ?? {}) as Record<string, unknown>) as Prisma.InputJsonValue,
               visibleWhen: field.visibleWhen === null ? Prisma.DbNull : (field.visibleWhen as Prisma.InputJsonValue),
               roles: field.roles.length ? { create: field.roles.map((r) => ({ roleId: r.roleId })) } : undefined,
             },
@@ -445,11 +451,14 @@ export class TemplatesService {
           id: f.id,
           key: f.key,
           type: f.type,
+          dataType: f.dataType,
+          semanticRole: f.semanticRole,
           label: f.label,
           help: f.help,
           required: f.required,
           order: f.order,
-          config: (f.config ?? {}) as Record<string, unknown>,
+          // Normaliza el shape de config al vigente (options[] legacy → optionSource).
+          config: upgradeFieldConfig(f.type, (f.config ?? {}) as Record<string, unknown>),
           visibleWhen: (f.visibleWhen as TemplateVersionDto["sections"][number]["fields"][number]["visibleWhen"]) ?? null,
           roleIds: f.roles.map((r) => r.roleId),
         })),
