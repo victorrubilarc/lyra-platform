@@ -13,6 +13,7 @@ import { AuthModule } from "./auth/auth.module";
 import { StructureModule } from "./structure/structure.module";
 import { EquipmentModule } from "./equipment/equipment.module";
 import { TemplatesModule } from "./templates/templates.module";
+import { WorkflowsModule } from "./workflows/workflows.module";
 import { SecurityModule } from "./security/security.module";
 
 @Module({
@@ -45,6 +46,7 @@ import { SecurityModule } from "./security/security.module";
     StructureModule,
     EquipmentModule,
     TemplatesModule,
+    WorkflowsModule,
     SecurityModule,
     HealthModule,
   ],

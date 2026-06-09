@@ -4,6 +4,54 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-09 · Fase 2.2 — Flujos reutilizables (`WorkflowDefinition`) (implementado)
+
+Implementación del fork 4 (flujos REUTILIZABLES) fijado el 2026-06-09. Un flujo es una **máquina de estados
+configurable** (estados + transiciones), **NO BPMN**, integrada al RBAC dim. 3 (la autorización por transición es
+DATO). Solo lado **DEFINICIÓN**: la ejecución (LogEntry/transiciones en vivo/firmas) sigue diferida a 2.4/2.5.
+Investigación de respaldo: FSM declarativa (XState / Step Functions Standard, no orquestador BPMN), ciclo de vida
+de registro controlado (21 CFR Part 11 / GAMP 5 / ALCOA+), validación de máquina (1 inicial, ≥1 final,
+alcanzabilidad, sin trampas). Decisiones de ejecución (aprobadas por el usuario, plan + 3 forks):
+
+- **Versionado/congelable estilo Template.** `WorkflowDefinition` (contenedor mutable) 1—N
+  `WorkflowDefinitionVersion` (INMUTABLE al publicar) → `WorkflowState` + `WorkflowTransition` +
+  `WorkflowTransitionRole` (roles permitidos por transición = dato, mismo patrón que `TemplateSectionRole`).
+  El builder edita SIEMPRE un borrador; publicar congela; editar publicada **clona** un borrador nuevo (espejo
+  exacto de `TemplatesService`). Flags por transición `requireSignature`+`signatureMeaning` y `requireMfa`
+  (step-up AAL) **modelados** y se honran en ejecución (2.5).
+- **`editableInStateKey` de sección por CLAVE, no FK** (objeción aceptada): la versión de plantilla congela una
+  versión de flujo; la sección referencia un estado *dentro de esa versión* por su `key` estable, igual que
+  `visibleWhen` referencia campos. Un FK a `WorkflowState.id` acoplaría a IDs de una versión concreta sin ganar
+  integridad (la da el congelamiento de la versión). Coherente con la intención ya documentada en 2.1.
+- **FK desde `TemplateVersion`** (reemplaza las columnas string de 2.1): `workflowDefinitionId` →
+  `WorkflowDefinition`, `workflowDefinitionVersionId` → `WorkflowDefinitionVersion`, ambas **`onDelete: Restrict`**
+  (un registro histórico no queda sin su flujo; el borrado del flujo es lógico vía `deletedAt`). Aditivo: las
+  columnas existían en null (no había editor), así que añadir el FK no toca datos. `WorkflowsService.remove`
+  además **bloquea** borrar un flujo en uso por una versión de plantilla.
+- **Binding flujo↔plantilla validado en backend** (`TemplatesService.saveDraft`): el flujo debe existir, estar
+  **PUBLICADO** y la versión a congelar debe ser su `currentVersionId` vigente; cada `editableInStateKey` de
+  sección debe ser una clave de estado de esa versión. Sin flujo (`null`) ⇒ ninguna sección puede declarar
+  estado (**degradación elegante**: form simple). El binding se preserva al clonar borrador.
+- **Validación de la máquina = fuente única** `validateWorkflowMachine` en `@lyra/contracts` (1 inicial exacto,
+  ≥1 final, claves únicas, refs válidas, alcanzabilidad desde el inicial, sin trampas). La usa el `superRefine`
+  del contrato, el backend (defensa en profundidad, al guardar y al publicar) **y** el builder web (feedback en
+  vivo + deshabilita publicar si es inválida). Se confirmó el fork: **≥1 estado final exigido para publicar**.
+- **Permisos** (catálogo 33 → **37**): `module:workflows:view/manage` (módulo/sidebar, mi adición por
+  consistencia con los demás módulos — aprobada en el fork) + `workflow:view/manage` (acción, coarse estilo
+  Roles). La autorización **por transición** NO es clave de catálogo: vive en `WorkflowTransitionRole`. Seed los
+  asigna al rol admin (itera el catálogo, sin código nuevo).
+- **UI = editor declarativo, NO canvas BPMN** (fork confirmado): mantenedor `features/workflows` (lista estilo
+  Plantillas + `WorkflowBuilder` con listas de estados/transiciones + roles por transición + validación FSM en
+  vivo). El Form Builder gana: selector de flujo publicado, mapeo sección→estado y editor de override de rol por
+  campo (`TemplateFieldRole`, que ya persistía en backend desde 2.1).
+- **Editor del override por campo (`TemplateFieldRole`)**: el modelo y el persistir ya existían (2.1); 2.2 agrega
+  solo el editor UI (multiselect de roles por campo; vacío = hereda la sección).
+- **Verificado:** typecheck/lint (0 errores; 1 warning preexistente en OrgTree)/build web (1911 módulos)/test
+  (contracts 36 +13 · permissions 5 · API 88 +10) en verde. **Smoke en vivo** (demo): flujo crear→borrador→máquina
+  inválida (sin final / inalcanzable) 400→publicar (congela)→listar→borrar 204; binding plantilla↔flujo (estado de
+  sección válido persiste; estado inexistente 400; versión no vigente 400; flujo EN USO no se borra 400). Datos de
+  prueba limpiados (hard-delete). Migración `20260609163822_add_workflow_definition` aplicada con `migrate deploy`.
+
 ### 2026-06-09 · Fase 2.1.1 — Endurecimiento de modelo (ADITIVO): campo en 3 capas + `optionSource` (implementado)
 
 Implementación del endurecimiento de modelo fijado el mismo día (ver entrada siguiente), ANTES del llenado (2.4)

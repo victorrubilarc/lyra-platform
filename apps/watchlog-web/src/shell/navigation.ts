@@ -1,4 +1,4 @@
-import { LayoutDashboard, Layers, Network, ShieldCheck, UserCog, type LucideIcon } from "lucide-react";
+import { GitBranch, LayoutDashboard, Layers, Network, ShieldCheck, UserCog, type LucideIcon } from "lucide-react";
 import type { Permission } from "@lyra/permissions";
 
 /**
@@ -33,6 +33,13 @@ export const ROUTES: readonly NavRoute[] = [
     labelKey: "nav.templates",
     icon: Layers,
     permission: "module:templates:view",
+    inSidebar: true,
+  },
+  {
+    path: "/flujos",
+    labelKey: "nav.workflows",
+    icon: GitBranch,
+    permission: "module:workflows:view",
     inSidebar: true,
   },
   {

@@ -5,8 +5,9 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-09** (**Fase 2.1 ✅** + **Fase 2.1.1 ✅** — Plantillas: modelo definición + campo en 3
-> capas + `optionSource` + Form Builder; **siguiente: Fase 2.2 — Flujos reutilizables `WorkflowDefinition`**).
+> actualización: **2026-06-09** (**Fase 2.1 ✅** + **Fase 2.1.1 ✅** + **Fase 2.2 ✅** — Plantillas (definición +
+> 3 capas + `optionSource` + Form Builder) + **Flujos reutilizables `WorkflowDefinition`**; **siguiente: Fase 2.x —
+> Datos de referencia / Listas**, o 2.3 Rondas).
 
 ---
 
@@ -43,6 +44,7 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **UI de Seguridad** (usuarios/roles/política/auditoría + reset MFA) | `main` (fusionado desde `feat/seguridad-ui`) | ✅ fusionado y publicado en `origin/main` (`a6f8b10`) | ninguna |
 | **Fase 2.1 Plantillas** (modelo definición + contratos + Form Builder) | `main` (fusionado desde `feat/plantillas`) | ✅ fusionado y publicado en `origin/main` (`a440f54`) | ninguna |
 | **Fase 2.1.1 Endurecimiento de modelo** (campo en 3 capas + `optionSource`) | `main` (fusionado desde `feat/plantillas-2.1.1`) | ✅ fusionado y publicado en `origin/main` (`365e31f`) | ninguna |
+| **Fase 2.2 Flujos reutilizables** (`WorkflowDefinition` + mantenedor + binding) | `main` (fusionado desde `feat/workflows`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 
 **Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
@@ -185,9 +187,14 @@ nunca queda más de una sesión atrás.
         a una lista (`optionSource.referenceList`). El **sync desde APIs externas** (alimentar/persistir una lista
         desde ERP/MES/RRHH) es **Fase 3 (Orígenes de datos)**. Ubicar antes o junto al llenado (2.4 guarda codes).
         Ver DECISIONS 2026-06-09 (patrón FHIR ValueSet / dimensión de DW; guardar code, no label).
-  - [ ] **2.2 Flujos reutilizables (`WorkflowDefinition`):** mantenedor propio (catálogo, estilo Roles) —
-        estados + transiciones + roles/permiso por transición + config de firma; versionado/congelable.
-        Asignar un flujo a una versión de plantilla y mapear secciones→estados editables.
+  - [x] **2.2 Flujos reutilizables (`WorkflowDefinition`):** ✅ (2026-06-09). Mantenedor propio (catálogo estilo
+        Plantillas) — `WorkflowDefinition` 1—N `WorkflowDefinitionVersion` (inmutable) → estados + transiciones +
+        **roles por transición (dato)** + firma/`signatureMeaning`/MFA opt-in; versionado/congelable. `validateWorkflowMachine`
+        (fuente única: contrato+backend+builder). FK desde `TemplateVersion` (reemplaza columnas string, `onDelete:
+        Restrict`). Binding validado en backend (flujo publicado + versión vigente + `editableInStateKey` ∈ estados).
+        Web: `WorkflowBuilder` declarativo + Form Builder (asignar flujo, sección→estado, override de rol por campo
+        `TemplateFieldRole`). 4 permisos nuevos (catálogo **37**). Tests: contracts 36, API 88. Ver DECISIONS/PROGRESS.
+        **Pendiente: smoke VISUAL** (§4).
   - [ ] **2.3 Programación de rondas/turnos (`LogPeriod`):** plantilla recurrente (turno/intervalo/calendario,
         simple, no un scheduler genérico); cada ocurrencia abre/gener​a un `LogEntry` ligado a su periodo.
         Investigar ISA-95 / shift handover antes de modelar.
@@ -298,6 +305,13 @@ probatoria (hash+timestamp). Ref: `DECISIONS.md` (sección de recomendaciones).
       línea genera un `code` estable + `label`); marcar el toggle **"Fecha efectiva del registro"** en un campo
       DATE/DATETIME y comprobar que al marcar otro se **desmarca el anterior**; vista previa del SELECT usando los
       codes; guardar/publicar; modo claro. App en `:5173`.
+- [ ] **Flujos 2.2 — smoke VISUAL en navegador** (se verificó typecheck/lint/build/test + smoke por API; falta el
+      clic): `/flujos` (grilla, buscador, filtro de estado, estados vacíos), crear flujo (modal → builder), builder
+      (agregar estados, marcar inicial único/final, color; agregar transiciones from→to, etiqueta, roles permitidos,
+      toggles firma+significado / MFA; **banner de validación FSM en vivo**; publicar deshabilitado si es inválida),
+      **Guardar borrador** y **Publicar** (congela versión), editar publicada (clona borrador), borrar (bloqueado si
+      en uso); en el **Form Builder**: asignar un flujo publicado, mapear secciones→estados editables, editar el
+      **override de rol por campo**; modo claro. App en `:5173`.
 - [ ] **Modo claro — QA visual** (nuevo): revisar que TODO el workspace se vea premium en **claro**
       (contraste WCAG, glass, glows, severidades, tablas futuras, drawers/modales) y que `auto` siga al
       sistema. El default es oscuro; el login es siempre oscuro. Ref: DECISIONS 2026-06-06.

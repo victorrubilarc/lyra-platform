@@ -38,6 +38,7 @@ import {
 import { BuilderConfigPanel } from "./BuilderConfigPanel.js";
 import { PreviewForm } from "./FieldPreview.js";
 import { usePublishTemplate, useSaveTemplateDraft } from "./templates-queries.js";
+import { useWorkflow, useWorkflows } from "../workflows/workflows-queries.js";
 import styles from "./TemplateBuilder.module.css";
 
 interface Selection {
@@ -63,6 +64,14 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
   const rolesQuery = useQuery({ queryKey: ["templates", "roles"], queryFn: fetchRoles, retry: false });
   const roles = rolesQuery.data ?? [];
 
+  // Flujos PUBLICADOS asignables (gateado por workflow:view) y, si hay uno
+  // asignado, su detalle para mapear secciones → estados.
+  const canViewWorkflows = perms.can("workflow:view");
+  const workflowsQuery = useWorkflows(canViewWorkflows ? { status: "PUBLISHED" } : {});
+  const publishedWorkflows = canViewWorkflows ? (workflowsQuery.data ?? []).filter((w) => w.status === "PUBLISHED") : [];
+  const assignedWorkflow = useWorkflow(state.workflowDefinitionId);
+  const workflowStates = assignedWorkflow.data?.version.states ?? [];
+
   const nodeOptions = useMemo(() => flattenNodeOptions(tree), [tree]);
   const canEdit = perms.can("template:edit");
   const isPublishedView = detail.version.status === "PUBLISHED";
@@ -85,10 +94,21 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
     setDirty(true);
   }
 
+  function setWorkflow(wfId: string) {
+    // Cambiar (o quitar) el flujo invalida los estados de sección previos.
+    const wf = publishedWorkflows.find((w) => w.id === wfId);
+    patchState({
+      ...state,
+      workflowDefinitionId: wfId || null,
+      workflowDefinitionVersionId: wf?.currentVersionId ?? null,
+      sections: state.sections.map((s) => ({ ...s, editableInStateKey: null })),
+    });
+  }
+
   function addSection() {
     const title = t("templates.builder.sectionDefault");
     const key = uniqueKey(slugifyKey(title, `seccion_${state.sections.length + 1}`), collectSectionKeys(state));
-    const sec: EditSection = { uid: nextUid(), key, title, description: null, requireSignature: false, roleIds: [], fields: [] };
+    const sec: EditSection = { uid: nextUid(), key, title, description: null, requireSignature: false, editableInStateKey: null, roleIds: [], fields: [] };
     patchState({ ...state, sections: [...state.sections, sec] });
     setSelected({ s: sec.uid });
   }
@@ -100,7 +120,7 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
     if (!targetUid) {
       const stitle = t("templates.builder.sectionDefault");
       const skey = uniqueKey(slugifyKey(stitle, "seccion_1"), collectSectionKeys(state));
-      const sec: EditSection = { uid: nextUid(), key: skey, title: stitle, description: null, requireSignature: false, roleIds: [], fields: [] };
+      const sec: EditSection = { uid: nextUid(), key: skey, title: stitle, description: null, requireSignature: false, editableInStateKey: null, roleIds: [], fields: [] };
       sections = [...sections, sec];
       targetUid = sec.uid;
     }
@@ -287,6 +307,25 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
                   <Textarea id={id} rows={2} value={state.description} onChange={(e) => patchState({ ...state, description: e.target.value })} />
                 )}
               </FormField>
+              <FormField label={t("templates.builder.workflow")} hint={t("templates.builder.workflowHint")}>
+                {({ id }) => (
+                  <Select id={id} value={state.workflowDefinitionId ?? ""} disabled={!canEdit} onChange={(e) => setWorkflow(e.target.value)}>
+                    <option value="">{t("templates.builder.workflowNone")}</option>
+                    {publishedWorkflows.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {w.name}
+                      </option>
+                    ))}
+                    {/* Mantiene visible el flujo asignado aunque ya no esté en la lista. */}
+                    {state.workflowDefinitionId &&
+                      !publishedWorkflows.some((w) => w.id === state.workflowDefinitionId) && (
+                        <option value={state.workflowDefinitionId}>
+                          {assignedWorkflow.data?.name ?? state.workflowDefinitionId}
+                        </option>
+                      )}
+                  </Select>
+                )}
+              </FormField>
             </Card>
 
             {state.sections.length === 0 ? (
@@ -361,6 +400,8 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
               field={selectedField}
               roles={roles}
               booleanFields={booleanFields}
+              workflowStates={workflowStates}
+              hasWorkflow={Boolean(state.workflowDefinitionId)}
               onUpdateSection={(patch) => selectedSection && updateSection(selectedSection.uid, patch)}
               onUpdateField={(patch) => selectedField && selectedSection && updateField(selectedSection.uid, selectedField.uid, patch)}
             />

@@ -248,6 +248,37 @@ export const PERMISSION_CATALOG = [
     group: "templates",
     description: "Eliminar (borrado lógico) plantillas.",
   },
+
+  // --- Dimensión 1: módulo de flujos (Fase 2.2) ---
+  {
+    key: "module:workflows:view",
+    dimension: "MODULE",
+    group: "workflows",
+    description: "Ver el módulo de flujos (máquinas de estado reutilizables).",
+  },
+  {
+    key: "module:workflows:manage",
+    dimension: "MODULE",
+    group: "workflows",
+    description: "Administrar el módulo de flujos.",
+  },
+
+  // --- Dimensión 2: acciones — flujos (Fase 2.2) ---
+  // Nota: la autorización POR TRANSICIÓN es DATO (roles permitidos en cada
+  // transición del flujo), no una clave de catálogo; se honra en la ejecución
+  // (2.5). Estas claves gobiernan el MANTENEDOR del catálogo de flujos.
+  {
+    key: "workflow:view",
+    dimension: "ACTION",
+    group: "workflows",
+    description: "Listar y ver flujos y sus versiones.",
+  },
+  {
+    key: "workflow:manage",
+    dimension: "ACTION",
+    group: "workflows",
+    description: "Crear, editar, publicar y eliminar flujos.",
+  },
 ] as const satisfies readonly PermissionDef[];
 
 /** Unión literal de todas las claves de permiso conocidas. */

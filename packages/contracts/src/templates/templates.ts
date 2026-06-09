@@ -199,6 +199,12 @@ export const saveTemplateDraftRequestSchema = z
     requireSignature: z.boolean().optional(),
     recurrenceKind: recurrenceKindSchema.optional(),
     recurrenceConfig: recurrenceConfigSchema.nullable().optional(),
+    // Flujo reutilizable asignado a la versión (Fase 2.2). null = sin flujo
+    // (degradación elegante: form simple, todas las secciones siempre editables).
+    // El backend valida que el flujo exista, esté publicado y que la versión
+    // coincida con su versión publicada actual.
+    workflowDefinitionId: z.string().nullable().optional(),
+    workflowDefinitionVersionId: z.string().nullable().optional(),
     sections: z.array(draftSectionInputSchema).max(100),
   })
   .superRefine((body, ctx) => {
