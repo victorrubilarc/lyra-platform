@@ -65,6 +65,18 @@
   padding-left: var(--space-4);
 }
 
+.pendingBanner {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  padding: var(--space-3);
+  border-radius: var(--radius-md, 10px);
+  background: var(--color-warning-bg, rgba(245, 158, 11, 0.12));
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  color: var(--color-warning);
+  font-size: var(--text-body-sm-size);
+}
+
 .validBanner {
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-md, 10px);
@@ -72,6 +84,65 @@
   border: 1px solid rgba(34, 197, 94, 0.35);
   color: var(--color-success);
   font-size: var(--text-body-sm-size);
+}
+
+/* Resumen de transiciones (tabla de solo lectura). */
+.summaryCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+}
+
+.summaryHeader {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-brand);
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--color-text-primary);
+}
+
+.summaryTableWrap {
+  overflow-x: auto;
+}
+
+.summaryTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.summaryTable th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--color-border, rgba(255, 255, 255, 0.08));
+  white-space: nowrap;
+}
+
+.summaryTable td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--color-border, rgba(255, 255, 255, 0.06));
+  color: var(--color-text-secondary);
+  vertical-align: middle;
+}
+
+.summaryTable tr:last-child td {
+  border-bottom: none;
+}
+
+.flowCell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  color: var(--color-text-primary);
 }
 
 .metaCard {
@@ -115,6 +186,16 @@
   font-weight: 600;
   font-size: 14px;
   color: var(--color-text-primary);
+  /* Fijo al hacer scroll: el botón "Agregar" no se pierde con listas largas. */
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--color-bg-surface-1);
+  margin: calc(-1 * var(--space-4)) calc(-1 * var(--space-4)) var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border, rgba(255, 255, 255, 0.08));
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
 }
 
 .columnHeader span {
