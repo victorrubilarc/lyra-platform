@@ -1,8 +1,14 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Checkbox } from "@lyra/ui";
+import { Search } from "lucide-react";
+import { Checkbox, Input } from "@lyra/ui";
 import type { PermissionDef } from "@lyra/contracts";
 import styles from "./PermissionMatrix.module.css";
+
+/** Normaliza para buscar sin distinción de mayúsculas ni acentos (es-CL). */
+function norm(s: string): string {
+  return s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+}
 
 interface PermissionMatrixProps {
   catalog: PermissionDef[];
@@ -20,16 +26,37 @@ interface PermissionMatrixProps {
  */
 export function PermissionMatrix({ catalog, selected, onChange, disabled }: PermissionMatrixProps) {
   const { t } = useTranslation();
+  const [query, setQuery] = useState("");
+
+  function groupLabelRaw(group: string): string {
+    const key = `security.permGroups.${group}`;
+    const label = t(key);
+    return label === key ? group : label;
+  }
+
+  // Filtra por clave, descripción o nombre de grupo (sin acentos/mayúsculas).
+  const filteredCatalog = useMemo(() => {
+    const q = norm(query.trim());
+    if (!q) return catalog;
+    return catalog.filter(
+      (def) =>
+        norm(def.key).includes(q) ||
+        norm(def.description).includes(q) ||
+        norm(groupLabelRaw(def.group)).includes(q),
+    );
+    // groupLabelRaw depende de t; query y catalog son los disparadores reales.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catalog, query]);
 
   const groups = useMemo(() => {
     const map = new Map<string, PermissionDef[]>();
-    for (const def of catalog) {
+    for (const def of filteredCatalog) {
       const list = map.get(def.group) ?? [];
       list.push(def);
       map.set(def.group, list);
     }
     return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-  }, [catalog]);
+  }, [filteredCatalog]);
 
   function toggleKey(key: string, value: boolean) {
     const next = new Set(selected);
@@ -47,15 +74,19 @@ export function PermissionMatrix({ catalog, selected, onChange, disabled }: Perm
     onChange(next);
   }
 
-  function groupLabel(group: string): string {
-    const key = `security.permGroups.${group}`;
-    const label = t(key);
-    return label === key ? group : label;
-  }
-
   return (
     <div className={styles.matrix}>
-      {groups.map(([group, defs]) => {
+      <Input
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder={t("security.roles.searchPermissions")}
+        rightSlot={<Search size={15} aria-hidden="true" />}
+      />
+
+      {groups.length === 0 ? (
+        <p className={styles.noMatches}>{t("security.roles.noPermissionMatches")}</p>
+      ) : (
+        groups.map(([group, defs]) => {
         const selectedCount = defs.filter((d) => selected.has(d.key)).length;
         const allSelected = selectedCount === defs.length;
         const partial = selectedCount > 0 && !allSelected;
@@ -67,8 +98,8 @@ export function PermissionMatrix({ catalog, selected, onChange, disabled }: Perm
                 indeterminate={partial}
                 disabled={disabled}
                 onChange={(v) => toggleGroup(defs, v)}
-                label={groupLabel(group)}
-                aria-label={groupLabel(group)}
+                label={groupLabelRaw(group)}
+                aria-label={groupLabelRaw(group)}
               />
               <span className={styles.groupCount}>
                 {selectedCount}/{defs.length}
@@ -92,8 +123,9 @@ export function PermissionMatrix({ catalog, selected, onChange, disabled }: Perm
               ))}
             </div>
           </fieldset>
-        );
-      })}
+          );
+        })
+      )}
     </div>
   );
 }

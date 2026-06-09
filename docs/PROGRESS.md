@@ -377,7 +377,9 @@ Consume el backend de seguridad ya existente. Ver DECISIONS 2026-06-08. La UI so
   auto-expande, sin acentos/mayúsculas) + **resumen de seleccionados** (chips removibles + limpiar), para
   árboles extensos. Pestaña *Alcance* preparada como **multi-dimensión** (encabezado "Estructura
   organizacional"; las plantillas se sumarán como sección hermana en Fase 2). **Buscador** en la pestaña de
-  *Roles* (filtra por nombre/clave/descripción).
+  *Roles* (filtra por nombre/clave/descripción) y **buscador en la matriz de permisos** del editor de rol
+  (`PermissionMatrix`: filtra por clave/descripción/grupo, sin acentos; el "seleccionar grupo" opera sobre lo
+  visible filtrado).
 - **Auditoría filtrable (para auditores)**: backend `GET /security/audit` extendido con filtros **rango de
   fechas** (`from`/`to`), **acción**, **actor** y **tipo de entidad** (coincidencia parcial insensible a
   mayúsculas, vía `where` de Prisma). UI con barra de filtros (fechas + texto + select de entidad), **atajos

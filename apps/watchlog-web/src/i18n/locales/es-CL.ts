@@ -360,6 +360,8 @@ export const esCL = {
       requireMfa: "Exigir MFA",
       requireMfaHint: "Los usuarios con este rol deberán activar MFA (si el modo global lo honra).",
       permissions: "Permisos",
+      searchPermissions: "Buscar permiso (clave, descripción o grupo)…",
+      noPermissionMatches: "Ningún permiso coincide con la búsqueda.",
       deleteTitle: "Eliminar rol",
       deleteConfirm: "¿Eliminar el rol «{{name}}»? Esta acción no se puede deshacer.",
       deleteUsersWarning: "Este rol está asignado a {{count}} usuario(s); perderán sus permisos.",
