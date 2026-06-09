@@ -433,10 +433,14 @@ export const esCL = {
       stateDefault: "Estado {{n}}",
       stateN: "Estado {{n}}",
       stateName: "Nombre del estado",
+      stateKey: "Clave del estado",
+      stateKeyHint:
+        "Clave estable interna: con ella las transiciones y el mapeo de secciones referencian este estado. En estados nuevos sigue al nombre; puedes editarla.",
       isInitial: "Inicial",
       isFinal: "Final",
       color: "Color",
       colorNone: "Sin color",
+      colorCustom: "Personalizar…",
       colors: {
         accent: "Índigo",
         success: "Verde",

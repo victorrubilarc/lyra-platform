@@ -24,6 +24,22 @@ import styles from "./WorkflowBuilder.module.css";
 
 const STATE_COLORS = ["accent", "success", "warning", "error", "info", "muted"] as const;
 
+/** Mapeo de los colores preset a variables CSS del DS (para el swatch). */
+const PRESET_CSS: Record<string, string> = {
+  accent: "var(--color-accent-primary)",
+  success: "var(--color-success)",
+  warning: "var(--color-warning)",
+  error: "var(--color-error)",
+  info: "var(--color-accent-secondary)",
+  muted: "var(--color-text-muted)",
+};
+
+const isPreset = (color: string | null): boolean => color != null && color in PRESET_CSS;
+const isCustomColor = (color: string | null): boolean => color != null && color.startsWith("#");
+/** CSS de fondo para el swatch del estado (preset → var; hex → directo). */
+const swatchCss = (color: string | null): string =>
+  color == null ? "transparent" : isCustomColor(color) ? color : (PRESET_CSS[color] ?? "transparent");
+
 export function WorkflowBuilder({ detail }: { detail: WorkflowDetail }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -79,7 +95,7 @@ export function WorkflowBuilder({ detail }: { detail: WorkflowDetail }) {
     const name = t("workflows.builder.stateDefault", { n: wf.states.length + 1 });
     const key = uniqueKey(slugifyKey(name, `estado_${wf.states.length + 1}`), collectStateKeys(wf));
     const isInitial = wf.states.length === 0; // el primero es inicial por defecto
-    const state: EditWorkflowState = { uid: nextUid(), key, name, description: null, isInitial, isFinal: false, color: null };
+    const state: EditWorkflowState = { uid: nextUid(), key, name, description: null, isInitial, isFinal: false, color: null, keyLocked: false };
     patch({ ...wf, states: [...wf.states, state] });
   }
 
@@ -92,6 +108,44 @@ export function WorkflowBuilder({ detail }: { detail: WorkflowDetail }) {
         if (claimsInitial && s.isInitial) return { ...s, isInitial: false }; // único inicial
         return s;
       }),
+    });
+  }
+
+  /** Re-mapea las transiciones que referencian `oldKey` hacia `newKey`. */
+  function rekeyTransitions(transitions: EditWorkflow["transitions"], oldKey: string, newKey: string) {
+    if (oldKey === newKey) return transitions;
+    return transitions.map((tr) => ({
+      ...tr,
+      fromStateKey: tr.fromStateKey === oldKey ? newKey : tr.fromStateKey,
+      toStateKey: tr.toStateKey === oldKey ? newKey : tr.toStateKey,
+    }));
+  }
+
+  /** Renombra el estado; si la clave no está fijada, la deriva del nombre (mnemotécnica). */
+  function renameState(uid: string, name: string) {
+    const st = wf.states.find((s) => s.uid === uid);
+    if (!st) return;
+    let newKey = st.key;
+    if (!st.keyLocked) {
+      const used = new Set(wf.states.filter((s) => s.uid !== uid).map((s) => s.key));
+      newKey = uniqueKey(slugifyKey(name, st.key), used);
+    }
+    patch({
+      ...wf,
+      states: wf.states.map((s) => (s.uid === uid ? { ...s, name, key: newKey } : s)),
+      transitions: rekeyTransitions(wf.transitions, st.key, newKey),
+    });
+  }
+
+  /** Edita la clave manualmente (la fija) y la propaga a las transiciones. */
+  function editStateKey(uid: string, raw: string) {
+    const st = wf.states.find((s) => s.uid === uid);
+    if (!st) return;
+    const newKey = slugifyKey(raw, st.key);
+    patch({
+      ...wf,
+      states: wf.states.map((s) => (s.uid === uid ? { ...s, key: newKey, keyLocked: true } : s)),
+      transitions: rekeyTransitions(wf.transitions, st.key, newKey),
     });
   }
 
@@ -305,10 +359,18 @@ export function WorkflowBuilder({ detail }: { detail: WorkflowDetail }) {
                   <Input
                     value={s.name}
                     disabled={!canEdit}
-                    onChange={(e) => updateState(s.uid, { name: e.target.value })}
+                    onChange={(e) => renameState(s.uid, e.target.value)}
                     aria-label={t("workflows.builder.stateName")}
                   />
-                  <span className={styles.keyBadge}>{s.key}</span>
+                  <input
+                    className={styles.keyInput}
+                    value={s.key}
+                    disabled={!canEdit}
+                    onChange={(e) => editStateKey(s.uid, e.target.value)}
+                    aria-label={t("workflows.builder.stateKey")}
+                    title={t("workflows.builder.stateKeyHint")}
+                    spellCheck={false}
+                  />
                   <button type="button" className={styles.iconBtnDanger} onClick={() => deleteState(s.uid)} disabled={!canEdit} aria-label={t("common.delete")}>
                     <Trash2 size={14} />
                   </button>
@@ -330,20 +392,39 @@ export function WorkflowBuilder({ detail }: { detail: WorkflowDetail }) {
                     onChange={(checked) => updateState(s.uid, { isFinal: checked })}
                     label={t("workflows.builder.isFinal")}
                   />
-                  <Select
-                    value={s.color ?? ""}
-                    disabled={!canEdit}
-                    onChange={(e) => updateState(s.uid, { color: e.target.value || null })}
-                    aria-label={t("workflows.builder.color")}
-                    className={styles.colorSelect}
-                  >
-                    <option value="">{t("workflows.builder.colorNone")}</option>
-                    {STATE_COLORS.map((c) => (
-                      <option key={c} value={c}>
-                        {t(`workflows.builder.colors.${c}`)}
-                      </option>
-                    ))}
-                  </Select>
+                  <div className={styles.colorRow}>
+                    <span className={styles.swatch} style={{ background: swatchCss(s.color) }} aria-hidden />
+                    <Select
+                      value={s.color == null ? "" : isPreset(s.color) ? s.color : "custom"}
+                      disabled={!canEdit}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (v === "") updateState(s.uid, { color: null });
+                        else if (v === "custom") updateState(s.uid, { color: isCustomColor(s.color) ? s.color : "#6366f1" });
+                        else updateState(s.uid, { color: v });
+                      }}
+                      aria-label={t("workflows.builder.color")}
+                      className={styles.colorSelect}
+                    >
+                      <option value="">{t("workflows.builder.colorNone")}</option>
+                      {STATE_COLORS.map((c) => (
+                        <option key={c} value={c}>
+                          {t(`workflows.builder.colors.${c}`)}
+                        </option>
+                      ))}
+                      <option value="custom">{t("workflows.builder.colorCustom")}</option>
+                    </Select>
+                    {isCustomColor(s.color) && (
+                      <input
+                        type="color"
+                        className={styles.colorInput}
+                        value={s.color ?? "#6366f1"}
+                        disabled={!canEdit}
+                        onChange={(e) => updateState(s.uid, { color: e.target.value })}
+                        aria-label={t("workflows.builder.colorCustom")}
+                      />
+                    )}
+                  </div>
                 </div>
               </div>
             ))

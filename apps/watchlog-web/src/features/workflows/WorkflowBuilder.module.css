@@ -402,9 +402,64 @@
   min-height: 32px;
 }
 
+.colorRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+  border: 1px solid var(--color-border-default);
+  flex-shrink: 0;
+}
+
 .colorSelect {
   max-width: 150px;
-  margin-left: auto;
+}
+
+.colorInput {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm, 8px);
+  background: var(--color-hover);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.colorInput:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Clave estable del estado (editable, mono). */
+.keyInput {
+  width: 110px;
+  flex-shrink: 0;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  color: var(--color-text-muted);
+  background: var(--color-hover, rgba(255, 255, 255, 0.05));
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 6px;
+  padding: 6px 8px;
+  outline: none;
+  min-height: 32px;
+}
+
+.keyInput:focus {
+  border-color: var(--color-accent-primary);
+  color: var(--color-text-primary);
+}
+
+.keyInput:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .transitionFlow {

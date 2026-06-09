@@ -14,6 +14,8 @@ export interface EditWorkflowState {
   isInitial: boolean;
   isFinal: boolean;
   color: string | null;
+  /** La clave fue fijada por el usuario (deja de seguir al nombre). Solo local. */
+  keyLocked: boolean;
 }
 
 export interface EditWorkflowTransition {
@@ -71,6 +73,8 @@ export function detailToEditWorkflow(detail: WorkflowDetail): EditWorkflow {
       isInitial: s.isInitial,
       isFinal: s.isFinal,
       color: s.color,
+      // Estados ya existentes: preservar su clave (no auto-renombrar al editar el nombre).
+      keyLocked: true,
     })),
     transitions: detail.version.transitions.map((t) => ({
       uid: nextUid(),
