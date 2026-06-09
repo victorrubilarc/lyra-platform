@@ -35,6 +35,10 @@ export const envSchema = z.object({
   APP_PUBLIC_URL: z.string().url().default("http://localhost:5173"),
   // Vida del token de restablecimiento de contraseña, en segundos (def. 30 min).
   PASSWORD_RESET_TTL: z.coerce.number().int().positive().default(1800),
+  // Tope de filas por import CSV de listas de referencia (def. 5000; un CSV de
+  // 5k filas ≈ 400 KB, bajo el bodyLimit de 1 MB de Fastify). Catálogos mayores
+  // van por el sync de Orígenes de Datos (Fase 3), no por archivo.
+  REFERENCE_IMPORT_MAX_ROWS: z.coerce.number().int().positive().default(5000),
 
   // --- Correo saliente (SMTP) ---
   // Interfaz abstracta EmailService → implementación SMTP (nodemailer). En dev se
