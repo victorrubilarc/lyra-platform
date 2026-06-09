@@ -1,6 +1,8 @@
 import {
   createReferenceItemRequestSchema,
   createReferenceListRequestSchema,
+  referenceImportReportSchema,
+  referenceImportRequestSchema,
   referenceItemSchema,
   referenceListDetailSchema,
   referenceListSchema,
@@ -9,6 +11,8 @@ import {
   updateReferenceListRequestSchema,
   type CreateReferenceItemRequest,
   type CreateReferenceListRequest,
+  type ReferenceImportReport,
+  type ReferenceImportRequest,
   type ReferenceItem,
   type ReferenceList,
   type ReferenceListDetail,
@@ -17,7 +21,7 @@ import {
   type UpdateReferenceListRequest,
 } from "@lyra/contracts";
 import { z } from "zod";
-import { apiJson, apiVoid } from "../../lib/api-client.js";
+import { apiBlob, apiJson, apiVoid } from "../../lib/api-client.js";
 
 export function fetchReferenceLists(): Promise<ReferenceList[]> {
   return apiJson("/reference-lists", z.array(referenceListSchema));
@@ -61,4 +65,15 @@ export function updateReferenceItem(
 
 export function deleteReferenceItem(listId: string, itemId: string): Promise<void> {
   return apiVoid(`/reference-lists/${listId}/items/${itemId}`, { method: "DELETE" });
+}
+
+/** Descarga el CSV de los ítems de la lista (el backend lo arma; ';' es-CL). */
+export function exportReferenceListCsv(listId: string): Promise<Blob> {
+  return apiBlob(`/reference-lists/${listId}/export`);
+}
+
+/** Import CSV (dry-run o commit) — devuelve el reporte de diferencias. */
+export function importReferenceListCsv(listId: string, dto: ReferenceImportRequest): Promise<ReferenceImportReport> {
+  referenceImportRequestSchema.parse(dto);
+  return apiJson(`/reference-lists/${listId}/import`, referenceImportReportSchema, { method: "POST", body: dto });
 }
