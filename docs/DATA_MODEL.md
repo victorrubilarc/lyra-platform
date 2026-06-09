@@ -33,9 +33,10 @@
   viva), `createdById/updatedById` (referencia blanda), `deletedAt` (borrado lógico).
 - **Template** *1—N* **TemplateVersion** *(implementado)* — versión **INMUTABLE al publicar** (patrón MMR de
   21 CFR Part 11): `versionNumber`, `status` (DRAFT/PUBLISHED), `name/description` (snapshot), `publishedAt/By`.
-  Referencias **modeladas** (editores 2.2/2.3): `workflowDefinitionId?/workflowDefinitionVersionId?` (sin FK
-  aún — la entidad `WorkflowDefinition` llega en 2.2), `requireSignature` (Part 11 opt-in),
-  `recurrenceKind`/`recurrenceConfig` (rondas/turnos).
+  **Flujo congelado (Fase 2.2):** `workflowDefinitionId?` → `WorkflowDefinition` y `workflowDefinitionVersionId?`
+  → `WorkflowDefinitionVersion`, ambos **FK `onDelete: Restrict`** (la versión publicada congela qué versión de
+  flujo usa; integridad histórica). Además `requireSignature` (Part 11 opt-in) y `recurrenceKind`/`recurrenceConfig`
+  (rondas/turnos, editor 2.3).
 - **TemplateSection** *(implementado)* — unidad atómica de permiso/llenado/firma: `key` (estable), `title`,
   `description?`, `order`, `requireSignature` (opt-in), `editableInStateKey?` (estado del flujo que la
   habilita; null = siempre). *N—N* `Role` vía **TemplateSectionRole** (permiso de llenado por sección).
@@ -69,13 +70,36 @@
 - **EntryChangeLog** — diffs antes/después + motivo (auditoría de edición).
 - **AutoIncidentRule** — reglas que disparan incidencias desde campos (umbral, severidad ≥ N).
 
+### Flujos reutilizables (máquina de estados)
+> **Fase 2.2 (implementado — lado DEFINICIÓN):** migración `20260609163822_add_workflow_definition`. Máquina de
+> estados configurable (estados + transiciones), **NO BPMN**, integrada al RBAC dim. 3. Catálogo reutilizable por
+> varias plantillas. La EJECUCIÓN (transiciones en vivo, firmas, step-up MFA) es 2.5.
+- **WorkflowDefinition** *(implementado)* — contenedor lógico mutable: `key` (estable, único), `name`,
+  `description?`, `status` (DRAFT/PUBLISHED/ARCHIVED), `currentVersionId?`, `createdById/updatedById`, `deletedAt`
+  (borrado lógico). Espejo de `Template`.
+- **WorkflowDefinition** *1—N* **WorkflowDefinitionVersion** *(implementado)* — versión **INMUTABLE al publicar**:
+  `versionNumber`, `status`, `name/description` (snapshot), `publishedAt/By`. Referenciada/congelada por
+  `TemplateVersion`. Editar publicada **clona** un borrador nuevo.
+- **WorkflowState** *(implementado)* — estado de la máquina: `key` (estable en la versión), `name`, `description?`,
+  `order`, `isInitial` (exactamente uno), `isFinal` (≥1), `color?` (token DS). `TemplateSection.editableInStateKey`
+  referencia un estado por **clave** dentro de la versión de flujo congelada (no FK; ver DECISIONS 2026-06-09).
+- **WorkflowTransition** *(implementado)* — transición dirigida: `key`, `label`, `fromStateId`/`toStateId` (FK a
+  `WorkflowState` de la misma versión), `order`, `requireSignature`+`signatureMeaning?` (Part 11 opt-in),
+  `requireMfa` (step-up AAL). *N—N* `Role` vía **WorkflowTransitionRole** (roles autorizados a ejecutar la
+  transición = **dato**, no clave de catálogo; se honra en ejecución 2.5).
+- **Validación de la máquina** (`validateWorkflowMachine` en `@lyra/contracts`, fuente única contrato+backend+UI):
+  1 inicial exacto, ≥1 final, claves únicas, transiciones con estados existentes, alcanzabilidad desde el inicial,
+  sin trampas (todo estado llega a un final). Se exige válida para **publicar**.
+
 ### Orígenes de datos
 - **DataSource** — URL base, tipo de auth, **credencial cifrada en reposo**. *1—N* **DataSourceEndpoint** (path, método, mapeo JSONPath, TTL). Caché en Redis.
 
 ### Incidencias (workflow HSE)
 - **Incident** — severidad, prioridad, estado, asignado, reporter, SLA/due, protocolo, origen.
 - **IncidentComment**, **IncidentActivity** (timeline append-only), **IncidentAttachment**.
-- **WorkflowDefinition** *1—N* **WorkflowTransition** — estados y transiciones configurables (permiso por transición).
+- **Flujo de incidencias** — reutiliza la entidad **WorkflowDefinition** ya implementada en Fase 2.2 (estados +
+  transiciones + roles por transición). En Fase 4 una incidencia instancia/avanza por un flujo configurable, igual
+  patrón que los registros de bitácora; no se duplica el modelo de máquina de estados.
 
 ### Turnos
 - **ShiftPattern** *1—N* **Shift** — régimen configurable.

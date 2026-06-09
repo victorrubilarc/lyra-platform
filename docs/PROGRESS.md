@@ -1,10 +1,10 @@
 # Progreso — Lyra WatchLog
 
-Última actualización: 2026-06-09 (**Fase 1 completa**; **Fase 2.1 ✅** + **Fase 2.1.1 ✅** — Plantillas: modelo de
-DEFINICIÓN (`Template`/`TemplateVersion` inmutable/secciones/campos) + **campo en 3 capas** (`type`/`dataType`
-derivado/`semanticRole`) + **`optionSource`** discriminado (inline; referenceList/external modelados) + contratos +
-**Form Builder** (lista + builder 3-columnas + vista previa + borrador/publicar + toggle fecha efectiva).
-**Siguiente: Fase 2.2 — Flujos reutilizables (`WorkflowDefinition`)**).
+Última actualización: 2026-06-09 (**Fase 1 completa**; **Fase 2.1 ✅** + **Fase 2.1.1 ✅** + **Fase 2.2 ✅** —
+Plantillas: modelo de DEFINICIÓN + campo en 3 capas + `optionSource` + Form Builder; **Flujos reutilizables
+`WorkflowDefinition`**: máquina de estados versionable/congelable + mantenedor propio + binding a versiones de
+plantilla y secciones→estados + override de rol por campo). **Siguiente: Fase 2.x — Datos de referencia / Listas
+(`ReferenceList`/`ReferenceItem`)** (o 2.3 Rondas, según prioridad).
 
 ## Estado por fase
 
@@ -12,7 +12,7 @@ derivado/`semanticRole`) + **`optionSource`** discriminado (inline; referenceLis
 |---|---|---|
 | 0 | **Cimientos** (monorepo, Docker, Design System tokens, contratos, API health) | ✅ Hecho |
 | 1 | Seguridad (auth + RBAC/ABAC) + Estructura organizacional + AuditLog | ✅ Backend ✅ · UI: Login ✅ · **Estructura ✅ (+ Equipos ✅)** · **Seguridad ✅** |
-| 2 | Plantillas / Form Builder + Bitácoras | 🔄 **2.1 ✅** + **2.1.1 ✅** (modelo definición + 3 capas/`optionSource` + Form Builder) · 2.2–2.7 pendientes |
+| 2 | Plantillas / Form Builder + Bitácoras | 🔄 **2.1 ✅** + **2.1.1 ✅** + **2.2 ✅** (Form Builder + Flujos reutilizables) · 2.3–2.7 pendientes |
 | 3 | Orígenes de datos | ⬜ Pendiente |
 | 4 | Motor de incidencias | ⬜ Pendiente |
 | 5 | Cambio de turno + IA (resumen) | ⬜ Pendiente |
@@ -477,10 +477,46 @@ Todo aditivo/no destructivo. Ver DECISIONS 2026-06-09 (entrada "2.1.1 implementa
   limpiados.
 - **Pendiente**: smoke **VISUAL** en navegador (toggle fecha efectiva, editor de opciones inline) — ver BACKLOG §4.
 
+## Hecho en Fase 2.2 (Flujos reutilizables — `WorkflowDefinition`)
+
+Máquina de estados configurable (estados + transiciones), NO BPMN, integrada al RBAC dim. 3. Solo lado
+DEFINICIÓN (la ejecución sigue diferida a 2.4/2.5). Ver DECISIONS 2026-06-09 ("Fase 2.2 implementado"). Rama
+`feat/workflows`, 5 commits (contratos+permisos / migración / backend+binding / web mantenedor / web form builder).
+
+- **Contratos** (`@lyra/contracts/workflows`): `WorkflowDefinition` 1—N `WorkflowDefinitionVersion` (inmutable) →
+  estados + transiciones (con `roleIds` por transición, firma+significado, MFA step-up). **`validateWorkflowMachine`**
+  = fuente única de validación FSM (1 inicial, ≥1 final, claves únicas, refs válidas, alcanzabilidad, sin trampas),
+  usada por contrato + backend + builder web. DTOs y requests create/update/saveDraft(bulk)/publish/list. **+13 specs**.
+- **Permisos** (catálogo **33→37**): `module:workflows:view/manage` + `workflow:view/manage`. La autorización por
+  transición es DATO (`WorkflowTransitionRole`), no clave. Seed los asigna al rol admin.
+- **Prisma** (migración aditiva `20260609163822_add_workflow_definition`): modelos Workflow* + enums + **FK desde
+  `TemplateVersion`** (reemplaza las columnas string de 2.1, `onDelete: Restrict`). 100% aditiva (CREATE + ADD
+  CONSTRAINT sobre columnas en null). Aplicada con `migrate deploy` (esquiva el EPERM del DLL con el watch vivo).
+- **Backend** `WorkflowsModule`: CRUD gateado/auditado con patrón clonar-borrador-al-editar e inmutabilidad al
+  publicar (espejo de `TemplatesService`); valida la máquina en backend (al guardar y al publicar); `remove`
+  bloquea flujos en uso. **`TemplatesService.saveDraft`** resuelve/valida el binding del flujo (existe, publicado,
+  versión vigente) y que cada `editableInStateKey` de sección sea un estado de esa versión; preserva el binding al
+  clonar. Contrato `saveTemplateDraft` gana `workflowDefinitionId/VersionId`. **+10 tests** (WorkflowsService).
+- **Web** `features/workflows`: **WorkflowsPage** (grilla de cards estilo Plantillas) + **WorkflowBuilder** (editor
+  declarativo de estados [inicial único/final/color] y transiciones [from→to, firma, MFA, roles permitidos] con
+  **validación FSM en vivo**; publicar deshabilitado si es inválida; borrador/publicar). Navegación `/flujos` gateada
+  por `module:workflows:view`, i18n namespace `workflows`. **Form Builder** ampliado: selector de flujo publicado +
+  mapeo sección→estado (`editableInStateKey`) + **editor de override de rol por campo** (`TemplateFieldRole`).
+- **Degradación elegante:** una plantilla sin flujo (`workflowDefinitionId = null`) se comporta como form simple
+  (ninguna sección declara estado; todas siempre editables).
+- **Verificación**: `typecheck`/`lint` (0 errores; 1 warning preexistente en OrgTree)/`build` (web **1911** módulos;
+  API NO se buildea por el watch)/`test` (**contracts 36** +13 · permissions 5 · **API 88** +10) en verde. **Smoke en
+  vivo** (demo): flujo crear→borrador→máquina inválida 400→publicar (congela)→listar→borrar 204; binding
+  plantilla↔flujo (estado válido persiste; estado inexistente / versión no vigente / flujo EN USO → 400). Datos de
+  prueba limpiados (hard-delete).
+- **Pendiente**: smoke **VISUAL** en navegador (ver BACKLOG §4): `/flujos` (grilla, crear, builder con estados/
+  transiciones/roles/firma/MFA, validación en vivo, publicar), y en el Form Builder asignar flujo + mapear
+  secciones→estados + override de rol por campo; modo claro.
+
 ## Próximo paso
-**Fase 2.1 + 2.1.1 completas** (Plantillas: modelo definición + campo en 3 capas + `optionSource` + Form Builder).
-**Sesión siguiente = Fase 2.2 · Flujos reutilizables (`WorkflowDefinition`) — mantenedor propio + binding a
-versiones de plantilla y secciones→estados.** (Ver BACKLOG §2.)
+**Fase 2.1 + 2.1.1 + 2.2 completas.** **Sesión siguiente = Fase 2.x · Datos de referencia / Listas
+(`ReferenceList`/`ReferenceItem`)** — mantenedor hermano de Estructura/Seguridad + binding del `optionSource.referenceList`
+(o **2.3 Rondas/`LogPeriod`** según prioridad). Ver BACKLOG §2.
 
 **Mejora futura registrada (BACKLOG §2):** seguridad a nivel de nodo en el mantenedor de Estructura (ABAC
 enterprise: asignar usuarios/roles a nodos desde el propio árbol, "quién accede a este nodo"). El modelo ya
