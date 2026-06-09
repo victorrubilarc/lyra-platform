@@ -5,8 +5,8 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-08** (cierre de la **UI de Seguridad**: usuarios/roles/política/auditoría + reset
-> MFA de admin sobre `/security/*`; **Fase 1 funcionalmente completa**; **siguiente: Fase 2 — Plantillas / Form Builder**).
+> actualización: **2026-06-09** (**Fase 2.1 ✅** — Plantillas: modelo definición + contratos + Form Builder;
+> **siguiente: Fase 2.2 — Flujos reutilizables `WorkflowDefinition`**).
 
 ---
 
@@ -41,8 +41,9 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Docs cierre + fix header responsivo del detalle** | `main` | ✅ publicado (`91a4bd6`) | ninguna |
 | **Módulo Equipos** (CRUD + categorías + `ExternalReference` modelo) | `main` (fusionado desde `feat/equipos`) | ✅ fusionado y publicado en `origin/main` (`a299ab6`) | ninguna |
 | **UI de Seguridad** (usuarios/roles/política/auditoría + reset MFA) | `main` (fusionado desde `feat/seguridad-ui`) | ✅ fusionado y publicado en `origin/main` (`a6f8b10`) | ninguna |
+| **Fase 2.1 Plantillas** (modelo definición + contratos + Form Builder) | `feat/plantillas` (3 commits) | ⏳ a fusionar a `main` + push al cerrar la sesión | merge + push |
 
-**Estado:** **nada vive solo en local.** `main` = `origin/main`.
+**Estado:** al cerrar 2.1 se fusiona `feat/plantillas` → `main` y se publica (`origin/main`).
 
 **Convención propuesta (a confirmar):** trabajar cada módulo en rama `feat/<modulo>`;
 al cerrar la sesión → push de la rama + merge a `main` + push de `main`. Así `origin/main`
@@ -160,13 +161,14 @@ nunca queda más de una sesión atrás.
       definición versionada vs ejecución auditada; flujo = máquina de estados configurable integrada al RBAC
       dim. 3; firmas estilo Part 11 opt-in). **El modelo se diseña completo desde el inicio** (secciones +
       flujo + versionado + firma) para no migrar; la UI/comportamiento se construye por sesiones:
-  - [ ] **2.1 Plantillas: modelo + contratos + Form Builder (estructura).** `Template`/`TemplateVersion`
-        inmutable + **secciones** + campos (tipos núcleo: número con min/max/umbral/unidad, texto, textarea,
-        select/multiselect, booleano, fecha/datetime) + validaciones básicas + permiso por sección (con
-        override por campo en el modelo) + vista previa + borrador/publicar. Referencias a `WorkflowDefinition`,
-        firma y recurrencia **modeladas en contratos** (sus editores vienen en 2.2/2.3). **Sin llenado.**
-        ← *próxima sesión* (mirar `prototipo.tsx`). Lente proactiva: buscador de plantillas, estados
-        vacíos/carga, permisos, dual theme.
+  - [x] **2.1 Plantillas: modelo + contratos + Form Builder (estructura).** ✅ (2026-06-09). `Template` 1—N
+        `TemplateVersion` inmutable (MMR Part 11) + **secciones** + campos núcleo (número con min/max/**umbral
+        ISA-18.2**/unidad, texto, textarea, select/multiselect, booleano, fecha/datetime) + SEVERITY/SIGNATURE
+        modelados + validación de config por tipo en backend + permiso por sección (override por campo en el
+        modelo) + **vista previa** + **borrador/publicar** (congela versión, editar publicada clona borrador).
+        Referencias a `WorkflowDefinition`/firma/recurrencia como columnas (editores 2.2/2.3). 7 permisos
+        nuevos (catálogo 33). `@lyra/ui`: `Textarea`. **Sin llenado.** Ver PROGRESS y DECISIONS 2026-06-09.
+        **Pendiente: smoke VISUAL** (ver §4).
   - [ ] **2.2 Flujos reutilizables (`WorkflowDefinition`):** mantenedor propio (catálogo, estilo Roles) —
         estados + transiciones + roles/permiso por transición + config de firma; versionado/congelable.
         Asignar un flujo a una versión de plantilla y mapear secciones→estados editables.
@@ -262,6 +264,13 @@ probatoria (hash+timestamp). Ref: `DECISIONS.md` (sección de recomendaciones).
       **reset de MFA**, MFA self-service probado en vivo), CRUD de roles + **matriz de permisos** con buscador
       + `requireMfa`, **política** (incl. `mfaMode`), **auditoría** filtrable + export CSV, búsquedas y
       exportaciones. Pendiente menor no bloqueante: QA explícito de **modo claro** (ítem propio más abajo).
+- [ ] **Plantillas 2.1 — smoke VISUAL en navegador** (se verificó typecheck/lint/build/test + smoke por API;
+      falta el clic): `/plantillas` (grilla, buscador, filtro de estado, estados vacíos), crear plantilla
+      (modal → builder), builder (agregar sección, agregar campos núcleo desde la paleta, configurar etiqueta/
+      obligatorio, NÚMERO con unidad+min/max+**bandas de umbral**, opciones de select, **condicional por
+      booleano**, **roles por sección**, firma Part 11 opt-in, reordenar con flechas, borrar), **vista previa**
+      (incl. número fuera de rango), **Guardar borrador** y **Publicar** (confirmación + versión congelada),
+      editar publicada (crea borrador v2), borrar plantilla; modo claro. App en `:5173`.
 - [ ] **Modo claro — QA visual** (nuevo): revisar que TODO el workspace se vea premium en **claro**
       (contraste WCAG, glass, glows, severidades, tablas futuras, drawers/modales) y que `auto` siga al
       sistema. El default es oscuro; el login es siempre oscuro. Ref: DECISIONS 2026-06-06.

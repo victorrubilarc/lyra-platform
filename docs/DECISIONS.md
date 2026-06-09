@@ -4,6 +4,47 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-09 · Fase 2.1 — Plantillas: modelo de DEFINICIÓN + contratos + Form Builder (implementado)
+
+Implementación de 2.1 sobre la arquitectura fijada el mismo día (ver entrada siguiente). Decisiones de
+ejecución tomadas con el usuario (4 forks, todos con la opción recomendada):
+
+- **Umbrales del campo NÚMERO = bandas estilo ISA-18.2.** `config` lleva `min`/`max` (rango válido duro) +
+  bandas opcionales `warnLow/warnHigh` (advertencia) y `critLow/critHigh` (crítico). El cruce del rango
+  crítico **alimentará** la creación de incidencia en Fase 4. Es más rico que el `min/max` único del
+  prototipo y diferencia a Lyra de un Forms genérico. Retro-compatible.
+- **Tablas de EJECUCIÓN diferidas a 2.4.** En 2.1 se migra SOLO el lado **definición** (`Template`,
+  `TemplateVersion`, `TemplateSection`, `TemplateField`, joins `TemplateSectionRole`/`TemplateFieldRole`).
+  Las tablas `LogEntry*` se diseñan en contratos pero se migran cuando se construya el llenado (2.4), donde
+  su forma se valida con lógica real. **Agregar tablas nuevas es aditivo/no destructivo** ⇒ no contradice
+  "diseñar el modelo completo desde el inicio" (lo que esa regla evita son los `ALTER` destructivos).
+- **`WorkflowDefinition` como entidad llega en 2.2.** En 2.1 la versión referencia el flujo por **columnas**
+  (`workflowDefinitionId`/`workflowDefinitionVersionId` nullable, sin FK) y la sección guarda
+  `editableInStateKey` (clave de estado, sin FK). La entidad y su FK se añaden con su mantenedor en 2.2.
+  Firma (`requireSignature` en versión y sección) y recurrencia (`recurrenceKind`/`recurrenceConfig`) van
+  como columnas opt-in modeladas; sus editores en 2.3/2.5.
+- **Tipos de campo = 8 núcleo con editor + SEVERITY/SIGNATURE modelados.** El enum `FieldType` tiene los 10;
+  el builder edita los 8 núcleo (NUMBER/TEXT/TEXTAREA/SELECT/MULTISELECT/BOOLEAN/DATE/DATETIME). Agregar más
+  valores al enum en Postgres es aditivo (no re-migra).
+- **Permiso por sección editable ahora; override por campo modelado.** El builder asigna **roles por
+  sección** (join `TemplateSectionRole`). El override por campo (`TemplateFieldRole`) existe en el modelo;
+  su editor llega en 2.2 junto al binding sección→estado del flujo.
+
+**Inmutabilidad / versionado (patrón MMR de 21 CFR Part 11):** el builder edita SIEMPRE una versión en
+**BORRADOR**. Publicar congela esa versión (`PUBLISHED`, `publishedAt/By`) y fija `Template.currentVersionId`.
+Editar una plantilla publicada **clona** la versión publicada en un nuevo borrador `v(n+1)` (las publicadas
+nunca se mutan). Verificado en smoke en vivo (crear→borrador→publicar v1→editar→clona borrador v2→borrar).
+
+**`config` como JSONB validado por unión Zod** (`fieldConfigSchemaFor(type)`), no columnas por atributo: el
+universo de tipos/config es abierto y heterogéneo; columnas serían un mar de NULLs. La validación de config
+**contra el tipo** se aplica en backend (request `saveDraft`) — verificado: opciones en un NÚMERO ⇒ 400.
+
+**Claves estables de sección/campo:** se generan al crear (slug único) y se preservan; el `visibleWhen`
+(condicional) referencia por clave, estable entre recargas. **Alcance ABAC al listar:** plantillas globales
+(sin nodo) visibles para todos; las ancladas a un nodo, solo si está en el alcance del usuario (reusa
+`ScopeService`). **Nuevo primitivo `@lyra/ui`: `Textarea`** (los demás componentes se reusaron; los del
+builder son de dominio y viven en `features/templates`).
+
 ### 2026-06-09 · Fase 2 — Arquitectura enterprise del Form Builder (forks CONFIRMADOS por el usuario)
 
 > Diseño de fondo pedido por el usuario para que el módulo de plantillas/bitácoras marque diferencia con
