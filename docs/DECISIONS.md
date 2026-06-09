@@ -4,6 +4,88 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-09 · Fase 2 — Arquitectura enterprise del Form Builder (PROPUESTA, pendiente de confirmar forks)
+
+> Diseño de fondo pedido por el usuario para que el módulo de plantillas/bitácoras marque diferencia con
+> sistemas tipo "Forms" genéricos. Anclado a **registros electrónicos GxP / 21 CFR Part 11** (batch records),
+> **máquinas de estado** (no BPMN pesado) y a la auth RBAC/ABAC ya existente. Pendiente confirmar los forks
+> del final (firmas, rondas programadas, granularidad). Aún NO se programa.
+
+**Paradigma (la idea que rompe con "un form plano"):** un formulario **no** es una lista de campos que se
+llena de una vez; es un **proceso = documento vivo** compuesto de **secciones**, donde cada sección tiene
+**dueño** (rol/permiso), **momento** (estado del flujo en que es editable) y **estado de completitud/firma**.
+El **registro** (entrada de bitácora) instancia una **versión** de la plantilla y avanza por un **flujo de
+estados configurable**; en cada estado se habilitan/bloquean secciones para ciertos roles. *Quién llena qué y
+cuándo* **emerge** de `secciones × flujo × RBAC/ABAC`, sin lógica a medida. Es el paradigma del **registro
+electrónico por lotes (EBR/GxP)** aplicado a bitácoras operacionales.
+
+**Elegancia clave — la maquinaria enterprise es OPT-IN (degradación elegante):** una plantilla con **una
+sección, un estado, sin firma** se comporta como un form simple tipo Google Forms. Secciones múltiples, flujo,
+permisos por sección y firmas se activan **solo cuando se configuran**. Así no complejizamos lo simple.
+
+**La SECCIÓN es la unidad atómica** de: permiso de llenado, asignación a estado del flujo, completitud,
+bloqueo y firma. Resuelve el requisito "varios usuarios llenan distintas secciones en distintos instantes":
+el operador A llena la Sección 1 en T1 (atribuida `filledBy/At`, opcionalmente firmada → bloqueada), el
+técnico B llena la Sección 2 en T2. **No hay bloqueo global del formulario**; la concurrencia es por sección
+(concurrencia optimista con revisión por sección). "Distintos permisos por instante" = la editabilidad de una
+sección es función de **(estado del flujo) × (rol/permiso) × (alcance ABAC)**.
+
+**Definición (config versionada) vs Ejecución (relacional + auditada):**
+- *Definición:* `Template` + **`TemplateVersion` inmutable** (al publicar se congela: secciones, campos,
+  flujo y config de firma). Las entradas referencian una **versión** concreta → editar la plantilla luego no
+  altera registros históricos (auditabilidad). Campos con `type`, `required`, validaciones (min/max/umbral/
+  unidad/regex), visibilidad condicional, orden, sección.
+- *Ejecución:* `LogEntry` (versión, alcance/nodo/equipo, periodo/turno opcional, `currentState`),
+  `LogEntrySection` (estado pending/in_progress/completed/locked + `filledBy/At` + firma), `LogEntryValue`
+  (valor actual) con **historial por campo** (reusar `AuditLog` quién/qué/cuándo/antes-después),
+  `LogEntryTransition` (log del flujo: from→to, actor, motivo, firma).
+
+**Flujo = máquina de estados configurable, integrada al RBAC dim. 3 (workflows):** estados + transiciones;
+cada transición guarda **roles/permiso permitidos como DATO** (no hardcodeado) + flags `requireSignature?`,
+`requireMfa?` (step-up AAL para acciones críticas). Entrar a un estado recomputa qué secciones son editables.
+Esto reusa la dimensión 3 de permisos ya diseñada (`docs/SECURITY.md` §2). **No** se usa un motor BPMN: una
+máquina de estados liviana y declarativa basta.
+
+**Firmas electrónicas (diferenciador enterprise, estilo Part 11):** opcionales por completitud de sección y
+por transición. Registran `userId`, timestamp UTC, **significado** ("Revisado"/"Aprobado") y **hash del
+payload firmado**; re-autenticación (contraseña/MFA step-up) configurable. Junto con la auditoría append-only
+ya existente → registros con validez probatoria (minería/farma/energía). Es lo que separa esto de un Forms
+genérico.
+
+**Validación y umbrales:** el backend valida valores contra las reglas de la versión al guardar y como
+**guardas de transición** (p. ej. no se puede "enviar" si faltan secciones obligatorias). Los umbrales marcan
+lecturas fuera de rango y **modelan** una regla que, en **Fase 4 (motor de incidencias)**, disparará una
+incidencia. En Fase 2 solo se modela la regla; **la creación de la incidencia se integra en Fase 4**.
+
+**Cómo atacarlo sin perder el hilo (un objetivo por sesión; el MODELO se diseña completo desde el inicio para
+no migrar después):**
+1. **Plantillas: modelo + contratos + Form Builder (estructura).** `Template`/`TemplateVersion` + secciones +
+   campos (tipos núcleo) + validaciones básicas + **vista previa** + **borrador/publicar con versión
+   inmutable**. Flujo y firma quedan **modelados en contratos** aunque su editor UI venga después. Sin llenado.
+2. **Editor de flujo + permisos de sección** (definición): estados/transiciones, asignar secciones a estados y
+   roles, config de firma.
+3. **Llenado (Nueva entrada) multi-actor:** secciones editables según estado+rol; guardar con validación
+   backend + auditoría por campo + concurrencia por sección.
+4. **Ejecución de flujo + firmas:** transiciones gateadas, firma electrónica (re-auth/MFA), bloqueo/desbloqueo
+   de secciones, log de transiciones.
+5. **Bitácoras: listado + detalle + línea de tiempo + log de cambios** (vista de auditor del registro vivo).
+6. **(cruce Fase 4)** reglas que disparan incidencias.
+
+**Permisos nuevos (catálogo `@lyra/contracts`, asignación = dato):** `template:view/create/edit/publish/delete`,
+`logentry:view/create/fill`, y transiciones vía datos de la transición (roles permitidos) en lugar de claves
+hardcodeadas. Confirmar en el diseño detallado.
+
+**Forks a confirmar con el usuario (definen el modelo final):**
+1. "Varios instantes en el tiempo": ¿(a) un mismo registro colaborativo llenado por fases [lo central],
+   (b) además **rondas/lecturas programadas recurrentes** por turno/periodo, o (c) ambas? — (b) agrega modelar
+   periodo/turno/programación.
+2. **Firmas electrónicas** estilo Part 11 con re-auth/MFA en transiciones críticas: ¿sí, configurables por
+   plantilla? (recomendado).
+3. **Granularidad** de permisos de llenado: **sección** como unidad por defecto, con override por campo
+   opcional (recomendado) vs campo siempre.
+4. **Flujo** embebido en la versión de plantilla (definición versionada) y ejecución normalizada (recomendado)
+   vs definiciones de flujo reutilizables entre plantillas desde ya.
+
 ### 2026-06-08 · Reset de contraseña por administrador (contraseña temporal, estilo AD)
 
 Hueco detectado en la UI de Seguridad: no había forma de que un admin restableciera la contraseña de un
