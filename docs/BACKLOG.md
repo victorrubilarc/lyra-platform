@@ -229,13 +229,12 @@ probatoria (hash+timestamp). Ref: `DECISIONS.md` (sección de recomendaciones).
       `EquipmentDrawer` (tag, categoría, criticidad, toggle de estado); edición inline del orden; abrir
       `CategoriesDrawer` (crear/editar/activar/eliminar categoría); borrar equipo (modal); chips de
       criticidad (colores Severidad 1–5) y de estado; modo claro y oscuro. App en `:5173`.
-- [ ] **Seguridad — smoke VISUAL en navegador** (se verificó typecheck/lint/build/test + smoke por API:
-      `GET users/roles/permissions/policy/audit` 200, forma del contrato de auditoría, round-trip de rol
-      crear/leer/borrar; falta el clic): navegar las sub-tabs `/seguridad/{usuarios,roles,politica,auditoria}`
-      (deep-link + breadcrumb + una sola pestaña), alta de usuario (contraseña temporal + generador),
-      seleccionar usuario → editar datos/roles/**scope** (árbol + incluye descendientes)/**reset MFA**;
-      CRUD de roles + **matriz de permisos** (grupo con indeterminado) + `requireMfa`; editar **política**
-      (incl. `mfaMode`); leer **auditoría** + modal de diff + "cargar más"; modo claro y oscuro. App en `:5173`.
+- [x] **Seguridad — smoke VISUAL en navegador** ✅ (2026-06-09, confirmado por el usuario): sub-tabs
+      `/seguridad/{usuarios,roles,politica,auditoria}` (deep-link + breadcrumb + una sola pestaña), alta de
+      usuario, detalle con pestañas (datos/roles/**scope** con buscador/**Seguridad**: reset de contraseña +
+      **reset de MFA**, MFA self-service probado en vivo), CRUD de roles + **matriz de permisos** con buscador
+      + `requireMfa`, **política** (incl. `mfaMode`), **auditoría** filtrable + export CSV, búsquedas y
+      exportaciones. Pendiente menor no bloqueante: QA explícito de **modo claro** (ítem propio más abajo).
 - [ ] **Modo claro — QA visual** (nuevo): revisar que TODO el workspace se vea premium en **claro**
       (contraste WCAG, glass, glows, severidades, tablas futuras, drawers/modales) y que `auto` siga al
       sistema. El default es oscuro; el login es siempre oscuro. Ref: DECISIONS 2026-06-06.
