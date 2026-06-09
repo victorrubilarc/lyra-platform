@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, ArrowRight, ChevronDown, ChevronRight, Info, ListChecks, PlayCircle, Plus, Save, Trash2, TriangleAlert } from "lucide-react";
-import { Button, Card, Checkbox, Chip, FormField, Input, Modal, MultiSelect, Select, Textarea, Toggle, useToast } from "@lyra/ui";
+import { Button, Card, Checkbox, Chip, cx, FormField, Input, Modal, MultiSelect, Select, Textarea, Toggle, useToast } from "@lyra/ui";
 import { validateWorkflowMachine, type WorkflowDetail } from "@lyra/contracts";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { fetchRoles } from "../security/security-api.js";
@@ -34,6 +34,16 @@ export function WorkflowBuilder({ detail }: { detail: WorkflowDetail }) {
   const [dirty, setDirty] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
+  const [collapsedTransitions, setCollapsedTransitions] = useState<Set<string>>(new Set());
+
+  function toggleTransitionCollapse(uid: string) {
+    setCollapsedTransitions((prev) => {
+      const next = new Set(prev);
+      if (next.has(uid)) next.delete(uid);
+      else next.add(uid);
+      return next;
+    });
+  }
 
   const save = useSaveWorkflowDraft();
   const publish = usePublishWorkflow();
@@ -351,12 +361,39 @@ export function WorkflowBuilder({ detail }: { detail: WorkflowDetail }) {
           {wf.transitions.length === 0 ? (
             <div className={styles.empty}>{t("workflows.builder.noTransitions")}</div>
           ) : (
-            wf.transitions.map((tr, idx) => (
+            wf.transitions.map((tr, idx) => {
+              const open = !collapsedTransitions.has(tr.uid);
+              return (
               <div key={tr.uid} className={styles.itemCard}>
-                <div className={styles.itemHeader}>
-                  <span className={styles.indexBadge}>{idx + 1}</span>
-                  <span className={styles.itemHeaderTitle}>{t("workflows.builder.transitionN", { n: idx + 1 })}</span>
+                <div className={cx(styles.collapsibleHeader, open && styles.headerOpen)}>
+                  <button
+                    type="button"
+                    className={styles.headerToggle}
+                    onClick={() => toggleTransitionCollapse(tr.uid)}
+                    aria-expanded={open}
+                    aria-label={t(open ? "workflows.builder.collapse" : "workflows.builder.expand")}
+                  >
+                    {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                    <span className={styles.indexBadge}>{idx + 1}</span>
+                    {open ? (
+                      <span className={styles.itemHeaderTitle}>{t("workflows.builder.transitionN", { n: idx + 1 })}</span>
+                    ) : (
+                      <span className={styles.collapsedSummary}>
+                        <span className={styles.collapsedLabel}>{tr.label || t("workflows.builder.transitionN", { n: idx + 1 })}</span>
+                        <span className={styles.collapsedFlow}>
+                          {stateName(tr.fromStateKey)} <ArrowRight size={11} /> {stateName(tr.toStateKey)}
+                        </span>
+                        {tr.requireSignature && <span className={styles.miniTag}>{t("workflows.builder.tagSignature")}</span>}
+                        {tr.requireMfa && <span className={styles.miniTag}>MFA</span>}
+                        {tr.roleIds.length > 0 && <span className={styles.miniTag}>{t("workflows.builder.tagRoles", { count: tr.roleIds.length })}</span>}
+                      </span>
+                    )}
+                  </button>
+                  <button type="button" className={styles.iconBtnDanger} onClick={() => deleteTransition(tr.uid)} disabled={!canEdit} aria-label={t("common.delete")}>
+                    <Trash2 size={14} />
+                  </button>
                 </div>
+                {open && (<>
                 <div className={styles.itemTop}>
                   <Input
                     value={tr.label}
@@ -364,9 +401,6 @@ export function WorkflowBuilder({ detail }: { detail: WorkflowDetail }) {
                     onChange={(e) => updateTransition(tr.uid, { label: e.target.value })}
                     aria-label={t("workflows.builder.transitionLabel")}
                   />
-                  <button type="button" className={styles.iconBtnDanger} onClick={() => deleteTransition(tr.uid)} disabled={!canEdit} aria-label={t("common.delete")}>
-                    <Trash2 size={14} />
-                  </button>
                 </div>
                 <div className={styles.transitionFlow}>
                   <Select
@@ -447,8 +481,10 @@ export function WorkflowBuilder({ detail }: { detail: WorkflowDetail }) {
                     />
                   )}
                 </div>
+                </>)}
               </div>
-            ))
+              );
+            })
           )}
         </Card>
       </div>
