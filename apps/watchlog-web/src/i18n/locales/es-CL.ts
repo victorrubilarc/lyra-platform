@@ -338,6 +338,15 @@ export const esCL = {
       unsavedSection: "campo(s)",
       sectionCount_one: "{{count}} campo",
       sectionCount_other: "{{count}} campos",
+      workflow: "Flujo de trabajo",
+      workflowHint:
+        "Flujo reutilizable que gobierna los estados del registro. Sin flujo = formulario simple (todas las secciones siempre editables).",
+      workflowNone: "Sin flujo (formulario simple)",
+      editableInState: "Editable en el estado",
+      editableInStateHint: "La sección solo se podrá llenar cuando el registro esté en este estado (Fase 2.4).",
+      editableAlways: "Editable en cualquier estado",
+      fieldRoles: "Roles del campo (override)",
+      fieldRolesHint: "Si seleccionas roles, sustituyen a los de la sección para este campo. Vacío = hereda la sección.",
     },
   },
   workflows: {

@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { Checkbox, FormField, Input, Select, Textarea, Toggle } from "@lyra/ui";
-import type { OptionInlineItem, RoleSummary } from "@lyra/contracts";
+import type { OptionInlineItem, RoleSummary, WorkflowStateDto } from "@lyra/contracts";
 import { fieldTypeMeta, slugifyKey, type EditField, type EditSection } from "./builder-model.js";
 import styles from "./TemplateBuilder.module.css";
 
@@ -20,6 +20,10 @@ interface BuilderConfigPanelProps {
   field: EditField | null;
   roles: RoleSummary[];
   booleanFields: BooleanFieldRef[];
+  /** Estados del flujo asignado (para mapear sección → estado editable). */
+  workflowStates: WorkflowStateDto[];
+  /** Hay un flujo asignado a la versión. */
+  hasWorkflow: boolean;
   onUpdateSection: (patch: Partial<EditSection>) => void;
   onUpdateField: (patch: Partial<EditField>) => void;
 }
@@ -50,6 +54,8 @@ export function BuilderConfigPanel({
   field,
   roles,
   booleanFields,
+  workflowStates,
+  hasWorkflow,
   onUpdateSection,
   onUpdateField,
 }: BuilderConfigPanelProps) {
@@ -190,6 +196,33 @@ export function BuilderConfigPanel({
             )}
           </FormField>
         )}
+
+        {/* Override de permiso por campo (TemplateFieldRole): vacío = hereda la sección. */}
+        <div>
+          <div className={styles.configSubLabel}>{t("templates.builder.fieldRoles")}</div>
+          <p className={styles.thresholdHint}>{t("templates.builder.fieldRolesHint")}</p>
+          {roles.length === 0 ? (
+            <p className={styles.modeledNote}>{t("templates.builder.noRoles")}</p>
+          ) : (
+            <div className={styles.rolesList}>
+              {roles.map((r) => (
+                <div key={r.id} className={styles.inlineCheck}>
+                  <Checkbox
+                    checked={field.roleIds.includes(r.id)}
+                    label={r.name}
+                    onChange={(checked) =>
+                      onUpdateField({
+                        roleIds: checked
+                          ? [...field.roleIds, r.id]
+                          : field.roleIds.filter((x) => x !== r.id),
+                      })
+                    }
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     );
   }
@@ -241,6 +274,26 @@ export function BuilderConfigPanel({
             </div>
           )}
         </div>
+
+        {/* Estado del flujo en que la sección es editable (Fase 2.2). */}
+        {hasWorkflow && (
+          <FormField label={t("templates.builder.editableInState")} hint={t("templates.builder.editableInStateHint")}>
+            {({ id }) => (
+              <Select
+                id={id}
+                value={section.editableInStateKey ?? ""}
+                onChange={(e) => onUpdateSection({ editableInStateKey: e.target.value || null })}
+              >
+                <option value="">{t("templates.builder.editableAlways")}</option>
+                {workflowStates.map((s) => (
+                  <option key={s.key} value={s.key}>
+                    {s.name}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </FormField>
+        )}
 
         <div className={styles.inlineCheck}>
           <Toggle

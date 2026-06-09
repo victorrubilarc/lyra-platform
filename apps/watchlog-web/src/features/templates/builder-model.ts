@@ -83,6 +83,8 @@ export interface EditSection {
   title: string;
   description: string | null;
   requireSignature: boolean;
+  /** Estado del flujo en que la sección es editable (clave). null = siempre. */
+  editableInStateKey: string | null;
   roleIds: string[];
   fields: EditField[];
 }
@@ -92,6 +94,9 @@ export interface EditState {
   description: string;
   orgNodeId: string | null;
   requireSignature: boolean;
+  /** Flujo reutilizable asignado a la versión (Fase 2.2). null = sin flujo. */
+  workflowDefinitionId: string | null;
+  workflowDefinitionVersionId: string | null;
   sections: EditSection[];
 }
 
@@ -136,12 +141,15 @@ export function detailToEditState(detail: TemplateDetail): EditState {
     description: detail.description ?? "",
     orgNodeId: detail.orgNodeId,
     requireSignature: detail.version.requireSignature,
+    workflowDefinitionId: detail.version.workflowDefinitionId,
+    workflowDefinitionVersionId: detail.version.workflowDefinitionVersionId,
     sections: detail.version.sections.map((s) => ({
       uid: nextUid(),
       key: s.key,
       title: s.title,
       description: s.description,
       requireSignature: s.requireSignature,
+      editableInStateKey: s.editableInStateKey,
       roleIds: s.roleIds,
       fields: s.fields.map((f) => ({
         uid: nextUid(),
@@ -181,11 +189,15 @@ export function editStateToDraftRequest(state: EditState): SaveTemplateDraftRequ
     description: state.description.trim() || null,
     orgNodeId: state.orgNodeId,
     requireSignature: state.requireSignature,
+    workflowDefinitionId: state.workflowDefinitionId,
+    workflowDefinitionVersionId: state.workflowDefinitionVersionId,
     sections: state.sections.map((s, si) => ({
       key: s.key,
       title: s.title.trim() || `Sección ${si + 1}`,
       description: s.description?.trim() ? s.description.trim() : null,
       requireSignature: s.requireSignature,
+      // Solo se envía el estado si hay un flujo asignado (degradación elegante).
+      editableInStateKey: state.workflowDefinitionId ? s.editableInStateKey : null,
       roleIds: s.roleIds,
       fields: s.fields.map((f, fi) => ({
         key: f.key,
