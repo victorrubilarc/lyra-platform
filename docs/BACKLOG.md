@@ -41,9 +41,9 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Docs cierre + fix header responsivo del detalle** | `main` | ✅ publicado (`91a4bd6`) | ninguna |
 | **Módulo Equipos** (CRUD + categorías + `ExternalReference` modelo) | `main` (fusionado desde `feat/equipos`) | ✅ fusionado y publicado en `origin/main` (`a299ab6`) | ninguna |
 | **UI de Seguridad** (usuarios/roles/política/auditoría + reset MFA) | `main` (fusionado desde `feat/seguridad-ui`) | ✅ fusionado y publicado en `origin/main` (`a6f8b10`) | ninguna |
-| **Fase 2.1 Plantillas** (modelo definición + contratos + Form Builder) | `feat/plantillas` (3 commits) | ⏳ a fusionar a `main` + push al cerrar la sesión | merge + push |
+| **Fase 2.1 Plantillas** (modelo definición + contratos + Form Builder) | `main` (fusionado desde `feat/plantillas`) | ✅ fusionado y publicado en `origin/main` (`a440f54`) | ninguna |
 
-**Estado:** al cerrar 2.1 se fusiona `feat/plantillas` → `main` y se publica (`origin/main`).
+**Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
 **Convención propuesta (a confirmar):** trabajar cada módulo en rama `feat/<modulo>`;
 al cerrar la sesión → push de la rama + merge a `main` + push de `main`. Así `origin/main`
