@@ -339,6 +339,10 @@ export const esCL = {
       referenceListPlaceholder: "Selecciona una lista…",
       referenceListMissing: 'La lista "{{key}}" no existe en el catálogo. Créala o cambia la fuente.',
       referenceListInactive: "Esta lista está inactiva.",
+      lookupPlaceholder: "Buscar y seleccionar…",
+      lookupConfirm: "Aceptar",
+      lookupSummary_one: "{{count}} seleccionado",
+      lookupSummary_other: "{{count}} seleccionados",
       effectiveDate: "Fecha efectiva del registro",
       effectiveDateHint:
         "La hora del evento/lectura (no la de captura). La plataforma usa este campo como fecha de referencia del registro para reportes (Fase 2.4).",

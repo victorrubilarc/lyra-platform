@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AlertTriangle } from "lucide-react";
-import { Combobox, Input, MultiSelect, Textarea, Toggle } from "@lyra/ui";
+import { Combobox, Input, LookupPicker, MultiSelect, Textarea, Toggle } from "@lyra/ui";
 import type { OptionInlineItem } from "@lyra/contracts";
 import { useResolvedReferenceList } from "../reference-data/reference-data-queries.js";
 import type { EditField, EditState } from "./builder-model.js";
@@ -41,6 +41,17 @@ function PreviewField({ field, values, setValue }: { field: EditField; values: V
   const opts: OptionInlineItem[] = listKey
     ? (resolved.data ?? []).map((o) => ({ code: o.code, label: o.label }))
     : options(field);
+  // Resumen de metadata por code (columna "detalle" del lookup de referencia).
+  const detailByCode = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const o of resolved.data ?? []) {
+      if (!o.metadata) continue;
+      const entries = Object.entries(o.metadata);
+      if (entries.length === 0) continue;
+      m.set(o.code, entries.slice(0, 3).map(([k, val]) => `${k}: ${typeof val === "string" ? val : JSON.stringify(val)}`).join(" · "));
+    }
+    return m;
+  }, [resolved.data]);
 
   const label = (
     <label className={styles.previewLabel}>
@@ -100,7 +111,27 @@ function PreviewField({ field, values, setValue }: { field: EditField; values: V
       );
       break;
     case "MULTISELECT":
-      control = (
+      // Lista de Referencia → lookup con tabla (código/etiqueta/metadata, patrón
+      // "value help" SAP); opciones inline (cortas) → token-picker simple.
+      control = listKey ? (
+        <div style={{ maxWidth: 480 }}>
+          <LookupPicker
+            value={(v as string[]) ?? []}
+            onChange={(vals) => setValue(field.key, vals)}
+            options={opts.map((o) => ({ value: o.code, label: o.label, hint: o.code, detail: detailByCode.get(o.code) }))}
+            title={field.label}
+            placeholder={t("templates.builder.lookupPlaceholder")}
+            searchPlaceholder={t("common.search")}
+            confirmLabel={t("templates.builder.lookupConfirm")}
+            cancelLabel={t("common.cancel")}
+            clearLabel={t("common.clear")}
+            codeHeader={t("referenceData.item.code")}
+            labelHeader={t("referenceData.item.label")}
+            detailHeader={t("referenceData.item.metadata")}
+            summaryText={(n) => t("templates.builder.lookupSummary", { count: n })}
+          />
+        </div>
+      ) : (
         <div style={{ maxWidth: 360 }}>
           <MultiSelect
             value={(v as string[]) ?? []}
