@@ -114,6 +114,48 @@ describe("TemplatesService", () => {
     await expect(service.remove("ghost", ctx)).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  it("saveDraft deriva el dataType del tipo y persiste el semanticRole (capas 2 y 3)", async () => {
+    const fieldCreate = vi.fn().mockResolvedValue({ id: "f1" });
+    const tx = {
+      template: { update: vi.fn().mockResolvedValue({}) },
+      templateVersion: { update: vi.fn().mockResolvedValue({}) },
+      templateSection: { deleteMany: vi.fn().mockResolvedValue({}), create: vi.fn().mockResolvedValue({ id: "sec1" }) },
+      templateField: { create: fieldCreate },
+    };
+    const { service } = makeService({
+      template: { findFirst: vi.fn().mockResolvedValue({ id: "t1", name: "X", description: null, orgNodeId: null }) },
+      templateVersion: { findFirst: vi.fn().mockResolvedValue({ id: "v1" }) },
+      role: { count: vi.fn().mockResolvedValue(0) },
+      $transaction: vi.fn().mockImplementation((arg) => (Array.isArray(arg) ? Promise.all(arg) : arg(tx))),
+    });
+    vi.spyOn(service, "getDetail").mockResolvedValue({ id: "t1" } as never);
+
+    await service.saveDraft(
+      "admin",
+      "t1",
+      {
+        sections: [
+          {
+            key: "lectura",
+            title: "Lectura",
+            fields: [
+              { key: "fecha", type: "DATE", label: "Fecha lectura", semanticRole: "EFFECTIVE_DATE" },
+              { key: "turno", type: "SELECT", label: "Turno", config: { optionSource: { kind: "inline", items: [{ code: "dia", label: "Día" }] } } },
+            ],
+          },
+        ],
+      },
+      ctx,
+    );
+
+    expect(fieldCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ key: "fecha", dataType: "DATE", semanticRole: "EFFECTIVE_DATE" }) }),
+    );
+    expect(fieldCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ key: "turno", dataType: "CODE", semanticRole: null }) }),
+    );
+  });
+
   it("listar aplica el alcance ABAC: oculta plantillas de nodos fuera de alcance", async () => {
     const templates = [
       { id: "t1", name: "A", description: null, orgNodeId: "n1", status: "DRAFT", currentVersionId: null, createdAt: new Date(), updatedAt: new Date(), versions: [{ id: "v1", versionNumber: 1, status: "DRAFT" }] },
