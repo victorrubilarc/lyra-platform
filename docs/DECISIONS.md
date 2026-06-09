@@ -4,6 +4,45 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-09 · Calendario operacional (turnos + periodo contable) — dimensiones derivadas, NO campos (aprobado)
+
+Inquietud del usuario (correcta) antes de 2.4: **turno, periodo contable y fecha** son **estructurales/contextuales**,
+como el nodo de la estructura organizacional — una plantilla los *puede* usar o no, pero **no son campos que el
+operador escribe**. Investigado el estándar y aprobada la solución + el orden.
+
+**Cómo lo hace la industria:** un **Calendario Operacional / Shift Calendar** como **configuración de primera clase**,
+separado del formulario. SAP PP/PM (*factory calendar* + *shift definitions/sequences*), MES (Wonderware/AVEVA,
+Rockwell: módulo "Shift Calendar" con *production day*), **ISA-95 Parte 2** (*resource/operations calendars*),
+historiadores PI/AVEVA (*shift reports*/event frames). Es el patrón **dimensión de Fecha + Turno del Data Warehouse**:
+el *hecho* (la lectura) recibe claves de Fecha/Turno/Periodo **derivadas del timestamp al cargar**. Concepto central:
+**"día de producción" ≠ "día civil"** — el día operacional arranca en el cambio de turno (p. ej. 07:00), por eso el
+**mes contable puede empezar en el 2.º turno del día 1** (caso que planteó el usuario).
+
+**Decisión (extiende el modelo de campos de sistema de 2.1.1):** los campos de sistema son **intrínsecos, DERIVADOS,
+no tipeados**. Ya existen `recordedAt` (commit, UTC) y `effectiveAt` (hora de negocio, del campo con rol
+`EFFECTIVE_DATE`). **Turno y Periodo son dos dimensiones más, derivadas de `effectiveAt`** (fallback `recordedAt`):
+
+1. **Módulo de configuración `OperationalCalendar`** (mantenedor hermano de Estructura/Seguridad/Listas): **turnos**
+   (`code` A/B/C, label, `startTime`, `durationMinutes` — la duración resuelve el cruce de medianoche sin
+   ambigüedad), **ancla del día operacional** (a qué hora/turno empieza el día de producción), **definición del
+   periodo** (`MONTH`/`WEEK`/`CUSTOM` + ancla; el "mes de producción" va del inicio del día operacional del día 1 al
+   del 1 del mes siguiente), **TZ del sitio** (se guarda UTC, se resuelve en la TZ para que los límites de turno
+   caigan bien). Alcance: un calendario por defecto (single-tenant), **asignable por nodo modelado** sin
+   sobre-ingeniería al inicio.
+2. **`ShiftResolver`** (servicio tras interfaz, patrón `LlmProvider`/`EmailService`): `timestamp → (operationalDate,
+   shiftCode, periodKey)`. Fuente única consumida por 2.4 (estampa), 2.3 Rondas (programa por turno) y Fase 5
+   (cambio de turno).
+3. **En `LogEntry` (2.4):** columnas **indexadas, inmutables, nullable** `shiftCode?`, `operationalDate?`,
+   `periodKey?` estampadas por el resolver al sellar la entrada → reportabilidad por turno/periodo sin recalcular y
+   offline-friendly. **Opt-in / degradación elegante:** sin calendario configurado quedan en null y la plantilla que
+   no lo necesita los ignora (igual que anclar a un nodo o marcar `EFFECTIVE_DATE` es opcional).
+
+**Orden de fases (aprobado por el usuario): `2.3.0` ANTES de `2.4`.** El calendario es **pura configuración** (bajo
+riesgo, como las Listas) y es el **cimiento compartido** de 2.4 (estampado), 2.3 Rondas (programación por turno) y
+Fase 5. Hacerlo primero ⇒ la **primera entrada real ya nace clasificada** por turno/periodo (sin backfills) y se evita
+diseñar el `LogEntry` dos veces. Re-slicing: **2.3.0 Calendario operacional → 2.4 Llenado → 2.3 Rondas → 2.5 …**
+(ver BACKLOG §2). NO es un scheduler genérico; se mantiene simple y anclado a la práctica industrial.
+
 ### 2026-06-09 · Datos de referencia — Import/Export CSV de ítems (implementado)
 
 Primer quick-win del roadmap industrial (ver entrada "mirada crítica"). Patrón **dry-run enterprise** (SAP LSMW /

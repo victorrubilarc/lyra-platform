@@ -224,11 +224,23 @@ nunca queda más de una sesión atrás.
         Web: `WorkflowBuilder` declarativo + Form Builder (asignar flujo, sección→estado, override de rol por campo
         `TemplateFieldRole`). 4 permisos nuevos (catálogo **37**). Tests: contracts 36, API 88. Ver DECISIONS/PROGRESS.
         **Pendiente: smoke VISUAL** (§4).
+  - [ ] **2.3.0 Calendario operacional (turnos + periodo contable) — PRÓXIMA SESIÓN.** Mantenedor de configuración
+        (hermano de Estructura/Seguridad/Listas), **pura config sin ejecución**. `OperationalCalendar` con **turnos**
+        (`code` A/B/C + label + `startTime` + `durationMinutes`, maneja cruce de medianoche), **ancla del día
+        operacional** (cuándo arranca el "día de producción" ≠ día civil) y **definición del periodo contable**
+        (MONTH/WEEK/CUSTOM con ancla — p. ej. el mes parte en el 2.º turno del día 1). TZ del sitio. Alcance: 1 por
+        defecto, **asignable por nodo modelado** (sin sobre-ingeniería). **`ShiftResolver`** (servicio tras interfaz)
+        que mapea `timestamp → (operationalDate, shiftCode, periodKey)` — lo consumirá 2.4 (estampa columnas
+        derivadas en `LogEntry`), 2.3 Rondas (programa por turno) y Fase 5 (cambio de turno). Principio: **turno/
+        periodo/fecha = dimensiones estructurales DERIVADAS, no campos del Form Builder** (patrón dimensión de DW /
+        ISA-95 / shift calendar de MES/SAP). Ver DECISIONS 2026-06-09 ("Calendario operacional"). Aditivo.
   - [ ] **2.3 Programación de rondas/turnos (`LogPeriod`):** plantilla recurrente (turno/intervalo/calendario,
-        simple, no un scheduler genérico); cada ocurrencia abre/gener​a un `LogEntry` ligado a su periodo.
-        Investigar ISA-95 / shift handover antes de modelar.
+        simple, no un scheduler genérico); cada ocurrencia abre/gener​a un `LogEntry` ligado a su periodo. **Se apoya
+        en el `OperationalCalendar` de 2.3.0** (turnos ya definidos). Investigar ISA-95 / shift handover antes de modelar.
   - [ ] **2.4 Llenado (Nueva entrada) multi-actor:** secciones editables por estado+rol; validación backend +
-        auditoría por campo + concurrencia optimista por sección.
+        auditoría por campo + concurrencia optimista por sección. **Estampa las dimensiones derivadas** (`recordedAt`,
+        `effectiveAt`, y vía `ShiftResolver`: `shiftCode`/`operationalDate`/`periodKey`) como columnas indexadas
+        inmutables; nullable si no hay calendario (degradación elegante).
   - [ ] **2.5 Ejecución de flujo + firmas electrónicas (Part 11):** transiciones gateadas, firma
         (re-auth / MFA step-up), bloqueo/desbloqueo de secciones, log de transiciones.
   - [ ] **2.6 Bitácoras: listado + detalle + línea de tiempo + log de cambios** (vista de auditor).
