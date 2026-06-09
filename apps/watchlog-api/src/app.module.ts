@@ -12,6 +12,7 @@ import { AuthzModule } from "./authz/authz.module";
 import { AuthModule } from "./auth/auth.module";
 import { StructureModule } from "./structure/structure.module";
 import { EquipmentModule } from "./equipment/equipment.module";
+import { TemplatesModule } from "./templates/templates.module";
 import { SecurityModule } from "./security/security.module";
 
 @Module({
@@ -43,6 +44,7 @@ import { SecurityModule } from "./security/security.module";
     AuthModule,
     StructureModule,
     EquipmentModule,
+    TemplatesModule,
     SecurityModule,
     HealthModule,
   ],

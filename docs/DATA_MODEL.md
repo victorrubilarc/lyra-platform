@@ -25,8 +25,24 @@
 - **ExternalReference** *(implementado — solo modelo; UI/motor en Fase 3)* — mapeo polimórfico de un `OrgNode` **o** un `Equipment` (XOR, check constraint, patrón Scope) hacia un sistema externo (historiador/MES/EAM). `systemType` (String configurable), `externalId` (WebID/NodeId/Equipment Number), `externalPath`, `endpoint`, `metadata jsonb`, `enabled`. Integration-ready: un equipo mapea a varios sistemas a la vez.
 
 ### Plantillas y registros
-- **Template** *1—N* **TemplateVersion** — definición de campos en `JSONB`, versionada (inmutable al publicar). Anclada a `OrgNode` y a roles.
-- **Entry** (bitácora) — valores en `JSONB`; FK a `TemplateVersion`, `OrgNode`, `Shift`, autor.
+> **Fase 2.1 (implementado — lado DEFINICIÓN):** ver migración `20260609133247_add_template_definition`.
+> Un formulario es un **proceso de SECCIONES**, no una lista plana (ver DECISIONS 2026-06-09). El lado
+> EJECUCIÓN (LogEntry…) se diseña en contratos y se migra en 2.4.
+- **Template** *(implementado)* — contenedor lógico mutable: `name`, `description?`, `orgNodeId?` (ancla en
+  estructura; null = global), `status` (DRAFT/PUBLISHED/ARCHIVED), `currentVersionId?` (versión publicada
+  viva), `createdById/updatedById` (referencia blanda), `deletedAt` (borrado lógico).
+- **Template** *1—N* **TemplateVersion** *(implementado)* — versión **INMUTABLE al publicar** (patrón MMR de
+  21 CFR Part 11): `versionNumber`, `status` (DRAFT/PUBLISHED), `name/description` (snapshot), `publishedAt/By`.
+  Referencias **modeladas** (editores 2.2/2.3): `workflowDefinitionId?/workflowDefinitionVersionId?` (sin FK
+  aún — la entidad `WorkflowDefinition` llega en 2.2), `requireSignature` (Part 11 opt-in),
+  `recurrenceKind`/`recurrenceConfig` (rondas/turnos).
+- **TemplateSection** *(implementado)* — unidad atómica de permiso/llenado/firma: `key` (estable), `title`,
+  `description?`, `order`, `requireSignature` (opt-in), `editableInStateKey?` (estado del flujo que la
+  habilita; null = siempre). *N—N* `Role` vía **TemplateSectionRole** (permiso de llenado por sección).
+- **TemplateField** *(implementado)* — `key`, `type` (enum `FieldType`: 8 núcleo + SEVERITY/SIGNATURE),
+  `label`, `help?`, `required`, `order`, `config` (JSONB validado por unión Zod: unidad/umbral ISA-18.2/
+  opciones/regex…), `visibleWhen?` (condicional). *N—N* `Role` vía **TemplateFieldRole** (override por campo).
+- **Entry / LogEntry** (bitácora, **Fase 2.4**) — valores con FK a `TemplateVersion`, `OrgNode`, periodo, autor.
 - **EntryChangeLog** — diffs antes/después + motivo (auditoría de edición).
 - **AutoIncidentRule** — reglas que disparan incidencias desde campos (umbral, severidad ≥ N).
 

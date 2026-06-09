@@ -21,6 +21,9 @@ export type { SpinnerProps } from "./components/Spinner/Spinner.js";
 export { Input } from "./components/Input/Input.js";
 export type { InputProps } from "./components/Input/Input.js";
 
+export { Textarea } from "./components/Textarea/Textarea.js";
+export type { TextareaProps } from "./components/Textarea/Textarea.js";
+
 export { FormField } from "./components/FormField/FormField.js";
 export type { FormFieldProps, FieldControlProps } from "./components/FormField/FormField.js";
 

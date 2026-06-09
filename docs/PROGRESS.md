@@ -1,6 +1,9 @@
 # Progreso — Lyra WatchLog
 
-Última actualización: 2026-06-08 (Fase 1 — backend ✅; **UI: Login + cimientos ✅**; **Recuperación de contraseña ✅**; **MFA self-service ✅**; **App Shell / Workspace premium ✅**; **UI Estructura organizacional ✅** — layout master-detail premium + UX responsivo + `description`/`reportOrder`; **Módulo Equipos ✅** (CRUD + categorías configurables + `ExternalReference` integration-ready a nivel de modelo) → **Estructura CERRADA**; **UI de Seguridad ✅** (usuarios/roles/política/auditoría + reset MFA de admin) → **Fase 1 funcionalmente completa**; **siguiente: Fase 2 — Plantillas / Form Builder**).
+Última actualización: 2026-06-09 (**Fase 1 completa**; **Fase 2.1 ✅** — Plantillas: modelo de DEFINICIÓN
+(`Template`/`TemplateVersion` inmutable/secciones/campos) + contratos (config por tipo + umbrales ISA-18.2) +
+**Form Builder** (lista + builder 3-columnas + vista previa + borrador/publicar) + 7 permisos nuevos.
+**Siguiente: Fase 2.2 — Flujos reutilizables (`WorkflowDefinition`)**).
 
 ## Estado por fase
 
@@ -8,7 +11,7 @@
 |---|---|---|
 | 0 | **Cimientos** (monorepo, Docker, Design System tokens, contratos, API health) | ✅ Hecho |
 | 1 | Seguridad (auth + RBAC/ABAC) + Estructura organizacional + AuditLog | ✅ Backend ✅ · UI: Login ✅ · **Estructura ✅ (+ Equipos ✅)** · **Seguridad ✅** |
-| 2 | Plantillas / Form Builder + Bitácoras | ⬜ Pendiente |
+| 2 | Plantillas / Form Builder + Bitácoras | 🔄 **2.1 ✅** (Plantillas: modelo definición + contratos + Form Builder) · 2.2–2.7 pendientes |
 | 3 | Orígenes de datos | ⬜ Pendiente |
 | 4 | Motor de incidencias | ⬜ Pendiente |
 | 5 | Cambio de turno + IA (resumen) | ⬜ Pendiente |
@@ -26,8 +29,8 @@
 | Estructura organizacional | 1 | ✅ API + UI |
 | Equipos (CRUD + categorías + refs externas modelo) | 1 | ✅ API + UI |
 | Seguridad / roles / permisos (nueva) | 1 | ✅ API + UI (usuarios/roles/política/auditoría + reset MFA de admin) |
-| Plantillas (Form Builder) | 2 | ⬜ |
-| Nueva entrada / Llenado | 2 | ⬜ |
+| Plantillas (Form Builder) | 2 | ✅ **2.1** API + UI (definición: secciones/campos/umbrales/permiso por sección/borrador-publicar) |
+| Nueva entrada / Llenado | 2 | ⬜ (2.4) |
 | Bitácoras (listado + detalle + log de cambios) | 2 | ⬜ |
 | Orígenes de datos | 3 | ⬜ |
 | Incidencias (kanban + drawer workflow) | 4 | ⬜ |
@@ -411,9 +414,45 @@ Consume el backend de seguridad ya existente. Ver DECISIONS 2026-06-08. La UI so
 - **Pendiente**: smoke **VISUAL** en navegador (ver BACKLOG §4): navegar sub-tabs, alta/edición de usuario,
   asignar roles/scope, reset MFA, CRUD de roles + matriz, editar política, leer auditoría + diff, modo claro.
 
+## Hecho en Fase 2.1 (Plantillas: modelo de definición + contratos + Form Builder)
+
+Primer slice de la Fase 2. SOLO el lado **definición** (sin llenado/flujos/rondas). Arquitectura en
+DECISIONS 2026-06-09; 4 forks resueltos con la opción recomendada. 3 commits (modelo+contratos+permisos /
+backend / UI).
+
+- **Prisma** (migración `20260609133247_add_template_definition`): `Template` (contenedor mutable) 1—N
+  `TemplateVersion` (inmutable al publicar, patrón MMR Part 11) → `TemplateSection` (unidad atómica de
+  permiso/llenado/firma) → `TemplateField`; joins `TemplateSectionRole` + `TemplateFieldRole` (override).
+  Enums `TemplateStatus`/`TemplateVersionStatus`/`FieldType` (8 núcleo + SEVERITY/SIGNATURE)/`RecurrenceKind`.
+  Referencias a flujo/firma/recurrencia como **columnas** (editores 2.2/2.3, sin re-migrar). Ejecución → 2.4.
+- **Contratos** (`@lyra/contracts/templates`): unión de `config` por tipo (`fieldConfigSchemaFor`),
+  **NÚMERO con bandas de umbral ISA-18.2** (`warn*`/`crit*`), `visibleWhen`, DTOs y requests
+  (create/patch/**saveDraft** bulk/publish/list). **+7 specs** (config por tipo, min>max, claves duplicadas).
+- **Permisos** (catálogo **26→33**): `module:templates:view/manage` + `template:view/create/edit/publish/delete`.
+  Seed re-sincroniza y los asigna al rol admin (demo los tiene).
+- **Backend** `TemplatesModule`: `GET/POST /templates`, `GET /templates/:id`, `PATCH :id`, `PUT :id/draft`
+  (save bulk validado por contrato), `POST :id/publish` (congela + fija `currentVersionId`), `DELETE :id`
+  (lógico). Gateado por permiso, **auditado**, **validación de config contra el tipo en backend**, alcance
+  **ABAC** al listar (`ScopeService`). Inmutabilidad: editar publicada **clona** un borrador nuevo. **+7 tests**.
+- **`@lyra/ui`**: primitivo **`Textarea`** (dual-theme sobre tokens). El resto de componentes se reusó.
+- **Web** (`features/templates/`, anclado al prototipo): **TemplatesPage** (grilla de cards con nodo/estado/
+  conteos/versión, buscador, filtro de estado, estados vacíos/carga/error, alta por modal, borrado) y
+  **TemplateBuilder** (3 columnas: paleta de objetos / lienzo de secciones+campos con reordenar / panel de
+  config; editores núcleo + umbrales + opciones + condicional + roles por sección + firma opt-in; **vista
+  previa** que refleja `FieldRender`; **Guardar borrador** y **Publicar** con confirmación). Navegación
+  (`/plantillas`, `/plantillas/:id`) + i18n namespace `templates` (es-CL).
+- **Verificación**: `typecheck`/`lint` (0 errores; 1 warning preexistente en OrgTree)/`build` (web **1901
+  módulos**)/`test` (**contracts 15** +7 · permissions 5 · **API 77** +7) en verde. **Smoke en vivo** (demo):
+  crear→guardar borrador (1 sección, 2 campos)→**config inválida para el tipo ⇒ 400**→publicar (PUBLISHED +
+  `currentVersionId` + v1)→listar (conteos + publishedV)→editar publicada ⇒ **clona borrador v2**→borrar 204→
+  ausente del listado. DB de demo limpia tras el smoke.
+- **Pendiente**: smoke **VISUAL** en navegador (ver BACKLOG §4): `/plantillas`, crear, builder (agregar
+  sección/campos, umbrales, reordenar, roles por sección, condicional), vista previa, publicar, modo claro.
+
 ## Próximo paso
-**Fase 1 funcionalmente completa** (auth + RBAC/ABAC + Estructura + Equipos + UI de Seguridad).
-**Sesión siguiente = Fase 2 · Plantillas / Form Builder + Bitácoras.**
+**Fase 2.1 completa** (Plantillas: modelo definición + contratos + Form Builder).
+**Sesión siguiente = Fase 2.2 · Flujos reutilizables (`WorkflowDefinition`) — mantenedor propio + binding a
+versiones de plantilla y secciones→estados.** (Ver BACKLOG §2.)
 
 **Mejora futura registrada (BACKLOG §2):** seguridad a nivel de nodo en el mantenedor de Estructura (ABAC
 enterprise: asignar usuarios/roles a nodos desde el propio árbol, "quién accede a este nodo"). El modelo ya

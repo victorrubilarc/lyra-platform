@@ -1,4 +1,4 @@
-import { LayoutDashboard, Network, ShieldCheck, UserCog, type LucideIcon } from "lucide-react";
+import { LayoutDashboard, Layers, Network, ShieldCheck, UserCog, type LucideIcon } from "lucide-react";
 import type { Permission } from "@lyra/permissions";
 
 /**
@@ -26,6 +26,13 @@ export const ROUTES: readonly NavRoute[] = [
     labelKey: "nav.structure",
     icon: Network,
     permission: "module:structure:view",
+    inSidebar: true,
+  },
+  {
+    path: "/plantillas",
+    labelKey: "nav.templates",
+    icon: Layers,
+    permission: "module:templates:view",
     inSidebar: true,
   },
   {

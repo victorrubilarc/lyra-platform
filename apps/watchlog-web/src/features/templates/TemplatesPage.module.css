@@ -1,0 +1,138 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.heading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.title {
+  font-family: var(--font-brand);
+  font-size: var(--text-h1-size);
+  font-weight: var(--text-h1-weight);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.accent {
+  background: var(--gradient-brand);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.subtitle {
+  font-size: var(--text-body-sm-size);
+  color: var(--color-text-muted);
+  margin: 0;
+  max-width: 70ch;
+}
+
+.toolbar {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.searchBox {
+  flex: 1;
+  min-width: 240px;
+  max-width: 420px;
+}
+
+.statusSelect {
+  max-width: 220px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+  gap: var(--space-3);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+}
+
+.cardTop {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.nodeTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--color-accent-secondary);
+  background: var(--color-accent-soft, rgba(6, 182, 212, 0.12));
+  padding: 3px 9px;
+  border-radius: 99px;
+  max-width: 70%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardName {
+  font-family: var(--font-brand);
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--color-text-primary);
+}
+
+.cardDesc {
+  font-size: var(--text-body-sm-size);
+  color: var(--color-text-secondary);
+  line-height: 1.45;
+}
+
+.cardMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-top: auto;
+}
+
+.cardMeta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.versionTag {
+  color: var(--color-success);
+  font-weight: 600;
+}
+
+.draftTag {
+  color: var(--color-warning);
+  font-weight: 600;
+}
+
+.cardActions {
+  display: flex;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+}
