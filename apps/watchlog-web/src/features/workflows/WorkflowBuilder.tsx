@@ -50,7 +50,11 @@ export function WorkflowBuilder({ detail }: { detail: WorkflowDetail }) {
   const [dirty, setDirty] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
-  const [collapsedTransitions, setCollapsedTransitions] = useState<Set<string>>(new Set());
+  // Las transiciones ya existentes arrancan PLEGADAS (vista compacta al abrir);
+  // las que se agreguen en la sesión quedan expandidas (uid nuevo ∉ del set).
+  const [collapsedTransitions, setCollapsedTransitions] = useState<Set<string>>(
+    () => new Set(wf.transitions.map((tr) => tr.uid)),
+  );
 
   function toggleTransitionCollapse(uid: string) {
     setCollapsedTransitions((prev) => {
