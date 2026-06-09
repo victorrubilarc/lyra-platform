@@ -1,13 +1,16 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Eye, EyeOff, ListChecks, Pencil, Plus, Search, Tag, Trash2, TriangleAlert } from "lucide-react";
+import { Download, Eye, EyeOff, FileUp, ListChecks, Pencil, Plus, Search, Tag, Trash2, TriangleAlert } from "lucide-react";
 import { Button, Chip, EmptyState, Input, Select, Skeleton, Table, useToast, type TableColumn, type TableSort } from "@lyra/ui";
 import type { ReferenceItem, ReferenceListDetail } from "@lyra/contracts";
 import { Can } from "../../auth/Can.js";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { ApiError } from "../../lib/api-client.js";
+import { downloadBlob, fileStamp } from "../../lib/download.js";
 import { ConfirmDeleteModal } from "../templates/ConfirmDeleteModal.js";
+import { ImportCsvModal } from "./ImportCsvModal.js";
 import { ItemDrawer } from "./ItemDrawer.js";
+import { exportReferenceListCsv } from "./reference-data-api.js";
 import {
   useDeleteReferenceItem,
   useDeleteReferenceList,
@@ -84,6 +87,8 @@ export function ReferenceListDetailPanel({ listId, onEditList, onDeleted }: Prop
   const [itemDrawer, setItemDrawer] = useState<{ mode: "create" | "edit"; item: ReferenceItem | null } | null>(null);
   const [toDeleteItem, setToDeleteItem] = useState<ReferenceItem | null>(null);
   const [deleteListOpen, setDeleteListOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   // Estado de la grilla enterprise (buscador + filtro de estado + orden).
   const [itemSearch, setItemSearch] = useState("");
@@ -158,6 +163,18 @@ export function ReferenceListDetailPanel({ listId, onEditList, onDeleted }: Prop
         onError: (err) => toast.error(err instanceof ApiError ? err.message : t("common.errorGeneric")),
       },
     );
+  }
+
+  async function handleExport() {
+    setExporting(true);
+    try {
+      const blob = await exportReferenceListCsv(detail.id);
+      downloadBlob(`lista-${detail.key}-${fileStamp()}.csv`, blob);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : t("common.errorGeneric"));
+    } finally {
+      setExporting(false);
+    }
   }
 
   function confirmDeleteList() {
@@ -297,11 +314,19 @@ export function ReferenceListDetailPanel({ listId, onEditList, onDeleted }: Prop
             {t("referenceData.detail.itemsSummary", { active: activeCount, total: allItems.length })}
           </span>
         </span>
-        <Can perform="referencelist:manage">
-          <Button variant="primary" leftIcon={<Plus size={15} />} onClick={() => setItemDrawer({ mode: "create", item: null })}>
-            {t("referenceData.item.add")}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <Button variant="secondary" leftIcon={<Download size={15} />} onClick={handleExport} loading={exporting}>
+            {t("referenceData.csv.export")}
           </Button>
-        </Can>
+          <Can perform="referencelist:manage">
+            <Button variant="secondary" leftIcon={<FileUp size={15} />} onClick={() => setImportOpen(true)}>
+              {t("referenceData.csv.import")}
+            </Button>
+            <Button variant="primary" leftIcon={<Plus size={15} />} onClick={() => setItemDrawer({ mode: "create", item: null })}>
+              {t("referenceData.item.add")}
+            </Button>
+          </Can>
+        </div>
       </div>
 
       <div className={styles.itemsToolbar}>
@@ -342,6 +367,8 @@ export function ReferenceListDetailPanel({ listId, onEditList, onDeleted }: Prop
           />
         }
       />
+
+      <ImportCsvModal open={importOpen} listId={detail.id} listName={detail.name} onClose={() => setImportOpen(false)} />
 
       {itemDrawer && (
         <ItemDrawer
