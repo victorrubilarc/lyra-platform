@@ -4,12 +4,12 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
-### 2026-06-09 · Fase 2 — Arquitectura enterprise del Form Builder (PROPUESTA, pendiente de confirmar forks)
+### 2026-06-09 · Fase 2 — Arquitectura enterprise del Form Builder (forks CONFIRMADOS por el usuario)
 
 > Diseño de fondo pedido por el usuario para que el módulo de plantillas/bitácoras marque diferencia con
 > sistemas tipo "Forms" genéricos. Anclado a **registros electrónicos GxP / 21 CFR Part 11** (batch records),
-> **máquinas de estado** (no BPMN pesado) y a la auth RBAC/ABAC ya existente. Pendiente confirmar los forks
-> del final (firmas, rondas programadas, granularidad). Aún NO se programa.
+> **máquinas de estado** (no BPMN pesado) y a la auth RBAC/ABAC ya existente. Los 4 forks quedaron
+> **confirmados el 2026-06-09** (ver al final). Aún NO se programa.
 
 **Paradigma (la idea que rompe con "un form plano"):** un formulario **no** es una lista de campos que se
 llena de una vez; es un **proceso = documento vivo** compuesto de **secciones**, donde cada sección tiene
@@ -75,16 +75,27 @@ no migrar después):**
 `logentry:view/create/fill`, y transiciones vía datos de la transición (roles permitidos) en lugar de claves
 hardcodeadas. Confirmar en el diseño detallado.
 
-**Forks a confirmar con el usuario (definen el modelo final):**
-1. "Varios instantes en el tiempo": ¿(a) un mismo registro colaborativo llenado por fases [lo central],
-   (b) además **rondas/lecturas programadas recurrentes** por turno/periodo, o (c) ambas? — (b) agrega modelar
-   periodo/turno/programación.
-2. **Firmas electrónicas** estilo Part 11 con re-auth/MFA en transiciones críticas: ¿sí, configurables por
-   plantilla? (recomendado).
-3. **Granularidad** de permisos de llenado: **sección** como unidad por defecto, con override por campo
-   opcional (recomendado) vs campo siempre.
-4. **Flujo** embebido en la versión de plantilla (definición versionada) y ejecución normalizada (recomendado)
-   vs definiciones de flujo reutilizables entre plantillas desde ya.
+**Forks CONFIRMADOS por el usuario (2026-06-09) — definen el modelo:**
+1. **Captura temporal = AMBAS, completas.** (a) registro **colaborativo por fases** (secciones llenadas por
+   distintos usuarios en distintos momentos) **y** (b) **rondas/lecturas programadas recurrentes** por
+   turno/periodo. ⇒ Se modela **`LogPeriod`/programación** (turno/intervalo/calendario): una plantilla puede
+   declararse **recurrente** y cada ocurrencia genera/abre un `LogEntry` ligado a su periodo; además el
+   registro admite llenado colaborativo por secciones. Investigar estándar de **rondas/turnos** (ISA-95, shift
+   handover) antes de modelar el calendario; mantenerlo simple (no un scheduler genérico).
+2. **Firmas electrónicas estilo Part 11 = SÍ**, configurables por plantilla/transición (opt-in), con re-auth /
+   **MFA step-up** reutilizando el MFA ya implementado. Diferenciador para auditorías.
+3. **Granularidad = SECCIÓN por defecto + OVERRIDE por campo** donde se justifique. El modelo de permisos de
+   llenado se resuelve a nivel sección, con posibilidad de afinar por campo.
+4. **Flujo = DEFINICIONES REUTILIZABLES.** `WorkflowDefinition` es **entidad de primera clase** (catálogo de
+   flujos: estados + transiciones + roles/permiso + firma), referenciada por las versiones de plantilla
+   (varias plantillas pueden compartir un flujo). Mantenedor propio (estilo Roles). La **ejecución** sigue
+   normalizada (`LogEntry.currentState`, `LogEntrySection`, `LogEntryTransition`). La versión de plantilla
+   **congela** qué `WorkflowDefinition` (y versión de éste) usa, para no alterar registros históricos.
+
+**Ajuste al modelo por los forks:** entidades nuevas respecto a la propuesta inicial → **`WorkflowDefinition`**
+(catálogo reutilizable, versionado/congelable) y **`LogPeriod`/config de recurrencia** (rondas/turnos). El
+slicing por sesión se reordena en BACKLOG §2 para incluir un mantenedor de **Flujos** (2.2) y la
+**Programación de rondas** (2.3) antes del llenado.
 
 ### 2026-06-08 · Reset de contraseña por administrador (contraseña temporal, estilo AD)
 

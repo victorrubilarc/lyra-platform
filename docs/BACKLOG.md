@@ -161,21 +161,28 @@ nunca queda más de una sesión atrás.
       dim. 3; firmas estilo Part 11 opt-in). **El modelo se diseña completo desde el inicio** (secciones +
       flujo + versionado + firma) para no migrar; la UI/comportamiento se construye por sesiones:
   - [ ] **2.1 Plantillas: modelo + contratos + Form Builder (estructura).** `Template`/`TemplateVersion`
-        inmutable + secciones + campos (tipos núcleo: número con min/max/umbral/unidad, texto, textarea,
-        select/multiselect, booleano, fecha/datetime) + validaciones básicas + vista previa + borrador/publicar.
-        Flujo y firma **modelados en contratos** (UI luego). **Sin llenado.** ← *próxima sesión* (mirar
-        `prototipo.tsx`). Lente proactiva: buscador de plantillas, estados vacíos/carga, permisos, dual theme.
-  - [ ] **2.2 Editor de flujo + permisos de sección** (definición): estados/transiciones, secciones→estados y
-        roles, config de firma por transición.
-  - [ ] **2.3 Llenado (Nueva entrada) multi-actor:** secciones editables por estado+rol; validación backend +
+        inmutable + **secciones** + campos (tipos núcleo: número con min/max/umbral/unidad, texto, textarea,
+        select/multiselect, booleano, fecha/datetime) + validaciones básicas + permiso por sección (con
+        override por campo en el modelo) + vista previa + borrador/publicar. Referencias a `WorkflowDefinition`,
+        firma y recurrencia **modeladas en contratos** (sus editores vienen en 2.2/2.3). **Sin llenado.**
+        ← *próxima sesión* (mirar `prototipo.tsx`). Lente proactiva: buscador de plantillas, estados
+        vacíos/carga, permisos, dual theme.
+  - [ ] **2.2 Flujos reutilizables (`WorkflowDefinition`):** mantenedor propio (catálogo, estilo Roles) —
+        estados + transiciones + roles/permiso por transición + config de firma; versionado/congelable.
+        Asignar un flujo a una versión de plantilla y mapear secciones→estados editables.
+  - [ ] **2.3 Programación de rondas/turnos (`LogPeriod`):** plantilla recurrente (turno/intervalo/calendario,
+        simple, no un scheduler genérico); cada ocurrencia abre/gener​a un `LogEntry` ligado a su periodo.
+        Investigar ISA-95 / shift handover antes de modelar.
+  - [ ] **2.4 Llenado (Nueva entrada) multi-actor:** secciones editables por estado+rol; validación backend +
         auditoría por campo + concurrencia optimista por sección.
-  - [ ] **2.4 Ejecución de flujo + firmas electrónicas:** transiciones gateadas, firma (re-auth/MFA step-up),
-        bloqueo/desbloqueo de secciones, log de transiciones.
-  - [ ] **2.5 Bitácoras: listado + detalle + línea de tiempo + log de cambios** (vista de auditor).
-  - [ ] **2.6 (cruce Fase 4)** reglas de umbral que disparan incidencias (con el motor de incidencias).
+  - [ ] **2.5 Ejecución de flujo + firmas electrónicas (Part 11):** transiciones gateadas, firma
+        (re-auth / MFA step-up), bloqueo/desbloqueo de secciones, log de transiciones.
+  - [ ] **2.6 Bitácoras: listado + detalle + línea de tiempo + log de cambios** (vista de auditor).
+  - [ ] **2.7 (cruce Fase 4)** reglas de umbral que disparan incidencias (con el motor de incidencias).
   - **Permisos nuevos** (catálogo `@lyra/contracts`): `template:view/create/edit/publish/delete`,
-    `logentry:view/create/fill`, transiciones por dato. **Forks pendientes de confirmar** (ver DECISIONS):
-    rondas programadas, firmas Part 11, granularidad sección/campo, flujo embebido vs reutilizable.
+    `workflow:view/manage`, `logentry:view/create/fill`, transiciones por dato. **Forks confirmados**
+    (ver DECISIONS 2026-06-09): ambas capturas (colaborativa + rondas), firmas Part 11 opt-in, granularidad
+    sección+override, flujos reutilizables.
 - [ ] **Fase 3** — Orígenes de datos.
 - [ ] **Fase 4** — Motor de incidencias (workflow HSE).
 - [ ] **Fase 5** — Cambio de turno + IA (resumen).
