@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cx } from "../../cx.js";
-import { panelPlacement } from "../Combobox/Combobox.js";
+import { useAnchoredPanel } from "../../internal/useAnchoredPanel.js";
 import styles from "./MultiSelect.module.css";
 
 export interface MultiSelectOption {
@@ -60,7 +60,6 @@ export function MultiSelect({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
-  const [rect, setRect] = useState<DOMRect | null>(null);
 
   const byValue = useMemo(() => new Map(options.map((o) => [o.value, o])), [options]);
   const selected = value.map((v) => byValue.get(v)).filter((o): o is MultiSelectOption => Boolean(o));
@@ -71,9 +70,10 @@ export function MultiSelect({
     return options.filter((o) => norm(o.label).includes(q) || (o.hint ? norm(o.hint).includes(q) : false));
   }, [options, query]);
 
+  const panelStyle = useAnchoredPanel(open, triggerRef, panelRef, [filtered.length]);
+
   function toggleOpen() {
     if (disabled) return;
-    if (triggerRef.current) setRect(triggerRef.current.getBoundingClientRect());
     setOpen((o) => !o);
   }
 
@@ -154,13 +154,13 @@ export function MultiSelect({
         </span>
       </button>
 
-      {open && rect && createPortal(
+      {open && createPortal(
         <div
           ref={panelRef}
           className={styles.panel}
           role="listbox"
           aria-multiselectable
-          style={{ position: "fixed", ...panelPlacement(rect), width: Math.max(rect.width, 240) }}
+          style={panelStyle}
         >
           <div className={styles.searchRow}>
             <input
