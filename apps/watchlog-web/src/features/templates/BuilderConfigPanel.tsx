@@ -1,8 +1,14 @@
 import { useTranslation } from "react-i18next";
 import { Checkbox, FormField, Input, Select, Textarea, Toggle } from "@lyra/ui";
-import type { FieldOption, RoleSummary } from "@lyra/contracts";
+import type { OptionInlineItem, RoleSummary } from "@lyra/contracts";
 import { fieldTypeMeta, slugifyKey, type EditField, type EditSection } from "./builder-model.js";
 import styles from "./TemplateBuilder.module.css";
+
+/** Lee los ítems inline del `optionSource` de un SELECT/MULTISELECT (vacío si no es inline). */
+function inlineItems(config: Record<string, unknown>): OptionInlineItem[] {
+  const src = config.optionSource as { kind?: string; items?: OptionInlineItem[] } | undefined;
+  return src?.kind === "inline" && Array.isArray(src.items) ? src.items : [];
+}
 
 interface BooleanFieldRef {
   key: string;
@@ -59,7 +65,10 @@ export function BuilderConfigPanel({
       onUpdateField({ config: next });
     };
     const isOptions = field.type === "SELECT" || field.type === "MULTISELECT";
-    const optionLines = ((field.config.options as FieldOption[] | undefined) ?? []).map((o) => o.label).join("\n");
+    const isDateLike = field.type === "DATE" || field.type === "DATETIME";
+    const optionLines = inlineItems(field.config)
+      .map((o) => o.label)
+      .join("\n");
 
     return (
       <div className={styles.configBody}>
@@ -124,21 +133,35 @@ export function BuilderConfigPanel({
                 placeholder={t("templates.builder.optionsPlaceholder")}
                 onChange={(e) => {
                   const used = new Set<string>();
-                  const opts: FieldOption[] = e.target.value
+                  const items: OptionInlineItem[] = e.target.value
                     .split("\n")
                     .map((l) => l.trim())
                     .filter(Boolean)
                     .map((label, i) => {
-                      let value = slugifyKey(label, `op_${i + 1}`);
-                      while (used.has(value)) value = `${value}_${i}`;
-                      used.add(value);
-                      return { value, label };
+                      // El `code` es el valor estable que se persiste (no el label).
+                      let code = slugifyKey(label, `op_${i + 1}`);
+                      while (used.has(code)) code = `${code}_${i}`;
+                      used.add(code);
+                      return { code, label };
                     });
-                  setConfig("options", opts);
+                  setConfig("optionSource", { kind: "inline", items });
                 }}
               />
             )}
           </FormField>
+        )}
+
+        {isDateLike && (
+          <div className={styles.inlineCheck}>
+            <Checkbox
+              checked={field.semanticRole === "EFFECTIVE_DATE"}
+              onChange={(checked) => onUpdateField({ semanticRole: checked ? "EFFECTIVE_DATE" : null })}
+              label={t("templates.builder.effectiveDate")}
+            />
+          </div>
+        )}
+        {isDateLike && field.semanticRole === "EFFECTIVE_DATE" && (
+          <p className={styles.thresholdHint}>{t("templates.builder.effectiveDateHint")}</p>
         )}
 
         {(field.type === "SEVERITY" || field.type === "SIGNATURE") && (

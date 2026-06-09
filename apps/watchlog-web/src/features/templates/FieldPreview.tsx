@@ -2,15 +2,17 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AlertTriangle } from "lucide-react";
 import { Input, Select, Textarea, Toggle } from "@lyra/ui";
-import type { FieldOption } from "@lyra/contracts";
+import type { OptionInlineItem } from "@lyra/contracts";
 import type { EditField, EditState } from "./builder-model.js";
 import styles from "./TemplateBuilder.module.css";
 
 type Values = Record<string, unknown>;
 
-function options(field: EditField): FieldOption[] {
-  const raw = (field.config.options as FieldOption[] | undefined) ?? [];
-  return raw.filter((o) => o && typeof o.value === "string");
+/** Opciones a previsualizar: ítems inline del `optionSource` (datos vivos = Fase 3). */
+function options(field: EditField): OptionInlineItem[] {
+  const src = field.config.optionSource as { kind?: string; items?: OptionInlineItem[] } | undefined;
+  const raw = src?.kind === "inline" && Array.isArray(src.items) ? src.items : [];
+  return raw.filter((o) => o && typeof o.code === "string");
 }
 
 /** Evalúa el estado de un valor numérico contra rango y bandas de umbral. */
@@ -78,7 +80,7 @@ function PreviewField({ field, values, setValue }: { field: EditField; values: V
         <Select value={(v as string) ?? ""} onChange={(e) => setValue(field.key, e.target.value)}>
           <option value="">—</option>
           {options(field).map((o) => (
-            <option key={o.value} value={o.value}>
+            <option key={o.code} value={o.code}>
               {o.label}
             </option>
           ))}
@@ -90,13 +92,13 @@ function PreviewField({ field, values, setValue }: { field: EditField; values: V
         <div className={styles.previewChips}>
           {options(field).map((o) => {
             const arr = (v as string[]) ?? [];
-            const on = arr.includes(o.value);
+            const on = arr.includes(o.code);
             return (
               <button
-                key={o.value}
+                key={o.code}
                 type="button"
                 className={on ? styles.previewChipOn : styles.previewChip}
-                onClick={() => setValue(field.key, on ? arr.filter((x) => x !== o.value) : [...arr, o.value])}
+                onClick={() => setValue(field.key, on ? arr.filter((x) => x !== o.code) : [...arr, o.code])}
               >
                 {on ? "✓ " : ""}
                 {o.label}

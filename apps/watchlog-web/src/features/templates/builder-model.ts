@@ -12,6 +12,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type {
+  FieldSemanticRole,
   FieldType,
   OrgNodeTree,
   SaveTemplateDraftRequest,
@@ -66,6 +67,8 @@ export interface EditField {
   uid: string;
   key: string;
   type: FieldType;
+  /** Rol semántico opcional (capa 3). En 2.1.1 el builder solo setea EFFECTIVE_DATE. */
+  semanticRole: FieldSemanticRole | null;
   label: string;
   help: string | null;
   required: boolean;
@@ -120,7 +123,7 @@ export function defaultFieldConfig(type: FieldType): Record<string, unknown> {
   switch (type) {
     case "SELECT":
     case "MULTISELECT":
-      return { options: [{ value: "opcion_1", label: "Opción 1" }] };
+      return { optionSource: { kind: "inline", items: [{ code: "opcion_1", label: "Opción 1" }] } };
     default:
       return {};
   }
@@ -144,6 +147,7 @@ export function detailToEditState(detail: TemplateDetail): EditState {
         uid: nextUid(),
         key: f.key,
         type: f.type,
+        semanticRole: f.semanticRole,
         label: f.label,
         help: f.help,
         required: f.required,
@@ -186,6 +190,7 @@ export function editStateToDraftRequest(state: EditState): SaveTemplateDraftRequ
       fields: s.fields.map((f, fi) => ({
         key: f.key,
         type: f.type,
+        semanticRole: f.semanticRole,
         label: f.label.trim() || `Campo ${fi + 1}`,
         help: f.help?.trim() ? f.help.trim() : null,
         required: f.required,

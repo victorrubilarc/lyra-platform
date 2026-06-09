@@ -105,7 +105,7 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
       targetUid = sec.uid;
     }
     const fkey = uniqueKey(slugifyKey(label, "campo"), collectFieldKeys({ ...state, sections }));
-    const field: EditField = { uid: nextUid(), key: fkey, type, label, help: null, required: false, config: defaultFieldConfig(type), visibleWhen: null, roleIds: [] };
+    const field: EditField = { uid: nextUid(), key: fkey, type, semanticRole: null, label, help: null, required: false, config: defaultFieldConfig(type), visibleWhen: null, roleIds: [] };
     sections = sections.map((s) => (s.uid === targetUid ? { ...s, fields: [...s.fields, field] } : s));
     patchState({ ...state, sections });
     setSelected({ s: targetUid, f: field.uid });
@@ -116,11 +116,18 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
   }
 
   function updateField(sUid: string, fUid: string, patch: Partial<EditField>) {
+    // "Fecha efectiva" es única por versión: al marcar una, desmarca las demás.
+    const claimsEffectiveDate = patch.semanticRole === "EFFECTIVE_DATE";
     patchState({
       ...state,
-      sections: state.sections.map((s) =>
-        s.uid === sUid ? { ...s, fields: s.fields.map((f) => (f.uid === fUid ? { ...f, ...patch } : f)) } : s,
-      ),
+      sections: state.sections.map((s) => ({
+        ...s,
+        fields: s.fields.map((f) => {
+          if (f.uid === fUid) return { ...f, ...patch };
+          if (claimsEffectiveDate && f.semanticRole === "EFFECTIVE_DATE") return { ...f, semanticRole: null };
+          return f;
+        }),
+      })),
     });
   }
 
