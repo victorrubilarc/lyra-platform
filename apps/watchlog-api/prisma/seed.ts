@@ -12,6 +12,7 @@ import * as argon2 from "argon2";
 import { NODE_DESCRIPTIONS } from "./structure-descriptions.js";
 import { assignReportOrderBySiblings } from "./report-order.js";
 import { DEMO_EQUIPMENT, EQUIPMENT_CATEGORIES } from "./equipment-seed-data.js";
+import { REFERENCE_LISTS } from "./reference-data-seed.js";
 
 const prisma = new PrismaClient();
 
@@ -314,6 +315,36 @@ async function seedDemoEquipment(): Promise<void> {
   console.log(`✔ Equipos de demo creados: ${created}`);
 }
 
+/**
+ * Listas de referencia de demo (SOLO desarrollo). Idempotente: upsert por `key`
+ * estable (lista) y `(listId, code)` (ítem). Ver `reference-data-seed.ts`.
+ */
+async function seedReferenceData(): Promise<void> {
+  if (process.env.NODE_ENV === "production") return;
+
+  for (const list of REFERENCE_LISTS) {
+    const saved = await prisma.referenceList.upsert({
+      where: { key: list.key },
+      create: { key: list.key, name: list.name, description: list.description, sortOrder: list.sortOrder },
+      update: { name: list.name, description: list.description, sortOrder: list.sortOrder },
+    });
+    for (const item of list.items) {
+      await prisma.referenceItem.upsert({
+        where: { listId_code: { listId: saved.id, code: item.code } },
+        create: {
+          listId: saved.id,
+          code: item.code,
+          label: item.label,
+          sortOrder: item.sortOrder,
+          metadata: item.metadata ?? undefined,
+        },
+        update: { label: item.label, sortOrder: item.sortOrder, metadata: item.metadata ?? undefined },
+      });
+    }
+  }
+  console.log(`✔ Listas de referencia de demo sincronizadas: ${REFERENCE_LISTS.length}`);
+}
+
 async function main(): Promise<void> {
   await seedPermissions();
   await seedAdminRole();
@@ -323,6 +354,7 @@ async function main(): Promise<void> {
   await seedDemoStructure();
   await seedEquipmentCategories();
   await seedDemoEquipment();
+  await seedReferenceData();
 }
 
 main()

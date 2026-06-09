@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { Checkbox, FormField, Input, MultiSelect, Select, Textarea, Toggle } from "@lyra/ui";
 import type { OptionInlineItem, RoleSummary, WorkflowStateDto } from "@lyra/contracts";
+import { useReferenceLists } from "../reference-data/reference-data-queries.js";
 import { fieldTypeMeta, slugifyKey, type EditField, type EditSection } from "./builder-model.js";
 import styles from "./TemplateBuilder.module.css";
 
@@ -8,6 +9,18 @@ import styles from "./TemplateBuilder.module.css";
 function inlineItems(config: Record<string, unknown>): OptionInlineItem[] {
   const src = config.optionSource as { kind?: string; items?: OptionInlineItem[] } | undefined;
   return src?.kind === "inline" && Array.isArray(src.items) ? src.items : [];
+}
+
+/** Tipo de fuente de opciones del campo (inline por defecto). */
+function optionSourceKind(config: Record<string, unknown>): "inline" | "referenceList" {
+  const src = config.optionSource as { kind?: string } | undefined;
+  return src?.kind === "referenceList" ? "referenceList" : "inline";
+}
+
+/** `listKey` referenciado (vacío si no es referenceList). */
+function referencedListKey(config: Record<string, unknown>): string {
+  const src = config.optionSource as { kind?: string; listKey?: string } | undefined;
+  return src?.kind === "referenceList" ? (src.listKey ?? "") : "";
 }
 
 interface BooleanFieldRef {
@@ -130,31 +143,57 @@ export function BuilderConfigPanel({
         )}
 
         {isOptions && (
-          <FormField label={t("templates.builder.options")}>
-            {({ id }) => (
-              <Textarea
-                id={id}
-                rows={4}
-                value={optionLines}
-                placeholder={t("templates.builder.optionsPlaceholder")}
-                onChange={(e) => {
-                  const used = new Set<string>();
-                  const items: OptionInlineItem[] = e.target.value
-                    .split("\n")
-                    .map((l) => l.trim())
-                    .filter(Boolean)
-                    .map((label, i) => {
-                      // El `code` es el valor estable que se persiste (no el label).
-                      let code = slugifyKey(label, `op_${i + 1}`);
-                      while (used.has(code)) code = `${code}_${i}`;
-                      used.add(code);
-                      return { code, label };
-                    });
-                  setConfig("optionSource", { kind: "inline", items });
-                }}
+          <>
+            <FormField label={t("templates.builder.optionSource")} hint={t("templates.builder.optionSourceHint")}>
+              {({ id }) => (
+                <Select
+                  id={id}
+                  value={optionSourceKind(field.config)}
+                  onChange={(e) => {
+                    const kind = e.target.value;
+                    if (kind === "referenceList") setConfig("optionSource", { kind: "referenceList", listKey: "" });
+                    else setConfig("optionSource", { kind: "inline", items: inlineItems(field.config) });
+                  }}
+                >
+                  <option value="inline">{t("templates.builder.optionSourceInline")}</option>
+                  <option value="referenceList">{t("templates.builder.optionSourceReference")}</option>
+                </Select>
+              )}
+            </FormField>
+
+            {optionSourceKind(field.config) === "inline" ? (
+              <FormField label={t("templates.builder.options")}>
+                {({ id }) => (
+                  <Textarea
+                    id={id}
+                    rows={4}
+                    value={optionLines}
+                    placeholder={t("templates.builder.optionsPlaceholder")}
+                    onChange={(e) => {
+                      const used = new Set<string>();
+                      const items: OptionInlineItem[] = e.target.value
+                        .split("\n")
+                        .map((l) => l.trim())
+                        .filter(Boolean)
+                        .map((label, i) => {
+                          // El `code` es el valor estable que se persiste (no el label).
+                          let code = slugifyKey(label, `op_${i + 1}`);
+                          while (used.has(code)) code = `${code}_${i}`;
+                          used.add(code);
+                          return { code, label };
+                        });
+                      setConfig("optionSource", { kind: "inline", items });
+                    }}
+                  />
+                )}
+              </FormField>
+            ) : (
+              <ReferenceListPicker
+                value={referencedListKey(field.config)}
+                onChange={(listKey) => setConfig("optionSource", { kind: "referenceList", listKey })}
               />
             )}
-          </FormField>
+          </>
         )}
 
         {isDateLike && (
@@ -296,4 +335,44 @@ export function BuilderConfigPanel({
   }
 
   return <div className={styles.configEmpty}>{t("templates.builder.selectToConfig")}</div>;
+}
+
+/**
+ * Selector de Lista de Referencia para un campo SELECT/MULTISELECT. Las opciones
+ * se resuelven desde la lista en la vista previa (muestra label, guarda code). Si
+ * la lista referenciada ya no existe en el catálogo, se conserva y se avisa.
+ */
+function ReferenceListPicker({ value, onChange }: { value: string; onChange: (listKey: string) => void }) {
+  const { t } = useTranslation();
+  const { data: lists = [], isLoading } = useReferenceLists();
+  const known = lists.some((l) => l.key === value);
+  const selected = lists.find((l) => l.key === value);
+
+  return (
+    <FormField label={t("templates.builder.referenceList")} hint={t("templates.builder.referenceListHint")}>
+      {({ id }) => (
+        <>
+          <Select id={id} value={value} onChange={(e) => onChange(e.target.value)} disabled={isLoading}>
+            <option value="">{t("templates.builder.referenceListPlaceholder")}</option>
+            {lists.map((l) => (
+              <option key={l.id} value={l.key}>
+                {l.name} ({l.itemCount ?? 0})
+              </option>
+            ))}
+            {value && !known && <option value={value}>{value}</option>}
+          </Select>
+          {value && !known && !isLoading && (
+            <p className={styles.thresholdHint} style={{ color: "var(--color-warning)" }}>
+              {t("templates.builder.referenceListMissing", { key: value })}
+            </p>
+          )}
+          {selected && !selected.active && (
+            <p className={styles.thresholdHint} style={{ color: "var(--color-warning)" }}>
+              {t("templates.builder.referenceListInactive")}
+            </p>
+          )}
+        </>
+      )}
+    </FormField>
+  );
 }

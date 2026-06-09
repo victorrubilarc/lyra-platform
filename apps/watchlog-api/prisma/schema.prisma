@@ -770,6 +770,66 @@ model WorkflowTransitionRole {
 }
 
 // ===========================================================================
+//  Datos de referencia / Listas (Fase 2.x) — catálogo gobernado
+// ===========================================================================
+//
+// Listas de valores reutilizables y reportables (modos de falla, turnos, causas,
+// contratistas…). A diferencia de Template/Workflow, NO es versionado-inmutable:
+// es un catálogo VIVO estilo Equipment/Role (code estable + activar/desactivar +
+// sortOrder + borrado lógico). Ver docs/DECISIONS.md (2026-06-09).
+//
+// El `code` de un ítem es lo que el llenado (Fase 2.4) persiste — NO el label
+// (regla de oro de reportabilidad = dimensión de DW / FHIR Coding). Un code en
+// uso no se borra: se desactiva. La `key` de la lista es la clave de join que
+// referencia el `optionSource.referenceList.listKey` de un campo SELECT/
+// MULTISELECT (por clave estable, no FK — el config vive en JSONB). `source`
+// EXTERNAL solo se MODELA; el motor de sincronización es Fase 3.
+
+enum ReferenceSource {
+  MANUAL
+  EXTERNAL
+}
+
+model ReferenceList {
+  id          String          @id @default(cuid())
+  // Clave estable y única (slug). La referencia optionSource.referenceList.listKey.
+  key         String          @unique
+  name        String
+  description String?
+  source      ReferenceSource @default(MANUAL)
+  active      Boolean         @default(true)
+  // Orden de presentación del catálogo (asc).
+  sortOrder   Int             @default(0)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  deletedAt   DateTime? // borrado lógico
+
+  items ReferenceItem[]
+
+  @@index([deletedAt])
+}
+
+model ReferenceItem {
+  id        String   @id @default(cuid())
+  listId    String
+  // Clave estable, única dentro de la lista. Es el valor que se persiste al llenar.
+  code      String
+  label     String
+  active    Boolean  @default(true)
+  // Orden de presentación en pickers, relativo a la lista (asc).
+  sortOrder Int      @default(0)
+  // Atributos enriquecidos (jsonb freeform): falla→{isoCategory}, contratista→{rut}…
+  metadata  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  list ReferenceList @relation(fields: [listId], references: [id], onDelete: Cascade)
+
+  @@unique([listId, code])
+  @@index([listId])
+}
+
+// ===========================================================================
 //  Auditoría — append-only / inmutable (trigger en la migración)
 // ===========================================================================
 

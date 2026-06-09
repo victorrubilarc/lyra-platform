@@ -1,4 +1,4 @@
-import { GitBranch, LayoutDashboard, Layers, Network, ShieldCheck, UserCog, type LucideIcon } from "lucide-react";
+import { GitBranch, LayoutDashboard, Layers, ListChecks, Network, ShieldCheck, UserCog, type LucideIcon } from "lucide-react";
 import type { Permission } from "@lyra/permissions";
 
 /**
@@ -40,6 +40,13 @@ export const ROUTES: readonly NavRoute[] = [
     labelKey: "nav.workflows",
     icon: GitBranch,
     permission: "module:workflows:view",
+    inSidebar: true,
+  },
+  {
+    path: "/datos-referencia",
+    labelKey: "nav.referenceData",
+    icon: ListChecks,
+    permission: "module:referencedata:view",
     inSidebar: true,
   },
   {

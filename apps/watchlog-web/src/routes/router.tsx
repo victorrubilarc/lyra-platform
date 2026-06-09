@@ -19,6 +19,7 @@ import { TemplatesPage } from "../features/templates/TemplatesPage.js";
 import { TemplateBuilderPage } from "../features/templates/TemplateBuilderPage.js";
 import { WorkflowsPage } from "../features/workflows/WorkflowsPage.js";
 import { WorkflowBuilderPage } from "../features/workflows/WorkflowBuilderPage.js";
+import { ReferenceDataPage } from "../features/reference-data/ReferenceDataPage.js";
 
 /**
  * Mapa de rutas. `/login` es pública; todo lo demás cuelga de `ProtectedRoute`
@@ -44,6 +45,7 @@ export const router = createBrowserRouter([
           { path: "/plantillas/:id", element: <TemplateBuilderPage /> },
           { path: "/flujos", element: <WorkflowsPage /> },
           { path: "/flujos/:id", element: <WorkflowBuilderPage /> },
+          { path: "/datos-referencia", element: <ReferenceDataPage /> },
           {
             path: "/seguridad",
             element: <SecurityLayout />,

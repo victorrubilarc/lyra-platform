@@ -54,9 +54,9 @@
   - Además: `key`, `label`, `help?`, `required`, `order`, `config` (JSONB validado por unión Zod), `visibleWhen?`
     (condicional). *N—N* `Role` vía **TemplateFieldRole** (override por campo).
   - **`config` de SELECT/MULTISELECT = `optionSource` discriminado** (desde 2.1.1, reemplaza `options[]`):
-    `inline` (`items:[{code,label}]`, único editable hoy) · `referenceList` (`listKey` → Lista de Referencia
-    gobernada, entidad y FK en 2.x) · `external` (`sourceKey` → Orígenes de Datos, Fase 3). El shape `options[]`
-    legacy se **sube** a `inline` al leer/escribir (helper `upgradeFieldConfig`; configs son JSONB ⇒ sin migración SQL).
+    `inline` (`items:[{code,label}]`) · `referenceList` (`listKey` → **Lista de Referencia gobernada**, REAL desde
+    2.x: validado en `saveDraft`, resuelto en el preview) · `external` (`sourceKey` → Orígenes de Datos, Fase 3). El
+    shape `options[]` legacy se **sube** a `inline` al leer/escribir (helper `upgradeFieldConfig`; configs son JSONB ⇒ sin migración SQL).
   - **Regla de reportabilidad:** el valor que se persiste al llenar (2.4) para una referencia es el **`code` estable,
     NO el label** (patrón dimensión de DW / FHIR Coding). Labels cambian sin romper histórico.
 - **Entry / LogEntry** (bitácora, **Fase 2.4** — solo DISEÑO, sin tabla aún):
@@ -97,8 +97,25 @@
   1 inicial exacto, ≥1 final, claves únicas, transiciones con estados existentes, alcanzabilidad desde el inicial,
   sin trampas (todo estado llega a un final). Se exige válida para **publicar**.
 
+### Datos de referencia / Listas
+> **Fase 2.x (implementado):** migración `20260609205303_add_reference_data`. Catálogo **gobernado** (NO
+> versionado-inmutable como Template/Workflow): listas de valores reutilizables y reportables. El valor que se
+> persiste al llenar (2.4) es el **`code` estable, NO el label** (dimensión de DW / FHIR Coding).
+- **ReferenceList** *(implementado)* — `key` (estable, único; la referencia `optionSource.referenceList.listKey`),
+  `name`, `description?`, `source` (MANUAL | EXTERNAL — EXTERNAL solo modelado; el sync es Fase 3), `active`,
+  `sortOrder`, `deletedAt` (borrado lógico). *1—N* **ReferenceItem**.
+- **ReferenceItem** *(implementado)* — `code` (estable, **`@@unique([listId, code])`**), `label`, `active`,
+  `sortOrder`, **`metadata` jsonb** (atributos enriquecidos freeform: falla→{isoCategory}, contratista→{rut}…).
+  FK a la lista `onDelete: Cascade`. Un code en uso **se desactiva, no se borra**; el guard de "code en uso" real
+  (valores de `LogEntry`) llega en 2.4.
+- **Binding** — `listKey` por **clave** (no FK; vive en el `config` JSONB del campo, coherente con
+  `editableInStateKey`). Validado en `TemplatesService.saveDraft` (la lista debe existir y estar viva). Una lista
+  referenciada por una plantilla **no se borra** (guard en `ReferenceListsService.remove`, consulta JSONB de
+  `TemplateField.config`). Endpoint `GET /reference-lists/:idOrKey/resolve` devuelve ítems **activos** ordenados
+  (code/label/metadata) para el preview del Form Builder y el llenado (2.4).
+
 ### Orígenes de datos
-- **DataSource** — URL base, tipo de auth, **credencial cifrada en reposo**. *1—N* **DataSourceEndpoint** (path, método, mapeo JSONPath, TTL). Caché en Redis.
+- **DataSource** — URL base, tipo de auth, **credencial cifrada en reposo**. *1—N* **DataSourceEndpoint** (path, método, mapeo JSONPath, TTL). Caché en Redis. **Espejo ENTRANTE:** en Fase 3 un endpoint puede **alimentar/materializar** una `ReferenceList` (`source=EXTERNAL`).
 
 ### Incidencias (workflow HSE)
 - **Incident** — severidad, prioridad, estado, asignado, reporter, SLA/due, protocolo, origen.

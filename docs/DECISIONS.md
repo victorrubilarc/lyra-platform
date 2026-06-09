@@ -4,6 +4,51 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-09 · Fase 2.x — Datos de referencia / Listas (`ReferenceList`/`ReferenceItem`) (implementado)
+
+Hace REAL el `optionSource.referenceList` que 2.1.1 dejó modelado. Investigación de respaldo: **FHIR
+ValueSet/CodeSystem**, **Reference/Master Data Management**, **dimensión de Data Warehouse** (guardar code,
+no label), **ISO 14224** (taxonomía de fallas como code-list). Decisiones de ejecución (plan + 3 forks
+aprobados por el usuario):
+
+- **Catálogo GOBERNADO, NO versionado-inmutable** (a diferencia de Template/Workflow). Es un mantenedor vivo
+  estilo `Equipment`/`Role`: `ReferenceList` (key único estable + name + description + `source` MANUAL|EXTERNAL
+  + active + sortOrder + **borrado lógico** `deletedAt`) 1—N `ReferenceItem` (`code` estable **único por lista** +
+  label + active + sortOrder + **metadata jsonb** enriquecido). **Resuelve la ambigüedad** de la entrada de diseño
+  2026-06-09 ("activa/versionable"): el versionado-inmutable **no** aplica aquí; la integridad histórica la dará el
+  llenado (2.4) guardando el **code estable**, no una versión de la lista. Migración aditiva
+  `20260609205303_add_reference_data` (`migrate deploy`, esquiva el EPERM del DLL con el watch).
+- **El valor se persiste como `code` estable, no el label** (regla de oro de reportabilidad = dimensión DW /
+  FHIR Coding; ya documentada en 2.1.1). Un **code en uso se DESACTIVA, no se borra** (fork confirmado): en la UI
+  la acción gobernada del ítem es activar/desactivar; el **hard-delete de ítem** existe en el backend para limpiar
+  errores de captura, pero el **guard de "code en uso" real** (valores de `LogEntry`) se incorpora en **2.4** (hoy
+  no hay ejecución que consultar). El `resolve` devuelve solo ítems **activos**.
+- **`listKey` por CLAVE, no FK** (coherente con `editableInStateKey` de 2.2): el `optionSource.referenceList.listKey`
+  vive en el `config` JSONB del campo y referencia `ReferenceList.key`. La integridad se valida en backend
+  (`TemplatesService.saveDraft`: la lista debe existir y estar viva) — **espejo de la validación del binding de
+  flujo**. Mantiene config JSONB + degradación elegante (un SELECT inline sigue igual). Una lista **referenciada
+  por una plantilla no se borra** (guard en `ReferenceListsService.remove`, consulta JSONB de `TemplateField.config`),
+  espejo del guard "en uso" de Flujos. *Nota:* el conteo es **conservador** (cuenta campos de versiones aunque la
+  plantilla esté con borrado lógico), mismo comportamiento ya registrado para Flujos (BACKLOG §3).
+- **Módulo propio de sidebar** (fork confirmado): `/datos-referencia`, hermano de Estructura/Seguridad/Flujos.
+  **4 permisos nuevos** (catálogo 37→**41**): `module:referencedata:view/manage` + `referencelist:view/manage`. El
+  `resolve` y la lectura se gatean por `referencelist:view` (lo necesitan también los editores de plantillas para
+  el preview); el seed los asigna al rol admin iterando el catálogo (sin código nuevo).
+- **UI = mantenedor master-detail** (molde Equipos/Roles, `ResizableSplit`): lista de Listas + panel de detalle
+  con grilla de ítems (activar/desactivar, orden inline, editar, eliminar) y drawers de lista/ítem (editor de
+  metadata key-value que infiere número/booleano/texto). En el **Form Builder**, SELECT/MULTISELECT gana un selector
+  de **fuente de opciones** (inline vs Lista de Referencia); la **vista previa resuelve** las opciones desde la lista
+  (muestra label, valor = code). Reusa primitivos `@lyra/ui` existentes (Select/Table/Drawer/Chip); sin componentes nuevos.
+- **Frontera con Fase 3/2.4 (intacta):** el **sync** que alimenta/materializa una lista desde ERP/MES/RRHH es Fase 3
+  (`source=EXTERNAL` solo modelado). El **llenado** que guarda codes en vivo es 2.4. Seed demo (dev): `failure-modes`
+  (ISO 14224, con metadata) + `shifts`.
+- **Verificado:** typecheck (6 paquetes) · lint (0 errores; 1 warning preexistente en OrgTree) · build web (1921
+  módulos; API NO se buildea por el watch) · test (**contracts 44** +5 · permissions 5 · **API 97** +8 de
+  `ReferenceListsService`). **Smoke en vivo** (demo): CRUD lista/ítem; key duplicada 400; code duplicado por lista
+  400; resolve (excluye inactivos, conserva metadata); binding en `saveDraft` (listKey inexistente 400 / válido 200);
+  lista EN USO no se borra 400. Datos de prueba ad-hoc limpiados (hard-delete); las 2 listas del seed quedan como
+  demo dev-only.
+
 ### 2026-06-09 · Eventos de dominio + Webhooks salientes (diseño; implementación diferida)
 
 Necesidad planteada por el usuario: el sistema debe poder **empujar datos** (bitácoras, incidencias, transiciones,
