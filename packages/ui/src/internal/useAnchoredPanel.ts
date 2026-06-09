@@ -24,17 +24,23 @@ export function useAnchoredPanel(
     const r = trigger.getBoundingClientRect();
     const margin = 8;
     const gap = 6;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
     const width = Math.max(r.width, 260);
-    // Altura natural del panel (sin el clamp) para decidir la dirección.
-    const panelH = panelRef.current?.scrollHeight ?? 0;
-    const spaceBelow = window.innerHeight - r.bottom - margin;
-    const spaceAbove = r.top - margin;
-    // Abre hacia arriba solo si abajo no alcanza para el panel y arriba hay más sitio.
-    const openUp = panelH > spaceBelow && spaceAbove > spaceBelow;
-    const maxHeight = Math.max(160, Math.min(panelH || Infinity, openUp ? spaceAbove : spaceBelow));
-    const left = Math.max(margin, Math.min(r.left, window.innerWidth - width - margin));
+    // Espacio REAL disponible para el panel a cada lado del trigger.
+    const spaceBelow = vh - r.bottom - margin - gap;
+    const spaceAbove = r.top - margin - gap;
+    // Altura natural del contenido (medida tras montar; 0 en el primer paso).
+    const natural = panelRef.current?.scrollHeight ?? 0;
+    const fitsBelow = natural > 0 && natural <= spaceBelow;
+    // Abre hacia arriba si no cabe abajo y arriba hay más espacio.
+    const openUp = !fitsBelow && spaceAbove > spaceBelow;
+    const avail = openUp ? spaceAbove : spaceBelow;
+    // La altura NUNCA excede el espacio disponible → jamás se sale del viewport.
+    const maxHeight = Math.max(0, Math.min(natural || avail, avail));
+    const left = Math.max(margin, Math.min(r.left, vw - width - margin));
     const next: CSSProperties = { position: "fixed", left, width, maxHeight, visibility: "visible" };
-    if (openUp) next.bottom = window.innerHeight - r.top + gap;
+    if (openUp) next.bottom = vh - r.top + gap;
     else next.top = r.bottom + gap;
     setStyle(next);
   }, [triggerRef, panelRef]);
