@@ -546,9 +546,17 @@ Plantillas/Flujos): valor = **code estable, no label** (patrón dimensión DW / 
   inactivos y conserva metadata; binding en `saveDraft` (listKey inexistente 400 / válido 200); lista EN USO no se
   borra 400; seed resuelve (failure-modes 8 ítems + metadata, shifts 3). Datos ad-hoc limpiados; listas del seed
   quedan como demo dev-only.
+- **Endurecimiento UX (mismo día, pedido del usuario):** grilla de ítems **enterprise** (buscador code/label/
+  metadata + filtro de estado + columnas ordenables + paginación + conteo + metadata en chips; orden inline remonta
+  con el valor del servidor). Nuevo primitivo **`@lyra/ui` `Combobox`** (single-select buscable con portal + teclado
+  + clearable + reposición en scroll). El selector de Lista del Form Builder y la vista previa (SELECT→`Combobox`,
+  MULTISELECT→`MultiSelect`) pasan a objetos premium que **escalan a listas largas**. Ver DECISIONS 2026-06-09
+  ("endurecimiento UX"). Verificado: typecheck/lint (0 errores)/build web (**1923** módulos)/test (contracts 44 ·
+  permissions 5 · API 97) + resolve en vivo OK.
 - **Pendiente**: smoke **VISUAL** en navegador (ver BACKLOG §4): `/datos-referencia` (crear lista, ítems con
-  metadata, activar/desactivar, orden inline, eliminar) y en el Form Builder elegir una Lista en un SELECT y ver la
-  vista previa resolver; modo claro.
+  metadata, **buscar/ordenar/paginar** la grilla, filtro de estado, activar/desactivar, orden inline, eliminar) y en
+  el Form Builder elegir una Lista en un SELECT (selector buscable) y ver la **vista previa resolver** (SELECT y
+  MULTISELECT buscables); modo claro.
 
 ## Próximo paso
 **Fase 2.1 + 2.1.1 + 2.2 + 2.x completas.** **Sesión siguiente = Fase 2.3 · Rondas/`LogPeriod`** (plantilla
