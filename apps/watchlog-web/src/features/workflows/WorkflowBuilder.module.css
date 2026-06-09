@@ -97,11 +97,31 @@
 .summaryHeader {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   font-family: var(--font-brand);
   font-weight: 600;
   font-size: 14px;
   color: var(--color-text-primary);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  align-self: flex-start;
+  min-height: 32px;
+}
+
+.summaryHeader:hover {
+  color: var(--color-accent-primary);
+}
+
+.summaryCount {
+  font-family: var(--font-ui, inherit);
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  background: var(--color-hover, rgba(255, 255, 255, 0.06));
+  border-radius: 99px;
+  padding: 1px 8px;
 }
 
 .summaryTableWrap {
@@ -186,9 +206,11 @@
   font-weight: 600;
   font-size: 14px;
   color: var(--color-text-primary);
-  /* Fijo al hacer scroll: el botón "Agregar" no se pierde con listas largas. */
+  /* Fijo al hacer scroll: el botón "Agregar" no se pierde con listas largas.
+     El offset = alto del topbar de la app (sticky, 58px); el `.tabsBar` no es
+     sticky, así que no se suma. */
   position: sticky;
-  top: 0;
+  top: 58px;
   z-index: 3;
   background: var(--color-bg-surface-1);
   margin: calc(-1 * var(--space-4)) calc(-1 * var(--space-4)) var(--space-1);

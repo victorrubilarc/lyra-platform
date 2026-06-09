@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, Info, ListChecks, PlayCircle, Plus, Save, Trash2, TriangleAlert } from "lucide-react";
+import { ArrowLeft, ArrowRight, ChevronDown, ChevronRight, Info, ListChecks, PlayCircle, Plus, Save, Trash2, TriangleAlert } from "lucide-react";
 import { Button, Card, Checkbox, Chip, FormField, Input, Modal, Select, Textarea, Toggle, useToast } from "@lyra/ui";
 import { validateWorkflowMachine, type WorkflowDetail } from "@lyra/contracts";
 import { usePermissions } from "../../auth/use-permissions.js";
@@ -33,6 +33,7 @@ export function WorkflowBuilder({ detail }: { detail: WorkflowDetail }) {
   const [wf, setWf] = useState<EditWorkflow>(() => detailToEditWorkflow(detail));
   const [dirty, setDirty] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
+  const [summaryOpen, setSummaryOpen] = useState(true);
 
   const save = useSaveWorkflowDraft();
   const publish = usePublishWorkflow();
@@ -225,12 +226,21 @@ export function WorkflowBuilder({ detail }: { detail: WorkflowDetail }) {
         </FormField>
       </Card>
 
-      {/* Resumen de transiciones (tabla) — útil cuando hay muchas. */}
+      {/* Resumen de transiciones (tabla) — colapsable; útil cuando hay muchas. */}
       {wf.transitions.length > 0 && (
         <Card className={styles.summaryCard}>
-          <div className={styles.summaryHeader}>
-            <ListChecks size={15} /> {t("workflows.builder.summaryTitle")}
-          </div>
+          <button
+            type="button"
+            className={styles.summaryHeader}
+            onClick={() => setSummaryOpen((o) => !o)}
+            aria-expanded={summaryOpen}
+          >
+            {summaryOpen ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+            <ListChecks size={15} />
+            <span>{t("workflows.builder.summaryTitle")}</span>
+            <span className={styles.summaryCount}>{wf.transitions.length}</span>
+          </button>
+          {summaryOpen && (
           <div className={styles.summaryTableWrap}>
             <table className={styles.summaryTable}>
               <thead>
@@ -259,6 +269,7 @@ export function WorkflowBuilder({ detail }: { detail: WorkflowDetail }) {
               </tbody>
             </table>
           </div>
+          )}
         </Card>
       )}
 
