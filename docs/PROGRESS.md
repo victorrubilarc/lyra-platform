@@ -1,8 +1,9 @@
 # Progreso — Lyra WatchLog
 
-Última actualización: 2026-06-09 (**Fase 1 completa**; **Fase 2.1 ✅** — Plantillas: modelo de DEFINICIÓN
-(`Template`/`TemplateVersion` inmutable/secciones/campos) + contratos (config por tipo + umbrales ISA-18.2) +
-**Form Builder** (lista + builder 3-columnas + vista previa + borrador/publicar) + 7 permisos nuevos.
+Última actualización: 2026-06-09 (**Fase 1 completa**; **Fase 2.1 ✅** + **Fase 2.1.1 ✅** — Plantillas: modelo de
+DEFINICIÓN (`Template`/`TemplateVersion` inmutable/secciones/campos) + **campo en 3 capas** (`type`/`dataType`
+derivado/`semanticRole`) + **`optionSource`** discriminado (inline; referenceList/external modelados) + contratos +
+**Form Builder** (lista + builder 3-columnas + vista previa + borrador/publicar + toggle fecha efectiva).
 **Siguiente: Fase 2.2 — Flujos reutilizables (`WorkflowDefinition`)**).
 
 ## Estado por fase
@@ -11,7 +12,7 @@
 |---|---|---|
 | 0 | **Cimientos** (monorepo, Docker, Design System tokens, contratos, API health) | ✅ Hecho |
 | 1 | Seguridad (auth + RBAC/ABAC) + Estructura organizacional + AuditLog | ✅ Backend ✅ · UI: Login ✅ · **Estructura ✅ (+ Equipos ✅)** · **Seguridad ✅** |
-| 2 | Plantillas / Form Builder + Bitácoras | 🔄 **2.1 ✅** (Plantillas: modelo definición + contratos + Form Builder) · 2.2–2.7 pendientes |
+| 2 | Plantillas / Form Builder + Bitácoras | 🔄 **2.1 ✅** + **2.1.1 ✅** (modelo definición + 3 capas/`optionSource` + Form Builder) · 2.2–2.7 pendientes |
 | 3 | Orígenes de datos | ⬜ Pendiente |
 | 4 | Motor de incidencias | ⬜ Pendiente |
 | 5 | Cambio de turno + IA (resumen) | ⬜ Pendiente |
@@ -449,8 +450,35 @@ backend / UI).
 - **Pendiente**: smoke **VISUAL** en navegador (ver BACKLOG §4): `/plantillas`, crear, builder (agregar
   sección/campos, umbrales, reordenar, roles por sección, condicional), vista previa, publicar, modo claro.
 
+## Hecho en Fase 2.1.1 (Endurecimiento de modelo — ADITIVO, antes del llenado)
+
+Refina el modelo de campo a **3 capas** y los datos de referencia, ANTES de 2.4 y sin datos de ejecución.
+Todo aditivo/no destructivo. Ver DECISIONS 2026-06-09 (entrada "2.1.1 implementado"). Rama `feat/plantillas-2.1.1`.
+
+- **Contratos** (`@lyra/contracts/templates`): enums `FieldDataType` (12 valores) y `FieldSemanticRole` (4, nullable);
+  `deriveDataType(type)` (mapeo único `FieldType→FieldDataType`); **`optionSource`** discriminado
+  (`inline`/`referenceList`/`external`) con `preprocess` que **sube el `options[]` legacy** a `inline`;
+  `upgradeFieldConfig(type,config)` reutilizable; `templateFieldSchema` gana `dataType`+`semanticRole`,
+  `draftFieldInputSchema` gana `semanticRole?`; validación **≤1 `EFFECTIVE_DATE` por versión**. **+8 specs**.
+- **Prisma** (migración `20260609155007_add_field_layers`): enums + `TemplateField.dataType`/`semanticRole`,
+  backfill de `dataType` desde `type`, `SET NOT NULL`. Aplicada con `migrate deploy` (esquiva el EPERM del DLL
+  con el watch vivo); cliente regenerado (los `.d.ts`, suficiente para typecheck).
+- **Backend** (`TemplatesService`): `saveDraft` **deriva `dataType`** y persiste `semanticRole`; `mapVersion`
+  **normaliza el config al leer** (`upgradeFieldConfig`); `ensureDraft` clona ambos + normaliza. **+1 test**
+  (deriva capas 2/3). El valor de referencia se documenta como **`code` estable, no label**.
+- **Web** (Form Builder): editor de opciones inline ahora escribe `optionSource.inline.items` (`code`/`label`);
+  **toggle "Fecha efectiva del registro"** en DATE/DATETIME (único por versión: marca una, desmarca las demás);
+  `dataType` oculto/derivado; `FieldPreview`/`builder-model` migrados a `optionSource`. i18n es-CL nuevas claves.
+- **Verificación**: `typecheck` (6 paquetes) · `lint` (0 errores, 1 warning preexistente en OrgTree) · `build`
+  (web **1901** módulos; API NO se buildea por el watch) · `test` (**contracts 23** +8 · permissions 5 · **API 78** +1)
+  en verde. **Smoke en vivo** (demo): crear → guardar (DATE effectiveDate + SELECT optionSource inline + NÚMERO) →
+  leer (`dataType` DATE/CODE/NUMBER derivado, `semanticRole=EFFECTIVE_DATE`, `optionSource` normalizado) → escribir
+  shape legacy `options[]` ⇒ se sube a `inline` al leer → **2× EFFECTIVE_DATE ⇒ 400** → borrar 204. Datos de prueba
+  limpiados.
+- **Pendiente**: smoke **VISUAL** en navegador (toggle fecha efectiva, editor de opciones inline) — ver BACKLOG §4.
+
 ## Próximo paso
-**Fase 2.1 completa** (Plantillas: modelo definición + contratos + Form Builder).
+**Fase 2.1 + 2.1.1 completas** (Plantillas: modelo definición + campo en 3 capas + `optionSource` + Form Builder).
 **Sesión siguiente = Fase 2.2 · Flujos reutilizables (`WorkflowDefinition`) — mantenedor propio + binding a
 versiones de plantilla y secciones→estados.** (Ver BACKLOG §2.)
 

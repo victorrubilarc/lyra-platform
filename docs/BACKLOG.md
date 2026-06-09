@@ -5,8 +5,8 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-09** (**Fase 2.1 ✅** — Plantillas: modelo definición + contratos + Form Builder;
-> **siguiente: Fase 2.2 — Flujos reutilizables `WorkflowDefinition`**).
+> actualización: **2026-06-09** (**Fase 2.1 ✅** + **Fase 2.1.1 ✅** — Plantillas: modelo definición + campo en 3
+> capas + `optionSource` + Form Builder; **siguiente: Fase 2.2 — Flujos reutilizables `WorkflowDefinition`**).
 
 ---
 
@@ -169,15 +169,15 @@ nunca queda más de una sesión atrás.
         Referencias a `WorkflowDefinition`/firma/recurrencia como columnas (editores 2.2/2.3). 7 permisos
         nuevos (catálogo 33). `@lyra/ui`: `Textarea`. **Sin llenado.** Ver PROGRESS y DECISIONS 2026-06-09.
         **Pendiente: smoke VISUAL** (ver §4).
-  - [ ] **2.1.1 Endurecimiento de modelo (ADITIVO, antes del llenado 2.4).** Refinar el modelo de campo en 3
-        capas (ver DECISIONS 2026-06-09): `options[]` → **`optionSource`** discriminado (`inline` ahora;
-        `referenceList`/`external` modelados); agregar **`dataType`** (string/number/boolean/date/code/code[]/
-        reference/file/geo/computed; derivable del tipo) y **`semanticRole?`** (`effectiveDate`/`title`/
-        `primaryEquipment`/`severityDriver`) al campo; definir que el valor de una referencia se guarda como
-        **`code` estable** (no label). Modelar los **campos de sistema** de `LogEntry` (recordedAt/createdBy/
-        orgNode/equipo/versión/estado/periodo/firmas como columnas indexadas) + columna `effectiveAt` derivada
-        del campo con rol `effectiveDate`. Migración aditiva sobre 2.1, sin datos de llenado aún. ← *recomendado
-        como próxima sesión.*
+  - [x] **2.1.1 Endurecimiento de modelo (ADITIVO, antes del llenado 2.4).** ✅ (2026-06-09). Campo en **3 capas**:
+        `type` (presentación) + **`dataType`** derivado (enum `FieldDataType`, 12 valores; `deriveDataType`) +
+        **`semanticRole?`** (enum `FieldSemanticRole?`, nullable; solo `EFFECTIVE_DATE` con editor/comportamiento,
+        ≤1 por versión). `options[]` → **`optionSource`** discriminado (`inline` editable; `referenceList`/`external`
+        modelados, sin resolución; `upgradeFieldConfig` sube el shape legacy sin migración SQL). Valor de referencia =
+        **`code` estable** (documentado). Migración aditiva `20260609155007_add_field_layers` (backfill de `dataType`
+        desde `type`). Form Builder: editor inline `code/label` + toggle "Fecha efectiva". **`LogEntry` diferido 100%
+        a 2.4** (solo diseño en DATA_MODEL/DECISIONS; crear tablas nuevas es aditivo). Tests: contracts 23, API 78.
+        Smoke en vivo OK. **Pendiente: smoke VISUAL** (§4). Ver PROGRESS y DECISIONS 2026-06-09.
   - [ ] **2.x Datos de referencia / Listas (módulo nuevo, hermano de Estructura/Seguridad).** Mantenedor de
         **`ReferenceList`** + **`ReferenceItem`** (`code` estable + `label` + `active` + `sortOrder` +
         **`metadata` jsonb** enriquecido), permiso `referencelist:manage`, auditado. Binding de SELECT/MULTISELECT
@@ -292,6 +292,11 @@ probatoria (hash+timestamp). Ref: `DECISIONS.md` (sección de recomendaciones).
       booleano**, **roles por sección**, firma Part 11 opt-in, reordenar con flechas, borrar), **vista previa**
       (incl. número fuera de rango), **Guardar borrador** y **Publicar** (confirmación + versión congelada),
       editar publicada (crea borrador v2), borrar plantilla; modo claro. App en `:5173`.
+- [ ] **Plantillas 2.1.1 — smoke VISUAL en navegador** (se verificó typecheck/lint/build/test + smoke por API;
+      falta el clic): en el builder, agregar un SELECT/MULTISELECT y editar opciones inline (verificar que cada
+      línea genera un `code` estable + `label`); marcar el toggle **"Fecha efectiva del registro"** en un campo
+      DATE/DATETIME y comprobar que al marcar otro se **desmarca el anterior**; vista previa del SELECT usando los
+      codes; guardar/publicar; modo claro. App en `:5173`.
 - [ ] **Modo claro — QA visual** (nuevo): revisar que TODO el workspace se vea premium en **claro**
       (contraste WCAG, glass, glows, severidades, tablas futuras, drawers/modales) y que `auto` siga al
       sistema. El default es oscuro; el login es siempre oscuro. Ref: DECISIONS 2026-06-06.
