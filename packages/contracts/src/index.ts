@@ -28,3 +28,6 @@ export * from "./workflows/workflows.js";
 
 // Datos de referencia / Listas (Fase 2.x)
 export * from "./reference-data/reference-data.js";
+
+// Calendario operacional (turnos + periodo contable) (Fase 2.3.0)
+export * from "./operational-calendar/operational-calendar.js";

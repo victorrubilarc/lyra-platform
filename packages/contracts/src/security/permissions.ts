@@ -307,6 +307,34 @@ export const PERMISSION_CATALOG = [
     group: "referencedata",
     description: "Crear, editar y eliminar listas de referencia y sus ítems.",
   },
+
+  // --- Dimensión 1: módulo de calendario operacional (Fase 2.3.0) ---
+  {
+    key: "module:opscalendar:view",
+    dimension: "MODULE",
+    group: "opscalendar",
+    description: "Ver el módulo de calendario operacional (turnos y periodos).",
+  },
+  {
+    key: "module:opscalendar:manage",
+    dimension: "MODULE",
+    group: "opscalendar",
+    description: "Administrar el módulo de calendario operacional.",
+  },
+
+  // --- Dimensión 2: acciones — calendario operacional (Fase 2.3.0) ---
+  {
+    key: "opscalendar:view",
+    dimension: "ACTION",
+    group: "opscalendar",
+    description: "Listar, ver y previsualizar calendarios operacionales.",
+  },
+  {
+    key: "opscalendar:manage",
+    dimension: "ACTION",
+    group: "opscalendar",
+    description: "Crear, editar, asignar a nodos y eliminar calendarios operacionales.",
+  },
 ] as const satisfies readonly PermissionDef[];
 
 /** Unión literal de todas las claves de permiso conocidas. */
