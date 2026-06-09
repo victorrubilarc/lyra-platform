@@ -22,3 +22,6 @@ export * from "./structure/equipment.js";
 // Plantillas / Form Builder (Fase 2.1)
 export * from "./templates/field-types.js";
 export * from "./templates/templates.js";
+
+// Flujos reutilizables (Fase 2.2)
+export * from "./workflows/workflows.js";
