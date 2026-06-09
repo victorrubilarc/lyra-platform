@@ -69,6 +69,9 @@ export type { SelectProps } from "./components/Select/Select.js";
 export { MultiSelect } from "./components/MultiSelect/MultiSelect.js";
 export type { MultiSelectProps, MultiSelectOption } from "./components/MultiSelect/MultiSelect.js";
 
+export { Combobox } from "./components/Combobox/Combobox.js";
+export type { ComboboxProps, ComboboxOption } from "./components/Combobox/Combobox.js";
+
 export { Table } from "./components/Table/Table.js";
 export type { TableProps, TableColumn, TableSort } from "./components/Table/Table.js";
 
