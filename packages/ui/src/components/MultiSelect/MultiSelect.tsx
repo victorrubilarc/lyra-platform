@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cx } from "../../cx.js";
+import { panelPlacement } from "../Combobox/Combobox.js";
 import styles from "./MultiSelect.module.css";
 
 export interface MultiSelectOption {
@@ -159,7 +160,7 @@ export function MultiSelect({
           className={styles.panel}
           role="listbox"
           aria-multiselectable
-          style={{ position: "fixed", top: rect.bottom + 6, left: rect.left, width: Math.max(rect.width, 240) }}
+          style={{ position: "fixed", ...panelPlacement(rect), width: Math.max(rect.width, 240) }}
         >
           <div className={styles.searchRow}>
             <input

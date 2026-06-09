@@ -72,6 +72,9 @@ export type { MultiSelectProps, MultiSelectOption } from "./components/MultiSele
 export { Combobox } from "./components/Combobox/Combobox.js";
 export type { ComboboxProps, ComboboxOption } from "./components/Combobox/Combobox.js";
 
+export { LookupPicker } from "./components/LookupPicker/LookupPicker.js";
+export type { LookupPickerProps, LookupOption } from "./components/LookupPicker/LookupPicker.js";
+
 export { Table } from "./components/Table/Table.js";
 export type { TableProps, TableColumn, TableSort } from "./components/Table/Table.js";
 

@@ -32,6 +32,28 @@ export interface ComboboxProps {
 
 const norm = (s: string): string => s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
 
+/** Altura estimada del panel (búsqueda + lista acotada). */
+const PANEL_ESTIMATE = 330;
+
+/**
+ * Posición del panel flotante: hacia abajo por defecto; si no hay espacio bajo
+ * el trigger y sí lo hay arriba, se ABRE HACIA ARRIBA (flip). Además acota la
+ * altura al espacio disponible para que nunca se corte fuera del viewport.
+ */
+export function panelPlacement(rect: DOMRect): React.CSSProperties {
+  const spaceBelow = window.innerHeight - rect.bottom - 12;
+  const spaceAbove = rect.top - 12;
+  const openUp = spaceBelow < PANEL_ESTIMATE && spaceAbove > spaceBelow;
+  if (openUp) {
+    return {
+      bottom: window.innerHeight - rect.top + 6,
+      left: rect.left,
+      maxHeight: Math.min(PANEL_ESTIMATE, spaceAbove),
+    };
+  }
+  return { top: rect.bottom + 6, left: rect.left, maxHeight: Math.min(PANEL_ESTIMATE, Math.max(spaceBelow, 160)) };
+}
+
 /**
  * Selector ÚNICO con búsqueda (combobox / autocomplete). Escala a catálogos
  * grandes: el panel (portal, acotado y con scroll) permite filtrar por teclado
@@ -189,7 +211,7 @@ export function Combobox({
             ref={panelRef}
             className={styles.panel}
             role="listbox"
-            style={{ position: "fixed", top: rect.bottom + 6, left: rect.left, width: Math.max(rect.width, 240) }}
+            style={{ position: "fixed", ...panelPlacement(rect), width: Math.max(rect.width, 240) }}
           >
             <div className={styles.searchRow}>
               <input
