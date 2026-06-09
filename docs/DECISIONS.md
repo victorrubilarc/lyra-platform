@@ -46,10 +46,20 @@ alcanzabilidad, sin trampas). Decisiones de ejecución (aprobadas por el usuario
   campo (`TemplateFieldRole`, que ya persistía en backend desde 2.1).
 - **Editor del override por campo (`TemplateFieldRole`)**: el modelo y el persistir ya existían (2.1); 2.2 agrega
   solo el editor UI (multiselect de roles por campo; vacío = hereda la sección).
+- **Refinamiento UX (mismo día, pulido del builder a pedido del usuario):** la validación de la máquina se
+  clasifica por **severidad** — `error` (integridad: claves duplicadas, transición a estado inexistente) **bloquea
+  guardar Y publicar** (banner rojo); `pending` (falta inicial/final, inalcanzable, trampa) **solo bloquea
+  publicar** (banner ámbar "pendiente de conectar"). Así un borrador a medio construir **se puede guardar** (antes
+  el `superRefine`/backend exigían la máquina completa al guardar → no se podía guardar WIP). El contrato y
+  `WorkflowsService.saveDraft` ahora solo exigen INTEGRIDAD; **`publish` sigue exigiendo la máquina completa**.
+  Helper `hasBlockingMachineErrors`. Además: header de columna **fijo (sticky)** para no perder "Agregar
+  estado/transición" en listas largas, y **tabla resumen** de transiciones (etiqueta · desde→hacia · firma · MFA ·
+  roles). Tests: contracts 39, API 89.
 - **Verificado:** typecheck/lint (0 errores; 1 warning preexistente en OrgTree)/build web (1911 módulos)/test
-  (contracts 36 +13 · permissions 5 · API 88 +10) en verde. **Smoke en vivo** (demo): flujo crear→borrador→máquina
+  (contracts 39 · permissions 5 · API 89) en verde. **Smoke en vivo** (demo): flujo crear→borrador→máquina
   inválida (sin final / inalcanzable) 400→publicar (congela)→listar→borrar 204; binding plantilla↔flujo (estado de
-  sección válido persiste; estado inexistente 400; versión no vigente 400; flujo EN USO no se borra 400). Datos de
+  sección válido persiste; estado inexistente 400; versión no vigente 400; flujo EN USO no se borra 400); severidad
+  (guardar con pendiente 200 / publicar con pendiente 400 / guardar con error de integridad 400). Datos de
   prueba limpiados (hard-delete). Migración `20260609163822_add_workflow_definition` aplicada con `migrate deploy`.
 
 ### 2026-06-09 · Fase 2.1.1 — Endurecimiento de modelo (ADITIVO): campo en 3 capas + `optionSource` (implementado)
