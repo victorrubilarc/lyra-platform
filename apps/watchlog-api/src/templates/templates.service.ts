@@ -235,6 +235,8 @@ export class TemplatesService {
     // Valida el binding del flujo (existe/publicado/versión congelada) y que las
     // claves de estado de sección pertenezcan a esa versión de flujo.
     const workflowBinding = await this.resolveWorkflowBinding(dto);
+    // Valida que cada campo con optionSource.referenceList apunte a una lista viva.
+    await this.assertReferenceListsExist(dto);
 
     const draft = await this.ensureDraft(id);
 
@@ -561,5 +563,39 @@ export class TemplatesService {
       }
     }
     return { definitionId: defId, versionId };
+  }
+
+  /**
+   * Valida el binding de datos de referencia (Fase 2.x): cada campo SELECT/
+   * MULTISELECT cuyo `optionSource` sea `referenceList` debe apuntar a una lista
+   * existente y viva (no borrada). Espejo de la validación del binding de flujo.
+   * El valor se guarda como `code` estable; aquí solo se asegura que la lista
+   * referenciada exista al definir la plantilla.
+   */
+  private async assertReferenceListsExist(dto: SaveTemplateDraftRequest): Promise<void> {
+    const keys = new Set<string>();
+    for (const section of dto.sections) {
+      for (const field of section.fields) {
+        if (field.type !== "SELECT" && field.type !== "MULTISELECT") continue;
+        const config = upgradeFieldConfig(field.type, (field.config ?? {}) as Record<string, unknown>);
+        const source = config.optionSource as { kind?: string; listKey?: string } | undefined;
+        if (source?.kind === "referenceList" && source.listKey) {
+          keys.add(source.listKey);
+        }
+      }
+    }
+    if (keys.size === 0) return;
+
+    const found = await this.prisma.referenceList.findMany({
+      where: { key: { in: [...keys] }, deletedAt: null },
+      select: { key: true },
+    });
+    const foundKeys = new Set(found.map((l) => l.key));
+    const missing = [...keys].filter((k) => !foundKeys.has(k));
+    if (missing.length > 0) {
+      throw new BadRequestException(
+        `Lista de referencia inexistente: ${missing.join(", ")}. Créela en Datos de referencia o use opciones en línea.`,
+      );
+    }
   }
 }

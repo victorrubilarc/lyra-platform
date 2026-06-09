@@ -14,6 +14,7 @@ import { StructureModule } from "./structure/structure.module";
 import { EquipmentModule } from "./equipment/equipment.module";
 import { TemplatesModule } from "./templates/templates.module";
 import { WorkflowsModule } from "./workflows/workflows.module";
+import { ReferenceListsModule } from "./reference-lists/reference-lists.module";
 import { SecurityModule } from "./security/security.module";
 
 @Module({
@@ -47,6 +48,7 @@ import { SecurityModule } from "./security/security.module";
     EquipmentModule,
     TemplatesModule,
     WorkflowsModule,
+    ReferenceListsModule,
     SecurityModule,
     HealthModule,
   ],
