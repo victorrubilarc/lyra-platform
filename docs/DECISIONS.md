@@ -52,9 +52,13 @@ alcanzabilidad, sin trampas). Decisiones de ejecución (aprobadas por el usuario
   publicar** (banner ámbar "pendiente de conectar"). Así un borrador a medio construir **se puede guardar** (antes
   el `superRefine`/backend exigían la máquina completa al guardar → no se podía guardar WIP). El contrato y
   `WorkflowsService.saveDraft` ahora solo exigen INTEGRIDAD; **`publish` sigue exigiendo la máquina completa**.
-  Helper `hasBlockingMachineErrors`. Además: header de columna **fijo (sticky)** para no perder "Agregar
-  estado/transición" en listas largas, y **tabla resumen** de transiciones (etiqueta · desde→hacia · firma · MFA ·
-  roles). Tests: contracts 39, API 89.
+  Helper `hasBlockingMachineErrors`. Además: header de columna **fijo (sticky `top:58px`** = alto del topbar de la
+  app, que es el contenedor sticky; el `.tabsBar` no lo es) para no perder "Agregar estado/transición" en listas
+  largas, y **tabla resumen** de transiciones (etiqueta · desde→hacia · firma · MFA · roles), **plegable y plegada
+  por defecto**. **Nuevo primitivo `@lyra/ui`: `MultiSelect`** (token-picker con búsqueda + chips + panel portal
+  acotado con scroll / seleccionar-todos / limpiar / conteo) que **reemplaza las listas planas de checkboxes de
+  roles** (no escalaban con catálogos grandes) en: roles por transición del flujo, y en el Form Builder los roles
+  de sección y el override de rol por campo. Tests: contracts 39, API 89.
 - **Verificado:** typecheck/lint (0 errores; 1 warning preexistente en OrgTree)/build web (1911 módulos)/test
   (contracts 39 · permissions 5 · API 89) en verde. **Smoke en vivo** (demo): flujo crear→borrador→máquina
   inválida (sin final / inalcanzable) 400→publicar (congela)→listar→borrar 204; binding plantilla↔flujo (estado de
