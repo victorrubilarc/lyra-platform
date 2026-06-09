@@ -42,6 +42,7 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Módulo Equipos** (CRUD + categorías + `ExternalReference` modelo) | `main` (fusionado desde `feat/equipos`) | ✅ fusionado y publicado en `origin/main` (`a299ab6`) | ninguna |
 | **UI de Seguridad** (usuarios/roles/política/auditoría + reset MFA) | `main` (fusionado desde `feat/seguridad-ui`) | ✅ fusionado y publicado en `origin/main` (`a6f8b10`) | ninguna |
 | **Fase 2.1 Plantillas** (modelo definición + contratos + Form Builder) | `main` (fusionado desde `feat/plantillas`) | ✅ fusionado y publicado en `origin/main` (`a440f54`) | ninguna |
+| **Fase 2.1.1 Endurecimiento de modelo** (campo en 3 capas + `optionSource`) | `main` (fusionado desde `feat/plantillas-2.1.1`) | ✅ fusionado y publicado en `origin/main` (`365e31f`) | ninguna |
 
 **Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
