@@ -4,6 +4,63 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-09 · Fase 2 — Modelo de campo en 3 capas, campos de sistema, y DATOS DE REFERENCIA (dirección aprobada)
+
+Sesión de diseño pedida por el usuario antes de seguir, con investigación de industria (FHIR Questionnaire/SDC,
+Reference Data Management, dimensiones de data warehouse, taxonomías de form builders). Aprobado: (1) modelo de
+datos de referencia con **Listas gobernadas + `optionSource`** guardando el **code** estable; (2) hacer primero
+un **endurecimiento de modelo 2.1.1** (aditivo) antes de 2.2 Flujos. Aún NO se programa.
+
+**Principio rector — un campo son 3 capas separadas** (como FHIR `item.type` + `answerOption/answerValueSet`):
+1. **Presentación/widget** (cómo se ve: selector, radio, slider, matriz…).
+2. **Tipo de dato** (cómo se almacena/valida/reporta: string, number+unidad, boolean, date/time, **code** =
+   referencia única, **code[]**, **reference** = id de entidad, file, geo, **computed**).
+3. **Rol semántico** opcional (qué significa para el sistema: `effectiveDate`, `title`, `primaryEquipment`,
+   `severityDriver`…). El almacenamiento/reporte sigue al **tipo de dato**, no al widget. La UI sigue simple;
+   el MODELO lleva `dataType` + `optionSource` + `semanticRole?`.
+
+**Campos de SISTEMA vs CONTENIDO (Tema 1 — reportabilidad temporal):**
+- **Intrínsecos** en cada `LogEntry` (Fase 2.4), capturados SIEMPRE, como **columnas indexadas** inmutables/
+  auditadas: `recordedAt` (commit), `createdBy`, `orgNode`, `equipo?`, versión, estado, periodo/turno?, firmas.
+  La trazabilidad temporal NO es opcional ni un "campo que se agrega": es estructural.
+- **Fecha efectiva de negocio** (hora de lectura/evento ≠ captura): es un campo DATE/DATETIME/TIME con
+  **rol `effectiveDate`** → la plataforma lo promueve a una columna `effectiveAt` indexada. Si la plantilla no
+  marca ninguno, `effectiveAt` cae a `recordedAt`. "Estructural donde importa, opcional donde no", vía rol.
+
+**DATOS DE REFERENCIA (Tema 2 — el diferenciador). `optionSource` discriminado** reemplaza el `options[]`
+literal de SELECT/MULTISELECT:
+- `inline` — `{code,label}[]` en el campo (caso trivial; lo actual, solo envuelto).
+- `referenceList` — FK a una **Lista de Referencia** interna gobernada (RECOMENDADO para lo reutilizable/reportable).
+- `external` — endpoint de Orígenes de Datos (Fase 3), resuelto en backend/cacheado, **materializable** (sync)
+  en una Lista de Referencia.
+
+Entidades nuevas (módulo propio "Datos de referencia / Listas", hermano de Estructura/Seguridad):
+- **`ReferenceList`**: `key`, `name`, `description`, `source` (MANUAL | EXTERNAL), activa/versionable.
+- **`ReferenceItem`**: `code` (**clave estable**), `label`, `active`, `sortOrder`, **`metadata` jsonb** (atributos
+  enriquecidos: falla→{categoríaISO, severidadDefault}; contratista→{rut, vigencia}; químico→{CAS}…).
+
+**Regla de oro de reportabilidad (patrón dimensión de DW / FHIR Coding):** el valor de la entrada almacena el
+**`code` estable, NO el label**. Los reportes unen valor→`ReferenceItem` y traen label + metadata → agrupar/
+filtrar por atributos enriquecidos. Labels cambian sin romper histórico; un code en uso **no se borra** (se
+desactiva). Permiso `referencelist:manage`, auditado. **Persistencia = eficiencia + offline en terreno** (no se
+machaca la API en cada render). En **Fase 3**, un endpoint externo alimenta/sincroniza una Lista (ERP/MES/RRHH).
+
+**Taxonomía de OBJETOS (Tema 3) — roadmap incremental** (enum aditivo en Postgres; `config`+`dataType`+
+`optionSource` cubren las necesidades):
+- Alto valor próximo: **Conforme/No conforme/N.A.** (tri-estado de inspección), **lookup/picker de referencia**
+  (single/multi), **picker de Equipo/Usuario/Nodo** (`reference`), **grupo repetible / tabla-matriz**, **campo
+  calculado/fórmula**, **bloque de instrucción**, **TIME** + `effectiveDate`.
+- Evidencia (MinIO; modelar ahora, construir hacia Fase 7): adjunto, **foto**, **código de barras/QR**, **GPS**.
+- Ligeros: escala/Likert, slider %, rating, email, teléfono, URL, auto-numérico.
+
+**Qué FIJAR en 2.1.1 (aditivo, ANTES del llenado 2.4, para no migrar con datos):** `options[]`→`optionSource`
+(`inline` ahora; `referenceList`/`external` modelados), agregar `dataType` (derivable del tipo) y `semanticRole?`
+al campo, y dejar definido que el valor de una referencia se guarda como **code**. El mantenedor de Listas es su
+propia sesión; el sync externo es Fase 3. **Re-slicing:** 2.1.1 endurecer modelo → 2.2 Flujos → **2.x Datos de
+referencia** (antes/junto al llenado) → 2.3 Rondas → 2.4 Llenado (guarda code/refs + fechas sistema/efectiva) →
+expansiones de tipos → Fase 3 alimenta/sincroniza listas. Refs: FHIR ValueSet/answerValueSet, IBM Reference Data
+Management, dimensión de data warehouse (code vs label), ISO 14224 (taxonomías como code lists), ISA-95 (master data).
+
 ### 2026-06-09 · Fase 2.1 — Plantillas: modelo de DEFINICIÓN + contratos + Form Builder (implementado)
 
 Implementación de 2.1 sobre la arquitectura fijada el mismo día (ver entrada siguiente). Decisiones de

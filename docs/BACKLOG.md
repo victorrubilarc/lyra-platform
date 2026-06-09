@@ -169,6 +169,21 @@ nunca queda más de una sesión atrás.
         Referencias a `WorkflowDefinition`/firma/recurrencia como columnas (editores 2.2/2.3). 7 permisos
         nuevos (catálogo 33). `@lyra/ui`: `Textarea`. **Sin llenado.** Ver PROGRESS y DECISIONS 2026-06-09.
         **Pendiente: smoke VISUAL** (ver §4).
+  - [ ] **2.1.1 Endurecimiento de modelo (ADITIVO, antes del llenado 2.4).** Refinar el modelo de campo en 3
+        capas (ver DECISIONS 2026-06-09): `options[]` → **`optionSource`** discriminado (`inline` ahora;
+        `referenceList`/`external` modelados); agregar **`dataType`** (string/number/boolean/date/code/code[]/
+        reference/file/geo/computed; derivable del tipo) y **`semanticRole?`** (`effectiveDate`/`title`/
+        `primaryEquipment`/`severityDriver`) al campo; definir que el valor de una referencia se guarda como
+        **`code` estable** (no label). Modelar los **campos de sistema** de `LogEntry` (recordedAt/createdBy/
+        orgNode/equipo/versión/estado/periodo/firmas como columnas indexadas) + columna `effectiveAt` derivada
+        del campo con rol `effectiveDate`. Migración aditiva sobre 2.1, sin datos de llenado aún. ← *recomendado
+        como próxima sesión.*
+  - [ ] **2.x Datos de referencia / Listas (módulo nuevo, hermano de Estructura/Seguridad).** Mantenedor de
+        **`ReferenceList`** + **`ReferenceItem`** (`code` estable + `label` + `active` + `sortOrder` +
+        **`metadata` jsonb** enriquecido), permiso `referencelist:manage`, auditado. Binding de SELECT/MULTISELECT
+        a una lista (`optionSource.referenceList`). El **sync desde APIs externas** (alimentar/persistir una lista
+        desde ERP/MES/RRHH) es **Fase 3 (Orígenes de datos)**. Ubicar antes o junto al llenado (2.4 guarda codes).
+        Ver DECISIONS 2026-06-09 (patrón FHIR ValueSet / dimensión de DW; guardar code, no label).
   - [ ] **2.2 Flujos reutilizables (`WorkflowDefinition`):** mantenedor propio (catálogo, estilo Roles) —
         estados + transiciones + roles/permiso por transición + config de firma; versionado/congelable.
         Asignar un flujo a una versión de plantilla y mapear secciones→estados editables.
@@ -181,6 +196,12 @@ nunca queda más de una sesión atrás.
         (re-auth / MFA step-up), bloqueo/desbloqueo de secciones, log de transiciones.
   - [ ] **2.6 Bitácoras: listado + detalle + línea de tiempo + log de cambios** (vista de auditor).
   - [ ] **2.7 (cruce Fase 4)** reglas de umbral que disparan incidencias (con el motor de incidencias).
+  - [ ] **Expansión de tipos de campo (incremental, cada uno pequeño).** Alto valor industrial: **Conforme/No
+        conforme/N.A.** (tri-estado), **lookup/picker de referencia** (single/multi, tras 2.x), **picker de
+        Equipo/Usuario/Nodo** (`reference`), **grupo repetible / tabla-matriz**, **campo calculado/fórmula**,
+        **bloque de instrucción**, **TIME**. Evidencia (MinIO; modelar ahora, construir hacia Fase 7): adjunto,
+        **foto**, **código de barras/QR**, **GPS**. Ligeros: escala/Likert, slider %, rating, email, teléfono,
+        URL, auto-numérico. El enum `FieldType` crece de forma aditiva. Ver DECISIONS 2026-06-09 (taxonomía).
   - **Permisos nuevos** (catálogo `@lyra/contracts`): `template:view/create/edit/publish/delete`,
     `workflow:view/manage`, `logentry:view/create/fill`, transiciones por dato. **Forks confirmados**
     (ver DECISIONS 2026-06-09): ambas capturas (colaborativa + rondas), firmas Part 11 opt-in, granularidad
