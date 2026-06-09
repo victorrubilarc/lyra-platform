@@ -124,8 +124,19 @@ export type WorkflowDetail = z.infer<typeof workflowDetailSchema>;
 
 // === Validación de la máquina de estados (fuente única back↔front) ===========
 
+/**
+ * Severidad de un problema de la máquina:
+ * - `error`: integridad estructural (claves duplicadas, transición a un estado
+ *   inexistente). Rompería la persistencia ⇒ bloquea **guardar** y **publicar**.
+ * - `pending`: regla de negocio del flujo completo (falta inicial/final,
+ *   estado inalcanzable o trampa). Es válido tenerlos en un borrador a medio
+ *   construir ⇒ NO bloquea guardar, pero sí **publicar**.
+ */
+export type MachineIssueSeverity = "error" | "pending";
+
 export interface MachineIssue {
   message: string;
+  severity: MachineIssueSeverity;
   /** Ruta Zod opcional para señalar el elemento problemático. */
   path?: (string | number)[];
 }
@@ -156,11 +167,11 @@ export function validateWorkflowMachine(
   const issues: MachineIssue[] = [];
 
   if (states.length === 0) {
-    issues.push({ message: "El flujo debe tener al menos un estado", path: ["states"] });
+    issues.push({ message: "El flujo debe tener al menos un estado", severity: "pending", path: ["states"] });
     return issues; // sin estados, el resto no aplica
   }
 
-  // Claves de estado únicas.
+  // Claves de estado únicas (integridad).
   const stateKeys = new Set<string>();
   const dupStateKeys = new Set<string>();
   states.forEach((s) => {
@@ -170,6 +181,7 @@ export function validateWorkflowMachine(
   if (dupStateKeys.size > 0) {
     issues.push({
       message: `Clave de estado duplicada: ${[...dupStateKeys].join(", ")}`,
+      severity: "error",
       path: ["states"],
     });
   }
@@ -177,10 +189,11 @@ export function validateWorkflowMachine(
   // Exactamente un estado inicial.
   const initial = states.filter((s) => s.isInitial);
   if (initial.length === 0) {
-    issues.push({ message: "Debe haber exactamente un estado inicial", path: ["states"] });
+    issues.push({ message: "Debe haber exactamente un estado inicial", severity: "pending", path: ["states"] });
   } else if (initial.length > 1) {
     issues.push({
       message: `Solo puede haber un estado inicial (hay ${initial.length})`,
+      severity: "pending",
       path: ["states"],
     });
   }
@@ -188,25 +201,25 @@ export function validateWorkflowMachine(
   // Al menos un estado final (el registro debe poder cerrarse).
   const finals = states.filter((s) => s.isFinal);
   if (finals.length === 0) {
-    issues.push({ message: "Debe haber al menos un estado final", path: ["states"] });
+    issues.push({ message: "Debe haber al menos un estado final", severity: "pending", path: ["states"] });
   }
 
-  // Claves de transición únicas.
+  // Claves de transición únicas (integridad).
   const transitionKeys = new Set<string>();
   transitions.forEach((t, i) => {
     if (transitionKeys.has(t.key)) {
-      issues.push({ message: `Clave de transición duplicada: ${t.key}`, path: ["transitions", i, "key"] });
+      issues.push({ message: `Clave de transición duplicada: ${t.key}`, severity: "error", path: ["transitions", i, "key"] });
     }
     transitionKeys.add(t.key);
   });
 
-  // Las transiciones referencian estados existentes.
+  // Las transiciones referencian estados existentes (integridad).
   transitions.forEach((t, i) => {
     if (!stateKeys.has(t.fromStateKey)) {
-      issues.push({ message: `Transición "${t.key}": estado origen inexistente`, path: ["transitions", i, "fromStateKey"] });
+      issues.push({ message: `Transición "${t.key}": estado origen inexistente`, severity: "error", path: ["transitions", i, "fromStateKey"] });
     }
     if (!stateKeys.has(t.toStateKey)) {
-      issues.push({ message: `Transición "${t.key}": estado destino inexistente`, path: ["transitions", i, "toStateKey"] });
+      issues.push({ message: `Transición "${t.key}": estado destino inexistente`, severity: "error", path: ["transitions", i, "toStateKey"] });
     }
   });
 
@@ -247,6 +260,7 @@ export function validateWorkflowMachine(
   if (unreachable.length > 0) {
     issues.push({
       message: `Estado(s) inalcanzable(s) desde el inicial: ${unreachable.join(", ")}`,
+      severity: "pending",
       path: ["states"],
     });
   }
@@ -261,12 +275,18 @@ export function validateWorkflowMachine(
     if (traps.length > 0) {
       issues.push({
         message: `Estado(s) sin salida hacia un final (trampa): ${traps.join(", ")}`,
+        severity: "pending",
         path: ["states"],
       });
     }
   }
 
   return issues;
+}
+
+/** ¿Hay errores de integridad (bloquean guardar borrador y publicar)? */
+export function hasBlockingMachineErrors(issues: readonly MachineIssue[]): boolean {
+  return issues.some((i) => i.severity === "error");
 }
 
 // === Requests ================================================================
@@ -317,7 +337,11 @@ export const saveWorkflowDraftRequestSchema = z
     transitions: z.array(draftTransitionInputSchema).max(200),
   })
   .superRefine((body, ctx) => {
+    // El borrador solo exige INTEGRIDAD (errores). Las reglas de máquina completa
+    // (inicial/final/alcanzabilidad) se exigen al PUBLICAR, no al guardar — así se
+    // puede guardar una máquina a medio construir.
     for (const issue of validateWorkflowMachine(body.states, body.transitions)) {
+      if (issue.severity !== "error") continue;
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: issue.message,

@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, PlayCircle, Plus, Save, Trash2, TriangleAlert } from "lucide-react";
+import { ArrowLeft, ArrowRight, Info, ListChecks, PlayCircle, Plus, Save, Trash2, TriangleAlert } from "lucide-react";
 import { Button, Card, Checkbox, Chip, FormField, Input, Modal, Select, Textarea, Toggle, useToast } from "@lyra/ui";
 import { validateWorkflowMachine, type WorkflowDetail } from "@lyra/contracts";
 import { usePermissions } from "../../auth/use-permissions.js";
@@ -51,7 +51,12 @@ export function WorkflowBuilder({ detail }: { detail: WorkflowDetail }) {
       ),
     [wf],
   );
-  const valid = issues.length === 0;
+  // Errores de integridad (rojo, bloquean guardar+publicar) vs pendientes de
+  // conexión (ámbar, solo bloquean publicar — normal en un borrador a medio hacer).
+  const errors = issues.filter((i) => i.severity === "error");
+  const pending = issues.filter((i) => i.severity === "pending");
+  const valid = issues.length === 0; // habilita Publicar
+  const canSaveMachine = errors.length === 0; // habilita Guardar borrador
 
   function patch(next: EditWorkflow) {
     setWf(next);
@@ -146,6 +151,8 @@ export function WorkflowBuilder({ detail }: { detail: WorkflowDetail }) {
 
   const busy = save.isPending || publish.isPending;
   const stateName = (key: string) => wf.states.find((s) => s.key === key)?.name ?? key;
+  const roleNames = (ids: string[]) =>
+    ids.map((id) => roles.find((r) => r.id === id)?.name ?? "—").join(", ");
 
   return (
     <div className={styles.page}>
@@ -161,7 +168,7 @@ export function WorkflowBuilder({ detail }: { detail: WorkflowDetail }) {
         </div>
         <div className={styles.topActions}>
           {canEdit && (
-            <Button variant="secondary" onClick={handleSave} loading={save.isPending} disabled={busy || !dirty}>
+            <Button variant="secondary" onClick={handleSave} loading={save.isPending} disabled={busy || !dirty || !canSaveMachine}>
               <Save size={15} /> {t("workflows.builder.saveDraft")}
             </Button>
           )}
@@ -175,14 +182,27 @@ export function WorkflowBuilder({ detail }: { detail: WorkflowDetail }) {
 
       {isPublishedView && <div className={styles.readOnlyBanner}>{t("workflows.builder.publishedReadOnly")}</div>}
 
-      {/* Validación de la máquina */}
-      {issues.length > 0 ? (
+      {/* Validación de la máquina: rojo = errores de integridad; ámbar = pendiente
+          de conectar (normal mientras construyes); verde = lista para publicar. */}
+      {errors.length > 0 ? (
         <div className={styles.invalidBanner}>
           <TriangleAlert size={16} />
           <div>
             <strong>{t("workflows.builder.invalidTitle")}</strong>
             <ul className={styles.issueList}>
-              {issues.map((i, idx) => (
+              {errors.map((i, idx) => (
+                <li key={idx}>{i.message}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      ) : pending.length > 0 ? (
+        <div className={styles.pendingBanner}>
+          <Info size={16} />
+          <div>
+            <strong>{t("workflows.builder.pendingTitle")}</strong>
+            <ul className={styles.issueList}>
+              {pending.map((i, idx) => (
                 <li key={idx}>{i.message}</li>
               ))}
             </ul>
@@ -204,6 +224,43 @@ export function WorkflowBuilder({ detail }: { detail: WorkflowDetail }) {
           )}
         </FormField>
       </Card>
+
+      {/* Resumen de transiciones (tabla) — útil cuando hay muchas. */}
+      {wf.transitions.length > 0 && (
+        <Card className={styles.summaryCard}>
+          <div className={styles.summaryHeader}>
+            <ListChecks size={15} /> {t("workflows.builder.summaryTitle")}
+          </div>
+          <div className={styles.summaryTableWrap}>
+            <table className={styles.summaryTable}>
+              <thead>
+                <tr>
+                  <th>{t("workflows.builder.colTransition")}</th>
+                  <th>{t("workflows.builder.colFlow")}</th>
+                  <th>{t("workflows.builder.colSignature")}</th>
+                  <th>{t("workflows.builder.colMfa")}</th>
+                  <th>{t("workflows.builder.colRoles")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {wf.transitions.map((tr) => (
+                  <tr key={tr.uid}>
+                    <td>{tr.label}</td>
+                    <td>
+                      <span className={styles.flowCell}>
+                        {stateName(tr.fromStateKey)} <ArrowRight size={12} /> {stateName(tr.toStateKey)}
+                      </span>
+                    </td>
+                    <td>{tr.requireSignature ? `✓${tr.signatureMeaning ? ` ${tr.signatureMeaning}` : ""}` : "—"}</td>
+                    <td>{tr.requireMfa ? "✓" : "—"}</td>
+                    <td>{tr.roleIds.length > 0 ? roleNames(tr.roleIds) : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
 
       <div className={styles.columns}>
         {/* Estados */}

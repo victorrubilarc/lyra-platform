@@ -9,7 +9,7 @@ import type {
   WorkflowListQuery,
   WorkflowVersionDto,
 } from "@lyra/contracts";
-import { validateWorkflowMachine } from "@lyra/contracts";
+import { hasBlockingMachineErrors, validateWorkflowMachine } from "@lyra/contracts";
 import { Prisma } from "@prisma/client";
 import { AuditService, type AuditContext } from "../audit/audit.service";
 import { PrismaService } from "../prisma/prisma.service";
@@ -226,11 +226,11 @@ export class WorkflowsService {
     const def = await this.prisma.workflowDefinition.findFirst({ where: { id, deletedAt: null } });
     if (!def) throw new NotFoundException("Flujo no encontrado");
 
-    // Defensa en profundidad: revalida la máquina en backend (el contrato ya la
-    // valida, pero no confiamos en el cliente).
+    // Defensa en profundidad: el borrador solo exige INTEGRIDAD (errores). Las
+    // reglas de máquina completa se exigen al publicar (no confiamos en el cliente).
     const issues = validateWorkflowMachine(dto.states, dto.transitions);
-    if (issues.length > 0) {
-      throw new BadRequestException(issues.map((i) => i.message).join("; "));
+    if (hasBlockingMachineErrors(issues)) {
+      throw new BadRequestException(issues.filter((i) => i.severity === "error").map((i) => i.message).join("; "));
     }
     await this.assertRolesExist(dto);
 

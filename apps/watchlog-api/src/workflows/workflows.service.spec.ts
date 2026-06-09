@@ -157,10 +157,23 @@ describe("WorkflowsService", () => {
     );
   });
 
-  it("saveDraft rechaza una máquina inválida (estado inalcanzable)", async () => {
+  it("saveDraft PERMITE una máquina a medio construir (estado inalcanzable = pending)", async () => {
+    const tx = {
+      workflowDefinition: { update: vi.fn().mockResolvedValue({}) },
+      workflowDefinitionVersion: { update: vi.fn().mockResolvedValue({}) },
+      workflowState: {
+        deleteMany: vi.fn().mockResolvedValue({}),
+        create: vi.fn().mockImplementation(({ data }) => Promise.resolve({ id: `st-${data.key}`, ...data })),
+      },
+      workflowTransition: { create: vi.fn().mockResolvedValue({ id: "tr1" }) },
+    };
     const { service } = makeService({
-      workflowDefinition: { findFirst: vi.fn().mockResolvedValue({ id: "wf1", name: "X" }) },
+      workflowDefinition: { findFirst: vi.fn().mockResolvedValue({ id: "wf1", name: "X", description: null }) },
+      workflowDefinitionVersion: { findFirst: vi.fn().mockResolvedValue({ id: "v1" }) },
+      role: { count: vi.fn().mockResolvedValue(0) },
+      $transaction: vi.fn().mockImplementation((arg) => (Array.isArray(arg) ? Promise.all(arg) : arg(tx))),
     });
+    vi.spyOn(service, "getDetail").mockResolvedValue({ id: "wf1" } as never);
     await expect(
       service.saveDraft(
         "wf1",
@@ -171,6 +184,26 @@ describe("WorkflowsService", () => {
             { key: "orphan", name: "Huérfano", isFinal: true },
           ],
           transitions: [{ key: "close", label: "Cerrar", fromStateKey: "draft", toStateKey: "closed" }],
+        },
+        ctx,
+      ),
+    ).resolves.toBeDefined();
+  });
+
+  it("saveDraft rechaza un error de integridad (transición a estado inexistente)", async () => {
+    const { service } = makeService({
+      workflowDefinition: { findFirst: vi.fn().mockResolvedValue({ id: "wf1", name: "X" }) },
+      workflowDefinitionVersion: { findFirst: vi.fn().mockResolvedValue({ id: "v1" }) },
+    });
+    await expect(
+      service.saveDraft(
+        "wf1",
+        {
+          states: [
+            { key: "draft", name: "Borrador", isInitial: true },
+            { key: "closed", name: "Cerrado", isFinal: true },
+          ],
+          transitions: [{ key: "x", label: "X", fromStateKey: "draft", toStateKey: "ghost" }],
         },
         ctx,
       ),
