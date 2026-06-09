@@ -233,6 +233,17 @@ nunca queda más de una sesión atrás.
 - [ ] **Fase 5** — Cambio de turno + IA (resumen).
 - [ ] **Fase 6** — Base de conocimiento + Dashboard + Asistente IA.
 - [ ] **Fase 7** — Endurecimiento (ver §3 y §5).
+- [ ] **Plataforma: Mensajería / Notificaciones multicanal** (módulo transversal; diseño en DECISIONS 2026-06-09).
+      Notificar en **transiciones de flujo** (correo con enlace **aprobar/rechazar**), **WhatsApp**, **SMS**,
+      **in-app**; **mantenedor de plantillas de mensaje** (`NotificationTemplate`, variables de merge, i18n).
+      Reutiliza el `EmailService`/`SmtpEmailService` ya existentes; proveedores SMS/WhatsApp **opcionales**
+      (Twilio/Meta) — sin SaaS obligatorio. Disparo = **dato** (campo aditivo `notifications` en
+      `WorkflowTransition`); destinatarios por roles/usuarios/asignado/**escalamiento**; **token de acción**
+      firmado single-use/TTL (patrón `PasswordResetToken`) con **restricción Part 11** (si la transición exige
+      firma, el enlace re-autentica + captura significado, no aprueba "a ciegas" → **security review**); entrega
+      **asíncrona** (cola/reintentos/estado de envío/rate-limit/opt-out). **Se construye con/después de Fase 2.5**
+      (necesita el evento de transición); compartido con **Fase 4 (SLA/escalamiento de incidencias)** y **Fase 5**.
+      El mantenedor de plantillas puede adelantarse. **Prioridad: alta dentro de 2.5+.**
 
 ---
 

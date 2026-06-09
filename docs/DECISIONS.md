@@ -4,6 +4,36 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-09 · Plataforma de Mensajería / Notificaciones multicanal (diseño; implementación diferida)
+
+Necesidad planteada por el usuario: una transición de flujo (y, por extensión, incidencias/turnos) debe poder
+**notificar** — correo (con enlace para **aprobar/rechazar**), **WhatsApp**, **SMS**, in-app — de forma
+**configurable y enterprise**, con **mantenedor de plantillas de mensaje**. Decisión: es un **subsistema de
+plataforma transversal**, NO una feature de flujos; se reutilizará en Flujos (2.5), **Incidencias (Fase 4,
+SLA/escalamiento)** y **Cambio de turno (Fase 5)**. Aún NO se programa. Pilares (estándar tipo ServiceNow/Jira/
+Camunda + EBR/GxP):
+
+- **Abstracción de canal enchufable** (`NotificationChannel`: EMAIL/SMS/WHATSAPP/IN_APP/WEBHOOK) detrás de una
+  interfaz, **igual patrón que `EmailService`/`LlmProvider`** (token DI). **Reutiliza el `EmailService` +
+  `SmtpEmailService` ya existentes** (Fase 1, nodemailer/Mailpit). SMS/WhatsApp = proveedores **opcionales**
+  (Twilio / Meta Cloud API) — nunca obligatorios (respeta on-prem / sin SaaS forzado).
+- **Mantenedor de `NotificationTemplate`** (canal, asunto, cuerpo con **variables de merge**, i18n, versionable):
+  mismo molde de mantenedor de la casa.
+- **Disparo declarativo = DATO** en la transición: campo **aditivo** `notifications` en `WorkflowTransition`
+  (plantilla + canal(es) + destinatarios + condición), coherente con "roles por transición = dato". Resolución de
+  **destinatarios** por roles→usuarios / usuarios / el asignado / **cadenas de escalamiento**.
+- **Acciones desde el mensaje (aprobar/rechazar)**: **token de acción firmado, single-use, con TTL y alcance**
+  (entry+transición+usuario+nonce), reusando el patrón de `PasswordResetToken` (se guarda el hash). **Restricción
+  Part 11:** si la transición exige firma, el enlace **NO** aprueba de un clic — aterriza en una página que
+  **re-autentica (MFA step-up) y captura el significado**; el "un clic" solo aplica a transiciones **sin** firma y
+  **siempre auditado**. Es superficie de auth → **requiere security review** al implementarse.
+- **Entrega asíncrona** (cola + reintentos), **estado/auditoría de envío**, **rate-limit**, **preferencias/opt-out**
+  por usuario y canal.
+- **Secuenciación**: el *motor de disparo* necesita la **ejecución de transiciones (Fase 2.5)** (antes no hay
+  evento que notificar). Se construye **con/después de 2.5** como módulo de plataforma; el **mantenedor de
+  plantillas** puede adelantarse. El campo `notifications` en `WorkflowTransition` se añade de forma **aditiva**
+  cuando toque (no ahora). Ya parcialmente anticipado en BACKLOG §3 ("notificaciones SMTP SLA/escalamiento").
+
 ### 2026-06-09 · Fase 2.2 — Flujos reutilizables (`WorkflowDefinition`) (implementado)
 
 Implementación del fork 4 (flujos REUTILIZABLES) fijado el 2026-06-09. Un flujo es una **máquina de estados
