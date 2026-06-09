@@ -1,6 +1,8 @@
 import { z } from "zod";
 import {
   fieldConfigSchemaFor,
+  fieldDataTypeSchema,
+  fieldSemanticRoleSchema,
   fieldTypeSchema,
   recurrenceConfigSchema,
   recurrenceKindSchema,
@@ -39,6 +41,10 @@ export const templateFieldSchema = z.object({
   id: z.string(),
   key: z.string(),
   type: fieldTypeSchema,
+  /** Capa 2: tipo de dato (almacenamiento/reporte). Derivado del `type` en backend. */
+  dataType: fieldDataTypeSchema,
+  /** Capa 3: rol semántico opcional (effectiveDate/…). null = ninguno. */
+  semanticRole: fieldSemanticRoleSchema.nullable(),
   label: z.string(),
   help: z.string().nullable(),
   required: z.boolean(),
@@ -137,6 +143,9 @@ export const draftFieldInputSchema = z
   .object({
     key: keySchema,
     type: fieldTypeSchema,
+    // `dataType` NO viaja: el backend lo deriva de `type` (capa 2 = derivada).
+    /** Rol semántico opcional (capa 3). En 2.1.1 el builder solo setea EFFECTIVE_DATE. */
+    semanticRole: fieldSemanticRoleSchema.nullable().optional(),
     label: z.string().trim().min(1).max(200),
     help: z.string().trim().max(500).nullable().optional(),
     required: z.boolean().optional(),
@@ -204,6 +213,24 @@ export const saveTemplateDraftRequestSchema = z
       }
       seen.add(s.key);
     });
+
+    // A lo sumo un campo puede ser la "fecha efectiva del registro" por versión
+    // (promueve LogEntry.effectiveAt en 2.4).
+    const effectiveDateFields: Array<[number, number]> = [];
+    body.sections.forEach((s, si) => {
+      s.fields.forEach((f, fi) => {
+        if (f.semanticRole === "EFFECTIVE_DATE") effectiveDateFields.push([si, fi]);
+      });
+    });
+    if (effectiveDateFields.length > 1) {
+      for (const [si, fi] of effectiveDateFields) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Solo un campo puede ser la fecha efectiva del registro",
+          path: ["sections", si, "fields", fi, "semanticRole"],
+        });
+      }
+    }
   });
 export type SaveTemplateDraftRequest = z.infer<typeof saveTemplateDraftRequestSchema>;
 
