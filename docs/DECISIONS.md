@@ -4,6 +4,27 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-09 · Eventos de dominio + Webhooks salientes (diseño; implementación diferida)
+
+Necesidad planteada por el usuario: el sistema debe poder **empujar datos** (bitácoras, incidencias, transiciones,
+etc.) a **sistemas externos vía webhooks**. Decisión de diseño: introducir un **backbone de EVENTOS DE DOMINIO**
+con **patrón outbox** que es la **fuente común** tanto de las **Notificaciones** (sumidero a personas) como de los
+**Webhooks salientes** (sumidero máquina-a-máquina). Aún NO se programa.
+
+- **Eventos de dominio** versionados: `logentry.created`, `logentry.transitioned`, `incident.created`,
+  `incident.transitioned`, `task.*`, `structure.*`, etc. Se persisten en una tabla **outbox** (misma transacción
+  que el cambio → entrega "at-least-once" garantizada) y un worker los despacha **asíncrono**.
+- **Webhooks salientes** (patrón Stripe/GitHub): **`WebhookSubscription`** (URL endpoint, tipos de evento
+  suscritos, **secreto** para firma **HMAC** del payload, headers custom, activo, **credencial cifrada en reposo**)
+  + **`WebhookDelivery`** (log de intentos, status, **reintentos con backoff**, **replay** manual). Payload JSON
+  estable y versionado. On-prem friendly: solo HTTP POST saliente (egress + secretos). Auditado.
+- **Relación con lo demás:** comparte el backbone con la **Mensajería/Notificaciones** (ver entrada siguiente) — un
+  mismo evento alimenta reglas de notificación y/o suscripciones de webhook. **Amplía el punto "D: Webhooks"** de la
+  integración pendiente (estaba acotado a cambios de estructura; ahora es transversal a bitácoras/incidencias/flujos).
+  Es el **espejo SALIENTE** de la Fase 3 (Orígenes de datos = entrante); puede vivir en Fase 3 o en un módulo de
+  integración propio. Se construye **con/después de Fase 2.5** (cuando existen los eventos de transición).
+  Refs: Stripe/GitHub webhooks (HMAC + reintentos + replay), patrón transactional outbox.
+
 ### 2026-06-09 · Plataforma de Mensajería / Notificaciones multicanal (diseño; implementación diferida)
 
 Necesidad planteada por el usuario: una transición de flujo (y, por extensión, incidencias/turnos) debe poder
@@ -19,9 +40,10 @@ Camunda + EBR/GxP):
   (Twilio / Meta Cloud API) — nunca obligatorios (respeta on-prem / sin SaaS forzado).
 - **Mantenedor de `NotificationTemplate`** (canal, asunto, cuerpo con **variables de merge**, i18n, versionable):
   mismo molde de mantenedor de la casa.
-- **Disparo declarativo = DATO** en la transición: campo **aditivo** `notifications` en `WorkflowTransition`
-  (plantilla + canal(es) + destinatarios + condición), coherente con "roles por transición = dato". Resolución de
-  **destinatarios** por roles→usuarios / usuarios / el asignado / **cadenas de escalamiento**.
+- **Disparo declarativo = DATO, POR TRANSICIÓN:** se configura en **cuáles** transiciones se gatilla mensaje y en
+  cuáles no, y **qué** mensaje. Campo **aditivo** `notifications` en `WorkflowTransition` = lista **0..N** de
+  {plantilla, canal(es), destinatarios, condición opcional}. Coherente con "roles por transición = dato".
+  Resolución de **destinatarios** por roles→usuarios / usuarios / el asignado / **cadenas de escalamiento**.
 - **Acciones desde el mensaje (aprobar/rechazar)**: **token de acción firmado, single-use, con TTL y alcance**
   (entry+transición+usuario+nonce), reusando el patrón de `PasswordResetToken` (se guarda el hash). **Restricción
   Part 11:** si la transición exige firma, el enlace **NO** aprueba de un clic — aterriza en una página que

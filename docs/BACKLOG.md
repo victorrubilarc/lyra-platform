@@ -233,9 +233,17 @@ nunca queda más de una sesión atrás.
 - [ ] **Fase 5** — Cambio de turno + IA (resumen).
 - [ ] **Fase 6** — Base de conocimiento + Dashboard + Asistente IA.
 - [ ] **Fase 7** — Endurecimiento (ver §3 y §5).
+- [ ] **Plataforma: Eventos de dominio + Webhooks salientes** (módulo transversal; diseño en DECISIONS 2026-06-09).
+      **Backbone de eventos** (`logentry.*`, `incident.*`, `task.*`, `structure.*`) con **patrón outbox**
+      (entrega at-least-once) que alimenta tanto Notificaciones como **Webhooks salientes** para **empujar datos
+      de bitácoras/incidencias/otros a sistemas externos**. `WebhookSubscription` (URL, eventos suscritos, **secreto
+      HMAC** cifrado, headers, activo) + `WebhookDelivery` (intentos, status, **reintentos backoff**, **replay**),
+      entrega asíncrona/auditada. Espejo SALIENTE de Fase 3 (entrante). **Amplía** el punto "D: Webhooks" de la
+      integración pendiente (ya no solo estructura). Se construye **con/después de 2.5**.
 - [ ] **Plataforma: Mensajería / Notificaciones multicanal** (módulo transversal; diseño en DECISIONS 2026-06-09).
-      Notificar en **transiciones de flujo** (correo con enlace **aprobar/rechazar**), **WhatsApp**, **SMS**,
-      **in-app**; **mantenedor de plantillas de mensaje** (`NotificationTemplate`, variables de merge, i18n).
+      Notificar **POR TRANSICIÓN** (se configura cuáles disparan y cuál mensaje; 0..N por transición): **correo** con
+      enlace **aprobar/rechazar**, **WhatsApp**, **SMS**, **in-app**; **mantenedor de plantillas de mensaje**
+      (`NotificationTemplate`, variables de merge, i18n).
       Reutiliza el `EmailService`/`SmtpEmailService` ya existentes; proveedores SMS/WhatsApp **opcionales**
       (Twilio/Meta) — sin SaaS obligatorio. Disparo = **dato** (campo aditivo `notifications` en
       `WorkflowTransition`); destinatarios por roles/usuarios/asignado/**escalamiento**; **token de acción**
