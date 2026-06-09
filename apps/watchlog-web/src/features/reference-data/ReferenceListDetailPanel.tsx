@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Eye, EyeOff, ListChecks, Pencil, Plus, Tag, Trash2, TriangleAlert } from "lucide-react";
-import { Button, Chip, EmptyState, Skeleton, Table, useToast, type TableColumn } from "@lyra/ui";
+import { Eye, EyeOff, ListChecks, Pencil, Plus, Search, Tag, Trash2, TriangleAlert } from "lucide-react";
+import { Button, Chip, EmptyState, Input, Select, Skeleton, Table, useToast, type TableColumn, type TableSort } from "@lyra/ui";
 import type { ReferenceItem, ReferenceListDetail } from "@lyra/contracts";
 import { Can } from "../../auth/Can.js";
 import { usePermissions } from "../../auth/use-permissions.js";
@@ -32,6 +32,44 @@ function metadataSummary(meta: ReferenceItem["metadata"]): string {
     .join(" · ");
 }
 
+const norm = (s: string): string => s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+
+type StatusFilter = "all" | "active" | "inactive";
+
+/** Celda de metadata: chips clave:valor (máx. 3 + "+N"), o "—" si vacía. */
+function MetadataCell({ meta }: { meta: ReferenceItem["metadata"] }) {
+  if (!meta) return <span style={{ color: "var(--color-text-muted)" }}>—</span>;
+  const entries = Object.entries(meta);
+  if (entries.length === 0) return <span style={{ color: "var(--color-text-muted)" }}>—</span>;
+  const shown = entries.slice(0, 3);
+  const extra = entries.length - shown.length;
+  return (
+    <span style={{ display: "inline-flex", gap: 4, flexWrap: "wrap" }}>
+      {shown.map(([k, v]) => (
+        <Chip key={k} label={`${k}: ${typeof v === "string" ? v : JSON.stringify(v)}`} variant="default" size="sm" />
+      ))}
+      {extra > 0 && <Chip label={`+${extra}`} variant="default" size="sm" />}
+    </span>
+  );
+}
+
+function sortItems(items: ReferenceItem[], sort: TableSort): ReferenceItem[] {
+  const dir = sort.direction === "asc" ? 1 : -1;
+  return [...items].sort((a, b) => {
+    switch (sort.key) {
+      case "code":
+        return a.code.localeCompare(b.code) * dir;
+      case "label":
+        return a.label.localeCompare(b.label) * dir;
+      case "active":
+        return (Number(a.active) - Number(b.active)) * dir;
+      case "sortOrder":
+      default:
+        return ((a.sortOrder - b.sortOrder || a.label.localeCompare(b.label)) as number) * dir;
+    }
+  });
+}
+
 export function ReferenceListDetailPanel({ listId, onEditList, onDeleted }: Props) {
   const { t } = useTranslation();
   const toast = useToast();
@@ -46,6 +84,22 @@ export function ReferenceListDetailPanel({ listId, onEditList, onDeleted }: Prop
   const [itemDrawer, setItemDrawer] = useState<{ mode: "create" | "edit"; item: ReferenceItem | null } | null>(null);
   const [toDeleteItem, setToDeleteItem] = useState<ReferenceItem | null>(null);
   const [deleteListOpen, setDeleteListOpen] = useState(false);
+
+  // Estado de la grilla enterprise (buscador + filtro de estado + orden).
+  const [itemSearch, setItemSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [sort, setSort] = useState<TableSort>({ key: "sortOrder", direction: "asc" });
+
+  const allItems = useMemo(() => list?.items ?? [], [list]);
+  const activeCount = allItems.filter((i) => i.active).length;
+  const visibleItems = useMemo(() => {
+    let rows = allItems;
+    if (statusFilter === "active") rows = rows.filter((i) => i.active);
+    else if (statusFilter === "inactive") rows = rows.filter((i) => !i.active);
+    const q = norm(itemSearch.trim());
+    if (q) rows = rows.filter((i) => norm(`${i.code} ${i.label} ${metadataSummary(i.metadata)}`).includes(q));
+    return sortItems(rows, sort);
+  }, [allItems, statusFilter, itemSearch, sort]);
 
   if (!listId) {
     return (
@@ -121,29 +175,31 @@ export function ReferenceListDetailPanel({ listId, onEditList, onDeleted }: Prop
     {
       key: "code",
       header: t("referenceData.item.code"),
-      width: 140,
+      width: 150,
+      sortable: true,
       render: (row) => <span className={styles.codeCell}>{row.code}</span>,
     },
     {
       key: "label",
       header: t("referenceData.item.label"),
+      sortable: true,
       render: (row) => <span style={{ opacity: row.active ? 1 : 0.55 }}>{row.label}</span>,
     },
     {
       key: "metadata",
       header: t("referenceData.item.metadata"),
-      render: (row) => (
-        <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>{metadataSummary(row.metadata)}</span>
-      ),
+      render: (row) => <MetadataCell meta={row.metadata} />,
     },
     {
       key: "sortOrder",
       header: t("referenceData.sortOrder"),
       width: 90,
       align: "center",
+      sortable: true,
       render: (row) =>
         canManage ? (
           <input
+            key={`${row.id}-${row.sortOrder}`}
             type="number"
             min={0}
             step={10}
@@ -163,6 +219,7 @@ export function ReferenceListDetailPanel({ listId, onEditList, onDeleted }: Prop
       key: "active",
       header: t("referenceData.item.status"),
       width: 110,
+      sortable: true,
       render: (row) =>
         row.active ? (
           <Chip label={t("referenceData.item.active")} variant="success" size="sm" />
@@ -234,7 +291,12 @@ export function ReferenceListDetailPanel({ listId, onEditList, onDeleted }: Prop
       </div>
 
       <div className={styles.itemsHeader}>
-        <span className={styles.itemsTitle}>{t("referenceData.detail.itemsTitle")}</span>
+        <span className={styles.itemsTitle}>
+          {t("referenceData.detail.itemsTitle")}
+          <span className={styles.itemsCount}>
+            {t("referenceData.detail.itemsSummary", { active: activeCount, total: allItems.length })}
+          </span>
+        </span>
         <Can perform="referencelist:manage">
           <Button variant="primary" leftIcon={<Plus size={15} />} onClick={() => setItemDrawer({ mode: "create", item: null })}>
             {t("referenceData.item.add")}
@@ -242,12 +304,42 @@ export function ReferenceListDetailPanel({ listId, onEditList, onDeleted }: Prop
         </Can>
       </div>
 
+      <div className={styles.itemsToolbar}>
+        <div className={styles.itemsSearch}>
+          <Input
+            value={itemSearch}
+            onChange={(e) => setItemSearch(e.target.value)}
+            placeholder={t("referenceData.detail.searchItems")}
+            aria-label={t("referenceData.detail.searchItems")}
+            rightSlot={<Search size={15} color="var(--color-text-muted)" />}
+          />
+        </div>
+        <Select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+          aria-label={t("referenceData.detail.statusFilter")}
+          className={styles.statusSelect}
+        >
+          <option value="all">{t("referenceData.detail.statusAll")}</option>
+          <option value="active">{t("referenceData.item.active")}</option>
+          <option value="inactive">{t("referenceData.item.inactive")}</option>
+        </Select>
+      </div>
+
       <Table
         columns={columns}
-        data={detail.items}
+        data={visibleItems}
         rowKey={(r) => r.id}
+        sort={sort}
+        onSort={(key, direction) => setSort({ key, direction })}
+        paginated
+        defaultPageSize={10}
         emptyState={
-          <EmptyState icon={<Tag size={30} />} title={t("referenceData.detail.noItems")} description={t("referenceData.detail.noItemsDesc")} />
+          <EmptyState
+            icon={<Tag size={30} />}
+            title={itemSearch.trim() || statusFilter !== "all" ? t("referenceData.detail.noItemsFiltered") : t("referenceData.detail.noItems")}
+            description={itemSearch.trim() || statusFilter !== "all" ? undefined : t("referenceData.detail.noItemsDesc")}
+          />
         }
       />
 
