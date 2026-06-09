@@ -1,4 +1,4 @@
-import { GitBranch, LayoutDashboard, Layers, ListChecks, Network, ShieldCheck, UserCog, type LucideIcon } from "lucide-react";
+import { CalendarClock, GitBranch, LayoutDashboard, Layers, ListChecks, Network, ShieldCheck, UserCog, type LucideIcon } from "lucide-react";
 import type { Permission } from "@lyra/permissions";
 
 /**
@@ -47,6 +47,13 @@ export const ROUTES: readonly NavRoute[] = [
     labelKey: "nav.referenceData",
     icon: ListChecks,
     permission: "module:referencedata:view",
+    inSidebar: true,
+  },
+  {
+    path: "/calendario-operacional",
+    labelKey: "nav.opsCalendar",
+    icon: CalendarClock,
+    permission: "module:opscalendar:view",
     inSidebar: true,
   },
   {

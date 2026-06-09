@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Activity, ArrowRight, Database, Layers, Network, ShieldCheck, type LucideIcon } from "lucide-react";
+import { Activity, ArrowRight, CalendarClock, Database, Layers, Network, ShieldCheck, type LucideIcon } from "lucide-react";
 import { Card, cx } from "@lyra/ui";
 import type { Permission } from "@lyra/permissions";
 import { useAuth } from "../../auth/use-auth.js";
@@ -38,6 +38,14 @@ const MODULES: ModuleCard[] = [
     permission: "module:security:view",
   },
   { name: "Plantillas", description: "Form builder de bitácoras", icon: Layers, status: "soon" },
+  {
+    name: "Calendario operacional",
+    description: "Turnos, día operacional y periodo contable",
+    icon: CalendarClock,
+    status: "ready",
+    path: "/calendario-operacional",
+    permission: "module:opscalendar:view",
+  },
   { name: "Orígenes de datos", description: "Integraciones externas", icon: Database, status: "soon" },
   { name: "Incidencias", description: "Workflow HSE", icon: Activity, status: "soon" },
 ];
