@@ -107,6 +107,7 @@ model Role {
   scopes      Scope[]
   templateSectionRoles TemplateSectionRole[]
   templateFieldRoles   TemplateFieldRole[]
+  workflowTransitionRoles WorkflowTransitionRole[]
 }
 
 model Permission {
@@ -523,9 +524,10 @@ model TemplateVersion {
   name          String
   description   String?
 
-  // --- Referencias futuras (modeladas; editores en 2.2/2.3) -----------------
-  // Flujo reutilizable congelado por la versión. La entidad WorkflowDefinition
-  // y su FK se añaden en 2.2; aquí van como cadenas para no re-migrar.
+  // --- Flujo reutilizable congelado por la versión (Fase 2.2) ---------------
+  // Patrón MMR: la versión de plantilla CONGELA qué flujo y qué versión de éste
+  // usa, para no alterar registros históricos. onDelete: Restrict (un histórico
+  // no debe quedar sin su flujo; el borrado del flujo es lógico vía deletedAt).
   workflowDefinitionId        String?
   workflowDefinitionVersionId String?
   // Firma electrónica estilo Part 11 (opt-in a nivel de versión).
@@ -542,10 +544,14 @@ model TemplateVersion {
   template  Template          @relation("TemplateVersions", fields: [templateId], references: [id], onDelete: Cascade)
   currentOf Template?         @relation("TemplateCurrentVersion")
   sections  TemplateSection[]
+  workflowDefinition        WorkflowDefinition?        @relation(fields: [workflowDefinitionId], references: [id], onDelete: Restrict)
+  workflowDefinitionVersion WorkflowDefinitionVersion? @relation(fields: [workflowDefinitionVersionId], references: [id], onDelete: Restrict)
 
   @@unique([templateId, versionNumber])
   @@index([templateId])
   @@index([status])
+  @@index([workflowDefinitionId])
+  @@index([workflowDefinitionVersionId])
 }
 
 // La SECCIÓN es la unidad atómica de permiso de llenado, asignación a estado del
@@ -629,6 +635,137 @@ model TemplateFieldRole {
   role  Role          @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   @@id([fieldId, roleId])
+  @@index([roleId])
+}
+
+// ===========================================================================
+//  Flujos reutilizables (Fase 2.2) — máquina de estados configurable
+// ===========================================================================
+//
+// Un flujo es una MÁQUINA DE ESTADOS (estados + transiciones), NO un motor BPMN.
+// Es un catálogo de primera clase, reutilizable por varias versiones de plantilla
+// y referenciado/congelado por ellas. Espejo del patrón Template/TemplateVersion:
+// `WorkflowDefinition` (contenedor mutable) 1—N `WorkflowDefinitionVersion`
+// (INMUTABLE al publicar). La autorización POR TRANSICIÓN es DATO
+// (`WorkflowTransitionRole`), no claves hardcodeadas; se honra en la EJECUCIÓN
+// (2.5). Aquí vive solo la DEFINICIÓN (sin ejecución/transiciones en vivo).
+
+enum WorkflowStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum WorkflowVersionStatus {
+  DRAFT
+  PUBLISHED
+}
+
+model WorkflowDefinition {
+  id               String         @id @default(cuid())
+  key              String         @unique // estable, ej. "cierre-turno"
+  name             String
+  description      String?
+  status           WorkflowStatus @default(DRAFT)
+  // Versión publicada "viva". Null mientras solo exista borrador.
+  currentVersionId String?        @unique
+  createdById      String?
+  updatedById      String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  deletedAt        DateTime? // borrado lógico
+
+  versions       WorkflowDefinitionVersion[] @relation("WorkflowVersions")
+  currentVersion WorkflowDefinitionVersion?  @relation("WorkflowCurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  // Versiones de plantilla que referencian este flujo (integridad histórica).
+  templateVersions TemplateVersion[]
+
+  @@index([status])
+  @@index([deletedAt])
+}
+
+model WorkflowDefinitionVersion {
+  id                   String                @id @default(cuid())
+  workflowDefinitionId String
+  versionNumber        Int
+  status               WorkflowVersionStatus @default(DRAFT)
+  // Snapshot del nombre/descripción al publicar (inmutabilidad histórica).
+  name                 String
+  description          String?
+  publishedAt          DateTime?
+  publishedById        String?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  definition  WorkflowDefinition   @relation("WorkflowVersions", fields: [workflowDefinitionId], references: [id], onDelete: Cascade)
+  currentOf   WorkflowDefinition?  @relation("WorkflowCurrentVersion")
+  states      WorkflowState[]
+  transitions WorkflowTransition[]
+  // Versiones de plantilla congeladas a esta versión de flujo (no se hard-borra).
+  templateVersions TemplateVersion[]
+
+  @@unique([workflowDefinitionId, versionNumber])
+  @@index([workflowDefinitionId])
+  @@index([status])
+}
+
+// Estado de la máquina. Exactamente uno isInitial; al menos uno isFinal por
+// versión (validado en backend con validateWorkflowMachine de @lyra/contracts).
+model WorkflowState {
+  id                          String  @id @default(cuid())
+  workflowDefinitionVersionId String
+  key                         String // estable dentro de la versión
+  name                        String
+  description                 String?
+  order                       Int     @default(0)
+  isInitial                   Boolean @default(false)
+  isFinal                     Boolean @default(false)
+  // Token de color del DS para el chip (opcional).
+  color                       String?
+
+  version          WorkflowDefinitionVersion @relation(fields: [workflowDefinitionVersionId], references: [id], onDelete: Cascade)
+  outgoing         WorkflowTransition[]       @relation("TransitionFrom")
+  incoming         WorkflowTransition[]       @relation("TransitionTo")
+
+  @@unique([workflowDefinitionVersionId, key])
+  @@index([workflowDefinitionVersionId])
+}
+
+// Transición dirigida entre dos estados de la misma versión. `requireSignature`
+// (+ significado) y `requireMfa` (step-up) son opt-in y se HONRAN en ejecución
+// (2.5). Los roles permitidos viven en WorkflowTransitionRole (autorización = dato).
+model WorkflowTransition {
+  id                          String  @id @default(cuid())
+  workflowDefinitionVersionId String
+  key                         String // estable dentro de la versión
+  label                       String
+  fromStateId                 String
+  toStateId                   String
+  order                       Int     @default(0)
+  requireSignature            Boolean @default(false)
+  signatureMeaning            String?
+  requireMfa                  Boolean @default(false)
+
+  version   WorkflowDefinitionVersion @relation(fields: [workflowDefinitionVersionId], references: [id], onDelete: Cascade)
+  fromState WorkflowState             @relation("TransitionFrom", fields: [fromStateId], references: [id], onDelete: Cascade)
+  toState   WorkflowState             @relation("TransitionTo", fields: [toStateId], references: [id], onDelete: Cascade)
+  roles     WorkflowTransitionRole[]
+
+  @@unique([workflowDefinitionVersionId, key])
+  @@index([workflowDefinitionVersionId])
+  @@index([fromStateId])
+  @@index([toStateId])
+}
+
+// Roles autorizados a ejecutar una transición (autorización = dato, dim. 3 RBAC).
+model WorkflowTransitionRole {
+  transitionId String
+  roleId       String
+
+  transition WorkflowTransition @relation(fields: [transitionId], references: [id], onDelete: Cascade)
+  role       Role               @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([transitionId, roleId])
   @@index([roleId])
 }
 
