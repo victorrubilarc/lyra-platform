@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import type { Prisma } from "@prisma/client";
+import type { AuditLog, Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 
 /** Contexto del actor y la petición para anexar a un evento de auditoría. */
@@ -52,13 +52,60 @@ export class AuditService {
     } = {},
   ) {
     const take = Math.min(Math.max(params.take ?? 50, 1), 200);
+    return this.prisma.auditLog.findMany({
+      where: this.buildWhere(params),
+      take,
+      orderBy: { occurredAt: "desc" },
+      ...(params.cursor ? { skip: 1, cursor: { id: params.cursor } } : {}),
+    });
+  }
 
+  /** Tope de filas por exportación (evita una descarga descontrolada). */
+  static readonly EXPORT_MAX_ROWS = 100_000;
+
+  /**
+   * Trae TODAS las filas que cumplen los filtros (para exportar), en lotes por
+   * cursor para no cargar toda la tabla en memoria de una vez. Acotado por
+   * `EXPORT_MAX_ROWS`. Devuelve `{ rows, truncated }` para avisar si se cortó.
+   */
+  async findForExport(
+    params: { from?: Date; to?: Date; action?: string; actor?: string; entityType?: string } = {},
+  ): Promise<{ rows: AuditLog[]; truncated: boolean }> {
+    const where = this.buildWhere(params);
+    const batchSize = 1000;
+    const rows: AuditLog[] = [];
+    let cursor: string | undefined;
+
+    for (;;) {
+      const batch = await this.prisma.auditLog.findMany({
+        where,
+        take: batchSize,
+        orderBy: { occurredAt: "desc" },
+        ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+      });
+      rows.push(...batch);
+      if (batch.length < batchSize) return { rows, truncated: false };
+      if (rows.length >= AuditService.EXPORT_MAX_ROWS) {
+        return { rows: rows.slice(0, AuditService.EXPORT_MAX_ROWS), truncated: true };
+      }
+      cursor = batch[batch.length - 1]?.id;
+    }
+  }
+
+  /** Construye el filtro `where` compartido por listado y exportación. */
+  private buildWhere(params: {
+    from?: Date;
+    to?: Date;
+    action?: string;
+    actor?: string;
+    entityType?: string;
+  }): Prisma.AuditLogWhereInput {
     const occurredAt =
       params.from || params.to
         ? { ...(params.from ? { gte: params.from } : {}), ...(params.to ? { lte: params.to } : {}) }
         : undefined;
 
-    const where: Prisma.AuditLogWhereInput = {
+    return {
       ...(occurredAt ? { occurredAt } : {}),
       ...(params.action ? { action: { contains: params.action, mode: "insensitive" } } : {}),
       ...(params.actor ? { actorEmail: { contains: params.actor, mode: "insensitive" } } : {}),
@@ -66,13 +113,6 @@ export class AuditService {
         ? { entityType: { contains: params.entityType, mode: "insensitive" } }
         : {}),
     };
-
-    return this.prisma.auditLog.findMany({
-      where,
-      take,
-      orderBy: { occurredAt: "desc" },
-      ...(params.cursor ? { skip: 1, cursor: { id: params.cursor } } : {}),
-    });
   }
 
   async record(event: AuditEvent): Promise<void> {

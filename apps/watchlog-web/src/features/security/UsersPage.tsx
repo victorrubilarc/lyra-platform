@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Plus, Search, TriangleAlert, Users as UsersIcon } from "lucide-react";
+import { Download, Plus, Search, TriangleAlert, Users as UsersIcon } from "lucide-react";
 import { Button, Chip, EmptyState, Input, ResizableSplit, Table, cx, type TableColumn } from "@lyra/ui";
 import type { UserStatus, UserSummary } from "@lyra/contracts";
 import { Can } from "../../auth/Can.js";
+import { downloadText, fileStamp, toCsv } from "../../lib/download.js";
 import { useUsers } from "./security-queries.js";
 import { UserDetail } from "./UserDetail.js";
 import { UserDrawer } from "./UserDrawer.js";
@@ -32,6 +33,19 @@ export function UsersPage() {
       (u) => u.displayName.toLowerCase().includes(q) || u.email.toLowerCase().includes(q),
     );
   }, [users, query]);
+
+  function exportCsv() {
+    const csv = toCsv(filtered, [
+      { header: t("security.users.displayName"), value: (u) => u.displayName },
+      { header: t("security.users.email"), value: (u) => u.email },
+      { header: t("security.users.colStatus"), value: (u) => t(`security.users.status.${u.status}`) },
+      { header: "MFA", value: (u) => (u.mfaEnabled ? "Sí" : "No") },
+      { header: t("security.users.roles"), value: (u) => u.roles.map((r) => r.name).join(" · ") },
+      { header: "Último ingreso", value: (u) => u.lastLoginAt ?? "" },
+      { header: "Creado", value: (u) => u.createdAt },
+    ]);
+    downloadText(`usuarios-${fileStamp()}.csv`, csv);
+  }
 
   const columns: TableColumn<UserSummary>[] = [
     {
@@ -69,13 +83,16 @@ export function UsersPage() {
           <h2 className={shared.toolbarTitle}>{t("security.users.title")}</h2>
           <p className={shared.toolbarSubtitle}>{t("security.users.subtitle")}</p>
         </div>
-        <Can perform="user:create">
-          <div className={shared.toolbarActions}>
+        <div className={shared.toolbarActions}>
+          <Button variant="secondary" leftIcon={<Download size={16} />} onClick={exportCsv} disabled={filtered.length === 0}>
+            {t("common.export")}
+          </Button>
+          <Can perform="user:create">
             <Button variant="primary" leftIcon={<Plus size={16} />} onClick={() => setDrawerOpen(true)}>
               {t("security.users.new")}
             </Button>
-          </div>
-        </Can>
+          </Can>
+        </div>
       </div>
 
       <div className={styles.split}>

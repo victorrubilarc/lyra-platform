@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Put, Query } from "@nestjs/common";
+import { Body, Controller, Get, Put, Query, Res } from "@nestjs/common";
+import type { FastifyReply } from "fastify";
 import {
   PERMISSION_CATALOG,
   updatePasswordPolicyRequestSchema,
@@ -9,6 +10,7 @@ import { AuditService } from "../audit/audit.service";
 import { PasswordPolicyService } from "../auth/password-policy.service";
 import type { RequestUser } from "../authz/auth-user";
 import { CurrentUser, RequirePermission } from "../authz/authz.decorators";
+import { toCsv } from "../common/csv";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 
 /** Endpoints transversales de seguridad: catálogo, política y auditoría. */
@@ -41,6 +43,57 @@ export class SecurityController {
     return this.policy.updatePolicy(dto, user.id);
   }
 
+  private parseDate(v?: string): Date | undefined {
+    if (!v) return undefined;
+    const d = new Date(v);
+    return Number.isNaN(d.getTime()) ? undefined : d;
+  }
+
+  private auditFilters(q: { from?: string; to?: string; action?: string; actor?: string; entityType?: string }) {
+    return {
+      from: this.parseDate(q.from),
+      to: this.parseDate(q.to),
+      action: q.action?.trim() || undefined,
+      actor: q.actor?.trim() || undefined,
+      entityType: q.entityType?.trim() || undefined,
+    };
+  }
+
+  /** Exporta la auditoría filtrada a CSV (set completo, no solo la página actual). */
+  @Get("audit/export")
+  @RequirePermission("audit:read")
+  async auditExport(
+    @Res() reply: FastifyReply,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
+    @Query("action") action?: string,
+    @Query("actor") actor?: string,
+    @Query("entityType") entityType?: string,
+  ): Promise<void> {
+    const { rows, truncated } = await this.audit.findForExport(
+      this.auditFilters({ from, to, action, actor, entityType }),
+    );
+    const csv = toCsv(rows, [
+      { header: "Fecha (ISO)", value: (r) => r.occurredAt.toISOString() },
+      { header: "Acción", value: (r) => r.action },
+      { header: "Actor", value: (r) => r.actorEmail },
+      { header: "ActorId", value: (r) => r.actorId },
+      { header: "Entidad", value: (r) => r.entityType },
+      { header: "EntidadId", value: (r) => r.entityId },
+      { header: "IP", value: (r) => r.ip },
+      { header: "Navegador", value: (r) => r.userAgent },
+      { header: "Antes", value: (r) => r.before },
+      { header: "Después", value: (r) => r.after },
+      { header: "Metadatos", value: (r) => r.metadata },
+    ]);
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+    await reply
+      .header("Content-Type", "text/csv; charset=utf-8")
+      .header("Content-Disposition", `attachment; filename="auditoria-${stamp}.csv"`)
+      .header("X-Export-Truncated", String(truncated))
+      .send(csv);
+  }
+
   @Get("audit")
   @RequirePermission("audit:read")
   async audit_(
@@ -52,19 +105,10 @@ export class SecurityController {
     @Query("actor") actor?: string,
     @Query("entityType") entityType?: string,
   ): Promise<AuditLogEntry[]> {
-    const parseDate = (v?: string): Date | undefined => {
-      if (!v) return undefined;
-      const d = new Date(v);
-      return Number.isNaN(d.getTime()) ? undefined : d;
-    };
     const rows = await this.audit.list({
       take: take ? Number(take) : undefined,
       cursor,
-      from: parseDate(from),
-      to: parseDate(to),
-      action: action?.trim() || undefined,
-      actor: actor?.trim() || undefined,
-      entityType: entityType?.trim() || undefined,
+      ...this.auditFilters({ from, to, action, actor, entityType }),
     });
     return rows.map((r) => ({
       id: r.id,

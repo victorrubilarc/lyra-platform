@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Pencil, Plus, Search, ShieldCheck, Trash2, TriangleAlert } from "lucide-react";
+import { Download, Pencil, Plus, Search, ShieldCheck, Trash2, TriangleAlert } from "lucide-react";
 import { Button, Chip, EmptyState, Input, Modal, Table, useToast, type TableColumn } from "@lyra/ui";
 import type { RoleSummary } from "@lyra/contracts";
 import { Can } from "../../auth/Can.js";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { ApiError } from "../../lib/api-client.js";
+import { downloadText, fileStamp, toCsv } from "../../lib/download.js";
 import { useDeleteRole, useRoles } from "./security-queries.js";
 import { RoleDrawer } from "./RoleDrawer.js";
 import shared from "./security-shared.module.css";
@@ -36,6 +37,19 @@ export function RolesPage() {
         (r.description?.toLowerCase().includes(q) ?? false),
     );
   }, [roles, query]);
+
+  function exportCsv() {
+    const csv = toCsv(filtered, [
+      { header: t("security.roles.colName"), value: (r) => r.name },
+      { header: t("security.roles.key"), value: (r) => r.key },
+      { header: t("security.roles.colDescription"), value: (r) => r.description ?? "" },
+      { header: t("security.roles.colMfa"), value: (r) => (r.requireMfa ? "Sí" : "No") },
+      { header: t("security.roles.colPerms"), value: (r) => r.permissionCount },
+      { header: t("security.roles.colUsers"), value: (r) => r.userCount },
+      { header: t("security.roles.system"), value: (r) => (r.isSystem ? "Sí" : "No") },
+    ]);
+    downloadText(`roles-${fileStamp()}.csv`, csv);
+  }
 
   async function confirmDelete() {
     if (!toDelete) return;
@@ -155,6 +169,9 @@ export function RolesPage() {
               rightSlot={<Search size={15} aria-hidden="true" />}
             />
           </div>
+          <Button variant="secondary" leftIcon={<Download size={16} />} onClick={exportCsv} disabled={filtered.length === 0}>
+            {t("common.export")}
+          </Button>
           <Can perform="role:manage">
             <Button variant="primary" leftIcon={<Plus size={16} />} onClick={() => setDrawer({ open: true, roleId: null })}>
               {t("security.roles.new")}

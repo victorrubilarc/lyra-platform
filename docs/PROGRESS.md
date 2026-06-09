@@ -384,6 +384,13 @@ Consume el backend de seguridad ya existente. Ver DECISIONS 2026-06-08. La UI so
   de rango** (24 h / 7 d / 30 d), conteo de resultados y debounce; la query de TanStack se rekeyea por
   filtros. Contrato `AuditFilters`. Smoke en vivo: `action=login` → todos con "login"; `entityType=Role` →
   todos Role; `from=hoy` acota; rango futuro → 0.
+- **Exportación CSV** (transversal, anticipada): **Auditoría** exporta **server-side el set completo filtrado**
+  (`GET /security/audit/export`, gateado por `audit:read`) — `AuditService.findForExport` itera por cursor en
+  lotes (tope `EXPORT_MAX_ROWS=100k`, header `X-Export-Truncated`), CSV RFC 4180 + BOM UTF-8 (helper
+  `common/csv.ts`), `Content-Disposition` con nombre fechado. **Usuarios** y **Roles** exportan el listado
+  cargado (CSV cliente, `lib/download.ts` + `lib/api-client.apiBlob`). i18n `common.export`. Smoke en vivo:
+  CSV con cabeceras, JSON escapado y filtros respetados (`entityType=Role` → 3 filas). PDF y export del resto
+  de módulos quedan para Fase 7.
 - **Roles**: `RolesPage` (tabla + borrado gateado, system no borrable) + `RoleDrawer` + `PermissionMatrix`
   (agrupada por `group` del catálogo, checkbox de grupo con indeterminado, `requireMfa`).
 - **Política**: `PolicyPage` (RHF+Zod): contraseñas (longitud/complejidad/historial/expiración), bloqueo por

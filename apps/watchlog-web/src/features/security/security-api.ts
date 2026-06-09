@@ -30,7 +30,7 @@ import {
   type UserSummary,
 } from "@lyra/contracts";
 import { z } from "zod";
-import { apiJson, apiVoid } from "../../lib/api-client.js";
+import { apiBlob, apiJson, apiVoid } from "../../lib/api-client.js";
 
 // ─── Usuarios ────────────────────────────────────────────────────────────────
 
@@ -135,4 +135,16 @@ export function fetchAudit(
   if (params.entityType) q.set("entityType", params.entityType);
   const qs = q.toString();
   return apiJson(`/security/audit${qs ? `?${qs}` : ""}`, z.array(auditLogEntrySchema));
+}
+
+/** Exporta la auditoría filtrada a CSV (set completo, lo arma el backend). */
+export function exportAuditCsv(filters: AuditFilters = {}): Promise<Blob> {
+  const q = new URLSearchParams();
+  if (filters.from) q.set("from", filters.from);
+  if (filters.to) q.set("to", filters.to);
+  if (filters.action) q.set("action", filters.action);
+  if (filters.actor) q.set("actor", filters.actor);
+  if (filters.entityType) q.set("entityType", filters.entityType);
+  const qs = q.toString();
+  return apiBlob(`/security/audit/export${qs ? `?${qs}` : ""}`);
 }

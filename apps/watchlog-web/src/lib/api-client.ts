@@ -140,6 +140,13 @@ export async function apiVoid(path: string, options: RequestOptions = {}): Promi
   if (!res.ok) throw await toApiError(res);
 }
 
+/** Petición que devuelve un Blob (descargas: CSV/PDF). Mantiene Bearer + refresh. */
+export async function apiBlob(path: string, options: RequestOptions = {}): Promise<Blob> {
+  const res = await request(path, options);
+  if (!res.ok) throw await toApiError(res);
+  return res.blob();
+}
+
 /** Petición que devuelve JSON validado con un esquema Zod del contrato. */
 export async function apiJson<T>(
   path: string,

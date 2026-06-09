@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { FilterX, ScrollText, TriangleAlert } from "lucide-react";
-import { Button, Chip, EmptyState, Input, Modal, Select, Table, type TableColumn } from "@lyra/ui";
+import { Download, FilterX, ScrollText, TriangleAlert } from "lucide-react";
+import { Button, Chip, EmptyState, Input, Modal, Select, Table, useToast, type TableColumn } from "@lyra/ui";
 import type { AuditFilters, AuditLogEntry } from "@lyra/contracts";
+import { ApiError } from "../../lib/api-client.js";
+import { downloadBlob, fileStamp } from "../../lib/download.js";
+import { exportAuditCsv } from "./security-api.js";
 import { useAudit } from "./security-queries.js";
 import shared from "./security-shared.module.css";
 import styles from "./AuditPage.module.css";
@@ -57,9 +60,11 @@ function actionVariant(action: string): "success" | "warning" | "error" | "info"
 
 export function AuditPage() {
   const { t } = useTranslation();
+  const toast = useToast();
   const [form, setForm] = useState<FilterForm>(EMPTY_FILTERS);
   const [applied, setApplied] = useState<AuditFilters>({});
   const [selected, setSelected] = useState<AuditLogEntry | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   // Debounce: aplica los filtros 400 ms después del último cambio.
   useEffect(() => {
@@ -81,6 +86,18 @@ export function AuditPage() {
     const from = new Date();
     from.setDate(from.getDate() - days);
     setForm((f) => ({ ...f, from: isoDay(from), to: isoDay(to) }));
+  }
+
+  async function doExport() {
+    setExporting(true);
+    try {
+      const blob = await exportAuditCsv(applied);
+      downloadBlob(`auditoria-${fileStamp()}.csv`, blob);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : t("common.errorGeneric"));
+    } finally {
+      setExporting(false);
+    }
   }
 
   const columns: TableColumn<AuditLogEntry>[] = [
@@ -146,6 +163,9 @@ export function AuditPage() {
           <Button variant="secondary" onClick={() => presetDays(1)}>{t("security.audit.preset24h")}</Button>
           <Button variant="secondary" onClick={() => presetDays(7)}>{t("security.audit.preset7d")}</Button>
           <Button variant="secondary" onClick={() => presetDays(30)}>{t("security.audit.preset30d")}</Button>
+          <Button variant="primary" leftIcon={<Download size={16} />} loading={exporting} onClick={doExport}>
+            {t("security.audit.export")}
+          </Button>
         </div>
       </div>
 
