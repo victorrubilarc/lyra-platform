@@ -255,6 +255,18 @@ nunca queda más de una sesión atrás.
       de los miembros del rol al activar el requisito) o se acepta la latencia. **Prioridad: baja.**
 - [ ] **Bundle web grande** (~743 KB JS): code-splitting / `manualChunks`. **Fase 7.**
 - [ ] **Ranura OIDC/LDAP**: diseñada, `AuthProvider` listo; se activa cuando un cliente lo pida.
+- [ ] **Flujos (`WorkflowDefinition`) — gaps de gobernanza (no afectan integridad).** La integridad histórica
+      ya está garantizada (inmutabilidad de versiones publicadas + FK `onDelete: Restrict` + guard "en uso" en
+      `remove` + validación FSM). Falta el **gobierno/UX proactivo**, registrado el 2026-06-09:
+  - **Aviso proactivo de impacto al editar/publicar un flujo en uso.** Hoy, si una versión nueva elimina/renombra
+    un estado que plantillas vivas usan en `editableInStateKey`, la incompatibilidad **solo se detecta cuando esa
+    plantilla se re-vincula** (400 en `TemplatesService.saveDraft`). Falta un "⚠️ N plantillas usan el estado *X*"
+    en el momento de editar/publicar el flujo, y/o un visor de **"¿qué plantillas usan este flujo?"**. **Prioridad:
+    media; cobra más valor junto con la ejecución 2.5.**
+  - **Concurrencia optimista en el builder de flujos** (igual que se hará en el llenado por sección): dos admins
+    editando el mismo borrador → hoy *last-write-wins* (reemplazo total). Añadir revisión/`updatedAt` check. **Prioridad: baja.**
+  - **El conteo "en uso" es conservador**: cuenta `TemplateVersion` en borrador e incluso de plantillas con borrado
+    lógico. Evaluar acotar a publicadas/activas si molesta en la práctica. **Prioridad: baja.**
 
 ### Recomendaciones de endurecimiento (Fase 7, ya registradas)
 Respaldos Postgres/MinIO · observabilidad (pino/Prometheus/OpenTelemetry/Grafana/Loki) ·
