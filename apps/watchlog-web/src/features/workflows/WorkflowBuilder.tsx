@@ -285,8 +285,12 @@ export function WorkflowBuilder({ detail }: { detail: WorkflowDetail }) {
           {wf.states.length === 0 ? (
             <div className={styles.empty}>{t("workflows.builder.noStates")}</div>
           ) : (
-            wf.states.map((s) => (
+            wf.states.map((s, idx) => (
               <div key={s.uid} className={styles.itemCard}>
+                <div className={styles.itemHeader}>
+                  <span className={styles.indexBadge}>{idx + 1}</span>
+                  <span className={styles.itemHeaderTitle}>{t("workflows.builder.stateN", { n: idx + 1 })}</span>
+                </div>
                 <div className={styles.itemTop}>
                   <Input
                     value={s.name}
@@ -347,8 +351,12 @@ export function WorkflowBuilder({ detail }: { detail: WorkflowDetail }) {
           {wf.transitions.length === 0 ? (
             <div className={styles.empty}>{t("workflows.builder.noTransitions")}</div>
           ) : (
-            wf.transitions.map((tr) => (
+            wf.transitions.map((tr, idx) => (
               <div key={tr.uid} className={styles.itemCard}>
+                <div className={styles.itemHeader}>
+                  <span className={styles.indexBadge}>{idx + 1}</span>
+                  <span className={styles.itemHeaderTitle}>{t("workflows.builder.transitionN", { n: idx + 1 })}</span>
+                </div>
                 <div className={styles.itemTop}>
                   <Input
                     value={tr.label}
