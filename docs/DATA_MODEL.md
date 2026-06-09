@@ -63,6 +63,12 @@
   - **Campos de SISTEMA intrínsecos** (columnas indexadas, inmutables/auditadas, capturados SIEMPRE): `recordedAt`
     (commit), `createdBy`, `orgNodeId`, `equipmentId?`, `templateVersionId` (FK), `currentState`, periodo/turno?,
     firmas. La trazabilidad temporal es **estructural**, no un campo que se agrega.
+  - **`workflowDefinitionVersionId` DENORMALIZADO en `LogEntry`** (decisión de diseño 2026-06-09, a aplicar en 2.4):
+    al crear la entrada se **copia** la versión de flujo que congeló su `TemplateVersion`. La entrada vive TODO su
+    ciclo (incl. su próxima transición) bajo **esa** versión, aunque el flujo publique v(n+1) después — la `currentVersion`
+    del flujo solo aplica a entradas nuevas. Se copia (en vez de derivar siempre vía `TemplateVersion`) por ser más
+    explícito, consultable e inmune a indirecciones. Re-basar una entrada a una versión nueva = operación explícita
+    y auditada (por defecto NO; estilo GxP).
   - **`effectiveAt`** (columna indexada) = fecha efectiva de negocio (hora del evento/lectura ≠ captura). Se promueve
     del valor del campo con `semanticRole = EFFECTIVE_DATE`; si la plantilla no marca ninguno, cae a `recordedAt`.
   - Valores con historial por campo + transiciones de flujo. **Las tablas se crean en 2.4** (aditivo/no destructivo;

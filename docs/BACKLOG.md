@@ -215,7 +215,21 @@ nunca queda más de una sesión atrás.
     (ver DECISIONS 2026-06-09): ambas capturas (colaborativa + rondas), firmas Part 11 opt-in, granularidad
     sección+override, flujos reutilizables.
 - [ ] **Fase 3** — Orígenes de datos.
-- [ ] **Fase 4** — Motor de incidencias (workflow HSE).
+- [ ] **Fase 4** — Motor de incidencias (workflow HSE). **Alcance ampliado a modelar desde el inicio** (escenario
+      planteado por el usuario 2026-06-09): una **regla de negocio en un campo de bitácora** (umbral ISA-18.2 ya
+      modelado en `TemplateField.config`) **dispara una incidencia** (`AutoIncidentRule`) en un **modelo aparte**
+      (`Incident`), con su **propio flujo** (reutiliza `WorkflowDefinition` de 2.2). La incidencia puede generar
+      **N tareas** (`IncidentTask`/`WorkItem`) **asignables a uno o varios responsables**, **cada tarea con su propio
+      flujo**, y cada una capaz de **generar sus propios registros de avance / bitácoras**. Requisitos clave a diseñar:
+  - **Procedencia/trazabilidad bidireccional**: `Incident.sourceLogEntryId` (+ campo/valor que disparó), y enlaces
+    `Incident → IncidentTask → (registros de avance)`. La **entrada de bitácora original queda atada** a la
+    incidencia y a todos los registros derivados (línea de tiempo navegable en ambos sentidos).
+  - **Tareas con flujo propio**: `IncidentTask` instancia su `WorkflowDefinition` (definición inmutable vs ejecución
+    auditada, igual patrón que `LogEntry`); asignación multi-responsable; firmas/MFA por transición ya disponibles.
+  - **Reutilización**: NO duplicar el motor de máquina de estados ni el de definición/ejecución; todo cuelga de
+    `WorkflowDefinition` + el patrón de 2.x. La taxonomía de campos (evidencia foto/QR/GPS, etc.) se comparte.
+  - **El disparo concreto** (crear la incidencia al cruzar el umbral) es el **cruce Fase 2.7 ↔ Fase 4**; en Fase 2
+    solo se modela la regla en el campo. Ver DECISIONS 2026-06-09 (umbrales) y la sección Incidencias de DATA_MODEL.
 - [ ] **Fase 5** — Cambio de turno + IA (resumen).
 - [ ] **Fase 6** — Base de conocimiento + Dashboard + Asistente IA.
 - [ ] **Fase 7** — Endurecimiento (ver §3 y §5).
