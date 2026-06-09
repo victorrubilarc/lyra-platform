@@ -190,6 +190,12 @@ export const assignCalendarNodesRequestSchema = z.object({
 });
 export type AssignCalendarNodesRequest = z.infer<typeof assignCalendarNodesRequestSchema>;
 
+/** Cuerpo del probador: el instante (ISO-8601 UTC) a resolver. */
+export const operationalCalendarPreviewRequestSchema = z.object({
+  at: z.string().datetime({ offset: true }),
+});
+export type OperationalCalendarPreviewRequest = z.infer<typeof operationalCalendarPreviewRequestSchema>;
+
 // === Validación cruzada (fuente única: contrato + backend + builder web) =====
 
 interface ValidatableCalendar {
