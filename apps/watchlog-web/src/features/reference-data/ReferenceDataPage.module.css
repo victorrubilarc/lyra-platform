@@ -205,11 +205,40 @@
 }
 
 .itemsTitle {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
   font-size: var(--text-body-sm-size);
   font-weight: 600;
   color: var(--color-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.06em;
+}
+
+.itemsCount {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.itemsToolbar {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.itemsSearch {
+  flex: 1;
+  min-width: 220px;
+  max-width: 380px;
+}
+
+.statusSelect {
+  max-width: 180px;
 }
 
 /* Celda de code (mono) en la grilla de ítems. */

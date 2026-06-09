@@ -525,8 +525,13 @@ export const esCL = {
       empty: "Selecciona una lista para ver y administrar sus ítems.",
       loadError: "No se pudo cargar la lista.",
       itemsTitle: "Ítems",
+      itemsSummary: "{{active}} activos · {{total}} en total",
+      searchItems: "Buscar por código, etiqueta o metadata…",
+      statusFilter: "Filtrar por estado",
+      statusAll: "Todos",
       noItems: "Esta lista no tiene ítems",
       noItemsDesc: "Agrega valores con su código estable y etiqueta visible.",
+      noItemsFiltered: "Sin coincidencias",
     },
     item: {
       add: "Agregar ítem",

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AlertTriangle } from "lucide-react";
-import { Input, Select, Textarea, Toggle } from "@lyra/ui";
+import { Combobox, Input, MultiSelect, Textarea, Toggle } from "@lyra/ui";
 import type { OptionInlineItem } from "@lyra/contracts";
 import { useResolvedReferenceList } from "../reference-data/reference-data-queries.js";
 import type { EditField, EditState } from "./builder-model.js";
@@ -88,34 +88,25 @@ function PreviewField({ field, values, setValue }: { field: EditField; values: V
     }
     case "SELECT":
       control = (
-        <Select value={(v as string) ?? ""} onChange={(e) => setValue(field.key, e.target.value)}>
-          <option value="">—</option>
-          {opts.map((o) => (
-            <option key={o.code} value={o.code}>
-              {o.label}
-            </option>
-          ))}
-        </Select>
+        <div style={{ maxWidth: 360 }}>
+          <Combobox
+            value={(v as string) ?? ""}
+            onChange={(val) => setValue(field.key, val)}
+            options={opts.map((o) => ({ value: o.code, label: o.label, hint: o.code }))}
+            placeholder="—"
+            clearable
+          />
+        </div>
       );
       break;
     case "MULTISELECT":
       control = (
-        <div className={styles.previewChips}>
-          {opts.map((o) => {
-            const arr = (v as string[]) ?? [];
-            const on = arr.includes(o.code);
-            return (
-              <button
-                key={o.code}
-                type="button"
-                className={on ? styles.previewChipOn : styles.previewChip}
-                onClick={() => setValue(field.key, on ? arr.filter((x) => x !== o.code) : [...arr, o.code])}
-              >
-                {on ? "✓ " : ""}
-                {o.label}
-              </button>
-            );
-          })}
+        <div style={{ maxWidth: 360 }}>
+          <MultiSelect
+            value={(v as string[]) ?? []}
+            onChange={(vals) => setValue(field.key, vals)}
+            options={opts.map((o) => ({ value: o.code, label: o.label, hint: o.code }))}
+          />
         </div>
       );
       break;

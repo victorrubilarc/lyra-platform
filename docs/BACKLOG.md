@@ -46,6 +46,7 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Fase 2.1.1 Endurecimiento de modelo** (campo en 3 capas + `optionSource`) | `main` (fusionado desde `feat/plantillas-2.1.1`) | ✅ fusionado y publicado en `origin/main` (`365e31f`) | ninguna |
 | **Fase 2.2 Flujos reutilizables** (`WorkflowDefinition` + mantenedor + binding) | `main` (fusionado desde `feat/workflows`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Fase 2.x Datos de referencia** (`ReferenceList`/`ReferenceItem` + mantenedor + binding) | `main` (fusionado desde `feat/datos-referencia`) | ✅ fusionado y publicado en `origin/main` | ninguna |
+| **Datos de referencia — UX enterprise** (grilla orden/búsqueda/paginación + `Combobox` + selectores premium) | `main` (fusionado desde `feat/datos-referencia-ux`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 
 **Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
@@ -368,7 +369,10 @@ probatoria (hash+timestamp). Ref: `DECISIONS.md` (sección de recomendaciones).
       **activar/desactivar** ítem, **orden inline**, editar, eliminar (modal); editar/eliminar lista (bloqueada si en
       uso). En el **Form Builder**: en un SELECT/MULTISELECT cambiar la fuente a **Lista de Referencia**, elegir
       `failure-modes`, y verificar que la **vista previa resuelve** las opciones (muestra label, guarda code); guardar/
-      publicar; modo claro. App en `:5173`.
+      publicar; modo claro. App en `:5173`. **(UX enterprise 2026-06-09)** verificar además: en la grilla de ítems el
+      **buscador**, el **filtro de estado**, el **ordenamiento por columnas**, la **paginación** y la metadata en
+      chips; en el Form Builder el **selector de Lista buscable (`Combobox`)** y que el **SELECT/MULTISELECT de la
+      vista previa** sean buscables y escalen con una lista larga.
 - [ ] **Modo claro — QA visual** (nuevo): revisar que TODO el workspace se vea premium en **claro**
       (contraste WCAG, glass, glows, severidades, tablas futuras, drawers/modales) y que `auto` siga al
       sistema. El default es oscuro; el login es siempre oscuro. Ref: DECISIONS 2026-06-06.

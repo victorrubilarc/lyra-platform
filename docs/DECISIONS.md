@@ -4,6 +4,22 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-09 · Datos de referencia — endurecimiento UX (grilla enterprise + `Combobox`)
+
+Pulido pedido por el usuario tras 2.x, antes de avanzar de fase. Decisiones:
+- **Grilla de ítems enterprise** (no una tabla básica): buscador (code/label/metadata), **filtro de estado**
+  (todos/activos/inactivos), **columnas ordenables** (code/label/orden/estado), **paginación** (10/pág), conteo
+  "activos · total", y **metadata como chips**. El orden inline ahora **remonta** (`key` por `id+sortOrder`) para
+  reflejar el valor del servidor tras editar. Reusa el `Table` de `@lyra/ui` (ya soportaba sort/paginación).
+- **Nuevo primitivo `@lyra/ui`: `Combobox`** (single-select buscable con panel **portal**, navegación por teclado
+  flechas+Enter, Escape, limpiable, **reposiciona en scroll/resize**). Era un hueco real del design system: existían
+  `MultiSelect` (múltiple) y `Select` (nativo, listas cortas) pero no un **autocomplete de selección única** para
+  catálogos grandes. **Motivo (objeción del usuario):** un `<select>` nativo no escala a una Lista de Referencia
+  larga; el selector debe ser un objeto premium buscable.
+- **Aplicación:** en el Form Builder el **selector de Lista** usa `Combobox`; en la **vista previa**, un campo SELECT
+  bound a una lista usa `Combobox` y un MULTISELECT usa el `MultiSelect` primitivo (antes pintaba TODAS las opciones
+  como chips → se rompía con listas largas). Ambos buscables, premium y consistentes con el resto de la app.
+
 ### 2026-06-09 · Fase 2.x — Datos de referencia / Listas (`ReferenceList`/`ReferenceItem`) (implementado)
 
 Hace REAL el `optionSource.referenceList` que 2.1.1 dejó modelado. Investigación de respaldo: **FHIR

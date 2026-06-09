@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Checkbox, FormField, Input, MultiSelect, Select, Textarea, Toggle } from "@lyra/ui";
+import { Checkbox, Combobox, FormField, Input, MultiSelect, Select, Textarea, Toggle } from "@lyra/ui";
 import type { OptionInlineItem, RoleSummary, WorkflowStateDto } from "@lyra/contracts";
 import { useReferenceLists } from "../reference-data/reference-data-queries.js";
 import { fieldTypeMeta, slugifyKey, type EditField, type EditSection } from "./builder-model.js";
@@ -348,19 +348,27 @@ function ReferenceListPicker({ value, onChange }: { value: string; onChange: (li
   const known = lists.some((l) => l.key === value);
   const selected = lists.find((l) => l.key === value);
 
+  const opts = lists.map((l) => ({
+    value: l.key,
+    label: `${l.name} (${l.itemCount ?? 0})`,
+    hint: l.key,
+  }));
+  if (value && !known) opts.push({ value, label: value, hint: value });
+
   return (
     <FormField label={t("templates.builder.referenceList")} hint={t("templates.builder.referenceListHint")}>
       {({ id }) => (
         <>
-          <Select id={id} value={value} onChange={(e) => onChange(e.target.value)} disabled={isLoading}>
-            <option value="">{t("templates.builder.referenceListPlaceholder")}</option>
-            {lists.map((l) => (
-              <option key={l.id} value={l.key}>
-                {l.name} ({l.itemCount ?? 0})
-              </option>
-            ))}
-            {value && !known && <option value={value}>{value}</option>}
-          </Select>
+          <Combobox
+            id={id}
+            value={value}
+            onChange={onChange}
+            options={opts}
+            disabled={isLoading}
+            placeholder={t("templates.builder.referenceListPlaceholder")}
+            searchPlaceholder={t("referenceData.search")}
+            ariaLabel={t("templates.builder.referenceList")}
+          />
           {value && !known && !isLoading && (
             <p className={styles.thresholdHint} style={{ color: "var(--color-warning)" }}>
               {t("templates.builder.referenceListMissing", { key: value })}
