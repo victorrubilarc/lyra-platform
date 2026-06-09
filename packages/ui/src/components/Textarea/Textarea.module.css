@@ -1,0 +1,43 @@
+.textarea {
+  width: 100%;
+  background: var(--color-hover);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  padding: 10px 14px;
+  font-family: var(--font-body);
+  font-size: var(--text-body-size);
+  line-height: 1.5;
+  min-height: 80px;
+  resize: vertical;
+  outline: none;
+  transition: var(--transition-border), box-shadow 0.2s ease;
+}
+
+.textarea::placeholder {
+  color: var(--color-text-muted);
+}
+
+.textarea:focus {
+  border-color: var(--color-accent-primary);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.18);
+}
+
+.textarea:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.invalid {
+  border-color: var(--color-error);
+}
+.invalid:focus {
+  border-color: var(--color-error);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18);
+}
+
+/* Texto monoespaciado (p. ej. editor de opciones, una por línea). */
+.mono {
+  font-family: var(--font-mono);
+  font-size: 13px;
+}

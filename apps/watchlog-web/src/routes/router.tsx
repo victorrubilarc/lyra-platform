@@ -15,6 +15,8 @@ import { PolicyPage } from "../features/security/PolicyPage.js";
 import { AuditPage } from "../features/security/AuditPage.js";
 import { HomePage } from "../features/home/HomePage.js";
 import { StructurePage } from "../features/structure/StructurePage.js";
+import { TemplatesPage } from "../features/templates/TemplatesPage.js";
+import { TemplateBuilderPage } from "../features/templates/TemplateBuilderPage.js";
 
 /**
  * Mapa de rutas. `/login` es pública; todo lo demás cuelga de `ProtectedRoute`
@@ -36,6 +38,8 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <HomePage /> },
           { path: "/estructura", element: <StructurePage /> },
+          { path: "/plantillas", element: <TemplatesPage /> },
+          { path: "/plantillas/:id", element: <TemplateBuilderPage /> },
           {
             path: "/seguridad",
             element: <SecurityLayout />,
