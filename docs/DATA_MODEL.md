@@ -59,26 +59,41 @@
     shape `options[]` legacy se **sube** a `inline` al leer/escribir (helper `upgradeFieldConfig`; configs son JSONB ⇒ sin migración SQL).
   - **Regla de reportabilidad:** el valor que se persiste al llenar (2.4) para una referencia es el **`code` estable,
     NO el label** (patrón dimensión de DW / FHIR Coding). Labels cambian sin romper histórico.
-- **Entry / LogEntry** (bitácora, **Fase 2.4** — solo DISEÑO, sin tabla aún):
-  - **Campos de SISTEMA intrínsecos** (columnas indexadas, inmutables/auditadas, capturados SIEMPRE): `recordedAt`
-    (commit), `createdBy`, `orgNodeId`, `equipmentId?`, `templateVersionId` (FK), `currentState`, periodo/turno?,
-    firmas. La trazabilidad temporal es **estructural**, no un campo que se agrega.
-  - **`workflowDefinitionVersionId` DENORMALIZADO en `LogEntry`** (decisión de diseño 2026-06-09, a aplicar en 2.4):
-    al crear la entrada se **copia** la versión de flujo que congeló su `TemplateVersion`. La entrada vive TODO su
-    ciclo (incl. su próxima transición) bajo **esa** versión, aunque el flujo publique v(n+1) después — la `currentVersion`
-    del flujo solo aplica a entradas nuevas. Se copia (en vez de derivar siempre vía `TemplateVersion`) por ser más
-    explícito, consultable e inmune a indirecciones. Re-basar una entrada a una versión nueva = operación explícita
-    y auditada (por defecto NO; estilo GxP).
-  - **`effectiveAt`** (columna indexada) = fecha efectiva de negocio (hora del evento/lectura ≠ captura). Se promueve
-    del valor del campo con `semanticRole = EFFECTIVE_DATE`; si la plantilla no marca ninguno, cae a `recordedAt`.
-  - **Dimensiones de turno/periodo estampadas (Fase 2.3.0 lista):** `shiftCode?`, `operationalDate?`, `periodKey?`
-    (columnas indexadas, inmutables, **nullable**) se derivan al sellar la entrada vía **`ShiftResolver`** (a partir de
-    `effectiveAt`, fallback `recordedAt`, con el calendario que aplica al `orgNodeId`). Sin calendario configurado
-    quedan en null (degradación elegante). Reportabilidad por turno/periodo sin recalcular y offline-friendly.
-  - Valores con historial por campo + transiciones de flujo. **Las tablas se crean en 2.4** (aditivo/no destructivo;
-    su forma se valida con la lógica real del llenado). En 2.1.1 quedan solo como diseño aquí y en DECISIONS.
-- **EntryChangeLog** — diffs antes/después + motivo (auditoría de edición).
-- **AutoIncidentRule** — reglas que disparan incidencias desde campos (umbral, severidad ≥ N).
+- **LogEntry** *(implementado — Fase 2.4, migración `20260610011231_add_log_entry`)* — EJECUCIÓN auditada de una
+  versión de plantilla. **Campos de SISTEMA intrínsecos** (columnas indexadas, inmutables/auditadas, capturados
+  SIEMPRE): `recordedAt` (commit, inmutable), `createdById`/`updatedById` (referencia blanda), `orgNodeId` (FK
+  `Restrict`), `equipmentId?` (FK `SetNull`), `templateId`/`templateVersionId` (FK `Restrict`, integridad histórica),
+  `currentStateKey?` (estado del flujo; null = sin flujo), `status` (`DRAFT`/`SUBMITTED`/`VOID`), `sealedAt?`,
+  `deletedAt?`. La trazabilidad temporal es **estructural**, no un campo que se agrega.
+  - **`workflowDefinitionVersionId` DENORMALIZADO** (+ `workflowDefinitionId`): al crear la entrada se **copia** la
+    versión de flujo que congeló su `TemplateVersion`. La entrada vive TODO su ciclo bajo **esa** versión aunque el
+    flujo publique v(n+1) después. Re-basar = operación explícita y auditada (por defecto NO; estilo GxP).
+  - **`effectiveAt`** (columna indexada) = fecha efectiva de negocio. Se promueve del valor del campo con
+    `semanticRole = EFFECTIVE_DATE` (`resolveEffectiveAt` en `@lyra/contracts`); fallback `recordedAt`. Se **recalcula
+    en cada guardado mientras la entrada es DRAFT** y se **CONGELA al enviar** (`sealedAt`).
+  - **Dimensiones de turno/periodo estampadas:** `shiftCode?`, `operationalDate?`, `periodKey?` (columnas indexadas,
+    nullable) se derivan vía **`ShiftResolver`** (a partir de `effectiveAt`, con el calendario que aplica al
+    `orgNodeId`). Sin calendario → null (degradación elegante). Reportabilidad por turno/periodo sin recalcular.
+- **LogEntrySection** *(implementado)* — sección INSTANCIADA: porta el estado de ejecución que no se deriva de la
+  plantilla. `sectionKey` (clave estable), `state` (`PENDING`/`IN_PROGRESS`/`COMPLETED`/`LOCKED`), `filledById?`/
+  `filledAt?`, `signatureId?` (Part 11, se llena en 2.5), **`version` Int** (concurrencia optimista por sección,
+  check-and-bump). FK `onDelete: Cascade`, `@@unique([logEntryId, sectionKey])`.
+- **LogEntryValue** *(implementado)* — valor actual, **1 fila por campo**: `sectionKey`, `fieldKey`, `dataType`
+  (copiado para reporte), `value` jsonb (null = vacío). El valor de un campo de referencia se persiste como **`code`
+  estable, NO label**. `@@unique([logEntryId, fieldKey])`.
+- **LogEntryFieldChange** *(implementado)* — historial **append-only por campo** (antes/después): `fieldKey`,
+  `before`/`after` jsonb, `changedById`, `changedAt`, `reason?`. Auditoría fina del llenado; complementa el AuditLog
+  de eventos de alto nivel (`logentry.created`/`logentry.section.saved`/`logentry.submitted`).
+- **LogEntryTransition** *(diseñado; tabla en 2.5)* — log del flujo (from→to, actor, motivo, firma). Se materializa
+  con el motor de ejecución de flujo (2.5); el gancho `sealedAt`/`currentStateKey` ya existe.
+- **AutoIncidentRule** — reglas que disparan incidencias desde campos (umbral, severidad ≥ N). **Fase 4.**
+
+> **Autorización del llenado (2.4):** los guards aplican `logentry:view/create/fill`; la editabilidad por SECCIÓN la
+> decide el backend = `(sección editable en `currentStateKey`) × (rol con permiso de sección, dato `TemplateSectionRole`
+> + override por campo `TemplateFieldRole`) × (ABAC sobre `orgNodeId`)`. La validación de valores es 100% en servidor
+> (`validateFieldValue` en `@lyra/contracts`, fuente única reusada por el cliente para feedback inmediato): tipo/rango/
+> umbral ISA-18.2/regex/`optionSource` resuelto contra Listas vivas/`visibleWhen`. **Límite del slice:** la entrada
+> permanece en su estado inicial; las TRANSICIONES de flujo y las firmas Part 11 son 2.5.
 
 ### Flujos reutilizables (máquina de estados)
 > **Fase 2.2 (implementado — lado DEFINICIÓN):** migración `20260609163822_add_workflow_definition`. Máquina de
@@ -184,6 +199,9 @@ Incident(resuelta) ──> KnowledgeArticle
 ```
 
 ## Notas de implementación
-- Valores de formularios en `JSONB` validados contra la `TemplateVersion` (Zod en backend); columnas indexadas/derivadas donde haga falta filtrar/ordenar.
+- **Valores de llenado en TABLA HILA relacional** (`LogEntryValue`, 1 fila por campo; fork confirmado 2026-06-09),
+  no en un blob: habilita auditoría por campo (`LogEntryFieldChange`), concurrencia optimista por sección, el guard
+  real de "code en uso" de Listas y reportabilidad por columna. El `value` de cada fila es `JSONB` tipado por
+  `dataType`; validado contra la `TemplateVersion` (Zod en backend, `validateFieldValue`).
 - Índices previstos: FKs, `OrgNode.parentId`, `Entry(templateId, createdAt)`, `Incident(status, severity)`, GIN en `tsvector` de KB y en `JSONB` consultable.
 - El esquema vive en `apps/watchlog-api/prisma/schema.prisma`; migraciones versionadas con `prisma migrate`.

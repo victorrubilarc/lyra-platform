@@ -1,11 +1,11 @@
 # Progreso — Lyra WatchLog
 
-Última actualización: 2026-06-09 (**Fase 1 completa**; **Fase 2.1 ✅** + **Fase 2.1.1 ✅** + **Fase 2.2 ✅** +
-**Fase 2.x ✅** + **Fase 2.3.0 ✅** — Plantillas: modelo de DEFINICIÓN + campo en 3 capas + `optionSource` + Form
-Builder; **Flujos reutilizables `WorkflowDefinition`**; **Datos de referencia `ReferenceList`/`ReferenceItem`**:
-catálogo gobernado + mantenedor `/datos-referencia` + binding real; **Calendario operacional `OperationalCalendar`**:
-turnos + día operacional + periodo contable + `ShiftResolver` + mantenedor `/calendario-operacional`).
-**Siguiente: Fase 2.4 — Llenado (Nueva entrada)**, que estampará las dimensiones derivadas vía `ShiftResolver`.
+Última actualización: 2026-06-10 (**Fase 1 completa**; **Fase 2.1/2.1.1/2.2/2.x/2.3.0 ✅** + **Fase 2.4 ✅** —
+Plantillas/Form Builder; Flujos `WorkflowDefinition`; Datos de referencia `ReferenceList`/`ReferenceItem`; Calendario
+operacional `OperationalCalendar` + `ShiftResolver`; y **Llenado (Nueva entrada) multi-actor**: tablas `LogEntry*`,
+llenado por secciones con concurrencia optimista, validación 100% en servidor, estampado de turno/día operacional/
+periodo vía `ShiftResolver`, y sellado de `effectiveAt`+dimensiones al enviar).
+**Siguiente: Fase 2.5 — Ejecución de flujo + firmas electrónicas (Part 11)** (o 2.3 Rondas intercalable).
 
 ## Estado por fase
 
@@ -13,7 +13,7 @@ turnos + día operacional + periodo contable + `ShiftResolver` + mantenedor `/ca
 |---|---|---|
 | 0 | **Cimientos** (monorepo, Docker, Design System tokens, contratos, API health) | ✅ Hecho |
 | 1 | Seguridad (auth + RBAC/ABAC) + Estructura organizacional + AuditLog | ✅ Backend ✅ · UI: Login ✅ · **Estructura ✅ (+ Equipos ✅)** · **Seguridad ✅** |
-| 2 | Plantillas / Form Builder + Bitácoras | 🔄 **2.1 ✅** + **2.1.1 ✅** + **2.2 ✅** + **2.x ✅** + **2.3.0 ✅** (Form Builder + Flujos + Datos de referencia + Calendario operacional) · 2.4–2.7 pendientes |
+| 2 | Plantillas / Form Builder + Bitácoras | 🔄 **2.1 ✅** + **2.1.1 ✅** + **2.2 ✅** + **2.x ✅** + **2.3.0 ✅** + **2.4 ✅** (Form Builder + Flujos + Datos de referencia + Calendario operacional + **Llenado/Nueva entrada**) · 2.3 Rondas, 2.5–2.7 pendientes |
 | 3 | Orígenes de datos | ⬜ Pendiente |
 | 4 | Motor de incidencias | ⬜ Pendiente |
 | 5 | Cambio de turno + IA (resumen) | ⬜ Pendiente |
@@ -32,7 +32,7 @@ turnos + día operacional + periodo contable + `ShiftResolver` + mantenedor `/ca
 | Equipos (CRUD + categorías + refs externas modelo) | 1 | ✅ API + UI |
 | Seguridad / roles / permisos (nueva) | 1 | ✅ API + UI (usuarios/roles/política/auditoría + reset MFA de admin) |
 | Plantillas (Form Builder) | 2 | ✅ **2.1** API + UI (definición: secciones/campos/umbrales/permiso por sección/borrador-publicar) |
-| Nueva entrada / Llenado | 2 | ⬜ (2.4) |
+| Nueva entrada / Llenado | 2 | ✅ **2.4** API + UI (llenado multi-actor por secciones, concurrencia, validación servidor, estampado de dimensiones, sellado al enviar) |
 | Bitácoras (listado + detalle + log de cambios) | 2 | ⬜ |
 | Orígenes de datos | 3 | ⬜ |
 | Incidencias (kanban + drawer workflow) | 4 | ⬜ |
@@ -619,13 +619,54 @@ DW). Ver DECISIONS 2026-06-09 ("Fase 2.3.0 — IMPLEMENTADO"). Rama `feat/calend
   hard-deleted; `mina-rajo` queda como demo dev-only.
 - **Pendiente**: smoke **VISUAL** en navegador (ver BACKLOG §4).
 
+## Hecho en Fase 2.4 (Llenado / Nueva entrada multi-actor)
+
+Primer slice de EJECUCIÓN. Tablas `LogEntry*` aditivas + backend `/log-entries` + pantalla de llenado. Paradigma
+EBR/GxP. Ver DECISIONS 2026-06-10 (4 forks resueltos). Rama `feat/llenado`, 4 commits.
+
+- **Contratos** (`@lyra/contracts/log-entries`): `LogEntry`/`LogEntrySection`/`LogEntryValue` (forma de respuesta +
+  DTOs create/saveSection/submit/list) y la **lógica compartida = fuente única backend+frontend**:
+  `validateFieldValue` (tipo/rango/**umbral ISA-18.2**/regex/catálogo de codes), `isFieldVisible` (`visibleWhen`),
+  `resolveEffectiveAt` (campo `EFFECTIVE_DATE` → `effectiveAt`, fallback `recordedAt`), `isSectionEditableInState`,
+  `isEmptyValue`. **+17 specs**.
+- **Permisos** (catálogo **45→49**): `module:logbook:view` + `logentry:view/create/fill`. QUIÉN llena cada sección
+  sigue siendo DATO (`TemplateSectionRole`), no clave. El seed los asigna al rol admin iterando el catálogo.
+- **Prisma** (migración aditiva `20260610011231_add_log_entry`, 100% CREATE): `LogEntry` (cabecera con campos de
+  sistema intrínsecos + `workflowDefinitionVersionId` DENORMALIZADO + `effectiveAt`/`shiftCode`/`operationalDate`/
+  `periodKey`/`sealedAt`), `LogEntrySection` (estado + `version` para concurrencia), `LogEntryValue` (1 fila/campo,
+  `value` jsonb + `dataType`), `LogEntryFieldChange` (historial append-only). `LogEntryTransition` modelado, su tabla
+  en 2.5. Aplicada con `migrate deploy` (EPERM del DLL con el watch). Relaciones inversas en Template/TemplateVersion/
+  OrgNode/Equipment (`onDelete Restrict`/`SetNull`).
+- **Backend** `LogEntriesModule` (`/log-entries`, gateado por `logentry:view/create/fill`): `create` (copia la versión
+  publicada, instancia secciones, denormaliza flujo+estado inicial, sella `recordedAt`, estampa dimensiones vía
+  `ShiftResolver`); `getDetail` (definición congelada + estado por sección + valores + `editable` resuelto por usuario);
+  `saveSection` (**concurrencia optimista por sección** 409, **validación 100% en servidor** + catálogo de codes
+  resuelto contra Listas vivas + `visibleWhen`, **override de rol por campo**, **auditoría por campo**, recálculo de
+  `effectiveAt`+dims); `submit` (valida obligatorios y **SELLA** `effectiveAt`+dims → `sealedAt`, `SUBMITTED`); `list`
+  con ABAC. Inyecta `ShiftResolver`. **+10 tests** (API 119→129).
+- **Web** `features/log-entries`: **`FieldControl`** (control de campo COMPARTIDO interactivo + solo-lectura, extraído
+  de `FieldPreview`; Form Builder y llenado lo reusan → nunca divergen; resuelve opciones de Listas mostrando label/
+  guardando code); **`NewEntryPage`** (`/nueva-entrada`, grilla de plantillas publicadas a rol/alcance → crea entrada);
+  **`EntryFillPage`** (`/nueva-entrada/:id`, cabecera con estado + dimensiones estampadas; secciones como cards con
+  gating de editabilidad; validación inmediata por campo reusando `validateFieldValue`; guardar/completar por sección
+  con manejo de 409; enviar = sella; banner al registrar). Capa de datos TanStack Query; navegación (módulo `logbook`),
+  i18n namespace `logbook` es-CL + `common.yes/no`, dual theme, tokens, 44px.
+- **Verificación**: `typecheck` (6 paquetes) · `lint` (0 errores; 1 warning preexistente OrgTree) · `build` web
+  (**1943** módulos; API NO se buildea por el watch) · `test` (**contracts 97** +17 · permissions 5 · **API 129** +10)
+  en verde. **Smoke en vivo** (demo, 49 permisos tras seed + invalidar Redis): login → crear plantilla (fecha efectiva
+  + número con rango/umbral + select inline + obs) → publicar → crear entrada (DRAFT, dimensiones estampadas) →
+  **valor fuera de rango 400** → guardar sección válida (**effectiveAt recalcula día op./turno/periodo**; fecha efectiva
+  2026-03-15 → día operacional 2026-03-14 noche, cruce de medianoche correcto) → **concurrencia 409** → **select fuera
+  de catálogo 400** → enviar/sellar (`sealedAt`) → **inmutable tras enviar 400** → listado lo incluye. **15/15 checks.**
+  Datos de prueba hard-deleted (0 entradas restantes).
+- **Pendiente**: smoke **VISUAL** en navegador (ver BACKLOG §4).
+
 ## Próximo paso
-**Fase 2.1 + 2.1.1 + 2.2 + 2.x + 2.3.0 completas.** **Sesión siguiente = Fase 2.4 · Llenado (Nueva entrada)
-multi-actor**: secciones editables por estado+rol; guarda codes/refs + campos de sistema; **estampa las dimensiones
-derivadas** (`recordedAt`, `effectiveAt` y, vía `ShiftResolver` ya disponible, `shiftCode`/`operationalDate`/
-`periodKey`) como columnas indexadas inmutables en `LogEntry` (nullable si no hay calendario → degradación elegante).
-Luego 2.3 Rondas (`LogPeriod`, se apoya en los turnos ya definidos), 2.5 ejecución de flujo + firmas, 2.6 bitácoras.
-Ver BACKLOG §2.
+**Fase 2.4 completa.** **Sesión siguiente = Fase 2.5 · Ejecución de flujo + firmas electrónicas (Part 11)**:
+transiciones gateadas por rol (dato), firma con re-auth/MFA step-up, bloqueo/desbloqueo de secciones, log de
+transiciones (`LogEntryTransition`, tabla nueva), y el sellado de `effectiveAt`/dimensiones movido a la primera
+transición. Alternativa intercalable: **2.3 Rondas/`LogPeriod`** (se apoya en los turnos ya definidos). Luego 2.6
+bitácoras (listado/detalle/timeline/log de cambios). Ver BACKLOG §2.
 
 **Mejora futura registrada (BACKLOG §2):** seguridad a nivel de nodo en el mantenedor de Estructura (ABAC
 enterprise: asignar usuarios/roles a nodos desde el propio árbol, "quién accede a este nodo"). El modelo ya
