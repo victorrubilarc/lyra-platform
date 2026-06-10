@@ -299,6 +299,9 @@ model OrgNode {
   reportOrder  Int       @default(0)
   /// Código de identificación en sistemas externos (ERP, CMMS, SCADA, etc.)
   externalCode String?
+  // Calendario operacional asignado directamente a este nodo (Fase 2.3.0). Null =
+  // hereda del ancestro más cercano que tenga uno, o el calendario por defecto.
+  operationalCalendarId String?
   parentId     String?
   levelId      String
   // Ruta materializada de ancestros incluyéndose: "/<id>/<id>/.../". Permite
@@ -315,10 +318,12 @@ model OrgNode {
   equipment Equipment[]
   externalRefs ExternalReference[]
   templates Template[]
+  operationalCalendar OperationalCalendar? @relation(fields: [operationalCalendarId], references: [id], onDelete: SetNull)
 
   @@index([parentId])
   @@index([levelId])
   @@index([path])
+  @@index([operationalCalendarId])
 }
 
 // ===========================================================================
@@ -460,6 +465,14 @@ enum RecurrenceKind {
   SHIFT
   INTERVAL
   CALENDAR
+}
+
+// Tipo de periodo contable/de reporte del calendario operacional (Fase 2.3.0).
+// MONTH (con día-ancla), WEEK (con día de inicio), CUSTOM (ciclo de N días op.).
+enum PeriodKind {
+  MONTH
+  WEEK
+  CUSTOM
 }
 
 // Capa 2 del campo: tipo de dato (cómo se almacena/valida/reporta), derivado del
@@ -827,6 +840,63 @@ model ReferenceItem {
 
   @@unique([listId, code])
   @@index([listId])
+}
+
+// ===========================================================================
+//  Calendario operacional (turnos + periodo contable) — Fase 2.3.0
+//  Config de primera clase, separada del formulario. Turno/día operacional/
+//  periodo son dimensiones DERIVADAS del timestamp (ver DECISIONS 2026-06-09).
+//  Catálogo GOBERNADO (no versionado-inmutable): la inmutabilidad histórica la
+//  da el estampado de estas dimensiones en LogEntry (2.4).
+// ===========================================================================
+
+model OperationalCalendar {
+  id          String     @id @default(cuid())
+  // Clave estable y única (slug). Para seed idempotente y referencias.
+  key         String     @unique
+  name        String
+  description String?
+  // Zona horaria IANA (ej. "America/Santiago"). Todo se guarda en UTC.
+  timezone    String
+  // Exactamente un calendario es el por defecto (single-tenant). Se mantiene en
+  // transacción al marcar otro como default.
+  isDefault   Boolean    @default(false)
+  active      Boolean    @default(true)
+  // Turno cuyo inicio marca el arranque del día operacional (por código, no FK:
+  // los turnos se reemplazan en bloque al guardar). Null = el día arranca a las 00:00.
+  dayStartShiftCode String?
+  // Definición del periodo contable.
+  periodKind         PeriodKind @default(MONTH)
+  periodAnchorDay    Int?       @default(1) // MONTH: día civil que abre el mes (1..28)
+  periodStartWeekday Int?       @default(1) // WEEK: 1=Lun..7=Dom (ISO-8601)
+  periodLengthDays   Int? // CUSTOM: largo del ciclo en días operacionales
+  periodAnchorDate   String? // CUSTOM: fecha de referencia "YYYY-MM-DD"
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  deletedAt   DateTime? // borrado lógico
+
+  shifts        OperationalShift[]
+  assignedNodes OrgNode[]
+
+  @@index([deletedAt])
+}
+
+model OperationalShift {
+  id              String  @id @default(cuid())
+  calendarId      String
+  // Clave estable del turno (A/B/C…), única dentro del calendario.
+  code            String
+  label           String
+  // Hora de inicio (hora de pared local), "HH:MM".
+  startTime       String
+  // Duración en minutos (1..1440). Resuelve el cruce de medianoche sin ambigüedad.
+  durationMinutes Int
+  sortOrder       Int     @default(0)
+
+  calendar OperationalCalendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+
+  @@unique([calendarId, code])
+  @@index([calendarId])
 }
 
 // ===========================================================================

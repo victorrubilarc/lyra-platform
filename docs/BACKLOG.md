@@ -49,6 +49,7 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Datos de referencia — UX enterprise** (grilla orden/búsqueda/paginación + `Combobox` + selectores premium) | `main` (fusionado desde `feat/datos-referencia-ux`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Fix recorte de paneles + `LookupPicker`** (flip-up/clamp + diálogo tabla con tokens) | `main` (fusionado desde `feat/datos-referencia-lookup`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Import/Export CSV de Listas** (dry-run→commit + export `;` es-CL) | `main` (fusionado desde `feat/listas-csv`) | ✅ fusionado y publicado en `origin/main` | ninguna |
+| **Fase 2.3.0 Calendario operacional** (`OperationalCalendar`/`OperationalShift` + `ShiftResolver` + mantenedor) | `main` (fusionado desde `feat/calendario-operacional`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 
 **Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
@@ -224,16 +225,20 @@ nunca queda más de una sesión atrás.
         Web: `WorkflowBuilder` declarativo + Form Builder (asignar flujo, sección→estado, override de rol por campo
         `TemplateFieldRole`). 4 permisos nuevos (catálogo **37**). Tests: contracts 36, API 88. Ver DECISIONS/PROGRESS.
         **Pendiente: smoke VISUAL** (§4).
-  - [ ] **2.3.0 Calendario operacional (turnos + periodo contable) — PRÓXIMA SESIÓN.** Mantenedor de configuración
-        (hermano de Estructura/Seguridad/Listas), **pura config sin ejecución**. `OperationalCalendar` con **turnos**
-        (`code` A/B/C + label + `startTime` + `durationMinutes`, maneja cruce de medianoche), **ancla del día
-        operacional** (cuándo arranca el "día de producción" ≠ día civil) y **definición del periodo contable**
-        (MONTH/WEEK/CUSTOM con ancla — p. ej. el mes parte en el 2.º turno del día 1). TZ del sitio. Alcance: 1 por
-        defecto, **asignable por nodo modelado** (sin sobre-ingeniería). **`ShiftResolver`** (servicio tras interfaz)
-        que mapea `timestamp → (operationalDate, shiftCode, periodKey)` — lo consumirá 2.4 (estampa columnas
-        derivadas en `LogEntry`), 2.3 Rondas (programa por turno) y Fase 5 (cambio de turno). Principio: **turno/
-        periodo/fecha = dimensiones estructurales DERIVADAS, no campos del Form Builder** (patrón dimensión de DW /
-        ISA-95 / shift calendar de MES/SAP). Ver DECISIONS 2026-06-09 ("Calendario operacional"). Aditivo.
+  - [x] **2.3.0 Calendario operacional (turnos + periodo contable)** ✅ (2026-06-09). `OperationalCalendar` 1—N
+        `OperationalShift` (catálogo VIVO, no versionado) + `PeriodKind` MONTH(anchorDay)/WEEK(startWeekday)/CUSTOM
+        (ciclo N días). **`resolveShift`** función pura (`Intl`, sin deps) `timestamp→(operationalDate, shiftCode,
+        periodKey)` + **`validateOperationalCalendar`** (sin solapes, huecos OK) = fuentes únicas. **`ShiftResolver`**
+        (token DI, patrón EmailService) exportado para 2.4/2.3/Fase 5. FK `OrgNode.operationalCalendarId` + resolución
+        por path. 4 permisos (catálogo **45**). Migración aditiva `…_add_operational_calendar`. Web
+        `/calendario-operacional` (editor turnos + timeline 24 h + ancla + periodo + **probador** en vivo + nodos).
+        Seed `mina-rajo`. Tests: contracts 76, API 119. Smoke en vivo OK. Ver DECISIONS/PROGRESS 2026-06-09.
+        **Pendiente: smoke VISUAL** (§4).
+    - [ ] **Diferidos del Calendario operacional (aditivos, cuando un cliente lo pida):** calendario fiscal **4-4-5**
+          (meses de largo variable, retail/finanzas); **rotación de cuadrillas / turno distinto por día de semana**
+          (sería un scheduler); **shift definitions con vigencia** (`validFrom`/`validTo`) para re-resolver timestamps
+          históricos con la definición de su época (hoy el catálogo es vivo + estampado en `LogEntry` preserva el
+          histórico). Ver DECISIONS 2026-06-09 (forks 2 y 5).
   - [ ] **2.3 Programación de rondas/turnos (`LogPeriod`):** plantilla recurrente (turno/intervalo/calendario,
         simple, no un scheduler genérico); cada ocurrencia abre/gener​a un `LogEntry` ligado a su periodo. **Se apoya
         en el `OperationalCalendar` de 2.3.0** (turnos ya definidos). Investigar ISA-95 / shift handover antes de modelar.
@@ -414,6 +419,14 @@ probatoria (hash+timestamp). Ref: `DECISIONS.md` (sección de recomendaciones).
       **Exportar** descarga un CSV que Excel es-CL abre en columnas (`;` + BOM, metadata aplanada); **Importar**
       (elegir archivo → analizar → reporte con chips/tabla, error con nº de línea → aplicar; checkbox de
       desactivar ausentes; con errores el botón Aplicar queda deshabilitado).
+- [ ] **Calendario operacional 2.3.0 — smoke VISUAL en navegador** (se verificó typecheck/lint/test/build + smoke
+      por API; falta el clic): `/calendario-operacional` (lista + buscador + badge predeterminado), crear calendario
+      (drawer key/nombre/TZ), editar turnos en filas (agregar/eliminar) y ver el **timeline 24 h** con cobertura/
+      huecos + marcador del turno ancla, **banner de validación en vivo** (solape → rojo), elegir turno ancla del
+      día, cambiar periodo MONTH/WEEK/CUSTOM (campos condicionales), usar el **probador** (datetime → turno/día
+      operacional/periodo en vivo, incl. madrugada y hueco), **Guardar** (deshabilitado si inválido o sin cambios),
+      hacer predeterminado, asignar nodos (modal sobre el árbol), eliminar (bloqueado si es el default); modo claro.
+      App en `:5173`.
 - [ ] **Modo claro — QA visual** (nuevo): revisar que TODO el workspace se vea premium en **claro**
       (contraste WCAG, glass, glows, severidades, tablas futuras, drawers/modales) y que `auto` siga al
       sistema. El default es oscuro; el login es siempre oscuro. Ref: DECISIONS 2026-06-06.

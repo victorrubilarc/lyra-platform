@@ -1,10 +1,11 @@
 # Progreso — Lyra WatchLog
 
 Última actualización: 2026-06-09 (**Fase 1 completa**; **Fase 2.1 ✅** + **Fase 2.1.1 ✅** + **Fase 2.2 ✅** +
-**Fase 2.x ✅** — Plantillas: modelo de DEFINICIÓN + campo en 3 capas + `optionSource` + Form Builder; **Flujos
-reutilizables `WorkflowDefinition`**; **Datos de referencia `ReferenceList`/`ReferenceItem`**: catálogo gobernado +
-mantenedor propio `/datos-referencia` + binding real de `optionSource.referenceList`). **Siguiente: Fase 2.3 — Rondas
-(`LogPeriod`)** o **2.4 Llenado**, según prioridad.
+**Fase 2.x ✅** + **Fase 2.3.0 ✅** — Plantillas: modelo de DEFINICIÓN + campo en 3 capas + `optionSource` + Form
+Builder; **Flujos reutilizables `WorkflowDefinition`**; **Datos de referencia `ReferenceList`/`ReferenceItem`**:
+catálogo gobernado + mantenedor `/datos-referencia` + binding real; **Calendario operacional `OperationalCalendar`**:
+turnos + día operacional + periodo contable + `ShiftResolver` + mantenedor `/calendario-operacional`).
+**Siguiente: Fase 2.4 — Llenado (Nueva entrada)**, que estampará las dimensiones derivadas vía `ShiftResolver`.
 
 ## Estado por fase
 
@@ -12,7 +13,7 @@ mantenedor propio `/datos-referencia` + binding real de `optionSource.referenceL
 |---|---|---|
 | 0 | **Cimientos** (monorepo, Docker, Design System tokens, contratos, API health) | ✅ Hecho |
 | 1 | Seguridad (auth + RBAC/ABAC) + Estructura organizacional + AuditLog | ✅ Backend ✅ · UI: Login ✅ · **Estructura ✅ (+ Equipos ✅)** · **Seguridad ✅** |
-| 2 | Plantillas / Form Builder + Bitácoras | 🔄 **2.1 ✅** + **2.1.1 ✅** + **2.2 ✅** + **2.x ✅** (Form Builder + Flujos + Datos de referencia) · 2.3–2.7 pendientes |
+| 2 | Plantillas / Form Builder + Bitácoras | 🔄 **2.1 ✅** + **2.1.1 ✅** + **2.2 ✅** + **2.x ✅** + **2.3.0 ✅** (Form Builder + Flujos + Datos de referencia + Calendario operacional) · 2.4–2.7 pendientes |
 | 3 | Orígenes de datos | ⬜ Pendiente |
 | 4 | Motor de incidencias | ⬜ Pendiente |
 | 5 | Cambio de turno + IA (resumen) | ⬜ Pendiente |
@@ -579,10 +580,51 @@ Plantillas/Flujos): valor = **code estable, no label** (patrón dimensión DW / 
   con ×); **CSV**: Exportar (abre en Excel es-CL en columnas), Importar (elegir archivo → analizar → reporte →
   aplicar); modo claro.
 
+## Hecho en Fase 2.3.0 (Calendario operacional — turnos + periodo contable)
+
+Configuración de primera clase, **pura config sin ejecución**, aditiva. Turno/día operacional/periodo son
+**dimensiones DERIVADAS** del timestamp (patrón Shift Calendar de MES / SAP / ISA-95 / dimensión Fecha+Turno de
+DW). Ver DECISIONS 2026-06-09 ("Fase 2.3.0 — IMPLEMENTADO"). Rama `feat/calendario-operacional`, 5 commits.
+
+- **Contratos** (`@lyra/contracts/operational-calendar`): `OperationalCalendar` 1—N `OperationalShift` +
+  `PeriodKind` (MONTH/WEEK/CUSTOM) + DTOs create/update/asignación/preview. **`validateOperationalCalendar`** =
+  fuente única (contrato `superRefine` + backend + builder web en vivo): TZ IANA, turnos **sin solapes** (huecos
+  permitidos), turno ancla del día, config de periodo. **`resolveShift`** = **función PURA** (solo `Intl`)
+  `timestamp → (operationalDate, shiftCode, periodKey)`: día operacional ≠ día civil, cruce de medianoche por
+  duración, periodo derivado. **30 specs** (DST Santiago invierno/verano, borde de mes con día-ancla, ciclo
+  CUSTOM, WEEK configurable, huecos).
+- **Permisos** (catálogo **41→45**): `module:opscalendar:view/manage` + `opscalendar:view/manage`. El seed los
+  asigna al rol admin iterando el catálogo.
+- **Prisma** (migración aditiva `20260609233155_add_operational_calendar`): enum `PeriodKind` + modelos +
+  `OrgNode.operationalCalendarId` (FK `onDelete: SetNull`). Aplicada con `migrate deploy` (esquiva el EPERM del DLL).
+- **Backend** `OperationalCalendarModule`: CRUD gateado/auditado (molde `ReferenceLists`); guardado reemplaza
+  turnos en bloque; `isDefault` único en tx; **no se borra el default**; `assignNodes` (reemplaza set, valida
+  existencia, limpia al borrar); `preview(id, at)`. **`ShiftResolver`** (clase abstracta = token DI, patrón
+  `EmailService`) + `ShiftResolverService`: elige el calendario por nodo (path-walk → ancestro → default) y delega
+  en `resolveShift`. **Exportado** para que 2.4 (estampa `LogEntry`), 2.3 Rondas y Fase 5 lo inyecten. **9 tests**.
+- **Web** `features/operational-calendar`: `/calendario-operacional` master-detail (estilo Listas/Flujos);
+  `CalendarDrawer` (alta key/nombre/TZ); `CalendarDetailPanel` (editor de turnos en filas + **timeline 24 h** con
+  marcador del ancla + **banner de validación en vivo** + selector de turno ancla + definición de periodo
+  MONTH/WEEK/CUSTOM + **PROBADOR** que resuelve fecha-hora→turno/día operacional/periodo en vivo con la función
+  pura + asignación de nodos por modal sobre el árbol de Estructura). Navegación + Home + i18n namespace
+  `opsCalendar` (es-CL), dual theme, tokens, 44px.
+- **Seed demo** (dev): `mina-rajo` (America/Santiago, 3 turnos A/B/C de 8 h, día op. 07:00, periodo mensual día 1,
+  default). Idempotente por `key`.
+- **Verificación**: `typecheck` (6 paquetes) · `lint` (0 errores; 1 warning preexistente en OrgTree) · `build` web
+  (1,482 KB JS; API NO se buildea por el watch) · `test` (**contracts 76** +30 · permissions 5 · **API 119** +9) en
+  verde. **Smoke en vivo** (demo, 45 permisos tras invalidar la caché Redis): listar (seed `mina-rajo`); **preview
+  02:00 Santiago invierno (UTC-4) ⇒ día op. 2026-06-14 + turno C + periodo 2026-06** (DST + medianoche + mes
+  correctos); 09:00 ⇒ turno A mismo día; **crear con solape ⇒ 400**; **borrar default ⇒ 400**; ciclo
+  crear/preview-hueco(shiftCode null + CUSTOM key)/setDefault+restaurar/assign-nodos/borrar(204). Datos de prueba
+  hard-deleted; `mina-rajo` queda como demo dev-only.
+- **Pendiente**: smoke **VISUAL** en navegador (ver BACKLOG §4).
+
 ## Próximo paso
-**Fase 2.1 + 2.1.1 + 2.2 + 2.x completas.** **Sesión siguiente = Fase 2.3 · Rondas/`LogPeriod`** (plantilla
-recurrente turno/intervalo/calendario; cada ocurrencia abre un `LogEntry`) **o 2.4 Llenado** (Nueva entrada
-multi-actor: secciones por estado+rol, guarda codes/refs + campos de sistema + `effectiveAt`), según prioridad.
+**Fase 2.1 + 2.1.1 + 2.2 + 2.x + 2.3.0 completas.** **Sesión siguiente = Fase 2.4 · Llenado (Nueva entrada)
+multi-actor**: secciones editables por estado+rol; guarda codes/refs + campos de sistema; **estampa las dimensiones
+derivadas** (`recordedAt`, `effectiveAt` y, vía `ShiftResolver` ya disponible, `shiftCode`/`operationalDate`/
+`periodKey`) como columnas indexadas inmutables en `LogEntry` (nullable si no hay calendario → degradación elegante).
+Luego 2.3 Rondas (`LogPeriod`, se apoya en los turnos ya definidos), 2.5 ejecución de flujo + firmas, 2.6 bitácoras.
 Ver BACKLOG §2.
 
 **Mejora futura registrada (BACKLOG §2):** seguridad a nivel de nodo en el mantenedor de Estructura (ABAC
