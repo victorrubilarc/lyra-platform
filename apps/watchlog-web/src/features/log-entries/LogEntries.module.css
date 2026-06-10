@@ -206,3 +206,81 @@
   padding: 12px 16px;
   margin-bottom: 18px;
 }
+
+/* --- Ejecución de flujo (Fase 2.5) --- */
+.entryHeadChips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.transitionBar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.timeline {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.timelineItem {
+  border-left: 2px solid var(--color-border-active, rgba(99, 102, 241, 0.4));
+  padding: 2px 0 2px 14px;
+}
+.timelineHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.timelineLabel {
+  font-weight: 600;
+  font-size: 14px;
+}
+.timelineMeta {
+  font-size: 12.5px;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+.timelineReason {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin-top: 3px;
+  font-style: italic;
+}
+
+/* --- Modales de transición / firma --- */
+.modalTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.transitionTo {
+  font-size: 13.5px;
+  color: var(--color-text-secondary);
+  margin: 0 0 12px;
+}
+.signatureNotice {
+  background: color-mix(in srgb, var(--color-accent, #6366f1) 10%, transparent);
+  border: 1px solid var(--color-border-active, rgba(99, 102, 241, 0.4));
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+.signatureMeaning {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+}
+.signatureSigner {
+  font-size: 12.5px;
+  color: var(--color-text-muted);
+  margin-top: 4px;
+}

@@ -1,7 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { CreateLogEntryRequest, LogEntryListQuery, SaveLogEntrySectionRequest, SubmitLogEntryRequest } from "@lyra/contracts";
+import type {
+  CreateLogEntryRequest,
+  ExecuteTransitionRequest,
+  LogEntryListQuery,
+  SaveLogEntrySectionRequest,
+  SubmitLogEntryRequest,
+} from "@lyra/contracts";
 import {
   createLogEntry,
+  executeTransition,
   fetchLogEntries,
   fetchLogEntry,
   saveLogEntrySection,
@@ -50,6 +57,17 @@ export function useSubmitLogEntry(id: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (dto: SubmitLogEntryRequest = {}) => submitLogEntry(id, dto),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: LOG_ENTRY_KEYS.all });
+      qc.setQueryData(LOG_ENTRY_KEYS.detail(id), data);
+    },
+  });
+}
+
+export function useExecuteTransition(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (dto: ExecuteTransitionRequest) => executeTransition(id, dto),
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: LOG_ENTRY_KEYS.all });
       qc.setQueryData(LOG_ENTRY_KEYS.detail(id), data);
