@@ -2,10 +2,12 @@ import { Body, Controller, Get, Param, Post, Put, Query, Req } from "@nestjs/com
 import type { FastifyRequest } from "fastify";
 import {
   createLogEntryRequestSchema,
+  executeTransitionRequestSchema,
   logEntryListQuerySchema,
   saveLogEntrySectionRequestSchema,
   submitLogEntryRequestSchema,
   type CreateLogEntryRequest,
+  type ExecuteTransitionRequest,
   type LogEntryListQuery,
   type SaveLogEntrySectionRequest,
   type SubmitLogEntryRequest,
@@ -67,6 +69,18 @@ export class LogEntriesController {
     @Req() req: FastifyRequest,
   ) {
     return this.entries.submit(user.id, id, dto, this.ctx(user, req));
+  }
+
+  /** Ejecuta una transición de flujo (firma + step-up MFA según la transición). */
+  @Post(":id/transitions")
+  @RequirePermission("logentry:transition")
+  executeTransition(
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(executeTransitionRequestSchema)) dto: ExecuteTransitionRequest,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.entries.executeTransition(user.id, id, dto, this.ctx(user, req));
   }
 
   private ctx(user: RequestUser, req: FastifyRequest): AuditContext {

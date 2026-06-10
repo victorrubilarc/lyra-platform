@@ -5,6 +5,7 @@ import { MfaService } from "./mfa.service";
 import { MfaRequirementService } from "./mfa-requirement.service";
 import { PasswordPolicyService } from "./password-policy.service";
 import { PasswordResetService } from "./password-reset.service";
+import { ReauthService } from "./reauth.service";
 import { TokenService } from "./token.service";
 import { CsrfGuard } from "./csrf.guard";
 import { LocalAuthProvider } from "./providers/local-auth.provider";
@@ -23,9 +24,10 @@ import { LocalAuthProvider } from "./providers/local-auth.provider";
     MfaRequirementService,
     PasswordPolicyService,
     PasswordResetService,
+    ReauthService,
     CsrfGuard,
     LocalAuthProvider,
   ],
-  exports: [AuthService, PasswordPolicyService, MfaRequirementService],
+  exports: [AuthService, PasswordPolicyService, MfaRequirementService, ReauthService],
 })
 export class AuthModule {}
