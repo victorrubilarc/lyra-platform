@@ -338,6 +338,7 @@ interface LocalParts {
   day: number; // 1..31
   hour: number; // 0..23
   minute: number; // 0..59
+  second: number; // 0..59
 }
 
 /** Descompone un instante UTC en hora de pared local de la TZ (vía Intl, sin deps). */
@@ -349,13 +350,14 @@ function getLocalParts(at: Date, timezone: string): LocalParts {
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
+    second: "2-digit",
     hour12: false,
   });
   const parts = fmt.formatToParts(at);
   const get = (type: string): number => Number(parts.find((p) => p.type === type)?.value ?? "0");
   let hour = get("hour");
   if (hour === 24) hour = 0; // algunos ICU emiten "24" para la medianoche
-  return { year: get("year"), month: get("month"), day: get("day"), hour, minute: get("minute") };
+  return { year: get("year"), month: get("month"), day: get("day"), hour, minute: get("minute"), second: get("second") };
 }
 
 /** Suma `days` (puede ser negativo) a una fecha local Y-M-D; devuelve "YYYY-MM-DD". */
@@ -379,12 +381,20 @@ function daysBetween(a: string, b: string): number {
   return Math.round(ms / 86_400_000);
 }
 
-/** ¿El minuto local `min` cae dentro del turno [start, start+dur) (con wrap)? */
-function shiftCovers(min: number, startTime: string, durationMinutes: number): boolean {
-  const start = minutesOfDay(startTime);
-  const end = start + durationMinutes; // puede superar 1440 (cruza medianoche)
-  if (end <= 1440) return min >= start && min < end;
-  return min >= start || min < end - 1440;
+const SECONDS_PER_DAY = 86_400;
+
+/**
+ * ¿El segundo local `sec` cae dentro del turno `[inicio, inicio+duración)` (con
+ * wrap de medianoche)? Intervalo SEMIABIERTO: el instante exacto del fin pertenece
+ * al turno SIGUIENTE (p. ej. A 08:00–20:00 y B 20:00–08:00: las 20:00:00 son de B,
+ * sin solape ni hueco). Los turnos se definen al minuto; la lectura se compara al
+ * segundo para que el borde sea exacto sin redondear.
+ */
+function shiftCovers(sec: number, startTime: string, durationMinutes: number): boolean {
+  const start = minutesOfDay(startTime) * 60;
+  const end = start + durationMinutes * 60; // puede superar 1 día (cruza medianoche)
+  if (end <= SECONDS_PER_DAY) return sec >= start && sec < end;
+  return sec >= start || sec < end - SECONDS_PER_DAY;
 }
 
 /**
@@ -394,22 +404,23 @@ function shiftCovers(min: number, startTime: string, durationMinutes: number): b
  *
  * Lógica:
  *  1. Convierte el instante a hora de pared local de la TZ del sitio.
- *  2. Turno: el (único) turno cuyo intervalo [inicio, inicio+duración) contiene al
- *     minuto local; null si cae en un hueco o no hay turnos.
- *  3. Día operacional: si el minuto local ≥ inicio del turno ancla → la fecha civil
+ *  2. Turno: el (único) turno cuyo intervalo SEMIABIERTO [inicio, inicio+duración)
+ *     contiene al instante local (preciso al segundo); null si cae en un hueco o no
+ *     hay turnos. El borde exacto (p. ej. 20:00:00) pertenece al turno siguiente.
+ *  3. Día operacional: si el instante local ≥ inicio del turno ancla → la fecha civil
  *     local; si es menor → la fecha civil local MENOS un día (la madrugada pertenece
  *     al día de producción anterior). Sin turno ancla, el día arranca a las 00:00.
  *  4. Periodo: se deriva del día operacional según el `periodKind`.
  */
 export function resolveShift(at: Date, cal: ShiftResolverCalendar): ShiftResolution {
   const local = getLocalParts(at, cal.timezone);
-  const localMin = local.hour * 60 + local.minute;
+  const localSec = local.hour * 3600 + local.minute * 60 + local.second;
 
   // 2. Turno (sin solapes ⇒ a lo sumo uno).
   let shiftCode: string | null = null;
   let shiftLabel: string | null = null;
   for (const s of cal.shifts) {
-    if (shiftCovers(localMin, s.startTime, s.durationMinutes)) {
+    if (shiftCovers(localSec, s.startTime, s.durationMinutes)) {
       shiftCode = s.code;
       shiftLabel = s.label ?? s.code;
       break;
@@ -419,9 +430,9 @@ export function resolveShift(at: Date, cal: ShiftResolverCalendar): ShiftResolut
   // 3. Día operacional.
   const anchorShift =
     cal.dayStartShiftCode != null ? cal.shifts.find((s) => s.code === cal.dayStartShiftCode) : undefined;
-  const dayStartMin = anchorShift ? minutesOfDay(anchorShift.startTime) : 0;
+  const dayStartSec = anchorShift ? minutesOfDay(anchorShift.startTime) * 60 : 0;
   const operationalDate =
-    localMin >= dayStartMin
+    localSec >= dayStartSec
       ? addDays(local.year, local.month, local.day, 0)
       : addDays(local.year, local.month, local.day, -1);
 

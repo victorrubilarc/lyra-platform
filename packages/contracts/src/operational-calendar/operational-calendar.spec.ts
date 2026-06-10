@@ -54,6 +54,47 @@ describe("resolveShift — turno y día operacional", () => {
   });
 });
 
+describe("resolveShift — borde de turno semiabierto [inicio, fin)", () => {
+  // Dos turnos 12 h contiguos: A 08:00–20:00, B 20:00–08:00.
+  const TWELVE: ShiftResolverCalendar = {
+    timezone: "UTC",
+    shifts: [
+      { code: "A", label: "Día", startTime: "08:00", durationMinutes: 720 },
+      { code: "B", label: "Noche", startTime: "20:00", durationMinutes: 720 },
+    ],
+    dayStartShiftCode: "A",
+    periodKind: "MONTH",
+    periodAnchorDay: 1,
+  };
+
+  it("el instante EXACTO del cambio (20:00:00) pertenece al turno SIGUIENTE (B), sin solape", () => {
+    expect(resolveShift(new Date("2026-06-15T20:00:00Z"), TWELVE).shiftCode).toBe("B");
+  });
+
+  it("un segundo antes (19:59:59) sigue en el turno anterior (A)", () => {
+    expect(resolveShift(new Date("2026-06-15T19:59:59Z"), TWELVE).shiftCode).toBe("A");
+  });
+
+  it("el cambio del día (08:00:00) abre el turno A; 07:59:59 aún es B", () => {
+    expect(resolveShift(new Date("2026-06-15T08:00:00Z"), TWELVE).shiftCode).toBe("A");
+    expect(resolveShift(new Date("2026-06-15T07:59:59Z"), TWELVE).shiftCode).toBe("B");
+  });
+
+  it("dos turnos contiguos (fin = inicio del siguiente) NO se consideran solape", () => {
+    expect(
+      validateOperationalCalendar({
+        timezone: "UTC",
+        dayStartShiftCode: "A",
+        periodKind: "MONTH",
+        shifts: [
+          { code: "A", startTime: "08:00", durationMinutes: 720 },
+          { code: "B", startTime: "20:00", durationMinutes: 720 },
+        ],
+      }),
+    ).toEqual([]);
+  });
+});
+
 describe("resolveShift — borde de mes (el mes arranca en el cambio de turno)", () => {
   it("la madrugada del día 1 aún pertenece al mes anterior", () => {
     const r = resolveShift(new Date("2026-07-01T02:00:00Z"), MINING_UTC);

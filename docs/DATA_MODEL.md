@@ -135,6 +135,10 @@
 - **Asignación por nodo** — **`OrgNode.operationalCalendarId`** (FK `onDelete: SetNull`). La resolución de "qué
   calendario aplica a un nodo" sube por la **ruta materializada** (nodo → ancestro más cercano con calendario →
   `isDefault`), en `ShiftResolverService`.
+- **Semántica de borde** — los turnos son **intervalos semiabiertos `[inicio, fin)`** (estándar DW/historiadores):
+  el instante exacto del fin pertenece al turno SIGUIENTE (A 08:00–20:00 + B 20:00–08:00 ⇒ las 20:00:00 son de B, sin
+  solape ni hueco). Los turnos se definen al **minuto** (HH:MM, como SAP/ISA-95); la lectura se clasifica al **segundo**
+  para que el borde sea exacto sin redondear.
 - **Resolución** — **`resolveShift`** (función PURA en `@lyra/contracts`, solo `Intl`): `timestamp → {operationalDate
   (YYYY-MM-DD), shiftCode|null, periodKey|null}`. **`ShiftResolver`** (clase abstracta = token DI, patrón
   `EmailService`) elige el calendario por nodo y delega; lo inyectarán **2.4** (estampa `shiftCode`/`operationalDate`/
