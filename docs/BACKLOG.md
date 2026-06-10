@@ -5,9 +5,10 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-10** (**Fase 2.1/2.1.1/2.2/2.x/2.3.0 ✅** + **Fase 2.4 ✅** — Plantillas/Form Builder +
-> Flujos + Datos de referencia + Calendario operacional + **Llenado (Nueva entrada) multi-actor** (`LogEntry*`);
-> **siguiente: Fase 2.5 — Ejecución de flujo + firmas Part 11**, o 2.3 Rondas intercalable).
+> actualización: **2026-06-10** (**Fase 2.1/2.1.1/2.2/2.x/2.3.0 ✅** + **Fase 2.4 ✅** + **Fase 2.5 ✅** — Plantillas/Form
+> Builder + Flujos + Datos de referencia + Calendario operacional + **Llenado** (`LogEntry*`) + **Ejecución de flujo +
+> firmas Part 11** (`LogEntryTransition`/`LogEntrySignature`); **siguiente: Fase 2.6 — Bitácoras (listado/detalle/timeline/
+> log de cambios)**, o 2.3 Rondas intercalable).
 
 ---
 
@@ -51,6 +52,7 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Import/Export CSV de Listas** (dry-run→commit + export `;` es-CL) | `main` (fusionado desde `feat/listas-csv`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Fase 2.3.0 Calendario operacional** (`OperationalCalendar`/`OperationalShift` + `ShiftResolver` + mantenedor) | `main` (fusionado desde `feat/calendario-operacional`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Fase 2.4 Llenado (Nueva entrada)** (`LogEntry*` + `/log-entries` + `FieldControl` + pantalla de llenado) | `main` (fusionado desde `feat/llenado`) | ✅ fusionado y publicado en `origin/main` | ninguna |
+| **Fase 2.5 Ejecución de flujo + firmas Part 11** (`LogEntryTransition`/`LogEntrySignature` + `executeTransition` + `ReauthService` + modales de firma) | `main` (fusionado desde `feat/ejecucion-flujo`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 
 **Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
@@ -258,9 +260,23 @@ nunca queda más de una sesión atrás.
           guardado). **(c)** edición de una entrada ya enviada (`logentry:edit`/anulación con motivo) — hoy SUBMITTED es
           inmutable. **(d)** hard-delete real de ítem de Lista con `code` en uso (ahora ya hay `LogEntryValue` para
           consultarlo, deuda registrada en 2.x).
-  - [ ] **2.5 Ejecución de flujo + firmas electrónicas (Part 11):** transiciones gateadas, firma
-        (re-auth / MFA step-up), bloqueo/desbloqueo de secciones, log de transiciones.
-  - [ ] **2.6 Bitácoras: listado + detalle + línea de tiempo + log de cambios** (vista de auditor).
+  - [x] **2.5 Ejecución de flujo + firmas electrónicas (Part 11)** ✅ (2026-06-10). Motor `executeTransition`
+        (rol-dato `WorkflowTransitionRole` × ABAC × completitud de secciones del estado de origen), firmas
+        `LogEntrySignature` polimórficas (TRANSITION|SECTION_COMPLETION, check XOR) con re-auth `ReauthService`
+        (contraseña + MFA step-up condicional) y hash del snapshot canónico (§11.50/11.70/11.200), recomputo de
+        secciones (LOCKED/reapertura), sellado reconciliado a la 1ª transición (submit queda para forms sin flujo),
+        `status` terminal SUBMITTED, historial `LogEntryTransition`. Permiso `logentry:transition` (catálogo **50**).
+        Gancho `onTransitionExecuted` (no-op) para el bus de eventos/Fase 4. Web: `TransitionModal`/`SectionSignModal`
+        + barra de transiciones + timeline. Migración `…_add_log_entry_execution`. Tests: contracts 104, API 144.
+        Smoke en vivo 21/21. `/security-review` sin hallazgos. Ver DECISIONS/PROGRESS 2026-06-10. **Pendiente: smoke VISUAL** (§4).
+    - [ ] **Diferidos de 2.5 (aditivos):** **(a)** **reversa/anulación de transición** (corrección GxP) — transición
+          inversa con motivo obligatorio + su propia firma; el modelo append-only ya la soporta (fork 5 diferido).
+          **(b)** guarda de completitud **configurable por transición** (hoy exige COMPLETED todas las secciones del
+          estado de origen con campos). **(c)** re-seed del editor al transicionar desde otra pestaña (concurrencia de
+          estado, espejo del 409 de sección). **(d)** anulación de entrada (`VOID`) con motivo y firma.
+  - [ ] **2.6 Bitácoras: listado + detalle + línea de tiempo + log de cambios** (vista de auditor). **← siguiente
+        recomendada.** Ya hay mucho que mostrar: entradas + `LogEntryTransition` (historial) + `LogEntrySignature`
+        (firmas) + `LogEntryFieldChange` (cambios por campo). Read-only, filtrable, exportable.
   - [ ] **2.7 (cruce Fase 4)** reglas de umbral que disparan incidencias (con el motor de incidencias).
   - [ ] **Expansión de tipos de campo (incremental, cada uno pequeño).** Alto valor industrial: **Conforme/No
         conforme/N.A.** (tri-estado), **lookup/picker de referencia** (single/multi, tras 2.x), **picker de
@@ -359,6 +375,17 @@ nunca queda más de una sesión atrás.
   - **El conteo "en uso" es conservador**: cuenta `TemplateVersion` en borrador e incluso de plantillas con borrado
     lógico. Evaluar acotar a publicadas/activas si molesta en la práctica. **Prioridad: baja.**
 
+- [ ] **Firmas/re-auth (Fase 2.5) — deuda de endurecimiento (no afecta integridad).** Registrada el 2026-06-10
+      tras `/security-review` (sin hallazgos explotables):
+  - **Throttle de re-auth de firma**: `ReauthService.verifyForSignature` no tiene contador propio de fallos. No es
+    explotable en la práctica (el actor re-autentica su PROPIA contraseña en una sesión ya autenticada), pero como
+    defensa en profundidad conviene reutilizar el lockout de contraseña o un contador dedicado. **Prioridad: baja.**
+  - **Recovery code consumido antes del commit**: en el step-up MFA con código de recuperación, `assertSecondFactor`
+    consume el código antes de la transacción de la transición; si la tx falla después, el código queda gastado.
+    Mover la verificación MFA dentro de la tx o compensar. **Prioridad: baja** (operacional, no de seguridad).
+  - **PKI / sello de tiempo cualificado**: hoy la firma es hash SHA-256 + metadatos (integridad/no repudio interno).
+    Firma criptográfica con validez probatoria externa (PAdES/sello cualificado) **diferida a Fase 7**.
+
 ### Recomendaciones de endurecimiento (Fase 7, ya registradas)
 Respaldos Postgres/MinIO · observabilidad (pino/Prometheus/OpenTelemetry/Grafana/Loki) ·
 rate-limit global + CSP/HSTS (Caddy) · exportación CSV/PDF · notificaciones SMTP
@@ -446,6 +473,14 @@ probatoria (hash+timestamp). Ref: `DECISIONS.md` (sección de recomendaciones).
       **Guardar y completar**; **Enviar y registrar** → banner de sellado; secciones de solo-lectura tras enviar);
       probar **concurrencia** (dos pestañas guardando la misma sección → toast de conflicto + recarga); modo claro.
       App en `:5173`.
+- [ ] **Ejecución de flujo + firmas 2.5 — smoke VISUAL en navegador** (se verificó typecheck/lint/test/build web +
+      smoke por API 21/21; falta el clic): abrir una entrada con flujo en `/nueva-entrada/:id` → chip de estado del
+      flujo en cabecera; completar la sección del estado inicial; **barra de transiciones** (botones gateados por
+      `availableTransitions`); ejecutar una transición **sin firma** (reason opcional) → verificar cambio de estado,
+      sección anterior **LOCKED**, banner/sello; ejecutar una transición **con firma** → **`TransitionModal`** muestra
+      el significado + firmante y pide contraseña (y MFA si la transición lo exige) → verificar chip "Firmado" e
+      **historial de transiciones**; una sección con `requireSignature` → **`SectionSignModal`** al completar; estado
+      final → sin transiciones; modo claro. App en `:5173`.
 - [ ] **Modo claro — QA visual** (nuevo): revisar que TODO el workspace se vea premium en **claro**
       (contraste WCAG, glass, glows, severidades, tablas futuras, drawers/modales) y que `auto` siga al
       sistema. El default es oscuro; el login es siempre oscuro. Ref: DECISIONS 2026-06-06.

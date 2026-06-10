@@ -938,6 +938,20 @@ enum LogEntrySectionState {
   LOCKED
 }
 
+// Contexto de una firma electrónica (Part 11): transición de flujo o completitud
+// de sección. Determina cuál de transitionKey/sectionKey aplica (check XOR).
+enum SignatureContext {
+  TRANSITION
+  SECTION_COMPLETION
+}
+
+// Componentes con que se re-autenticó la firma (§11.200): contraseña sola, o
+// contraseña + segundo factor (step-up AAL exigido por la transición).
+enum SignatureMethod {
+  PASSWORD
+  PASSWORD_MFA
+}
+
 model LogEntry {
   id                          String         @id @default(cuid())
   templateId                  String
@@ -976,6 +990,8 @@ model LogEntry {
   sections        LogEntrySection[]
   values          LogEntryValue[]
   changes         LogEntryFieldChange[]
+  transitions     LogEntryTransition[]
+  signatures      LogEntrySignature[]
 
   @@index([templateId])
   @@index([templateVersionId])
@@ -998,7 +1014,9 @@ model LogEntrySection {
   state       LogEntrySectionState @default(PENDING)
   filledById  String?
   filledAt    DateTime?
-  // Firma de completitud de la sección (Part 11). Se captura en la ejecución 2.5.
+  // Firma de completitud de la sección (Part 11), si la sección la exige.
+  // Referencia blanda a LogEntrySignature.id (la firma es append-only y cuelga de
+  // la entrada por logEntryId+context+sectionKey; este puntero es de conveniencia).
   signatureId String?
   // Revisión para la concurrencia optimista POR SECCIÓN (check-and-bump).
   version     Int                  @default(0)
@@ -1049,6 +1067,57 @@ model LogEntryFieldChange {
 
   @@index([logEntryId])
   @@index([changedAt])
+}
+
+// Transición de flujo EJECUTADA sobre una entrada (Fase 2.5). Historial
+// append-only: trazabilidad ALCOA+ de cómo avanzó el registro entre estados.
+// Las claves (from/to/transition) son las de la VERSIÓN CONGELADA del flujo.
+model LogEntryTransition {
+  id                          String  @id @default(cuid())
+  logEntryId                  String
+  // Versión de flujo congelada bajo la que se ejecutó (integridad histórica).
+  workflowDefinitionVersionId String
+  transitionKey               String
+  fromStateKey                String
+  toStateKey                  String
+  // Actor (referencia blanda + snapshot del correo; el usuario puede borrarse).
+  actorId                     String?
+  actorEmail                  String?
+  reason                      String?
+  // Firma asociada (si la transición la exigía). Referencia blanda a la firma.
+  signatureId                 String?
+  occurredAt                  DateTime @default(now())
+
+  logEntry LogEntry @relation(fields: [logEntryId], references: [id], onDelete: Cascade)
+
+  @@index([logEntryId, occurredAt])
+}
+
+// Firma electrónica estilo 21 CFR Part 11 (§11.50/11.70/11.200). Entidad de
+// primer orden, POLIMÓRFICA por `context`: firma de una transición de flujo o de
+// la completitud de una sección. Guarda el nombre impreso del firmante, el
+// significado, el método de re-auth y el SHA-256 del snapshot canónico firmado
+// (record–signature linking: integridad/no repudio sin almacenar el snapshot).
+model LogEntrySignature {
+  id            String           @id @default(cuid())
+  logEntryId    String
+  context       SignatureContext
+  // Exactamente uno aplica según `context` (check XOR en la migración).
+  transitionKey String?
+  sectionKey    String?
+  // Firmante (referencia blanda + nombre impreso capturado al firmar, §11.50).
+  signerId      String?
+  signerName    String
+  meaning       String
+  method        SignatureMethod
+  // SHA-256 (hex) del payload canónico firmado.
+  payloadHash   String
+  signedAt      DateTime         @default(now())
+
+  logEntry LogEntry @relation(fields: [logEntryId], references: [id], onDelete: Cascade)
+
+  @@index([logEntryId])
+  @@index([signerId])
 }
 
 model AuditLog {

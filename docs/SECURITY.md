@@ -110,6 +110,40 @@ Implementado en Fase 1 según **NIST 800-63B** (AAL2) y **OWASP ASVS v4 §2.2 / 
   `forcePasswordChange` aún se hace cumplir solo en la UI (a diferencia del gate de MFA); pendiente de
   igualar con enforcement de backend.
 
+## 8. Firmas electrónicas — estilo 21 CFR Part 11 (Fase 2.5)
+
+Ejecución de flujo + firmas sobre bitácoras, alineadas a **21 CFR Part 11** (§11.50/11.70/11.200),
+**ALCOA+** y step-up de **NIST 800-63B**. La maquinaria es **opt-in**: una plantilla sin flujo/sin firma
+se comporta como un form simple (degradación elegante).
+
+- **Autorización de transición (decidida 100% en backend)**: `executeTransition` valida, en orden,
+  (a) la transición existe y sale de `currentStateKey`, (b) el usuario tiene un **rol-dato** autorizado
+  (`WorkflowTransitionRole`, nunca clave hardcodeada), (c) **ABAC** sobre `orgNodeId`, (d) **completitud**
+  de las secciones del estado de origen. El permiso base es `logentry:transition`; el QUIÉN concreto es dato.
+  La lista `availableTransitions` que ve el cliente es solo cosmética (oculta botones); el backend re-decide.
+- **Firma electrónica (§11.50 manifestación)**: captura **nombre impreso** del firmante, **fecha/hora UTC**,
+  **significado** (`signatureMeaning`) y `method`. Opt-in por **transición** (`requireSignature`) y por
+  **completitud de sección** (`TemplateSection.requireSignature`).
+- **Record–signature linking (§11.70 / no repudio)**: se firma el **SHA-256 de un snapshot canónico**
+  (`canonicalSignaturePayload`, serialización determinista con claves ordenadas) que liga la firma a un
+  contenido exacto (entrada + versión + estado origen/destino + valores). Se almacena **solo el hash**; el
+  snapshot es reconstruíble desde `LogEntryValue`/`LogEntryFieldChange`. **Sin contraseña ni secreto en
+  reposo** en `LogEntrySignature`. PKI/sello de tiempo cualificado **diferidos a Fase 7**.
+- **Re-autenticación (§11.200 componentes)**: `ReauthService.verifyForSignature` exige **contraseña**
+  (Argon2id `verify`, constante en tiempo) como 2.º componente; **MFA step-up** (TOTP/recovery, ±1 ventana)
+  **solo si la transición lo pide** (`requireMfa`). El firmante es siempre el sujeto del JWT (`signerId =
+  userId`): no hay impersonación. Las credenciales viajan en el cuerpo, se re-verifican en backend y **no se
+  registran** en auditoría/logs.
+- **Inmutabilidad / trazabilidad**: `LogEntryTransition` y `LogEntrySignature` son **append-only**; el
+  cambio de estado, el recomputo de secciones (`LOCKED`/reapertura), el sellado de `effectiveAt`+dimensiones
+  (1ª salida del estado inicial) y la firma ocurren en **una transacción**. Auditoría
+  `logentry.transition.executed`. Estados finales reconcilian `status=SUBMITTED` (registro cerrado).
+- **Residual (honestidad técnica):** la re-auth de firma **no tiene throttle propio** (defensa en
+  profundidad; el actor re-autentica su PROPIA contraseña en una sesión ya autenticada, sin ganancia de
+  fuerza bruta práctica); un recovery code usado en el step-up se consume aunque la tx falle después
+  (operacional). **Reversa/anulación de transición** (corrección GxP con su firma y motivo) **diferida**.
+  Ver BACKLOG §2/§3.
+
 ## Estado
 - **Fase 0:** cabeceras (Helmet) y validación de entorno activas.
 - **Fase 1 (backend, ✅):** auth local Argon2id; access JWT (15 min) + refresh rotativo httpOnly con detección de reuso por familia; CSRF de doble envío en refresh/logout; lockout por fuerza bruta (contador en BD); **MFA TOTP** completo (enrolamiento + recovery codes, secreto cifrado en reposo); `PermissionsGuard` + `@RequirePermission` (dims. 1–3) globales; `ScopeService` (dim. 4) con ruta materializada; catálogo de permisos en `@lyra/contracts`; `AuditLog` append-only con **trigger Postgres** que rechaza UPDATE/DELETE; política de contraseñas configurable + historial; seed idempotente con admin de arranque (forzado a cambiar contraseña).

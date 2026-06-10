@@ -1,11 +1,11 @@
 # Progreso — Lyra WatchLog
 
-Última actualización: 2026-06-10 (**Fase 1 completa**; **Fase 2.1/2.1.1/2.2/2.x/2.3.0 ✅** + **Fase 2.4 ✅** —
+Última actualización: 2026-06-10 (**Fase 1 completa**; **Fase 2.1/2.1.1/2.2/2.x/2.3.0 ✅** + **Fase 2.4 ✅** + **Fase 2.5 ✅** —
 Plantillas/Form Builder; Flujos `WorkflowDefinition`; Datos de referencia `ReferenceList`/`ReferenceItem`; Calendario
-operacional `OperationalCalendar` + `ShiftResolver`; y **Llenado (Nueva entrada) multi-actor**: tablas `LogEntry*`,
-llenado por secciones con concurrencia optimista, validación 100% en servidor, estampado de turno/día operacional/
-periodo vía `ShiftResolver`, y sellado de `effectiveAt`+dimensiones al enviar).
-**Siguiente: Fase 2.5 — Ejecución de flujo + firmas electrónicas (Part 11)** (o 2.3 Rondas intercalable).
+operacional `OperationalCalendar` + `ShiftResolver`; **Llenado (Nueva entrada) multi-actor** (`LogEntry*`); y **Ejecución de
+flujo + firmas electrónicas Part 11**: motor `executeTransition` [rol-dato × ABAC × completitud], firmas `LogEntrySignature`
+polimórficas con re-auth `ReauthService`, sellado reconciliado, recomputo de secciones e historial `LogEntryTransition`).
+**Siguiente: Fase 2.6 — Bitácoras (listado + detalle + línea de tiempo + log de cambios)** (vista de auditor; o 2.3 Rondas intercalable).
 
 ## Estado por fase
 
@@ -13,7 +13,7 @@ periodo vía `ShiftResolver`, y sellado de `effectiveAt`+dimensiones al enviar).
 |---|---|---|
 | 0 | **Cimientos** (monorepo, Docker, Design System tokens, contratos, API health) | ✅ Hecho |
 | 1 | Seguridad (auth + RBAC/ABAC) + Estructura organizacional + AuditLog | ✅ Backend ✅ · UI: Login ✅ · **Estructura ✅ (+ Equipos ✅)** · **Seguridad ✅** |
-| 2 | Plantillas / Form Builder + Bitácoras | 🔄 **2.1 ✅** + **2.1.1 ✅** + **2.2 ✅** + **2.x ✅** + **2.3.0 ✅** + **2.4 ✅** (Form Builder + Flujos + Datos de referencia + Calendario operacional + **Llenado/Nueva entrada**) · 2.3 Rondas, 2.5–2.7 pendientes |
+| 2 | Plantillas / Form Builder + Bitácoras | 🔄 **2.1 ✅** + **2.1.1 ✅** + **2.2 ✅** + **2.x ✅** + **2.3.0 ✅** + **2.4 ✅** + **2.5 ✅** (Form Builder + Flujos + Datos de referencia + Calendario operacional + **Llenado/Nueva entrada** + **Ejecución de flujo/firmas Part 11**) · 2.3 Rondas, 2.6–2.7 pendientes |
 | 3 | Orígenes de datos | ⬜ Pendiente |
 | 4 | Motor de incidencias | ⬜ Pendiente |
 | 5 | Cambio de turno + IA (resumen) | ⬜ Pendiente |
@@ -33,7 +33,8 @@ periodo vía `ShiftResolver`, y sellado de `effectiveAt`+dimensiones al enviar).
 | Seguridad / roles / permisos (nueva) | 1 | ✅ API + UI (usuarios/roles/política/auditoría + reset MFA de admin) |
 | Plantillas (Form Builder) | 2 | ✅ **2.1** API + UI (definición: secciones/campos/umbrales/permiso por sección/borrador-publicar) |
 | Nueva entrada / Llenado | 2 | ✅ **2.4** API + UI (llenado multi-actor por secciones, concurrencia, validación servidor, estampado de dimensiones, sellado al enviar) |
-| Bitácoras (listado + detalle + log de cambios) | 2 | ⬜ |
+| Ejecución de flujo + firmas (Part 11) | 2 | ✅ **2.5** API + UI (transiciones gateadas rol-dato×ABAC×completitud, firmas re-auth/MFA step-up, bloqueo/desbloqueo de secciones, historial de transiciones) |
+| Bitácoras (listado + detalle + log de cambios) | 2 | ⬜ 2.6 |
 | Orígenes de datos | 3 | ⬜ |
 | Incidencias (kanban + drawer workflow) | 4 | ⬜ |
 | Cambio de turno | 5 | ⬜ |
@@ -661,12 +662,54 @@ EBR/GxP. Ver DECISIONS 2026-06-10 (4 forks resueltos). Rama `feat/llenado`, 4 co
   Datos de prueba hard-deleted (0 entradas restantes).
 - **Pendiente**: smoke **VISUAL** en navegador (ver BACKLOG §4).
 
+## Hecho en Fase 2.5 (Ejecución de flujo + firmas electrónicas Part 11)
+
+Cierra el bucle de ejecución abierto en 2.4. Motor de transiciones + firmas estilo **21 CFR Part 11**
+(§11.50/11.70/11.200, ALCOA+, NIST 800-63B step-up). Ver DECISIONS 2026-06-10 (5 forks resueltos). Rama
+`feat/ejecucion-flujo`, 4 commits (contratos+permiso / migración / backend / web).
+
+- **Contratos** (`@lyra/contracts/log-entries`): enums `SignatureContext`/`SignatureMethod`; DTOs `LogEntrySignature`
+  (§11.50: nombre impreso + significado + `payloadHash` + UTC), `LogEntryTransition` (historial), `AvailableTransition`;
+  `LogEntryDetail` gana `workflowVersion` congelada + `currentStateName` + `availableTransitions` + `transitions` +
+  `signatures`; `SectionStateDto` gana resumen de firma. `executeTransitionRequest` (re-auth opcional) + `saveSection`
+  gana `password`. **Fuente única**: `availableTransitionsFor` (gateo estado×rol-dato) y `canonicalSignaturePayload`
+  (serialización determinista para el hash, §11.70). **+7 specs**.
+- **Permisos** (catálogo **49→50**): `logentry:transition` (gate base del endpoint; el QUIÉN de cada transición sigue
+  siendo dato `WorkflowTransitionRole`). El seed lo asigna al rol admin iterando el catálogo.
+- **Prisma** (migración aditiva `20260610035255_add_log_entry_execution`, 100% CREATE): `LogEntryTransition` (append-only:
+  from/to/transitionKey de la versión congelada + actor + motivo + firma + `occurredAt`); `LogEntrySignature` (Part 11,
+  **polimórfica** por `context`, **check XOR** transitionKey↔sectionKey, patrón Scope/ExternalReference); enums. `LogEntry`
+  gana relaciones `transitions[]`/`signatures[]`. Aplicada con `migrate deploy` (EPERM del DLL con el watch).
+- **Backend**: **`ReauthService`** (módulo auth, **reutilizable** por Fase 4/notificaciones): re-auth contraseña
+  (Argon2id) + MFA step-up condicional; método `PASSWORD`|`PASSWORD_MFA`; firmante = sujeto del JWT (sin impersonación).
+  **`LogEntriesService.executeTransition`** (`POST /log-entries/:id/transitions`): valida (a) sale del estado actual, (b)
+  rol-dato, (c) ABAC, (d) completitud de secciones del estado de origen; aplica cambio de estado, **recomputa secciones**
+  (`LOCKED`/reapertura), **sella** dimensiones en la 1ª salida del estado inicial, reconcilia `status` (terminal ⇒
+  SUBMITTED), **firma** (TRANSITION) con hash del snapshot canónico en la misma tx, audita y emite el gancho
+  `onTransitionExecuted` (no-op; punto de enganche del evento). Firma de **completitud de sección** en `saveSection`
+  (flag `TemplateSection.requireSignature`). `submit` ahora finaliza SOLO forms sin flujo. `saveSection` respeta
+  `sealedAt`. Helpers DRY compartidos (`collectCompletionErrors`/`computeSeal`/`createSignature`). **+15 tests**.
+- **Web** `features/log-entries`: **`TransitionModal`** (confirma transición; si exige firma muestra significado +
+  firmante y pide re-auth contraseña + MFA step-up condicional; botones **gateados por `availableTransitions` del
+  backend**), **`SectionSignModal`** (firma de completitud de sección), `EntryFillPage` ampliada (chip de estado del
+  flujo, indicador de sección firmada, barra de transiciones que reemplaza submit cuando hay flujo, **historial de
+  transiciones** timeline ALCOA+). api/queries `executeTransition`. i18n es-CL (`logbook.transition.*` + `fill.signed*`),
+  tokens `@lyra/ui`, dual theme, 44px.
+- **Verificación**: `typecheck` (6 paquetes) · `lint` (0 errores; 1 warning preexistente OrgTree) · `build` web (1532 KB
+  JS; API NO se buildea por el watch) · `test` (**contracts 104** +7 · permissions 5 · **API 144** +15) en verde.
+  **Smoke en vivo** (demo, 50 permisos tras seed + invalidar Redis): workflow open→review→closed publicado + plantilla con
+  flujo + 2 secciones por estado → crear entrada (estado inicial) → completar s_open → **submit con flujo 400** →
+  **approve desde open 409** → **send** (sin firma) → review + **sellado** + s_open **LOCKED** + status DRAFT → completar
+  s_review (**sello NO se recalcula**) → **approve sin/con contraseña errónea 401** → **approve firmado** → closed +
+  SUBMITTED + **firma Part 11 registrada** (hash, método) → **transición tras finalizar 400**. **21/21 checks.** Datos de
+  prueba hard-deleted (0 restantes). **`/security-review` sobre el diff: sin hallazgos.**
+- **Pendiente**: smoke **VISUAL** en navegador (ver BACKLOG §4).
+
 ## Próximo paso
-**Fase 2.4 completa.** **Sesión siguiente = Fase 2.5 · Ejecución de flujo + firmas electrónicas (Part 11)**:
-transiciones gateadas por rol (dato), firma con re-auth/MFA step-up, bloqueo/desbloqueo de secciones, log de
-transiciones (`LogEntryTransition`, tabla nueva), y el sellado de `effectiveAt`/dimensiones movido a la primera
-transición. Alternativa intercalable: **2.3 Rondas/`LogPeriod`** (se apoya en los turnos ya definidos). Luego 2.6
-bitácoras (listado/detalle/timeline/log de cambios). Ver BACKLOG §2.
+**Fase 2.5 completa.** **Sesión siguiente recomendada = Fase 2.6 · Bitácoras (listado + detalle + línea de tiempo +
+log de cambios)**: vista de auditor read-only sobre todo lo que la ejecución ya produce (entradas, transiciones, firmas,
+historial de campos). Alternativa intercalable: **2.3 Rondas/`LogPeriod`** (recurrencia sobre los turnos ya definidos).
+Luego 2.7 (umbral→incidencia, cruce Fase 4) → Fase 3 (sincroniza Listas `source=EXTERNAL`). Ver BACKLOG §2.
 
 **Mejora futura registrada (BACKLOG §2):** seguridad a nivel de nodo en el mantenedor de Estructura (ABAC
 enterprise: asignar usuarios/roles a nodos desde el propio árbol, "quién accede a este nodo"). El modelo ya

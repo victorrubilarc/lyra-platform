@@ -1,11 +1,25 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
-import { AlertTriangle, ArrowLeft, CalendarClock, CheckCircle2, Clock, Lock, Send, TriangleAlert } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  CalendarClock,
+  CheckCircle2,
+  ChevronRight,
+  Clock,
+  History,
+  Lock,
+  PenLine,
+  Send,
+  TriangleAlert,
+} from "lucide-react";
 import { Button, Card, Chip, EmptyState, Spinner, useToast } from "@lyra/ui";
 import {
   isFieldVisible,
   validateFieldValue,
+  type AvailableTransitionDto,
+  type ExecuteTransitionRequest,
   type LogEntrySectionStateDto,
   type TemplateFieldDto,
   type TemplateSectionDto,
@@ -13,7 +27,15 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { ApiError } from "../../lib/api-client.js";
 import { FieldControl } from "../templates/FieldControl.js";
-import { LOG_ENTRY_KEYS, useLogEntry, useSaveLogEntrySection, useSubmitLogEntry } from "./log-entries-queries.js";
+import {
+  LOG_ENTRY_KEYS,
+  useExecuteTransition,
+  useLogEntry,
+  useSaveLogEntrySection,
+  useSubmitLogEntry,
+} from "./log-entries-queries.js";
+import { SectionSignModal } from "./SectionSignModal.js";
+import { TransitionModal } from "./TransitionModal.js";
 import styles from "./LogEntries.module.css";
 
 type Draft = Record<string, unknown>;
@@ -39,9 +61,12 @@ export function EntryFillPage() {
   const { data: entry, isLoading, isError } = useLogEntry(id);
   const save = useSaveLogEntrySection(id);
   const submit = useSubmitLogEntry(id);
+  const transition = useExecuteTransition(id);
 
   const [draft, setDraft] = useState<Draft>({});
   const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [activeTransition, setActiveTransition] = useState<AvailableTransitionDto | null>(null);
+  const [signingSection, setSigningSection] = useState<{ section: TemplateSectionDto; st: LogEntrySectionStateDto } | null>(null);
 
   // Semilla del borrador local desde los valores del servidor (una vez por entrada).
   useEffect(() => {
@@ -72,14 +97,22 @@ export function EntryFillPage() {
   const isDraft = entry.status === "DRAFT";
   const stateBySection = new Map(entry.sectionStates.map((s) => [s.sectionKey, s]));
 
-  function saveSection(section: TemplateSectionDto, st: LogEntrySectionStateDto, markComplete: boolean) {
+  function saveSection(
+    section: TemplateSectionDto,
+    st: LogEntrySectionStateDto,
+    markComplete: boolean,
+    password?: string,
+  ) {
     const visible = section.fields.filter((f) => isFieldVisible(f.visibleWhen, draft));
     const values = visible.map((f) => ({ fieldKey: f.key, value: draft[f.key] ?? null }));
     setSavingKey(section.key + (markComplete ? ":complete" : ""));
     save.mutate(
-      { sectionKey: section.key, dto: { expectedVersion: st.version, values, markComplete } },
+      { sectionKey: section.key, dto: { expectedVersion: st.version, values, markComplete, password } },
       {
-        onSuccess: () => toast.success(markComplete ? t("logbook.fill.sectionCompleted") : t("logbook.fill.sectionSaved")),
+        onSuccess: () => {
+          toast.success(markComplete ? t("logbook.fill.sectionCompleted") : t("logbook.fill.sectionSaved"));
+          setSigningSection(null);
+        },
         onError: (e) => {
           if (e instanceof ApiError && e.status === 409) {
             toast.error(t("logbook.fill.conflict"));
@@ -91,11 +124,31 @@ export function EntryFillPage() {
     );
   }
 
+  /** Completar: si la sección exige firma (Part 11), pide contraseña antes de completar. */
+  function completeSection(section: TemplateSectionDto, st: LogEntrySectionStateDto) {
+    if (section.requireSignature) setSigningSection({ section, st });
+    else saveSection(section, st, true);
+  }
+
   function doSubmit() {
     submit.mutate(
       {},
       {
         onSuccess: () => toast.success(t("logbook.fill.submitted")),
+        onError: (e) => toast.error(e instanceof ApiError ? e.message : t("common.errorGeneric")),
+      },
+    );
+  }
+
+  function runTransition(dto: Omit<ExecuteTransitionRequest, "transitionKey">) {
+    if (!activeTransition) return;
+    transition.mutate(
+      { transitionKey: activeTransition.transitionKey, ...dto },
+      {
+        onSuccess: () => {
+          toast.success(t("logbook.transition.done", { state: activeTransition.toStateName }));
+          setActiveTransition(null);
+        },
         onError: (e) => toast.error(e instanceof ApiError ? e.message : t("common.errorGeneric")),
       },
     );
@@ -114,10 +167,13 @@ export function EntryFillPage() {
             <div className={styles.entryName}>{entry.templateName}</div>
             <div className={styles.entryNode}>{entry.orgNodePath ?? "—"}</div>
           </div>
-          <Chip
-            variant={entry.status === "SUBMITTED" ? "success" : entry.status === "VOID" ? "default" : "warning"}
-            label={t(`logbook.status.${entry.status}`)}
-          />
+          <div className={styles.entryHeadChips}>
+            {entry.currentStateName && <Chip variant="info" label={entry.currentStateName} />}
+            <Chip
+              variant={entry.status === "SUBMITTED" ? "success" : entry.status === "VOID" ? "default" : "warning"}
+              label={t(`logbook.status.${entry.status}`)}
+            />
+          </div>
         </div>
         <div className={styles.dimsRow}>
           <span className={styles.dimChip}>
@@ -161,6 +217,9 @@ export function EntryFillPage() {
               </div>
               <div className={styles.sectionMeta}>
                 {st && <Chip variant={st.state === "COMPLETED" ? "success" : st.state === "LOCKED" ? "default" : "warning"} label={t(`logbook.sectionState.${st.state}`)} />}
+                {st?.signature && (
+                  <Chip variant="success" label={t("logbook.fill.signedBy", { name: st.signature.signerName })} />
+                )}
                 {st?.filledByName && <span className={styles.filledBy}>{t("logbook.fill.filledBy", { name: st.filledByName })}</span>}
               </div>
             </div>
@@ -193,8 +252,9 @@ export function EntryFillPage() {
                 <Button variant="secondary" loading={savingKey === section.key} onClick={() => saveSection(section, st, false)}>
                   {t("logbook.fill.saveSection")}
                 </Button>
-                <Button variant="primary" loading={savingKey === section.key + ":complete"} onClick={() => saveSection(section, st, true)}>
-                  <CheckCircle2 size={15} /> {t("logbook.fill.completeSection")}
+                <Button variant="primary" loading={savingKey === section.key + ":complete"} onClick={() => completeSection(section, st)}>
+                  {section.requireSignature ? <PenLine size={15} /> : <CheckCircle2 size={15} />}{" "}
+                  {section.requireSignature ? t("logbook.fill.completeAndSign") : t("logbook.fill.completeSection")}
                 </Button>
               </div>
             )}
@@ -202,14 +262,69 @@ export function EntryFillPage() {
         );
       })}
 
-      {/* Enviar (sella) */}
-      {isDraft && (
+      {/* Acciones: con flujo → transiciones (gateadas por el backend); sin flujo → enviar */}
+      {isDraft && entry.workflowVersion ? (
+        <div className={styles.transitionBar}>
+          {entry.availableTransitions.length === 0 ? (
+            <span className={styles.submitHint}>{t("logbook.transition.none")}</span>
+          ) : (
+            entry.availableTransitions.map((tr, i) => (
+              <Button key={tr.transitionKey} variant={i === 0 ? "primary" : "secondary"} onClick={() => setActiveTransition(tr)}>
+                {tr.requireSignature ? <PenLine size={15} /> : <ChevronRight size={15} />} {tr.label}
+              </Button>
+            ))
+          )}
+        </div>
+      ) : isDraft ? (
         <div className={styles.submitBar}>
           <Button variant="primary" loading={submit.isPending} onClick={doSubmit}>
             <Send size={15} /> {t("logbook.fill.submit")}
           </Button>
           <span className={styles.submitHint}>{t("logbook.fill.submitHint")}</span>
         </div>
+      ) : null}
+
+      {/* Historial de transiciones (trazabilidad ALCOA+) */}
+      {entry.transitions.length > 0 && (
+        <Card className={styles.section}>
+          <div className={styles.sectionTitle}>
+            <History size={16} /> {t("logbook.transition.historyTitle")}
+          </div>
+          <ul className={styles.timeline}>
+            {entry.transitions.map((tr) => (
+              <li key={tr.id} className={styles.timelineItem}>
+                <div className={styles.timelineHead}>
+                  <span className={styles.timelineLabel}>{tr.label ?? tr.transitionKey}</span>
+                  {tr.signature && (
+                    <Chip variant="success" label={t("logbook.transition.signedChip", { meaning: tr.signature.meaning })} />
+                  )}
+                </div>
+                <div className={styles.timelineMeta}>
+                  {tr.actorName ?? "—"} · {new Date(tr.occurredAt).toLocaleString("es-CL")}
+                </div>
+                {tr.reason && <div className={styles.timelineReason}>“{tr.reason}”</div>}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+
+      {activeTransition && (
+        <TransitionModal
+          transition={activeTransition}
+          loading={transition.isPending}
+          onConfirm={runTransition}
+          onClose={() => setActiveTransition(null)}
+        />
+      )}
+
+      {signingSection && (
+        <SectionSignModal
+          sectionTitle={signingSection.section.title}
+          loading={savingKey === signingSection.section.key + ":complete"}
+          onConfirm={(password) => saveSection(signingSection.section, signingSection.st, true, password)}
+          onClose={() => setSigningSection(null)}
+        />
       )}
     </div>
   );

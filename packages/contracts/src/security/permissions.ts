@@ -366,6 +366,13 @@ export const PERMISSION_CATALOG = [
     group: "logbook",
     description: "Llenar/guardar secciones de una entrada y enviarla (según permiso de sección).",
   },
+  {
+    key: "logentry:transition",
+    dimension: "ACTION",
+    group: "logbook",
+    description:
+      "Ejecutar transiciones de flujo y firmar una entrada (QUIÉN puede cada transición es dato: roles por transición del flujo).",
+  },
 ] as const satisfies readonly PermissionDef[];
 
 /** Unión literal de todas las claves de permiso conocidas. */

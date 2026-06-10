@@ -1,10 +1,12 @@
 import {
   createLogEntryRequestSchema,
+  executeTransitionRequestSchema,
   logEntryDetailSchema,
   logEntryListItemSchema,
   saveLogEntrySectionRequestSchema,
   submitLogEntryRequestSchema,
   type CreateLogEntryRequest,
+  type ExecuteTransitionRequest,
   type LogEntryDetail,
   type LogEntryListItem,
   type LogEntryListQuery,
@@ -47,4 +49,9 @@ export function saveLogEntrySection(
 export function submitLogEntry(id: string, dto: SubmitLogEntryRequest = {}): Promise<LogEntryDetail> {
   submitLogEntryRequestSchema.parse(dto);
   return apiJson(`/log-entries/${id}/submit`, logEntryDetailSchema, { method: "POST", body: dto });
+}
+
+export function executeTransition(id: string, dto: ExecuteTransitionRequest): Promise<LogEntryDetail> {
+  executeTransitionRequestSchema.parse(dto);
+  return apiJson(`/log-entries/${id}/transitions`, logEntryDetailSchema, { method: "POST", body: dto });
 }

@@ -6,18 +6,29 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import type {
+  AvailableTransitionDto,
   CreateLogEntryRequest,
+  ExecuteTransitionRequest,
   FieldForValidation,
   LogEntryDetail,
   LogEntryListItem,
   LogEntryListQuery,
+  LogEntrySectionState,
   LogEntrySectionStateDto,
+  LogEntrySignatureDto,
+  LogEntrySignatureSummaryDto,
+  LogEntryTransitionDto,
   LogEntryValueDto,
   SaveLogEntrySectionRequest,
+  SignatureContext,
+  SignatureMethod,
   SubmitLogEntryRequest,
   TemplateVersionDto,
+  WorkflowVersionDto,
 } from "@lyra/contracts";
 import {
+  availableTransitionsFor,
+  canonicalSignaturePayload,
   isEmptyValue,
   isFieldVisible,
   isSectionEditableInState,
@@ -26,10 +37,16 @@ import {
   validateFieldValue,
 } from "@lyra/contracts";
 import { Prisma } from "@prisma/client";
+import { ReauthService } from "../auth/reauth.service";
 import { AuditService, type AuditContext } from "../audit/audit.service";
 import { ScopeService } from "../authz/scope.service";
+import { EncryptionService } from "../crypto/encryption.service";
 import { ShiftResolver } from "../operational-calendar/shift-resolver";
 import { PrismaService } from "../prisma/prisma.service";
+
+/** Significado por defecto de la firma de completitud de sección (las secciones no
+ * portan un campo de significado; las transiciones sí vía `signatureMeaning`). */
+const SECTION_SIGNATURE_MEANING = "Sección completada y firmada";
 
 /** Versión completa (secciones → campos → roles) para renderizar y validar. */
 const versionInclude = {
@@ -48,6 +65,23 @@ const versionInclude = {
 type VersionWithGraph = Prisma.TemplateVersionGetPayload<{ include: typeof versionInclude }>;
 type LogEntryRow = Prisma.LogEntryGetPayload<Record<string, never>>;
 
+/** Versión de flujo CONGELADA (estados + transiciones → roles) para ejecutar/render. */
+const workflowVersionInclude = {
+  states: { orderBy: { order: "asc" } },
+  transitions: {
+    orderBy: { order: "asc" },
+    include: {
+      fromState: { select: { key: true } },
+      toState: { select: { key: true } },
+      roles: { select: { roleId: true } },
+    },
+  },
+} satisfies Prisma.WorkflowDefinitionVersionInclude;
+
+type WorkflowVersionWithGraph = Prisma.WorkflowDefinitionVersionGetPayload<{
+  include: typeof workflowVersionInclude;
+}>;
+
 /** Vista normalizada de un campo de la versión (para validar/autorizar). */
 interface FieldDef {
   key: string;
@@ -62,6 +96,16 @@ interface FieldDef {
   roleIds: string[];
 }
 
+/** Evento de dominio emitido al ejecutar una transición (gancho de plataforma). */
+export interface TransitionEvent {
+  logEntryId: string;
+  transitionKey: string;
+  fromStateKey: string;
+  toStateKey: string;
+  toIsFinal: boolean;
+  actorId: string;
+}
+
 /**
  * Llenado de bitácoras (Fase 2.4) — EJECUCIÓN auditada de una plantilla.
  *
@@ -72,8 +116,14 @@ interface FieldDef {
  * por campo (antes/después) y estampa las dimensiones operacionales vía
  * `ShiftResolver`. Concurrencia optimista por sección (`version` check-and-bump).
  *
- * Límite del slice: la entrada permanece en su estado inicial; las TRANSICIONES
- * de flujo y las firmas Part 11 llegan en 2.5.
+ * EJECUCIÓN DE FLUJO (Fase 2.5): `executeTransition` valida en backend (a) la
+ * transición sale del estado actual, (b) el usuario tiene un rol-dato autorizado,
+ * (c) ABAC sobre el nodo, (d) completitud de las secciones del estado de origen;
+ * aplica el cambio de estado, recomputa qué secciones quedan editables/`LOCKED`,
+ * sella las dimensiones en la 1ª salida del estado inicial y, si la transición lo
+ * exige, captura una FIRMA electrónica Part 11 con re-autenticación (`ReauthService`).
+ * Esta lógica vive aquí (no en un servicio aparte) para reusar toda la maquinaria
+ * de secciones/valores/validación/sellado sin exponerla ni duplicarla.
  */
 @Injectable()
 export class LogEntriesService {
@@ -82,6 +132,8 @@ export class LogEntriesService {
     private readonly audit: AuditService,
     private readonly scope: ScopeService,
     private readonly shiftResolver: ShiftResolver,
+    private readonly reauth: ReauthService,
+    private readonly enc: EncryptionService,
   ) {}
 
   // --- Crear (abrir) una entrada ---------------------------------------------
@@ -157,22 +209,30 @@ export class LogEntriesService {
 
     const version = await this.loadVersion(entry.templateVersionId);
     const template = await this.prisma.template.findUnique({ where: { id: entry.templateId } });
-    const [sectionRows, valueRows] = await Promise.all([
+    const [sectionRows, valueRows, transitionRows, signatureRows, wfVersion] = await Promise.all([
       this.prisma.logEntrySection.findMany({ where: { logEntryId: id } }),
       this.prisma.logEntryValue.findMany({ where: { logEntryId: id } }),
+      this.prisma.logEntryTransition.findMany({ where: { logEntryId: id }, orderBy: { occurredAt: "asc" } }),
+      this.prisma.logEntrySignature.findMany({ where: { logEntryId: id }, orderBy: { signedAt: "asc" } }),
+      entry.workflowDefinitionVersionId ? this.loadWorkflowVersion(entry.workflowDefinitionVersionId) : Promise.resolve(null),
     ]);
 
     const roleIds = await this.userRoleIds(userId);
-    const fillerNames = await this.namesByUserId(sectionRows.map((s) => s.filledById));
+    const actorNames = await this.namesByUserId([
+      ...sectionRows.map((s) => s.filledById),
+      ...transitionRows.map((t) => t.actorId),
+    ]);
     const editable = entry.status === "DRAFT";
+    const sigById = new Map(signatureRows.map((s) => [s.id, s]));
 
     const sectionStates: LogEntrySectionStateDto[] = version.sections.map((def) => {
       const row = sectionRows.find((r) => r.sectionKey === def.key);
+      const sig = row?.signatureId ? sigById.get(row.signatureId) : undefined;
       return {
         sectionKey: def.key,
         state: row?.state ?? "PENDING",
         filledById: row?.filledById ?? null,
-        filledByName: row?.filledById ? (fillerNames.get(row.filledById) ?? null) : null,
+        filledByName: row?.filledById ? (actorNames.get(row.filledById) ?? null) : null,
         filledAt: row?.filledAt?.toISOString() ?? null,
         version: row?.version ?? 0,
         editable:
@@ -184,6 +244,7 @@ export class LogEntriesService {
             entry.currentStateKey,
             roleIds,
           ),
+        signature: sig ? this.signatureSummary(sig) : null,
       };
     });
 
@@ -194,12 +255,69 @@ export class LogEntriesService {
       updatedById: v.updatedById,
     }));
 
+    // Transiciones que ESTE usuario puede ejecutar ahora (solo si sigue editable).
+    const labelByKey = new Map((wfVersion?.transitions ?? []).map((t) => [t.key, t.label]));
+    const availableTransitions: AvailableTransitionDto[] =
+      editable && wfVersion
+        ? availableTransitionsFor(
+            wfVersion.transitions.map((t) => ({
+              key: t.key,
+              label: t.label,
+              fromStateKey: t.fromState.key,
+              toStateKey: t.toState.key,
+              requireSignature: t.requireSignature,
+              signatureMeaning: t.signatureMeaning,
+              requireMfa: t.requireMfa,
+              roleIds: t.roles.map((r) => r.roleId),
+            })),
+            wfVersion.states.map((s) => ({ key: s.key, name: s.name })),
+            entry.currentStateKey,
+            roleIds,
+          )
+        : [];
+
+    const transitions: LogEntryTransitionDto[] = transitionRows.map((t) => ({
+      id: t.id,
+      transitionKey: t.transitionKey,
+      label: labelByKey.get(t.transitionKey) ?? null,
+      fromStateKey: t.fromStateKey,
+      toStateKey: t.toStateKey,
+      actorId: t.actorId,
+      actorName: t.actorId ? (actorNames.get(t.actorId) ?? null) : null,
+      reason: t.reason,
+      signature: t.signatureId ? (this.signatureSummary(sigById.get(t.signatureId)) ?? null) : null,
+      occurredAt: t.occurredAt.toISOString(),
+    }));
+
+    const signatures: LogEntrySignatureDto[] = signatureRows.map((s) => ({
+      id: s.id,
+      context: s.context,
+      transitionKey: s.transitionKey,
+      sectionKey: s.sectionKey,
+      signerId: s.signerId,
+      signerName: s.signerName,
+      meaning: s.meaning,
+      method: s.method,
+      payloadHash: s.payloadHash,
+      signedAt: s.signedAt.toISOString(),
+    }));
+
+    const currentStateName =
+      wfVersion && entry.currentStateKey
+        ? (wfVersion.states.find((s) => s.key === entry.currentStateKey)?.name ?? entry.currentStateKey)
+        : null;
+
     return {
       ...this.mapEntry(entry, template?.name ?? "—"),
       orgNodePath: await this.nodePath(entry.orgNodeId),
       version: this.mapVersion(version),
+      workflowVersion: wfVersion ? this.mapWorkflowVersion(wfVersion) : null,
+      currentStateName,
       sectionStates,
       values,
+      availableTransitions,
+      transitions,
+      signatures,
     };
   }
 
@@ -292,6 +410,15 @@ export class LogEntriesService {
     const now = new Date();
     const newState = dto.markComplete ? "COMPLETED" : "IN_PROGRESS";
 
+    // Firma de completitud de sección (Part 11), si la sección la exige y se está
+    // completando. Las secciones no portan flag de MFA → re-auth por contraseña.
+    // La re-autenticación va ANTES de la transacción (no contamina la tx con I/O
+    // de auth); si falla, lanza y nada se persiste.
+    const mustSign = Boolean(dto.markComplete) && sectionDef.requireSignature;
+    const reauth = mustSign
+      ? await this.reauth.verifyForSignature(userId, { password: dto.password }, { requireMfa: false })
+      : null;
+
     await this.prisma.$transaction(async (tx) => {
       for (const input of dto.values) {
         const def = fieldsByKey.get(input.fieldKey)!;
@@ -323,28 +450,56 @@ export class LogEntriesService {
         });
       }
 
+      // Snapshot canónico de TODOS los valores actuales (incluye los recién guardados).
+      let signatureId: string | null = null;
+      if (mustSign && reauth) {
+        const signature = await this.createSignature(tx, {
+          entry,
+          context: "SECTION_COMPLETION",
+          sectionKey,
+          meaning: SECTION_SIGNATURE_MEANING,
+          signerId: userId,
+          signerName: reauth.signerName,
+          method: reauth.method,
+          valuesByKey,
+          signedAt: now,
+        });
+        signatureId = signature.id;
+      }
+
       await tx.logEntrySection.update({
         where: { id: sectionRow.id },
-        data: { version: { increment: 1 }, state: newState, filledById: userId, filledAt: now },
-      });
-
-      // Recalcula effectiveAt + dimensiones mientras la entrada es DRAFT.
-      const effectiveAt = resolveEffectiveAt(
-        version.sections.map((s) => ({ fields: s.fields.map((f) => this.toFieldDtoLite(f)) })),
-        valuesByKey,
-        entry.recordedAt,
-      );
-      const dims = await this.shiftResolver.resolve(effectiveAt, entry.orgNodeId);
-      await tx.logEntry.update({
-        where: { id },
         data: {
-          effectiveAt,
-          shiftCode: dims?.shiftCode ?? null,
-          operationalDate: dims?.operationalDate ?? null,
-          periodKey: dims?.periodKey ?? null,
-          updatedById: userId,
+          version: { increment: 1 },
+          state: newState,
+          filledById: userId,
+          filledAt: now,
+          ...(signatureId ? { signatureId } : {}),
         },
       });
+
+      // Recalcula effectiveAt + dimensiones SOLO mientras la entrada no esté sellada
+      // (el sellado lo congela la 1ª transición o el submit de un form sin flujo).
+      if (!entry.sealedAt) {
+        const effectiveAt = resolveEffectiveAt(
+          version.sections.map((s) => ({ fields: s.fields.map((f) => this.toFieldDtoLite(f)) })),
+          valuesByKey,
+          entry.recordedAt,
+        );
+        const dims = await this.shiftResolver.resolve(effectiveAt, entry.orgNodeId);
+        await tx.logEntry.update({
+          where: { id },
+          data: {
+            effectiveAt,
+            shiftCode: dims?.shiftCode ?? null,
+            operationalDate: dims?.operationalDate ?? null,
+            periodKey: dims?.periodKey ?? null,
+            updatedById: userId,
+          },
+        });
+      } else {
+        await tx.logEntry.update({ where: { id }, data: { updatedById: userId } });
+      }
     });
 
     await this.audit.record({
@@ -352,78 +507,207 @@ export class LogEntriesService {
       action: "logentry.section.saved",
       entityType: "LogEntry",
       entityId: id,
-      metadata: { sectionKey, complete: Boolean(dto.markComplete), warnings: warnings.length },
+      metadata: { sectionKey, complete: Boolean(dto.markComplete), signed: mustSign, warnings: warnings.length },
     });
     return this.getDetail(userId, id);
   }
 
-  // --- Enviar (sella las dimensiones) ----------------------------------------
+  // --- Enviar (finaliza un form SIN flujo; sella las dimensiones) -------------
 
   async submit(userId: string, id: string, _dto: SubmitLogEntryRequest, ctx: AuditContext): Promise<LogEntryDetail> {
     const entry = await this.loadEntry(id);
-    if (entry.status !== "DRAFT") throw new BadRequestException("La entrada ya fue enviada o anulada");
+    if (entry.status !== "DRAFT") throw new BadRequestException("La entrada ya fue finalizada o anulada");
     await this.assertNodeInScope(userId, entry.orgNodeId);
+
+    // Degradación elegante: `submit` finaliza SOLO plantillas sin flujo. Con flujo,
+    // la finalización ocurre al transicionar a un estado final (executeTransition).
+    if (entry.workflowDefinitionVersionId) {
+      throw new BadRequestException("Esta plantilla tiene flujo: avance la entrada con una transición");
+    }
 
     const version = await this.loadVersion(entry.templateVersionId);
     const roleIds = await this.userRoleIds(userId);
-    const valueRows = await this.prisma.logEntryValue.findMany({ where: { logEntryId: id } });
-    const valuesByKey: Record<string, unknown> = {};
-    for (const v of valueRows) valuesByKey[v.fieldKey] = (v.value ?? null) as unknown;
+    const valuesByKey = await this.loadValuesByKey(id);
 
-    // Valida obligatorios + valores de las secciones editables en el estado actual.
-    const errors: string[] = [];
-    for (const section of version.sections) {
-      const editableNow = this.isSectionEditableForUser(
+    // Valida obligatorios + valores de las secciones editables para el usuario.
+    const errors = await this.collectCompletionErrors(version, valuesByKey, (section) =>
+      this.isSectionEditableForUser(
         section.key,
         section.editableInStateKey,
         section.roles.map((r) => r.roleId),
         entry.currentStateKey,
         roleIds,
-      );
-      if (!editableNow) continue;
-      const defs = section.fields.map((f) => this.toFieldDef(f, section.key));
-      const allowed = await this.resolveAllowedCodes(defs);
-      for (const def of defs) {
-        if (!isFieldVisible(def.visibleWhen, valuesByKey)) continue;
-        const val = valuesByKey[def.key];
-        if (def.required && isEmptyValue(val)) {
-          errors.push(`${def.label}: obligatorio`);
-          continue;
-        }
-        errors.push(...validateFieldValue(def, val, { allowedCodes: allowed.get(def.key) }).errors);
-      }
-    }
+      ),
+    );
     if (errors.length > 0) {
       throw new BadRequestException({ message: "No se puede enviar: faltan datos o hay errores", errors });
     }
 
     const sealedAt = new Date();
-    const effectiveAt = resolveEffectiveAt(
-      version.sections.map((s) => ({ fields: s.fields.map((f) => this.toFieldDtoLite(f)) })),
-      valuesByKey,
-      entry.recordedAt,
-    );
-    const dims = await this.shiftResolver.resolve(effectiveAt, entry.orgNodeId);
-
+    const seal = await this.computeSeal(entry, version, valuesByKey);
     await this.prisma.logEntry.update({
       where: { id },
-      data: {
-        status: "SUBMITTED",
-        sealedAt,
-        effectiveAt,
-        shiftCode: dims?.shiftCode ?? null,
-        operationalDate: dims?.operationalDate ?? null,
-        periodKey: dims?.periodKey ?? null,
-        updatedById: userId,
-      },
+      data: { status: "SUBMITTED", sealedAt, ...seal, updatedById: userId },
     });
     await this.audit.record({
       ...ctx,
       action: "logentry.submitted",
       entityType: "LogEntry",
       entityId: id,
-      after: { effectiveAt: effectiveAt.toISOString(), shiftCode: dims?.shiftCode ?? null, periodKey: dims?.periodKey ?? null },
+      after: { effectiveAt: seal.effectiveAt.toISOString(), shiftCode: seal.shiftCode, periodKey: seal.periodKey },
     });
+    return this.getDetail(userId, id);
+  }
+
+  // --- Ejecutar una transición de flujo (Fase 2.5) ---------------------------
+
+  async executeTransition(
+    userId: string,
+    id: string,
+    dto: ExecuteTransitionRequest,
+    ctx: AuditContext,
+  ): Promise<LogEntryDetail> {
+    const entry = await this.loadEntry(id);
+    if (entry.status !== "DRAFT") throw new BadRequestException("La entrada ya fue finalizada o anulada");
+    await this.assertNodeInScope(userId, entry.orgNodeId); // guarda (c) ABAC
+    if (!entry.workflowDefinitionVersionId || !entry.currentStateKey) {
+      throw new BadRequestException("La entrada no tiene un flujo configurado");
+    }
+
+    const wfVersion = await this.loadWorkflowVersion(entry.workflowDefinitionVersionId);
+    const transition = wfVersion.transitions.find((t) => t.key === dto.transitionKey);
+    if (!transition) throw new NotFoundException("Transición no encontrada en el flujo");
+
+    // (a) la transición sale del estado actual.
+    if (transition.fromState.key !== entry.currentStateKey) {
+      throw new ConflictException("La transición no parte del estado actual de la entrada");
+    }
+
+    // (b) el usuario tiene un rol-dato autorizado (vacío = abierta al permiso base).
+    const roleIds = await this.userRoleIds(userId);
+    const allowedRoleIds = transition.roles.map((r) => r.roleId);
+    if (allowedRoleIds.length > 0 && !allowedRoleIds.some((r) => roleIds.has(r))) {
+      throw new ForbiddenException("No tiene un rol autorizado para ejecutar esta transición");
+    }
+
+    // (d) completitud: las secciones editables en el estado de ORIGEN deben estar
+    // marcadas COMPLETED y sin errores de validación (defensa en profundidad).
+    const version = await this.loadVersion(entry.templateVersionId);
+    const valuesByKey = await this.loadValuesByKey(id);
+    const sectionRows = await this.prisma.logEntrySection.findMany({ where: { logEntryId: id } });
+    const fromStateKey = entry.currentStateKey;
+    const editableInFrom = (section: VersionWithGraph["sections"][number]): boolean =>
+      isSectionEditableInState(section.editableInStateKey, fromStateKey);
+
+    const errors = await this.collectCompletionErrors(version, valuesByKey, editableInFrom);
+    for (const section of version.sections) {
+      if (!editableInFrom(section) || section.fields.length === 0) continue;
+      const row = sectionRows.find((r) => r.sectionKey === section.key);
+      if (!row || row.state !== "COMPLETED") errors.push(`Sección "${section.title}" sin completar`);
+    }
+    if (errors.length > 0) {
+      throw new BadRequestException({ message: "No se puede avanzar: hay secciones incompletas o con errores", errors });
+    }
+
+    // Firma (si la transición la exige): re-auth ANTES de la transacción. El
+    // step-up MFA se aplica solo si la transición lo pide (requireMfa).
+    const reauth = transition.requireSignature
+      ? await this.reauth.verifyForSignature(
+          userId,
+          { password: dto.password, mfaCode: dto.mfaCode },
+          { requireMfa: transition.requireMfa },
+        )
+      : null;
+
+    const now = new Date();
+    const fromState = wfVersion.states.find((s) => s.key === transition.fromState.key)!;
+    const toState = wfVersion.states.find((s) => s.key === transition.toState.key)!;
+    // Sellado: la 1ª transición que sale del estado inicial congela las dimensiones.
+    const seal = !entry.sealedAt && fromState.isInitial ? await this.computeSeal(entry, version, valuesByKey) : null;
+    // Reconciliación de status: terminal ⇒ SUBMITTED; si no, sigue DRAFT (trabajo en curso).
+    const nextStatus = toState.isFinal ? "SUBMITTED" : "DRAFT";
+
+    await this.prisma.$transaction(async (tx) => {
+      let signatureId: string | null = null;
+      if (transition.requireSignature && reauth) {
+        const sig = await this.createSignature(tx, {
+          entry,
+          context: "TRANSITION",
+          transitionKey: transition.key,
+          fromStateKey: fromState.key,
+          toStateKey: toState.key,
+          meaning: transition.signatureMeaning ?? transition.label,
+          signerId: userId,
+          signerName: reauth.signerName,
+          method: reauth.method,
+          valuesByKey,
+          signedAt: now,
+        });
+        signatureId = sig.id;
+      }
+
+      await tx.logEntryTransition.create({
+        data: {
+          logEntryId: id,
+          workflowDefinitionVersionId: entry.workflowDefinitionVersionId!,
+          transitionKey: transition.key,
+          fromStateKey: fromState.key,
+          toStateKey: toState.key,
+          actorId: userId,
+          actorEmail: ctx.actorEmail ?? null,
+          reason: dto.reason ?? null,
+          signatureId,
+          occurredAt: now,
+        },
+      });
+
+      // Recomputa la editabilidad objetiva de cada sección en el NUEVO estado.
+      for (const section of version.sections) {
+        const row = sectionRows.find((r) => r.sectionKey === section.key);
+        if (!row) continue;
+        const editableNow = isSectionEditableInState(section.editableInStateKey, toState.key);
+        const next = this.nextSectionState(row.state, editableNow);
+        if (next !== row.state) {
+          await tx.logEntrySection.update({ where: { id: row.id }, data: { state: next } });
+        }
+      }
+
+      await tx.logEntry.update({
+        where: { id },
+        data: {
+          currentStateKey: toState.key,
+          status: nextStatus,
+          updatedById: userId,
+          ...(seal ? { sealedAt: now, ...seal } : {}),
+        },
+      });
+    });
+
+    await this.audit.record({
+      ...ctx,
+      action: "logentry.transition.executed",
+      entityType: "LogEntry",
+      entityId: id,
+      after: {
+        transition: transition.key,
+        from: fromState.key,
+        to: toState.key,
+        signed: transition.requireSignature,
+        sealed: Boolean(seal),
+        status: nextStatus,
+      },
+    });
+
+    // Gancho de evento de dominio (Notificaciones / umbral→incidencia engancharán aquí).
+    this.onTransitionExecuted({
+      logEntryId: id,
+      transitionKey: transition.key,
+      fromStateKey: fromState.key,
+      toStateKey: toState.key,
+      toIsFinal: toState.isFinal,
+      actorId: userId,
+    });
+
     return this.getDetail(userId, id);
   }
 
@@ -462,6 +746,154 @@ export class LogEntriesService {
     const version = await this.prisma.templateVersion.findUnique({ where: { id: versionId }, include: versionInclude });
     if (!version) throw new NotFoundException("Versión de plantilla no encontrada");
     return version;
+  }
+
+  private async loadWorkflowVersion(versionId: string): Promise<WorkflowVersionWithGraph> {
+    const version = await this.prisma.workflowDefinitionVersion.findUnique({
+      where: { id: versionId },
+      include: workflowVersionInclude,
+    });
+    if (!version) throw new NotFoundException("Versión de flujo no encontrada");
+    return version;
+  }
+
+  /** Foto plana de los valores actuales de la entrada (fieldKey → value). */
+  private async loadValuesByKey(id: string): Promise<Record<string, unknown>> {
+    const rows = await this.prisma.logEntryValue.findMany({ where: { logEntryId: id } });
+    const map: Record<string, unknown> = {};
+    for (const v of rows) map[v.fieldKey] = (v.value ?? null) as unknown;
+    return map;
+  }
+
+  /**
+   * Recolecta errores de validación de las secciones que cumplen `predicate`:
+   * obligatorios vacíos (visibles) + valores inválidos por tipo/rango/catálogo.
+   * Fuente compartida por `submit` (form sin flujo) y la guarda de completitud de
+   * `executeTransition`. Salta campos ocultos por `visibleWhen`.
+   */
+  private async collectCompletionErrors(
+    version: VersionWithGraph,
+    valuesByKey: Record<string, unknown>,
+    predicate: (section: VersionWithGraph["sections"][number]) => boolean,
+  ): Promise<string[]> {
+    const errors: string[] = [];
+    for (const section of version.sections) {
+      if (!predicate(section)) continue;
+      const defs = section.fields.map((f) => this.toFieldDef(f, section.key));
+      const allowed = await this.resolveAllowedCodes(defs);
+      for (const def of defs) {
+        if (!isFieldVisible(def.visibleWhen, valuesByKey)) continue;
+        const val = valuesByKey[def.key];
+        if (def.required && isEmptyValue(val)) {
+          errors.push(`${def.label}: obligatorio`);
+          continue;
+        }
+        errors.push(...validateFieldValue(def, val, { allowedCodes: allowed.get(def.key) }).errors);
+      }
+    }
+    return errors;
+  }
+
+  /** Calcula effectiveAt + dimensiones de turno a partir de los valores actuales. */
+  private async computeSeal(
+    entry: LogEntryRow,
+    version: VersionWithGraph,
+    valuesByKey: Record<string, unknown>,
+  ): Promise<{ effectiveAt: Date; shiftCode: string | null; operationalDate: string | null; periodKey: string | null }> {
+    const effectiveAt = resolveEffectiveAt(
+      version.sections.map((s) => ({ fields: s.fields.map((f) => this.toFieldDtoLite(f)) })),
+      valuesByKey,
+      entry.recordedAt,
+    );
+    const dims = await this.shiftResolver.resolve(effectiveAt, entry.orgNodeId);
+    return {
+      effectiveAt,
+      shiftCode: dims?.shiftCode ?? null,
+      operationalDate: dims?.operationalDate ?? null,
+      periodKey: dims?.periodKey ?? null,
+    };
+  }
+
+  /**
+   * Próximo estado de una sección al recomputar editabilidad tras una transición:
+   * no editable ⇒ LOCKED (preserva completitud/firma/autoría); editable y estaba
+   * LOCKED ⇒ se reabre a PENDING (rework, conserva los valores); en otro caso se
+   * mantiene el estado actual.
+   */
+  private nextSectionState(current: LogEntrySectionState, editableNow: boolean): LogEntrySectionState {
+    if (!editableNow) return "LOCKED";
+    return current === "LOCKED" ? "PENDING" : current;
+  }
+
+  /**
+   * Crea una firma electrónica (Part 11): hashea el snapshot canónico (record–
+   * signature linking §11.70) y persiste la manifestación (§11.50). Corre dentro
+   * de la transacción de la acción firmada (transición o completitud de sección).
+   */
+  private async createSignature(
+    tx: Prisma.TransactionClient,
+    args: {
+      entry: LogEntryRow;
+      context: SignatureContext;
+      transitionKey?: string | null;
+      sectionKey?: string | null;
+      fromStateKey?: string | null;
+      toStateKey?: string | null;
+      meaning: string;
+      signerId: string;
+      signerName: string;
+      method: SignatureMethod;
+      valuesByKey: Record<string, unknown>;
+      signedAt: Date;
+    },
+  ): Promise<{ id: string }> {
+    const payloadHash = this.enc.sha256(
+      canonicalSignaturePayload({
+        entryId: args.entry.id,
+        templateVersionId: args.entry.templateVersionId,
+        context: args.context,
+        transitionKey: args.transitionKey ?? null,
+        sectionKey: args.sectionKey ?? null,
+        fromStateKey: args.fromStateKey ?? null,
+        toStateKey: args.toStateKey ?? null,
+        signerId: args.signerId,
+        meaning: args.meaning,
+        signedAt: args.signedAt.toISOString(),
+        values: args.valuesByKey,
+      }),
+    );
+    return tx.logEntrySignature.create({
+      data: {
+        logEntryId: args.entry.id,
+        context: args.context,
+        transitionKey: args.transitionKey ?? null,
+        sectionKey: args.sectionKey ?? null,
+        signerId: args.signerId,
+        signerName: args.signerName,
+        meaning: args.meaning,
+        method: args.method,
+        payloadHash,
+        signedAt: args.signedAt,
+      },
+      select: { id: true },
+    });
+  }
+
+  private signatureSummary(
+    sig: Prisma.LogEntrySignatureGetPayload<Record<string, never>> | undefined,
+  ): LogEntrySignatureSummaryDto | null {
+    if (!sig) return null;
+    return { signerName: sig.signerName, meaning: sig.meaning, signedAt: sig.signedAt.toISOString() };
+  }
+
+  /**
+   * Gancho de evento de dominio: una transición se ejecutó. Punto de extensión
+   * ÚNICO para el futuro bus de eventos/outbox → Notificaciones por transición y
+   * regla umbral→incidencia (Fase 4). Hoy es no-op intencional: la transición ya
+   * queda auditada, así que no se pierde nada. Ver docs/BACKLOG.md.
+   */
+  protected onTransitionExecuted(_event: TransitionEvent): void {
+    /* TODO(plataforma de eventos / Fase 4): publicar al outbox `logentry.transition.executed`. */
   }
 
   private async initialStateKey(workflowDefinitionVersionId: string | null): Promise<string | null> {
@@ -618,6 +1050,40 @@ export class LogEntriesService {
           visibleWhen: (f.visibleWhen as TemplateVersionDto["sections"][number]["fields"][number]["visibleWhen"]) ?? null,
           roleIds: f.roles.map((r) => r.roleId),
         })),
+      })),
+    };
+  }
+
+  private mapWorkflowVersion(version: WorkflowVersionWithGraph): WorkflowVersionDto {
+    return {
+      id: version.id,
+      workflowDefinitionId: version.workflowDefinitionId,
+      versionNumber: version.versionNumber,
+      status: version.status,
+      name: version.name,
+      description: version.description,
+      publishedAt: version.publishedAt?.toISOString() ?? null,
+      states: version.states.map((s) => ({
+        id: s.id,
+        key: s.key,
+        name: s.name,
+        description: s.description,
+        order: s.order,
+        isInitial: s.isInitial,
+        isFinal: s.isFinal,
+        color: s.color,
+      })),
+      transitions: version.transitions.map((t) => ({
+        id: t.id,
+        key: t.key,
+        label: t.label,
+        fromStateKey: t.fromState.key,
+        toStateKey: t.toState.key,
+        order: t.order,
+        requireSignature: t.requireSignature,
+        signatureMeaning: t.signatureMeaning,
+        requireMfa: t.requireMfa,
+        roleIds: t.roles.map((r) => r.roleId),
       })),
     };
   }

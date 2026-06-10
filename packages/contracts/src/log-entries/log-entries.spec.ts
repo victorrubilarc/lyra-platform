@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  availableTransitionsFor,
+  canonicalSignaturePayload,
   createLogEntryRequestSchema,
+  executeTransitionRequestSchema,
   isEmptyValue,
   isFieldVisible,
   isSectionEditableInState,
@@ -8,6 +11,7 @@ import {
   saveLogEntrySectionRequestSchema,
   validateFieldValue,
   type FieldForValidation,
+  type TransitionForAvailability,
 } from "./log-entries.js";
 
 const numberField = (config: Record<string, unknown> = {}): FieldForValidation => ({
@@ -144,5 +148,104 @@ describe("isSectionEditableInState", () => {
     expect(isSectionEditableInState("open", "open")).toBe(true);
     expect(isSectionEditableInState("open", "review")).toBe(false);
     expect(isSectionEditableInState("open", null)).toBe(false);
+  });
+});
+
+describe("availableTransitionsFor", () => {
+  const states = [
+    { key: "open", name: "Abierto" },
+    { key: "review", name: "En revisión" },
+    { key: "closed", name: "Cerrado" },
+  ];
+  const tx = (over: Partial<TransitionForAvailability>): TransitionForAvailability => ({
+    key: "send",
+    label: "Enviar a revisión",
+    fromStateKey: "open",
+    toStateKey: "review",
+    requireSignature: false,
+    signatureMeaning: null,
+    requireMfa: false,
+    roleIds: [],
+    ...over,
+  });
+
+  it("solo devuelve transiciones que salen del estado actual", () => {
+    const res = availableTransitionsFor(
+      [tx({}), tx({ key: "close", fromStateKey: "review", toStateKey: "closed" })],
+      states,
+      "open",
+      [],
+    );
+    expect(res.map((r) => r.transitionKey)).toEqual(["send"]);
+    expect(res[0]!.toStateName).toBe("En revisión");
+  });
+
+  it("sin estado actual (sin flujo) no hay transiciones", () => {
+    expect(availableTransitionsFor([tx({})], states, null, ["r1"])).toEqual([]);
+  });
+
+  it("filtra por rol cuando la transición declara roles (autorización = dato)", () => {
+    const t = [tx({ roleIds: ["supervisor"] })];
+    expect(availableTransitionsFor(t, states, "open", ["operador"])).toHaveLength(0);
+    expect(availableTransitionsFor(t, states, "open", ["supervisor"])).toHaveLength(1);
+  });
+
+  it("transición sin roles está abierta a cualquiera con el permiso base", () => {
+    expect(availableTransitionsFor([tx({ roleIds: [] })], states, "open", [])).toHaveLength(1);
+  });
+});
+
+describe("canonicalSignaturePayload", () => {
+  it("es determinista ante distinto orden de claves (mismo hash de contenido)", () => {
+    const a = canonicalSignaturePayload({
+      entryId: "e1",
+      templateVersionId: "tv1",
+      context: "TRANSITION",
+      transitionKey: "approve",
+      fromStateKey: "review",
+      toStateKey: "closed",
+      signerId: "u1",
+      meaning: "Aprobado",
+      signedAt: "2026-06-09T12:00:00.000Z",
+      values: { b: 2, a: 1, nested: { y: 1, x: 2 } },
+    });
+    const b = canonicalSignaturePayload({
+      signedAt: "2026-06-09T12:00:00.000Z",
+      meaning: "Aprobado",
+      values: { nested: { x: 2, y: 1 }, a: 1, b: 2 },
+      signerId: "u1",
+      toStateKey: "closed",
+      fromStateKey: "review",
+      transitionKey: "approve",
+      context: "TRANSITION",
+      templateVersionId: "tv1",
+      entryId: "e1",
+    });
+    expect(a).toBe(b);
+  });
+
+  it("distinto contenido ⇒ distinta serialización", () => {
+    const base = {
+      entryId: "e1",
+      templateVersionId: "tv1",
+      context: "TRANSITION" as const,
+      signerId: "u1",
+      meaning: "Aprobado",
+      signedAt: "2026-06-09T12:00:00.000Z",
+      values: {},
+    };
+    expect(canonicalSignaturePayload({ ...base, meaning: "Revisado" })).not.toBe(
+      canonicalSignaturePayload(base),
+    );
+  });
+});
+
+describe("executeTransitionRequestSchema", () => {
+  it("exige transitionKey y acepta credenciales opcionales", () => {
+    expect(executeTransitionRequestSchema.safeParse({ transitionKey: "approve" }).success).toBe(true);
+    expect(
+      executeTransitionRequestSchema.safeParse({ transitionKey: "approve", password: "x", mfaCode: "123456" }).success,
+    ).toBe(true);
+    expect(executeTransitionRequestSchema.safeParse({}).success).toBe(false);
   });
 });

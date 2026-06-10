@@ -1,15 +1,17 @@
 import { Module } from "@nestjs/common";
+import { AuthModule } from "../auth/auth.module";
 import { OperationalCalendarModule } from "../operational-calendar/operational-calendar.module";
 import { LogEntriesController } from "./log-entries.controller";
 import { LogEntriesService } from "./log-entries.service";
 
 /**
- * Llenado de bitácoras (Fase 2.4) — EJECUCIÓN auditada de plantillas.
- * Importa OperationalCalendarModule para inyectar `ShiftResolver` (estampa las
- * dimensiones de turno/día operacional/periodo en cada entrada).
+ * Llenado + EJECUCIÓN DE FLUJO de bitácoras (Fases 2.4/2.5).
+ * - OperationalCalendarModule → `ShiftResolver` (estampa turno/día operacional/periodo).
+ * - AuthModule → `ReauthService` (re-autenticación para las firmas Part 11).
+ * `EncryptionService` (hash del payload firmado) viene del CryptoModule global.
  */
 @Module({
-  imports: [OperationalCalendarModule],
+  imports: [OperationalCalendarModule, AuthModule],
   controllers: [LogEntriesController],
   providers: [LogEntriesService],
   exports: [LogEntriesService],
