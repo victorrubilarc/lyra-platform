@@ -4,6 +4,78 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-10 · Fase 2.6 Módulo de Bitácoras — diseño COMPLETO + slicing; 2.6.0 (núcleo de lectura) IMPLEMENTADO
+
+Vista de consulta/auditoría sobre todo lo que produce la ejecución (2.4/2.5). El módulo se **diseñó completo de una
+vez** (contratos + modelo + arquitectura) y se construye por **sub-slices publicables**: **2.6.0 núcleo de lectura ✅**
+(esta sesión) · **2.6.1 personalización** (SavedView server-side como concepto de PLATAFORMA + gestor de columnas +
+densidad + última vista) · **2.6.2 analítica/UX avanzada** (facetas con conteo, agrupación con subtotales, peek panel,
+sparklines, ⌘K profundo, export con columnas de valores por plantilla). Patrones aplicados: **review by exception**
+(ISPE GAMP 5 / EBR — indicadores por fila y vista de excepciones), **§11.50 manifestación de firma** y **§11.70
+record–signature linking** (verificación), **ALCOA+** (audit trail unificado), saved searches/list variants
+(Splunk/Kibana/SAP/Maximo — 2.6.1), estado de grilla serializable (AG Grid columnState → shape del deep-link y del
+futuro `SavedView.config`), event frames de PI (panel de relacionadas). **9 forks confirmados por el usuario:**
+
+1. **`/bitacoras` = pantalla nueva del módulo logbook** (sidebar propio como el prototipo); backend en el MISMO
+   `LogEntriesModule` (mismo agregado/autorización), pero **CQRS-lite**: lado de lectura en `LogbookQueryService`
+   separado del de escritura (`LogEntriesService`, que ya iba en ~1000 líneas); comparte sus helpers internos.
+2. **Timeline fusionada en BACKEND** (`GET :id/timeline`): k-way merge de cambios+transiciones+firmas de sección+
+   eventos sintéticos CREATED/SEALED con cursor `(at, id)`. Motivo: orden autoritativo del servidor y paginación
+   multi-tabla imposible de hacer bien en cliente; patrón audit trail viewer de Veeva/MasterControl; reusable Fase 4.
+   El desempate a igual instante es por `id` (estable para el cursor), no por tipo de evento.
+3. **Verificación de integridad ON-DEMAND** (botón por firma) y **AUDITADA** (`logentry.signature.verified`): la
+   verificación es un acto de revisión GxP. Veredicto tri-estado: `VALID` (hash coincide con valores actuales) /
+   `VALID_RECORD_CHANGED_AFTER` (coincide al REBOBINAR `LogEntryFieldChange` a `signedAt` ⇒ firma íntegra, registro
+   editado después — legítimo en flujos multi-estado) / `INVALID` (no reconstruible ⇒ investigar).
+4. **Log de cambios por campo = endpoint paginado aparte** (`GET :id/changes`): es append-only y sin tope; el detalle
+   queda liviano. En el visor van timeline (narrativa) Y log de cambios (tabla fina) como paneles separados.
+5. **SIN permiso nuevo de "auditor"**: `logentry:view` + ABAC ya definen el alcance (el alcance es atributo, no clave
+   nueva — NIST SP 800-162); "ver todo" = rol sin restricción de scope; la autoría es FILTRO, no frontera (el logbook
+   es registro compartido del turno por diseño). Si un cliente exige "solo mis entradas", será dimensión de scope.
+6. **Export CSV WIDE** (1 fila/entrada: columnas de sistema + indicadores), espejo exacto del patrón de
+   `/security/audit/export` (lotes keyset, tope 100k, `X-Export-Truncated`, BOM, `;` es-CL). Variante "con columnas de
+   valores" SOLO al filtrar por una plantilla → 2.6.2; formato LONG (BI) diferido hasta demanda real.
+7. **Vistas guardadas: server-side desde 2.6.1 como plataforma** (`SavedView` con discriminador `module`, config =
+   {filters, search, sort, columns{order,hidden,pinned,widths}, density}); vistas de SISTEMA en código (versionables,
+   i18n, imborrables por construcción), no en BD. Compartir por rol DIFERIDO (columna aditiva futura).
+8. **Facetas con conteo → 2.6.2**; en 2.6.0 ya hay KPIs (`GET /log-entries/stats`: groupBy acotados con el MISMO
+   `where` del listado). **Sin virtualización**: cursor keyset + "cargar más" de 50 (un humano filtra, no pagina 5k).
+9. **Slicing aprobado** con 2 ajustes: deep-link básico y CSS de impresión SUBEN a 2.6.0.
+
+**Modelo (migración aditiva `20260610051359_add_logbook_review_columns`, las 3 adiciones confirmadas):**
+- **`LogEntry.entryNumber`** — folio humano correlativo (`BIT-000123`, helper `formatEntryFolio`); backfill ORDENADO
+  por `recordedAt` con secuencia propia (un SERIAL directo asignaría en orden físico). Patrón WO number Maximo.
+- **`LogEntrySection.requiresSignature`** — estampado de la definición congelada al instanciar (+backfill): "firmas
+  pendientes" pasa a ser `EXISTS (requiresSignature AND signatureId IS NULL)` en SQL, sin join a la definición.
+- **`LogEntryValue.thresholdBand`** (enum WARN|CRIT) — banda ISA-18.2 estampada al guardar (la validación ya la
+  computa; fuente única `thresholdBandFor` en contracts, también usada por el badge en UI y el backfill
+  `db:backfill-threshold-bands`). Habilita filtros/KPIs de excepción sin re-evaluar configs.
+- Índices nuevos: `LogEntry(createdById)`, `LogEntry(currentStateKey)`, `LogEntryValue(thresholdBand)` (deuda
+  detectada: autoría y estado de flujo sin índice).
+
+**Canonicalización de firma v2 (decisión técnica importante):** el mapa `values` firmado podía contener claves con
+`null` SIN fila en BD (inputs vacíos de `saveSection`) ⇒ ambigüedad "clave-con-null" vs "clave-ausente" que produciría
+falsos `INVALID` al verificar. `canonicalSignaturePayload` ahora **descarta los valores vacíos**
+(`canonicalSignatureValues`, fuente única) y `LogEntryFieldChange.changedAt` se estampa con el MISMO reloj que
+`signedAt` (antes lo ponía la BD ⇒ el rebobinado no podía excluir con exactitud los cambios del propio guardado
+firmado). **Efecto:** las firmas creadas ANTES de 2.6 cuyo payload contenía nulls verificarían `INVALID`; aceptado
+explícitamente porque no existe ninguna instalación productiva (solo datos de demo/smoke). Desde 2.6 el hash es
+estable y verificable.
+
+**Decisiones de UI:** filtro de nodo con `Combobox` aplanado + checkbox "incluir descendientes" (el `ScopeTreePicker`
+es un editor multi-selección de scope, control equivocado para UN nodo de filtro); el select de "estado del flujo" se
+puebla con los estados PRESENTES en el set cargado (self-narrowing honesto hasta las facetas de 2.6.2); atajos "turno
+actual" / "este periodo" DIFERIDOS (requieren resolver el calendario en cliente o facetas; hoy van hoy/24h/7d/30d);
+filtro de EQUIPO en contrato pero sin UI (2.6.1). `@lyra/ui Chip` gana `onRemove` (chips de filtros activos,
+reutilizable por Incidencias). La URL es la fuente de verdad de la grilla (deep-link; base del `SavedView` de 2.6.1).
+Orden servidor solo por la whitelist NOT NULL (`recordedAt`/`effectiveAt`/`entryNumber`) — keyset correcto sin ramas
+de nulos; el multi-sort de columnas arbitrarias queda para el gestor de columnas (2.6.1) si se justifica.
+
+Tests: contracts **113** (+9) · API **156** (+12). Smoke en vivo **22/22** (datos de prueba creados y LIMPIADOS).
+Rama `feat/bitacoras-auditor`.
+
+---
+
 ### 2026-06-10 · Fase 2.5 Ejecución de flujo + firmas electrónicas Part 11 — IMPLEMENTADO (forks resueltos)
 
 Cierra el bucle de ejecución abierto en 2.4: motor de transiciones + firmas estilo **21 CFR Part 11**

@@ -65,6 +65,9 @@
   `Restrict`), `equipmentId?` (FK `SetNull`), `templateId`/`templateVersionId` (FK `Restrict`, integridad histórica),
   `currentStateKey?` (estado del flujo; null = sin flujo), `status` (`DRAFT`/`SUBMITTED`/`VOID`), `sealedAt?`,
   `deletedAt?`. La trazabilidad temporal es **estructural**, no un campo que se agrega.
+  - **`entryNumber`** *(Fase 2.6, migración `20260610051359_add_logbook_review_columns`)* — **folio humano
+    correlativo** único (secuencia BD; backfill ordenado por `recordedAt`). Referencia estable de auditoría/terreno
+    (`BIT-000123` vía `formatEntryFolio`). Índices 2.6 añadidos: `createdById`, `currentStateKey`.
   - **`workflowDefinitionVersionId` DENORMALIZADO** (+ `workflowDefinitionId`): al crear la entrada se **copia** la
     versión de flujo que congeló su `TemplateVersion`. La entrada vive TODO su ciclo bajo **esa** versión aunque el
     flujo publique v(n+1) después. Re-basar = operación explícita y auditada (por defecto NO; estilo GxP).
@@ -78,12 +81,18 @@
   plantilla. `sectionKey` (clave estable), `state` (`PENDING`/`IN_PROGRESS`/`COMPLETED`/`LOCKED`), `filledById?`/
   `filledAt?`, `signatureId?` (Part 11, se llena en 2.5), **`version` Int** (concurrencia optimista por sección,
   check-and-bump). FK `onDelete: Cascade`, `@@unique([logEntryId, sectionKey])`.
+  - **`requiresSignature`** *(Fase 2.6)* — estampado de la definición congelada al instanciar (+backfill): "firmas
+    pendientes" = `requiresSignature AND signatureId IS NULL` en SQL, sin join a la definición.
 - **LogEntryValue** *(implementado)* — valor actual, **1 fila por campo**: `sectionKey`, `fieldKey`, `dataType`
   (copiado para reporte), `value` jsonb (null = vacío). El valor de un campo de referencia se persiste como **`code`
   estable, NO label**. `@@unique([logEntryId, fieldKey])`.
+  - **`thresholdBand?`** *(Fase 2.6, enum `WARN`|`CRIT`)* — banda ISA-18.2 ESTAMPADA al guardar contra la versión
+    congelada (fuente única `thresholdBandFor` en contracts; backfill `db:backfill-threshold-bands`). Habilita
+    review-by-exception (filtros/KPIs de "fuera de umbral") sin re-evaluar configs. Indexada.
 - **LogEntryFieldChange** *(implementado)* — historial **append-only por campo** (antes/después): `fieldKey`,
   `before`/`after` jsonb, `changedById`, `changedAt`, `reason?`. Auditoría fina del llenado; complementa el AuditLog
-  de eventos de alto nivel (`logentry.created`/`logentry.section.saved`/`logentry.submitted`).
+  de eventos de alto nivel (`logentry.created`/`logentry.section.saved`/`logentry.submitted`). Desde 2.6 `changedAt`
+  se estampa con el MISMO reloj que la firma del guardado (la verificación de integridad rebobina con `> signedAt`).
 - **LogEntryTransition** *(implementado — Fase 2.5, migración `20260610035255_add_log_entry_execution`)* — historial
   **append-only** de transiciones EJECUTADAS: `workflowDefinitionVersionId` (versión congelada), `transitionKey`,
   `fromStateKey`/`toStateKey`, `actorId`+`actorEmail` (snapshot), `reason?`, `signatureId?` (ref. blanda a la firma),
@@ -110,6 +119,13 @@
 > estado inicial y reconcilia `status` (terminal ⇒ `SUBMITTED`). `submit` queda SOLO para forms sin flujo (con flujo se
 > rechaza). Firma opt-in por transición (`requireSignature`/`requireMfa`) y por completitud de sección
 > (`TemplateSection.requireSignature`), capturada con `ReauthService` (contraseña + MFA step-up condicional).
+>
+> **Lectura / módulo de Bitácoras (2.6 — implementado):** `LogbookQueryService` (CQRS-lite, mismo módulo) sirve
+> `GET /log-entries` (filtros completos en SQL + ABAC + keyset cursor + indicadores batched), `/stats` (KPIs con el
+> mismo `where`), `/export` (CSV server-side), `:id/timeline` (audit trail unificado fusionado en backend),
+> `:id/changes` (paginado), `:id/related` (mismo nodo+periodo / mismo turno) y
+> `POST :id/signatures/:sigId/verify` (recomputa el hash canónico; rebobina `LogEntryFieldChange` a `signedAt`;
+> veredicto `VALID` / `VALID_RECORD_CHANGED_AFTER` / `INVALID`, auditado).
 
 ### Flujos reutilizables (máquina de estados)
 > **Fase 2.2 (implementado — lado DEFINICIÓN):** migración `20260609163822_add_workflow_definition`. Máquina de

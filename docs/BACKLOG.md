@@ -5,10 +5,10 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-10** (**Fase 2.1/2.1.1/2.2/2.x/2.3.0 ✅** + **Fase 2.4 ✅** + **Fase 2.5 ✅** — Plantillas/Form
-> Builder + Flujos + Datos de referencia + Calendario operacional + **Llenado** (`LogEntry*`) + **Ejecución de flujo +
-> firmas Part 11** (`LogEntryTransition`/`LogEntrySignature`); **siguiente: Fase 2.6 — Bitácoras (listado/detalle/timeline/
-> log de cambios)**, o 2.3 Rondas intercalable).
+> actualización: **2026-06-10** (**Fase 2.1/2.1.1/2.2/2.x/2.3.0 ✅** + **2.4 ✅** + **2.5 ✅** + **2.6.0 ✅** — … +
+> **Módulo de Bitácoras núcleo de lectura**: grilla `/bitacoras` + record viewer + timeline ALCOA+ + verificación de
+> firmas §11.70 + export CSV; **siguiente: 2.6.1 — Personalización (SavedView de plataforma + gestor de columnas)**,
+> o 2.3 Rondas / 2.6.2 intercalables).
 
 ---
 
@@ -53,6 +53,7 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Fase 2.3.0 Calendario operacional** (`OperationalCalendar`/`OperationalShift` + `ShiftResolver` + mantenedor) | `main` (fusionado desde `feat/calendario-operacional`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Fase 2.4 Llenado (Nueva entrada)** (`LogEntry*` + `/log-entries` + `FieldControl` + pantalla de llenado) | `main` (fusionado desde `feat/llenado`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Fase 2.5 Ejecución de flujo + firmas Part 11** (`LogEntryTransition`/`LogEntrySignature` + `executeTransition` + `ReauthService` + modales de firma) | `main` (fusionado desde `feat/ejecucion-flujo`) | ✅ fusionado y publicado en `origin/main` | ninguna |
+| **Fase 2.6.0 Módulo de Bitácoras — núcleo de lectura** (folio + estampados + `LogbookQueryService` + `/bitacoras` + record viewer + verificación de firmas) | `main` (fusionado desde `feat/bitacoras-auditor`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 
 **Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
@@ -274,9 +275,33 @@ nunca queda más de una sesión atrás.
           **(b)** guarda de completitud **configurable por transición** (hoy exige COMPLETED todas las secciones del
           estado de origen con campos). **(c)** re-seed del editor al transicionar desde otra pestaña (concurrencia de
           estado, espejo del 409 de sección). **(d)** anulación de entrada (`VOID`) con motivo y firma.
-  - [ ] **2.6 Bitácoras: listado + detalle + línea de tiempo + log de cambios** (vista de auditor). **← siguiente
-        recomendada.** Ya hay mucho que mostrar: entradas + `LogEntryTransition` (historial) + `LogEntrySignature`
-        (firmas) + `LogEntryFieldChange` (cambios por campo). Read-only, filtrable, exportable.
+  - [x] **2.6.0 Módulo de Bitácoras — núcleo de lectura** ✅ (2026-06-10). Diseño COMPLETO del módulo + slicing en
+        DECISIONS 2026-06-10 (9 forks + 3 adiciones de modelo confirmados). Migración aditiva
+        `…_add_logbook_review_columns` (folio `entryNumber` con backfill ordenado, `requiresSignature` estampado,
+        `thresholdBand` ISA-18.2 estampada + `db:backfill-threshold-bands`, índices createdById/currentStateKey).
+        `LogbookQueryService` (CQRS-lite): list con filtros completos en SQL + ABAC + keyset, stats, export CSV
+        server-side, timeline ALCOA+ fusionada en backend, changes paginado, related, **verificación de integridad de
+        firma** (§11.70, veredicto tri-estado, auditada; canonicalización v2 del payload — descarta valores vacíos —
+        y `changedAt` estampado con el reloj de la firma). Web `/bitacoras` (KPIs + filtros + chips + grilla con color
+        de estado congelado + indicadores + cursor + deep-link + export) y `/bitacoras/:id` (record viewer EBR:
+        mini-stepper, FieldControl readOnly + badges de umbral, panel de firmas con verificación, timeline, log de
+        cambios, relacionadas, impresión). `Chip.onRemove` en @lyra/ui. Tests: contracts 113, API 156. Smoke 22/22.
+        **Pendiente: smoke VISUAL** (§4).
+  - [ ] **2.6.1 Bitácoras — Personalización** **← siguiente recomendada.** `SavedView` server-side como concepto de
+        PLATAFORMA (`module` discriminador; config = {filters, search, sort, columns{order,hidden,pinned,widths},
+        density}; CRUD del dueño; UNA default por usuario+módulo; **vistas de sistema en código**, no en BD: "Mi
+        turno", "Firmas pendientes", "Excepciones", "Últimas 24h"; deep-link a vista; compartir por rol DIFERIDO) +
+        **gestor de columnas** (mostrar/ocultar/reordenar drag/pin izq-der/redimensionar/autosize — evolución del
+        `Table` de @lyra/ui, reusable por Incidencias Fase 4) + densidad por grilla + recordar última vista (efímero
+        localStorage, nombradas en BD). Incluir aquí: **filtro de EQUIPO en UI** (contrato ya lo soporta) y
+        **multi-sort** si el gestor lo justifica.
+  - [ ] **2.6.2 Bitácoras — Analítica/UX avanzada**: **facetas con conteo por valor** (estilo Splunk/Kibana; de paso
+        el select de "estado del flujo" deja de poblarse solo con el set cargado), agrupación con subtotales
+        (por plantilla/nodo/turno/estado), peek/quick-look (Drawer lateral sin salir del listado), hover cards,
+        copiar al portapapeles (folio/valor), mini-tendencias/sparklines de campos numéricos en el periodo,
+        atajos de teclado + ⌘K profundo (abrir vista guardada), atajos "turno actual"/"este periodo" (requieren
+        resolver el calendario o facetas), **export con columnas de valores al filtrar por UNA plantilla**,
+        contador de cambios por campo inline en sección (popover). Formato LONG de export diferido hasta demanda BI.
   - [ ] **2.7 (cruce Fase 4)** reglas de umbral que disparan incidencias (con el motor de incidencias).
   - [ ] **Expansión de tipos de campo (incremental, cada uno pequeño).** Alto valor industrial: **Conforme/No
         conforme/N.A.** (tri-estado), **lookup/picker de referencia** (single/multi, tras 2.x), **picker de
@@ -375,6 +400,10 @@ nunca queda más de una sesión atrás.
   - **El conteo "en uso" es conservador**: cuenta `TemplateVersion` en borrador e incluso de plantillas con borrado
     lógico. Evaluar acotar a publicadas/activas si molesta en la práctica. **Prioridad: baja.**
 
+- [ ] **Verificación de firmas — nota de compatibilidad (2.6).** La canonicalización v2 del payload (descarta
+      valores vacíos) hace que firmas creadas ANTES de 2.6 cuyo mapa firmado contenía claves con `null` verifiquen
+      `INVALID`. Hoy solo existían datos de demo/smoke (aceptado en DECISIONS 2026-06-10). Si alguna vez se migra una
+      instalación con firmas v1 reales, implementar verificación dual (intentar v1 y v2). **Prioridad: informativa.**
 - [ ] **Firmas/re-auth (Fase 2.5) — deuda de endurecimiento (no afecta integridad).** Registrada el 2026-06-10
       tras `/security-review` (sin hallazgos explotables):
   - **Throttle de re-auth de firma**: `ReauthService.verifyForSignature` no tiene contador propio de fallos. No es
@@ -473,6 +502,17 @@ probatoria (hash+timestamp). Ref: `DECISIONS.md` (sección de recomendaciones).
       **Guardar y completar**; **Enviar y registrar** → banner de sellado; secciones de solo-lectura tras enviar);
       probar **concurrencia** (dos pestañas guardando la misma sección → toast de conflicto + recarga); modo claro.
       App en `:5173`.
+- [ ] **Bitácoras 2.6.0 — smoke VISUAL en navegador** (se verificó typecheck/lint/test/build web + smoke por API
+      22/22; falta el clic): `/bitacoras` (KPIs clicables y que respetan filtros; barra de filtros: búsqueda con
+      debounce, nodo con incluir-descendientes, plantilla, status, estado de flujo, turno, día operacional, rangos
+      con atajos hoy/24h/7d/30d, banda de umbral, mis entradas, firmas pendientes; chips activos removibles +
+      limpiar; grilla: folio mono, chip de estado con color congelado, indicadores por fila con tooltips, orden por
+      folio/efectiva/captura, cargar más; **deep-link**: copiar la URL con filtros y abrirla en otra pestaña;
+      exportar CSV y abrirlo en Excel es-CL); `/bitacoras/:id` (cabecera con folio + mini-stepper del flujo, chips de
+      dimensiones, secciones read-only con labels de Listas resueltos + badges de umbral, panel de firmas §11.50 +
+      **verificar integridad** [VALID y VALID_RECORD_CHANGED_AFTER tras editar], timeline unificada + cargar más,
+      log de cambios antes→después, relacionadas navegables, **imprimir** [solo contenido, sin chrome]); ítem
+      "Bitácoras" en sidebar y ⌘K; modo claro y oscuro; tablet. App en `:5173`.
 - [ ] **Ejecución de flujo + firmas 2.5 — smoke VISUAL en navegador** (se verificó typecheck/lint/test/build web +
       smoke por API 21/21; falta el clic): abrir una entrada con flujo en `/nueva-entrada/:id` → chip de estado del
       flujo en cabecera; completar la sección del estado inicial; **barra de transiciones** (botones gateados por

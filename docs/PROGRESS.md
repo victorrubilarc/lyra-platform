@@ -1,11 +1,11 @@
 # Progreso — Lyra WatchLog
 
-Última actualización: 2026-06-10 (**Fase 1 completa**; **Fase 2.1/2.1.1/2.2/2.x/2.3.0 ✅** + **Fase 2.4 ✅** + **Fase 2.5 ✅** —
-Plantillas/Form Builder; Flujos `WorkflowDefinition`; Datos de referencia `ReferenceList`/`ReferenceItem`; Calendario
-operacional `OperationalCalendar` + `ShiftResolver`; **Llenado (Nueva entrada) multi-actor** (`LogEntry*`); y **Ejecución de
-flujo + firmas electrónicas Part 11**: motor `executeTransition` [rol-dato × ABAC × completitud], firmas `LogEntrySignature`
-polimórficas con re-auth `ReauthService`, sellado reconciliado, recomputo de secciones e historial `LogEntryTransition`).
-**Siguiente: Fase 2.6 — Bitácoras (listado + detalle + línea de tiempo + log de cambios)** (vista de auditor; o 2.3 Rondas intercalable).
+Última actualización: 2026-06-10 (**Fase 1 completa**; **Fase 2.1/2.1.1/2.2/2.x/2.3.0 ✅** + **Fase 2.4 ✅** + **Fase 2.5 ✅**
++ **Fase 2.6.0 ✅** — Plantillas/Form Builder; Flujos; Datos de referencia; Calendario operacional; Llenado multi-actor;
+Ejecución de flujo + firmas Part 11; y **Módulo de Bitácoras (núcleo de lectura)**: grilla enterprise `/bitacoras` con
+filtros+KPIs+cursor+deep-link+export CSV, record viewer `/bitacoras/:id` con timeline ALCOA+ unificada, log de cambios y
+**verificación de integridad de firmas** §11.70; folio `entryNumber` + estampados `requiresSignature`/`thresholdBand`).
+**Siguiente: 2.6.1 — Personalización (SavedView de plataforma + gestor de columnas)** (o 2.3 Rondas / 2.6.2 intercalables).
 
 ## Estado por fase
 
@@ -13,7 +13,7 @@ polimórficas con re-auth `ReauthService`, sellado reconciliado, recomputo de se
 |---|---|---|
 | 0 | **Cimientos** (monorepo, Docker, Design System tokens, contratos, API health) | ✅ Hecho |
 | 1 | Seguridad (auth + RBAC/ABAC) + Estructura organizacional + AuditLog | ✅ Backend ✅ · UI: Login ✅ · **Estructura ✅ (+ Equipos ✅)** · **Seguridad ✅** |
-| 2 | Plantillas / Form Builder + Bitácoras | 🔄 **2.1 ✅** + **2.1.1 ✅** + **2.2 ✅** + **2.x ✅** + **2.3.0 ✅** + **2.4 ✅** + **2.5 ✅** (Form Builder + Flujos + Datos de referencia + Calendario operacional + **Llenado/Nueva entrada** + **Ejecución de flujo/firmas Part 11**) · 2.3 Rondas, 2.6–2.7 pendientes |
+| 2 | Plantillas / Form Builder + Bitácoras | 🔄 **2.1 ✅** + **2.1.1 ✅** + **2.2 ✅** + **2.x ✅** + **2.3.0 ✅** + **2.4 ✅** + **2.5 ✅** + **2.6.0 ✅** (Form Builder + Flujos + Datos de referencia + Calendario operacional + Llenado + Ejecución de flujo/firmas + **Bitácoras núcleo de lectura**) · 2.3 Rondas, 2.6.1/2.6.2, 2.7 pendientes |
 | 3 | Orígenes de datos | ⬜ Pendiente |
 | 4 | Motor de incidencias | ⬜ Pendiente |
 | 5 | Cambio de turno + IA (resumen) | ⬜ Pendiente |
@@ -34,7 +34,7 @@ polimórficas con re-auth `ReauthService`, sellado reconciliado, recomputo de se
 | Plantillas (Form Builder) | 2 | ✅ **2.1** API + UI (definición: secciones/campos/umbrales/permiso por sección/borrador-publicar) |
 | Nueva entrada / Llenado | 2 | ✅ **2.4** API + UI (llenado multi-actor por secciones, concurrencia, validación servidor, estampado de dimensiones, sellado al enviar) |
 | Ejecución de flujo + firmas (Part 11) | 2 | ✅ **2.5** API + UI (transiciones gateadas rol-dato×ABAC×completitud, firmas re-auth/MFA step-up, bloqueo/desbloqueo de secciones, historial de transiciones) |
-| Bitácoras (listado + detalle + log de cambios) | 2 | ⬜ 2.6 |
+| Bitácoras (listado + detalle + log de cambios) | 2 | ✅ **2.6.0** API + UI (grilla enterprise + record viewer + timeline + verificación de firmas + export) · 2.6.1 personalización / 2.6.2 analítica pendientes |
 | Orígenes de datos | 3 | ⬜ |
 | Incidencias (kanban + drawer workflow) | 4 | ⬜ |
 | Cambio de turno | 5 | ⬜ |
@@ -705,11 +705,64 @@ Cierra el bucle de ejecución abierto en 2.4. Motor de transiciones + firmas est
   prueba hard-deleted (0 restantes). **`/security-review` sobre el diff: sin hallazgos.**
 - **Pendiente**: smoke **VISUAL** en navegador (ver BACKLOG §4).
 
+## Hecho en Fase 2.6.0 (Módulo de Bitácoras — núcleo de lectura)
+
+Vista de consulta/auditoría de clase mundial sobre todo lo que produce la ejecución (2.4/2.5). El módulo 2.6 se
+**diseñó completo** y se construye por sub-slices publicables (**2.6.0 ✅** · 2.6.1 personalización · 2.6.2
+analítica/UX avanzada — ver DECISIONS 2026-06-10, 9 forks + 3 adiciones de modelo confirmados). Patrones: review by
+exception (ISPE GAMP 5/EBR), §11.50/§11.70 Part 11, ALCOA+, saved-search/deep-link (Splunk/Kibana), grid state
+serializable (AG Grid). Rama `feat/bitacoras-auditor`, 4 commits por capa.
+
+- **Prisma** (migración aditiva `20260610051359_add_logbook_review_columns`): **`LogEntry.entryNumber`** (folio
+  humano correlativo, backfill ORDENADO por `recordedAt` + secuencia propia), **`LogEntrySection.requiresSignature`**
+  (estampado de la definición congelada + backfill — "firmas pendientes" en SQL puro),
+  **`LogEntryValue.thresholdBand`** (enum WARN|CRIT, estampada al guardar; backfill `db:backfill-threshold-bands`
+  que reusa la fuente única de contracts), índices `LogEntry(createdById)`/`LogEntry(currentStateKey)`/
+  `LogEntryValue(thresholdBand)` (deuda de índices detectada y cerrada).
+- **Contratos** (`@lyra/contracts/log-entries`): `logEntryListQuerySchema` v2 (búsqueda por folio/plantilla/nodo,
+  nodo±descendientes, equipo, status, stateKey, turno/periodo/día operacional, rangos effectiveAt/recordedAt,
+  autoría, firmas pendientes, banda de umbral, orden por whitelist NOT NULL + cursor keyset + take≤100);
+  `LogEntryListItem` enriquecido (folio, versión, nodo, estado congelado con color, autoría, equipo + indicadores);
+  `LogEntryStats`; timeline = unión discriminada CREATED/FIELD_CHANGE/TRANSITION/SECTION_SIGNED/SEALED; log de
+  cambios paginado; relacionadas; veredicto de verificación `VALID`/`VALID_RECORD_CHANGED_AFTER`/`INVALID`.
+  **Fuentes únicas nuevas**: `thresholdBandFor` (banda ISA-18.2) y `canonicalSignatureValues` (canonicalización v2:
+  el payload firmado DESCARTA valores vacíos — elimina falsos INVALID; firmas pre-2.6 con nulls quedan no
+  verificables, aceptado por no haber instalación productiva). `formatEntryFolio`. **+9 specs**.
+- **Backend** (**CQRS-lite**: lado de lectura en **`LogbookQueryService`**, separado del de escritura):
+  `GET /log-entries` (TODOS los filtros en SQL + ABAC siempre + keyset validado contra el orden + enriquecimiento por
+  página 100% batched, cero N+1, payload sin valores), `GET /log-entries/stats` (KPIs, mismo `where`),
+  `GET /log-entries/export` (CSV server-side del set completo, patrón auditoría: lotes keyset/tope 100k/
+  `X-Export-Truncated`/BOM/`;` es-CL), `GET :id/timeline` (k-way merge multi-tabla con cursor `(at,id)` + eventos
+  sintéticos), `GET :id/changes` (paginado con labels congelados), `GET :id/related` (mismo nodo+periodo / mismo
+  turno), `POST :id/signatures/:sigId/verify` (recomputa hash canónico; REBOBINA `LogEntryFieldChange` a `signedAt`;
+  auditado como acto de revisión). Escritura: `create` estampa `requiresSignature`; `saveSection` estampa
+  `thresholdBand` y fija `changedAt = signedAt` (mismo reloj, clave para el rebobinado). `getDetail` gana
+  `createdByName`/`equipmentName`; `mapEntry` expone el folio. **+12 tests**.
+- **Web** (`features/logbook`): **`/bitacoras`** — barra KPI clicable (total/en curso/registradas/firmas
+  pendientes/excepciones), filtros completos con chips ACTIVOS removibles + limpiar, atajos hoy/24h/7d/30d, grilla
+  con folio + chip del estado con el COLOR congelado + indicadores review-by-exception por fila, orden servidor,
+  "cargar más" por cursor, export CSV y **estado deep-linkeable en la URL** (fuente de verdad). **`/bitacoras/:id`**
+  (record viewer read-only estilo EBR): cabecera de identidad con folio + **mini-stepper de la máquina de estados**,
+  chips de dimensiones selladas, secciones con `FieldControl` readOnly + badges ISA-18.2, **panel de firmas §11.50
+  con verificación de integridad on-demand** (veredicto explicado), **línea de tiempo unificada** paginada, **log de
+  cambios** antes→después con motivo (estilo prototipo), relacionadas navegables y **vista de impresión** (`@media
+  print` oculta el chrome del shell). `@lyra/ui Chip` gana `onRemove`. Ítem "Bitácoras" en sidebar/⌘K. i18n es-CL.
+- **Verificación**: `typecheck` (6 paquetes) · `lint` (0 errores; 1 warning preexistente OrgTree) · `build` web
+  (1618 KB JS; API NO se buildea por el watch) · `test` (**contracts 113** +9 · permissions 5 · **API 156** +12) en
+  verde. **Smoke en vivo** (demo): plantilla con umbrales y sección con firma → entrada A CRIT firmada (folio
+  asignado) + entrada B WARN con firma pendiente → filtros banda CRIT/WARN/ANY, firmas pendientes, búsqueda por folio
+  `BIT-000016`, rama con/sin descendientes, paginación keyset, cursor de otro orden 400 → stats exactos → detalle
+  enriquecido → timeline (CREATED+cambios+SECTION_SIGNED) → log de cambios → relacionadas → **verificación de firma
+  VALID → editar valor → VALID_RECORD_CHANGED_AFTER (1 cambio)** → export CSV (BOM+`;`+cabeceras, no truncado).
+  **22/22 checks.** Datos de prueba eliminados (15 entradas originales intactas).
+- **Pendiente**: smoke **VISUAL** en navegador (ver BACKLOG §4). Sub-slices 2.6.1/2.6.2 diseñados en DECISIONS/BACKLOG.
+
 ## Próximo paso
-**Fase 2.5 completa.** **Sesión siguiente recomendada = Fase 2.6 · Bitácoras (listado + detalle + línea de tiempo +
-log de cambios)**: vista de auditor read-only sobre todo lo que la ejecución ya produce (entradas, transiciones, firmas,
-historial de campos). Alternativa intercalable: **2.3 Rondas/`LogPeriod`** (recurrencia sobre los turnos ya definidos).
-Luego 2.7 (umbral→incidencia, cruce Fase 4) → Fase 3 (sincroniza Listas `source=EXTERNAL`). Ver BACKLOG §2.
+**Fase 2.6.0 completa y publicada.** **Sesión siguiente recomendada = 2.6.1 · Personalización de Bitácoras**:
+`SavedView` server-side como concepto de PLATAFORMA (vistas guardadas con default + vistas de sistema en código) +
+gestor de columnas (mostrar/ocultar/reordenar/pin/redimensionar) + densidad + recordar última vista. Alternativas
+intercalables: **2.3 Rondas/`LogPeriod`** o **2.6.2 analítica** (facetas con conteo, agrupación, peek). Luego 2.7
+(umbral→incidencia, cruce Fase 4) → Fase 3 (sincroniza Listas `source=EXTERNAL`). Ver BACKLOG §2.
 
 **Mejora futura registrada (BACKLOG §2):** seguridad a nivel de nodo en el mantenedor de Estructura (ABAC
 enterprise: asignar usuarios/roles a nodos desde el propio árbol, "quién accede a este nodo"). El modelo ya
