@@ -324,6 +324,7 @@ export function CalendarDetailPanel({ calendarId, onDeleted }: CalendarDetailPan
         )}
       </div>
 
+      <div className={styles.detailBody}>
       {/* General */}
       <div className={styles.section}>
         <h3 className={styles.sectionTitle}>{t("opsCalendar.general")}</h3>
@@ -538,6 +539,7 @@ export function CalendarDetailPanel({ calendarId, onDeleted }: CalendarDetailPan
             </Button>
           </div>
         </Can>
+      </div>
       </div>
 
       {confirmDelete && (
