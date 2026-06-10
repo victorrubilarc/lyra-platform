@@ -1,11 +1,9 @@
 import { Fragment, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ChevronDown, ChevronRight, Search } from "lucide-react";
-import { Button, Checkbox, Chip, Input, Modal, useToast } from "@lyra/ui";
+import { Button, Checkbox, Chip, Input, Modal } from "@lyra/ui";
 import type { OrgNodeTree } from "@lyra/contracts";
-import { ApiError } from "../../lib/api-client.js";
 import { useOrgTree } from "../structure/structure-queries.js";
-import { useAssignCalendarNodes } from "./operational-calendar-queries.js";
 import styles from "./OperationalCalendarPage.module.css";
 
 function norm(s: string): string {
@@ -22,8 +20,9 @@ function filterTree(nodes: OrgNodeTree[], q: string): OrgNodeTree[] {
 }
 
 interface AssignNodesModalProps {
-  calendarId: string;
   currentNodeIds: string[];
+  /** Devuelve la selección al panel (se persiste con el Guardar del calendario). */
+  onConfirm: (orgNodeIds: string[]) => void;
   onClose: () => void;
 }
 
@@ -31,12 +30,11 @@ interface AssignNodesModalProps {
  * Selección de nodos asignados directamente a este calendario (set plano). La
  * herencia a descendientes la resuelve el backend por la ruta materializada, así
  * que basta marcar el nodo raíz de una rama. Picker mínimo sobre el árbol existente.
+ * NO persiste: devuelve la selección al panel, que la guarda junto al resto.
  */
-export function AssignNodesModal({ calendarId, currentNodeIds, onClose }: AssignNodesModalProps) {
+export function AssignNodesModal({ currentNodeIds, onConfirm, onClose }: AssignNodesModalProps) {
   const { t } = useTranslation();
-  const toast = useToast();
   const { data: tree = [] } = useOrgTree();
-  const assign = useAssignCalendarNodes();
 
   const [selected, setSelected] = useState<Set<string>>(new Set(currentNodeIds));
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -90,16 +88,6 @@ export function AssignNodesModal({ calendarId, currentNodeIds, onClose }: Assign
     );
   };
 
-  const onSave = async () => {
-    try {
-      await assign.mutateAsync({ id: calendarId, dto: { orgNodeIds: [...selected] } });
-      toast.success(t("opsCalendar.nodesSaved"));
-      onClose();
-    } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : t("common.errorGeneric"));
-    }
-  };
-
   return (
     <Modal
       open
@@ -114,8 +102,8 @@ export function AssignNodesModal({ calendarId, currentNodeIds, onClose }: Assign
             <Button variant="secondary" onClick={onClose}>
               {t("common.cancel")}
             </Button>
-            <Button variant="primary" onClick={() => void onSave()} loading={assign.isPending}>
-              {t("common.save")}
+            <Button variant="primary" onClick={() => onConfirm([...selected])}>
+              {t("opsCalendar.applyNodes")}
             </Button>
           </div>
         </div>
