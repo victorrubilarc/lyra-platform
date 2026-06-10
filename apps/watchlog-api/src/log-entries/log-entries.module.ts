@@ -3,9 +3,12 @@ import { AuthModule } from "../auth/auth.module";
 import { OperationalCalendarModule } from "../operational-calendar/operational-calendar.module";
 import { LogEntriesController } from "./log-entries.controller";
 import { LogEntriesService } from "./log-entries.service";
+import { LogbookQueryService } from "./logbook-query.service";
 
 /**
- * Llenado + EJECUCIÓN DE FLUJO de bitácoras (Fases 2.4/2.5).
+ * Llenado + EJECUCIÓN DE FLUJO de bitácoras (Fases 2.4/2.5) y módulo de
+ * Bitácoras read-only (Fase 2.6, `LogbookQueryService`: listado/KPIs/timeline/
+ * export/verificación de firmas).
  * - OperationalCalendarModule → `ShiftResolver` (estampa turno/día operacional/periodo).
  * - AuthModule → `ReauthService` (re-autenticación para las firmas Part 11).
  * `EncryptionService` (hash del payload firmado) viene del CryptoModule global.
@@ -13,7 +16,7 @@ import { LogEntriesService } from "./log-entries.service";
 @Module({
   imports: [OperationalCalendarModule, AuthModule],
   controllers: [LogEntriesController],
-  providers: [LogEntriesService],
+  providers: [LogEntriesService, LogbookQueryService],
   exports: [LogEntriesService],
 })
 export class LogEntriesModule {}

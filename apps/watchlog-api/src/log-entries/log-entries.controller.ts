@@ -1,41 +1,114 @@
-import { Body, Controller, Get, Param, Post, Put, Query, Req } from "@nestjs/common";
-import type { FastifyRequest } from "fastify";
+import { Body, Controller, Get, Param, Post, Put, Query, Req, Res } from "@nestjs/common";
+import type { FastifyReply, FastifyRequest } from "fastify";
 import {
   createLogEntryRequestSchema,
   executeTransitionRequestSchema,
   logEntryListQuerySchema,
   saveLogEntrySectionRequestSchema,
   submitLogEntryRequestSchema,
+  timelineQuerySchema,
   type CreateLogEntryRequest,
   type ExecuteTransitionRequest,
   type LogEntryListQuery,
   type SaveLogEntrySectionRequest,
   type SubmitLogEntryRequest,
+  type TimelineQuery,
 } from "@lyra/contracts";
 import type { AuditContext } from "../audit/audit.service";
 import type { RequestUser } from "../authz/auth-user";
 import { CurrentUser, RequirePermission } from "../authz/authz.decorators";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { LogEntriesService } from "./log-entries.service";
+import { LogbookQueryService } from "./logbook-query.service";
 
 /**
- * Llenado de bitácoras (Fase 2.4). Los guards aplican el RBAC dim. 1–2; la
- * editabilidad por SECCIÓN (rol de sección × estado × ABAC) la decide el service.
+ * Llenado de bitácoras (Fase 2.4/2.5) + módulo de Bitácoras read-only (Fase 2.6).
+ * Los guards aplican el RBAC dim. 1–2; la editabilidad por SECCIÓN y el ABAC los
+ * deciden los services. Las rutas estáticas (`stats`, `export`) van ANTES de
+ * `:id` (Nest resuelve en orden de declaración).
  */
 @Controller("log-entries")
 export class LogEntriesController {
-  constructor(private readonly entries: LogEntriesService) {}
+  constructor(
+    private readonly entries: LogEntriesService,
+    private readonly logbook: LogbookQueryService,
+  ) {}
 
   @Get()
   @RequirePermission("logentry:view")
   list(@Query(new ZodValidationPipe(logEntryListQuerySchema)) query: LogEntryListQuery, @CurrentUser() user: RequestUser) {
-    return this.entries.list(user.id, query);
+    return this.logbook.list(user.id, query);
+  }
+
+  /** KPIs del set filtrado (misma query y mismo `where` que el listado). */
+  @Get("stats")
+  @RequirePermission("logentry:view")
+  stats(@Query(new ZodValidationPipe(logEntryListQuerySchema)) query: LogEntryListQuery, @CurrentUser() user: RequestUser) {
+    return this.logbook.stats(user.id, query);
+  }
+
+  /** Exporta el set COMPLETO filtrado a CSV (server-side, patrón de auditoría). */
+  @Get("export")
+  @RequirePermission("logentry:view")
+  async export(
+    @Query(new ZodValidationPipe(logEntryListQuerySchema)) query: LogEntryListQuery,
+    @CurrentUser() user: RequestUser,
+    @Res() reply: FastifyReply,
+  ): Promise<void> {
+    const { csv, truncated } = await this.logbook.exportCsv(user.id, query);
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+    await reply
+      .header("Content-Type", "text/csv; charset=utf-8")
+      .header("Content-Disposition", `attachment; filename="bitacoras-${stamp}.csv"`)
+      .header("X-Export-Truncated", String(truncated))
+      .send(csv);
   }
 
   @Get(":id")
   @RequirePermission("logentry:view")
   getDetail(@Param("id") id: string, @CurrentUser() user: RequestUser) {
     return this.entries.getDetail(user.id, id);
+  }
+
+  /** Audit trail unificado (creación + cambios + transiciones + firmas + sellado). */
+  @Get(":id/timeline")
+  @RequirePermission("logentry:view")
+  timeline(
+    @Param("id") id: string,
+    @Query(new ZodValidationPipe(timelineQuerySchema)) query: TimelineQuery,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.logbook.timeline(user.id, id, query);
+  }
+
+  /** Log de cambios por campo, paginado. */
+  @Get(":id/changes")
+  @RequirePermission("logentry:view")
+  changes(
+    @Param("id") id: string,
+    @Query(new ZodValidationPipe(timelineQuerySchema)) query: TimelineQuery,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.logbook.changes(user.id, id, query);
+  }
+
+  /** Entradas relacionadas (mismo nodo+periodo / mismo turno). */
+  @Get(":id/related")
+  @RequirePermission("logentry:view")
+  related(@Param("id") id: string, @CurrentUser() user: RequestUser) {
+    return this.logbook.related(user.id, id);
+  }
+
+  /** Verificación de integridad de una firma (§11.70). Acto de revisión: se audita. */
+  @Post(":id/signatures/:signatureId/verify")
+  @RequirePermission("logentry:view")
+  verifySignature(
+    @Param("id") id: string,
+    @Param("signatureId") signatureId: string,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.logbook.verifySignature(user.id, id, signatureId, this.ctx(user, req));
   }
 
   @Post()
