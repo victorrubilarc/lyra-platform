@@ -675,6 +675,7 @@ export const esCL = {
     removeNode: "Quitar {{name}}",
     fixErrors: "Corrige los errores de configuración antes de guardar (p. ej. turnos solapados).",
     manageNodes: "Gestionar nodos",
+    applyNodes: "Aplicar selección",
     searchNodes: "Buscar nodo…",
     nodesSaved: "Nodos asignados",
     noNodesAvailable: "No hay nodos en la estructura.",

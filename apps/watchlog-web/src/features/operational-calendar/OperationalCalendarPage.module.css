@@ -157,6 +157,15 @@
   justify-content: space-between;
   gap: var(--space-4);
   flex-wrap: wrap;
+  /* La barra de acciones (Guardar/Predeterminado/Eliminar) se mantiene visible al
+     hacer scroll del editor. Bordea hasta los bordes del panel con fondo propio. */
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  margin: calc(var(--space-4) * -1) calc(var(--space-4) * -1) 0;
+  padding: var(--space-4);
+  background: var(--color-bg-surface-1);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .detailHeaderInfo {

@@ -39,6 +39,7 @@ interface EditableState {
   periodStartWeekday: number;
   periodLengthDays: number;
   periodAnchorDate: string;
+  assignedNodeIds: string[];
 }
 
 function minutesOfDay(time: string): number {
@@ -155,7 +156,7 @@ export function CalendarDetailPanel({ calendarId, onDeleted }: CalendarDetailPan
   }, [tree]);
 
   const [state, setState] = useState<EditableState | null>(null);
-  const [loadedSnapshot, setLoadedSnapshot] = useState("");
+  const [loaded, setLoaded] = useState<EditableState | null>(null);
   const [testAt, setTestAt] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
@@ -163,6 +164,7 @@ export function CalendarDetailPanel({ calendarId, onDeleted }: CalendarDetailPan
   useEffect(() => {
     if (!cal) {
       setState(null);
+      setLoaded(null);
       return;
     }
     const next: EditableState = {
@@ -177,13 +179,18 @@ export function CalendarDetailPanel({ calendarId, onDeleted }: CalendarDetailPan
       periodStartWeekday: cal.periodStartWeekday ?? 1,
       periodLengthDays: cal.periodLengthDays ?? 14,
       periodAnchorDate: cal.periodAnchorDate ?? "",
+      assignedNodeIds: [...(cal.assignedNodeIds ?? [])].sort(),
     };
     setState(next);
-    setLoadedSnapshot(JSON.stringify(next));
+    setLoaded(next);
   }, [cal]);
 
   const errors = useMemo(() => (state ? validateOperationalCalendar(state) : []), [state]);
-  const dirty = state ? JSON.stringify(state) !== loadedSnapshot : false;
+  // Dos "dirty" separados: el calendario (PATCH) y los nodos asignados (endpoint propio).
+  // El botón Guardar se habilita con cualquiera de los dos; onSave llama solo lo que cambió.
+  const calendarDirty = !!state && !!loaded && JSON.stringify({ ...state, assignedNodeIds: [] }) !== JSON.stringify({ ...loaded, assignedNodeIds: [] });
+  const nodesDirty = !!state && !!loaded && state.assignedNodeIds.join("|") !== loaded.assignedNodeIds.join("|");
+  const dirty = calendarDirty || nodesDirty;
 
   const preview: ShiftResolution | null = useMemo(() => {
     if (!state || errors.length > 0 || !testAt) return null;
@@ -242,22 +249,27 @@ export function CalendarDetailPanel({ calendarId, onDeleted }: CalendarDetailPan
       return;
     }
     try {
-      await update.mutateAsync({
-        id: cal.id,
-        dto: {
-          name: state.name,
-          description: state.description.trim() || null,
-          timezone: state.timezone,
-          active: state.active,
-          dayStartShiftCode: state.dayStartShiftCode || null,
-          periodKind: state.periodKind,
-          periodAnchorDay: state.periodKind === "MONTH" ? state.periodAnchorDay : null,
-          periodStartWeekday: state.periodKind === "WEEK" ? state.periodStartWeekday : null,
-          periodLengthDays: state.periodKind === "CUSTOM" ? state.periodLengthDays : null,
-          periodAnchorDate: state.periodKind === "CUSTOM" ? state.periodAnchorDate : null,
-          shifts: state.shifts,
-        },
-      });
+      if (calendarDirty) {
+        await update.mutateAsync({
+          id: cal.id,
+          dto: {
+            name: state.name,
+            description: state.description.trim() || null,
+            timezone: state.timezone,
+            active: state.active,
+            dayStartShiftCode: state.dayStartShiftCode || null,
+            periodKind: state.periodKind,
+            periodAnchorDay: state.periodKind === "MONTH" ? state.periodAnchorDay : null,
+            periodStartWeekday: state.periodKind === "WEEK" ? state.periodStartWeekday : null,
+            periodLengthDays: state.periodKind === "CUSTOM" ? state.periodLengthDays : null,
+            periodAnchorDate: state.periodKind === "CUSTOM" ? state.periodAnchorDate : null,
+            shifts: state.shifts,
+          },
+        });
+      }
+      if (nodesDirty) {
+        await assignNodes.mutateAsync({ id: cal.id, dto: { orgNodeIds: state.assignedNodeIds } });
+      }
       toast.success(t("opsCalendar.saved"));
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : t("common.errorGeneric"));
@@ -275,14 +287,9 @@ export function CalendarDetailPanel({ calendarId, onDeleted }: CalendarDetailPan
     }
   };
 
-  const onRemoveNode = async (nodeId: string) => {
-    try {
-      await assignNodes.mutateAsync({ id: cal.id, dto: { orgNodeIds: (cal.assignedNodeIds ?? []).filter((x) => x !== nodeId) } });
-      toast.success(t("opsCalendar.nodesSaved"));
-    } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : t("common.errorGeneric"));
-    }
-  };
+  // Quita un nodo de la selección LOCAL (se persiste al Guardar, junto al resto).
+  const onRemoveNode = (nodeId: string) =>
+    set("assignedNodeIds", state.assignedNodeIds.filter((x) => x !== nodeId));
 
   return (
     <div className={styles.detail}>
@@ -305,7 +312,12 @@ export function CalendarDetailPanel({ calendarId, onDeleted }: CalendarDetailPan
             <Button variant="danger" leftIcon={<Trash2 size={15} />} onClick={() => setConfirmDelete(true)} disabled={cal.isDefault}>
               {t("common.delete")}
             </Button>
-            <Button variant="primary" onClick={() => void onSave()} loading={update.isPending} disabled={!dirty || errors.length > 0}>
+            <Button
+              variant="primary"
+              onClick={() => void onSave()}
+              loading={update.isPending || assignNodes.isPending}
+              disabled={!dirty || errors.length > 0}
+            >
               {t("common.save")}
             </Button>
           </div>
@@ -495,10 +507,10 @@ export function CalendarDetailPanel({ calendarId, onDeleted }: CalendarDetailPan
         <h3 className={styles.sectionTitle}>{t("opsCalendar.assignedNodes")}</h3>
         <p className={styles.hint}>{t("opsCalendar.assignedNodesHint")}</p>
         <div className={styles.nodeChips}>
-          {(cal.assignedNodeIds?.length ?? 0) === 0 ? (
+          {state.assignedNodeIds.length === 0 ? (
             <span className={styles.hint}>{t("opsCalendar.noNodes")}</span>
           ) : (
-            cal.assignedNodeIds!.map((id) => {
+            state.assignedNodeIds.map((id) => {
               const info = nodeInfo.get(id);
               return (
                 <span key={id} className={styles.nodeToken}>
@@ -508,9 +520,8 @@ export function CalendarDetailPanel({ calendarId, onDeleted }: CalendarDetailPan
                     <button
                       type="button"
                       className={styles.nodeTokenRemove}
-                      onClick={() => void onRemoveNode(id)}
+                      onClick={() => onRemoveNode(id)}
                       aria-label={t("opsCalendar.removeNode", { name: info?.name ?? id })}
-                      disabled={assignNodes.isPending}
                     >
                       <X size={13} />
                     </button>
@@ -551,8 +562,11 @@ export function CalendarDetailPanel({ calendarId, onDeleted }: CalendarDetailPan
 
       {assignOpen && (
         <AssignNodesModal
-          calendarId={cal.id}
-          currentNodeIds={cal.assignedNodeIds ?? []}
+          currentNodeIds={state.assignedNodeIds}
+          onConfirm={(ids) => {
+            set("assignedNodeIds", [...ids].sort());
+            setAssignOpen(false);
+          }}
           onClose={() => setAssignOpen(false)}
         />
       )}
