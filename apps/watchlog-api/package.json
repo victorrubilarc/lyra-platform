@@ -16,6 +16,7 @@
     "db:seed": "dotenv -e ../../.env -- tsx prisma/seed.ts",
     "db:backfill-descriptions": "dotenv -e ../../.env -- tsx prisma/backfill-node-descriptions.ts",
     "db:backfill-report-order": "dotenv -e ../../.env -- tsx prisma/backfill-report-order.ts",
+    "db:backfill-threshold-bands": "dotenv -e ../../.env -- tsx prisma/backfill-threshold-bands.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

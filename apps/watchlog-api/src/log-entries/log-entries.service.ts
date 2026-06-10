@@ -11,8 +11,6 @@ import type {
   ExecuteTransitionRequest,
   FieldForValidation,
   LogEntryDetail,
-  LogEntryListItem,
-  LogEntryListQuery,
   LogEntrySectionState,
   LogEntrySectionStateDto,
   LogEntrySignatureDto,
@@ -33,6 +31,7 @@ import {
   isFieldVisible,
   isSectionEditableInState,
   resolveEffectiveAt,
+  thresholdBandFor,
   upgradeFieldConfig,
   validateFieldValue,
 } from "@lyra/contracts";
@@ -49,7 +48,7 @@ import { PrismaService } from "../prisma/prisma.service";
 const SECTION_SIGNATURE_MEANING = "Sección completada y firmada";
 
 /** Versión completa (secciones → campos → roles) para renderizar y validar. */
-const versionInclude = {
+export const versionInclude = {
   sections: {
     orderBy: { order: "asc" },
     include: {
@@ -62,11 +61,11 @@ const versionInclude = {
   },
 } satisfies Prisma.TemplateVersionInclude;
 
-type VersionWithGraph = Prisma.TemplateVersionGetPayload<{ include: typeof versionInclude }>;
-type LogEntryRow = Prisma.LogEntryGetPayload<Record<string, never>>;
+export type VersionWithGraph = Prisma.TemplateVersionGetPayload<{ include: typeof versionInclude }>;
+export type LogEntryRow = Prisma.LogEntryGetPayload<Record<string, never>>;
 
 /** Versión de flujo CONGELADA (estados + transiciones → roles) para ejecutar/render. */
-const workflowVersionInclude = {
+export const workflowVersionInclude = {
   states: { orderBy: { order: "asc" } },
   transitions: {
     orderBy: { order: "asc" },
@@ -78,7 +77,7 @@ const workflowVersionInclude = {
   },
 } satisfies Prisma.WorkflowDefinitionVersionInclude;
 
-type WorkflowVersionWithGraph = Prisma.WorkflowDefinitionVersionGetPayload<{
+export type WorkflowVersionWithGraph = Prisma.WorkflowDefinitionVersionGetPayload<{
   include: typeof workflowVersionInclude;
 }>;
 
@@ -186,7 +185,13 @@ export class LogEntriesService {
         createdById: userId,
         updatedById: userId,
         sections: {
-          create: version.sections.map((s) => ({ sectionKey: s.key, state: "PENDING" as const })),
+          // `requiresSignature` se ESTAMPA desde la definición congelada (2.6):
+          // así "firmas pendientes" es un filtro SQL sin join a la definición.
+          create: version.sections.map((s) => ({
+            sectionKey: s.key,
+            state: "PENDING" as const,
+            requiresSignature: s.requireSignature,
+          })),
         },
       },
     });
@@ -209,16 +214,20 @@ export class LogEntriesService {
 
     const version = await this.loadVersion(entry.templateVersionId);
     const template = await this.prisma.template.findUnique({ where: { id: entry.templateId } });
-    const [sectionRows, valueRows, transitionRows, signatureRows, wfVersion] = await Promise.all([
+    const [sectionRows, valueRows, transitionRows, signatureRows, wfVersion, equipment] = await Promise.all([
       this.prisma.logEntrySection.findMany({ where: { logEntryId: id } }),
       this.prisma.logEntryValue.findMany({ where: { logEntryId: id } }),
       this.prisma.logEntryTransition.findMany({ where: { logEntryId: id }, orderBy: { occurredAt: "asc" } }),
       this.prisma.logEntrySignature.findMany({ where: { logEntryId: id }, orderBy: { signedAt: "asc" } }),
       entry.workflowDefinitionVersionId ? this.loadWorkflowVersion(entry.workflowDefinitionVersionId) : Promise.resolve(null),
+      entry.equipmentId
+        ? this.prisma.equipment.findUnique({ where: { id: entry.equipmentId }, select: { name: true } })
+        : Promise.resolve(null),
     ]);
 
     const roleIds = await this.userRoleIds(userId);
     const actorNames = await this.namesByUserId([
+      entry.createdById,
       ...sectionRows.map((s) => s.filledById),
       ...transitionRows.map((t) => t.actorId),
     ]);
@@ -310,6 +319,8 @@ export class LogEntriesService {
     return {
       ...this.mapEntry(entry, template?.name ?? "—"),
       orgNodePath: await this.nodePath(entry.orgNodeId),
+      createdByName: entry.createdById ? (actorNames.get(entry.createdById) ?? null) : null,
+      equipmentName: equipment?.name ?? null,
       version: this.mapVersion(version),
       workflowVersion: wfVersion ? this.mapWorkflowVersion(wfVersion) : null,
       currentStateName,
@@ -427,6 +438,9 @@ export class LogEntriesService {
         const afterVal = input.value ?? null;
         if (JSON.stringify(beforeVal) === JSON.stringify(afterVal)) continue; // sin cambio real
 
+        // Banda ISA-18.2 ESTAMPADA al guardar (review-by-exception 2.6): la
+        // validación ya la computó; persistirla evita re-evaluar configs al listar.
+        const band = thresholdBandFor(def, afterVal);
         await tx.logEntryValue.upsert({
           where: { logEntryId_fieldKey: { logEntryId: id, fieldKey: input.fieldKey } },
           create: {
@@ -435,9 +449,10 @@ export class LogEntriesService {
             fieldKey: input.fieldKey,
             dataType: def.dataType,
             value: this.toJson(afterVal),
+            thresholdBand: band,
             updatedById: userId,
           },
-          update: { value: this.toJson(afterVal), updatedById: userId },
+          update: { value: this.toJson(afterVal), thresholdBand: band, updatedById: userId },
         });
         await tx.logEntryFieldChange.create({
           data: {
@@ -446,6 +461,10 @@ export class LogEntriesService {
             before: this.toJson(beforeVal),
             after: this.toJson(afterVal),
             changedById: userId,
+            // Mismo instante que la firma de completitud (si la hay): el rebobinado
+            // de la verificación de integridad excluye con `> signedAt` exactamente
+            // los cambios de ESTE guardado (no se puede confiar en el reloj de BD).
+            changedAt: now,
           },
         });
       }
@@ -711,44 +730,24 @@ export class LogEntriesService {
     return this.getDetail(userId, id);
   }
 
-  // --- Listado ---------------------------------------------------------------
+  // --- Helpers (los marcados "interno" los comparte LogbookQueryService) ------
 
-  async list(userId: string, query: LogEntryListQuery): Promise<LogEntryListItem[]> {
-    const accessible = await this.scope.getAccessibleNodeIds(userId);
-    const where: Prisma.LogEntryWhereInput = { deletedAt: null };
-    if (query.templateId) where.templateId = query.templateId;
-    if (query.orgNodeId) where.orgNodeId = query.orgNodeId;
-    if (query.status) where.status = query.status;
-    if (accessible !== null) where.orgNodeId = { in: [...accessible] };
-
-    const rows = await this.prisma.logEntry.findMany({
-      where,
-      orderBy: { recordedAt: "desc" },
-      take: 200,
-      include: { template: { select: { name: true } } },
-    });
-    const paths = await this.nodePaths(new Set(rows.map((r) => r.orgNodeId)));
-    return rows.map((r) => ({
-      ...this.mapEntry(r, r.template.name),
-      orgNodePath: paths.get(r.orgNodeId) ?? null,
-    }));
-  }
-
-  // --- Helpers ---------------------------------------------------------------
-
-  private async loadEntry(id: string): Promise<LogEntryRow> {
+  /** Interno: carga la entrada viva o lanza 404. */
+  async loadEntry(id: string): Promise<LogEntryRow> {
     const entry = await this.prisma.logEntry.findFirst({ where: { id, deletedAt: null } });
     if (!entry) throw new NotFoundException("Entrada no encontrada");
     return entry;
   }
 
-  private async loadVersion(versionId: string): Promise<VersionWithGraph> {
+  /** Interno: versión de plantilla congelada con su grafo completo. */
+  async loadVersion(versionId: string): Promise<VersionWithGraph> {
     const version = await this.prisma.templateVersion.findUnique({ where: { id: versionId }, include: versionInclude });
     if (!version) throw new NotFoundException("Versión de plantilla no encontrada");
     return version;
   }
 
-  private async loadWorkflowVersion(versionId: string): Promise<WorkflowVersionWithGraph> {
+  /** Interno: versión de flujo congelada con estados y transiciones. */
+  async loadWorkflowVersion(versionId: string): Promise<WorkflowVersionWithGraph> {
     const version = await this.prisma.workflowDefinitionVersion.findUnique({
       where: { id: versionId },
       include: workflowVersionInclude,
@@ -757,8 +756,8 @@ export class LogEntriesService {
     return version;
   }
 
-  /** Foto plana de los valores actuales de la entrada (fieldKey → value). */
-  private async loadValuesByKey(id: string): Promise<Record<string, unknown>> {
+  /** Interno: foto plana de los valores actuales de la entrada (fieldKey → value). */
+  async loadValuesByKey(id: string): Promise<Record<string, unknown>> {
     const rows = await this.prisma.logEntryValue.findMany({ where: { logEntryId: id } });
     const map: Record<string, unknown> = {};
     for (const v of rows) map[v.fieldKey] = (v.value ?? null) as unknown;
@@ -978,7 +977,8 @@ export class LogEntriesService {
     return new Set(rows.map((r) => r.roleId));
   }
 
-  private async namesByUserId(ids: (string | null)[]): Promise<Map<string, string>> {
+  /** Interno: nombre legible por id de usuario (displayName o email). */
+  async namesByUserId(ids: (string | null)[]): Promise<Map<string, string>> {
     const real = [...new Set(ids.filter((x): x is string => Boolean(x)))];
     if (real.length === 0) return new Map();
     const users = await this.prisma.user.findMany({ where: { id: { in: real } }, select: { id: true, displayName: true, email: true } });
@@ -989,9 +989,11 @@ export class LogEntriesService {
     return value === null || value === undefined ? Prisma.JsonNull : (value as Prisma.InputJsonValue);
   }
 
-  private mapEntry(e: LogEntryRow, templateName: string) {
+  /** Interno (lo comparte LogbookQueryService): cabecera de la entrada como DTO. */
+  mapEntry(e: LogEntryRow, templateName: string) {
     return {
       id: e.id,
+      entryNumber: e.entryNumber,
       templateId: e.templateId,
       templateVersionId: e.templateVersionId,
       workflowDefinitionId: e.workflowDefinitionId,
@@ -1098,7 +1100,8 @@ export class LogEntriesService {
     if (exists === 0) throw new BadRequestException("El equipo indicado no existe");
   }
 
-  private async assertNodeInScope(userId: string, orgNodeId: string): Promise<void> {
+  /** Interno: ABAC — 403 si el nodo de la entrada está fuera del alcance del usuario. */
+  async assertNodeInScope(userId: string, orgNodeId: string): Promise<void> {
     if (!(await this.scope.canAccessNode(userId, orgNodeId))) {
       throw new ForbiddenException("La entrada está fuera de su alcance");
     }
@@ -1108,7 +1111,8 @@ export class LogEntriesService {
     return (await this.nodePaths(new Set([orgNodeId]))).get(orgNodeId) ?? null;
   }
 
-  private async nodePaths(nodeIds: Set<string>): Promise<Map<string, string>> {
+  /** Interno: rutas legibles ("Planta › Área › Proceso") por id de nodo. */
+  async nodePaths(nodeIds: Set<string>): Promise<Map<string, string>> {
     const result = new Map<string, string>();
     if (nodeIds.size === 0) return result;
     const all = await this.prisma.orgNode.findMany({ select: { id: true, name: true, path: true } });

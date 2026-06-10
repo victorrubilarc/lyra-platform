@@ -954,6 +954,10 @@ enum SignatureMethod {
 
 model LogEntry {
   id                          String         @id @default(cuid())
+  // Folio humano correlativo (Fase 2.6): referencia estable para auditoría/terreno
+  // (patrón WO number de Maximo / document number de Veeva). Lo asigna la BD; el
+  // backfill de la migración lo asignó en orden de recordedAt.
+  entryNumber                 Int            @unique @default(autoincrement())
   templateId                  String
   // Versión congelada que se está llenando (inmutable; integridad histórica).
   templateVersionId           String
@@ -998,9 +1002,11 @@ model LogEntry {
   @@index([orgNodeId])
   @@index([equipmentId])
   @@index([status])
+  @@index([currentStateKey])
   @@index([effectiveAt])
   @@index([operationalDate])
   @@index([periodKey])
+  @@index([createdById])
   @@index([deletedAt])
 }
 
@@ -1018,6 +1024,10 @@ model LogEntrySection {
   // Referencia blanda a LogEntrySignature.id (la firma es append-only y cuelga de
   // la entrada por logEntryId+context+sectionKey; este puntero es de conveniencia).
   signatureId String?
+  // ¿La definición congelada exige firma de completitud? ESTAMPADO al instanciar
+  // (Fase 2.6) para que "firmas pendientes" sea un filtro SQL barato
+  // (requiresSignature = true AND signatureId IS NULL) sin join a la definición.
+  requiresSignature Boolean @default(false)
   // Revisión para la concurrencia optimista POR SECCIÓN (check-and-bump).
   version     Int                  @default(0)
   createdAt   DateTime             @default(now())
@@ -1027,6 +1037,14 @@ model LogEntrySection {
 
   @@unique([logEntryId, sectionKey])
   @@index([logEntryId])
+}
+
+// Banda de umbral ISA-18.2 en que cayó un valor numérico (Fase 2.6). Se estampa
+// al guardar (la validación ya la computa) contra la definición CONGELADA:
+// habilita review-by-exception (filtros/KPIs de "fuera de umbral") sin re-evaluar.
+enum ThresholdBand {
+  WARN
+  CRIT
 }
 
 // Valor actual de un campo (1 fila por campo). El de un campo de referencia se
@@ -1041,6 +1059,8 @@ model LogEntryValue {
   dataType    FieldDataType
   // code / code[] / número / booleano / fecha ISO / etc. null = vacío.
   value       Json?
+  // Banda de umbral en que cayó el valor al guardarse (null = en rango / no aplica).
+  thresholdBand ThresholdBand?
   updatedById String?
   updatedAt   DateTime      @updatedAt
 
@@ -1049,6 +1069,8 @@ model LogEntryValue {
   @@unique([logEntryId, fieldKey])
   @@index([logEntryId])
   @@index([sectionKey])
+  // Casi todo null: índice pequeño que acelera el semi-join de "fuera de umbral".
+  @@index([thresholdBand])
 }
 
 // Historial append-only por campo (antes/después). Auditoría fina del llenado;

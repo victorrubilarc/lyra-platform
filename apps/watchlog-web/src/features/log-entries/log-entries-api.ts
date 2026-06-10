@@ -2,28 +2,19 @@ import {
   createLogEntryRequestSchema,
   executeTransitionRequestSchema,
   logEntryDetailSchema,
-  logEntryListItemSchema,
   saveLogEntrySectionRequestSchema,
   submitLogEntryRequestSchema,
   type CreateLogEntryRequest,
   type ExecuteTransitionRequest,
   type LogEntryDetail,
-  type LogEntryListItem,
-  type LogEntryListQuery,
   type SaveLogEntrySectionRequest,
   type SubmitLogEntryRequest,
 } from "@lyra/contracts";
-import { z } from "zod";
 import { apiJson } from "../../lib/api-client.js";
 
-export function fetchLogEntries(query: LogEntryListQuery = {}): Promise<LogEntryListItem[]> {
-  const params = new URLSearchParams();
-  if (query.templateId) params.set("templateId", query.templateId);
-  if (query.orgNodeId) params.set("orgNodeId", query.orgNodeId);
-  if (query.status) params.set("status", query.status);
-  const qs = params.toString();
-  return apiJson(`/log-entries${qs ? `?${qs}` : ""}`, z.array(logEntryListItemSchema));
-}
+// El LISTADO de entradas vive en `features/logbook` (módulo de Bitácoras 2.6,
+// paginado por cursor); aquí queda solo el ciclo de LLENADO (crear/guardar/
+// enviar/transicionar) sobre el detalle.
 
 export function fetchLogEntry(id: string): Promise<LogEntryDetail> {
   return apiJson(`/log-entries/${id}`, logEntryDetailSchema);
