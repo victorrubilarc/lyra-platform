@@ -43,6 +43,48 @@ function minutesOfDay(time: string): number {
   return (h ?? 0) * 60 + (m ?? 0);
 }
 
+function toHHMM(totalMin: number): string {
+  const m = ((totalMin % 1440) + 1440) % 1440;
+  return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+}
+
+/** Hora de fin de pared a partir de inicio + duración (con cruce de medianoche). */
+function endTimeOf(startTime: string, durationMinutes: number): string {
+  return toHHMM(minutesOfDay(startTime) + durationMinutes);
+}
+
+/** Duración (min) a partir de inicio→fin; fin ≤ inicio cruza medianoche; igual = 24 h. */
+function durationFromTimes(startTime: string, endTime: string): number {
+  const start = minutesOfDay(startTime);
+  const end = minutesOfDay(endTime);
+  const diff = end - start;
+  return diff <= 0 ? diff + 1440 : diff;
+}
+
+/** Lectura amigable de una duración en minutos: "8 h" / "7 h 30 min" / "45 min". */
+function formatDuration(min: number): string {
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  if (h === 0) return `${m} min`;
+  return m === 0 ? `${h} h` : `${h} h ${m} min`;
+}
+
+/** Hora de pared ACTUAL de una TZ como "YYYY-MM-DDTHH:MM" (para el botón "Ahora"). */
+function nowInTz(tz: string): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date());
+  const g = (t: string) => parts.find((p) => p.type === t)?.value ?? "00";
+  const hour = g("hour") === "24" ? "00" : g("hour");
+  return `${g("year")}-${g("month")}-${g("day")}T${hour}:${g("minute")}`;
+}
+
 /** Offset (ms) de una TZ IANA en un instante dado. */
 function tzOffsetMs(instant: Date, tz: string): number {
   const dtf = new Intl.DateTimeFormat("en-US", {
@@ -278,16 +320,15 @@ export function CalendarDetailPanel({ calendarId, onDeleted }: CalendarDetailPan
               <Input type="time" value={sh.startTime} onChange={(e) => setShift(i, { startTime: e.target.value })} disabled={!canManage} />
             </div>
             <div>
-              {i === 0 && <label className={styles.fieldLabel}>{t("opsCalendar.shiftDuration")}</label>}
+              {i === 0 && <label className={styles.fieldLabel}>{t("opsCalendar.shiftEnd")}</label>}
               <Input
-                type="number"
-                min={1}
-                max={1440}
-                value={sh.durationMinutes}
-                onChange={(e) => setShift(i, { durationMinutes: Number(e.target.value) })}
+                type="time"
+                value={endTimeOf(sh.startTime, sh.durationMinutes)}
+                onChange={(e) => e.target.value && setShift(i, { durationMinutes: durationFromTimes(sh.startTime, e.target.value) })}
                 disabled={!canManage}
               />
             </div>
+            <div className={styles.durReadout}>{formatDuration(sh.durationMinutes)}</div>
             <div style={{ alignSelf: i === 0 ? "end" : "center" }}>
               {canManage && (
                 <Button variant="icon" aria-label={t("common.delete")} onClick={() => removeShift(i)}>
@@ -387,7 +428,7 @@ export function CalendarDetailPanel({ calendarId, onDeleted }: CalendarDetailPan
           <p className={styles.hint}>{t("opsCalendar.testerHint", { tz: state.timezone })}</p>
           <div className={styles.testerRow}>
             <input type="datetime-local" className={styles.dtInput} value={testAt} onChange={(e) => setTestAt(e.target.value)} aria-label={t("opsCalendar.tester")} />
-            <Button variant="secondary" onClick={() => setTestAt(new Date().toISOString().slice(0, 16))}>
+            <Button variant="secondary" onClick={() => setTestAt(nowInTz(state.timezone))}>
               {t("opsCalendar.testerNow")}
             </Button>
           </div>
