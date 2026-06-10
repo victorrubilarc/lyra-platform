@@ -158,6 +158,8 @@ export type AvailableTransitionDto = z.infer<typeof availableTransitionSchema>;
 /** Cabecera de la entrada: campos de SISTEMA intrínsecos (columnas indexadas). */
 export const logEntrySchema = z.object({
   id: z.string(),
+  /** Folio humano correlativo (Fase 2.6): referencia estable de auditoría/terreno. */
+  entryNumber: z.number().int(),
   templateId: z.string(),
   templateVersionId: z.string(),
   // Flujo DENORMALIZADO (copiado al crear). null = plantilla sin flujo (form simple).
@@ -199,6 +201,9 @@ export const logEntryDetailSchema = logEntrySchema.extend({
   /** Nombre legible de la plantilla y ruta del nodo (cabecera de la pantalla). */
   templateName: z.string(),
   orgNodePath: z.string().nullable(),
+  /** Nombre legible del autor y del equipo (cabecera del visor 2.6). */
+  createdByName: z.string().nullable(),
+  equipmentName: z.string().nullable(),
   sectionStates: z.array(logEntrySectionStateDtoSchema),
   values: z.array(logEntryValueSchema),
   /** Transiciones que ESTE usuario puede ejecutar ahora (gateado en backend). */
@@ -210,12 +215,72 @@ export const logEntryDetailSchema = logEntrySchema.extend({
 });
 export type LogEntryDetail = z.infer<typeof logEntryDetailSchema>;
 
-/** Ítem de listado de entradas (vista de bitácoras 2.6 / pruebas). */
+// === Listado enterprise (Fase 2.6 — módulo de Bitácoras) =====================
+
+/** Banda de umbral ISA-18.2 en que cayó un valor numérico (estampada al guardar). */
+export const THRESHOLD_BANDS = ["WARN", "CRIT"] as const;
+export const thresholdBandSchema = z.enum(THRESHOLD_BANDS);
+export type ThresholdBand = z.infer<typeof thresholdBandSchema>;
+
+/**
+ * Indicadores de "review by exception" (ISPE GAMP 5 / EBR): lo que un revisor
+ * necesita ver SIN abrir el registro. Los computa el backend por página (batched).
+ */
+export const logEntryIndicatorsSchema = z.object({
+  sectionsTotal: z.number().int(),
+  sectionsCompleted: z.number().int(),
+  sectionsLocked: z.number().int(),
+  /** Secciones que exigen firma y aún no la tienen. */
+  pendingSignatures: z.number().int(),
+  signaturesCount: z.number().int(),
+  transitionsCount: z.number().int(),
+  /** Peor banda de umbral entre los valores de la entrada (null = todo en rango). */
+  worstThresholdBand: thresholdBandSchema.nullable(),
+});
+export type LogEntryIndicators = z.infer<typeof logEntryIndicatorsSchema>;
+
+/** Ítem del listado de Bitácoras: cabecera + contexto legible + indicadores. LIGERO
+ * a propósito: NO incluye secciones ni valores (eso vive en el detalle). */
 export const logEntryListItemSchema = logEntrySchema.extend({
   templateName: z.string(),
+  templateVersionNumber: z.number().int(),
+  orgNodeName: z.string(),
   orgNodePath: z.string().nullable(),
+  equipmentName: z.string().nullable(),
+  createdByName: z.string().nullable(),
+  /** Nombre y color del estado del flujo (de la versión CONGELADA). null = sin flujo. */
+  currentStateName: z.string().nullable(),
+  currentStateColor: z.string().nullable(),
+  indicators: logEntryIndicatorsSchema,
 });
 export type LogEntryListItem = z.infer<typeof logEntryListItemSchema>;
+
+/** Respuesta paginada por cursor (keyset) del listado. */
+export const logEntryListResponseSchema = z.object({
+  items: z.array(logEntryListItemSchema),
+  /** Cursor opaco para la página siguiente; null = no hay más. */
+  nextCursor: z.string().nullable(),
+});
+export type LogEntryListResponse = z.infer<typeof logEntryListResponseSchema>;
+
+/**
+ * KPIs del listado (barra superior). Respetan EXACTAMENTE los mismos filtros que
+ * el listado (mismo `where` en backend); patrón Splunk/Kibana de resumen del set.
+ */
+export const logEntryStatsSchema = z.object({
+  total: z.number().int(),
+  byStatus: z.object({
+    DRAFT: z.number().int(),
+    SUBMITTED: z.number().int(),
+    VOID: z.number().int(),
+  }),
+  /** Entradas con ≥1 sección que exige firma y no la tiene. */
+  pendingSignatures: z.number().int(),
+  /** Entradas con ≥1 valor en banda crítica / de advertencia (excepciones). */
+  withCrit: z.number().int(),
+  withWarn: z.number().int(),
+});
+export type LogEntryStats = z.infer<typeof logEntryStatsSchema>;
 
 // === Requests ================================================================
 
@@ -271,12 +336,186 @@ export const executeTransitionRequestSchema = z.object({
 });
 export type ExecuteTransitionRequest = z.infer<typeof executeTransitionRequestSchema>;
 
+/** Booleano que llega como string por query param ("true"/"false"). */
+const queryBool = z
+  .union([z.boolean(), z.enum(["true", "false"]).transform((v) => v === "true")])
+  .optional();
+
+/** Campos por los que el backend acepta ordenar (whitelist; todos NOT NULL para
+ * que el cursor keyset sea correcto sin ramas de nulos). */
+export const LOG_ENTRY_SORT_FIELDS = ["recordedAt", "effectiveAt", "entryNumber"] as const;
+export const logEntrySortFieldSchema = z.enum(LOG_ENTRY_SORT_FIELDS);
+export type LogEntrySortField = z.infer<typeof logEntrySortFieldSchema>;
+
+/**
+ * Query del listado de Bitácoras (Fase 2.6). TODOS los filtros se aplican en
+ * backend (con ABAC); el cliente solo refleja este contrato. Paginación keyset
+ * (`cursor` opaco) + orden por whitelist.
+ */
 export const logEntryListQuerySchema = z.object({
+  /** Búsqueda: folio (numérico) o coincidencia parcial en plantilla / nodo. */
+  q: z.string().trim().min(1).max(120).optional(),
   templateId: z.string().optional(),
+  /** Nodo de la estructura; con `includeDescendants` filtra toda la rama (path). */
   orgNodeId: z.string().optional(),
+  includeDescendants: queryBool,
+  equipmentId: z.string().optional(),
   status: logEntryStatusSchema.optional(),
+  /** Estado del flujo (clave de la versión congelada). */
+  stateKey: z.string().optional(),
+  shiftCode: z.string().optional(),
+  periodKey: z.string().optional(),
+  /** Día operacional exacto (YYYY-MM-DD). */
+  operationalDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  /** Rangos ISO 8601 inclusivos sobre la fecha efectiva y la de captura. */
+  effectiveFrom: z.string().datetime({ offset: true }).optional(),
+  effectiveTo: z.string().datetime({ offset: true }).optional(),
+  recordedFrom: z.string().datetime({ offset: true }).optional(),
+  recordedTo: z.string().datetime({ offset: true }).optional(),
+  createdById: z.string().optional(),
+  /** Solo entradas con ≥1 sección que exige firma y no la tiene. */
+  pendingSignature: queryBool,
+  /** Excepciones de umbral: CRIT / WARN exactos, o ANY (cualquier banda). */
+  thresholdBand: z.enum(["WARN", "CRIT", "ANY"]).optional(),
+  sort: logEntrySortFieldSchema.optional(),
+  dir: z.enum(["asc", "desc"]).optional(),
+  /** Cursor keyset opaco devuelto por la página anterior. */
+  cursor: z.string().optional(),
+  take: z.coerce.number().int().min(1).max(100).optional(),
 });
 export type LogEntryListQuery = z.infer<typeof logEntryListQuerySchema>;
+
+/** Filtros del listado que maneja la UI (sin paginación ni orden). */
+export type LogEntryListFilters = Omit<LogEntryListQuery, "cursor" | "take" | "sort" | "dir">;
+
+// === Línea de tiempo / audit trail unificado (Fase 2.6) ======================
+
+/** Paginación de timeline / log de cambios. */
+export const timelineQuerySchema = z.object({
+  cursor: z.string().optional(),
+  take: z.coerce.number().int().min(1).max(200).optional(),
+});
+export type TimelineQuery = z.infer<typeof timelineQuerySchema>;
+
+/**
+ * Evento del audit trail unificado de una entrada (ALCOA+): la fusión cronológica
+ * de creación, cambios por campo, transiciones (con su firma), firmas de sección
+ * y sellado. La arma el BACKEND (orden autoritativo + paginación multi-tabla).
+ */
+export const logEntryTimelineEventSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("CREATED"),
+    id: z.string(),
+    at: z.string(),
+    actorName: z.string().nullable(),
+  }),
+  z.object({
+    kind: z.literal("FIELD_CHANGE"),
+    id: z.string(),
+    at: z.string(),
+    actorName: z.string().nullable(),
+    fieldKey: z.string(),
+    /** Etiqueta del campo en la versión congelada (null si ya no existe). */
+    fieldLabel: z.string().nullable(),
+    sectionKey: z.string().nullable(),
+    before: z.unknown().nullable(),
+    after: z.unknown().nullable(),
+    reason: z.string().nullable(),
+  }),
+  z.object({
+    kind: z.literal("TRANSITION"),
+    id: z.string(),
+    at: z.string(),
+    actorName: z.string().nullable(),
+    transitionKey: z.string(),
+    label: z.string().nullable(),
+    fromStateKey: z.string(),
+    toStateKey: z.string(),
+    fromStateName: z.string().nullable(),
+    toStateName: z.string().nullable(),
+    reason: z.string().nullable(),
+    signature: logEntrySignatureSummarySchema.nullable(),
+  }),
+  z.object({
+    kind: z.literal("SECTION_SIGNED"),
+    id: z.string(),
+    at: z.string(),
+    sectionKey: z.string(),
+    sectionTitle: z.string().nullable(),
+    signerName: z.string(),
+    meaning: z.string(),
+    method: signatureMethodSchema,
+  }),
+  z.object({
+    kind: z.literal("SEALED"),
+    id: z.string(),
+    at: z.string(),
+  }),
+]);
+export type LogEntryTimelineEvent = z.infer<typeof logEntryTimelineEventSchema>;
+
+export const logEntryTimelineResponseSchema = z.object({
+  events: z.array(logEntryTimelineEventSchema),
+  nextCursor: z.string().nullable(),
+});
+export type LogEntryTimelineResponse = z.infer<typeof logEntryTimelineResponseSchema>;
+
+/** Cambio de campo del log de auditoría fino (endpoint paginado propio). */
+export const logEntryFieldChangeDtoSchema = z.object({
+  id: z.string(),
+  fieldKey: z.string(),
+  fieldLabel: z.string().nullable(),
+  sectionKey: z.string().nullable(),
+  before: z.unknown().nullable(),
+  after: z.unknown().nullable(),
+  reason: z.string().nullable(),
+  changedByName: z.string().nullable(),
+  changedAt: z.string(),
+});
+export type LogEntryFieldChangeDto = z.infer<typeof logEntryFieldChangeDtoSchema>;
+
+export const logEntryChangesResponseSchema = z.object({
+  items: z.array(logEntryFieldChangeDtoSchema),
+  nextCursor: z.string().nullable(),
+});
+export type LogEntryChangesResponse = z.infer<typeof logEntryChangesResponseSchema>;
+
+/** Entradas relacionadas (contexto operacional, estilo event frames de PI). */
+export const relatedLogEntriesSchema = z.object({
+  /** Mismo nodo + mismo periodo contable. */
+  samePeriod: z.array(logEntryListItemSchema),
+  /** Mismo día operacional + mismo turno (cualquier nodo alcanzable). */
+  sameShift: z.array(logEntryListItemSchema),
+});
+export type RelatedLogEntries = z.infer<typeof relatedLogEntriesSchema>;
+
+// === Verificación de integridad de firma (Fase 2.6, §11.70) ==================
+
+/**
+ * Veredicto de la verificación: el backend recomputa el hash canónico con los
+ * valores ACTUALES y, si no coincide, con los valores REBOBINADOS al instante de
+ * la firma (revirtiendo el historial `LogEntryFieldChange` posterior).
+ *  - VALID: el hash coincide con el estado actual (nada cambió desde la firma).
+ *  - VALID_RECORD_CHANGED_AFTER: la firma es íntegra respecto de lo firmado, pero
+ *    el registro fue editado DESPUÉS (legítimo en flujos multi-estado; el detalle
+ *    de qué cambió está en el log de cambios).
+ *  - INVALID: no coincide ni rebobinando ⇒ el contenido firmado no es reconstruible
+ *    (alteración o pérdida de historial). Debe investigarse.
+ */
+export const SIGNATURE_VERIFY_VERDICTS = ["VALID", "VALID_RECORD_CHANGED_AFTER", "INVALID"] as const;
+export const signatureVerifyVerdictSchema = z.enum(SIGNATURE_VERIFY_VERDICTS);
+export type SignatureVerifyVerdict = z.infer<typeof signatureVerifyVerdictSchema>;
+
+export const signatureVerifyResultSchema = z.object({
+  signatureId: z.string(),
+  verdict: signatureVerifyVerdictSchema,
+  /** Hash almacenado al firmar. */
+  payloadHash: z.string(),
+  /** Nº de cambios de campo posteriores a la firma (contexto del veredicto). */
+  changesAfterSignature: z.number().int(),
+  verifiedAt: z.string(),
+});
+export type SignatureVerifyResult = z.infer<typeof signatureVerifyResultSchema>;
 
 // === Lógica compartida (fuente única backend + frontend) =====================
 
@@ -456,6 +695,29 @@ export function validateFieldValue(
 }
 
 /**
+ * Banda de umbral ISA-18.2 en que cae un valor NUMÉRICO según el config del campo
+ * (misma semántica que las advertencias de `validateFieldValue`: crítico domina a
+ * advertencia). FUENTE ÚNICA del estampado de `LogEntryValue.thresholdBand` en
+ * backend y de los badges de excepción en el frontend.
+ */
+export function thresholdBandFor(field: FieldForValidation, value: unknown): ThresholdBand | null {
+  if (field.type !== "NUMBER" || isEmptyValue(value)) return null;
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n)) return null;
+  const c = field.config as { warnLow?: number; warnHigh?: number; critLow?: number; critHigh?: number };
+  if (typeof c.critLow === "number" && n < c.critLow) return "CRIT";
+  if (typeof c.critHigh === "number" && n > c.critHigh) return "CRIT";
+  if (typeof c.warnLow === "number" && n < c.warnLow) return "WARN";
+  if (typeof c.warnHigh === "number" && n > c.warnHigh) return "WARN";
+  return null;
+}
+
+/** Folio legible de una entrada (referencia humana estable, ej. "BIT-000123"). */
+export function formatEntryFolio(entryNumber: number, prefix = "BIT"): string {
+  return `${prefix}-${String(entryNumber).padStart(6, "0")}`;
+}
+
+/**
  * Deriva la fecha efectiva de una versión a partir de sus valores: el valor del
  * campo con `semanticRole = EFFECTIVE_DATE`; si no hay (o está vacío/ inválido),
  * cae a `recordedAt`. Fuente única para el estampado en backend.
@@ -559,10 +821,27 @@ export interface SignaturePayloadInput {
 }
 
 /**
+ * Forma canónica del mapa de valores firmado: descarta las entradas vacías
+ * (null/undefined). Elimina la ambigüedad "clave presente con null" vs "clave
+ * ausente" entre el mapa en memoria al firmar y el reconstruido desde
+ * `LogEntryValue`/`LogEntryFieldChange` al VERIFICAR (Fase 2.6). Sin esto, una
+ * firma podría dar falso INVALID por pura representación.
+ */
+export function canonicalSignatureValues(valuesByKey: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(valuesByKey)) {
+    if (value !== null && value !== undefined) out[key] = value;
+  }
+  return out;
+}
+
+/**
  * Serializa el payload de firma de forma DETERMINISTA (claves ordenadas en todo
- * nivel) para que su SHA-256 sea estable e independiente del orden de inserción.
- * Es la pieza que ata la firma a un contenido exacto: el mismo input siempre
- * produce el mismo hash (no repudio / integridad). Fuente única back↔front.
+ * nivel, valores vacíos descartados vía `canonicalSignatureValues`) para que su
+ * SHA-256 sea estable e independiente del orden de inserción y de la
+ * representación de "vacío". Es la pieza que ata la firma a un contenido exacto:
+ * el mismo input siempre produce el mismo hash (no repudio / integridad).
+ * Fuente única back↔front (firmar y VERIFICAR pasan por aquí).
  */
 export function canonicalSignaturePayload(input: SignaturePayloadInput): string {
   return stableStringify({
@@ -576,7 +855,7 @@ export function canonicalSignaturePayload(input: SignaturePayloadInput): string 
     signerId: input.signerId,
     meaning: input.meaning,
     signedAt: input.signedAt,
-    values: input.values,
+    values: canonicalSignatureValues(input.values),
   });
 }
 

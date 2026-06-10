@@ -2,13 +2,18 @@ import { describe, expect, it } from "vitest";
 import {
   availableTransitionsFor,
   canonicalSignaturePayload,
+  canonicalSignatureValues,
   createLogEntryRequestSchema,
   executeTransitionRequestSchema,
+  formatEntryFolio,
   isEmptyValue,
   isFieldVisible,
   isSectionEditableInState,
+  logEntryListQuerySchema,
+  logEntryTimelineEventSchema,
   resolveEffectiveAt,
   saveLogEntrySectionRequestSchema,
+  thresholdBandFor,
   validateFieldValue,
   type FieldForValidation,
   type TransitionForAvailability,
@@ -247,5 +252,128 @@ describe("executeTransitionRequestSchema", () => {
       executeTransitionRequestSchema.safeParse({ transitionKey: "approve", password: "x", mfaCode: "123456" }).success,
     ).toBe(true);
     expect(executeTransitionRequestSchema.safeParse({}).success).toBe(false);
+  });
+});
+
+// === Fase 2.6 — Bitácoras ====================================================
+
+describe("thresholdBandFor", () => {
+  it("CRIT domina a WARN y coincide con las advertencias de validateFieldValue", () => {
+    const f = numberField({ warnLow: 10, warnHigh: 80, critLow: 5, critHigh: 95 });
+    expect(thresholdBandFor(f, 50)).toBeNull();
+    expect(thresholdBandFor(f, 8)).toBe("WARN");
+    expect(thresholdBandFor(f, 90)).toBe("WARN");
+    expect(thresholdBandFor(f, 2)).toBe("CRIT");
+    expect(thresholdBandFor(f, 99)).toBe("CRIT");
+    // Consistencia con la fuente de advertencias: hay banda ⇔ hay warning.
+    for (const v of [50, 8, 90, 2, 99]) {
+      const hasWarning = validateFieldValue(f, v).warnings.length > 0;
+      expect(thresholdBandFor(f, v) !== null).toBe(hasWarning);
+    }
+  });
+
+  it("null para vacío, no-número y tipos no NUMBER", () => {
+    expect(thresholdBandFor(numberField({ critHigh: 10 }), null)).toBeNull();
+    expect(thresholdBandFor(numberField({ critHigh: 10 }), "abc")).toBeNull();
+    expect(
+      thresholdBandFor({ key: "t", type: "TEXT", dataType: "STRING", label: "T", config: { critHigh: 1 } }, 5),
+    ).toBeNull();
+  });
+});
+
+describe("canonicalSignatureValues / canonicalSignaturePayload", () => {
+  it("descarta entradas null/undefined (clave-con-null ≡ clave-ausente)", () => {
+    expect(canonicalSignatureValues({ a: 1, b: null, c: undefined, d: 0, e: false })).toEqual({
+      a: 1,
+      d: 0,
+      e: false,
+    });
+  });
+
+  it("el payload con valores null es idéntico al payload sin esas claves", () => {
+    const base = {
+      entryId: "e1",
+      templateVersionId: "tv1",
+      context: "SECTION_COMPLETION" as const,
+      sectionKey: "s1",
+      signerId: "u1",
+      meaning: "Sección completada",
+      signedAt: "2026-06-10T12:00:00.000Z",
+    };
+    expect(canonicalSignaturePayload({ ...base, values: { temp: 42, obs: null } })).toBe(
+      canonicalSignaturePayload({ ...base, values: { temp: 42 } }),
+    );
+  });
+});
+
+describe("formatEntryFolio", () => {
+  it("rellena a 6 dígitos con prefijo", () => {
+    expect(formatEntryFolio(7)).toBe("BIT-000007");
+    expect(formatEntryFolio(123456)).toBe("BIT-123456");
+    expect(formatEntryFolio(1234567)).toBe("BIT-1234567");
+  });
+});
+
+describe("logEntryListQuerySchema (v2 — Bitácoras)", () => {
+  it("coerciona take y booleanos de query string", () => {
+    const parsed = logEntryListQuerySchema.parse({
+      take: "25",
+      includeDescendants: "true",
+      pendingSignature: "false",
+    });
+    expect(parsed.take).toBe(25);
+    expect(parsed.includeDescendants).toBe(true);
+    expect(parsed.pendingSignature).toBe(false);
+  });
+
+  it("rechaza sort fuera de la whitelist, take > 100 y fechas inválidas", () => {
+    expect(logEntryListQuerySchema.safeParse({ sort: "templateName" }).success).toBe(false);
+    expect(logEntryListQuerySchema.safeParse({ take: "500" }).success).toBe(false);
+    expect(logEntryListQuerySchema.safeParse({ effectiveFrom: "ayer" }).success).toBe(false);
+    expect(logEntryListQuerySchema.safeParse({ operationalDate: "10-06-2026" }).success).toBe(false);
+  });
+
+  it("acepta una query completa típica de la grilla", () => {
+    expect(
+      logEntryListQuerySchema.safeParse({
+        q: "BIT",
+        templateId: "t1",
+        orgNodeId: "n1",
+        includeDescendants: "true",
+        status: "SUBMITTED",
+        stateKey: "review",
+        shiftCode: "A",
+        operationalDate: "2026-06-10",
+        effectiveFrom: "2026-06-01T00:00:00.000Z",
+        effectiveTo: "2026-06-10T23:59:59.000Z",
+        thresholdBand: "ANY",
+        sort: "effectiveAt",
+        dir: "asc",
+      }).success,
+    ).toBe(true);
+  });
+});
+
+describe("logEntryTimelineEventSchema", () => {
+  it("discrimina por kind y rechaza kinds desconocidos", () => {
+    expect(
+      logEntryTimelineEventSchema.safeParse({
+        kind: "TRANSITION",
+        id: "t1",
+        at: "2026-06-10T12:00:00.000Z",
+        actorName: "Demo",
+        transitionKey: "approve",
+        label: "Aprobar",
+        fromStateKey: "draft",
+        toStateKey: "approved",
+        fromStateName: "Borrador",
+        toStateName: "Aprobado",
+        reason: null,
+        signature: { signerName: "Demo", meaning: "Aprobado", signedAt: "2026-06-10T12:00:00.000Z" },
+      }).success,
+    ).toBe(true);
+    expect(
+      logEntryTimelineEventSchema.safeParse({ kind: "OTRO", id: "x", at: "2026-06-10T12:00:00.000Z" }).success,
+    ).toBe(false);
   });
 });
