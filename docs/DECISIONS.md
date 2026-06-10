@@ -4,6 +4,46 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-09 · Fase 2.3.0 Calendario operacional — IMPLEMENTADO (forks resueltos)
+
+Implementada la decisión de abajo. **Forks confirmados por el usuario** y su justificación:
+
+1. **Forma del modelo = entidad padre + hijos** (`OperationalCalendar` 1—N `OperationalShift`), no
+   JSON embebido. Los turnos necesitan identidad estable (`code`), orden y validación individual;
+   reusa el patrón `ReferenceList`/`ReferenceItem`. El guardado **reemplaza los turnos en bloque**
+   (set pequeño y cohesivo, mismo criterio que estados/transiciones de un flujo).
+2. **Catálogo VIVO (como Listas), NO versionado-inmutable.** La inmutabilidad histórica la dará el
+   **estampado** de `operationalDate`/`shiftCode`/`periodKey` en `LogEntry` al sellar (2.4); el cambio
+   queda en `AuditLog` (before/after). Registrada como mejora futura "shift definitions con vigencia"
+   por si un cliente necesita re-resolver timestamps históricos con definiciones de su época.
+3. **Sin solapes (error duro) + huecos permitidos.** Un instante cae en ≤1 turno (clave de dimensión
+   única); pero una operación de turno único es válida: una lectura fuera de turno resuelve
+   `shiftCode=null` conservando su `operationalDate`. Validación por "pintado" de minutos en un círculo
+   de 1440 (cubre también suma de duraciones > 24 h).
+4. **TZ = UTC + `Intl` nativo** (sin luxon/date-fns-tz, requisito on-prem). Se guarda UTC; el resolver
+   convierte a hora de pared local del sitio con `Intl.DateTimeFormat` (DST correcto: los límites de
+   turno son hora de pared). El probador convierte hora-de-sitio→UTC con el offset de la TZ.
+5. **Periodo HÍBRIDO** (flexible multi-industria, no scheduler): `MONTH` + `anchorDay` (1..28; mes
+   26→25), `WEEK` + `startWeekday` (llave = fecha de inicio de semana), `CUSTOM` = ciclo de N días
+   operacionales desde una fecha ancla (quincena 14, ciclo 28, rosters; llave = fecha de inicio del
+   ciclo). **Fuera de alcance (BACKLOG):** calendario fiscal 4-4-5 (meses de largo variable) y rotación
+   de cuadrillas / turno distinto por día de semana (sería el scheduler genérico que la decisión excluyó).
+6. **Asignación por nodo = FK `OrgNode.operationalCalendarId` + resolución por ruta materializada**
+   (nodo → ancestro más cercano con calendario → `isDefault`) + picker mínimo sobre el árbol existente
+   (no toca la pantalla de Estructura). Exactamente un calendario `isDefault` (mantenido en tx; el
+   default no se puede borrar).
+
+**Entregado:** `@lyra/contracts/operational-calendar` (schemas + DTOs + `validateOperationalCalendar`
+fuente única + **`resolveShift` función PURA** `timestamp→(operationalDate, shiftCode, periodKey)`, 30
+specs incl. DST Santiago / borde de mes / ciclo CUSTOM / WEEK / huecos). 4 permisos (catálogo **45**).
+Migración aditiva `20260609233155_add_operational_calendar`. Backend `OperationalCalendarModule` (CRUD
+gateado/auditado + `preview`) + **`ShiftResolver`** (clase abstracta = token DI, patrón `EmailService`;
+elige el calendario por nodo y delega en `resolveShift`; exportado para 2.4/2.3/Fase 5). Web
+`/calendario-operacional` (master-detail + editor de turnos con **timeline 24 h** + selector de ancla +
+periodo + **probador** en vivo + asignación de nodos). Seed demo `mina-rajo`. Tests: contracts 76, API
+119. Smoke en vivo OK (preview DST, validación de solape 400, borrar default 400, ciclo create/setDefault/
+assign/delete + limpieza). **Pendiente: smoke VISUAL** (BACKLOG §4).
+
 ### 2026-06-09 · Calendario operacional (turnos + periodo contable) — dimensiones derivadas, NO campos (aprobado)
 
 Inquietud del usuario (correcta) antes de 2.4: **turno, periodo contable y fecha** son **estructurales/contextuales**,

@@ -71,6 +71,10 @@
     y auditada (por defecto NO; estilo GxP).
   - **`effectiveAt`** (columna indexada) = fecha efectiva de negocio (hora del evento/lectura ≠ captura). Se promueve
     del valor del campo con `semanticRole = EFFECTIVE_DATE`; si la plantilla no marca ninguno, cae a `recordedAt`.
+  - **Dimensiones de turno/periodo estampadas (Fase 2.3.0 lista):** `shiftCode?`, `operationalDate?`, `periodKey?`
+    (columnas indexadas, inmutables, **nullable**) se derivan al sellar la entrada vía **`ShiftResolver`** (a partir de
+    `effectiveAt`, fallback `recordedAt`, con el calendario que aplica al `orgNodeId`). Sin calendario configurado
+    quedan en null (degradación elegante). Reportabilidad por turno/periodo sin recalcular y offline-friendly.
   - Valores con historial por campo + transiciones de flujo. **Las tablas se crean en 2.4** (aditivo/no destructivo;
     su forma se valida con la lógica real del llenado). En 2.1.1 quedan solo como diseño aquí y en DECISIONS.
 - **EntryChangeLog** — diffs antes/después + motivo (auditoría de edición).
@@ -113,6 +117,30 @@
   referenciada por una plantilla **no se borra** (guard en `ReferenceListsService.remove`, consulta JSONB de
   `TemplateField.config`). Endpoint `GET /reference-lists/:idOrKey/resolve` devuelve ítems **activos** ordenados
   (code/label/metadata) para el preview del Form Builder y el llenado (2.4).
+
+### Calendario operacional (turnos + periodo contable)
+> **Fase 2.3.0 (implementado):** migración `20260609233155_add_operational_calendar`. Config de **primera clase**,
+> separada del formulario. Turno/día operacional/periodo son **dimensiones DERIVADAS** del timestamp (patrón Shift
+> Calendar de MES / SAP / ISA-95 / dimensión Fecha+Turno de DW). Catálogo **VIVO** (no versionado-inmutable); la
+> inmutabilidad histórica la dará el **estampado** en `LogEntry` (2.4). Ver DECISIONS 2026-06-09.
+- **OperationalCalendar** *(implementado)* — `key` (estable, único), `name`, `description?`, `timezone` (IANA; todo
+  se guarda en UTC), `isDefault` (exactamente uno, mantenido en tx; el default no se borra), `active`,
+  `dayStartShiftCode?` (turno cuyo inicio abre el día operacional; null = día civil 00:00), **periodo**:
+  `periodKind` (MONTH | WEEK | CUSTOM), `periodAnchorDay?` (MONTH 1..28), `periodStartWeekday?` (WEEK 1..7),
+  `periodLengthDays?`/`periodAnchorDate?` (CUSTOM ciclo de N días), `deletedAt` (borrado lógico). *1—N*
+  **OperationalShift**.
+- **OperationalShift** *(implementado)* — `code` (estable, **`@@unique([calendarId, code])`**), `label`,
+  `startTime` ("HH:MM" hora de pared local), `durationMinutes` (1..1440; resuelve el cruce de medianoche),
+  `sortOrder`. FK `onDelete: Cascade`. Los turnos **se reemplazan en bloque** al guardar el calendario.
+- **Asignación por nodo** — **`OrgNode.operationalCalendarId`** (FK `onDelete: SetNull`). La resolución de "qué
+  calendario aplica a un nodo" sube por la **ruta materializada** (nodo → ancestro más cercano con calendario →
+  `isDefault`), en `ShiftResolverService`.
+- **Resolución** — **`resolveShift`** (función PURA en `@lyra/contracts`, solo `Intl`): `timestamp → {operationalDate
+  (YYYY-MM-DD), shiftCode|null, periodKey|null}`. **`ShiftResolver`** (clase abstracta = token DI, patrón
+  `EmailService`) elige el calendario por nodo y delega; lo inyectarán **2.4** (estampa `shiftCode`/`operationalDate`/
+  `periodKey` en `LogEntry`), **2.3 Rondas** (programa por turno) y **Fase 5**. `validateOperationalCalendar` (sin
+  solapes, huecos permitidos) = fuente única contrato+backend+web. Endpoint `POST /operational-calendars/:id/preview`
+  para el probador/verificación.
 
 ### Orígenes de datos
 - **DataSource** — URL base, tipo de auth, **credencial cifrada en reposo**. *1—N* **DataSourceEndpoint** (path, método, mapeo JSONPath, TTL). Caché en Redis. **Espejo ENTRANTE:** en Fase 3 un endpoint puede **alimentar/materializar** una `ReferenceList` (`source=EXTERNAL`).
