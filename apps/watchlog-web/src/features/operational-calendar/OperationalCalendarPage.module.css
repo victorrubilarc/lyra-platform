@@ -401,6 +401,43 @@
   gap: var(--space-2);
 }
 
+.nodeToken {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 4px 10px;
+  min-height: 28px;
+  font-size: 12px;
+  color: var(--color-text-primary);
+  background: var(--color-bg-surface-2);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-full);
+}
+
+.nodeTokenPath {
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.nodeTokenRemove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: var(--transition-default);
+}
+
+.nodeTokenRemove:hover {
+  background: var(--color-hover);
+  color: var(--color-error);
+}
+
 .nodeTree {
   max-height: 360px;
   overflow: auto;

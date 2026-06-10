@@ -672,6 +672,8 @@ export const esCL = {
       "Nodos de la estructura que usan este calendario. Se hereda a los descendientes; si un nodo no tiene calendario, usa el predeterminado.",
     noNodes: "Ningún nodo asignado (se usa donde aplique el predeterminado).",
     nodeCount: "{{count}} nodo(s)",
+    removeNode: "Quitar {{name}}",
+    fixErrors: "Corrige los errores de configuración antes de guardar (p. ej. turnos solapados).",
     manageNodes: "Gestionar nodos",
     searchNodes: "Buscar nodo…",
     nodesSaved: "Nodos asignados",
