@@ -335,6 +335,37 @@ export const PERMISSION_CATALOG = [
     group: "opscalendar",
     description: "Crear, editar, asignar a nodos y eliminar calendarios operacionales.",
   },
+
+  // --- Dimensión 1: módulo de bitácoras / llenado (Fase 2.4) ---
+  // Nota: QUIÉN puede llenar cada SECCIÓN es DATO (roles por sección de la
+  // plantilla, TemplateSectionRole), no una clave de catálogo. Estas claves
+  // gobiernan el acceso al módulo y las acciones de alto nivel.
+  {
+    key: "module:logbook:view",
+    dimension: "MODULE",
+    group: "logbook",
+    description: "Ver el módulo de bitácoras (nueva entrada y registros).",
+  },
+
+  // --- Dimensión 2: acciones — bitácoras / entradas (Fase 2.4) ---
+  {
+    key: "logentry:view",
+    dimension: "ACTION",
+    group: "logbook",
+    description: "Listar y ver entradas de bitácora.",
+  },
+  {
+    key: "logentry:create",
+    dimension: "ACTION",
+    group: "logbook",
+    description: "Crear (abrir) una nueva entrada de bitácora a partir de una plantilla.",
+  },
+  {
+    key: "logentry:fill",
+    dimension: "ACTION",
+    group: "logbook",
+    description: "Llenar/guardar secciones de una entrada y enviarla (según permiso de sección).",
+  },
 ] as const satisfies readonly PermissionDef[];
 
 /** Unión literal de todas las claves de permiso conocidas. */
