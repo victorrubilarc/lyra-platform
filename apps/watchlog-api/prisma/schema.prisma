@@ -318,6 +318,7 @@ model OrgNode {
   equipment Equipment[]
   externalRefs ExternalReference[]
   templates Template[]
+  logEntries LogEntry[]
   operationalCalendar OperationalCalendar? @relation(fields: [operationalCalendarId], references: [id], onDelete: SetNull)
 
   @@index([parentId])
@@ -374,6 +375,7 @@ model Equipment {
   category     EquipmentCategory?  @relation(fields: [categoryId], references: [id])
   orgNode      OrgNode             @relation(fields: [orgNodeId], references: [id])
   externalRefs ExternalReference[]
+  logEntries   LogEntry[]
 
   @@index([orgNodeId])
   @@index([categoryId])
@@ -522,6 +524,7 @@ model Template {
   orgNode        OrgNode?          @relation(fields: [orgNodeId], references: [id], onDelete: SetNull)
   versions       TemplateVersion[] @relation("TemplateVersions")
   currentVersion TemplateVersion?  @relation("TemplateCurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  logEntries     LogEntry[]
 
   @@index([orgNodeId])
   @@index([status])
@@ -559,6 +562,7 @@ model TemplateVersion {
   sections  TemplateSection[]
   workflowDefinition        WorkflowDefinition?        @relation(fields: [workflowDefinitionId], references: [id], onDelete: Restrict)
   workflowDefinitionVersion WorkflowDefinitionVersion? @relation(fields: [workflowDefinitionVersionId], references: [id], onDelete: Restrict)
+  logEntries                LogEntry[]
 
   @@unique([templateId, versionNumber])
   @@index([templateId])
@@ -902,6 +906,150 @@ model OperationalShift {
 // ===========================================================================
 //  Auditoría — append-only / inmutable (trigger en la migración)
 // ===========================================================================
+
+// ===========================================================================
+//  Bitácoras / Llenado (Fase 2.4) — EJECUCIÓN auditada de una plantilla
+// ===========================================================================
+//
+// Paradigma EBR/GxP (ver docs/DECISIONS.md 2026-06-09): definición versionada
+// inmutable (TemplateVersion) vs EJECUCIÓN relacional auditada (LogEntry). La
+// SECCIÓN es la unidad atómica de permiso/llenado/concurrencia/firma; captura
+// multi-actor por fases resuelta por secciones × flujo × RBAC/ABAC.
+//
+// Forks confirmados: valores en tabla hija (LogEntryValue, 1 fila/campo) +
+// historial append-only (LogEntryFieldChange); secciones instanciadas con estado
+// (LogEntrySection); concurrencia optimista POR SECCIÓN (version check-and-bump);
+// sellado de effectiveAt+dimensiones al ENVIAR (sealedAt).
+//
+// El motor de TRANSICIONES de flujo y las firmas Part 11 son 2.5: aquí la entrada
+// permanece en su estado inicial. LogEntryTransition se modela en contratos pero
+// su TABLA se crea en 2.5 (mismo criterio con que LogEntry se difirió a 2.4).
+
+enum LogEntryStatus {
+  DRAFT
+  SUBMITTED
+  VOID
+}
+
+enum LogEntrySectionState {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  LOCKED
+}
+
+model LogEntry {
+  id                          String         @id @default(cuid())
+  templateId                  String
+  // Versión congelada que se está llenando (inmutable; integridad histórica).
+  templateVersionId           String
+  // Flujo DENORMALIZADO (copiado al crear). null = plantilla sin flujo (form simple).
+  workflowDefinitionId        String?
+  workflowDefinitionVersionId String?
+  // Alcance/dimensiones de sistema (columnas indexadas).
+  orgNodeId                   String
+  equipmentId                 String?
+  // Estado del flujo (clave dentro de la versión congelada). null = sin flujo.
+  currentStateKey             String?
+  status                      LogEntryStatus @default(DRAFT)
+  // Marca de captura (commit), inmutable.
+  recordedAt                  DateTime       @default(now())
+  // Fecha efectiva de negocio (campo EFFECTIVE_DATE; fallback recordedAt).
+  effectiveAt                 DateTime       @default(now())
+  // Dimensiones operacionales estampadas vía ShiftResolver (nullable = sin calendario).
+  shiftCode                   String?
+  operationalDate             String? // "YYYY-MM-DD" (día operacional, fecha local)
+  periodKey                   String?
+  // Instante en que se congelaron effectiveAt + dimensiones (al enviar). null = DRAFT.
+  sealedAt                    DateTime?
+  // Autoría (referencia blanda, sin FK dura; igual que Template/AuditLog).
+  createdById                 String?
+  updatedById                 String?
+  createdAt                   DateTime       @default(now())
+  updatedAt                   DateTime       @updatedAt
+  deletedAt                   DateTime? // borrado lógico / anulación
+
+  template        Template              @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  templateVersion TemplateVersion       @relation(fields: [templateVersionId], references: [id], onDelete: Restrict)
+  orgNode         OrgNode               @relation(fields: [orgNodeId], references: [id], onDelete: Restrict)
+  equipment       Equipment?            @relation(fields: [equipmentId], references: [id], onDelete: SetNull)
+  sections        LogEntrySection[]
+  values          LogEntryValue[]
+  changes         LogEntryFieldChange[]
+
+  @@index([templateId])
+  @@index([templateVersionId])
+  @@index([orgNodeId])
+  @@index([equipmentId])
+  @@index([status])
+  @@index([effectiveAt])
+  @@index([operationalDate])
+  @@index([periodKey])
+  @@index([deletedAt])
+}
+
+// Sección INSTANCIADA: porta el ESTADO de ejecución que no se puede derivar de la
+// plantilla (completitud, autoría, firma, revisión de concurrencia).
+model LogEntrySection {
+  id          String               @id @default(cuid())
+  logEntryId  String
+  // Clave estable de la sección dentro de la versión congelada.
+  sectionKey  String
+  state       LogEntrySectionState @default(PENDING)
+  filledById  String?
+  filledAt    DateTime?
+  // Firma de completitud de la sección (Part 11). Se captura en la ejecución 2.5.
+  signatureId String?
+  // Revisión para la concurrencia optimista POR SECCIÓN (check-and-bump).
+  version     Int                  @default(0)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  logEntry LogEntry @relation(fields: [logEntryId], references: [id], onDelete: Cascade)
+
+  @@unique([logEntryId, sectionKey])
+  @@index([logEntryId])
+}
+
+// Valor actual de un campo (1 fila por campo). El de un campo de referencia se
+// persiste como `code` estable, NO como label (dimensión de DW / FHIR Coding).
+model LogEntryValue {
+  id          String        @id @default(cuid())
+  logEntryId  String
+  // Sección a la que pertenece el campo (para la concurrencia por sección).
+  sectionKey  String
+  fieldKey    String
+  // Tipo de dato copiado (reportabilidad sin re-leer la versión congelada).
+  dataType    FieldDataType
+  // code / code[] / número / booleano / fecha ISO / etc. null = vacío.
+  value       Json?
+  updatedById String?
+  updatedAt   DateTime      @updatedAt
+
+  logEntry LogEntry @relation(fields: [logEntryId], references: [id], onDelete: Cascade)
+
+  @@unique([logEntryId, fieldKey])
+  @@index([logEntryId])
+  @@index([sectionKey])
+}
+
+// Historial append-only por campo (antes/después). Auditoría fina del llenado;
+// complementa el AuditLog de eventos de alto nivel (creación/envío de la entrada).
+model LogEntryFieldChange {
+  id          String   @id @default(cuid())
+  logEntryId  String
+  fieldKey    String
+  before      Json?
+  after       Json?
+  reason      String?
+  changedById String?
+  changedAt   DateTime @default(now())
+
+  logEntry LogEntry @relation(fields: [logEntryId], references: [id], onDelete: Cascade)
+
+  @@index([logEntryId])
+  @@index([changedAt])
+}
 
 model AuditLog {
   id         String   @id @default(cuid())

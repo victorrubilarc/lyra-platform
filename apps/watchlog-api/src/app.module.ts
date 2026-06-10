@@ -16,6 +16,7 @@ import { TemplatesModule } from "./templates/templates.module";
 import { WorkflowsModule } from "./workflows/workflows.module";
 import { ReferenceListsModule } from "./reference-lists/reference-lists.module";
 import { OperationalCalendarModule } from "./operational-calendar/operational-calendar.module";
+import { LogEntriesModule } from "./log-entries/log-entries.module";
 import { SecurityModule } from "./security/security.module";
 
 @Module({
@@ -51,6 +52,7 @@ import { SecurityModule } from "./security/security.module";
     WorkflowsModule,
     ReferenceListsModule,
     OperationalCalendarModule,
+    LogEntriesModule,
     SecurityModule,
     HealthModule,
   ],

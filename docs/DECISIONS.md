@@ -4,6 +4,50 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-10 · Fase 2.4 Llenado (Nueva entrada) multi-actor — IMPLEMENTADO (forks resueltos)
+
+Primer slice de EJECUCIÓN: tablas `LogEntry*` (aditivas, migración `20260610011231_add_log_entry`) +
+backend `/log-entries` + pantalla de llenado web. Paradigma EBR/GxP: definición versionada inmutable
+(`TemplateVersion`) vs ejecución relacional auditada. **4 forks confirmados por el usuario** con su motivo:
+
+1. **Valores en TABLA HIJA** (`LogEntryValue`, 1 fila por campo) **+ historial append-only**
+   (`LogEntryFieldChange`), NO un blob JSONB en la cabecera. Motivo: la auditoría por campo (antes/después,
+   Part 11) es natural por fila; la concurrencia optimista por sección queda limpia; reporta por columna;
+   y habilita el guard real de "code en uso" de Listas. El `value` por fila es JSONB tipado por `dataType`.
+   El valor de un campo de referencia se persiste como **`code` estable, no label** (dimensión de DW / FHIR Coding).
+2. **Secciones INSTANCIADAS** (`LogEntrySection` con estado/filledBy/firma/`version`), no derivadas de la
+   versión. Motivo: la sección porta ESTADO de ejecución (completitud, autoría, firma, revisión de
+   concurrencia) que NO se puede derivar de la plantilla. Los campos siguen viviendo en la versión congelada
+   (no se instancian); solo se instancian secciones + valores.
+3. **Concurrencia optimista POR SECCIÓN** (`version` Int, check-and-bump → `ConflictException` 409). Motivo:
+   coincide con el paradigma "sin bloqueo global, multi-actor por secciones"; el operador A y el técnico B
+   editan secciones distintas en paralelo sin pisarse. Por entrada serializaría; por campo sería sobre-ingeniería.
+   La autorización por sección = `(editable en `currentStateKey`) × (rol de sección, dato `TemplateSectionRole`
+   + override por campo `TemplateFieldRole`) × (ABAC `orgNodeId`)`. Validación 100% en servidor
+   (`validateFieldValue`, fuente única reusada por el cliente para feedback inmediato).
+4. **Sellado: `recordedAt` al crear (inmutable); `effectiveAt` + dimensiones (turno/día operacional/periodo,
+   vía `ShiftResolver`) se RECALCULAN en cada guardado mientras la entrada es DRAFT y se CONGELAN al ENVIAR**
+   (`sealedAt`, `status=SUBMITTED`). Motivo: el campo `EFFECTIVE_DATE` puede llenarse a mitad de camino; sellar
+   al crear estamparía el turno con la hora equivocada. Sellar al enviar es el momento "commit" GxP. Degradación
+   elegante: sin calendario → dimensiones null; sin campo `EFFECTIVE_DATE` → `effectiveAt = recordedAt`.
+
+**`workflowDefinitionVersionId` DENORMALIZADO** en `LogEntry` (copiado al crear): la entrada vive su ciclo bajo
+la versión de flujo que congeló su `TemplateVersion`, aunque el flujo publique v(n+1) después.
+
+**Límite del slice (acordado):** la entrada permanece en su **estado inicial**; el motor de TRANSICIONES y las
+firmas Part 11 son **2.5**. En plantillas multi-estado solo se llenan en 2.4 las secciones del estado inicial;
+las plantillas sin flujo se llenan completas (degradación elegante). `LogEntryTransition` queda modelado; su
+tabla se crea en 2.5 (mismo criterio con que `LogEntry` se difirió a 2.4).
+
+**DRY de UI:** se extrajo `FieldControl` (control de campo interactivo + solo-lectura) como fuente única que
+reusan la vista previa del Form Builder y el llenado, para que nunca diverjan.
+
+**Seguimientos registrados** (BACKLOG): selector de nodo para plantillas GLOBALES al crear entrada (hoy se usa
+el nodo de la plantilla; las globales requieren `orgNodeId`); re-seed del borrador local al resolver un 409
+(hoy se recarga la query pero el borrador conserva los valores intentados); motor de transiciones/firmas (2.5).
+
+---
+
 ### 2026-06-09 · Fase 2.3.0 Calendario operacional — IMPLEMENTADO (forks resueltos)
 
 Implementada la decisión de abajo. **Forks confirmados por el usuario** y su justificación:

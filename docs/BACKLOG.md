@@ -5,9 +5,9 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-09** (**Fase 2.1 ✅** + **Fase 2.1.1 ✅** + **Fase 2.2 ✅** — Plantillas (definición +
-> 3 capas + `optionSource` + Form Builder) + **Flujos reutilizables `WorkflowDefinition`**; **siguiente: Fase 2.x —
-> Datos de referencia / Listas**, o 2.3 Rondas).
+> actualización: **2026-06-10** (**Fase 2.1/2.1.1/2.2/2.x/2.3.0 ✅** + **Fase 2.4 ✅** — Plantillas/Form Builder +
+> Flujos + Datos de referencia + Calendario operacional + **Llenado (Nueva entrada) multi-actor** (`LogEntry*`);
+> **siguiente: Fase 2.5 — Ejecución de flujo + firmas Part 11**, o 2.3 Rondas intercalable).
 
 ---
 
@@ -30,7 +30,7 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 
 ## 1. Git: ramas y commits SIN publicar (riesgo de pérdida) 🔴
 
-> Estado al 2026-06-08 (todo publicado). Verificar con:
+> Estado al 2026-06-10 (todo publicado). Verificar con:
 > `git rev-list --count origin/main..main` (debe dar 0) y `git branch --no-merged main`.
 
 | Qué | Dónde | Estado | Acción pendiente |
@@ -50,6 +50,7 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Fix recorte de paneles + `LookupPicker`** (flip-up/clamp + diálogo tabla con tokens) | `main` (fusionado desde `feat/datos-referencia-lookup`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Import/Export CSV de Listas** (dry-run→commit + export `;` es-CL) | `main` (fusionado desde `feat/listas-csv`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Fase 2.3.0 Calendario operacional** (`OperationalCalendar`/`OperationalShift` + `ShiftResolver` + mantenedor) | `main` (fusionado desde `feat/calendario-operacional`) | ✅ fusionado y publicado en `origin/main` | ninguna |
+| **Fase 2.4 Llenado (Nueva entrada)** (`LogEntry*` + `/log-entries` + `FieldControl` + pantalla de llenado) | `main` (fusionado desde `feat/llenado`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 
 **Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
@@ -242,10 +243,21 @@ nunca queda más de una sesión atrás.
   - [ ] **2.3 Programación de rondas/turnos (`LogPeriod`):** plantilla recurrente (turno/intervalo/calendario,
         simple, no un scheduler genérico); cada ocurrencia abre/gener​a un `LogEntry` ligado a su periodo. **Se apoya
         en el `OperationalCalendar` de 2.3.0** (turnos ya definidos). Investigar ISA-95 / shift handover antes de modelar.
-  - [ ] **2.4 Llenado (Nueva entrada) multi-actor:** secciones editables por estado+rol; validación backend +
-        auditoría por campo + concurrencia optimista por sección. **Estampa las dimensiones derivadas** (`recordedAt`,
-        `effectiveAt`, y vía `ShiftResolver`: `shiftCode`/`operationalDate`/`periodKey`) como columnas indexadas
-        inmutables; nullable si no hay calendario (degradación elegante).
+  - [x] **2.4 Llenado (Nueva entrada) multi-actor** ✅ (2026-06-10). Tablas `LogEntry`/`LogEntrySection`/
+        `LogEntryValue`/`LogEntryFieldChange` (aditivas). Secciones editables por estado+rol (dato `TemplateSectionRole`
+        + override por campo) × ABAC; validación 100% en servidor (`validateFieldValue` = fuente única reusada en
+        cliente); **concurrencia optimista por sección** (409); auditoría por campo. Estampa `recordedAt` (inmutable),
+        `effectiveAt` (recalcula en DRAFT, congela al enviar) y vía `ShiftResolver` `shiftCode`/`operationalDate`/
+        `periodKey` (nullable = degradación elegante). `workflowDefinitionVersionId` DENORMALIZADO. Web: `FieldControl`
+        compartido + `/nueva-entrada` (picker) + `/nueva-entrada/:id` (llenado). 4 permisos (catálogo **49**). Tests:
+        contracts 97, API 129. Ver DECISIONS/PROGRESS 2026-06-10. **Pendiente: smoke VISUAL** (§4).
+    - [ ] **Diferidos de 2.4 (seguimientos, aditivos):** **(a)** selector de NODO para plantillas GLOBALES al crear
+          una entrada (hoy se usa el nodo de la plantilla; las globales requieren `orgNodeId` y el picker muestra el
+          error del backend). **(b)** re-seed del borrador local al resolver un **409** (hoy se recarga la query pero el
+          borrador conserva los valores intentados; falta refrescar el editor con lo del servidor sin perder lo no
+          guardado). **(c)** edición de una entrada ya enviada (`logentry:edit`/anulación con motivo) — hoy SUBMITTED es
+          inmutable. **(d)** hard-delete real de ítem de Lista con `code` en uso (ahora ya hay `LogEntryValue` para
+          consultarlo, deuda registrada en 2.x).
   - [ ] **2.5 Ejecución de flujo + firmas electrónicas (Part 11):** transiciones gateadas, firma
         (re-auth / MFA step-up), bloqueo/desbloqueo de secciones, log de transiciones.
   - [ ] **2.6 Bitácoras: listado + detalle + línea de tiempo + log de cambios** (vista de auditor).
@@ -426,6 +438,13 @@ probatoria (hash+timestamp). Ref: `DECISIONS.md` (sección de recomendaciones).
       día, cambiar periodo MONTH/WEEK/CUSTOM (campos condicionales), usar el **probador** (datetime → turno/día
       operacional/periodo en vivo, incl. madrugada y hueco), **Guardar** (deshabilitado si inválido o sin cambios),
       hacer predeterminado, asignar nodos (modal sobre el árbol), eliminar (bloqueado si es el default); modo claro.
+      App en `:5173`.
+- [ ] **Llenado 2.4 — smoke VISUAL en navegador** (se verificó typecheck/lint/test/build web + smoke por API 15/15;
+      falta el clic): `/nueva-entrada` (grilla de plantillas publicadas, crear entrada), pantalla de llenado
+      (cabecera con estado + chips de turno/día operacional/periodo/fecha efectiva; secciones como cards; campo NÚMERO
+      con bandas de umbral; SELECT/MULTISELECT resolviendo Lista; validación inmediata por campo; **Guardar sección** y
+      **Guardar y completar**; **Enviar y registrar** → banner de sellado; secciones de solo-lectura tras enviar);
+      probar **concurrencia** (dos pestañas guardando la misma sección → toast de conflicto + recarga); modo claro.
       App en `:5173`.
 - [ ] **Modo claro — QA visual** (nuevo): revisar que TODO el workspace se vea premium en **claro**
       (contraste WCAG, glass, glows, severidades, tablas futuras, drawers/modales) y que `auto` siga al

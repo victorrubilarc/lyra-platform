@@ -1,4 +1,4 @@
-import { CalendarClock, GitBranch, LayoutDashboard, Layers, ListChecks, Network, ShieldCheck, UserCog, type LucideIcon } from "lucide-react";
+import { CalendarClock, FilePlus2, GitBranch, LayoutDashboard, Layers, ListChecks, Network, ShieldCheck, UserCog, type LucideIcon } from "lucide-react";
 import type { Permission } from "@lyra/permissions";
 
 /**
@@ -33,6 +33,13 @@ export const ROUTES: readonly NavRoute[] = [
     labelKey: "nav.templates",
     icon: Layers,
     permission: "module:templates:view",
+    inSidebar: true,
+  },
+  {
+    path: "/nueva-entrada",
+    labelKey: "nav.newEntry",
+    icon: FilePlus2,
+    permission: "module:logbook:view",
     inSidebar: true,
   },
   {
