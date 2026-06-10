@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ChevronDown, ChevronRight, Search } from "lucide-react";
-import { Button, Checkbox, Input, Modal, useToast } from "@lyra/ui";
+import { Button, Checkbox, Chip, Input, Modal, useToast } from "@lyra/ui";
 import type { OrgNodeTree } from "@lyra/contracts";
 import { ApiError } from "../../lib/api-client.js";
 import { useOrgTree } from "../structure/structure-queries.js";
@@ -61,9 +61,12 @@ export function AssignNodesModal({ calendarId, currentNodeIds, onClose }: Assign
       return next;
     });
 
-  const renderNode = (node: OrgNodeTree, depth: number): React.ReactNode => {
+  // `inherited` = algún ancestro está seleccionado ⇒ el nodo ya queda cubierto por
+  // herencia (no se marca directamente; se muestra como "heredado").
+  const renderNode = (node: OrgNodeTree, depth: number, inherited: boolean): React.ReactNode => {
     const hasChildren = node.children.length > 0;
     const isCollapsed = collapsed.has(node.id) && !q;
+    const directlySelected = selected.has(node.id);
     return (
       <Fragment key={node.id}>
         <div className={styles.nodeRow} style={{ paddingLeft: depth * 18 }}>
@@ -74,9 +77,15 @@ export function AssignNodesModal({ calendarId, currentNodeIds, onClose }: Assign
           ) : (
             <span style={{ width: 19, display: "inline-block" }} />
           )}
-          <Checkbox checked={selected.has(node.id)} onChange={() => toggleNode(node.id)} label={node.name} />
+          <Checkbox
+            checked={directlySelected || inherited}
+            disabled={inherited}
+            onChange={() => toggleNode(node.id)}
+            label={node.name}
+          />
+          {inherited && <Chip label={t("opsCalendar.inherited")} variant="default" size="sm" />}
         </div>
-        {hasChildren && !isCollapsed && node.children.map((c) => renderNode(c, depth + 1))}
+        {hasChildren && !isCollapsed && node.children.map((c) => renderNode(c, depth + 1, inherited || directlySelected))}
       </Fragment>
     );
   };
@@ -113,6 +122,7 @@ export function AssignNodesModal({ calendarId, currentNodeIds, onClose }: Assign
       }
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <p className={styles.hint}>{t("opsCalendar.inheritedHint")}</p>
         <Input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -123,7 +133,7 @@ export function AssignNodesModal({ calendarId, currentNodeIds, onClose }: Assign
           {visible.length === 0 ? (
             <p className={styles.hint}>{t("opsCalendar.noNodesAvailable")}</p>
           ) : (
-            visible.map((n) => renderNode(n, 0))
+            visible.map((n) => renderNode(n, 0, false))
           )}
         </div>
       </div>

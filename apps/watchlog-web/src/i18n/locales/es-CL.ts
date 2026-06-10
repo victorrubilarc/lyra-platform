@@ -634,12 +634,13 @@ export const esCL = {
     // Turnos
     shifts: "Turnos",
     shiftsHint:
-      "Define los turnos del día (código, etiqueta, hora de inicio y duración). La duración resuelve el cruce de medianoche. No pueden solaparse; se permiten huecos (operación de turno único).",
+      "Define los turnos del día (código, etiqueta, inicio y fin). Si el fin es menor o igual al inicio, el turno cruza la medianoche. No pueden solaparse; se permiten huecos (operación de turno único).",
     shiftCode: "Código",
     shiftLabel: "Etiqueta",
     shiftLabelPlaceholder: "Mañana",
     shiftStart: "Inicio",
-    shiftDuration: "Duración (min)",
+    shiftEnd: "Fin",
+    shiftDuration: "Duración",
     addShift: "Agregar turno",
     valid: "Configuración válida.",
     timelineAria: "Cobertura de turnos en 24 horas",
@@ -675,6 +676,9 @@ export const esCL = {
     searchNodes: "Buscar nodo…",
     nodesSaved: "Nodos asignados",
     noNodesAvailable: "No hay nodos en la estructura.",
+    inherited: "heredado",
+    inheritedHint:
+      "Marca solo el nodo raíz de cada rama: los descendientes heredan el calendario automáticamente (se muestran como «heredado»).",
     // Eliminar
     deleteTitle: "Eliminar calendario",
     deleteConfirm: '¿Eliminar el calendario "{{name}}"? Los nodos asignados quedarán sin calendario directo.',

@@ -231,9 +231,24 @@
 /* ── Editor de turnos (filas) ───────────────────────────────────────────── */
 .shiftRow {
   display: grid;
-  grid-template-columns: 90px 1fr 110px 130px 40px;
+  grid-template-columns: 84px 1fr 104px 104px 64px 40px;
   gap: var(--space-2);
   align-items: end;
+}
+
+.durReadout {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  padding-bottom: 9px;
+}
+
+.inheritedTag {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
 }
 
 .shiftRow + .shiftRow {
