@@ -21,6 +21,8 @@ import { WorkflowsPage } from "../features/workflows/WorkflowsPage.js";
 import { WorkflowBuilderPage } from "../features/workflows/WorkflowBuilderPage.js";
 import { ReferenceDataPage } from "../features/reference-data/ReferenceDataPage.js";
 import { OperationalCalendarPage } from "../features/operational-calendar/OperationalCalendarPage.js";
+import { NewEntryPage } from "../features/log-entries/NewEntryPage.js";
+import { EntryFillPage } from "../features/log-entries/EntryFillPage.js";
 
 /**
  * Mapa de rutas. `/login` es pública; todo lo demás cuelga de `ProtectedRoute`
@@ -44,6 +46,8 @@ export const router = createBrowserRouter([
           { path: "/estructura", element: <StructurePage /> },
           { path: "/plantillas", element: <TemplatesPage /> },
           { path: "/plantillas/:id", element: <TemplateBuilderPage /> },
+          { path: "/nueva-entrada", element: <NewEntryPage /> },
+          { path: "/nueva-entrada/:id", element: <EntryFillPage /> },
           { path: "/flujos", element: <WorkflowsPage /> },
           { path: "/flujos/:id", element: <WorkflowBuilderPage /> },
           { path: "/datos-referencia", element: <ReferenceDataPage /> },

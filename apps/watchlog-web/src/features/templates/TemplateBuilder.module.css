@@ -407,6 +407,20 @@
   font-size: 12px;
   color: var(--color-text-muted);
 }
+/* Valor en modo solo-lectura (sección no editable por el usuario / ya completada). */
+.previewReadonly {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text);
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  word-break: break-word;
+}
 .previewNumberRow {
   display: flex;
   align-items: center;

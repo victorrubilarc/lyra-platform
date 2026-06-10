@@ -1,0 +1,208 @@
+.page {
+  padding: var(--layout-content-pad-y, 28px) var(--layout-content-pad-x, 32px);
+  max-width: 920px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.title {
+  font-family: var(--font-display, "Sora", sans-serif);
+  font-size: 26px;
+  font-weight: 800;
+  margin: 0;
+}
+.accent {
+  background: var(--gradient-brand, linear-gradient(135deg, #6366f1, #06b6d4));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.subtitle {
+  color: var(--color-text-secondary);
+  font-size: 13.5px;
+  margin: 6px 0 0;
+}
+.backBtn {
+  margin-bottom: 16px;
+}
+
+/* --- Picker (Nueva entrada) --- */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px;
+}
+.cardTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.nodeTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  color: var(--color-text-secondary);
+}
+.cardName {
+  font-family: var(--font-display, "Sora", sans-serif);
+  font-weight: 700;
+  font-size: 15.5px;
+}
+.cardDesc {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+.cardMeta {
+  display: flex;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+
+/* --- Fill (cabecera) --- */
+.entryHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 22px 26px;
+  margin-bottom: 18px;
+}
+.entryHeadTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.entryName {
+  font-family: var(--font-display, "Sora", sans-serif);
+  font-size: 20px;
+  font-weight: 800;
+}
+.entryNode {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin-top: 3px;
+}
+.dimsRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.dimChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 99px;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+}
+.dimChip b {
+  color: var(--color-text);
+}
+
+/* --- Fill (secciones) --- */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 22px 26px;
+  margin-bottom: 16px;
+}
+.sectionHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 12px;
+}
+.sectionTitle {
+  font-family: var(--font-display, "Sora", sans-serif);
+  font-weight: 700;
+  font-size: 16px;
+}
+.sectionDesc {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin-top: 3px;
+}
+.sectionMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.filledBy {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+.lockedNote {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--color-text-muted);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+.fieldError {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-danger, #ef4444);
+  margin-top: 4px;
+}
+.sectionFooter {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding-top: 4px;
+}
+.submitBar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.submitHint {
+  font-size: 12.5px;
+  color: var(--color-text-muted);
+}
+.sealedBanner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  color: var(--color-success, #22c55e);
+  background: color-mix(in srgb, var(--color-success, #22c55e) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-success, #22c55e) 35%, transparent);
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin-bottom: 18px;
+}
