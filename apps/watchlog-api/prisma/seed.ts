@@ -13,6 +13,7 @@ import { NODE_DESCRIPTIONS } from "./structure-descriptions.js";
 import { assignReportOrderBySiblings } from "./report-order.js";
 import { DEMO_EQUIPMENT, EQUIPMENT_CATEGORIES } from "./equipment-seed-data.js";
 import { REFERENCE_LISTS } from "./reference-data-seed.js";
+import { DEMO_CALENDAR } from "./operational-calendar-seed.js";
 
 const prisma = new PrismaClient();
 
@@ -345,6 +346,43 @@ async function seedReferenceData(): Promise<void> {
   console.log(`✔ Listas de referencia de demo sincronizadas: ${REFERENCE_LISTS.length}`);
 }
 
+/**
+ * Calendario operacional de demo (SOLO desarrollo). Idempotente: upsert por `key`;
+ * reemplaza sus turnos para reflejar la definición de la fuente. Ver
+ * `operational-calendar-seed.ts`.
+ */
+async function seedOperationalCalendar(): Promise<void> {
+  if (process.env.NODE_ENV === "production") return;
+
+  const c = DEMO_CALENDAR;
+  const cal = await prisma.operationalCalendar.upsert({
+    where: { key: c.key },
+    create: {
+      key: c.key,
+      name: c.name,
+      description: c.description,
+      timezone: c.timezone,
+      isDefault: c.isDefault,
+      dayStartShiftCode: c.dayStartShiftCode,
+      periodKind: c.periodKind,
+      periodAnchorDay: c.periodAnchorDay,
+    },
+    update: {
+      name: c.name,
+      description: c.description,
+      timezone: c.timezone,
+      dayStartShiftCode: c.dayStartShiftCode,
+      periodKind: c.periodKind,
+      periodAnchorDay: c.periodAnchorDay,
+    },
+  });
+  await prisma.operationalShift.deleteMany({ where: { calendarId: cal.id } });
+  await prisma.operationalShift.createMany({
+    data: c.shifts.map((s, i) => ({ calendarId: cal.id, code: s.code, label: s.label, startTime: s.startTime, durationMinutes: s.durationMinutes, sortOrder: i * 10 })),
+  });
+  console.log(`✔ Calendario operacional de demo sincronizado: ${c.key} (${c.shifts.length} turnos)`);
+}
+
 async function main(): Promise<void> {
   await seedPermissions();
   await seedAdminRole();
@@ -355,6 +393,7 @@ async function main(): Promise<void> {
   await seedEquipmentCategories();
   await seedDemoEquipment();
   await seedReferenceData();
+  await seedOperationalCalendar();
 }
 
 main()
