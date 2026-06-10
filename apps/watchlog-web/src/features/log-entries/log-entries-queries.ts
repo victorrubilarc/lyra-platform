@@ -2,14 +2,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   CreateLogEntryRequest,
   ExecuteTransitionRequest,
-  LogEntryListQuery,
   SaveLogEntrySectionRequest,
   SubmitLogEntryRequest,
 } from "@lyra/contracts";
 import {
   createLogEntry,
   executeTransition,
-  fetchLogEntries,
   fetchLogEntry,
   saveLogEntrySection,
   submitLogEntry,
@@ -17,13 +15,8 @@ import {
 
 export const LOG_ENTRY_KEYS = {
   all: ["log-entries"] as const,
-  list: (query: LogEntryListQuery) => ["log-entries", "list", query] as const,
   detail: (id: string) => ["log-entries", "detail", id] as const,
 };
-
-export function useLogEntries(query: LogEntryListQuery = {}) {
-  return useQuery({ queryKey: LOG_ENTRY_KEYS.list(query), queryFn: () => fetchLogEntries(query) });
-}
 
 export function useLogEntry(id: string | null) {
   return useQuery({

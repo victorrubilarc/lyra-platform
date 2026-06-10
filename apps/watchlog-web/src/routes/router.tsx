@@ -23,6 +23,8 @@ import { ReferenceDataPage } from "../features/reference-data/ReferenceDataPage.
 import { OperationalCalendarPage } from "../features/operational-calendar/OperationalCalendarPage.js";
 import { NewEntryPage } from "../features/log-entries/NewEntryPage.js";
 import { EntryFillPage } from "../features/log-entries/EntryFillPage.js";
+import { LogbookPage } from "../features/logbook/LogbookPage.js";
+import { EntryViewerPage } from "../features/logbook/EntryViewerPage.js";
 
 /**
  * Mapa de rutas. `/login` es pública; todo lo demás cuelga de `ProtectedRoute`
@@ -48,6 +50,8 @@ export const router = createBrowserRouter([
           { path: "/plantillas/:id", element: <TemplateBuilderPage /> },
           { path: "/nueva-entrada", element: <NewEntryPage /> },
           { path: "/nueva-entrada/:id", element: <EntryFillPage /> },
+          { path: "/bitacoras", element: <LogbookPage /> },
+          { path: "/bitacoras/:id", element: <EntryViewerPage /> },
           { path: "/flujos", element: <WorkflowsPage /> },
           { path: "/flujos/:id", element: <WorkflowBuilderPage /> },
           { path: "/datos-referencia", element: <ReferenceDataPage /> },

@@ -21,6 +21,28 @@
   font-size: 12.5px;
 }
 
+/* Botón × de un chip removible (filtros activos). Hereda el color semántico. */
+.remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 5px;
+  margin-right: -3px;
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+.remove:hover {
+  background: color-mix(in srgb, currentColor 18%, transparent);
+}
+
 /* --- Variantes semánticas --- */
 .default {
   background: var(--color-hover);

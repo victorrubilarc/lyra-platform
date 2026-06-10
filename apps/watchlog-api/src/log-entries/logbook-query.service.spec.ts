@@ -161,7 +161,7 @@ describe("LogbookQueryService — list", () => {
       shiftCode: "A",
     });
 
-    const arg = (prisma.logEntry.findMany as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    const arg = (prisma.logEntry.findMany as ReturnType<typeof vi.fn>).mock.calls[0]![0];
     const and = arg.where.AND as Record<string, unknown>[];
     expect(and).toContainEqual({ deletedAt: null });
     expect(and).toContainEqual({ orgNodeId: { in: ["n1", "n2"] } });
@@ -177,7 +177,7 @@ describe("LogbookQueryService — list", () => {
   it("filtra una rama completa con includeDescendants (ruta materializada)", async () => {
     const { logbook, prisma } = makeServices();
     await logbook.list("u1", { orgNodeId: "n1", includeDescendants: true });
-    const arg = (prisma.logEntry.findMany as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    const arg = (prisma.logEntry.findMany as ReturnType<typeof vi.fn>).mock.calls[0]![0];
     expect(arg.where.AND).toContainEqual({ orgNode: { path: { startsWith: "/n1/" } } });
   });
 
@@ -201,7 +201,7 @@ describe("LogbookQueryService — list", () => {
     expect(page.nextCursor).not.toBeNull();
 
     await logbook.list("u1", { take: 2, cursor: page.nextCursor! });
-    const arg = (prisma.logEntry.findMany as ReturnType<typeof vi.fn>).mock.calls[1][0];
+    const arg = (prisma.logEntry.findMany as ReturnType<typeof vi.fn>).mock.calls[1]![0];
     const keyset = (arg.where.AND as Record<string, unknown>[])[1];
     expect(keyset).toEqual({
       OR: [

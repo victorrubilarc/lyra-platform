@@ -485,3 +485,21 @@
     animation: none;
   }
 }
+
+/* --- Impresión: solo el contenido del módulo (ej. revisión formal de una
+   bitácora en /bitacoras/:id). El chrome (sidebar/topbar/pestañas) no se imprime. */
+@media print {
+  .shell {
+    display: block;
+  }
+  .shell > :not(.main) {
+    display: none !important;
+  }
+  .main > :not(.content) {
+    display: none !important;
+  }
+  .content {
+    overflow: visible !important;
+    height: auto !important;
+  }
+}
