@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { CalendarClock, FlaskConical, Plus, Star, Trash2 } from "lucide-react";
+import { CalendarClock, FlaskConical, Plus, Star, Trash2, X } from "lucide-react";
 import { Button, Chip, Input, Modal, Select, Skeleton, Toggle, useToast } from "@lyra/ui";
+import type { OrgNodeTree } from "@lyra/contracts";
 import {
   PERIOD_KINDS,
   resolveShift,
@@ -14,7 +15,9 @@ import { Can } from "../../auth/Can.js";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { ApiError } from "../../lib/api-client.js";
 import { AssignNodesModal } from "./AssignNodesModal.js";
+import { useOrgTree } from "../structure/structure-queries.js";
 import {
+  useAssignCalendarNodes,
   useDeleteCalendar,
   useOperationalCalendar,
   useSetDefaultCalendar,
@@ -114,6 +117,19 @@ function siteWallClockToUtc(value: string, tz: string): Date | null {
   return new Date(guess - offset);
 }
 
+interface NodeInfo {
+  name: string;
+  path: string;
+}
+
+/** Aplana el árbol a id → {nombre, ruta de ancestros} para etiquetar los nodos asignados. */
+function flattenNodeInfo(nodes: OrgNodeTree[], ancestors: string[], map: Map<string, NodeInfo>): void {
+  for (const n of nodes) {
+    map.set(n.id, { name: n.name, path: ancestors.join(" / ") });
+    flattenNodeInfo(n.children, [...ancestors, n.name], map);
+  }
+}
+
 interface CalendarDetailPanelProps {
   calendarId: string | null;
   onDeleted: () => void;
@@ -126,9 +142,17 @@ export function CalendarDetailPanel({ calendarId, onDeleted }: CalendarDetailPan
   const canManage = perms.can("opscalendar:manage");
 
   const { data: cal, isLoading } = useOperationalCalendar(calendarId);
+  const { data: tree = [] } = useOrgTree();
   const update = useUpdateCalendar();
   const setDefault = useSetDefaultCalendar();
   const remove = useDeleteCalendar();
+  const assignNodes = useAssignCalendarNodes();
+
+  const nodeInfo = useMemo(() => {
+    const map = new Map<string, NodeInfo>();
+    flattenNodeInfo(tree, [], map);
+    return map;
+  }, [tree]);
 
   const [state, setState] = useState<EditableState | null>(null);
   const [loadedSnapshot, setLoadedSnapshot] = useState("");
@@ -213,6 +237,10 @@ export function CalendarDetailPanel({ calendarId, onDeleted }: CalendarDetailPan
     });
 
   const onSave = async () => {
+    if (errors.length > 0) {
+      toast.error(t("opsCalendar.fixErrors"));
+      return;
+    }
     try {
       await update.mutateAsync({
         id: cal.id,
@@ -242,6 +270,15 @@ export function CalendarDetailPanel({ calendarId, onDeleted }: CalendarDetailPan
       toast.success(t("opsCalendar.deleted"));
       setConfirmDelete(false);
       onDeleted();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : t("common.errorGeneric"));
+    }
+  };
+
+  const onRemoveNode = async (nodeId: string) => {
+    try {
+      await assignNodes.mutateAsync({ id: cal.id, dto: { orgNodeIds: (cal.assignedNodeIds ?? []).filter((x) => x !== nodeId) } });
+      toast.success(t("opsCalendar.nodesSaved"));
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : t("common.errorGeneric"));
     }
@@ -461,7 +498,26 @@ export function CalendarDetailPanel({ calendarId, onDeleted }: CalendarDetailPan
           {(cal.assignedNodeIds?.length ?? 0) === 0 ? (
             <span className={styles.hint}>{t("opsCalendar.noNodes")}</span>
           ) : (
-            <Chip label={t("opsCalendar.nodeCount", { count: cal.assignedNodeIds!.length })} variant="default" size="sm" />
+            cal.assignedNodeIds!.map((id) => {
+              const info = nodeInfo.get(id);
+              return (
+                <span key={id} className={styles.nodeToken}>
+                  {info?.path && <span className={styles.nodeTokenPath}>{info.path} /</span>}
+                  <span>{info?.name ?? id}</span>
+                  {canManage && (
+                    <button
+                      type="button"
+                      className={styles.nodeTokenRemove}
+                      onClick={() => void onRemoveNode(id)}
+                      aria-label={t("opsCalendar.removeNode", { name: info?.name ?? id })}
+                      disabled={assignNodes.isPending}
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
+                </span>
+              );
+            })
           )}
         </div>
         <Can perform="opscalendar:manage">
