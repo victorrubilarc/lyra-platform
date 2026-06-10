@@ -4,6 +4,41 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-10 · Fase 2.5 Ejecución de flujo + firmas electrónicas Part 11 — IMPLEMENTADO (forks resueltos)
+
+Cierra el bucle de ejecución abierto en 2.4: motor de transiciones + firmas estilo **21 CFR Part 11**
+(§11.50/11.70/11.200, ALCOA+, NIST 800-63B step-up). Migración aditiva `20260610035255_add_log_entry_execution`
+(`LogEntryTransition` + `LogEntrySignature`). Backend `executeTransition` (rama `feat/ejecucion-flujo`). **5 forks
+confirmados por el usuario** con su motivo:
+
+1. **Firma = tabla dedicada `LogEntrySignature` POLIMÓRFICA** (`context` TRANSITION|SECTION_COMPLETION, check XOR), no
+   embebida. Motivo: §11.50/11.70 piden la firma como entidad de primer orden enlazable; cubre tanto la firma de
+   transición como la de completitud de sección (`LogEntrySection.signatureId` la anticipaba); mismo patrón XOR que
+   Scope/ExternalReference.
+2. **Se hashea un snapshot canónico (SHA-256) + metadatos; PKI/sello de tiempo cualificado → Fase 7.** `canonicalSignaturePayload`
+   (claves ordenadas recursivamente, determinista) en `@lyra/contracts` = fuente única. Se guarda SOLO el hash (el snapshot es
+   reconstruíble desde `LogEntryValue`/`LogEntryFieldChange`). Da integridad/no repudio sin sobre-ingeniería.
+3. **Re-auth: firma ⇒ significado + contraseña (§11.200, 2.º componente); MFA step-up SOLO si `requireMfa`** de la transición.
+   Las secciones no portan flag de MFA ⇒ su firma de completitud es solo-contraseña. Encapsulado en `ReauthService` (módulo
+   auth, reutilizable por Fase 4 / notificaciones con acción firmada).
+4. **`status` reconciliado, sin enum nuevo:** `currentStateKey` = verdad del flujo; al entrar a un estado `isFinal` ⇒
+   `status=SUBMITTED` (el sellado ya ocurrió en la 1ª transición); `VOID` reservado a anulación. `status` sigue para
+   índices/listados gruesos. Evita doble fuente de verdad y migración de enum.
+5. **Reversa/anulación de transición (corrección GxP) DIFERIDA** (modelo append-only ya la soporta como transición inversa
+   con motivo + firma). Mantiene el alcance en "ejecutar + firmar"; registrada en BACKLOG §2/§3.
+
+**Sellado reconciliado:** movido de `submit` (2.4) a la **1ª transición que sale del estado inicial**; `submit` queda como
+finalización SOLO de plantillas sin flujo (degradación elegante). `saveSection` respeta `sealedAt` (no recalcula dimensiones
+tras sellar). **Recomputo de secciones** en cada transición: no editable en el nuevo estado ⇒ `LOCKED` (preserva
+completitud/firma/autoría); editable y estaba `LOCKED` ⇒ reapertura a `PENDING` (rework). **Gancho** `onTransitionExecuted`
+(no-op) = punto único para el bus de eventos/outbox → Notificaciones y umbral→incidencia (Fase 4). Permiso nuevo
+`logentry:transition` (catálogo **50**; QUIÉN puede cada transición sigue siendo dato `WorkflowTransitionRole`). El motor
+vive en `LogEntriesService` (no en un servicio aparte) para reusar la maquinaria de secciones/valores/validación/sellado
+sin duplicarla. Tests: contracts 104, API 144. Smoke en vivo 21/21. `/security-review` sin hallazgos. **Deuda registrada:**
+throttle de re-auth de firma (defensa en profundidad), recovery code consumido antes del commit de la tx (operacional).
+
+---
+
 ### 2026-06-10 · Fase 2.4 Llenado (Nueva entrada) multi-actor — IMPLEMENTADO (forks resueltos)
 
 Primer slice de EJECUCIÓN: tablas `LogEntry*` (aditivas, migración `20260610011231_add_log_entry`) +

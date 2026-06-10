@@ -84,16 +84,32 @@
 - **LogEntryFieldChange** *(implementado)* — historial **append-only por campo** (antes/después): `fieldKey`,
   `before`/`after` jsonb, `changedById`, `changedAt`, `reason?`. Auditoría fina del llenado; complementa el AuditLog
   de eventos de alto nivel (`logentry.created`/`logentry.section.saved`/`logentry.submitted`).
-- **LogEntryTransition** *(diseñado; tabla en 2.5)* — log del flujo (from→to, actor, motivo, firma). Se materializa
-  con el motor de ejecución de flujo (2.5); el gancho `sealedAt`/`currentStateKey` ya existe.
-- **AutoIncidentRule** — reglas que disparan incidencias desde campos (umbral, severidad ≥ N). **Fase 4.**
+- **LogEntryTransition** *(implementado — Fase 2.5, migración `20260610035255_add_log_entry_execution`)* — historial
+  **append-only** de transiciones EJECUTADAS: `workflowDefinitionVersionId` (versión congelada), `transitionKey`,
+  `fromStateKey`/`toStateKey`, `actorId`+`actorEmail` (snapshot), `reason?`, `signatureId?` (ref. blanda a la firma),
+  `occurredAt`. Índice `(logEntryId, occurredAt)`. Trazabilidad ALCOA+ de cómo avanzó el registro entre estados.
+- **LogEntrySignature** *(implementado — Fase 2.5)* — firma electrónica estilo **21 CFR Part 11** (§11.50/11.70/11.200),
+  entidad de primer orden **polimórfica** por `context` (`TRANSITION` | `SECTION_COMPLETION`): `transitionKey?`/
+  `sectionKey?` (check XOR según contexto, patrón Scope/ExternalReference), `signerId?`+`signerName` (nombre impreso),
+  `meaning` (significado), `method` (`PASSWORD`|`PASSWORD_MFA`), `payloadHash` (SHA-256 del snapshot canónico firmado),
+  `signedAt` UTC. El snapshot NO se almacena (es reconstruíble desde `LogEntryValue`/`LogEntryFieldChange`); el hash da
+  integridad/no repudio (record–signature linking). PKI/sello de tiempo cualificado **diferidos a Fase 7**.
+- **AutoIncidentRule** — reglas que disparan incidencias desde campos (umbral, severidad ≥ N). **Fase 4.** El gancho
+  `LogEntriesService.onTransitionExecuted` (no-op hoy) es el punto de enganche del evento `logentry.transition.executed`.
 
 > **Autorización del llenado (2.4):** los guards aplican `logentry:view/create/fill`; la editabilidad por SECCIÓN la
 > decide el backend = `(sección editable en `currentStateKey`) × (rol con permiso de sección, dato `TemplateSectionRole`
 > + override por campo `TemplateFieldRole`) × (ABAC sobre `orgNodeId`)`. La validación de valores es 100% en servidor
 > (`validateFieldValue` en `@lyra/contracts`, fuente única reusada por el cliente para feedback inmediato): tipo/rango/
-> umbral ISA-18.2/regex/`optionSource` resuelto contra Listas vivas/`visibleWhen`. **Límite del slice:** la entrada
-> permanece en su estado inicial; las TRANSICIONES de flujo y las firmas Part 11 son 2.5.
+> umbral ISA-18.2/regex/`optionSource` resuelto contra Listas vivas/`visibleWhen`.
+>
+> **Ejecución de flujo (2.5 — implementado):** `executeTransition` (`POST /log-entries/:id/transitions`, permiso
+> `logentry:transition`) valida en backend (a) la transición sale de `currentStateKey`, (b) rol-dato autorizado
+> (`WorkflowTransitionRole`), (c) ABAC sobre el nodo, (d) completitud de las secciones del estado de origen; aplica el
+> cambio de estado, recomputa secciones (`LOCKED`/reapertura), **sella** `effectiveAt`+dimensiones en la 1ª salida del
+> estado inicial y reconcilia `status` (terminal ⇒ `SUBMITTED`). `submit` queda SOLO para forms sin flujo (con flujo se
+> rechaza). Firma opt-in por transición (`requireSignature`/`requireMfa`) y por completitud de sección
+> (`TemplateSection.requireSignature`), capturada con `ReauthService` (contraseña + MFA step-up condicional).
 
 ### Flujos reutilizables (máquina de estados)
 > **Fase 2.2 (implementado — lado DEFINICIÓN):** migración `20260609163822_add_workflow_definition`. Máquina de
