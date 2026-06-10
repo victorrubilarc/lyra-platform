@@ -53,6 +53,7 @@ export function OperationalCalendarPage() {
         </Can>
       </div>
 
+      <div className={styles.splitWrap}>
       <ResizableSplit
         storageKey="wl_ops_calendar_split"
         defaultLeftWidth={340}
@@ -111,6 +112,7 @@ export function OperationalCalendarPage() {
         }
         right={<CalendarDetailPanel calendarId={selectedId} onDeleted={() => setSelectedId(null)} />}
       />
+      </div>
 
       {drawerOpen && (
         <CalendarDrawer

@@ -2,6 +2,21 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  /* Acota la página al alto disponible (viewport − topbar − padding del contenido)
+     para que el panel derecho scrollee internamente y la cabecera quede fija. */
+  height: calc(100dvh - 58px - 2 * var(--layout-content-pad-y));
+  min-height: 520px;
+}
+
+/* Hace que el ResizableSplit (su contenedor = hijo directo) llene el alto restante. */
+.splitWrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.splitWrap > div {
+  flex: 1;
+  min-height: 0;
 }
 
 .header {
@@ -129,19 +144,14 @@
 }
 
 /* ── Panel derecho: editor del calendario ───────────────────────────────── */
+/* El panel derecho del split es el que scrollea (overflow-y:auto en @lyra/ui);
+   .detail solo fluye dentro de él y su cabecera queda sticky arriba. */
 .detail {
   display: flex;
   flex-direction: column;
-  height: 100%;
-  min-height: 0;
-  overflow: hidden;
 }
 
-/* Solo el cuerpo hace scroll; la cabecera de acciones queda fija arriba. */
 .detailBody {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
   padding: var(--space-4);
   display: flex;
   flex-direction: column;
@@ -166,9 +176,11 @@
   justify-content: space-between;
   gap: var(--space-4);
   flex-wrap: wrap;
-  /* Barra de acciones (Guardar/Predeterminado/Eliminar) fija: vive fuera del área
-     scrolleable (.detailBody), así no se pierde al desplazar el editor. */
-  flex-shrink: 0;
+  /* Barra de acciones (Guardar/Predeterminado/Eliminar) STICKY al tope del panel
+     derecho (que es el que scrollea), así no se pierde al desplazar el editor. */
+  position: sticky;
+  top: 0;
+  z-index: 5;
   padding: var(--space-4);
   background: var(--color-bg-surface-1);
   border-bottom: 1px solid var(--color-border-subtle);
