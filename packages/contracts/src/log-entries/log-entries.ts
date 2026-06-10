@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { templateVersionSchema, type TemplateFieldDto, type TemplateSectionDto } from "../templates/templates.js";
 import type { VisibleWhen } from "../templates/field-types.js";
+import { workflowVersionSchema } from "../workflows/workflows.js";
 
 /**
  * Llenado de bitácoras (Fase 2.4) — EJECUCIÓN de una plantilla.
@@ -18,10 +19,16 @@ import type { VisibleWhen } from "../templates/field-types.js";
  *  - Secciones INSTANCIADAS como filas (portan estado/filledBy/version).
  *  - Concurrencia optimista POR SECCIÓN (`version` check-and-bump).
  *  - Sellado: `recordedAt` al crear (inmutable); `effectiveAt` + dimensiones de
- *    turno se recalculan en DRAFT y se CONGELAN al enviar (`sealedAt`).
+ *    turno se recalculan mientras la entrada es editable y se CONGELAN al sellar
+ *    (en la 1ª transición que sale del estado inicial, o al `submit` de una
+ *    plantilla sin flujo). Ver `sealedAt`.
  *
- * Límite de 2.4 (la EJECUCIÓN DE FLUJO es 2.5): la entrada permanece en su
- * estado inicial; las transiciones y las firmas Part 11 NO se ejecutan aquí.
+ * EJECUCIÓN DE FLUJO + FIRMAS (Fase 2.5): las TRANSICIONES sobre el flujo
+ * congelado (gateadas por rol-dato × ABAC × completitud) cambian `currentStateKey`
+ * y recomputan qué secciones quedan editables/`LOCKED`. Las que lo exigen capturan
+ * una FIRMA electrónica estilo 21 CFR Part 11 (§11.50/11.70/11.200): nombre
+ * impreso del firmante, fecha/hora UTC, SIGNIFICADO y hash del snapshot firmado,
+ * con re-autenticación (contraseña + MFA step-up si la transición lo pide).
  */
 
 // === Enums ===================================================================
@@ -36,6 +43,16 @@ export const LOG_ENTRY_SECTION_STATES = ["PENDING", "IN_PROGRESS", "COMPLETED", 
 export const logEntrySectionStateSchema = z.enum(LOG_ENTRY_SECTION_STATES);
 export type LogEntrySectionState = z.infer<typeof logEntrySectionStateSchema>;
 
+/** Contexto de una firma electrónica: transición de flujo o completitud de sección. */
+export const SIGNATURE_CONTEXTS = ["TRANSITION", "SECTION_COMPLETION"] as const;
+export const signatureContextSchema = z.enum(SIGNATURE_CONTEXTS);
+export type SignatureContext = z.infer<typeof signatureContextSchema>;
+
+/** Componentes con que se re-autenticó la firma (§11.200: ID + ≥2 componentes). */
+export const SIGNATURE_METHODS = ["PASSWORD", "PASSWORD_MFA"] as const;
+export const signatureMethodSchema = z.enum(SIGNATURE_METHODS);
+export type SignatureMethod = z.infer<typeof signatureMethodSchema>;
+
 // === Entidades (forma de respuesta; fechas como ISO string) ==================
 
 /** Valor actual de un campo (el `value` viaja como JSON arbitrario, tipado por dataType). */
@@ -47,6 +64,39 @@ export const logEntryValueSchema = z.object({
   updatedById: z.string().nullable(),
 });
 export type LogEntryValueDto = z.infer<typeof logEntryValueSchema>;
+
+/**
+ * Manifestación de una firma electrónica (Part 11 §11.50): identifica al firmante
+ * (nombre impreso), el SIGNIFICADO, el instante UTC y el hash del snapshot firmado
+ * (record–signature linking §11.70). Es la entidad de primer orden enlazable a una
+ * transición o a la completitud de una sección (`context`).
+ */
+export const logEntrySignatureSchema = z.object({
+  id: z.string(),
+  context: signatureContextSchema,
+  /** Clave de la transición firmada (cuando `context = TRANSITION`). */
+  transitionKey: z.string().nullable(),
+  /** Clave de la sección firmada (cuando `context = SECTION_COMPLETION`). */
+  sectionKey: z.string().nullable(),
+  signerId: z.string().nullable(),
+  /** Nombre impreso del firmante, capturado al firmar (§11.50). */
+  signerName: z.string(),
+  /** Significado de la firma ("Revisado", "Aprobado"…). */
+  meaning: z.string(),
+  method: signatureMethodSchema,
+  /** SHA-256 del snapshot canónico firmado (integridad / no repudio). */
+  payloadHash: z.string(),
+  signedAt: z.string(),
+});
+export type LogEntrySignatureDto = z.infer<typeof logEntrySignatureSchema>;
+
+/** Resumen de firma para mostrar junto a una sección (sin el hash). */
+export const logEntrySignatureSummarySchema = z.object({
+  signerName: z.string(),
+  meaning: z.string(),
+  signedAt: z.string(),
+});
+export type LogEntrySignatureSummaryDto = z.infer<typeof logEntrySignatureSummarySchema>;
 
 /**
  * Estado de EJECUCIÓN de una sección (no su definición, que vive en la versión).
@@ -63,8 +113,47 @@ export const logEntrySectionStateDtoSchema = z.object({
   version: z.number().int(),
   /** ¿Puede ESTE usuario editar la sección ahora? (decidido en backend). */
   editable: z.boolean(),
+  /** Firma de completitud de la sección, si fue firmada (Part 11). null = sin firma. */
+  signature: logEntrySignatureSummarySchema.nullable(),
 });
 export type LogEntrySectionStateDto = z.infer<typeof logEntrySectionStateDtoSchema>;
+
+/**
+ * Una transición REGISTRADA en el historial de ejecución del flujo (append-only).
+ * Es la trazabilidad ALCOA+ de cómo avanzó el registro entre estados.
+ */
+export const logEntryTransitionSchema = z.object({
+  id: z.string(),
+  transitionKey: z.string(),
+  /** Etiqueta legible de la transición (de la versión congelada del flujo). */
+  label: z.string().nullable(),
+  fromStateKey: z.string(),
+  toStateKey: z.string(),
+  actorId: z.string().nullable(),
+  actorName: z.string().nullable(),
+  reason: z.string().nullable(),
+  /** Firma asociada a la transición, si la exigía. null = sin firma. */
+  signature: logEntrySignatureSummarySchema.nullable(),
+  occurredAt: z.string(),
+});
+export type LogEntryTransitionDto = z.infer<typeof logEntryTransitionSchema>;
+
+/**
+ * Transición que ESTE usuario puede ejecutar AHORA sobre la entrada (decidido en
+ * backend: sale del estado actual × rol-dato autorizado). El frontend solo pinta
+ * los botones a partir de esta lista; nunca decide la autorización.
+ */
+export const availableTransitionSchema = z.object({
+  transitionKey: z.string(),
+  label: z.string(),
+  toStateKey: z.string(),
+  /** Nombre legible del estado destino (para el botón / confirmación). */
+  toStateName: z.string(),
+  requireSignature: z.boolean(),
+  signatureMeaning: z.string().nullable(),
+  requireMfa: z.boolean(),
+});
+export type AvailableTransitionDto = z.infer<typeof availableTransitionSchema>;
 
 /** Cabecera de la entrada: campos de SISTEMA intrínsecos (columnas indexadas). */
 export const logEntrySchema = z.object({
@@ -103,11 +192,21 @@ export type LogEntryDto = z.infer<typeof logEntrySchema>;
 export const logEntryDetailSchema = logEntrySchema.extend({
   /** Definición congelada que se está llenando (secciones → campos → config). */
   version: templateVersionSchema,
+  /** Versión de flujo CONGELADA (estados + transiciones) para render. null = sin flujo. */
+  workflowVersion: workflowVersionSchema.nullable(),
+  /** Nombre legible del estado actual del flujo (de la versión congelada). null = sin flujo. */
+  currentStateName: z.string().nullable(),
   /** Nombre legible de la plantilla y ruta del nodo (cabecera de la pantalla). */
   templateName: z.string(),
   orgNodePath: z.string().nullable(),
   sectionStates: z.array(logEntrySectionStateDtoSchema),
   values: z.array(logEntryValueSchema),
+  /** Transiciones que ESTE usuario puede ejecutar ahora (gateado en backend). */
+  availableTransitions: z.array(availableTransitionSchema),
+  /** Historial de transiciones ejecutadas (append-only, orden cronológico). */
+  transitions: z.array(logEntryTransitionSchema),
+  /** Firmas electrónicas capturadas en la entrada (transición + completitud). */
+  signatures: z.array(logEntrySignatureSchema),
 });
 export type LogEntryDetail = z.infer<typeof logEntryDetailSchema>;
 
@@ -142,6 +241,12 @@ export const saveLogEntrySectionRequestSchema = z.object({
   values: z.array(logEntryValueInputSchema).max(500),
   /** Marca la sección como COMPLETED (exige obligatorios visibles llenos). */
   markComplete: z.boolean().optional(),
+  /**
+   * Contraseña para firmar la completitud, SOLO si la sección exige firma
+   * (`TemplateSection.requireSignature`) y se está completando. El backend
+   * re-verifica; nunca se confía en el cliente.
+   */
+  password: z.string().min(1).max(200).optional(),
 });
 export type SaveLogEntrySectionRequest = z.infer<typeof saveLogEntrySectionRequestSchema>;
 
@@ -149,6 +254,22 @@ export const submitLogEntryRequestSchema = z.object({
   note: z.string().trim().max(500).optional(),
 });
 export type SubmitLogEntryRequest = z.infer<typeof submitLogEntryRequestSchema>;
+
+/**
+ * Ejecuta una transición de flujo sobre la entrada. Las credenciales de re-auth
+ * (`password`/`mfaCode`) SOLO se exigen si la transición pide firma (`requireSignature`)
+ * y/o MFA step-up (`requireMfa`); el backend re-verifica siempre, nunca el cliente.
+ */
+export const executeTransitionRequestSchema = z.object({
+  transitionKey: z.string().min(1).max(64),
+  /** Motivo / nota de la transición (queda en el historial). */
+  reason: z.string().trim().max(500).optional(),
+  /** Contraseña para re-autenticar la firma (§11.200). Requerida si hay firma. */
+  password: z.string().min(1).max(200).optional(),
+  /** Segundo factor (TOTP o código de recuperación). Requerido si `requireMfa`. */
+  mfaCode: z.string().trim().min(1).max(20).optional(),
+});
+export type ExecuteTransitionRequest = z.infer<typeof executeTransitionRequestSchema>;
 
 export const logEntryListQuerySchema = z.object({
   templateId: z.string().optional(),
@@ -366,4 +487,104 @@ export function isSectionEditableInState(
   // null = editable siempre (form simple). Con flujo, solo en su estado declarado.
   if (editableInStateKey === null) return true;
   return editableInStateKey === currentStateKey;
+}
+
+// === Ejecución de flujo (fuente única back↔front) ============================
+
+/** Forma mínima de una transición de la versión congelada para decidir disponibilidad. */
+export interface TransitionForAvailability {
+  key: string;
+  label: string;
+  fromStateKey: string;
+  toStateKey: string;
+  requireSignature: boolean;
+  signatureMeaning: string | null;
+  requireMfa: boolean;
+  /** Roles autorizados (dato). Vacío = cualquiera con el permiso base de transición. */
+  roleIds: readonly string[];
+}
+
+/** Forma mínima de un estado para resolver su nombre legible. */
+export interface StateForAvailability {
+  key: string;
+  name: string;
+}
+
+/**
+ * Transiciones que un usuario puede ejecutar AHORA: las que salen del estado
+ * actual y cuyo conjunto de roles autorizados intersecta los roles del usuario
+ * (o no declara roles = abierta a cualquiera con el permiso base). FUENTE ÚNICA:
+ * el backend la ejecuta como verdad (gatea la ejecución), el frontend la reusa
+ * para pintar SOLO los botones permitidos. No reemplaza la verificación de ABAC
+ * ni de firma, que el backend aplica al ejecutar.
+ */
+export function availableTransitionsFor(
+  transitions: readonly TransitionForAvailability[],
+  states: readonly StateForAvailability[],
+  currentStateKey: string | null,
+  userRoleIds: ReadonlySet<string> | readonly string[],
+): AvailableTransitionDto[] {
+  if (currentStateKey === null) return [];
+  const roles = userRoleIds instanceof Set ? userRoleIds : new Set(userRoleIds as readonly string[]);
+  const nameByKey = new Map(states.map((s) => [s.key, s.name]));
+  return transitions
+    .filter((t) => t.fromStateKey === currentStateKey)
+    .filter((t) => t.roleIds.length === 0 || t.roleIds.some((r) => roles.has(r)))
+    .map((t) => ({
+      transitionKey: t.key,
+      label: t.label,
+      toStateKey: t.toStateKey,
+      toStateName: nameByKey.get(t.toStateKey) ?? t.toStateKey,
+      requireSignature: t.requireSignature,
+      signatureMeaning: t.signatureMeaning,
+      requireMfa: t.requireMfa,
+    }));
+}
+
+/** Datos que entran al snapshot canónico que se firma (record–signature linking §11.70). */
+export interface SignaturePayloadInput {
+  entryId: string;
+  templateVersionId: string;
+  context: SignatureContext;
+  /** Transición (TRANSITION) o sección (SECTION_COMPLETION) firmada. */
+  transitionKey?: string | null;
+  sectionKey?: string | null;
+  fromStateKey?: string | null;
+  toStateKey?: string | null;
+  signerId: string;
+  meaning: string;
+  signedAt: string;
+  /** Foto de los valores firmados (fieldKey → value), relevante al contexto. */
+  values: Record<string, unknown>;
+}
+
+/**
+ * Serializa el payload de firma de forma DETERMINISTA (claves ordenadas en todo
+ * nivel) para que su SHA-256 sea estable e independiente del orden de inserción.
+ * Es la pieza que ata la firma a un contenido exacto: el mismo input siempre
+ * produce el mismo hash (no repudio / integridad). Fuente única back↔front.
+ */
+export function canonicalSignaturePayload(input: SignaturePayloadInput): string {
+  return stableStringify({
+    entryId: input.entryId,
+    templateVersionId: input.templateVersionId,
+    context: input.context,
+    transitionKey: input.transitionKey ?? null,
+    sectionKey: input.sectionKey ?? null,
+    fromStateKey: input.fromStateKey ?? null,
+    toStateKey: input.toStateKey ?? null,
+    signerId: input.signerId,
+    meaning: input.meaning,
+    signedAt: input.signedAt,
+    values: input.values,
+  });
+}
+
+/** JSON con claves ordenadas recursivamente (canonicalización determinista). */
+function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value) ?? "null";
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
+  const obj = value as Record<string, unknown>;
+  const keys = Object.keys(obj).sort();
+  return `{${keys.map((k) => `${JSON.stringify(k)}:${stableStringify(obj[k])}`).join(",")}}`;
 }
