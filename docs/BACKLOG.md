@@ -5,10 +5,10 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-10** (**Fase 2.1/2.1.1/2.2/2.x/2.3.0 ✅** + **2.4 ✅** + **2.5 ✅** + **2.6.0 ✅** — … +
-> **Módulo de Bitácoras núcleo de lectura**: grilla `/bitacoras` + record viewer + timeline ALCOA+ + verificación de
-> firmas §11.70 + export CSV; **siguiente: 2.6.1 — Personalización (SavedView de plataforma + gestor de columnas)**,
-> o 2.3 Rondas / 2.6.2 intercalables).
+> actualización: **2026-06-11** (**Afinamiento #4 ✅** — guardado por sección autoexplicativo + `submit` objetivo +
+> motivos de bloqueo en contrato/UI. Las **10 mejoras post-2.6.0** quedaron registradas en §2 y el **plan de fases
+> 2.7/2.8/2.9 está PROPUESTO en DECISIONS 2026-06-11, pendiente de visto bueno**; siguiente: aprobar el plan y
+> arrancar **2.7.0 Registro diferido**).
 
 ---
 
@@ -54,6 +54,7 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Fase 2.4 Llenado (Nueva entrada)** (`LogEntry*` + `/log-entries` + `FieldControl` + pantalla de llenado) | `main` (fusionado desde `feat/llenado`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Fase 2.5 Ejecución de flujo + firmas Part 11** (`LogEntryTransition`/`LogEntrySignature` + `executeTransition` + `ReauthService` + modales de firma) | `main` (fusionado desde `feat/ejecucion-flujo`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Fase 2.6.0 Módulo de Bitácoras — núcleo de lectura** (folio + estampados + `LogbookQueryService` + `/bitacoras` + record viewer + verificación de firmas) | `main` (fusionado desde `feat/bitacoras-auditor`) | ✅ fusionado y publicado en `origin/main` | ninguna |
+| **Afinamiento #4** (triage 10 mejoras + guardado por sección autoexplicativo + `submit` objetivo + motivos de bloqueo) | `main` (fusionado desde `feat/afinamiento-llenado`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 
 **Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
@@ -551,6 +552,13 @@ probatoria (hash+timestamp). Ref: `DECISIONS.md` (sección de recomendaciones).
       **verificar integridad** [VALID y VALID_RECORD_CHANGED_AFTER tras editar], timeline unificada + cargar más,
       log de cambios antes→después, relacionadas navegables, **imprimir** [solo contenido, sin chrome]); ítem
       "Bitácoras" en sidebar y ⌘K; modo claro y oscuro; tablet. App en `:5173`.
+- [ ] **Afinamiento #4 — smoke VISUAL en navegador** (se verificó typecheck/lint/test/build + smoke por API 22/22;
+      falta el clic): en `/nueva-entrada/:id` con una plantilla cuyas secciones tengan roles asignados y un campo con
+      override: chip "N de M secciones completadas" en cabecera; chip "Asignada a: <rol>" por sección; sección ajena
+      bloqueada con el motivo real ("asignada a X" / "se completa en la etapa Y" / "ya fue registrada"); campo
+      reservado en solo-lectura con nota; botones "Guardar avance" y "Completar sección"/"Completar y firmar" con
+      hint; "Enviar y registrar" deshabilitado listando las secciones que faltan (y habilitado al completar todas);
+      transiciones deshabilitadas con la misma guía; modo claro. App en `:5173`.
 - [ ] **Ejecución de flujo + firmas 2.5 — smoke VISUAL en navegador** (se verificó typecheck/lint/test/build web +
       smoke por API 21/21; falta el clic): abrir una entrada con flujo en `/nueva-entrada/:id` → chip de estado del
       flujo en cabecera; completar la sección del estado inicial; **barra de transiciones** (botones gateados por

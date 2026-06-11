@@ -1,11 +1,11 @@
 # Progreso — Lyra WatchLog
 
-Última actualización: 2026-06-10 (**Fase 1 completa**; **Fase 2.1/2.1.1/2.2/2.x/2.3.0 ✅** + **Fase 2.4 ✅** + **Fase 2.5 ✅**
-+ **Fase 2.6.0 ✅** — Plantillas/Form Builder; Flujos; Datos de referencia; Calendario operacional; Llenado multi-actor;
-Ejecución de flujo + firmas Part 11; y **Módulo de Bitácoras (núcleo de lectura)**: grilla enterprise `/bitacoras` con
-filtros+KPIs+cursor+deep-link+export CSV, record viewer `/bitacoras/:id` con timeline ALCOA+ unificada, log de cambios y
-**verificación de integridad de firmas** §11.70; folio `entryNumber` + estampados `requiresSignature`/`thresholdBand`).
-**Siguiente: 2.6.1 — Personalización (SavedView de plataforma + gestor de columnas)** (o 2.3 Rondas / 2.6.2 intercalables).
+Última actualización: 2026-06-11 (**Fase 1 completa**; **Fase 2.1/2.1.1/2.2/2.x/2.3.0/2.4/2.5/2.6.0 ✅** +
+**Afinamiento #4 ✅** — flujo de guardado por sección autoexplicativo + garantía de permisos por sección/campo en el
+servidor + `submit` objetivo que cierra la elusión de la firma de sección). Las **10 mejoras post-2.6.0** del dueño del
+producto quedaron registradas en BACKLOG §2 y el **plan de fases 2.7 (Gobernanza temporal) / 2.8 (Alcance+acceso) /
+2.9 (Plantillas inteligentes) está PROPUESTO en DECISIONS 2026-06-11, pendiente de visto bueno**.
+**Siguiente: aprobar el plan y arrancar 2.7.0 — Registro diferido (#1).**
 
 ## Estado por fase
 
@@ -757,12 +757,41 @@ serializable (AG Grid). Rama `feat/bitacoras-auditor`, 4 commits por capa.
   **22/22 checks.** Datos de prueba eliminados (15 entradas originales intactas).
 - **Pendiente**: smoke **VISUAL** en navegador (ver BACKLOG §4). Sub-slices 2.6.1/2.6.2 diseñados en DECISIONS/BACKLOG.
 
+## Hecho en Afinamiento #4 (2026-06-11 — rediseño del guardado por sección + garantía en servidor)
+
+Sesión de **triage + investigación + diseño** de las 10 mejoras post-2.6.0 (registradas en BACKLOG §2; plan de fases
+PROPUESTO en DECISIONS 2026-06-11) con UN entregable codificado: el **fix #4**. Rama `feat/afinamiento-llenado`.
+
+- **Auditoría primero** (hallazgo documentado en DECISIONS): el backend YA gateaba la edición por sección (sin agujero
+  de autorización); lo observado venía de (a) datos demo sin roles por sección y un solo rol en el sistema, (b) DTO
+  sin el PORQUÉ del bloqueo + nombres de acciones ambiguos, y (c) un **gap real en `submit` sin flujo**: validaba solo
+  las secciones del que envía y no exigía estado COMPLETED ⇒ podía **sellar** con secciones de otros roles incompletas
+  y **eludir la firma de completitud de sección** (Part 11).
+- **Contratos** (`@lyra/contracts/log-entries`): `LogEntrySectionStateDto` gana **`blockedReason`**
+  (`ENTRY_CLOSED`|`WRONG_STATE`|`MISSING_ROLE`, enum extensible para 2.7), **`assignedRoleNames`** y
+  **`readOnlyFieldKeys`** (override por campo). **+2 specs** (contracts **115**).
+- **Backend** (`LogEntriesService`): `getDetail` computa motivo de bloqueo + nombres de roles (batched) + campos
+  restringidos; `saveSection` responde 403 con el motivo REAL y el **override por campo ahora solo bloquea el CAMBIO**
+  (un eco sin cambio ya no impedía guardar el resto de la sección — defecto preexistente detectado y corregido);
+  **`submit` pasa a validación OBJETIVA** (todas las secciones con campos en COMPLETED + obligatorios de todas, espejo
+  del guard (d) de `executeTransition`). **+5 tests** (API **161**).
+- **Web** (`EntryFillPage`): chip de **progreso** "N de M secciones completadas" en cabecera; chip **"Asignada a:
+  rol"** por sección; nota de bloqueo con el **motivo específico** (etapa del flujo con su nombre / rol faltante /
+  registro enviado); campos reservados a otro rol en solo-lectura con nota (y EXCLUIDOS del payload de guardado);
+  acciones renombradas a lo que hacen: **"Guardar avance"** y **"Completar sección"/"Completar y firmar"** con hint;
+  **"Enviar y registrar"** y las transiciones se deshabilitan listando QUÉ secciones faltan (el backend re-valida).
+- **Verificación**: `typecheck` (6 paquetes) · `lint` (0 errores; 1 warning preexistente OrgTree) · `build` web ·
+  `test` (**contracts 115** +2 · permissions 5 · **API 161** +5) en verde. **Smoke en vivo 22/22** (rol de prueba +
+  plantilla con sección asignada y override por campo: MISSING_ROLE + assignedRoleNames + readOnlyFieldKeys expuestos;
+  403 al guardar sin rol; 403 al CAMBIAR campo reservado y OK el eco; **submit con sección ajena incompleta 400**;
+  con todo COMPLETED 200 SUBMITTED; ENTRY_CLOSED tras enviar). Datos de prueba eliminados (BD limpia verificada).
+- **NO probado**: smoke VISUAL en navegador de la nueva UI (ver BACKLOG §4).
+
 ## Próximo paso
-**Fase 2.6.0 completa y publicada.** **Sesión siguiente recomendada = 2.6.1 · Personalización de Bitácoras**:
-`SavedView` server-side como concepto de PLATAFORMA (vistas guardadas con default + vistas de sistema en código) +
-gestor de columnas (mostrar/ocultar/reordenar/pin/redimensionar) + densidad + recordar última vista. Alternativas
-intercalables: **2.3 Rondas/`LogPeriod`** o **2.6.2 analítica** (facetas con conteo, agrupación, peek). Luego 2.7
-(umbral→incidencia, cruce Fase 4) → Fase 3 (sincroniza Listas `source=EXTERNAL`). Ver BACKLOG §2.
+**Afinamiento #4 completo y publicado.** **Sesión siguiente: revisar/aprobar el plan de fases de DECISIONS 2026-06-11**
+(2.7 Gobernanza temporal → 2.8 Alcance+acceso → 2.9 Plantillas inteligentes; #10 IA-ready transversal) **y arrancar
+2.7.0 — Registro diferido (#1)** (UX sobre `effectiveAt` + marca `entryOrigin` + auditoría). La 2.6.1 (SavedView +
+columnas) queda FUSIONADA en 2.8.1; 2.6.2 intercalable tras 2.8; el viejo "2.7 umbral→incidencia" pasa a Fase 4.
 
 **Mejora futura registrada (BACKLOG §2):** seguridad a nivel de nodo en el mantenedor de Estructura (ABAC
 enterprise: asignar usuarios/roles a nodos desde el propio árbol, "quién accede a este nodo"). El modelo ya
