@@ -1,232 +1,324 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import {
-  enumeratePeriodKeys,
-  type ClosePeriodRequest,
+  enumeratePeriods,
+  yearRange,
   type ListOperationalPeriodsResponse,
   type OperationalPeriodDto,
-  type PeriodStatus,
-  type ReopenPeriodRequest,
 } from "@lyra/contracts";
-import type { OperationalPeriod } from "@prisma/client";
+import type { FiscalCalendar, OperationalPeriod } from "@prisma/client";
 import { AuditService, type AuditContext } from "../audit/audit.service";
 import { PrismaService } from "../prisma/prisma.service";
-import { toResolverCalendar } from "../operational-calendar/operational-calendar.service";
 import { ShiftResolver } from "../operational-calendar/shift-resolver";
+import { FiscalResolver, toFiscalConfig } from "../fiscal-calendar/fiscal-resolver";
 
-/** Permiso de excepción que permite escribir en períodos en cierre / cerrados. */
+/** Permiso de excepción que permite escribir en períodos CLOSED (no aplica a LOCKED). */
 export const PERIOD_WRITE_CLOSED_PERMISSION = "opsperiod:write-closed";
 
-/** Días hacia atrás/adelante que enumera el listado (cubre ~13 meses / semanas / ciclos). */
-const LIST_WINDOW_BACK_DAYS = 400;
-const LIST_WINDOW_FORWARD_DAYS = 45;
+/** Marca de secuencialidad inversa: reabrir un CLOSED con posteriores solo-CLOSED exige acuse. */
+export const REOPEN_NEEDS_ACK = "REOPEN_LATER_CLOSED";
 
 /**
- * Período contable gobernado (Fase 2.7.1).
+ * Período contable gobernado (Fase 2.7.1 → 2.7.1.1).
  *
- * Modelo LAZY: la ausencia de fila = OPEN. Cerrar/poner en cierre crea o actualiza una
- * fila `OperationalPeriod`; reabrir la vuelve a OPEN conservando el rastro de reapertura.
+ * Modelo MATERIALIZADO (backbone Maximo): los períodos se GENERAN explícitamente como
+ * filas contiguas con rango `[periodStart, periodEnd)`. Tri-estado OPEN→CLOSED→LOCKED
+ * (NetSuite). Fuente única de la guarda de escritura: `assertWritable` sobre la
+ * `effectiveAt` que el write persistiría (las lecturas/verificación de firma nunca la invocan).
  *
- * Es la FUENTE ÚNICA de la guarda de escritura por período: `assertWritable` se invoca en
- * cada mutación de `LogEntriesService` (create / saveSection / setDeferral / submit /
- * executeTransition) sobre la `effectiveAt` que el write persistiría. Las lecturas y la
- * verificación de firma nunca la invocan.
+ * Resolución del período: el `ShiftResolver` produce el `operationalDate` y el
+ * `FiscalResolver` lo mapea al `periodKey` del calendario fiscal del nodo (ejes desacoplados).
  */
 @Injectable()
 export class OperationalPeriodService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly shiftResolver: ShiftResolver,
+    private readonly fiscalResolver: FiscalResolver,
     private readonly audit: AuditService,
   ) {}
 
   // --- Guarda de escritura ---------------------------------------------------
 
   /**
-   * Estado de gobernanza del período en que cae `at` para el nodo dado. null = sin
-   * calendario o sin llave de período derivable (ungobernado: nunca bloquea).
+   * Estado de gobernanza del período en que cae `at` para el nodo dado. null = ungobernado
+   * (sin día operacional, sin calendario fiscal o sin llave derivable): nunca bloquea.
    */
-  async statusFor(
+  private async statusFor(
     at: Date,
     orgNodeId?: string | null,
-  ): Promise<{ calendarId: string; periodKey: string; status: PeriodStatus } | null> {
-    const resolved = await this.shiftResolver.resolveWithCalendar(at, orgNodeId);
-    if (!resolved || resolved.resolution.periodKey === null) return null;
+  ): Promise<{ fiscalCalendar: FiscalCalendar; periodKey: string; row: OperationalPeriod | null } | null> {
+    const shift = await this.shiftResolver.resolve(at, orgNodeId);
+    const resolved = await this.fiscalResolver.resolvePeriodKey(shift?.operationalDate ?? null, orgNodeId);
+    if (!resolved) return null;
     const row = await this.prisma.operationalPeriod.findUnique({
-      where: { calendarId_periodKey: { calendarId: resolved.calendarId, periodKey: resolved.resolution.periodKey } },
+      where: { fiscalCalendarId_periodKey: { fiscalCalendarId: resolved.fiscalCalendarId, periodKey: resolved.periodKey } },
     });
-    return {
-      calendarId: resolved.calendarId,
-      periodKey: resolved.resolution.periodKey,
-      status: row?.status ?? "OPEN",
-    };
-  }
-
-  /** ¿La escritura en `at` está bloqueada para un actor SIN el permiso de excepción? */
-  async isWriteBlocked(at: Date, orgNodeId?: string | null): Promise<boolean> {
-    const s = await this.statusFor(at, orgNodeId);
-    return s !== null && s.status !== "OPEN";
+    return { fiscalCalendar: resolved.fiscalCalendar, periodKey: resolved.periodKey, row };
   }
 
   /**
-   * Lanza 403 (`PERIOD_CLOSED`) si la fecha cae en un período en cierre/cerrado y el
-   * actor no tiene `opsperiod:write-closed`. `perms` = permisos efectivos del actor.
+   * Motivo por el que la escritura en `at` está bloqueada para el actor, o null si es
+   * escribible. Decisión única (la usan `assertWritable` y la huella de `getDetail`):
+   *  - LOCKED → bloquea a TODOS (incluido el bypass).
+   *  - CLOSED → bloquea salvo `opsperiod:write-closed`.
+   *  - sin fila generada + `requirePeriod` → bloquea salvo el bypass (rigor Maximo opt-in).
    */
-  async assertWritable(at: Date, orgNodeId: string | null | undefined, perms: ReadonlySet<string>): Promise<void> {
-    if (perms.has(PERIOD_WRITE_CLOSED_PERMISSION)) return;
-    if (await this.isWriteBlocked(at, orgNodeId)) {
-      throw new ForbiddenException(
-        "El período contable de esta fecha está cerrado: no puede registrar ni modificar (se requiere permiso de excepción).",
-      );
+  private async blockMessage(
+    at: Date,
+    orgNodeId: string | null | undefined,
+    perms: ReadonlySet<string>,
+  ): Promise<string | null> {
+    const s = await this.statusFor(at, orgNodeId);
+    if (!s) return null;
+    const hasBypass = perms.has(PERIOD_WRITE_CLOSED_PERMISSION);
+    if (s.row) {
+      if (s.row.status === "LOCKED") {
+        return "El período contable de esta fecha está BLOQUEADO (LOCKED): nadie puede registrar ni modificar. Requiere desbloqueo (opsperiod:unlock).";
+      }
+      if ((s.row.status === "CLOSED" || s.row.status === "CLOSING") && !hasBypass) {
+        return "El período contable de esta fecha está cerrado: no puede registrar ni modificar (se requiere permiso de excepción).";
+      }
+    } else if (s.fiscalCalendar.requirePeriod && !hasBypass) {
+      return "La fecha no cae en ningún período contable generado y el calendario fiscal exige período (se requiere permiso de excepción).";
     }
+    return null;
+  }
+
+  /** Lanza 403 si la fecha cae en un período no escribible para el actor. */
+  async assertWritable(at: Date, orgNodeId: string | null | undefined, perms: ReadonlySet<string>): Promise<void> {
+    const msg = await this.blockMessage(at, orgNodeId, perms);
+    if (msg) throw new ForbiddenException(msg);
+  }
+
+  /** ¿La escritura en `at` está bloqueada para este actor? (huella de lectura, no lanza). */
+  async isWriteBlockedForActor(at: Date, orgNodeId: string | null | undefined, perms: ReadonlySet<string>): Promise<boolean> {
+    return (await this.blockMessage(at, orgNodeId, perms)) !== null;
   }
 
   // --- Mantenedor ------------------------------------------------------------
 
+  /** Períodos MATERIALIZADOS de un calendario fiscal, recientes primero, con marca Actual. */
+  async list(fiscalCalendarId: string): Promise<ListOperationalPeriodsResponse> {
+    const cal = await this.assertCalendarExists(fiscalCalendarId);
+    const rows = await this.prisma.operationalPeriod.findMany({
+      where: { fiscalCalendarId },
+      orderBy: { periodStart: "desc" },
+    });
+    const today = todayInTimezone(cal.timezone);
+    const names = await this.namesByUserId(rows.flatMap((r) => [r.closedById, r.lockedById, r.reopenedById]));
+    return { fiscalCalendarId, periods: rows.map((r) => this.toDto(r, today, names)) };
+  }
+
   /**
-   * Períodos de un calendario: los recientes DERIVADOS de su configuración (sin
-   * pre-generar filas) unidos con las filas explícitas (cerrados/en cierre, incluso
-   * fuera de la ventana). OPEN para los que no tienen fila. Orden: más reciente primero.
+   * Genera (materializa) los períodos del año, idempotente: crea las filas faltantes
+   * (OPEN) y JAMÁS degrada un CLOSED/LOCKED. Devuelve la lista resultante.
    */
-  async list(calendarId: string): Promise<ListOperationalPeriodsResponse> {
-    const cal = await this.prisma.operationalCalendar.findFirst({
-      where: { id: calendarId, deletedAt: null },
-      include: { shifts: true },
-    });
-    if (!cal) throw new NotFoundException("Calendario no encontrado");
-
-    const today = new Date();
-    const from = isoDateOffset(today, -LIST_WINDOW_BACK_DAYS);
-    const to = isoDateOffset(today, LIST_WINDOW_FORWARD_DAYS);
-    const derived = enumeratePeriodKeys(toResolverCalendar(cal), from, to);
-
-    const rows = await this.prisma.operationalPeriod.findMany({ where: { calendarId } });
-    const rowByKey = new Map(rows.map((r) => [r.periodKey, r]));
-
-    const allKeys = new Set<string>([...derived, ...rows.map((r) => r.periodKey)]);
-    const names = await this.namesByUserId(rows.flatMap((r) => [r.closedById, r.reopenedById]));
-
-    const periods: OperationalPeriodDto[] = [...allKeys]
-      .sort((a, b) => (a < b ? 1 : a > b ? -1 : 0)) // descendente (más reciente primero)
-      .map((periodKey) => this.toDto(calendarId, periodKey, rowByKey.get(periodKey) ?? null, names));
-
-    return { calendarId, periods };
-  }
-
-  /** Cierra o pone en cierre un período (upsert de la fila). Auditado. */
-  async close(
-    calendarId: string,
-    periodKey: string,
-    dto: ClosePeriodRequest,
-    actorId: string,
-    ctx: AuditContext,
-  ): Promise<OperationalPeriodDto> {
-    await this.assertCalendarExists(calendarId);
-    const now = new Date();
-    const before = await this.prisma.operationalPeriod.findUnique({
-      where: { calendarId_periodKey: { calendarId, periodKey } },
-    });
-    const row = await this.prisma.operationalPeriod.upsert({
-      where: { calendarId_periodKey: { calendarId, periodKey } },
-      create: { calendarId, periodKey, status: dto.status, closedById: actorId, closedAt: now, closeReason: dto.reason },
-      update: {
-        status: dto.status,
-        closedById: actorId,
-        closedAt: now,
-        closeReason: dto.reason,
-        // Un cierre nuevo limpia el rastro de la reapertura previa.
-        reopenedById: null,
-        reopenedAt: null,
-        reopenReason: null,
-      },
-    });
-    await this.audit.record({
-      ...ctx,
-      action: "opsperiod.closed",
-      entityType: "OperationalPeriod",
-      entityId: row.id,
-      before: before ? { status: before.status } : { status: "OPEN" },
-      after: { calendarId, periodKey, status: dto.status, reason: dto.reason },
-    });
-    const names = await this.namesByUserId([row.closedById, row.reopenedById]);
-    return this.toDto(calendarId, periodKey, row, names);
-  }
-
-  /** Reabre un período en cierre/cerrado (vuelve a OPEN). Auditado. */
-  async reopen(
-    calendarId: string,
-    periodKey: string,
-    dto: ReopenPeriodRequest,
-    actorId: string,
-    ctx: AuditContext,
-  ): Promise<OperationalPeriodDto> {
-    await this.assertCalendarExists(calendarId);
-    const existing = await this.prisma.operationalPeriod.findUnique({
-      where: { calendarId_periodKey: { calendarId, periodKey } },
-    });
-    if (!existing || existing.status === "OPEN") {
-      throw new BadRequestException("El período ya está abierto");
+  async generate(fiscalCalendarId: string, year: number, ctx: AuditContext): Promise<ListOperationalPeriodsResponse> {
+    const cal = await this.assertCalendarExists(fiscalCalendarId);
+    const { fromDate, toDate } = yearRange(year);
+    const bounds = enumeratePeriods(toFiscalConfig(cal), fromDate, toDate);
+    if (bounds.length === 0) {
+      throw new BadRequestException("La configuración del calendario fiscal no permite derivar períodos.");
     }
-    const now = new Date();
-    const row = await this.prisma.operationalPeriod.update({
-      where: { calendarId_periodKey: { calendarId, periodKey } },
-      data: { status: "OPEN", reopenedById: actorId, reopenedAt: now, reopenReason: dto.reason },
+    const existing = await this.prisma.operationalPeriod.findMany({
+      where: { fiscalCalendarId, periodKey: { in: bounds.map((b) => b.periodKey) } },
+      select: { periodKey: true },
     });
+    const existingKeys = new Set(existing.map((e) => e.periodKey));
+    const toCreate = bounds.filter((b) => !existingKeys.has(b.periodKey));
+    if (toCreate.length > 0) {
+      await this.prisma.operationalPeriod.createMany({
+        data: toCreate.map((b) => ({
+          fiscalCalendarId,
+          periodKey: b.periodKey,
+          periodStart: b.periodStart,
+          periodEnd: b.periodEnd,
+          status: "OPEN" as const,
+        })),
+      });
+    }
     await this.audit.record({
       ...ctx,
-      action: "opsperiod.reopened",
-      entityType: "OperationalPeriod",
-      entityId: row.id,
-      before: { status: existing.status },
-      after: { calendarId, periodKey, status: "OPEN", reason: dto.reason },
+      action: "opsperiod.generated",
+      entityType: "FiscalCalendar",
+      entityId: fiscalCalendarId,
+      metadata: { year, created: toCreate.length, total: bounds.length },
     });
-    const names = await this.namesByUserId([row.closedById, row.reopenedById]);
-    return this.toDto(calendarId, periodKey, row, names);
+    return this.list(fiscalCalendarId);
+  }
+
+  /** Cierra un período (OPEN → CLOSED) con guarda SECUENCIAL: no hay un anterior abierto. */
+  async close(fiscalCalendarId: string, periodKey: string, reason: string, actorId: string, ctx: AuditContext): Promise<OperationalPeriodDto> {
+    const cal = await this.assertCalendarExists(fiscalCalendarId);
+    const row = await this.getRow(fiscalCalendarId, periodKey);
+    if (row.status !== "OPEN") {
+      throw new BadRequestException("Solo se puede cerrar un período abierto.");
+    }
+    const earlierOpen = await this.prisma.operationalPeriod.findFirst({
+      where: { fiscalCalendarId, periodStart: { lt: row.periodStart }, status: "OPEN" },
+      orderBy: { periodStart: "asc" },
+    });
+    if (earlierOpen) {
+      throw new ConflictException(
+        `No se puede cerrar: el período anterior (${earlierOpen.periodKey}) sigue abierto. El cierre es secuencial.`,
+      );
+    }
+    const updated = await this.prisma.operationalPeriod.update({
+      where: { id: row.id },
+      data: { status: "CLOSED", closedById: actorId, closedAt: new Date(), closeReason: reason, reopenedById: null, reopenedAt: null, reopenReason: null },
+    });
+    await this.recordTransition("opsperiod.closed", updated, row.status, reason, ctx);
+    return this.dtoWithNames(cal, updated);
+  }
+
+  /** Bloquea en duro un período (CLOSED → LOCKED). */
+  async lock(fiscalCalendarId: string, periodKey: string, reason: string, actorId: string, ctx: AuditContext): Promise<OperationalPeriodDto> {
+    const cal = await this.assertCalendarExists(fiscalCalendarId);
+    const row = await this.getRow(fiscalCalendarId, periodKey);
+    if (row.status !== "CLOSED" && row.status !== "CLOSING") {
+      throw new BadRequestException("Solo se puede bloquear (LOCKED) un período cerrado.");
+    }
+    const updated = await this.prisma.operationalPeriod.update({
+      where: { id: row.id },
+      data: { status: "LOCKED", lockedById: actorId, lockedAt: new Date(), lockReason: reason },
+    });
+    await this.recordTransition("opsperiod.locked", updated, row.status, reason, ctx);
+    return this.dtoWithNames(cal, updated);
+  }
+
+  /** Desbloquea un período (LOCKED → CLOSED, two-key). */
+  async unlock(fiscalCalendarId: string, periodKey: string, reason: string, actorId: string, ctx: AuditContext): Promise<OperationalPeriodDto> {
+    const cal = await this.assertCalendarExists(fiscalCalendarId);
+    const row = await this.getRow(fiscalCalendarId, periodKey);
+    if (row.status !== "LOCKED") {
+      throw new BadRequestException("Solo se puede desbloquear un período bloqueado (LOCKED).");
+    }
+    const updated = await this.prisma.operationalPeriod.update({
+      where: { id: row.id },
+      data: { status: "CLOSED", lockedById: actorId, lockedAt: new Date(), lockReason: reason },
+    });
+    await this.recordTransition("opsperiod.unlocked", updated, row.status, reason, ctx);
+    return this.dtoWithNames(cal, updated);
+  }
+
+  /**
+   * Reabre un período cerrado (CLOSED → OPEN). Secuencialidad inversa: BLOQUEA si existe un
+   * período posterior LOCKED; si los posteriores están solo CLOSED, exige `acknowledgeLaterClosed`.
+   */
+  async reopen(
+    fiscalCalendarId: string,
+    periodKey: string,
+    reason: string,
+    acknowledgeLaterClosed: boolean,
+    actorId: string,
+    ctx: AuditContext,
+  ): Promise<OperationalPeriodDto> {
+    const cal = await this.assertCalendarExists(fiscalCalendarId);
+    const row = await this.getRow(fiscalCalendarId, periodKey);
+    if (row.status !== "CLOSED" && row.status !== "CLOSING") {
+      throw new BadRequestException("Solo se puede reabrir un período cerrado.");
+    }
+    const laterLocked = await this.prisma.operationalPeriod.findFirst({
+      where: { fiscalCalendarId, periodStart: { gt: row.periodStart }, status: "LOCKED" },
+      orderBy: { periodStart: "asc" },
+    });
+    if (laterLocked) {
+      throw new ConflictException(
+        `No se puede reabrir: un período posterior (${laterLocked.periodKey}) está BLOQUEADO. Desbloquéelo primero.`,
+      );
+    }
+    const laterClosed = await this.prisma.operationalPeriod.findFirst({
+      where: { fiscalCalendarId, periodStart: { gt: row.periodStart }, status: { in: ["CLOSED", "CLOSING"] } },
+      orderBy: { periodStart: "asc" },
+    });
+    if (laterClosed && !acknowledgeLaterClosed) {
+      throw new ConflictException({
+        reason: REOPEN_NEEDS_ACK,
+        message: `Hay períodos posteriores ya cerrados (p. ej. ${laterClosed.periodKey}). Reabrir este período rompe la secuencia: confirme para continuar.`,
+      });
+    }
+    const updated = await this.prisma.operationalPeriod.update({
+      where: { id: row.id },
+      data: { status: "OPEN", reopenedById: actorId, reopenedAt: new Date(), reopenReason: reason },
+    });
+    await this.recordTransition("opsperiod.reopened", updated, row.status, reason, ctx);
+    return this.dtoWithNames(cal, updated);
   }
 
   // --- Helpers ---------------------------------------------------------------
 
-  private async assertCalendarExists(calendarId: string): Promise<void> {
-    const cal = await this.prisma.operationalCalendar.findFirst({
-      where: { id: calendarId, deletedAt: null },
-      select: { id: true },
-    });
-    if (!cal) throw new NotFoundException("Calendario no encontrado");
+  private async assertCalendarExists(fiscalCalendarId: string): Promise<FiscalCalendar> {
+    const cal = await this.prisma.fiscalCalendar.findFirst({ where: { id: fiscalCalendarId, deletedAt: null } });
+    if (!cal) throw new NotFoundException("Calendario fiscal no encontrado");
+    return cal;
   }
 
-  private toDto(
-    calendarId: string,
-    periodKey: string,
-    row: OperationalPeriod | null,
-    names: Map<string, string>,
-  ): OperationalPeriodDto {
+  private async getRow(fiscalCalendarId: string, periodKey: string): Promise<OperationalPeriod> {
+    const row = await this.prisma.operationalPeriod.findUnique({
+      where: { fiscalCalendarId_periodKey: { fiscalCalendarId, periodKey } },
+    });
+    if (!row) {
+      throw new NotFoundException("Período no encontrado. Genere los períodos del año antes de gobernarlos.");
+    }
+    return row;
+  }
+
+  private async recordTransition(
+    action: string,
+    row: OperationalPeriod,
+    fromStatus: string,
+    reason: string,
+    ctx: AuditContext,
+  ): Promise<void> {
+    await this.audit.record({
+      ...ctx,
+      action,
+      entityType: "OperationalPeriod",
+      entityId: row.id,
+      before: { status: fromStatus },
+      after: { fiscalCalendarId: row.fiscalCalendarId, periodKey: row.periodKey, status: row.status, reason },
+    });
+  }
+
+  private async dtoWithNames(cal: FiscalCalendar, row: OperationalPeriod): Promise<OperationalPeriodDto> {
+    const names = await this.namesByUserId([row.closedById, row.lockedById, row.reopenedById]);
+    return this.toDto(row, todayInTimezone(cal.timezone), names);
+  }
+
+  private toDto(row: OperationalPeriod, today: string, names: Map<string, string>): OperationalPeriodDto {
     return {
-      calendarId,
-      periodKey,
-      status: row?.status ?? "OPEN",
-      closedById: row?.closedById ?? null,
-      closedByName: row?.closedById ? (names.get(row.closedById) ?? null) : null,
-      closedAt: row?.closedAt?.toISOString() ?? null,
-      closeReason: row?.closeReason ?? null,
-      reopenedById: row?.reopenedById ?? null,
-      reopenedByName: row?.reopenedById ? (names.get(row.reopenedById) ?? null) : null,
-      reopenedAt: row?.reopenedAt?.toISOString() ?? null,
-      reopenReason: row?.reopenReason ?? null,
+      fiscalCalendarId: row.fiscalCalendarId,
+      periodKey: row.periodKey,
+      periodStart: row.periodStart,
+      periodEnd: row.periodEnd,
+      status: row.status,
+      isCurrent: row.periodStart <= today && today < row.periodEnd,
+      closedById: row.closedById,
+      closedByName: row.closedById ? (names.get(row.closedById) ?? null) : null,
+      closedAt: row.closedAt?.toISOString() ?? null,
+      closeReason: row.closeReason,
+      lockedById: row.lockedById,
+      lockedByName: row.lockedById ? (names.get(row.lockedById) ?? null) : null,
+      lockedAt: row.lockedAt?.toISOString() ?? null,
+      lockReason: row.lockReason,
+      reopenedById: row.reopenedById,
+      reopenedByName: row.reopenedById ? (names.get(row.reopenedById) ?? null) : null,
+      reopenedAt: row.reopenedAt?.toISOString() ?? null,
+      reopenReason: row.reopenReason,
     };
   }
 
   private async namesByUserId(ids: (string | null)[]): Promise<Map<string, string>> {
     const unique = [...new Set(ids.filter((id): id is string => Boolean(id)))];
     if (unique.length === 0) return new Map();
-    const users = await this.prisma.user.findMany({
-      where: { id: { in: unique } },
-      select: { id: true, displayName: true },
-    });
+    const users = await this.prisma.user.findMany({ where: { id: { in: unique } }, select: { id: true, displayName: true } });
     return new Map(users.map((u) => [u.id, u.displayName]));
   }
 }
 
-/** Devuelve "YYYY-MM-DD" desplazada `days` días respecto a `base` (en UTC; ventana holgada). */
-function isoDateOffset(base: Date, days: number): string {
-  const d = new Date(base.getTime() + days * 86_400_000);
-  return d.toISOString().slice(0, 10);
+/** "YYYY-MM-DD" de hoy en la TZ dada (vía Intl; para la marca Actual). */
+function todayInTimezone(timezone: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).format(
+    new Date(),
+  );
 }

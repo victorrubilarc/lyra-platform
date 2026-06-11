@@ -26,11 +26,6 @@ export function toResolverCalendar(cal: CalendarWithShifts): ShiftResolverCalend
       durationMinutes: s.durationMinutes,
     })),
     dayStartShiftCode: cal.dayStartShiftCode,
-    periodKind: cal.periodKind,
-    periodAnchorDay: cal.periodAnchorDay,
-    periodStartWeekday: cal.periodStartWeekday,
-    periodLengthDays: cal.periodLengthDays,
-    periodAnchorDate: cal.periodAnchorDate,
   };
 }
 
@@ -88,11 +83,6 @@ export class OperationalCalendarService {
             isDefault: dto.isDefault ?? false,
             active: dto.active ?? true,
             dayStartShiftCode: dto.dayStartShiftCode ?? null,
-            periodKind: dto.periodKind,
-            periodAnchorDay: dto.periodAnchorDay ?? null,
-            periodStartWeekday: dto.periodStartWeekday ?? null,
-            periodLengthDays: dto.periodLengthDays ?? null,
-            periodAnchorDate: dto.periodAnchorDate ?? null,
             shifts: { create: shifts.map((s, i) => ({ code: s.code, label: s.label, startTime: s.startTime, durationMinutes: s.durationMinutes, sortOrder: s.sortOrder ?? i })) },
           },
           include: { shifts: true },
@@ -121,11 +111,6 @@ export class OperationalCalendarService {
           isDefault: dto.isDefault === undefined ? undefined : dto.isDefault,
           active: dto.active === undefined ? undefined : dto.active,
           dayStartShiftCode: dto.dayStartShiftCode === undefined ? undefined : dto.dayStartShiftCode,
-          periodKind: dto.periodKind ?? undefined,
-          periodAnchorDay: dto.periodAnchorDay === undefined ? undefined : dto.periodAnchorDay,
-          periodStartWeekday: dto.periodStartWeekday === undefined ? undefined : dto.periodStartWeekday,
-          periodLengthDays: dto.periodLengthDays === undefined ? undefined : dto.periodLengthDays,
-          periodAnchorDate: dto.periodAnchorDate === undefined ? undefined : dto.periodAnchorDate,
         },
       });
       // Reemplazo en bloque de los turnos (el editor envía el set completo).
