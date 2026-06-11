@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   createOperationalCalendarRequestSchema,
-  isoWeekdayOf,
   resolveShift,
   validateOperationalCalendar,
   type ShiftResolverCalendar,
@@ -16,8 +15,6 @@ const MINING_UTC: ShiftResolverCalendar = {
     { code: "C", label: "Noche", startTime: "23:00", durationMinutes: 480 },
   ],
   dayStartShiftCode: "A",
-  periodKind: "MONTH",
-  periodAnchorDay: 1,
 };
 
 describe("resolveShift — turno y día operacional", () => {
@@ -25,7 +22,6 @@ describe("resolveShift — turno y día operacional", () => {
     const r = resolveShift(new Date("2026-06-15T10:00:00Z"), MINING_UTC);
     expect(r.shiftCode).toBe("A");
     expect(r.operationalDate).toBe("2026-06-15");
-    expect(r.periodKey).toBe("2026-06");
   });
 
   it("la madrugada (02:00) pertenece al día operacional ANTERIOR, turno noche", () => {
@@ -63,8 +59,6 @@ describe("resolveShift — borde de turno semiabierto [inicio, fin)", () => {
       { code: "B", label: "Noche", startTime: "20:00", durationMinutes: 720 },
     ],
     dayStartShiftCode: "A",
-    periodKind: "MONTH",
-    periodAnchorDay: 1,
   };
 
   it("el instante EXACTO del cambio (20:00:00) pertenece al turno SIGUIENTE (B), sin solape", () => {
@@ -85,7 +79,6 @@ describe("resolveShift — borde de turno semiabierto [inicio, fin)", () => {
       validateOperationalCalendar({
         timezone: "UTC",
         dayStartShiftCode: "A",
-        periodKind: "MONTH",
         shifts: [
           { code: "A", startTime: "08:00", durationMinutes: 720 },
           { code: "B", startTime: "20:00", durationMinutes: 720 },
@@ -95,23 +88,15 @@ describe("resolveShift — borde de turno semiabierto [inicio, fin)", () => {
   });
 });
 
-describe("resolveShift — borde de mes (el mes arranca en el cambio de turno)", () => {
-  it("la madrugada del día 1 aún pertenece al mes anterior", () => {
+describe("resolveShift — borde de día (la madrugada pertenece al día anterior)", () => {
+  it("la madrugada del día 1 aún pertenece al día operacional anterior", () => {
     const r = resolveShift(new Date("2026-07-01T02:00:00Z"), MINING_UTC);
     expect(r.operationalDate).toBe("2026-06-30");
-    expect(r.periodKey).toBe("2026-06");
   });
 
-  it("el turno ancla del día 1 abre el nuevo mes contable", () => {
+  it("el turno ancla del día 1 abre el nuevo día operacional", () => {
     const r = resolveShift(new Date("2026-07-01T08:00:00Z"), MINING_UTC);
     expect(r.operationalDate).toBe("2026-07-01");
-    expect(r.periodKey).toBe("2026-07");
-  });
-
-  it("MONTH con día-ancla 26 (mes 26→25): el día 25 pertenece al periodo anterior", () => {
-    const cal: ShiftResolverCalendar = { ...MINING_UTC, periodAnchorDay: 26 };
-    expect(resolveShift(new Date("2026-06-25T10:00:00Z"), cal).periodKey).toBe("2026-05");
-    expect(resolveShift(new Date("2026-06-26T10:00:00Z"), cal).periodKey).toBe("2026-06");
   });
 });
 
@@ -120,8 +105,6 @@ describe("resolveShift — huecos (operación de turno único)", () => {
     timezone: "UTC",
     shifts: [{ code: "D", label: "Día", startTime: "08:00", durationMinutes: 600 }], // 08:00–18:00
     dayStartShiftCode: "D",
-    periodKind: "MONTH",
-    periodAnchorDay: 1,
   };
 
   it("una lectura en horario de turno resuelve el turno", () => {
@@ -147,56 +130,6 @@ describe("resolveShift — sin turno ancla (día operacional = día civil)", () 
   });
 });
 
-describe("resolveShift — periodo WEEK", () => {
-  const WEEKLY = (startWeekday: number): ShiftResolverCalendar => ({
-    ...MINING_UTC,
-    periodKind: "WEEK",
-    periodStartWeekday: startWeekday,
-  });
-
-  it("la llave semanal es la fecha de inicio de semana (lunes por defecto)", () => {
-    const r = resolveShift(new Date("2026-06-17T10:00:00Z"), WEEKLY(1));
-    expect(isoWeekdayOf(r.periodKey!)).toBe(1); // arranca en lunes
-  });
-
-  it("dos lecturas de la misma semana comparten llave", () => {
-    const cal = WEEKLY(1);
-    const a = resolveShift(new Date("2026-06-16T10:00:00Z"), cal).periodKey;
-    const b = resolveShift(new Date("2026-06-18T10:00:00Z"), cal).periodKey;
-    expect(a).toBe(b);
-  });
-
-  it("respeta un día de inicio de semana configurable (domingo)", () => {
-    const r = resolveShift(new Date("2026-06-17T10:00:00Z"), WEEKLY(7));
-    expect(isoWeekdayOf(r.periodKey!)).toBe(7); // arranca en domingo
-  });
-});
-
-describe("resolveShift — periodo CUSTOM (ciclo de N días)", () => {
-  const FORTNIGHT: ShiftResolverCalendar = {
-    ...MINING_UTC,
-    periodKind: "CUSTOM",
-    periodLengthDays: 14,
-    periodAnchorDate: "2026-06-01",
-  };
-
-  it("el día ancla abre el ciclo", () => {
-    expect(resolveShift(new Date("2026-06-01T10:00:00Z"), FORTNIGHT).periodKey).toBe("2026-06-01");
-  });
-
-  it("el último día del ciclo comparte llave con el inicio", () => {
-    expect(resolveShift(new Date("2026-06-14T10:00:00Z"), FORTNIGHT).periodKey).toBe("2026-06-01");
-  });
-
-  it("el día siguiente arranca un ciclo nuevo", () => {
-    expect(resolveShift(new Date("2026-06-15T10:00:00Z"), FORTNIGHT).periodKey).toBe("2026-06-15");
-  });
-
-  it("fechas anteriores al ancla retroceden ciclos completos", () => {
-    expect(resolveShift(new Date("2026-05-31T10:00:00Z"), FORTNIGHT).periodKey).toBe("2026-05-18");
-  });
-});
-
 describe("resolveShift — zona horaria y DST (America/Santiago)", () => {
   const SCL: ShiftResolverCalendar = { ...MINING_UTC, timezone: "America/Santiago" };
 
@@ -219,8 +152,6 @@ describe("validateOperationalCalendar", () => {
   const valid = {
     timezone: "UTC",
     dayStartShiftCode: "A",
-    periodKind: "MONTH" as const,
-    periodAnchorDay: 1,
     shifts: [
       { code: "A", startTime: "07:00", durationMinutes: 480 },
       { code: "B", startTime: "15:00", durationMinutes: 480 },
@@ -237,7 +168,6 @@ describe("validateOperationalCalendar", () => {
       validateOperationalCalendar({
         timezone: "UTC",
         dayStartShiftCode: "D",
-        periodKind: "MONTH",
         shifts: [{ code: "D", startTime: "08:00", durationMinutes: 600 }],
       }),
     ).toEqual([]);
@@ -274,16 +204,6 @@ describe("validateOperationalCalendar", () => {
     const errors = validateOperationalCalendar({ ...valid, timezone: "Mars/Olympus" });
     expect(errors.some((e) => e.includes("Zona horaria"))).toBe(true);
   });
-
-  it("CUSTOM requiere largo de ciclo y fecha ancla", () => {
-    const errors = validateOperationalCalendar({
-      timezone: "UTC",
-      dayStartShiftCode: "A",
-      periodKind: "CUSTOM",
-      shifts: [{ code: "A", startTime: "07:00", durationMinutes: 480 }],
-    });
-    expect(errors.length).toBeGreaterThanOrEqual(2);
-  });
 });
 
 describe("createOperationalCalendarRequestSchema", () => {
@@ -293,8 +213,6 @@ describe("createOperationalCalendarRequestSchema", () => {
       name: "Mina Rajo",
       timezone: "America/Santiago",
       dayStartShiftCode: "A",
-      periodKind: "MONTH",
-      periodAnchorDay: 1,
       shifts: [
         { code: "A", label: "Mañana", startTime: "07:00", durationMinutes: 480 },
         { code: "B", label: "Tarde", startTime: "15:00", durationMinutes: 480 },
@@ -310,7 +228,6 @@ describe("createOperationalCalendarRequestSchema", () => {
         key: "Mina Rajo",
         name: "x",
         timezone: "UTC",
-        periodKind: "MONTH",
       }).success,
     ).toBe(false);
   });
@@ -320,7 +237,6 @@ describe("createOperationalCalendarRequestSchema", () => {
       key: "mina-rajo",
       name: "Mina Rajo",
       timezone: "UTC",
-      periodKind: "MONTH",
       shifts: [
         { code: "A", label: "M", startTime: "07:00", durationMinutes: 600 },
         { code: "B", label: "T", startTime: "12:00", durationMinutes: 600 },

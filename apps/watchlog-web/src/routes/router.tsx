@@ -21,6 +21,7 @@ import { WorkflowsPage } from "../features/workflows/WorkflowsPage.js";
 import { WorkflowBuilderPage } from "../features/workflows/WorkflowBuilderPage.js";
 import { ReferenceDataPage } from "../features/reference-data/ReferenceDataPage.js";
 import { OperationalCalendarPage } from "../features/operational-calendar/OperationalCalendarPage.js";
+import { FiscalCalendarPage } from "../features/fiscal-calendar/FiscalCalendarPage.js";
 import { NewEntryPage } from "../features/log-entries/NewEntryPage.js";
 import { EntryFillPage } from "../features/log-entries/EntryFillPage.js";
 import { LogbookPage } from "../features/logbook/LogbookPage.js";
@@ -56,6 +57,7 @@ export const router = createBrowserRouter([
           { path: "/flujos/:id", element: <WorkflowBuilderPage /> },
           { path: "/datos-referencia", element: <ReferenceDataPage /> },
           { path: "/calendario-operacional", element: <OperationalCalendarPage /> },
+          { path: "/calendario-fiscal", element: <FiscalCalendarPage /> },
           {
             path: "/seguridad",
             element: <SecurityLayout />,

@@ -44,7 +44,8 @@ import { PermissionService } from "../authz/permission.service";
 import { ScopeService } from "../authz/scope.service";
 import { EncryptionService } from "../crypto/encryption.service";
 import { ShiftResolver } from "../operational-calendar/shift-resolver";
-import { OperationalPeriodService, PERIOD_WRITE_CLOSED_PERMISSION } from "../operational-periods/operational-periods.service";
+import { FiscalResolver } from "../fiscal-calendar/fiscal-resolver";
+import { OperationalPeriodService } from "../operational-periods/operational-periods.service";
 import { PrismaService } from "../prisma/prisma.service";
 
 /** Significado por defecto de la firma de completitud de sección (las secciones no
@@ -135,6 +136,7 @@ export class LogEntriesService {
     private readonly audit: AuditService,
     private readonly scope: ScopeService,
     private readonly shiftResolver: ShiftResolver,
+    private readonly fiscalResolver: FiscalResolver,
     private readonly reauth: ReauthService,
     private readonly enc: EncryptionService,
     private readonly periods: OperationalPeriodService,
@@ -195,7 +197,7 @@ export class LogEntriesService {
     // diferido: declarar una fecha en período cerrado se rechaza con PERIOD_CLOSED.
     await this.periods.assertWritable(effectiveAt, orgNodeId, await this.permissions.getEffectivePermissions(userId));
 
-    const dims = await this.shiftResolver.resolve(effectiveAt, orgNodeId);
+    const dims = await this.resolveDims(effectiveAt, orgNodeId);
 
     const data = {
       templateId: template.id,
@@ -295,8 +297,11 @@ export class LogEntriesService {
     // con PERIOD_CLOSED (la congelación del período es un gate uniforme de la entrada).
     const periodBlocked =
       editable &&
-      !(await this.permissions.getEffectivePermissions(userId)).has(PERIOD_WRITE_CLOSED_PERMISSION) &&
-      (await this.periods.isWriteBlocked(entry.effectiveAt, entry.orgNodeId));
+      (await this.periods.isWriteBlockedForActor(
+        entry.effectiveAt,
+        entry.orgNodeId,
+        await this.permissions.getEffectivePermissions(userId),
+      ));
 
     const sectionStates: LogEntrySectionStateDto[] = version.sections.map((def) => {
       const row = sectionRows.find((r) => r.sectionKey === def.key);
@@ -604,7 +609,7 @@ export class LogEntriesService {
           entry.recordedAt,
           entry.declaredEffectiveAt,
         );
-        const dims = await this.shiftResolver.resolve(effectiveAt, entry.orgNodeId);
+        const dims = await this.resolveDims(effectiveAt, entry.orgNodeId);
         await tx.logEntry.update({
           where: { id },
           data: {
@@ -728,7 +733,7 @@ export class LogEntriesService {
     // y mismo motivo visible que el resto de las escrituras), salvo excepción.
     await this.periods.assertWritable(effectiveAt, entry.orgNodeId, await this.permissions.getEffectivePermissions(userId));
 
-    const dims = await this.shiftResolver.resolve(effectiveAt, entry.orgNodeId);
+    const dims = await this.resolveDims(effectiveAt, entry.orgNodeId);
 
     await this.prisma.$transaction(async (tx) => {
       if (dto.deferred && effField && effValue !== null) {
@@ -1110,6 +1115,24 @@ export class LogEntriesService {
     return errors;
   }
 
+  /**
+   * Resuelve las dimensiones a estampar en `LogEntry` desde dos ejes desacoplados
+   * (Fase 2.7.1.1): turno/día operacional del `ShiftResolver` y `periodKey` del
+   * `FiscalResolver` (que mapea el día operacional al período del calendario fiscal).
+   */
+  private async resolveDims(
+    effectiveAt: Date,
+    orgNodeId: string | null,
+  ): Promise<{ shiftCode: string | null; operationalDate: string | null; periodKey: string | null }> {
+    const shift = await this.shiftResolver.resolve(effectiveAt, orgNodeId);
+    const fiscal = await this.fiscalResolver.resolvePeriodKey(shift?.operationalDate ?? null, orgNodeId);
+    return {
+      shiftCode: shift?.shiftCode ?? null,
+      operationalDate: shift?.operationalDate ?? null,
+      periodKey: fiscal?.periodKey ?? null,
+    };
+  }
+
   /** Calcula effectiveAt + dimensiones de turno a partir de los valores actuales. */
   private async computeSeal(
     entry: LogEntryRow,
@@ -1122,7 +1145,7 @@ export class LogEntriesService {
       entry.recordedAt,
       entry.declaredEffectiveAt,
     );
-    const dims = await this.shiftResolver.resolve(effectiveAt, entry.orgNodeId);
+    const dims = await this.resolveDims(effectiveAt, entry.orgNodeId);
     return {
       effectiveAt,
       shiftCode: dims?.shiftCode ?? null,

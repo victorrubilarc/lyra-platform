@@ -6,6 +6,7 @@ import type { ReauthService } from "../auth/reauth.service";
 import type { ScopeService } from "../authz/scope.service";
 import type { EncryptionService } from "../crypto/encryption.service";
 import type { ShiftResolver } from "../operational-calendar/shift-resolver";
+import type { FiscalResolver } from "../fiscal-calendar/fiscal-resolver";
 import type { OperationalPeriodService } from "../operational-periods/operational-periods.service";
 import type { PermissionService } from "../authz/permission.service";
 import type { PrismaService } from "../prisma/prisma.service";
@@ -57,6 +58,7 @@ function makeService(
   prismaOver: Record<string, unknown> = {},
   opts: {
     dims?: unknown;
+    fiscal?: unknown;
     scope?: Partial<ScopeService>;
     reauth?: Partial<ReauthService>;
     periods?: Partial<OperationalPeriodService>;
@@ -93,8 +95,11 @@ function makeService(
   const audit = { record: vi.fn().mockResolvedValue(undefined) } as unknown as AuditService;
   const scope = { getAccessibleNodeIds: vi.fn().mockResolvedValue(null), canAccessNode: vi.fn().mockResolvedValue(true), ...opts.scope } as unknown as ScopeService;
   const shiftResolver = {
-    resolve: vi.fn().mockResolvedValue(opts.dims ?? { operationalDate: "2026-06-09", shiftCode: "A", shiftLabel: "A", periodKind: "MONTH", periodKey: "2026-06" }),
+    resolve: vi.fn().mockResolvedValue(opts.dims ?? { operationalDate: "2026-06-09", shiftCode: "A", shiftLabel: "A" }),
   } as unknown as ShiftResolver;
+  const fiscalResolver = {
+    resolvePeriodKey: vi.fn().mockResolvedValue(opts.fiscal ?? { fiscalCalendarId: "fc1", periodKey: "2026-06" }),
+  } as unknown as FiscalResolver;
   const reauth = {
     verifyForSignature: vi.fn().mockResolvedValue({ method: "PASSWORD", signerName: "Demo User" }),
     ...opts.reauth,
@@ -102,14 +107,14 @@ function makeService(
   const enc = { sha256: vi.fn().mockReturnValue("deadbeef") } as unknown as EncryptionService;
   const periods = {
     assertWritable: vi.fn().mockResolvedValue(undefined),
-    isWriteBlocked: vi.fn().mockResolvedValue(false),
+    isWriteBlockedForActor: vi.fn().mockResolvedValue(false),
     ...opts.periods,
   } as unknown as OperationalPeriodService;
   const permissions = {
     getEffectivePermissions: vi.fn().mockResolvedValue(new Set(opts.perms ?? [])),
   } as unknown as PermissionService;
   return {
-    service: new LogEntriesService(prisma, audit, scope, shiftResolver, reauth, enc, periods, permissions),
+    service: new LogEntriesService(prisma, audit, scope, shiftResolver, fiscalResolver, reauth, enc, periods, permissions),
     prisma,
     audit,
     shiftResolver,
@@ -409,7 +414,7 @@ describe("LogEntriesService — getDetail (motivos de bloqueo #4)", () => {
           findUnique: vi.fn().mockResolvedValue(versionGraph([section("s1", [field({ key: "obs", type: "TEXT", dataType: "STRING", label: "Obs" })])])),
         },
       },
-      { periods: { isWriteBlocked: vi.fn().mockResolvedValue(true) } },
+      { periods: { isWriteBlockedForActor: vi.fn().mockResolvedValue(true) } },
     );
 
     const detail = await service.getDetail("u1", "e1");

@@ -18,8 +18,6 @@ const validCreate = {
   name: "Mina Rajo",
   timezone: "America/Santiago",
   dayStartShiftCode: "A",
-  periodKind: "MONTH" as const,
-  periodAnchorDay: 1,
   shifts: VALID_SHIFTS,
 };
 
@@ -163,11 +161,6 @@ describe("OperationalCalendarService", () => {
           id: "c1",
           timezone: "UTC",
           dayStartShiftCode: "A",
-          periodKind: "MONTH",
-          periodAnchorDay: 1,
-          periodStartWeekday: null,
-          periodLengthDays: null,
-          periodAnchorDate: null,
           shifts: VALID_SHIFTS.map((s, i) => ({ ...s, id: `s${i}`, calendarId: "c1", sortOrder: i })),
         }),
       },
@@ -175,6 +168,5 @@ describe("OperationalCalendarService", () => {
     const res = await service.preview("c1", new Date("2026-06-15T02:00:00Z"));
     expect(res.shiftCode).toBe("C");
     expect(res.operationalDate).toBe("2026-06-14");
-    expect(res.periodKey).toBe("2026-06");
   });
 });

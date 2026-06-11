@@ -17,6 +17,7 @@
     "db:backfill-descriptions": "dotenv -e ../../.env -- tsx prisma/backfill-node-descriptions.ts",
     "db:backfill-report-order": "dotenv -e ../../.env -- tsx prisma/backfill-report-order.ts",
     "db:backfill-threshold-bands": "dotenv -e ../../.env -- tsx prisma/backfill-threshold-bands.ts",
+    "db:migrate-fiscal": "dotenv -e ../../.env -- tsx prisma/migrate-fiscal.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

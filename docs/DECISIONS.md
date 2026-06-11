@@ -4,7 +4,7 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
-### 2026-06-11 · Fase 2.7.1.1 — Calendario FISCAL transversal + período al estándar industrial — APROBADO, pendiente de construir
+### 2026-06-11 · Fase 2.7.1.1 — Calendario FISCAL transversal + período al estándar industrial — ✅ IMPLEMENTADO Y PUBLICADO
 
 Tras revisar la pantalla de 2.7.1, el dueño del producto pidió alinear los períodos al estándar de los grandes
 sistemas ("la más potente", entre NetSuite y Maximo) y **detectó un acoplamiento de diseño correcto**: el período
@@ -51,6 +51,36 @@ seed + invalidar caché authz. UI: mantenedor de calendario fiscal (probablement
 turnos) + `PeriodsSection` con "Generar" y acciones close/reopen/lock/unlock gateadas. **Supersede** la presentación LAZY
 y el scope-por-turno de 2.7.1 (el modelo de cierre/guarda se conserva y se endurece). El `periodKey` sigue siendo la
 identidad estampada (histórico intacto).
+
+**4 forks finos resueltos (2026-06-11, en la sesión de construcción; los 4 con la recomendación):**
+1. **Mantenedor fiscal = PANTALLA PROPIA `/calendario-fiscal`** (no sección dentro de `/calendario-operacional`).
+   SAP (company code) / Maximo (Organization) / NetSuite (subsidiaria) separan el período fiscal del *shift calendar*;
+   re-meterlo en la pantalla de turnos re-acopla lo que el refactor desacopla y genera ambigüedad ("¿períodos de qué
+   calendario?"). Costo bajo (ruta + nav + permiso de módulo).
+2. **Migración: un `FiscalCalendar` por cada config de período DISTINTA en uso** (dedup por firma
+   `periodKind`+ancla), no un fiscal global único. Verificado en BD: 3 calendarios con **2 configs** — default
+   `planta-eagon` = WEEK (SECADO/ELABORACION), `mina-rajo` = MONTH (**TREATMENT PLANT**), `calendario` = MONTH (sin
+   nodo). El default fiscal sale del calendario de turnos default (WEEK); cada fiscal no-default se **re-asigna a los
+   mismos nodos** que hoy resuelven a su calendario de turnos. Así el `periodKey` ya estampado (`2026-06-08`, llave
+   semanal, 23 entradas) y el de TREATMENT PLANT (MONTH) se preservan EXACTOS. Un fiscal global único habría cambiado
+   TREATMENT PLANT de MONTH→WEEK (histórico inconsistente).
+3. **`periodStart`/`periodEnd` ALMACENADOS** en las filas materializadas (set al "Generar", calculados por
+   `enumeratePeriods` puro; `periodEnd` exclusivo = inicio del siguiente). La generación explícita ya materializa filas
+   (Maximo), así que el costo de columna es cero y habilita "Actual" por SQL indexado (`periodStart <= hoy < periodEnd`),
+   cierre secuencial por orden y validación de contigüidad. La función pura sigue siendo la fuente de verdad; único
+   escritor = `generate` idempotente que jamás altera CLOSED/LOCKED.
+4. **Reapertura de LOCKED = two-key + secuencialidad inversa graduada.** `unlock` (`opsperiod:unlock`) lleva
+   LOCKED→**CLOSED** (no directo a OPEN); un segundo paso deliberado `reopen` (`opsperiod:reopen`) lleva CLOSED→OPEN
+   (espejo NetSuite, defensa en profundidad para lo más sensible). Reabrir un CLOSED se **BLOQUEA** si existe un período
+   POSTERIOR **LOCKED** (no se reabre detrás de un lock duro); se **ADVIERTE + permite con motivo** si los posteriores
+   están solo CLOSED (cultura de corrección ALCOA+, equilibra UX vs. consistencia).
+
+**Implementación (notas de construcción):** migración en **2 pasos + script TS** por el EPERM de Windows con el watch:
+M1 estructural aditiva (FiscalCalendar + `OrgNode.fiscalCalendarId?` + `OperationalPeriod += fiscalCalendarId?/periodStart?/
+periodEnd?/locked*` + `PeriodStatus += LOCKED`), script idempotente `db:migrate-fiscal` (dedup de firmas → fiscales,
+reasignación de nodos, remapeo de filas con `enumeratePeriods`), M2 cleanup (drop columnas de período de
+`OperationalCalendar`, `fiscalCalendarId` NOT NULL, swap del `@@unique`). Split del resolver: `resolveShift` pierde el
+período; nuevo `FiscalResolver` (token abstracto, path-walk por `OrgNode.fiscalCalendarId`) provee `periodKey`.
 
 ---
 

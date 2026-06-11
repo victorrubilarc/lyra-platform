@@ -1,11 +1,13 @@
 # Progreso — Lyra WatchLog
 
 Última actualización: 2026-06-11 (**Fase 1 completa**; **Fase 2.1/2.1.1/2.2/2.x/2.3.0/2.4/2.5/2.6.0 ✅** +
-**Afinamiento #4 ✅** + **Fase 2.7.0 — Registro diferido ✅** + **Fase 2.7.1 — Período contable gobernado ✅**:
-`OperationalPeriod` OPEN/CLOSING/CLOSED con cierre/reapertura auditada (motivo obligatorio) y guarda de escritura por
-`effectiveAt` (`blockedReason = PERIOD_CLOSED`), bypass configurable `opsperiod:write-closed`. El **plan de
-fases 2.7 (Gobernanza temporal) / 2.8 (Alcance+acceso) / 2.9 (Plantillas inteligentes) fue APROBADO TAL CUAL por el
-dueño del producto** (DECISIONS 2026-06-11).
+**Afinamiento #4 ✅** + **Fase 2.7.0 — Registro diferido ✅** + **Fase 2.7.1 — Período contable gobernado ✅** +
+**Fase 2.7.1.1 — Calendario FISCAL transversal ✅**: el período se DESACOPLÓ de los turnos a la entidad transversal
+`FiscalCalendar` (default + asignación por nodo); `OperationalPeriod` re-scopeada a `fiscalCalendarId × periodKey` con
+rango `[periodStart, periodEnd)`; tri-estado **OPEN→CLOSED→LOCKED** (NetSuite) con **generación explícita** (Maximo),
+cierre **secuencial**, lock/unlock two-key, reapertura con secuencialidad inversa; `assertWritable` gana LOCKED (bloquea
+incl. bypass) y `requirePeriod`. El **plan de fases 2.7 (Gobernanza temporal) / 2.8 (Alcance+acceso) / 2.9 (Plantillas
+inteligentes) fue APROBADO TAL CUAL por el dueño del producto** (DECISIONS 2026-06-11).
 **Siguiente: 2.7.2 — Ventana de edición configurable (#6).**
 
 ## Estado por fase
@@ -861,8 +863,47 @@ hard lock diferido · guarda en TODAS las mutaciones incl. transiciones, lectura
   ofrecía transición disponible al usuario sin bypass para ejercitarla en vivo); smoke VISUAL en navegador del
   mantenedor de períodos y de la huella (ver BACKLOG §4).
 
+## Hecho en Fase 2.7.1.1 (2026-06-11 — Calendario FISCAL transversal + período al estándar industrial)
+
+Corrige un acoplamiento de diseño: el período contable era TRANSVERSAL pero vivía DENTRO del calendario de turnos.
+Se DESACOPLA en la entidad `FiscalCalendar` (SAP company code / Maximo Organization / NetSuite subsidiaria).
+Rama `feat/calendario-fiscal`. **4 forks finos resueltos** (DECISIONS 2026-06-11): pantalla propia · un fiscal por
+config distinta + reasignar nodos · `periodStart/periodEnd` almacenados · unlock→CLOSED two-key + secuencialidad inversa.
+
+- **Contratos**: `shared/date-utils` (helpers de fecha puros compartidos por ambos ejes); **`fiscal-calendar`**
+  (`FiscalConfig`, `periodBoundsFor`/**`enumeratePeriods`** [rango contiguo `[start,end)`], `periodKeyForOperationalDate`,
+  `validateFiscalCalendar`, DTOs CRUD, `requirePeriod`). `operational-calendar`: `resolveShift` PIERDE el período (solo
+  `operationalDate`/`shiftCode`). `operational-periods`: tri-estado **OPEN→CLOSED→LOCKED** (CLOSING deprecado), `generate`,
+  `lock`/`unlock`, `reopen` con `acknowledgeLaterClosed`, DTO `+= fiscalCalendarId/periodStart/periodEnd/isCurrent/locked*`.
+  Permisos `+opsperiod:lock/unlock` (catálogo **54→56**). Tests contracts **139** (+período movido a fiscal spec).
+- **Migración** (2 pasos + script por el EPERM de Windows): **M1** `add_fiscal_calendar` (estructural aditiva); script
+  **`db:migrate-fiscal`** idempotente (dedup de configs por firma → 1 fiscal c/u, default desde el calendario de turnos
+  default, reasigna nodos con firma ≠ default, remapea filas de período con `periodBoundsFor`); **M2**
+  `decouple_fiscal_period_cleanup` (NOT NULL + drop de columnas legacy). En la BD real: 2 fiscales (fiscal-default **WEEK**
+  + fiscal-mensual **MONTH**), TREATMENT PLANT reasignado a MONTH; el `periodKey` histórico (`2026-06-08` semanal) intacto.
+- **Backend**: `FiscalCalendarModule` (CRUD gateado/auditado, default único, assignNodes) + **`FiscalResolver`** (token
+  abstracto, path-walk por `OrgNode.fiscalCalendarId`, deriva el `periodKey` del `operationalDate`). `OperationalPeriodService`
+  reescrito: `generate` idempotente contiguo (jamás degrada CLOSED/LOCKED), `close` con guarda **secuencial**, `lock`/`unlock`,
+  `reopen` con secuencialidad inversa (bloquea si posterior LOCKED, exige acuse si posterior CLOSED), `list` por filas reales
+  + `isCurrent`; `assertWritable` gana **LOCKED** (bloquea incl. bypass) y **`requirePeriod`** (sin fila ⇒ bloquea).
+  `LogEntriesService` estampa `periodKey` vía `FiscalResolver` (`resolveDims` combina ambos ejes). Seed: FiscalCalendar
+  default idempotente (no sobreescribe). **Fix de DI** (detectado en el smoke): `LogEntriesModule` importa `FiscalCalendarModule`.
+  Tests API **187** (operational-periods reescrito a 16).
+- **UI**: pantalla propia **`/calendario-fiscal`** (master-detail: config de período + `requirePeriod` + asignar nodos +
+  **`FiscalPeriodsSection`** con botón **Generar**, filas agrupadas por año, badge **Actual**, acciones close/reopen/lock/unlock
+  gateadas + acuse de secuencialidad inversa). `/calendario-operacional` pierde la config de período (solo turnos + ancla).
+  nav + router + i18n `fiscalCal` (es-CL). Web build **1962 módulos**.
+- **Verificación**: `typecheck`/`lint`/`build`/`test` verdes (contracts 139 · permissions 5 · API 187 · web 1962). **Smoke en
+  vivo**: login demo → CRUD fiscal (create CUSTOM, validación 400, delete 204) → **generate** 2026 (12 meses, Actual=2026-06,
+  idempotente) → **cierre secuencial** (409 fuera de orden, 201 en orden) → **lock/unlock** → **reopen inverso** (409 posterior
+  LOCKED, 409 acuse con posterior CLOSED, 201 con acuse) → **guarda de escritura** (huella de lectura: CLOSED ⇒ demo con bypass
+  NO bloqueado; **LOCKED ⇒ demo bloqueado pese al bypass** `PERIOD_CLOSED`) → **periodKey 2026-06-08 preservado**. Limpieza: 65
+  períodos de prueba borrados (AuditLog inmutable conserva 37 rastros). **Side-effect del smoke**: la entrada demo
+  `cmq7eglvm…` quedó con `fecha=2026-06-09` y `version` de sección +1 (un saveSection en estado OPEN; dato de demo, benigno).
+- **Pendiente**: smoke **VISUAL** en navegador (mantenedor fiscal, generar, marca Actual, lock/unlock, modo claro) — BACKLOG §4.
+
 ## Próximo paso
-**Fase 2.7.1 completa y publicada.** **Sesión siguiente: 2.7.2 — Ventana de edición configurable (#6)**: por plantilla
+**Fase 2.7.1.1 completa y publicada.** **Sesión siguiente: 2.7.2 — Ventana de edición configurable (#6)**: por plantilla
 (fallback global) `{ancla RECORDED|EFFECTIVE, duración}`; fuera de ventana solo privilegio explícito con motivo
 auditado; con período **gana la restricción MÁS estricta**. Extiende `blockedReason` con `EDIT_WINDOW_EXPIRED` (enum ya
 extensible). Luego 2.7.3 matriz rol×sección×tiempo (#7).

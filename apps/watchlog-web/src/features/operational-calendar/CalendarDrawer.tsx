@@ -43,8 +43,6 @@ export function CalendarDrawer({ open, onClose, onCreated }: CalendarDrawerProps
         key: values.key,
         name: values.name,
         timezone: values.timezone,
-        periodKind: "MONTH",
-        periodAnchorDay: 1,
         shifts: [],
       });
       toast.success(t("opsCalendar.created"));

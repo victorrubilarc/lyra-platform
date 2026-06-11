@@ -13,7 +13,7 @@ import { NODE_DESCRIPTIONS } from "./structure-descriptions.js";
 import { assignReportOrderBySiblings } from "./report-order.js";
 import { DEMO_EQUIPMENT, EQUIPMENT_CATEGORIES } from "./equipment-seed-data.js";
 import { REFERENCE_LISTS } from "./reference-data-seed.js";
-import { DEMO_CALENDAR } from "./operational-calendar-seed.js";
+import { DEMO_CALENDAR, DEMO_FISCAL_CALENDAR } from "./operational-calendar-seed.js";
 
 const prisma = new PrismaClient();
 
@@ -364,16 +364,12 @@ async function seedOperationalCalendar(): Promise<void> {
       timezone: c.timezone,
       isDefault: c.isDefault,
       dayStartShiftCode: c.dayStartShiftCode,
-      periodKind: c.periodKind,
-      periodAnchorDay: c.periodAnchorDay,
     },
     update: {
       name: c.name,
       description: c.description,
       timezone: c.timezone,
       dayStartShiftCode: c.dayStartShiftCode,
-      periodKind: c.periodKind,
-      periodAnchorDay: c.periodAnchorDay,
     },
   });
   await prisma.operationalShift.deleteMany({ where: { calendarId: cal.id } });
@@ -381,6 +377,26 @@ async function seedOperationalCalendar(): Promise<void> {
     data: c.shifts.map((s, i) => ({ calendarId: cal.id, code: s.code, label: s.label, startTime: s.startTime, durationMinutes: s.durationMinutes, sortOrder: i * 10 })),
   });
   console.log(`✔ Calendario operacional de demo sincronizado: ${c.key} (${c.shifts.length} turnos)`);
+
+  // Calendario FISCAL por defecto (Fase 2.7.1.1). Idempotente y NO destructivo: solo
+  // crea si falta (update vacío) para no sobreescribir la config de período de una
+  // instalación existente (el periodKey histórico ya estampado debe quedar intacto).
+  const f = DEMO_FISCAL_CALENDAR;
+  await prisma.fiscalCalendar.upsert({
+    where: { key: f.key },
+    create: {
+      key: f.key,
+      name: f.name,
+      description: f.description,
+      timezone: f.timezone,
+      isDefault: f.isDefault,
+      periodKind: f.periodKind,
+      periodAnchorDay: f.periodAnchorDay,
+      requirePeriod: false,
+    },
+    update: {},
+  });
+  console.log(`✔ Calendario fiscal por defecto asegurado: ${f.key} (${f.periodKind})`);
 }
 
 async function main(): Promise<void> {

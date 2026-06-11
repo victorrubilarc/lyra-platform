@@ -1,119 +1,194 @@
-import { BadRequestException, ForbiddenException } from "@nestjs/common";
+import { BadRequestException, ConflictException, ForbiddenException } from "@nestjs/common";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OperationalPeriodService } from "./operational-periods.service";
 import type { AuditService } from "../audit/audit.service";
 import type { ShiftResolver } from "../operational-calendar/shift-resolver";
+import type { FiscalResolver } from "../fiscal-calendar/fiscal-resolver";
 import type { PrismaService } from "../prisma/prisma.service";
 
 const ctx = { actorId: "u1", actorEmail: "u@x.cl", ip: null, userAgent: null };
 
-function make(opts: { resolution?: unknown; periodRow?: unknown } = {}) {
+interface MakeOpts {
+  fiscal?: unknown; // resultado de fiscalResolver.resolvePeriodKey (null = ungobernado)
+  requirePeriod?: boolean;
+  row?: Record<string, unknown> | null; // fila del período (findUnique)
+  rows?: Record<string, unknown>[]; // findMany (list)
+  earlierOpen?: Record<string, unknown> | null;
+  laterLocked?: Record<string, unknown> | null;
+  laterClosed?: Record<string, unknown> | null;
+  cal?: Record<string, unknown>;
+}
+
+function make(opts: MakeOpts = {}) {
+  const cal = opts.cal ?? {
+    id: "f1",
+    timezone: "UTC",
+    requirePeriod: opts.requirePeriod ?? false,
+    periodKind: "MONTH",
+    periodAnchorDay: 1,
+    periodStartWeekday: null,
+    periodLengthDays: null,
+    periodAnchorDate: null,
+  };
+
   const prisma = {
     operationalPeriod: {
-      findUnique: vi.fn().mockResolvedValue(opts.periodRow ?? null),
-      findMany: vi.fn().mockResolvedValue([]),
-      upsert: vi.fn().mockImplementation(({ create, update, where }) => ({
+      findUnique: vi.fn().mockResolvedValue(opts.row ?? null),
+      findMany: vi.fn().mockResolvedValue(opts.rows ?? []),
+      findFirst: vi.fn().mockImplementation(({ where }: { where: { status?: unknown } }) => {
+        if (where.status === "OPEN") return Promise.resolve(opts.earlierOpen ?? null);
+        if (where.status === "LOCKED") return Promise.resolve(opts.laterLocked ?? null);
+        return Promise.resolve(opts.laterClosed ?? null); // status in [CLOSED, CLOSING]
+      }),
+      update: vi.fn().mockImplementation(({ data }: { data: Record<string, unknown> }) => ({
         id: "op1",
-        calendarId: where.calendarId_periodKey.calendarId,
-        periodKey: where.calendarId_periodKey.periodKey,
-        closedById: "u1",
-        closedAt: new Date(),
-        reopenedById: null,
-        ...(create ?? update),
-      })),
-      update: vi.fn().mockImplementation(({ data, where }) => ({
-        id: "op1",
-        calendarId: where.calendarId_periodKey.calendarId,
-        periodKey: where.calendarId_periodKey.periodKey,
-        closedById: "u1",
-        closedAt: new Date(),
-        reopenedById: "u1",
-        reopenedAt: new Date(),
+        fiscalCalendarId: "f1",
+        periodKey: "2026-06",
+        periodStart: "2026-06-01",
+        periodEnd: "2026-07-01",
         ...data,
       })),
+      createMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
-    operationalCalendar: {
-      findFirst: vi.fn().mockResolvedValue({ id: "cal1", shifts: [] }),
-    },
+    fiscalCalendar: { findFirst: vi.fn().mockResolvedValue(cal) },
     user: { findMany: vi.fn().mockResolvedValue([]) },
   } as unknown as PrismaService;
 
   const shiftResolver = {
-    resolveWithCalendar: vi
-      .fn()
-      .mockResolvedValue(
-        opts.resolution === undefined
-          ? { calendarId: "cal1", resolution: { periodKey: "2026-06" } }
-          : opts.resolution,
-      ),
+    resolve: vi.fn().mockResolvedValue({ operationalDate: "2026-06-15", shiftCode: "A", shiftLabel: "A" }),
   } as unknown as ShiftResolver;
 
+  const fiscalResolver = {
+    resolvePeriodKey: vi
+      .fn()
+      .mockResolvedValue(
+        opts.fiscal === undefined
+          ? { fiscalCalendarId: "f1", fiscalCalendar: cal, periodKey: "2026-06" }
+          : opts.fiscal,
+      ),
+  } as unknown as FiscalResolver;
+
   const audit = { record: vi.fn().mockResolvedValue(undefined) } as unknown as AuditService;
-  return { service: new OperationalPeriodService(prisma, shiftResolver, audit), prisma, audit };
+  return { service: new OperationalPeriodService(prisma, shiftResolver, fiscalResolver, audit), prisma, audit };
 }
 
 beforeEach(() => vi.clearAllMocks());
 
 describe("OperationalPeriodService — guarda de escritura", () => {
-  it("ungobernado (sin calendario / sin periodKey) NUNCA bloquea", async () => {
-    const { service } = make({ resolution: null });
-    expect(await service.isWriteBlocked(new Date(), "n1")).toBe(false);
-    const noKey = make({ resolution: { calendarId: "cal1", resolution: { periodKey: null } } });
-    expect(await noKey.service.isWriteBlocked(new Date(), "n1")).toBe(false);
+  it("ungobernado (sin calendario fiscal) NUNCA bloquea", async () => {
+    const { service } = make({ fiscal: null });
+    expect(await service.isWriteBlockedForActor(new Date(), "n1", new Set())).toBe(false);
   });
 
-  it("período sin fila = OPEN ⇒ no bloquea", async () => {
-    const { service } = make({ periodRow: null });
-    expect(await service.isWriteBlocked(new Date(), "n1")).toBe(false);
+  it("período sin fila + requirePeriod=false ⇒ no bloquea", async () => {
+    const { service } = make({ row: null });
+    expect(await service.isWriteBlockedForActor(new Date(), "n1", new Set())).toBe(false);
   });
 
-  it("período CLOSED ⇒ bloquea", async () => {
-    const { service } = make({ periodRow: { status: "CLOSED" } });
-    expect(await service.isWriteBlocked(new Date(), "n1")).toBe(true);
+  it("período sin fila + requirePeriod=true ⇒ bloquea (salvo bypass)", async () => {
+    const { service } = make({ row: null, requirePeriod: true });
+    expect(await service.isWriteBlockedForActor(new Date(), "n1", new Set())).toBe(true);
+    expect(await service.isWriteBlockedForActor(new Date(), "n1", new Set(["opsperiod:write-closed"]))).toBe(false);
   });
 
-  it("período CLOSING también bloquea (a los no privilegiados)", async () => {
-    const { service } = make({ periodRow: { status: "CLOSING" } });
-    expect(await service.isWriteBlocked(new Date(), "n1")).toBe(true);
+  it("período CLOSED ⇒ bloquea salvo opsperiod:write-closed", async () => {
+    const { service } = make({ row: { status: "CLOSED" } });
+    expect(await service.isWriteBlockedForActor(new Date(), "n1", new Set())).toBe(true);
+    expect(await service.isWriteBlockedForActor(new Date(), "n1", new Set(["opsperiod:write-closed"]))).toBe(false);
+  });
+
+  it("período LOCKED ⇒ bloquea a TODOS, incluido el bypass", async () => {
+    const { service } = make({ row: { status: "LOCKED" } });
+    expect(await service.isWriteBlockedForActor(new Date(), "n1", new Set(["opsperiod:write-closed"]))).toBe(true);
   });
 
   it("assertWritable lanza 403 si está cerrado y el actor no tiene la excepción", async () => {
-    const { service } = make({ periodRow: { status: "CLOSED" } });
+    const { service } = make({ row: { status: "CLOSED" } });
     await expect(service.assertWritable(new Date(), "n1", new Set())).rejects.toBeInstanceOf(ForbiddenException);
-  });
-
-  it("assertWritable deja pasar al actor con opsperiod:write-closed aunque esté cerrado", async () => {
-    const { service } = make({ periodRow: { status: "CLOSED" } });
-    await expect(
-      service.assertWritable(new Date(), "n1", new Set(["opsperiod:write-closed"])),
-    ).resolves.toBeUndefined();
   });
 });
 
-describe("OperationalPeriodService — cierre / reapertura", () => {
-  it("close upsertea el período y audita", async () => {
-    const { service, prisma, audit } = make();
-    const dto = await service.close("cal1", "2026-06", { status: "CLOSED", reason: "Cierre mensual" }, "u1", ctx);
+describe("OperationalPeriodService — generación", () => {
+  it("genera solo las llaves faltantes (idempotente)", async () => {
+    const { service, prisma } = make({ rows: [] });
+    // findMany para 'existing' devuelve uno (junio ya existe) → solo crea el resto.
+    (prisma.operationalPeriod.findMany as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce([{ periodKey: "2026-06" }]) // existing
+      .mockResolvedValueOnce([]); // list al final
+    await service.generate("f1", 2026, ctx);
+    const createArg = (prisma.operationalPeriod.createMany as ReturnType<typeof vi.fn>).mock.calls[0]![0];
+    const keys = createArg.data.map((d: { periodKey: string }) => d.periodKey);
+    expect(keys).toContain("2026-01");
+    expect(keys).not.toContain("2026-06"); // ya existía: no se recrea
+  });
+});
+
+describe("OperationalPeriodService — cierre secuencial", () => {
+  it("close OPEN → CLOSED cuando no hay anterior abierto", async () => {
+    const { service, audit } = make({ row: { id: "op1", status: "OPEN", periodStart: "2026-06-01" }, earlierOpen: null });
+    const dto = await service.close("f1", "2026-06", "Cierre mensual", "u1", ctx);
     expect(dto.status).toBe("CLOSED");
-    expect((prisma.operationalPeriod.upsert as ReturnType<typeof vi.fn>)).toHaveBeenCalled();
     expect((audit.record as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith(
       expect.objectContaining({ action: "opsperiod.closed" }),
     );
   });
 
-  it("reopen falla si el período ya está abierto (sin fila)", async () => {
-    const { service } = make({ periodRow: null });
-    await expect(service.reopen("cal1", "2026-06", { reason: "Reapertura" }, "u1", ctx)).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
+  it("close BLOQUEA si un período anterior sigue abierto", async () => {
+    const { service } = make({
+      row: { id: "op1", status: "OPEN", periodStart: "2026-06-01" },
+      earlierOpen: { periodKey: "2026-05", periodStart: "2026-05-01" },
+    });
+    await expect(service.close("f1", "2026-06", "Cierre", "u1", ctx)).rejects.toBeInstanceOf(ConflictException);
   });
 
-  it("reopen vuelve a OPEN y audita cuando hay fila cerrada", async () => {
-    const { service, audit } = make({ periodRow: { status: "CLOSED" } });
-    const dto = await service.reopen("cal1", "2026-06", { reason: "Ajuste autorizado" }, "u1", ctx);
+  it("close falla si el período no está OPEN", async () => {
+    const { service } = make({ row: { id: "op1", status: "CLOSED", periodStart: "2026-06-01" } });
+    await expect(service.close("f1", "2026-06", "Cierre", "u1", ctx)).rejects.toBeInstanceOf(BadRequestException);
+  });
+});
+
+describe("OperationalPeriodService — lock / unlock", () => {
+  it("lock CLOSED → LOCKED", async () => {
+    const { service } = make({ row: { id: "op1", status: "CLOSED", periodStart: "2026-06-01" } });
+    const dto = await service.lock("f1", "2026-06", "Bloqueo definitivo", "u1", ctx);
+    expect(dto.status).toBe("LOCKED");
+  });
+
+  it("lock falla si no está cerrado", async () => {
+    const { service } = make({ row: { id: "op1", status: "OPEN", periodStart: "2026-06-01" } });
+    await expect(service.lock("f1", "2026-06", "Bloqueo", "u1", ctx)).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it("unlock LOCKED → CLOSED (two-key)", async () => {
+    const { service } = make({ row: { id: "op1", status: "LOCKED", periodStart: "2026-06-01" } });
+    const dto = await service.unlock("f1", "2026-06", "Reapertura autorizada", "u1", ctx);
+    expect(dto.status).toBe("CLOSED");
+  });
+});
+
+describe("OperationalPeriodService — reapertura con secuencialidad inversa", () => {
+  it("reopen CLOSED → OPEN cuando no hay posteriores conflictivos", async () => {
+    const { service } = make({ row: { id: "op1", status: "CLOSED", periodStart: "2026-06-01" } });
+    const dto = await service.reopen("f1", "2026-06", "Ajuste autorizado", false, "u1", ctx);
     expect(dto.status).toBe("OPEN");
-    expect((audit.record as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith(
-      expect.objectContaining({ action: "opsperiod.reopened" }),
-    );
+  });
+
+  it("reopen BLOQUEA si un período posterior está LOCKED", async () => {
+    const { service } = make({
+      row: { id: "op1", status: "CLOSED", periodStart: "2026-06-01" },
+      laterLocked: { periodKey: "2026-07", periodStart: "2026-07-01" },
+    });
+    await expect(service.reopen("f1", "2026-06", "Ajuste", false, "u1", ctx)).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it("reopen exige acuse si hay posteriores solo CLOSED", async () => {
+    const { service } = make({
+      row: { id: "op1", status: "CLOSED", periodStart: "2026-06-01" },
+      laterClosed: { periodKey: "2026-07", periodStart: "2026-07-01" },
+    });
+    await expect(service.reopen("f1", "2026-06", "Ajuste", false, "u1", ctx)).rejects.toBeInstanceOf(ConflictException);
+    // Con acuse, procede.
+    const dto = await service.reopen("f1", "2026-06", "Ajuste", true, "u1", ctx);
+    expect(dto.status).toBe("OPEN");
   });
 });

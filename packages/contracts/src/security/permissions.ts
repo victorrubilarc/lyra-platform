@@ -336,10 +336,11 @@ export const PERMISSION_CATALOG = [
     description: "Crear, editar, asignar a nodos y eliminar calendarios operacionales.",
   },
 
-  // --- Períodos contables gobernados (Fase 2.7.1) ---
-  // QUIÉN puede escribir en un período CLOSING/CLOSED es DATO: el permiso de
-  // excepción `opsperiod:write-closed` se asigna a roles vía RBAC (patrón
-  // authorization group de SAP OB52), nada hardcodeado.
+  // --- Períodos contables gobernados (Fase 2.7.1 → 2.7.1.1) ---
+  // QUIÉN puede escribir en un período CLOSED es DATO: el permiso de excepción
+  // `opsperiod:write-closed` se asigna a roles vía RBAC (patrón authorization group
+  // de SAP OB52), nada hardcodeado. Tri-estado OPEN→CLOSED→LOCKED: el LOCKED es duro
+  // (bloquea incluso al bypass) y reabrirlo exige el permiso superior `opsperiod:unlock`.
   {
     key: "opsperiod:view",
     dimension: "ACTION",
@@ -350,19 +351,31 @@ export const PERMISSION_CATALOG = [
     key: "opsperiod:close",
     dimension: "ACTION",
     group: "opsperiod",
-    description: "Cerrar o poner en cierre un período contable (motivo obligatorio).",
+    description: "Cerrar un período contable (OPEN → CLOSED, motivo obligatorio).",
   },
   {
     key: "opsperiod:reopen",
     dimension: "ACTION",
     group: "opsperiod",
-    description: "Reabrir un período contable cerrado o en cierre (motivo obligatorio).",
+    description: "Reabrir un período contable cerrado (CLOSED → OPEN, motivo obligatorio).",
+  },
+  {
+    key: "opsperiod:lock",
+    dimension: "ACTION",
+    group: "opsperiod",
+    description: "Bloquear en duro un período cerrado (CLOSED → LOCKED, motivo obligatorio).",
+  },
+  {
+    key: "opsperiod:unlock",
+    dimension: "ACTION",
+    group: "opsperiod",
+    description: "Desbloquear un período (LOCKED → CLOSED, permiso superior; motivo obligatorio).",
   },
   {
     key: "opsperiod:write-closed",
     dimension: "ACTION",
     group: "opsperiod",
-    description: "Excepción: registrar o modificar entradas cuya fecha cae en un período en cierre o cerrado.",
+    description: "Excepción: registrar o modificar entradas cuya fecha cae en un período cerrado (no aplica a LOCKED).",
   },
 
   // --- Dimensión 1: módulo de bitácoras / llenado (Fase 2.4) ---
