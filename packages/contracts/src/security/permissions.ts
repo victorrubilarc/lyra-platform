@@ -336,6 +336,35 @@ export const PERMISSION_CATALOG = [
     description: "Crear, editar, asignar a nodos y eliminar calendarios operacionales.",
   },
 
+  // --- Períodos contables gobernados (Fase 2.7.1) ---
+  // QUIÉN puede escribir en un período CLOSING/CLOSED es DATO: el permiso de
+  // excepción `opsperiod:write-closed` se asigna a roles vía RBAC (patrón
+  // authorization group de SAP OB52), nada hardcodeado.
+  {
+    key: "opsperiod:view",
+    dimension: "ACTION",
+    group: "opsperiod",
+    description: "Ver el estado de cierre de los períodos contables.",
+  },
+  {
+    key: "opsperiod:close",
+    dimension: "ACTION",
+    group: "opsperiod",
+    description: "Cerrar o poner en cierre un período contable (motivo obligatorio).",
+  },
+  {
+    key: "opsperiod:reopen",
+    dimension: "ACTION",
+    group: "opsperiod",
+    description: "Reabrir un período contable cerrado o en cierre (motivo obligatorio).",
+  },
+  {
+    key: "opsperiod:write-closed",
+    dimension: "ACTION",
+    group: "opsperiod",
+    description: "Excepción: registrar o modificar entradas cuya fecha cae en un período en cierre o cerrado.",
+  },
+
   // --- Dimensión 1: módulo de bitácoras / llenado (Fase 2.4) ---
   // Nota: QUIÉN puede llenar cada SECCIÓN es DATO (roles por sección de la
   // plantilla, TemplateSectionRole), no una clave de catálogo. Estas claves
