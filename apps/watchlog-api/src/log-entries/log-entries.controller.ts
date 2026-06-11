@@ -5,12 +5,14 @@ import {
   executeTransitionRequestSchema,
   logEntryListQuerySchema,
   saveLogEntrySectionRequestSchema,
+  setDeferralRequestSchema,
   submitLogEntryRequestSchema,
   timelineQuerySchema,
   type CreateLogEntryRequest,
   type ExecuteTransitionRequest,
   type LogEntryListQuery,
   type SaveLogEntrySectionRequest,
+  type SetDeferralRequest,
   type SubmitLogEntryRequest,
   type TimelineQuery,
 } from "@lyra/contracts";
@@ -131,6 +133,18 @@ export class LogEntriesController {
     @Req() req: FastifyRequest,
   ) {
     return this.entries.saveSection(user.id, id, sectionKey, dto, this.ctx(user, req));
+  }
+
+  /** Declara, corrige o quita (null) el registro DIFERIDO de un borrador (2.7.0). */
+  @Put(":id/deferral")
+  @RequirePermission("logentry:fill")
+  setDeferral(
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(setDeferralRequestSchema)) dto: SetDeferralRequest,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.entries.setDeferral(user.id, id, dto, this.ctx(user, req));
   }
 
   @Post(":id/submit")

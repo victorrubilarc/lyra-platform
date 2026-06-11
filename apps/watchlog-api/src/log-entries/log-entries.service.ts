@@ -19,6 +19,7 @@ import type {
   LogEntryValueDto,
   SaveLogEntrySectionRequest,
   SectionBlockedReason,
+  SetDeferralRequest,
   SignatureContext,
   SignatureMethod,
   SubmitLogEntryRequest,
@@ -165,44 +166,85 @@ export class LogEntriesService {
     const currentStateKey = await this.initialStateKey(version.workflowDefinitionVersionId);
 
     const recordedAt = new Date();
-    // Sin valores aún → effectiveAt = recordedAt; se recalcula al guardar/enviar.
-    const dims = await this.shiftResolver.resolve(recordedAt, orgNodeId);
+    const declaredAt = dto.deferred ? new Date(dto.deferred.effectiveAt) : null;
 
-    const created = await this.prisma.logEntry.create({
-      data: {
-        templateId: template.id,
-        templateVersionId: version.id,
-        workflowDefinitionId: version.workflowDefinitionId,
-        workflowDefinitionVersionId: version.workflowDefinitionVersionId,
-        orgNodeId,
-        equipmentId: dto.equipmentId ?? null,
-        currentStateKey,
-        status: "DRAFT",
-        recordedAt,
-        effectiveAt: recordedAt,
-        shiftCode: dims?.shiftCode ?? null,
-        operationalDate: dims?.operationalDate ?? null,
-        periodKey: dims?.periodKey ?? null,
-        createdById: userId,
-        updatedById: userId,
-        sections: {
-          // `requiresSignature` se ESTAMPA desde la definición congelada (2.6):
-          // así "firmas pendientes" es un filtro SQL sin join a la definición.
-          create: version.sections.map((s) => ({
-            sectionKey: s.key,
-            state: "PENDING" as const,
-            requiresSignature: s.requireSignature,
-          })),
-        },
+    // Registro DIFERIDO (2.7.0): si la versión tiene campo EFFECTIVE_DATE el gesto
+    // lo ESCRIBE (el campo sigue siendo la única fuente viva), con las mismas
+    // guardas de sección/rol que saveSection. Si no existe, la fecha declarada
+    // alimenta effectiveAt como fallback intermedio (campo → declarada → captura).
+    const effField = dto.deferred ? this.effectiveDateFieldOf(version) : null;
+    const effValue =
+      dto.deferred && effField
+        ? await this.prepareEffectiveDateWrite(userId, effField, currentStateKey, dto.deferred.effectiveAt)
+        : null;
+
+    // Sin más valores aún → effectiveAt = campo escrito / declarada / recordedAt;
+    // se recalcula al guardar/enviar.
+    const effectiveAt = resolveEffectiveAt(
+      version.sections.map((s) => ({ fields: s.fields.map((f) => this.toFieldDtoLite(f)) })),
+      effField && effValue !== null ? { [effField.field.key]: effValue } : {},
+      recordedAt,
+      declaredAt,
+    );
+    const dims = await this.shiftResolver.resolve(effectiveAt, orgNodeId);
+
+    const data = {
+      templateId: template.id,
+      templateVersionId: version.id,
+      workflowDefinitionId: version.workflowDefinitionId,
+      workflowDefinitionVersionId: version.workflowDefinitionVersionId,
+      orgNodeId,
+      equipmentId: dto.equipmentId ?? null,
+      currentStateKey,
+      status: "DRAFT" as const,
+      recordedAt,
+      effectiveAt,
+      shiftCode: dims?.shiftCode ?? null,
+      operationalDate: dims?.operationalDate ?? null,
+      periodKey: dims?.periodKey ?? null,
+      entryOrigin: (dto.deferred ? "DEFERRED" : "ONLINE") as Prisma.LogEntryCreateInput["entryOrigin"],
+      declaredEffectiveAt: declaredAt,
+      deferredReason: dto.deferred?.reason ?? null,
+      deferredDeclaredById: dto.deferred ? userId : null,
+      deferredDeclaredAt: dto.deferred ? recordedAt : null,
+      createdById: userId,
+      updatedById: userId,
+      sections: {
+        // `requiresSignature` se ESTAMPA desde la definición congelada (2.6):
+        // así "firmas pendientes" es un filtro SQL sin join a la definición.
+        create: version.sections.map((s) => ({
+          sectionKey: s.key,
+          state: "PENDING" as const,
+          requiresSignature: s.requireSignature,
+        })),
       },
-    });
+    };
+
+    // Con escritura del campo EFFECTIVE_DATE, entrada + valor + historial son un
+    // solo commit; el camino común (sin diferido) no paga la transacción.
+    const created =
+      dto.deferred && effField && effValue !== null
+        ? await this.prisma.$transaction(async (tx) => {
+            const row = await tx.logEntry.create({ data });
+            await this.writeEffectiveDateValue(tx, row.id, effField, effValue, dto.deferred!.reason, userId, recordedAt);
+            return row;
+          })
+        : await this.prisma.logEntry.create({ data });
 
     await this.audit.record({
       ...ctx,
       action: "logentry.created",
       entityType: "LogEntry",
       entityId: created.id,
-      after: { templateId: template.id, templateVersionId: version.id, orgNodeId },
+      after: {
+        templateId: template.id,
+        templateVersionId: version.id,
+        orgNodeId,
+        entryOrigin: dto.deferred ? "DEFERRED" : "ONLINE",
+        ...(dto.deferred
+          ? { declaredEffectiveAt: declaredAt!.toISOString(), deferredReason: dto.deferred.reason }
+          : {}),
+      },
     });
     return this.getDetail(userId, created.id);
   }
@@ -229,6 +271,7 @@ export class LogEntriesService {
     const roleIds = await this.userRoleIds(userId);
     const actorNames = await this.namesByUserId([
       entry.createdById,
+      entry.deferredDeclaredById,
       ...sectionRows.map((s) => s.filledById),
       ...transitionRows.map((t) => t.actorId),
     ]);
@@ -329,6 +372,9 @@ export class LogEntriesService {
       orgNodePath: await this.nodePath(entry.orgNodeId),
       createdByName: entry.createdById ? (actorNames.get(entry.createdById) ?? null) : null,
       equipmentName: equipment?.name ?? null,
+      deferredDeclaredByName: entry.deferredDeclaredById
+        ? (actorNames.get(entry.deferredDeclaredById) ?? null)
+        : null,
       version: this.mapVersion(version),
       workflowVersion: wfVersion ? this.mapWorkflowVersion(wfVersion) : null,
       currentStateName,
@@ -518,6 +564,7 @@ export class LogEntriesService {
           version.sections.map((s) => ({ fields: s.fields.map((f) => this.toFieldDtoLite(f)) })),
           valuesByKey,
           entry.recordedAt,
+          entry.declaredEffectiveAt,
         );
         const dims = await this.shiftResolver.resolve(effectiveAt, entry.orgNodeId);
         await tx.logEntry.update({
@@ -593,6 +640,192 @@ export class LogEntriesService {
       after: { effectiveAt: seal.effectiveAt.toISOString(), shiftCode: seal.shiftCode, periodKey: seal.periodKey },
     });
     return this.getDetail(userId, id);
+  }
+
+  // --- Declarar / corregir / quitar el registro DIFERIDO (Fase 2.7.0) --------
+
+  /**
+   * Declara la entrada como registro DIFERIDO (con fecha/hora real del evento y
+   * motivo obligatorio — práctica GxP de late entry), la corrige, o la quita
+   * (`deferred: null` ⇒ vuelve a ONLINE). Solo mientras la entrada está en
+   * borrador y SIN sellar: el sellado congela effectiveAt y sus dimensiones, y
+   * con ellas el origen declarado. Si la versión tiene campo EFFECTIVE_DATE, el
+   * gesto lo escribe (mismas guardas de sección/rol que `saveSection`, con
+   * `FieldChange` auditado y bump de versión de sección); ese campo sigue siendo
+   * la fuente viva y SIEMPRE manda sobre la fecha declarada a nivel de entrada.
+   */
+  async setDeferral(userId: string, id: string, dto: SetDeferralRequest, ctx: AuditContext): Promise<LogEntryDetail> {
+    const entry = await this.loadEntry(id);
+    if (entry.status !== "DRAFT" || entry.sealedAt) {
+      throw new BadRequestException("La entrada ya fue sellada: el origen del registro es inmutable");
+    }
+    await this.assertNodeInScope(userId, entry.orgNodeId);
+
+    const version = await this.loadVersion(entry.templateVersionId);
+    const now = new Date();
+    const declaredAt = dto.deferred ? new Date(dto.deferred.effectiveAt) : null;
+
+    const effField = dto.deferred ? this.effectiveDateFieldOf(version) : null;
+    const effValue =
+      dto.deferred && effField
+        ? await this.prepareEffectiveDateWrite(userId, effField, entry.currentStateKey, dto.deferred.effectiveAt)
+        : null;
+
+    // Recalcula effectiveAt con la cadena campo → declarada → captura. Al QUITAR
+    // la marca, el campo EFFECTIVE_DATE (si quedó escrito) sigue mandando: es
+    // dato visible y editable por el canal normal de llenado.
+    const valuesByKey = await this.loadValuesByKey(id);
+    if (effField && effValue !== null) valuesByKey[effField.field.key] = effValue;
+    const effectiveAt = resolveEffectiveAt(
+      version.sections.map((s) => ({ fields: s.fields.map((f) => this.toFieldDtoLite(f)) })),
+      valuesByKey,
+      entry.recordedAt,
+      declaredAt,
+    );
+    const dims = await this.shiftResolver.resolve(effectiveAt, entry.orgNodeId);
+
+    await this.prisma.$transaction(async (tx) => {
+      if (dto.deferred && effField && effValue !== null) {
+        await this.writeEffectiveDateValue(tx, id, effField, effValue, dto.deferred.reason, userId, now);
+      }
+      await tx.logEntry.update({
+        where: { id },
+        data: {
+          entryOrigin: dto.deferred ? "DEFERRED" : "ONLINE",
+          declaredEffectiveAt: declaredAt,
+          deferredReason: dto.deferred?.reason ?? null,
+          deferredDeclaredById: dto.deferred ? userId : null,
+          deferredDeclaredAt: dto.deferred ? now : null,
+          effectiveAt,
+          shiftCode: dims?.shiftCode ?? null,
+          operationalDate: dims?.operationalDate ?? null,
+          periodKey: dims?.periodKey ?? null,
+          updatedById: userId,
+        },
+      });
+    });
+
+    await this.audit.record({
+      ...ctx,
+      action: dto.deferred ? "logentry.deferral.declared" : "logentry.deferral.cleared",
+      entityType: "LogEntry",
+      entityId: id,
+      before: {
+        entryOrigin: entry.entryOrigin,
+        declaredEffectiveAt: entry.declaredEffectiveAt?.toISOString() ?? null,
+        deferredReason: entry.deferredReason,
+      },
+      after: dto.deferred
+        ? { entryOrigin: "DEFERRED", declaredEffectiveAt: declaredAt!.toISOString(), deferredReason: dto.deferred.reason }
+        : { entryOrigin: "ONLINE", declaredEffectiveAt: null, deferredReason: null },
+    });
+    return this.getDetail(userId, id);
+  }
+
+  /** Campo con `semanticRole = EFFECTIVE_DATE` de la versión congelada (≤1 por diseño). */
+  private effectiveDateFieldOf(
+    version: VersionWithGraph,
+  ): { section: VersionWithGraph["sections"][number]; field: VersionWithGraph["sections"][number]["fields"][number] } | null {
+    for (const section of version.sections) {
+      const field = section.fields.find((f) => f.semanticRole === "EFFECTIVE_DATE");
+      if (field) return { section, field };
+    }
+    return null;
+  }
+
+  /**
+   * Guardas + valor para escribir el campo EFFECTIVE_DATE desde el gesto de
+   * diferido: aplica las MISMAS reglas que `saveSection` (sección editable en el
+   * estado actual × rol de sección × override de rol por campo — sin bypass) y
+   * valida el valor contra la definición. Devuelve el valor a escribir.
+   * Para campos DATE conserva la fecha CIVIL del operador (se toma del string
+   * ISO original, no de la conversión UTC, que podría correr un día).
+   */
+  private async prepareEffectiveDateWrite(
+    userId: string,
+    eff: NonNullable<ReturnType<LogEntriesService["effectiveDateFieldOf"]>>,
+    currentStateKey: string | null,
+    rawEffectiveAt: string,
+  ): Promise<string> {
+    const roleIds = await this.userRoleIds(userId);
+    const blocked = this.sectionBlockedReasonFor(
+      eff.section.editableInStateKey,
+      eff.section.roles.map((r) => r.roleId),
+      currentStateKey,
+      roleIds,
+    );
+    if (blocked === "MISSING_ROLE") {
+      throw new ForbiddenException(
+        `La fecha del evento se declara en el campo "${eff.field.label}", reservado a otro rol: no puede diferir esta entrada`,
+      );
+    }
+    if (blocked !== null) {
+      throw new BadRequestException(
+        `La fecha del evento se declara en el campo "${eff.field.label}", que se edita en otra etapa del flujo`,
+      );
+    }
+    const fieldRoleIds = eff.field.roles.map((r) => r.roleId);
+    if (fieldRoleIds.length > 0 && !fieldRoleIds.some((r) => roleIds.has(r))) {
+      throw new ForbiddenException(`El campo "${eff.field.label}" está reservado a otro rol: no puede diferir esta entrada`);
+    }
+
+    const value = eff.field.type === "DATE" ? rawEffectiveAt.slice(0, 10) : rawEffectiveAt;
+    const def = this.toFieldDef(eff.field, eff.section.key);
+    const res = validateFieldValue(def, value);
+    if (res.errors.length > 0) {
+      throw new BadRequestException({ message: "La fecha del evento no es válida para el campo de fecha efectiva", errors: res.errors });
+    }
+    return value;
+  }
+
+  /**
+   * Escribe el campo EFFECTIVE_DATE desde el gesto de diferido: upsert del valor,
+   * `FieldChange` auditado (el motivo del diferimiento queda como `reason`) y
+   * bump de la versión de la sección (los editores concurrentes ven 409 y
+   * recargan, igual que en cualquier escritura por fuera de su borrador).
+   */
+  private async writeEffectiveDateValue(
+    tx: Prisma.TransactionClient,
+    logEntryId: string,
+    eff: NonNullable<ReturnType<LogEntriesService["effectiveDateFieldOf"]>>,
+    value: string,
+    reason: string,
+    userId: string,
+    now: Date,
+  ): Promise<void> {
+    const before = await tx.logEntryValue.findUnique({
+      where: { logEntryId_fieldKey: { logEntryId, fieldKey: eff.field.key } },
+    });
+    const beforeVal = (before?.value ?? null) as unknown;
+    if (JSON.stringify(beforeVal) === JSON.stringify(value)) return; // sin cambio real
+
+    await tx.logEntryValue.upsert({
+      where: { logEntryId_fieldKey: { logEntryId, fieldKey: eff.field.key } },
+      create: {
+        logEntryId,
+        sectionKey: eff.section.key,
+        fieldKey: eff.field.key,
+        dataType: eff.field.dataType,
+        value,
+        updatedById: userId,
+      },
+      update: { value, updatedById: userId },
+    });
+    await tx.logEntryFieldChange.create({
+      data: {
+        logEntryId,
+        fieldKey: eff.field.key,
+        before: this.toJson(beforeVal),
+        after: value,
+        reason,
+        changedById: userId,
+        changedAt: now,
+      },
+    });
+    await tx.logEntrySection.updateMany({
+      where: { logEntryId, sectionKey: eff.section.key },
+      data: { version: { increment: 1 } },
+    });
   }
 
   // --- Ejecutar una transición de flujo (Fase 2.5) ---------------------------
@@ -820,6 +1053,7 @@ export class LogEntriesService {
       version.sections.map((s) => ({ fields: s.fields.map((f) => this.toFieldDtoLite(f)) })),
       valuesByKey,
       entry.recordedAt,
+      entry.declaredEffectiveAt,
     );
     const dims = await this.shiftResolver.resolve(effectiveAt, entry.orgNodeId);
     return {
@@ -1037,6 +1271,10 @@ export class LogEntriesService {
       operationalDate: e.operationalDate,
       periodKey: e.periodKey,
       sealedAt: e.sealedAt?.toISOString() ?? null,
+      entryOrigin: e.entryOrigin,
+      declaredEffectiveAt: e.declaredEffectiveAt?.toISOString() ?? null,
+      deferredReason: e.deferredReason,
+      deferredDeclaredAt: e.deferredDeclaredAt?.toISOString() ?? null,
       createdById: e.createdById,
       createdAt: e.createdAt.toISOString(),
       updatedAt: e.updatedAt.toISOString(),

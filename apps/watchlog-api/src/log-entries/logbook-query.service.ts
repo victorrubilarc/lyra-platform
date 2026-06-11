@@ -183,6 +183,9 @@ export class LogbookQueryService {
         { header: "Fecha efectiva (ISO)", value: (r) => r.effectiveAt },
         { header: "Capturada (ISO)", value: (r) => r.recordedAt },
         { header: "Sellada (ISO)", value: (r) => r.sealedAt },
+        { header: "Origen", value: (r) => r.entryOrigin },
+        { header: "Fecha evento declarada (ISO)", value: (r) => r.declaredEffectiveAt },
+        { header: "Motivo diferido", value: (r) => r.deferredReason },
         { header: "Autor", value: (r) => r.createdByName },
         { header: "Equipo", value: (r) => r.equipmentName },
         { header: "Secciones completadas", value: (r) => r.indicators.sectionsCompleted },
@@ -263,6 +266,7 @@ export class LogbookQueryService {
     const sigById = new Map(transitionSigs.map((s) => [s.id, s]));
     const actorNames = await this.entries.namesByUserId([
       entry.createdById,
+      entry.deferredDeclaredById,
       ...changes.map((c) => c.changedById),
       ...transitions.map((t) => t.actorId),
     ]);
@@ -320,6 +324,18 @@ export class LogbookQueryService {
       !beforeAt || !before || at < beforeAt || (at.getTime() === beforeAt.getTime() && eventId < before.id);
     if (entry.sealedAt && passesCursor(entry.sealedAt, `sealed:${id}`)) {
       events.push({ kind: "SEALED", id: `sealed:${id}`, at: entry.sealedAt.toISOString() });
+    }
+    // Declaración VIGENTE de registro diferido (2.7.0). Las declaraciones previas
+    // (correcciones) quedan en AuditLog y en los FieldChange del campo de fecha.
+    if (entry.entryOrigin === "DEFERRED" && entry.deferredDeclaredAt && passesCursor(entry.deferredDeclaredAt, `deferred:${id}`)) {
+      events.push({
+        kind: "DEFERRED_DECLARED",
+        id: `deferred:${id}`,
+        at: entry.deferredDeclaredAt.toISOString(),
+        actorName: entry.deferredDeclaredById ? (actorNames.get(entry.deferredDeclaredById) ?? null) : null,
+        declaredEffectiveAt: (entry.declaredEffectiveAt ?? entry.effectiveAt).toISOString(),
+        reason: entry.deferredReason,
+      });
     }
     if (passesCursor(entry.createdAt, `created:${id}`)) {
       events.push({
@@ -535,6 +551,7 @@ export class LogbookQueryService {
     if (query.periodKey) and.push({ periodKey: query.periodKey });
     if (query.operationalDate) and.push({ operationalDate: query.operationalDate });
     if (query.createdById) and.push({ createdById: query.createdById });
+    if (query.entryOrigin) and.push({ entryOrigin: query.entryOrigin });
 
     if (query.effectiveFrom || query.effectiveTo) {
       and.push({
