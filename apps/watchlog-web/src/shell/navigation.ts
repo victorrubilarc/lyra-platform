@@ -1,4 +1,4 @@
-import { BookOpenCheck, CalendarClock, FilePlus2, GitBranch, LayoutDashboard, Layers, ListChecks, Network, ShieldCheck, UserCog, type LucideIcon } from "lucide-react";
+import { BookOpenCheck, CalendarClock, CalendarRange, FilePlus2, GitBranch, LayoutDashboard, Layers, ListChecks, Network, ShieldCheck, UserCog, type LucideIcon } from "lucide-react";
 import type { Permission } from "@lyra/permissions";
 
 /**
@@ -67,6 +67,13 @@ export const ROUTES: readonly NavRoute[] = [
     path: "/calendario-operacional",
     labelKey: "nav.opsCalendar",
     icon: CalendarClock,
+    permission: "module:opscalendar:view",
+    inSidebar: true,
+  },
+  {
+    path: "/calendario-fiscal",
+    labelKey: "nav.fiscalCalendar",
+    icon: CalendarRange,
     permission: "module:opscalendar:view",
     inSidebar: true,
   },

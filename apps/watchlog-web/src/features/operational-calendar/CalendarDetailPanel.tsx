@@ -4,18 +4,15 @@ import { CalendarClock, FlaskConical, Plus, Star, Trash2, X } from "lucide-react
 import { Button, Chip, Input, Modal, Select, Skeleton, Toggle, useToast } from "@lyra/ui";
 import type { OrgNodeTree } from "@lyra/contracts";
 import {
-  PERIOD_KINDS,
   resolveShift,
   validateOperationalCalendar,
   type OperationalShiftInput,
-  type PeriodKind,
   type ShiftResolution,
 } from "@lyra/contracts";
 import { Can } from "../../auth/Can.js";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { ApiError } from "../../lib/api-client.js";
 import { AssignNodesModal } from "./AssignNodesModal.js";
-import { PeriodsSection } from "./PeriodsSection.js";
 import { useOrgTree } from "../structure/structure-queries.js";
 import {
   useAssignCalendarNodes,
@@ -35,11 +32,6 @@ interface EditableState {
   active: boolean;
   shifts: OperationalShiftInput[];
   dayStartShiftCode: string;
-  periodKind: PeriodKind;
-  periodAnchorDay: number;
-  periodStartWeekday: number;
-  periodLengthDays: number;
-  periodAnchorDate: string;
   assignedNodeIds: string[];
 }
 
@@ -175,11 +167,6 @@ export function CalendarDetailPanel({ calendarId, onDeleted }: CalendarDetailPan
       active: cal.active,
       shifts: cal.shifts.map((s) => ({ code: s.code, label: s.label, startTime: s.startTime, durationMinutes: s.durationMinutes })),
       dayStartShiftCode: cal.dayStartShiftCode ?? "",
-      periodKind: cal.periodKind,
-      periodAnchorDay: cal.periodAnchorDay ?? 1,
-      periodStartWeekday: cal.periodStartWeekday ?? 1,
-      periodLengthDays: cal.periodLengthDays ?? 14,
-      periodAnchorDate: cal.periodAnchorDate ?? "",
       assignedNodeIds: [...(cal.assignedNodeIds ?? [])].sort(),
     };
     setState(next);
@@ -201,11 +188,6 @@ export function CalendarDetailPanel({ calendarId, onDeleted }: CalendarDetailPan
       timezone: state.timezone,
       shifts: state.shifts,
       dayStartShiftCode: state.dayStartShiftCode || null,
-      periodKind: state.periodKind,
-      periodAnchorDay: state.periodAnchorDay,
-      periodStartWeekday: state.periodStartWeekday,
-      periodLengthDays: state.periodLengthDays,
-      periodAnchorDate: state.periodAnchorDate || null,
     });
   }, [state, errors, testAt]);
 
@@ -259,11 +241,6 @@ export function CalendarDetailPanel({ calendarId, onDeleted }: CalendarDetailPan
             timezone: state.timezone,
             active: state.active,
             dayStartShiftCode: state.dayStartShiftCode || null,
-            periodKind: state.periodKind,
-            periodAnchorDay: state.periodKind === "MONTH" ? state.periodAnchorDay : null,
-            periodStartWeekday: state.periodKind === "WEEK" ? state.periodStartWeekday : null,
-            periodLengthDays: state.periodKind === "CUSTOM" ? state.periodLengthDays : null,
-            periodAnchorDate: state.periodKind === "CUSTOM" ? state.periodAnchorDate : null,
             shifts: state.shifts,
           },
         });
@@ -409,9 +386,9 @@ export function CalendarDetailPanel({ calendarId, onDeleted }: CalendarDetailPan
         ) : null}
       </div>
 
-      {/* Día operacional + periodo */}
+      {/* Día operacional */}
       <div className={styles.section}>
-        <h3 className={styles.sectionTitle}>{t("opsCalendar.dayAndPeriod")}</h3>
+        <h3 className={styles.sectionTitle}>{t("opsCalendar.dayAnchorTitle")}</h3>
         <div className={styles.fieldGrid}>
           <div>
             <label className={styles.fieldLabel}>{t("opsCalendar.dayAnchor")}</label>
@@ -425,53 +402,9 @@ export function CalendarDetailPanel({ calendarId, onDeleted }: CalendarDetailPan
             </Select>
             <p className={styles.hint}>{t("opsCalendar.dayAnchorHint")}</p>
           </div>
-          <div>
-            <label className={styles.fieldLabel}>{t("opsCalendar.periodKind")}</label>
-            <Select value={state.periodKind} onChange={(e) => set("periodKind", e.target.value as PeriodKind)} disabled={!canManage}>
-              {PERIOD_KINDS.map((k) => (
-                <option key={k} value={k}>
-                  {t(`opsCalendar.period.${k}`)}
-                </option>
-              ))}
-            </Select>
-          </div>
-          {state.periodKind === "MONTH" && (
-            <div>
-              <label className={styles.fieldLabel}>{t("opsCalendar.anchorDay")}</label>
-              <Input type="number" min={1} max={28} value={state.periodAnchorDay} onChange={(e) => set("periodAnchorDay", Number(e.target.value))} disabled={!canManage} />
-              <p className={styles.hint}>{t("opsCalendar.anchorDayHint")}</p>
-            </div>
-          )}
-          {state.periodKind === "WEEK" && (
-            <div>
-              <label className={styles.fieldLabel}>{t("opsCalendar.startWeekday")}</label>
-              <Select value={state.periodStartWeekday} onChange={(e) => set("periodStartWeekday", Number(e.target.value))} disabled={!canManage}>
-                {[1, 2, 3, 4, 5, 6, 7].map((d) => (
-                  <option key={d} value={d}>
-                    {t(`opsCalendar.weekday.${d}`)}
-                  </option>
-                ))}
-              </Select>
-            </div>
-          )}
-          {state.periodKind === "CUSTOM" && (
-            <>
-              <div>
-                <label className={styles.fieldLabel}>{t("opsCalendar.lengthDays")}</label>
-                <Input type="number" min={1} max={366} value={state.periodLengthDays} onChange={(e) => set("periodLengthDays", Number(e.target.value))} disabled={!canManage} />
-                <p className={styles.hint}>{t("opsCalendar.lengthDaysHint")}</p>
-              </div>
-              <div>
-                <label className={styles.fieldLabel}>{t("opsCalendar.anchorDate")}</label>
-                <Input type="date" value={state.periodAnchorDate} onChange={(e) => set("periodAnchorDate", e.target.value)} disabled={!canManage} invalid={errors.some((x) => x.includes("ciclo"))} />
-              </div>
-            </>
-          )}
         </div>
+        <p className={styles.hint}>{t("opsCalendar.periodMovedHint")}</p>
       </div>
-
-      {/* Períodos contables gobernados (2.7.1) */}
-      <PeriodsSection calendarId={cal.id} />
 
       {/* Probador */}
       <div className={styles.section}>
@@ -497,10 +430,6 @@ export function CalendarDetailPanel({ calendarId, onDeleted }: CalendarDetailPan
                 <span className={preview?.shiftCode ? styles.testerValue : styles.testerValueMuted}>
                   {preview ? (preview.shiftCode ? `${preview.shiftCode} · ${preview.shiftLabel ?? ""}` : t("opsCalendar.noShift")) : "—"}
                 </span>
-              </div>
-              <div className={styles.testerCard}>
-                <span className={styles.testerLabel}>{t("opsCalendar.resPeriod")}</span>
-                <span className={preview?.periodKey ? styles.testerValue : styles.testerValueMuted}>{preview?.periodKey ?? "—"}</span>
               </div>
             </div>
           )}
