@@ -4,7 +4,7 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
-### 2026-06-11 · Fase 2.7.1.1 — Calendario FISCAL transversal + período al estándar industrial — APROBADO, pendiente de construir
+### 2026-06-11 · Fase 2.7.1.1 — Calendario FISCAL transversal + período al estándar industrial — ✅ IMPLEMENTADO Y PUBLICADO
 
 Tras revisar la pantalla de 2.7.1, el dueño del producto pidió alinear los períodos al estándar de los grandes
 sistemas ("la más potente", entre NetSuite y Maximo) y **detectó un acoplamiento de diseño correcto**: el período

@@ -5,11 +5,12 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-11** (**Fase 2.7.1 Período contable gobernado ✅** — `OperationalPeriod` OPEN/CLOSING/CLOSED,
-> guarda `assertWritable` por `effectiveAt` con `PERIOD_CLOSED`, bypass `opsperiod:write-closed`, cierre/reapertura
-> auditada + mantenedor en `/calendario-operacional`. Catálogo **54**. El **plan de fases 2.7/2.8/2.9 fue APROBADO**
-> por el dueño del producto (DECISIONS 2026-06-11); siguiente: **2.7.2 Ventana de edición**. Sigue anotada deuda
-> **2.8.2**: creación de entrada sin borradores huérfanos + descarte de borrador).
+> actualización: **2026-06-11** (**Fase 2.7.1.1 Calendario FISCAL transversal ✅** — período DESACOPLADO de los turnos a
+> `FiscalCalendar`; `OperationalPeriod` re-scopeada a `fiscalCalendarId × periodKey` con rango `[start,end)`; tri-estado
+> **OPEN→CLOSED→LOCKED**, generación explícita idempotente, cierre secuencial, lock/unlock two-key, reopen inverso;
+> `assertWritable` gana LOCKED [bloquea incl. bypass] + `requirePeriod`; pantalla propia `/calendario-fiscal`. Catálogo
+> **56** (`+opsperiod:lock/unlock`). El **plan de fases 2.7/2.8/2.9 sigue vigente**; siguiente: **2.7.2 Ventana de
+> edición**. Sigue anotada deuda **2.8.2**: creación de entrada sin borradores huérfanos + descarte de borrador).
 
 ---
 
@@ -58,6 +59,7 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Afinamiento #4** (triage 10 mejoras + guardado por sección autoexplicativo + `submit` objetivo + motivos de bloqueo) | `main` (fusionado desde `feat/afinamiento-llenado`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Fase 2.7.0 Registro diferido** (`entryOrigin` + `setDeferral` + gesto mínimo + huella grilla/visor/timeline) | `main` (fusionado desde `feat/registro-diferido`) | ✅ fusionado y publicado en `origin/main` |
 | **Fase 2.7.1 Período contable gobernado** (`OperationalPeriod` + guarda `assertWritable` + cierre/reapertura auditada + mantenedor) | `main` (fusionado desde `feat/periodo-gobernado`) | ✅ fusionado y publicado en `origin/main` | ninguna |
+| **Fase 2.7.1.1 Calendario FISCAL transversal** (`FiscalCalendar` + `FiscalResolver` + período materializado OPEN→CLOSED→LOCKED + generate/lock/unlock + pantalla `/calendario-fiscal`) | `main` (fusionado desde `feat/calendario-fiscal`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 
 **Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
@@ -609,6 +611,14 @@ probatoria (hash+timestamp). Ref: `DECISIONS.md` (sección de recomendaciones).
       por API no la ejerció en vivo porque la plantilla de prueba no ofrecía una transición disponible al usuario sin
       bypass). Verificar con una plantilla CON flujo + un estado con transición de rol abierto + período cerrado:
       executeTransition debe dar 403 `PERIOD_CLOSED` (la guarda corre antes de la completitud y del re-auth).
+- [ ] **Calendario FISCAL 2.7.1.1 — smoke VISUAL en navegador** (typecheck/lint/build + smoke por API completo OK; falta
+      el clic): en **`/calendario-fiscal`** → crear un calendario fiscal (tipo de período MONTH/WEEK/CUSTOM), editar
+      config + toggle "Exigir período generado", asignar nodos; en la sección "Períodos contables": botón **Generar**
+      (elige año → materializa filas agrupadas por año, badge **Actual**), cerrar un período (secuencial: el botón falla
+      con motivo si hay un anterior abierto), bloquear (CLOSED→LOCKED), desbloquear, reabrir (con aviso de
+      secuencialidad inversa si hay posteriores cerrados); verificar que `/calendario-operacional` ya **no** muestra
+      config de período (solo turnos + ancla); modo claro y oscuro. App en `:5173`. **Nota**: el smoke por API dejó una
+      entrada demo (`cmq7eglvm…`) con `fecha=2026-06-09` y `version` de sección +1 (benigno).
 - [ ] **Afinamiento #4 — smoke VISUAL en navegador** (se verificó typecheck/lint/test/build + smoke por API 22/22;
       falta el clic): en `/nueva-entrada/:id` con una plantilla cuyas secciones tengan roles asignados y un campo con
       override: chip "N de M secciones completadas" en cabecera; chip "Asignada a: <rol>" por sección; sección ajena

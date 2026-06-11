@@ -144,23 +144,27 @@ se comporta como un form simple (degradación elegante).
   (operacional). **Reversa/anulación de transición** (corrección GxP con su firma y motivo) **diferida**.
   Ver BACKLOG §2/§3.
 
-### Gobernanza temporal — Período contable (Fase 2.7.1)
-Cierre de la ESCRITURA por ventana de tiempo (refs SAP OB52 / NetSuite / Odoo lock dates / Maximo).
+### Gobernanza temporal — Período contable (Fase 2.7.1 → 2.7.1.1)
+Cierre de la ESCRITURA por ventana de tiempo (refs SAP OB52 / NetSuite Open/Closed/Locked / Maximo). En **2.7.1.1** el
+período se desacopló al **calendario FISCAL** (transversal) y se endureció al estándar industrial.
 - **Guarda 100% en backend**: `OperationalPeriodService.assertWritable(effectiveAt, orgNodeId, perms)` se invoca
   en TODAS las mutaciones de bitácora (`create`/`saveSection`/`setDeferral`/`submit`/`executeTransition`) sobre la
-  `effectiveAt` que el write persistiría. Si el período (calendario × `periodKey`) está **CLOSING/CLOSED** y el actor
-  no tiene **`opsperiod:write-closed`**, lanza 403 con `blockedReason = PERIOD_CLOSED`. Se evalúa **antes** de la
-  completitud/validación de campos y del re-auth (gate duro; no consume códigos de recuperación). Las **lecturas y la
-  verificación de firma nunca se bloquean** (la verificación es un acto de revisión, no una escritura).
-- **Permisos nuevos (catálogo 50→54)**: `opsperiod:view` (ver estado), `opsperiod:close` (cerrar/poner en cierre),
-  `opsperiod:reopen` (reabrir — separado por ser más sensible, patrón SAP/NetSuite), `opsperiod:write-closed`
-  (**bypass** = excepción de escritura en período cerrado). El "rol privilegiado" es **DATO RBAC** (clave asignable a
-  roles, patrón authorization group de SAP OB52), **nunca hardcodeado**.
-- **Cierre/reapertura con motivo obligatorio (≥5) + auditoría**: `opsperiod.closed`/`opsperiod.reopened` con
-  before/after en `AuditLog` inmutable. El registro tardío (diferido) en período cerrado se rechaza con el mismo
-  `PERIOD_CLOSED` (la guarda es única). **Degradación elegante**: sin calendario (periodKey null) = ungobernado.
-- **Residual**: hard lock irreversible (Odoo) **diferido** (solo soft-close + reapertura auditada); ventana de edición
-  por plantilla y matriz rol×sección×tiempo llegan en 2.7.2/2.7.3.
+  `effectiveAt` que el write persistiría. Resuelve el período vía `ShiftResolver` (→ operationalDate) + `FiscalResolver`
+  (→ `periodKey` + fila). Decisión (fuente única `blockMessage`):
+  - **LOCKED** ⇒ bloquea a **TODOS, incluido el bypass** (hard lock; reabrir exige `opsperiod:unlock`).
+  - **CLOSED** ⇒ bloquea salvo **`opsperiod:write-closed`**.
+  - **`requirePeriod`** (opt-in del fiscal) sin fila generada ⇒ bloquea salvo el bypass.
+  Lanza 403 `blockedReason = PERIOD_CLOSED`. Se evalúa **antes** de la completitud/validación y del re-auth (gate duro;
+  no consume recovery codes). **Lecturas y verificación de firma nunca se bloquean.**
+- **Permisos (catálogo 54→56)**: `opsperiod:view`, `opsperiod:close` (OPEN→CLOSED), `opsperiod:reopen` (CLOSED→OPEN),
+  **`opsperiod:lock`** (CLOSED→LOCKED), **`opsperiod:unlock`** (LOCKED→CLOSED, permiso superior), `opsperiod:write-closed`
+  (**bypass** de escritura en CLOSED; **no** aplica a LOCKED). El "rol privilegiado" es **DATO RBAC** (clave asignable,
+  patrón authorization group SAP OB52), **nunca hardcodeado**. La generación de períodos usa `opscalendar:manage`.
+- **Cierre SECUENCIAL + secuencialidad inversa**: no se cierra un período si hay uno anterior abierto; reabrir un CLOSED
+  se bloquea si hay un posterior LOCKED y exige acuse si hay un posterior CLOSED (consistencia del prefijo cerrado).
+- **Motivo obligatorio (≥5) + auditoría** en cada transición (`opsperiod.generated|closed|locked|unlocked|reopened`,
+  before/after en `AuditLog` inmutable). **Degradación elegante**: sin día operacional/calendario fiscal = ungobernado.
+- **Residual**: ventana de edición por plantilla (#6) y matriz rol×sección×tiempo (#7) llegan en 2.7.2/2.7.3.
 
 ## Estado
 - **Fase 0:** cabeceras (Helmet) y validación de entorno activas.

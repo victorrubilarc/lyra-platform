@@ -188,12 +188,11 @@
 > separada del formulario. Turno/día operacional/periodo son **dimensiones DERIVADAS** del timestamp (patrón Shift
 > Calendar de MES / SAP / ISA-95 / dimensión Fecha+Turno de DW). Catálogo **VIVO** (no versionado-inmutable); la
 > inmutabilidad histórica la dará el **estampado** en `LogEntry` (2.4). Ver DECISIONS 2026-06-09.
-- **OperationalCalendar** *(implementado)* — `key` (estable, único), `name`, `description?`, `timezone` (IANA; todo
-  se guarda en UTC), `isDefault` (exactamente uno, mantenido en tx; el default no se borra), `active`,
-  `dayStartShiftCode?` (turno cuyo inicio abre el día operacional; null = día civil 00:00), **periodo**:
-  `periodKind` (MONTH | WEEK | CUSTOM), `periodAnchorDay?` (MONTH 1..28), `periodStartWeekday?` (WEEK 1..7),
-  `periodLengthDays?`/`periodAnchorDate?` (CUSTOM ciclo de N días), `deletedAt` (borrado lógico). *1—N*
-  **OperationalShift**.
+- **OperationalCalendar** *(implementado; el período se DESACOPLÓ en 2.7.1.1)* — `key` (estable, único), `name`,
+  `description?`, `timezone` (IANA; todo se guarda en UTC), `isDefault` (exactamente uno, mantenido en tx; el default no
+  se borra), `active`, `dayStartShiftCode?` (turno cuyo inicio abre el día operacional; null = día civil 00:00),
+  `deletedAt` (borrado lógico). *1—N* **OperationalShift**. (La config de período —`periodKind`/ancla— se movió a
+  `FiscalCalendar`; ver más abajo.)
 - **OperationalShift** *(implementado)* — `code` (estable, **`@@unique([calendarId, code])`**), `label`,
   `startTime` ("HH:MM" hora de pared local), `durationMinutes` (1..1440; resuelve el cruce de medianoche),
   `sortOrder`. FK `onDelete: Cascade`. Los turnos **se reemplazan en bloque** al guardar el calendario.
@@ -205,30 +204,52 @@
   solape ni hueco). Los turnos se definen al **minuto** (HH:MM, como SAP/ISA-95); la lectura se clasifica al **segundo**
   para que el borde sea exacto sin redondear.
 - **Resolución** — **`resolveShift`** (función PURA en `@lyra/contracts`, solo `Intl`): `timestamp → {operationalDate
-  (YYYY-MM-DD), shiftCode|null, periodKey|null}`. **`ShiftResolver`** (clase abstracta = token DI, patrón
-  `EmailService`) elige el calendario por nodo y delega; lo inyectarán **2.4** (estampa `shiftCode`/`operationalDate`/
-  `periodKey` en `LogEntry`), **2.3 Rondas** (programa por turno) y **Fase 5**. `validateOperationalCalendar` (sin
-  solapes, huecos permitidos) = fuente única contrato+backend+web. Endpoint `POST /operational-calendars/:id/preview`
-  para el probador/verificación.
+  (YYYY-MM-DD), shiftCode|null}` (en 2.7.1.1 **dejó de calcular el período**). **`ShiftResolver`** (clase abstracta =
+  token DI, patrón `EmailService`) elige el calendario por nodo y delega; lo inyectan **2.4** (estampa `shiftCode`/
+  `operationalDate`), **2.3 Rondas** y **Fase 5**. `validateOperationalCalendar` (sin solapes, huecos permitidos) =
+  fuente única contrato+backend+web. Endpoint `POST /operational-calendars/:id/preview` para el probador.
+
+### Calendario FISCAL (período contable transversal)
+> **Fase 2.7.1.1 (implementado):** migración `20260611210000_add_fiscal_calendar` + script `db:migrate-fiscal` +
+> `20260611211500_decouple_fiscal_period_cleanup`. El período es TRANSVERSAL (SAP company code / Maximo Organization /
+> NetSuite subsidiaria), desacoplado del *shift calendar*. Ver DECISIONS 2026-06-11.
+- **FiscalCalendar** *(implementado)* — `key` (estable, único), `name`, `description?`, `timezone` (para ubicar "hoy"
+  al generar/marcar Actual), `isDefault` (exactamente uno, en tx; el default no se borra), `active`, **período**:
+  `periodKind` (MONTH | WEEK | CUSTOM), `periodAnchorDay?` (MONTH 1..28), `periodStartWeekday?` (WEEK 1..7),
+  `periodLengthDays?`/`periodAnchorDate?` (CUSTOM), **`requirePeriod`** (rigor estricto Maximo, opt-in), `deletedAt`.
+  *1—N* `OperationalPeriod`. **Asignación por nodo**: `OrgNode.fiscalCalendarId` (FK `onDelete: SetNull`), misma
+  resolución por ruta materializada que el shift calendar.
+- **Resolución del período** — **`FiscalResolver`** (token DI abstracto, espejo de `ShiftResolver`): toma el
+  `operationalDate` (del shift calendar) y lo mapea al `periodKey` del calendario fiscal del nodo. Lógica pura en
+  `@lyra/contracts`: `periodBoundsFor`/`periodKeyForOperationalDate`/**`enumeratePeriods`** (rango contiguo
+  `[periodStart, periodEnd)`, `periodEnd` exclusivo = inicio del siguiente). `LogEntriesService.resolveDims` combina
+  ambos ejes para estampar `shiftCode`/`operationalDate` (eje turno) + `periodKey` (eje fiscal).
+- **Migración del histórico** — `db:migrate-fiscal` agrupa los `OperationalCalendar` por firma de período y crea **un
+  `FiscalCalendar` por firma distinta** (default desde el calendario de turnos default); reasigna `fiscalCalendarId` a
+  los nodos con firma ≠ default. Así el `periodKey` ya estampado se preserva EXACTO (no se rompe el histórico).
 
 ### Período contable gobernado
-> **Fase 2.7.1 (implementado):** migración `20260611200225_add_operational_period`. Gobierna el CIERRE de la
-> escritura por ventana de tiempo (refs SAP OB52 / NetSuite / Odoo lock dates / Maximo). Ver DECISIONS 2026-06-11.
-- **OperationalPeriod** *(implementado)* — estado de gobernanza de una llave de período DENTRO de un calendario:
-  `calendarId` (FK `onDelete: Cascade`), `periodKey` (la que estampa el `ShiftResolver`), `status`
-  (**PeriodStatus** OPEN | CLOSING | CLOSED), `closedById?`/`closedAt?`/`closeReason?`, `reopenedById?`/
-  `reopenedAt?`/`reopenReason?`. **`@@unique([calendarId, periodKey])`** + índice `(calendarId, status)`. El historial
-  completo de cierres/reaperturas vive en **AuditLog** (`opsperiod.closed|reopened`, inmutable).
-- **Modelo LAZY** — la AUSENCIA de fila = OPEN (patrón lock-date de Odoo); no se pre-generan filas. El mantenedor
-  LISTA los períodos recientes DERIVADOS de la config del calendario (**`enumeratePeriodKeys`**, función pura en
-  `@lyra/contracts`, ventana −400/+45 días) unidos con las filas explícitas. El período se identifica por
-  **(calendarId × periodKey)** (la llave es calendar-specific).
-- **Guarda de escritura** — **`OperationalPeriodService.assertWritable(at, orgNodeId, perms)`** (fuente única) resuelve
-  calendario+`periodKey` vía **`ShiftResolver.resolveWithCalendar`** y lanza 403 con `blockedReason = PERIOD_CLOSED`
-  si el período está CLOSING/CLOSED y el actor no tiene **`opsperiod:write-closed`** (bypass = DATO RBAC, patrón
-  authorization group SAP OB52). Invocada en `create`/`saveSection`/`setDeferral`/`submit`/`executeTransition` sobre la
-  `effectiveAt` que el write persistiría, **antes** de la completitud/validación y del re-auth. Las LECTURAS y la
-  verificación de firma nunca se bloquean. `periodKey` null (sin calendario) ⇒ ungobernado ⇒ nunca bloquea.
+> **Fase 2.7.1 → endurecido en 2.7.1.1.** Modelo MATERIALIZADO (backbone Maximo) + tri-estado NetSuite. Gobierna el
+> CIERRE de la escritura por ventana de tiempo (refs SAP OB52 / NetSuite / Maximo).
+- **OperationalPeriod** *(implementado)* — fila materializada de un período de un calendario FISCAL: `fiscalCalendarId`
+  (FK `onDelete: Cascade`), `periodKey`, **`periodStart`/`periodEnd`** (rango contiguo en días operacionales,
+  `periodEnd` exclusivo), `status` (**PeriodStatus** OPEN | CLOSED | LOCKED; CLOSING deprecado, retenido para parseo),
+  `closedBy*`/`closeReason?`, **`lockedBy*`/`lockReason?`**, `reopenedBy*`/`reopenReason?`.
+  **`@@unique([fiscalCalendarId, periodKey])`** + índice `(fiscalCalendarId, status)`. Historial en **AuditLog**
+  (`opsperiod.generated|closed|locked|unlocked|reopened`, inmutable).
+- **Generación EXPLÍCITA** — `generate(fiscalCalendarId, year)` materializa filas contiguas vía `enumeratePeriods`,
+  **idempotente** (crea las faltantes OPEN, jamás degrada CLOSED/LOCKED). Reemplaza el modelo LAZY de 2.7.1. La lista
+  agrupa por año y marca el período **Actual** (`isCurrent` = hoy ∈ `[periodStart, periodEnd)` en la TZ del fiscal).
+- **Estados y transiciones** — `close` OPEN→CLOSED con guarda **SECUENCIAL** (no se cierra si un anterior sigue OPEN);
+  `lock` CLOSED→**LOCKED** (`opsperiod:lock`); `unlock` LOCKED→CLOSED (`opsperiod:unlock`, two-key); `reopen` CLOSED→OPEN
+  (`opsperiod:reopen`) con **secuencialidad inversa**: BLOQUEA si hay posterior LOCKED, exige `acknowledgeLaterClosed`
+  si hay posterior solo CLOSED.
+- **Guarda de escritura** — **`OperationalPeriodService.assertWritable(at, orgNodeId, perms)`** (fuente única, usa
+  `ShiftResolver` → operationalDate → `FiscalResolver` → periodKey + fila): **LOCKED** bloquea a TODOS (incl. el bypass);
+  **CLOSED** bloquea salvo **`opsperiod:write-closed`**; **`requirePeriod`** sin fila generada bloquea salvo el bypass.
+  Lanza 403 `blockedReason = PERIOD_CLOSED`. Invocada en `create`/`saveSection`/`setDeferral`/`submit`/`executeTransition`
+  sobre la `effectiveAt`, **antes** de completitud/validación/re-auth. LECTURAS y verificación de firma nunca se bloquean.
+  Sin día operacional/calendario fiscal ⇒ ungobernado ⇒ nunca bloquea.
 - **Huella proactiva** — en `getDetail`, si el actor sin excepción tiene una entrada en período cerrado, todas las
   secciones reportan `PERIOD_CLOSED` (precede a las reglas de sección) y no se ofrecen transiciones.
 - **Endpoints** — `GET /operational-periods?calendarId=` (derivados ∪ explícitos), `POST .../close` (CLOSING|CLOSED +
