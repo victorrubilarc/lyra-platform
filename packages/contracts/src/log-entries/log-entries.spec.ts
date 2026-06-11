@@ -14,6 +14,7 @@ import {
   logEntryTimelineEventSchema,
   resolveEffectiveAt,
   saveLogEntrySectionRequestSchema,
+  setDeferralRequestSchema,
   thresholdBandFor,
   validateFieldValue,
   type FieldForValidation,
@@ -32,6 +33,37 @@ describe("log-entries — requests", () => {
   it("acepta crear con templateId y rechaza sin él", () => {
     expect(createLogEntryRequestSchema.safeParse({ templateId: "t1" }).success).toBe(true);
     expect(createLogEntryRequestSchema.safeParse({}).success).toBe(false);
+  });
+
+  it("crear DIFERIDA exige fecha ISO con offset y motivo (≥5)", () => {
+    const ok = {
+      templateId: "t1",
+      deferred: { effectiveAt: "2026-06-10T22:30:00-04:00", reason: "Sin señal en terreno" },
+    };
+    expect(createLogEntryRequestSchema.safeParse(ok).success).toBe(true);
+    // Motivo obligatorio y con contenido (práctica GxP de late entry).
+    expect(
+      createLogEntryRequestSchema.safeParse({ templateId: "t1", deferred: { effectiveAt: "2026-06-10T22:30:00Z", reason: "  x " } })
+        .success,
+    ).toBe(false);
+    // Fecha sin formato ISO datetime.
+    expect(
+      createLogEntryRequestSchema.safeParse({ templateId: "t1", deferred: { effectiveAt: "2026-06-10", reason: "Motivo válido" } })
+        .success,
+    ).toBe(false);
+  });
+
+  it("setDeferral acepta declarar y quitar (null)", () => {
+    expect(
+      setDeferralRequestSchema.safeParse({ deferred: { effectiveAt: "2026-06-10T08:00:00Z", reason: "Turno sin acceso" } }).success,
+    ).toBe(true);
+    expect(setDeferralRequestSchema.safeParse({ deferred: null }).success).toBe(true);
+    expect(setDeferralRequestSchema.safeParse({}).success).toBe(false);
+  });
+
+  it("listQuery acepta entryOrigin del enum y rechaza otros", () => {
+    expect(logEntryListQuerySchema.safeParse({ entryOrigin: "DEFERRED" }).success).toBe(true);
+    expect(logEntryListQuerySchema.safeParse({ entryOrigin: "LATE" }).success).toBe(false);
   });
 
   it("saveSection exige expectedVersion >= 0", () => {
@@ -178,6 +210,20 @@ describe("resolveEffectiveAt", () => {
   it("cae a recordedAt si no hay campo EFFECTIVE_DATE", () => {
     const none = [{ fields: [{ key: "x", semanticRole: null } as never] }] as Parameters<typeof resolveEffectiveAt>[0];
     expect(resolveEffectiveAt(none, { x: "2026-01-01" }, recordedAt)).toEqual(recordedAt);
+  });
+
+  it("cadena 2.7.0: campo → declarada → recordedAt", () => {
+    const declared = new Date("2026-06-05T20:00:00Z");
+    // Sin campo EFFECTIVE_DATE: la fecha declarada gana a recordedAt.
+    const none = [{ fields: [{ key: "x", semanticRole: null } as never] }] as Parameters<typeof resolveEffectiveAt>[0];
+    expect(resolveEffectiveAt(none, {}, recordedAt, declared)).toEqual(declared);
+    // Con campo vacío: cae a la declarada (no directo a recordedAt).
+    expect(resolveEffectiveAt(sections, { fecha: "" }, recordedAt, declared)).toEqual(declared);
+    // El campo con valor SIEMPRE manda sobre la declarada.
+    const r = resolveEffectiveAt(sections, { fecha: "2026-06-01T08:00:00Z" }, recordedAt, declared);
+    expect(r.toISOString()).toBe("2026-06-01T08:00:00.000Z");
+    // declarada null se comporta como antes.
+    expect(resolveEffectiveAt(sections, {}, recordedAt, null)).toEqual(recordedAt);
   });
 });
 
@@ -410,5 +456,18 @@ describe("logEntryTimelineEventSchema", () => {
     expect(
       logEntryTimelineEventSchema.safeParse({ kind: "OTRO", id: "x", at: "2026-06-10T12:00:00.000Z" }).success,
     ).toBe(false);
+  });
+
+  it("acepta el evento DEFERRED_DECLARED (2.7.0)", () => {
+    expect(
+      logEntryTimelineEventSchema.safeParse({
+        kind: "DEFERRED_DECLARED",
+        id: "deferred:e1",
+        at: "2026-06-11T10:00:00.000Z",
+        actorName: "Demo",
+        declaredEffectiveAt: "2026-06-10T22:30:00.000Z",
+        reason: "Sin señal en terreno",
+      }).success,
+    ).toBe(true);
   });
 });

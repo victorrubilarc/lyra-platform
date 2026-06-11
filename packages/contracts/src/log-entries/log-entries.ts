@@ -53,6 +53,16 @@ export const SIGNATURE_METHODS = ["PASSWORD", "PASSWORD_MFA"] as const;
 export const signatureMethodSchema = z.enum(SIGNATURE_METHODS);
 export type SignatureMethod = z.infer<typeof signatureMethodSchema>;
 
+/**
+ * Origen del registro (Fase 2.7.0, ALCOA+ "contemporaneous"): ONLINE = capturado
+ * en el momento del evento; DEFERRED = registro tardío DECLARADO por el operador
+ * (atestación, nunca inferido por diferencia de relojes). La entrada tardía es
+ * legítima si queda identificada: fecha del evento vs captura, quién y por qué.
+ */
+export const LOG_ENTRY_ORIGINS = ["ONLINE", "DEFERRED"] as const;
+export const logEntryOriginSchema = z.enum(LOG_ENTRY_ORIGINS);
+export type LogEntryOrigin = z.infer<typeof logEntryOriginSchema>;
+
 // === Entidades (forma de respuesta; fechas como ISO string) ==================
 
 /** Valor actual de un campo (el `value` viaja como JSON arbitrario, tipado por dataType). */
@@ -200,6 +210,15 @@ export const logEntrySchema = z.object({
   periodKey: z.string().nullable(),
   /** Instante en que se congelaron effectiveAt + dimensiones (al enviar). null = aún DRAFT. */
   sealedAt: z.string().nullable(),
+  /** Origen DECLARADO del registro (2.7.0): ONLINE contemporáneo / DEFERRED tardío. */
+  entryOrigin: logEntryOriginSchema,
+  /** Fecha/hora REAL del evento declarada al diferir (alimenta effectiveAt cuando
+   * la plantilla no tiene campo EFFECTIVE_DATE). null = sin declaración. */
+  declaredEffectiveAt: z.string().nullable(),
+  /** Motivo del diferimiento (obligatorio al declarar; GxP late entry). */
+  deferredReason: z.string().nullable(),
+  /** Cuándo se declaró el diferimiento (huella ALCOA+). */
+  deferredDeclaredAt: z.string().nullable(),
   createdById: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -224,6 +243,8 @@ export const logEntryDetailSchema = logEntrySchema.extend({
   /** Nombre legible del autor y del equipo (cabecera del visor 2.6). */
   createdByName: z.string().nullable(),
   equipmentName: z.string().nullable(),
+  /** Quién declaró el diferimiento (2.7.0). null = entrada en línea. */
+  deferredDeclaredByName: z.string().nullable(),
   sectionStates: z.array(logEntrySectionStateDtoSchema),
   values: z.array(logEntryValueSchema),
   /** Transiciones que ESTE usuario puede ejecutar ahora (gateado en backend). */
@@ -304,14 +325,35 @@ export type LogEntryStats = z.infer<typeof logEntryStatsSchema>;
 
 // === Requests ================================================================
 
+/**
+ * Declaración de registro DIFERIDO (gesto "Registrar con otra fecha/hora").
+ * El motivo es OBLIGATORIO (práctica GxP de late entry: la anotación tardía se
+ * identifica con justificación — MHRA Data Integrity 2018 / FDA DI Q&A 2018).
+ */
+export const deferralInputSchema = z.object({
+  /** Fecha/hora REAL del evento (ISO 8601 con offset). */
+  effectiveAt: z.string().datetime({ offset: true }),
+  /** Motivo del diferimiento. */
+  reason: z.string().trim().min(5).max(500),
+});
+export type DeferralInput = z.infer<typeof deferralInputSchema>;
+
 export const createLogEntryRequestSchema = z.object({
   templateId: z.string().min(1),
   /** Nodo de la entrada. Si se omite, hereda el de la plantilla (debe existir uno). */
   orgNodeId: z.string().nullable().optional(),
   /** Equipo opcional al que refiere el registro. */
   equipmentId: z.string().nullable().optional(),
+  /** Declarar la entrada como registro DIFERIDO desde su creación (2.7.0). */
+  deferred: deferralInputSchema.nullable().optional(),
 });
 export type CreateLogEntryRequest = z.infer<typeof createLogEntryRequestSchema>;
+
+/** Declara, corrige o quita (null) el diferimiento de una entrada en borrador. */
+export const setDeferralRequestSchema = z.object({
+  deferred: deferralInputSchema.nullable(),
+});
+export type SetDeferralRequest = z.infer<typeof setDeferralRequestSchema>;
 
 /** Un valor que el cliente envía al guardar una sección. */
 export const logEntryValueInputSchema = z.object({
@@ -393,6 +435,8 @@ export const logEntryListQuerySchema = z.object({
   recordedFrom: z.string().datetime({ offset: true }).optional(),
   recordedTo: z.string().datetime({ offset: true }).optional(),
   createdById: z.string().optional(),
+  /** Origen del registro (2.7.0): ONLINE / DEFERRED. */
+  entryOrigin: logEntryOriginSchema.optional(),
   /** Solo entradas con ≥1 sección que exige firma y no la tiene. */
   pendingSignature: queryBool,
   /** Excepciones de umbral: CRIT / WARN exactos, o ANY (cualquier banda). */
@@ -470,6 +514,15 @@ export const logEntryTimelineEventSchema = z.discriminatedUnion("kind", [
     kind: z.literal("SEALED"),
     id: z.string(),
     at: z.string(),
+  }),
+  z.object({
+    /** Declaración (vigente) de registro diferido: quién, cuándo y por qué (2.7.0). */
+    kind: z.literal("DEFERRED_DECLARED"),
+    id: z.string(),
+    at: z.string(),
+    actorName: z.string().nullable(),
+    declaredEffectiveAt: z.string(),
+    reason: z.string().nullable(),
   }),
 ]);
 export type LogEntryTimelineEvent = z.infer<typeof logEntryTimelineEventSchema>;
@@ -738,15 +791,19 @@ export function formatEntryFolio(entryNumber: number, prefix = "BIT"): string {
 }
 
 /**
- * Deriva la fecha efectiva de una versión a partir de sus valores: el valor del
- * campo con `semanticRole = EFFECTIVE_DATE`; si no hay (o está vacío/ inválido),
- * cae a `recordedAt`. Fuente única para el estampado en backend.
+ * Deriva la fecha efectiva de una versión a partir de sus valores. Cadena de
+ * prioridad (fuente única para el estampado en backend): el valor del campo con
+ * `semanticRole = EFFECTIVE_DATE` → la fecha DECLARADA a nivel de entrada
+ * (registro diferido 2.7.0) → `recordedAt`. El campo, cuando existe y tiene un
+ * valor válido, SIEMPRE manda (una sola fuente por entrada, sin ambigüedad).
  */
 export function resolveEffectiveAt(
   sections: Pick<TemplateSectionDto, "fields">[],
   valuesByKey: Record<string, unknown>,
   recordedAt: Date,
+  declaredEffectiveAt?: Date | null,
 ): Date {
+  const fallback = declaredEffectiveAt ?? recordedAt;
   for (const section of sections) {
     for (const field of section.fields) {
       if (field.semanticRole !== "EFFECTIVE_DATE") continue;
@@ -755,10 +812,10 @@ export function resolveEffectiveAt(
         const parsed = Date.parse(raw);
         if (!Number.isNaN(parsed)) return new Date(parsed);
       }
-      return recordedAt;
+      return fallback;
     }
   }
-  return recordedAt;
+  return fallback;
 }
 
 /** ¿Es la sección editable en el estado de flujo dado? (parte de la editabilidad). */
