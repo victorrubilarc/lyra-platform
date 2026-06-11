@@ -77,6 +77,7 @@ function makeService(
     orgNode: { count: vi.fn().mockResolvedValue(1), findMany: vi.fn().mockResolvedValue([]) },
     equipment: { count: vi.fn().mockResolvedValue(1) },
     userRole: { findMany: vi.fn().mockResolvedValue([]) },
+    role: { findMany: vi.fn().mockResolvedValue([]) },
     user: { findMany: vi.fn().mockResolvedValue([]) },
     $transaction: vi.fn().mockImplementation((arg) => (Array.isArray(arg) ? Promise.all(arg) : arg(tx))),
     ...prismaOver,
@@ -232,6 +233,44 @@ describe("LogEntriesService — saveSection", () => {
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
+  it("override por campo: bloquea CAMBIAR un campo reservado a otro rol, pero un eco sin cambio no bloquea la sección", async () => {
+    const make = () =>
+      makeService({
+        logEntry: { findFirst: vi.fn().mockResolvedValue(baseEntry), update: vi.fn(), create: vi.fn(), findMany: vi.fn() },
+        templateVersion: {
+          findUnique: vi.fn().mockResolvedValue(
+            versionGraph([
+              section("s1", [
+                field({ key: "obs", type: "TEXT", dataType: "STRING", label: "Obs" }),
+                field({ key: "vb", type: "TEXT", dataType: "STRING", label: "VB", roles: [{ roleId: "supervisor" }] }),
+              ]),
+            ]),
+          ),
+        },
+        logEntrySection: { findUnique: vi.fn().mockResolvedValue({ id: "ls1", version: 0 }), update: vi.fn() },
+        logEntryValue: { findMany: vi.fn().mockResolvedValue([{ fieldKey: "vb", value: "firmado" }]) },
+        userRole: { findMany: vi.fn().mockResolvedValue([{ roleId: "operador" }]) },
+      });
+
+    // Intento de CAMBIO del campo reservado → 403.
+    const a = make();
+    await expect(
+      a.service.saveSection("u1", "e1", "s1", { expectedVersion: 0, values: [{ fieldKey: "vb", value: "alterado" }] }, ctx),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    // Eco del mismo valor (cliente que reenvía la sección completa) → guarda OK.
+    const b = make();
+    vi.spyOn(b.service, "getDetail").mockResolvedValue({ id: "e1" } as never);
+    await b.service.saveSection(
+      "u1", "e1", "s1",
+      { expectedVersion: 0, values: [{ fieldKey: "obs", value: "nota" }, { fieldKey: "vb", value: "firmado" }] },
+      ctx,
+    );
+    expect(b.tx.logEntryValue.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ create: expect.objectContaining({ fieldKey: "obs" }) }),
+    );
+  });
+
   it("rechaza guardar en una entrada ya enviada", async () => {
     const { service } = makeService({
       logEntry: { findFirst: vi.fn().mockResolvedValue({ ...baseEntry, status: "SUBMITTED" }), update: vi.fn(), create: vi.fn(), findMany: vi.fn() },
@@ -239,6 +278,76 @@ describe("LogEntriesService — saveSection", () => {
     await expect(
       service.saveSection("u1", "e1", "s1", { expectedVersion: 0, values: [] }, ctx),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+});
+
+describe("LogEntriesService — getDetail (motivos de bloqueo #4)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("expone blockedReason MISSING_ROLE + assignedRoleNames + readOnlyFieldKeys para el usuario sin el rol", async () => {
+    const { service } = makeService({
+      logEntry: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "e1", entryNumber: 7, status: "DRAFT", orgNodeId: "n1", templateId: "t1", templateVersionId: "v1",
+          workflowDefinitionId: null, workflowDefinitionVersionId: null, currentStateKey: null, equipmentId: null,
+          recordedAt: new Date(), effectiveAt: new Date(), shiftCode: null, operationalDate: null, periodKey: null,
+          sealedAt: null, createdById: "u1", createdAt: new Date(), updatedAt: new Date(),
+        }),
+        update: vi.fn(), create: vi.fn(), findMany: vi.fn(),
+      },
+      templateVersion: {
+        findUnique: vi.fn().mockResolvedValue(
+          versionGraph([
+            section("s_libre", [field({ key: "obs", type: "TEXT", dataType: "STRING", label: "Obs" })]),
+            section(
+              "s_super",
+              [
+                field({ key: "vb", type: "TEXT", dataType: "STRING", label: "VB" }),
+                field({ key: "nota", type: "TEXT", dataType: "STRING", label: "Nota", roles: [{ roleId: "supervisor" }] }),
+              ],
+              { roles: [{ roleId: "supervisor" }] },
+            ),
+          ]),
+        ),
+      },
+      userRole: { findMany: vi.fn().mockResolvedValue([{ roleId: "operador" }]) },
+      role: { findMany: vi.fn().mockResolvedValue([{ id: "supervisor", name: "Supervisor" }]) },
+    });
+
+    const detail = await service.getDetail("u1", "e1");
+
+    const libre = detail.sectionStates.find((s) => s.sectionKey === "s_libre")!;
+    expect(libre.editable).toBe(true);
+    expect(libre.blockedReason).toBeNull();
+    expect(libre.assignedRoleNames).toEqual([]);
+
+    const superv = detail.sectionStates.find((s) => s.sectionKey === "s_super")!;
+    expect(superv.editable).toBe(false);
+    expect(superv.blockedReason).toBe("MISSING_ROLE");
+    expect(superv.assignedRoleNames).toEqual(["Supervisor"]);
+    // El override por campo también se refleja (la UI lo pinta read-only).
+    expect(superv.readOnlyFieldKeys).toEqual(["nota"]);
+  });
+
+  it("expone ENTRY_CLOSED cuando la entrada ya fue enviada", async () => {
+    const { service } = makeService({
+      logEntry: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "e1", entryNumber: 7, status: "SUBMITTED", orgNodeId: "n1", templateId: "t1", templateVersionId: "v1",
+          workflowDefinitionId: null, workflowDefinitionVersionId: null, currentStateKey: null, equipmentId: null,
+          recordedAt: new Date(), effectiveAt: new Date(), shiftCode: null, operationalDate: null, periodKey: null,
+          sealedAt: new Date(), createdById: "u1", createdAt: new Date(), updatedAt: new Date(),
+        }),
+        update: vi.fn(), create: vi.fn(), findMany: vi.fn(),
+      },
+      templateVersion: {
+        findUnique: vi.fn().mockResolvedValue(versionGraph([section("s1", [field({ key: "obs", type: "TEXT", dataType: "STRING", label: "Obs" })])])),
+      },
+    });
+
+    const detail = await service.getDetail("u1", "e1");
+    expect(detail.sectionStates[0]!.editable).toBe(false);
+    expect(detail.sectionStates[0]!.blockedReason).toBe("ENTRY_CLOSED");
   });
 });
 
@@ -256,12 +365,13 @@ describe("LogEntriesService — submit", () => {
     await expect(service.submit("u1", "e1", {}, ctx)).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it("sella effectiveAt + dimensiones y marca SUBMITTED", async () => {
+  it("sella effectiveAt + dimensiones y marca SUBMITTED (todas las secciones COMPLETED)", async () => {
     const update = vi.fn().mockResolvedValue({});
     const { service, audit } = makeService({
       logEntry: { findFirst: vi.fn().mockResolvedValue(entry), update, create: vi.fn(), findMany: vi.fn() },
       templateVersion: { findUnique: vi.fn().mockResolvedValue(versionGraph([section("s1", [field({ key: "obs", type: "TEXT", dataType: "STRING", label: "Obs" })])])) },
       logEntryValue: { findMany: vi.fn().mockResolvedValue([{ fieldKey: "obs", value: "ok" }]) },
+      logEntrySection: { findMany: vi.fn().mockResolvedValue([{ id: "ls1", sectionKey: "s1", state: "COMPLETED" }]), findUnique: vi.fn(), update: vi.fn() },
     });
     vi.spyOn(service, "getDetail").mockResolvedValue({ id: "e1" } as never);
 
@@ -271,6 +381,43 @@ describe("LogEntriesService — submit", () => {
       expect.objectContaining({ data: expect.objectContaining({ status: "SUBMITTED", sealedAt: expect.any(Date), shiftCode: "A" }) }),
     );
     expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({ action: "logentry.submitted" }));
+  });
+
+  it("rechaza enviar con una sección sin COMPLETAR aunque sus valores sean válidos (#4)", async () => {
+    const { service } = makeService({
+      logEntry: { findFirst: vi.fn().mockResolvedValue(entry), update: vi.fn(), create: vi.fn(), findMany: vi.fn() },
+      templateVersion: { findUnique: vi.fn().mockResolvedValue(versionGraph([section("s1", [field({ key: "obs", type: "TEXT", dataType: "STRING", label: "Obs" })])])) },
+      logEntryValue: { findMany: vi.fn().mockResolvedValue([{ fieldKey: "obs", value: "ok" }]) },
+      logEntrySection: { findMany: vi.fn().mockResolvedValue([{ id: "ls1", sectionKey: "s1", state: "IN_PROGRESS" }]), findUnique: vi.fn(), update: vi.fn() },
+    });
+    await expect(service.submit("u1", "e1", {}, ctx)).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it("la validación de envío es OBJETIVA: exige también las secciones asignadas a OTROS roles (#4)", async () => {
+    // El que envía no tiene el rol "supervisor" de s2; antes del fix esa sección
+    // se saltaba y la entrada se sellaba incompleta (eludiendo incluso su firma).
+    const { service } = makeService({
+      logEntry: { findFirst: vi.fn().mockResolvedValue(entry), update: vi.fn(), create: vi.fn(), findMany: vi.fn() },
+      templateVersion: {
+        findUnique: vi.fn().mockResolvedValue(
+          versionGraph([
+            section("s1", [field({ key: "obs", type: "TEXT", dataType: "STRING", label: "Obs" })]),
+            section("s2", [field({ key: "vb", type: "TEXT", dataType: "STRING", label: "VB", required: true })], { roles: [{ roleId: "supervisor" }] }),
+          ]),
+        ),
+      },
+      logEntryValue: { findMany: vi.fn().mockResolvedValue([{ fieldKey: "obs", value: "ok" }]) },
+      logEntrySection: {
+        findMany: vi.fn().mockResolvedValue([
+          { id: "ls1", sectionKey: "s1", state: "COMPLETED" },
+          { id: "ls2", sectionKey: "s2", state: "PENDING" },
+        ]),
+        findUnique: vi.fn(),
+        update: vi.fn(),
+      },
+      userRole: { findMany: vi.fn().mockResolvedValue([{ roleId: "operador" }]) },
+    });
+    await expect(service.submit("u1", "e1", {}, ctx)).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it("rechaza submit en una entrada CON flujo (debe usar transiciones)", async () => {

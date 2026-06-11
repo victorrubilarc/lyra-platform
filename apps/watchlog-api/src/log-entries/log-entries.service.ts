@@ -18,6 +18,7 @@ import type {
   LogEntryTransitionDto,
   LogEntryValueDto,
   SaveLogEntrySectionRequest,
+  SectionBlockedReason,
   SignatureContext,
   SignatureMethod,
   SubmitLogEntryRequest,
@@ -233,10 +234,18 @@ export class LogEntriesService {
     ]);
     const editable = entry.status === "DRAFT";
     const sigById = new Map(signatureRows.map((s) => [s.id, s]));
+    const roleNames = await this.roleNamesById(
+      version.sections.flatMap((s) => s.roles.map((r) => r.roleId)),
+    );
 
     const sectionStates: LogEntrySectionStateDto[] = version.sections.map((def) => {
       const row = sectionRows.find((r) => r.sectionKey === def.key);
       const sig = row?.signatureId ? sigById.get(row.signatureId) : undefined;
+      const sectionRoleIds = def.roles.map((r) => r.roleId);
+      // Motivo de bloqueo para ESTE usuario (la UI lo comunica tal cual).
+      const blockedReason: SectionBlockedReason | null = !editable
+        ? "ENTRY_CLOSED"
+        : this.sectionBlockedReasonFor(def.editableInStateKey, sectionRoleIds, entry.currentStateKey, roleIds);
       return {
         sectionKey: def.key,
         state: row?.state ?? "PENDING",
@@ -244,15 +253,14 @@ export class LogEntriesService {
         filledByName: row?.filledById ? (actorNames.get(row.filledById) ?? null) : null,
         filledAt: row?.filledAt?.toISOString() ?? null,
         version: row?.version ?? 0,
-        editable:
-          editable &&
-          this.isSectionEditableForUser(
-            def.key,
-            def.editableInStateKey,
-            def.roles.map((r) => r.roleId),
-            entry.currentStateKey,
-            roleIds,
-          ),
+        editable: blockedReason === null,
+        blockedReason,
+        assignedRoleNames: sectionRoleIds.map((id) => roleNames.get(id) ?? "—"),
+        // Campos cuyo override de rol excluye al usuario (la UI los pinta read-only;
+        // el guardado igual los rechaza con 403 — el backend siempre decide).
+        readOnlyFieldKeys: def.fields
+          .filter((f) => f.roles.length > 0 && !f.roles.some((r) => roleIds.has(r.roleId)))
+          .map((f) => f.key),
         signature: sig ? this.signatureSummary(sig) : null,
       };
     });
@@ -350,16 +358,18 @@ export class LogEntriesService {
     if (!sectionDef) throw new NotFoundException("Sección no encontrada en la versión");
 
     const roleIds = await this.userRoleIds(userId);
-    if (
-      !this.isSectionEditableForUser(
-        sectionDef.key,
-        sectionDef.editableInStateKey,
-        sectionDef.roles.map((r) => r.roleId),
-        entry.currentStateKey,
-        roleIds,
-      )
-    ) {
-      throw new ForbiddenException("No puede editar esta sección en el estado actual");
+    const blockedReason = this.sectionBlockedReasonFor(
+      sectionDef.editableInStateKey,
+      sectionDef.roles.map((r) => r.roleId),
+      entry.currentStateKey,
+      roleIds,
+    );
+    if (blockedReason !== null) {
+      throw new ForbiddenException(
+        blockedReason === "MISSING_ROLE"
+          ? "La sección está asignada a otro rol: su usuario no puede registrarla ni modificarla"
+          : "La sección no se edita en la etapa actual del flujo",
+      );
     }
 
     const sectionRow = await this.prisma.logEntrySection.findUnique({
@@ -379,17 +389,21 @@ export class LogEntriesService {
       }
     }
 
+    // Snapshot de TODOS los valores actuales (para visibilidad y fecha efectiva).
+    const existing = await this.prisma.logEntryValue.findMany({ where: { logEntryId: id } });
+
     // Override de rol por campo: si un campo declara roles y el usuario no los
-    // tiene, no puede modificar SU valor (granularidad por campo, fork 3).
+    // tiene, no puede MODIFICAR su valor (granularidad por campo, fork 3). Un eco
+    // sin cambio no bloquea: el resto de la sección debe poder guardarse.
     for (const input of dto.values) {
       const def = fieldsByKey.get(input.fieldKey)!;
-      if (def.roleIds.length > 0 && !def.roleIds.some((r) => roleIds.has(r))) {
-        throw new ForbiddenException(`No tiene permiso para editar el campo "${def.label}"`);
+      if (def.roleIds.length === 0 || def.roleIds.some((r) => roleIds.has(r))) continue;
+      const beforeVal = (existing.find((e) => e.fieldKey === input.fieldKey)?.value ?? null) as unknown;
+      if (JSON.stringify(beforeVal) !== JSON.stringify(input.value ?? null)) {
+        throw new ForbiddenException(`El campo "${def.label}" está reservado a otro rol: no puede modificarlo`);
       }
     }
 
-    // Snapshot de TODOS los valores actuales (para visibilidad y fecha efectiva).
-    const existing = await this.prisma.logEntryValue.findMany({ where: { logEntryId: id } });
     const valuesByKey: Record<string, unknown> = {};
     for (const v of existing) valuesByKey[v.fieldKey] = (v.value ?? null) as unknown;
     for (const input of dto.values) valuesByKey[input.fieldKey] = input.value ?? null;
@@ -545,21 +559,24 @@ export class LogEntriesService {
     }
 
     const version = await this.loadVersion(entry.templateVersionId);
-    const roleIds = await this.userRoleIds(userId);
     const valuesByKey = await this.loadValuesByKey(id);
 
-    // Valida obligatorios + valores de las secciones editables para el usuario.
-    const errors = await this.collectCompletionErrors(version, valuesByKey, (section) =>
-      this.isSectionEditableForUser(
-        section.key,
-        section.editableInStateKey,
-        section.roles.map((r) => r.roleId),
-        entry.currentStateKey,
-        roleIds,
-      ),
-    );
+    // Enviar SELLA el registro completo (commit GxP): la validación es OBJETIVA
+    // (todas las secciones, no solo las del que envía) y exige cada sección con
+    // campos en COMPLETED — espejo del guard (d) de executeTransition. Sin esto,
+    // un actor podía sellar con secciones de otros roles incompletas y eludir la
+    // firma de completitud de sección (TemplateSection.requireSignature).
+    const inCurrentState = (section: VersionWithGraph["sections"][number]): boolean =>
+      isSectionEditableInState(section.editableInStateKey, entry.currentStateKey);
+    const errors = await this.collectCompletionErrors(version, valuesByKey, inCurrentState);
+    const sectionRows = await this.prisma.logEntrySection.findMany({ where: { logEntryId: id } });
+    for (const section of version.sections) {
+      if (!inCurrentState(section) || section.fields.length === 0) continue;
+      const row = sectionRows.find((r) => r.sectionKey === section.key);
+      if (!row || row.state !== "COMPLETED") errors.push(`Sección "${section.title}" sin completar`);
+    }
     if (errors.length > 0) {
-      throw new BadRequestException({ message: "No se puede enviar: faltan datos o hay errores", errors });
+      throw new BadRequestException({ message: "No se puede enviar: hay secciones incompletas o con errores", errors });
     }
 
     const sealedAt = new Date();
@@ -959,22 +976,34 @@ export class LogEntriesService {
     return result;
   }
 
-  private isSectionEditableForUser(
-    _sectionKey: string,
+  /**
+   * Por qué ESTE usuario no puede editar la sección en el estado actual (null =
+   * sí puede). Es la MISMA decisión que gatea `saveSection` y que el DTO expone
+   * como `blockedReason` para que la UI comunique el motivo real.
+   */
+  private sectionBlockedReasonFor(
     editableInStateKey: string | null,
     sectionRoleIds: string[],
     currentStateKey: string | null,
     userRoleIds: Set<string>,
-  ): boolean {
-    if (!isSectionEditableInState(editableInStateKey, currentStateKey)) return false;
+  ): SectionBlockedReason | null {
+    if (!isSectionEditableInState(editableInStateKey, currentStateKey)) return "WRONG_STATE";
     // Sin roles declarados = cualquier usuario con permiso de llenado puede.
-    if (sectionRoleIds.length > 0 && !sectionRoleIds.some((r) => userRoleIds.has(r))) return false;
-    return true;
+    if (sectionRoleIds.length > 0 && !sectionRoleIds.some((r) => userRoleIds.has(r))) return "MISSING_ROLE";
+    return null;
   }
 
   private async userRoleIds(userId: string): Promise<Set<string>> {
     const rows = await this.prisma.userRole.findMany({ where: { userId }, select: { roleId: true } });
     return new Set(rows.map((r) => r.roleId));
+  }
+
+  /** Nombre legible de roles por id (para "Asignada a: X" en el DTO de sección). */
+  private async roleNamesById(ids: string[]): Promise<Map<string, string>> {
+    const real = [...new Set(ids)];
+    if (real.length === 0) return new Map();
+    const roles = await this.prisma.role.findMany({ where: { id: { in: real } }, select: { id: true, name: true } });
+    return new Map(roles.map((r) => [r.id, r.name]));
   }
 
   /** Interno: nombre legible por id de usuario (displayName o email). */
