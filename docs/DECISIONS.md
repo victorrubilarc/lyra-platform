@@ -4,6 +4,56 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-11 · Fase 2.7.1.1 — Calendario FISCAL transversal + período al estándar industrial — APROBADO, pendiente de construir
+
+Tras revisar la pantalla de 2.7.1, el dueño del producto pidió alinear los períodos al estándar de los grandes
+sistemas ("la más potente", entre NetSuite y Maximo) y **detectó un acoplamiento de diseño correcto**: el período
+contable es **transversal**, pero hoy vive DENTRO del calendario de turnos. Se investigó el estándar (SAP OB52 /
+fiscal year variant a nivel de sociedad; NetSuite accounting periods Open/Closed/Locked + Set Up Full Year + cierre
+secuencial + Override Period Restrictions; Maximo financial periods a nivel de ORGANIZACIÓN, contiguos, rango From/To,
+validación por fecha).
+
+**Corrección estructural (la decisión central):** **DESACOPLAR** el período del calendario de turnos. Hoy
+`OperationalCalendar` empaqueta turnos + `periodKind`/ancla y `OperationalPeriod` se scopea por `calendarId` ⇒ el mes
+contable queda fragmentado por calendario de turno. El estándar es claro: el período fiscal es **transversal a la
+organización** (SAP = company code; Maximo = Organization; NetSuite = subsidiaria), separado del *factory/shift
+calendar*. Se introduce **`FiscalCalendar`** (entidad transversal: `periodKind` MONTH/WEEK/CUSTOM + ancla, con
+**default** y asignación por nodo opcional — mismo patrón de resolución por ruta que `OperationalCalendar`, simétrico).
+`OperationalCalendar` se queda **solo con turnos + ancla del día operacional**. La fecha efectiva resuelve **dos ejes
+independientes**: `(operationalDate, shiftCode)` del calendario de turnos y `periodKey` del **calendario fiscal**.
+
+**4 forks resueltos (los 4 con la recomendación):**
+1. **Modelo base = backbone Maximo + tri‑estado NetSuite.** Períodos con **rango `periodStart`/`periodEnd`** (día
+   operacional, derivado del calendario FISCAL), **contiguos sin huecos**, validación por fecha; estado
+   **OPEN → CLOSED → LOCKED**. No se copian los "períodos especiales 13–16" de SAP (ajustes de GL de cierre de año,
+   fuera del alcance de una bitácora operacional).
+2. **Generación EXPLÍCITA.** Acción "Generar períodos" (año/rango) que **materializa filas contiguas** desde la config
+   del calendario fiscal (espejo de *Set Up Full Year* / generate de Maximo), **idempotente** (jamás degrada un
+   CLOSED/LOCKED). Reemplaza la lista sintética LAZY (ventana −400/+45d) que confundía. UI agrupa por año, marca el
+   período **Actual**.
+3. **Fecha sin período generado = ABIERTA por defecto + flag opt‑in `requirePeriod`** (en el FiscalCalendar). El rechazo
+   estricto de Maximo al pie de la letra trabaría el terreno; default permisivo (seguro), flag activa el rigor estricto.
+4. **Cierre SECUENCIAL + LOCKED duro.** No se cierra un período si hay uno anterior abierto. OPEN → **CLOSED**
+   (reversible; bypass `opsperiod:write-closed` aún postea) → **LOCKED** (bloquea a TODOS, incl. bypass; reabrir exige
+   permiso superior). Permisos nuevos **`opsperiod:lock` / `opsperiod:unlock`** (catálogo **54→56**); `opsperiod:reopen`
+   queda para el reabrir soft.
+
+**Plan de implementación (2.7.1.1, su propia sesión):** migración (nueva `FiscalCalendar` + asignación por nodo;
+**mover** `periodKind`/`periodAnchorDay`/`periodStartWeekday`/`periodLengthDays`/`periodAnchorDate` de `OperationalCalendar`
+a `FiscalCalendar`, seedeando un fiscal default desde la config de período existente para que el `periodKey` ya estampado
+en `LogEntry` quede consistente; `OperationalPeriod` re‑scopeada a `fiscalCalendarId × periodKey`, += `periodStart`/
+`periodEnd`; `PeriodStatus` += `LOCKED`, CLOSING deprecado; `FiscalCalendar.requirePeriod`). Resolver: split en eje
+turno (OperationalCalendar) y eje período (FiscalCalendar) — `LogEntry` estampa `shiftCode`/`operationalDate` del primero
+y `periodKey` del segundo. `enumeratePeriods` (start/end contiguos) en `@lyra/contracts`. `OperationalPeriodService`:
+`generate` idempotente, `close` con guarda secuencial, `lock`/`unlock`, `list` por filas generadas agrupadas por año +
+"Actual"; `assertWritable` gana LOCKED (bloquea incl. bypass) y `requirePeriod`. Permisos `opsperiod:lock`/`unlock` +
+seed + invalidar caché authz. UI: mantenedor de calendario fiscal (probablemente pantalla/sección propia, separada de
+turnos) + `PeriodsSection` con "Generar" y acciones close/reopen/lock/unlock gateadas. **Supersede** la presentación LAZY
+y el scope-por-turno de 2.7.1 (el modelo de cierre/guarda se conserva y se endurece). El `periodKey` sigue siendo la
+identidad estampada (histórico intacto).
+
+---
+
 ### 2026-06-11 · Fase 2.7.1 — Período contable gobernado (`OperationalPeriod`) — IMPLEMENTADO (forks resueltos)
 
 Segundo slice de la gobernanza temporal (#5). Los períodos (`periodKey` que ya estampa el `ShiftResolver`)

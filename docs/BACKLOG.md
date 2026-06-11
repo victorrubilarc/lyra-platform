@@ -334,10 +334,20 @@ nunca queda más de una sesión atrás.
             `opsperiod:write-closed` (catálogo **54**), huella proactiva en getDetail + mantenedor en
             `/calendario-operacional`. 4 forks resueltos en DECISIONS 2026-06-11. Tests: contracts 125 · API 180.
             Smoke 17/17. **Pendiente: smoke VISUAL** (§4) + guarda de executeTransition live (cubierta por código+unit).
-        - [ ] **Diferidos de 2.7.1 (aditivos):** **(a)** **hard lock irreversible** (Odoo) como opción de config
-              (`lockLevel` SOFT|HARD) — diferido; soft-close + reapertura cubre el 95%; **(b)** KPI/indicador de
-              períodos cerrados en `/bitacoras`; **(c)** vista "¿qué entradas caen en este período?" desde el mantenedor.
-      - [ ] **2.7.2 (#6) Ventana de edición configurable** **← siguiente.** `{ancla RECORDED|EFFECTIVE, duración}` por plantilla
+        - [ ] **Diferidos de 2.7.1 (aditivos):** **(b)** KPI/indicador de períodos cerrados en `/bitacoras`; **(c)**
+              vista "¿qué entradas caen en este período?" desde el mantenedor. *(El hard lock pasó a 2.7.1.1 como LOCKED.)*
+      - [ ] **2.7.1.1 (#5b) Calendario FISCAL transversal + período al estándar industrial** **← siguiente (APROBADO,
+            DECISIONS 2026-06-11).** Corrige el acoplamiento detectado por el dueño del producto: el período contable es
+            **transversal**, hoy vive dentro del calendario de turnos. **Desacoplar** en entidad **`FiscalCalendar`**
+            (transversal, default + asignación por nodo; `OperationalCalendar` se queda solo con turnos). Modelo
+            **Maximo + tri‑estado NetSuite**: períodos con rango From/To contiguos, **generación explícita** ("Generar
+            períodos" idempotente), estado **OPEN→CLOSED→LOCKED** (LOCKED duro bloquea incl. bypass; reabrir con
+            `opsperiod:unlock`), **cierre secuencial**, fecha sin período = abierta por defecto + flag `requirePeriod`.
+            `OperationalPeriod` re‑scopeada a `fiscalCalendarId × periodKey`. Permisos `opsperiod:lock`/`unlock`
+            (catálogo **54→56**). Supersede la presentación LAZY y el scope-por-turno de 2.7.1 (modelo de cierre/guarda
+            se conserva y endurece). El `periodKey` estampado no se rompe (se migra la config de período). 4 forks +
+            corrección estructural resueltos en DECISIONS 2026-06-11. **Su propia sesión.**
+      - [ ] **2.7.2 (#6) Ventana de edición configurable** `{ancla RECORDED|EFFECTIVE, duración}` por plantilla
             (fallback global); fuera de ventana solo privilegio explícito con motivo auditado; con período gana
             la restricción MÁS estricta. Extiende `blockedReason` con `EDIT_WINDOW_EXPIRED` (enum ya extensible).
       - [ ] **2.7.3 (#7) Permisos sección × tiempo**: matriz administrable rol×sección×ventana aplicada en
