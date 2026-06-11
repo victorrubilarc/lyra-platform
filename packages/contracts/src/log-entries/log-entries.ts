@@ -99,6 +99,18 @@ export const logEntrySignatureSummarySchema = z.object({
 export type LogEntrySignatureSummaryDto = z.infer<typeof logEntrySignatureSummarySchema>;
 
 /**
+ * Por qué ESTE usuario no puede editar la sección ahora (la UI lo comunica tal
+ * cual; el backend lo decide). Enum EXTENSIBLE: la gobernanza temporal (Fase 2.7)
+ * sumará PERIOD_CLOSED / EDIT_WINDOW_EXPIRED sin romper a los consumidores.
+ *  - ENTRY_CLOSED: la entrada ya fue enviada/anulada (registro sellado).
+ *  - WRONG_STATE: la sección se edita en OTRO estado del flujo.
+ *  - MISSING_ROLE: la sección está asignada a roles que el usuario no tiene.
+ */
+export const SECTION_BLOCKED_REASONS = ["ENTRY_CLOSED", "WRONG_STATE", "MISSING_ROLE"] as const;
+export const sectionBlockedReasonSchema = z.enum(SECTION_BLOCKED_REASONS);
+export type SectionBlockedReason = z.infer<typeof sectionBlockedReasonSchema>;
+
+/**
  * Estado de EJECUCIÓN de una sección (no su definición, que vive en la versión).
  * `editable` lo resuelve el backend para el usuario que pide el detalle =
  * (sección editable en el estado actual) × (rol con permiso de sección) × (ABAC).
@@ -113,6 +125,14 @@ export const logEntrySectionStateDtoSchema = z.object({
   version: z.number().int(),
   /** ¿Puede ESTE usuario editar la sección ahora? (decidido en backend). */
   editable: z.boolean(),
+  /** Motivo de bloqueo cuando `editable = false` (null si es editable). */
+  blockedReason: sectionBlockedReasonSchema.nullable(),
+  /** Nombres de los roles-dato asignados a la sección ([] = abierta a cualquiera
+   * con el permiso de llenado). Para que la UI muestre "Asignada a: X". */
+  assignedRoleNames: z.array(z.string()),
+  /** Campos cuyo override de rol (`TemplateFieldRole`) EXCLUYE a este usuario:
+   * la UI los pinta solo-lectura; el backend ya rechaza su escritura con 403. */
+  readOnlyFieldKeys: z.array(z.string()),
   /** Firma de completitud de la sección, si fue firmada (Part 11). null = sin firma. */
   signature: logEntrySignatureSummarySchema.nullable(),
 });

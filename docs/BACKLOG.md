@@ -5,10 +5,10 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-10** (**Fase 2.1/2.1.1/2.2/2.x/2.3.0 ✅** + **2.4 ✅** + **2.5 ✅** + **2.6.0 ✅** — … +
-> **Módulo de Bitácoras núcleo de lectura**: grilla `/bitacoras` + record viewer + timeline ALCOA+ + verificación de
-> firmas §11.70 + export CSV; **siguiente: 2.6.1 — Personalización (SavedView de plataforma + gestor de columnas)**,
-> o 2.3 Rondas / 2.6.2 intercalables).
+> actualización: **2026-06-11** (**Afinamiento #4 ✅** — guardado por sección autoexplicativo + `submit` objetivo +
+> motivos de bloqueo en contrato/UI. Las **10 mejoras post-2.6.0** quedaron registradas en §2 y el **plan de fases
+> 2.7/2.8/2.9 está PROPUESTO en DECISIONS 2026-06-11, pendiente de visto bueno**; siguiente: aprobar el plan y
+> arrancar **2.7.0 Registro diferido**).
 
 ---
 
@@ -54,6 +54,7 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Fase 2.4 Llenado (Nueva entrada)** (`LogEntry*` + `/log-entries` + `FieldControl` + pantalla de llenado) | `main` (fusionado desde `feat/llenado`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Fase 2.5 Ejecución de flujo + firmas Part 11** (`LogEntryTransition`/`LogEntrySignature` + `executeTransition` + `ReauthService` + modales de firma) | `main` (fusionado desde `feat/ejecucion-flujo`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Fase 2.6.0 Módulo de Bitácoras — núcleo de lectura** (folio + estampados + `LogbookQueryService` + `/bitacoras` + record viewer + verificación de firmas) | `main` (fusionado desde `feat/bitacoras-auditor`) | ✅ fusionado y publicado en `origin/main` | ninguna |
+| **Afinamiento #4** (triage 10 mejoras + guardado por sección autoexplicativo + `submit` objetivo + motivos de bloqueo) | `main` (fusionado desde `feat/afinamiento-llenado`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 
 **Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
@@ -303,6 +304,44 @@ nunca queda más de una sesión atrás.
         resolver el calendario o facetas), **export con columnas de valores al filtrar por UNA plantilla**,
         contador de cambios por campo inline en sección (popover). Formato LONG de export diferido hasta demanda BI.
   - [ ] **2.7 (cruce Fase 4)** reglas de umbral que disparan incidencias (con el motor de incidencias).
+        *Nota 2026-06-11: con el plan post-2.6.0 los números 2.7/2.8/2.9 se reasignan a las fases nuevas (abajo);
+        este cruce umbral→incidencia pasa a vivir dentro de la Fase 4.*
+  - [ ] **MEJORAS POST-2.6.0 (revisión del dueño del producto, 2026-06-11)** — 10 mejoras registradas; texto
+        íntegro fuente de verdad en `docs/NEXT_SESSION.md`; triage + plan de fases PROPUESTO en DECISIONS
+        2026-06-11 (**pendiente de visto bueno**; orden recomendado 2.7 → 2.8 → 2.9):
+    - [x] **#4 Rediseño "Guardar sección"/"Guardar y completar" + garantía por sección en servidor** ✅
+          (2026-06-11, esta sesión). Auditado ANTES de declarar bug: el backend ya gateaba (sin agujero); causas
+          reales = datos demo sin roles por sección + DTO sin "porqué" + gap REAL en `submit` sin flujo (sellaba
+          sin secciones COMPLETED ⇒ eludía la firma de sección). Ver DECISIONS 2026-06-11.
+    - [ ] **Fase 2.7 — Gobernanza temporal del registro** (interdependientes; alta prioridad por integridad):
+      - [ ] **2.7.0 (#1) Registro diferido**: UX gesto mínimo sobre `effectiveAt` (modelo YA resuelto) + marca
+            explícita `entryOrigin` ONLINE|DEFERRED + motivo + huella en grilla/visor/timeline. Valida contra
+            período (2.7.1) y ventana (2.7.2) cuando existan.
+      - [ ] **2.7.1 (#5) Período contable gobernado**: entidad `OperationalPeriod` (calendario × periodKey) con
+            OPEN/CLOSING/CLOSED, cierre/reapertura con motivo+permiso+auditoría, guardas de escritura por
+            `effectiveAt`, roles privilegiados configurables. Referentes: SAP OB52 / NetSuite / Odoo lock dates /
+            Maximo financial periods (destilado en DECISIONS).
+      - [ ] **2.7.2 (#6) Ventana de edición configurable** `{ancla RECORDED|EFFECTIVE, duración}` por plantilla
+            (fallback global); fuera de ventana solo privilegio explícito con motivo auditado; con período gana
+            la restricción MÁS estricta.
+      - [ ] **2.7.3 (#7) Permisos sección × tiempo**: matriz administrable rol×sección×ventana aplicada en
+            servidor; extiende `blockedReason` (+PERIOD_CLOSED, +EDIT_WINDOW_EXPIRED) para que la UI siempre
+            diga POR QUÉ.
+    - [ ] **Fase 2.8 — Alcance de plantilla + acceso** (absorbe diferido (a) de 2.4 y la 2.6.1 planificada):
+      - [ ] **2.8.0 (#2) Plantillas multi-nodo**: N:M `TemplateNodeAssignment` (nodo + `includeDescendants`),
+            3 modos (uno/varios/"todos los hijos de X" incl. nodos futuros), migración de datos, selector de
+            nodo al crear entrada filtrado por asignación ∩ ABAC.
+      - [ ] **2.8.1 (#9) UX de acceso nodo↔grilla** (+ SavedView/gestor de columnas de 2.6.1 FUSIONADOS aquí):
+            presentar 2–3 alternativas con pros/contras ANTES de implementar; "mis nodos"/recientes/favoritos,
+            búsqueda, filtros persistentes.
+    - [ ] **Fase 2.9 — Plantillas inteligentes**:
+      - [ ] **2.9.0 (#3) Layouts modernos**: modo por versión (clásico/pestañas/wizard/colapsable) + grilla
+            responsiva de campos (1/1, 1/2, 1/3) + separadores/ayudas, como DATO de la versión.
+      - [ ] **2.9.1 (#8) Motor de reglas de negocio**: condición→acción como dato versionado (mostrar/ocultar,
+            habilitar, exigir, calcular, validar entre campos), misma fuente única back↔front (generaliza
+            `visibleWhen`/`validateFieldValue`); admin visual sin código; extensible a notificar/escalar/incidente.
+    - [ ] **#10 IA-ready**: restricción TRANSVERSAL de diseño (no fase): metadatos estructurados + reglas como
+          datos + claves estables; documentar por fase qué habilita. La IA sigue detrás de `LlmProvider`.
   - [ ] **Expansión de tipos de campo (incremental, cada uno pequeño).** Alto valor industrial: **Conforme/No
         conforme/N.A.** (tri-estado), **lookup/picker de referencia** (single/multi, tras 2.x), **picker de
         Equipo/Usuario/Nodo** (`reference`), **grupo repetible / tabla-matriz**, **campo calculado/fórmula**,
@@ -513,6 +552,13 @@ probatoria (hash+timestamp). Ref: `DECISIONS.md` (sección de recomendaciones).
       **verificar integridad** [VALID y VALID_RECORD_CHANGED_AFTER tras editar], timeline unificada + cargar más,
       log de cambios antes→después, relacionadas navegables, **imprimir** [solo contenido, sin chrome]); ítem
       "Bitácoras" en sidebar y ⌘K; modo claro y oscuro; tablet. App en `:5173`.
+- [ ] **Afinamiento #4 — smoke VISUAL en navegador** (se verificó typecheck/lint/test/build + smoke por API 22/22;
+      falta el clic): en `/nueva-entrada/:id` con una plantilla cuyas secciones tengan roles asignados y un campo con
+      override: chip "N de M secciones completadas" en cabecera; chip "Asignada a: <rol>" por sección; sección ajena
+      bloqueada con el motivo real ("asignada a X" / "se completa en la etapa Y" / "ya fue registrada"); campo
+      reservado en solo-lectura con nota; botones "Guardar avance" y "Completar sección"/"Completar y firmar" con
+      hint; "Enviar y registrar" deshabilitado listando las secciones que faltan (y habilitado al completar todas);
+      transiciones deshabilitadas con la misma guía; modo claro. App en `:5173`.
 - [ ] **Ejecución de flujo + firmas 2.5 — smoke VISUAL en navegador** (se verificó typecheck/lint/test/build web +
       smoke por API 21/21; falta el clic): abrir una entrada con flujo en `/nueva-entrada/:id` → chip de estado del
       flujo en cabecera; completar la sección del estado inicial; **barra de transiciones** (botones gateados por

@@ -117,7 +117,10 @@
 > (`WorkflowTransitionRole`), (c) ABAC sobre el nodo, (d) completitud de las secciones del estado de origen; aplica el
 > cambio de estado, recomputa secciones (`LOCKED`/reapertura), **sella** `effectiveAt`+dimensiones en la 1ª salida del
 > estado inicial y reconcilia `status` (terminal ⇒ `SUBMITTED`). `submit` queda SOLO para forms sin flujo (con flujo se
-> rechaza). Firma opt-in por transición (`requireSignature`/`requireMfa`) y por completitud de sección
+> rechaza) y desde el Afinamiento #4 (2026-06-11) su validación es **OBJETIVA**: exige TODAS las secciones con campos
+> en `COMPLETED` (no solo las del que envía) — espejo del guard (d) de `executeTransition`; garantiza que la firma de
+> completitud de sección no se pueda eludir. El DTO de sección expone además `blockedReason`/`assignedRoleNames`/
+> `readOnlyFieldKeys` para que la UI comunique el motivo real del bloqueo. Firma opt-in por transición (`requireSignature`/`requireMfa`) y por completitud de sección
 > (`TemplateSection.requireSignature`), capturada con `ReauthService` (contraseña + MFA step-up condicional).
 >
 > **Lectura / módulo de Bitácoras (2.6 — implementado):** `LogbookQueryService` (CQRS-lite, mismo módulo) sirve

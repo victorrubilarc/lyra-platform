@@ -97,13 +97,44 @@ export function EntryFillPage() {
   const isDraft = entry.status === "DRAFT";
   const stateBySection = new Map(entry.sectionStates.map((s) => [s.sectionKey, s]));
 
+  // Progreso y completitud (espejo del guard del backend: secciones CON campos).
+  const sectionsWithFields = entry.version.sections.filter((s) => s.fields.length > 0);
+  const completedCount = sectionsWithFields.filter((s) => stateBySection.get(s.key)?.state === "COMPLETED").length;
+  // Secciones que el backend exigirá COMPLETED para enviar (sin flujo) o avanzar
+  // (con flujo): las editables en el estado actual. El servidor re-valida siempre.
+  const missingSections = sectionsWithFields.filter(
+    (s) =>
+      (s.editableInStateKey === null || s.editableInStateKey === entry.currentStateKey) &&
+      stateBySection.get(s.key)?.state !== "COMPLETED",
+  );
+  const missingTitles = missingSections.map((s) => `«${s.title}»`).join(", ");
+
+  /** Motivo de bloqueo de la sección, tal como lo decidió el backend. */
+  function blockedMessage(section: TemplateSectionDto, st: LogEntrySectionStateDto): string {
+    switch (st.blockedReason) {
+      case "MISSING_ROLE":
+        return t("logbook.fill.blockedMissingRole", { roles: st.assignedRoleNames.join(", ") });
+      case "WRONG_STATE": {
+        const stateName =
+          entry?.workflowVersion?.states.find((s) => s.key === section.editableInStateKey)?.name ??
+          section.editableInStateKey ??
+          "";
+        return t("logbook.fill.blockedWrongState", { state: stateName });
+      }
+      default:
+        return t("logbook.fill.blockedEntryClosed");
+    }
+  }
+
   function saveSection(
     section: TemplateSectionDto,
     st: LogEntrySectionStateDto,
     markComplete: boolean,
     password?: string,
   ) {
-    const visible = section.fields.filter((f) => isFieldVisible(f.visibleWhen, draft));
+    // No se envían los campos reservados a otro rol (el usuario no puede modificarlos).
+    const restricted = new Set(st.readOnlyFieldKeys);
+    const visible = section.fields.filter((f) => isFieldVisible(f.visibleWhen, draft) && !restricted.has(f.key));
     const values = visible.map((f) => ({ fieldKey: f.key, value: draft[f.key] ?? null }));
     setSavingKey(section.key + (markComplete ? ":complete" : ""));
     save.mutate(
@@ -173,6 +204,12 @@ export function EntryFillPage() {
               variant={entry.status === "SUBMITTED" ? "success" : entry.status === "VOID" ? "default" : "warning"}
               label={t(`logbook.status.${entry.status}`)}
             />
+            {sectionsWithFields.length > 0 && (
+              <Chip
+                variant={completedCount === sectionsWithFields.length ? "success" : "default"}
+                label={t("logbook.fill.progress", { done: completedCount, total: sectionsWithFields.length })}
+              />
+            )}
           </div>
         </div>
         <div className={styles.dimsRow}>
@@ -208,6 +245,7 @@ export function EntryFillPage() {
         const st = stateBySection.get(section.key);
         const editable = Boolean(st?.editable) && isDraft;
         const visible = section.fields.filter((f) => isFieldVisible(f.visibleWhen, draft));
+        const restrictedKeys = new Set(st?.readOnlyFieldKeys ?? []);
         return (
           <Card key={section.key} className={styles.section}>
             <div className={styles.sectionHead}>
@@ -216,6 +254,9 @@ export function EntryFillPage() {
                 {section.description && <div className={styles.sectionDesc}>{section.description}</div>}
               </div>
               <div className={styles.sectionMeta}>
+                {st && st.assignedRoleNames.length > 0 && (
+                  <Chip variant="info" label={t("logbook.fill.assignedTo", { roles: st.assignedRoleNames.join(", ") })} />
+                )}
                 {st && <Chip variant={st.state === "COMPLETED" ? "success" : st.state === "LOCKED" ? "default" : "warning"} label={t(`logbook.sectionState.${st.state}`)} />}
                 {st?.signature && (
                   <Chip variant="success" label={t("logbook.fill.signedBy", { name: st.signature.signerName })} />
@@ -224,18 +265,25 @@ export function EntryFillPage() {
               </div>
             </div>
 
-            {!editable && (
+            {!editable && st && (
               <div className={styles.lockedNote}>
-                <Lock size={13} /> {isDraft ? t("logbook.fill.notEditable") : t("logbook.fill.readonlySubmitted")}
+                <Lock size={13} /> {blockedMessage(section, st)}
               </div>
             )}
 
             <div>
               {visible.map((f) => {
-                const errs = editable ? validateFieldValue(fieldForValidation(f), draft[f.key], { allowedCodes: inlineCodes(f.config) }).errors : [];
+                const restricted = restrictedKeys.has(f.key);
+                const fieldEditable = editable && !restricted;
+                const errs = fieldEditable ? validateFieldValue(fieldForValidation(f), draft[f.key], { allowedCodes: inlineCodes(f.config) }).errors : [];
                 return (
                   <div key={f.key}>
-                    <FieldControl field={f} value={draft[f.key]} onChange={(v) => setValue(f.key, v)} readOnly={!editable} invalid={errs.length > 0} />
+                    <FieldControl field={f} value={draft[f.key]} onChange={(v) => setValue(f.key, v)} readOnly={!fieldEditable} invalid={errs.length > 0} />
+                    {restricted && editable && (
+                      <div className={styles.lockedNote}>
+                        <Lock size={12} /> {t("logbook.fill.fieldRestricted")}
+                      </div>
+                    )}
                     {errs.map((msg, i) => (
                       <div key={i} className={styles.fieldError}>
                         <AlertTriangle size={12} /> {msg}
@@ -256,31 +304,50 @@ export function EntryFillPage() {
                   {section.requireSignature ? <PenLine size={15} /> : <CheckCircle2 size={15} />}{" "}
                   {section.requireSignature ? t("logbook.fill.completeAndSign") : t("logbook.fill.completeSection")}
                 </Button>
+                <span className={styles.submitHint}>{t("logbook.fill.completeHint")}</span>
               </div>
             )}
           </Card>
         );
       })}
 
-      {/* Acciones: con flujo → transiciones (gateadas por el backend); sin flujo → enviar */}
+      {/* Acciones: con flujo → transiciones (gateadas por el backend); sin flujo → enviar.
+          La completitud requerida se refleja aquí (deshabilita + dice QUÉ falta);
+          el backend re-valida siempre. */}
       {isDraft && entry.workflowVersion ? (
         <div className={styles.transitionBar}>
           {entry.availableTransitions.length === 0 ? (
             <span className={styles.submitHint}>{t("logbook.transition.none")}</span>
           ) : (
-            entry.availableTransitions.map((tr, i) => (
-              <Button key={tr.transitionKey} variant={i === 0 ? "primary" : "secondary"} onClick={() => setActiveTransition(tr)}>
-                {tr.requireSignature ? <PenLine size={15} /> : <ChevronRight size={15} />} {tr.label}
-              </Button>
-            ))
+            <>
+              {entry.availableTransitions.map((tr, i) => (
+                <Button
+                  key={tr.transitionKey}
+                  variant={i === 0 ? "primary" : "secondary"}
+                  disabled={missingSections.length > 0}
+                  onClick={() => setActiveTransition(tr)}
+                >
+                  {tr.requireSignature ? <PenLine size={15} /> : <ChevronRight size={15} />} {tr.label}
+                </Button>
+              ))}
+              <span className={styles.submitHint}>
+                {missingSections.length > 0
+                  ? t("logbook.fill.advanceMissing", { sections: missingTitles })
+                  : t("logbook.fill.submitHint")}
+              </span>
+            </>
           )}
         </div>
       ) : isDraft ? (
         <div className={styles.submitBar}>
-          <Button variant="primary" loading={submit.isPending} onClick={doSubmit}>
+          <Button variant="primary" loading={submit.isPending} disabled={missingSections.length > 0} onClick={doSubmit}>
             <Send size={15} /> {t("logbook.fill.submit")}
           </Button>
-          <span className={styles.submitHint}>{t("logbook.fill.submitHint")}</span>
+          <span className={styles.submitHint}>
+            {missingSections.length > 0
+              ? t("logbook.fill.submitMissing", { sections: missingTitles })
+              : t("logbook.fill.submitHint")}
+          </span>
         </div>
       ) : null}
 

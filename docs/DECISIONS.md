@@ -4,6 +4,101 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-11 · Revisión del dueño del producto: 10 mejoras post-2.6.0 — triage, auditoría del #4 y plan de fases (PROPUESTO)
+
+El dueño del producto entregó **10 mejoras** tras una revisión exhaustiva en el navegador (texto íntegro en
+`docs/BACKLOG.md` §2 "Mejoras post-2.6.0" y en `docs/NEXT_SESSION.md`). Esta sesión hizo triage + investigación +
+diseño, y ejecutó SOLO el fix **#4** (abajo). El plan de fases queda **PROPUESTO, pendiente de visto bueno**; no se
+codea ninguna fase grande sin aprobación (CLAUDE.md).
+
+**Auditoría del #4 (hallazgo real, documentado ANTES de declarar bug):**
+- El backend **SÍ gatea** la edición por sección en el servidor (`LogEntriesService.saveSection`): editabilidad =
+  (sección editable en `currentStateKey`) × (rol-dato `TemplateSectionRole` + override por campo `TemplateFieldRole`)
+  × ABAC, con 403. **No hay agujero de autorización.**
+- Lo que el usuario observó tiene 3 causas reales: **(a) datos** — la plantilla de prueba publicada tiene 0 roles por
+  sección y `editableInStateKey` null, y el sistema demo tiene UN solo rol (Administrador) que tienen los 3 usuarios ⇒
+  nunca hay nada que gatear (una sección sin roles queda abierta a cualquiera con `logentry:fill`, degradación
+  elegante POR DISEÑO); **(b) UX** — el DTO solo exponía `editable: boolean` sin el PORQUÉ, la UI no muestra a qué rol
+  está asignada cada sección ni qué falta para completar/avanzar, y los nombres "Guardar sección"/"Guardar y
+  completar" no describen el efecto; **(c) un gap REAL en `submit` (forms sin flujo)** — validaba completitud solo
+  sobre las secciones editables POR EL QUE ENVÍA (predicado relativo al usuario) y NO exigía secciones en estado
+  COMPLETED ⇒ un actor podía SELLAR la entrada con secciones de otros roles incompletas y, peor, **sin capturar la
+  firma de completitud de sección** (`TemplateSection.requireSignature` se podía eludir por la vía submit). Con
+  flujo, `executeTransition` ya validaba objetivo (guard d); el submit sin flujo quedó asimétrico desde 2.5.
+
+**Fix #4 implementado (esta sesión):**
+1. **`submit` (sin flujo) pasa a validación OBJETIVA**: exige TODAS las secciones con campos en `COMPLETED` y valida
+   todos los obligatorios/valores (predicado objetivo, espejo del guard (d) de `executeTransition`). Cierra la elusión
+   de la firma de sección (Part 11) y la asimetría con flujo. Enviar = sellar el registro completo (GxP commit).
+2. **Contrato aditivo**: `LogEntrySectionStateDto` gana `blockedReason` (`ENTRY_CLOSED` | `WRONG_STATE` |
+   `MISSING_ROLE` | null), `assignedRoleNames: string[]` (nombres de los roles-dato de la sección) y
+   `readOnlyFieldKeys: string[]` (campos cuyo override de rol excluye al usuario). El enum nace EXTENSIBLE a
+   propósito: la Fase de gobernanza temporal le sumará `PERIOD_CLOSED`/`EDIT_WINDOW_EXPIRED` (#7) sin migración.
+3. **UI del llenado autoexplicativa**: barra de progreso de secciones en cabecera ("N de M completadas"); por sección,
+   chip de asignación de rol y motivo de bloqueo específico (no más "no editable" genérico); campos con override en
+   solo-lectura visible; acciones renombradas a lo que HACEN: "Guardar avance" (persiste sin completar) y "Completar
+   sección" / "Completar y firmar" (marca COMPLETED + firma si corresponde), con hint; "Enviar y registrar" se
+   deshabilita listando qué secciones faltan (el backend re-valida siempre).
+
+**Plan de fases PROPUESTO (espera visto bueno; sub-slices publicables):**
+- **Fase 2.7 — Gobernanza temporal del registro** (#5 + #6 + #1 + #7, interdependientes; toca la INTEGRIDAD del
+  registro auditable):
+  - **2.7.0 Registro diferido (#1):** el modelo temporal YA existe (`recordedAt` vs `effectiveAt`); falta la UX de
+    gesto mínimo ("Registrar con otra fecha/hora"), la marca explícita de entrada diferida (`entryOrigin`
+    ONLINE|DEFERRED declarado, no inferido) + motivo, y su huella en grilla/visor/timeline. GxP: la entrada tardía es
+    legítima si queda IDENTIFICADA como tal con fecha de evento vs fecha de registro y quién (ALCOA+ contemporaneous;
+    el backdating se vuelve fraude solo cuando se OCULTA).
+  - **2.7.1 Período gobernado (#5):** entidad NUEVA `OperationalPeriod` (calendario × `periodKey`) con estado
+    `OPEN`/`CLOSING`/`CLOSED`, cierre y **reapertura con motivo + permiso + auditoría**; guardas de ESCRITURA: toda
+    mutación (crear/guardar/transicionar) cuya `effectiveAt` caiga en período no abierto se bloquea salvo rol
+    privilegiado configurable. Referentes destilados: SAP OB52 (intervalos abiertos por grupo de autorización — roles
+    privilegiados pueden postear en período en cierre), NetSuite (reapertura con justificación obligatoria y
+    re-cierre; "Allow Non-G/L Changes" = edición parcial configurable en período cerrado), Odoo (lock date "soft" con
+    excepciones por usuario+motivo auditadas vs **hard lock irreversible**, que adoptamos como opción de
+    configuración), Maximo (transacción rechazada si `actualdate` no cae en período financiero activo).
+  - **2.7.2 Ventana de edición (#6):** config por plantilla (fallback global) `{ancla: RECORDED|EFFECTIVE, duración}`;
+    fuera de ventana solo roles con privilegio explícito y motivo (corrección excepcional auditada, patrón GxP).
+    Convive con 2.7.1: **gana la restricción más estricta**.
+  - **2.7.3 Permisos sección × tiempo (#7):** matriz administrable rol × sección × ventana temporal aplicada en
+    servidor; extiende el `blockedReason` de hoy para que la UI diga SIEMPRE por qué ("Período cerrado", "Fuera de
+    ventana", "Asignada a otro rol").
+- **Fase 2.8 — Alcance de plantilla + acceso** (#2 + #9; absorbe el diferido (a) de 2.4 y la 2.6.1 planificada):
+  - **2.8.0 Multi-nodo (#2):** N:M `TemplateNodeAssignment` (`orgNodeId` + `includeDescendants`) que reemplaza el
+    `Template.orgNodeId` único (migración: 1 fila por plantilla existente; 0 filas = global). Cubre los 3 modos
+    pedidos (uno / varios / "todos los hijos de X" con herencia a nodos futuros vía path). Al crear entrada: selector
+    de nodo filtrado por asignación ∩ ABAC cuando resuelve >1.
+  - **2.8.1 UX de acceso (#9 + 2.6.1):** se presentarán 2–3 alternativas con pros/contras ANTES de implementar
+    (entrada por nodo vs selector en flujo vs vista global con filtros persistentes — patrones Maximo Start
+    Center/"mis activos", j5 listas configurables por estación, Shiftconnector). La 2.6.1 (SavedView + gestor de
+    columnas) SE FUSIONA aquí: "filtros persistentes" de #9 y SavedView son la misma pieza.
+- **Fase 2.9 — Plantillas inteligentes** (#3 + #8):
+  - **2.9.0 Layouts (#3):** modo de presentación por versión (CLÁSICO | PESTAÑAS | WIZARD | COLAPSABLE) + grilla
+    responsiva de campos (ancho 1/1, 1/2, 1/3) + separadores/ayudas, todo DATO en la `TemplateVersion`. Referentes:
+    NN/g (wizard para proceso secuencial, tabs para acceso aleatorio, accordion reduce visibilidad — el modo lo
+    decide el CREADOR según naturaleza), Salesforce Dynamic Forms / page layouts, ServiceNow form sections.
+  - **2.9.1 Motor de reglas (#8):** reglas condición→acción como DATO VERSIONADO en la `TemplateVersion`
+    (mostrar/ocultar, habilitar/deshabilitar, exigir, calcular, validar entre campos), evaluadas por la MISMA fuente
+    única back↔front (generaliza `visibleWhen` + `validateFieldValue` + umbrales ISA-18.2 ya existentes). Referentes:
+    ServiceNow **UI Policies** (condición→acción declarativa no-code; con **Data Policies** como espejo server-side =
+    exactamente nuestra arquitectura cliente-UX/servidor-garantía) y Salesforce **Validation Rules** (fórmula → error
+    bloqueante) + Dynamic Forms (visibilidad condicional por campo/sección). Extensible a acciones futuras
+    (notificar, escalar, gatillar incidente — gancho Fase 4).
+- **#10 IA-ready = restricción TRANSVERSAL de diseño, no fase**: cada fase deja metadatos estructurados y enumerados
+  (dimensiones estampadas, `entryOrigin`, períodos con clave estable, `blockedReason`, reglas como datos versionados)
+  que son exactamente el substrato que un LLM necesita para búsqueda en lenguaje natural/resúmenes vía la interfaz
+  `LlmProvider` ya abstracta. Se documenta por fase.
+
+**Orden recomendado entre fases: 2.7 → 2.8 → 2.9** (coincide con la inclinación del usuario, con fundamento): (a) la
+gobernanza temporal cambia la semántica del CAMINO DE ESCRITURA — mientras antes exista, menos datos nacen bajo
+reglas laxas (retrofit barato hoy: `periodKey` ya se estampa); (b) el registro diferido (#1) es EL bloqueador
+operacional de adopción (las entradas atrasadas son lo habitual en operación real); (c) #7 necesita período+ventana
+para existir y #4 ya dejó el `blockedReason` listo para extenderlo. Contraste honesto: **2.8.0 multi-nodo es barato y
+auto-contenido** — si el piloto Eagon lo necesita para estructurar sus bitácoras antes, puede adelantarse como slice
+suelto sin romper el orden. 2.6.2 (analítica) queda intercalable tras 2.8; 2.3 Rondas se reevalúa tras 2.7 (sinergia
+con período/turnos).
+
+---
+
 ### 2026-06-10 · Fase 2.6 Módulo de Bitácoras — diseño COMPLETO + slicing; 2.6.0 (núcleo de lectura) IMPLEMENTADO
 
 Vista de consulta/auditoría sobre todo lo que produce la ejecución (2.4/2.5). El módulo se **diseñó completo de una
