@@ -7,7 +7,8 @@
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
 > actualización: **2026-06-11** (**Fase 2.7.0 Registro diferido ✅** — `entryOrigin` DECLARADO + motivo obligatorio +
 > gesto mínimo + huella en grilla/visor/timeline. El **plan de fases 2.7/2.8/2.9 fue APROBADO** por el dueño del
-> producto (DECISIONS 2026-06-11); siguiente: **2.7.1 Período contable gobernado**).
+> producto (DECISIONS 2026-06-11); siguiente: **2.7.1 Período contable gobernado**. Anotada deuda **2.8.2**:
+> creación de entrada sin borradores huérfanos + descarte de borrador).
 
 ---
 
@@ -341,6 +342,17 @@ nunca queda más de una sesión atrás.
       - [ ] **2.8.1 (#9) UX de acceso nodo↔grilla** (+ SavedView/gestor de columnas de 2.6.1 FUSIONADOS aquí):
             presentar 2–3 alternativas con pros/contras ANTES de implementar; "mis nodos"/recientes/favoritos,
             búsqueda, filtros persistentes.
+      - [ ] **2.8.2 Creación de entrada SIN borradores huérfanos + descarte de borrador** (deuda de UX/integridad
+            detectada 2026-06-11). HOY elegir una plantilla en `/nueva-entrada` hace `POST /log-entries` de
+            inmediato: persiste un `LogEntry` DRAFT en BD (incluido el diferimiento si se declaró) y la grilla lo
+            muestra (no filtra DRAFT por defecto). Un clic accidental o una prueba dejan **borradores vacíos
+            huérfanos imposibles de retirar** (no existe `DELETE` ni transición a `VOID` en el controller). Dos
+            frentes: **(a)** diferir la persistencia — elegir plantilla NO crea nada; la entrada se materializa en
+            el **primer guardado real** (1ª sección guardada / confirmación); mientras tanto el llenado trabaja
+            contra un borrador en memoria; **(b)** **anulación de borrador** (`VOID` con motivo + permiso +
+            auditoría — nunca borrado físico, por ALCOA+) para los que sí persistan. Cambia el modelo de creación
+            y toca el flujo de llenado ⇒ proponer enfoque y esperar visto bueno antes de codear. Ref: conversación
+            2026-06-11.
     - [ ] **Fase 2.9 — Plantillas inteligentes**:
       - [ ] **2.9.0 (#3) Layouts modernos**: modo por versión (clásico/pestañas/wizard/colapsable) + grilla
             responsiva de campos (1/1, 1/2, 1/3) + separadores/ayudas, como DATO de la versión.
