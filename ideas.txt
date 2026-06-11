@@ -1,0 +1,49 @@
+- Considerar que una entrada de bitácora puede ser registrada en línea en el turno, 
+  o bien un operador puede registrarla atrasad en diferido por varias razones. Esto no lo puedo hacer ahora
+  porque asigna la fecha hora en forma automática. Quizá hay que considerar una forma dual pero que sea facil
+  de usar por el usuario final sin mayor complejidad
+
+- Una plantilla tiene asignada un nodo de la estructura. 
+  No sé como lo planteas pero por ejemplo una misma bitácora puede ser registrada 
+  en todos los nodos hijos de una estructura o en las que se encuentren 
+  chequeadas, sin embargo, la plantilla me permite solo seleccionar un nodo, y obviamente lo asigna automáticamente en la 
+  entrada.
+
+- En este momento las plantillas se renderizan hacia abajo como un formulario infinito. Los campos van todos hacia abajo.
+  Quisiera que fueras mas creativo. Que el usuario creador pudiera configurar formatos, por ejemplo secciones por pestaña,
+  o modo wizard, o otros modos modernos para que en el caso de formularios grandes no sea tan denso. Tambien los campos poder
+  configurarlos y mejorar el layout de presentacion para que no vayan todos hacia abajo.
+
+- En la opcion de Nueva Entrada, No entiendo para nada para que sirve los botones Guardar seccion y Guardar y completar.
+  Aunque no tenga rol asignado la seccion se está pudiendo registrar de todas formas. No entiendo como funciona. Esto debe
+  ser intuitivo, y si yo no lo entiendo, menos lo entenderá el usuario. Debes mejorar esta parte.
+
+- Te había pedido manejar los turnos (lo cual está bien), pero ademas el periodo contable pero parece que entendiste mal.
+  Cuando hablo del periodo contable, me refiero al mes contable y que al igual que los turnos, el mes contable tambien puede
+  comenzar y/o finalizar no en el dia hora calendario. Esto debe poderse configurar. Se deben poder abrir o cerrar los meses
+  contables y los usuarios en un mes cerrado no podrian (segun alguna configuracion) modificar movimientos. Quiero que
+  revises los mejores sistemas de este tipo y veas como lo hacen ls mejores software del mundo en este caso. Quiero la 
+  implementacion mas potente.
+
+- Tambien hay que ver como limitar las modificaciones de las entradas con x dias, para evitar correcciones fuera de la 
+  ventana de tiempo permitida.
+
+- En el registro de entradas hay que considerar quien puede o no puede y en que instancia de tiempo modificar los datos de 
+  una seccion. 
+
+- Hay que considerar la implementacion de reglas de negocio para implementar en las plantillas, para que estas sean mas
+  inteligentes, tengan validaciones, los campos tengan reacciones de acuerdo a lo que se registre en otros campos de la 
+  plantilla. Las reglas de negocio deben ser claras de administrar, de nuevo como lo hacen los mejores software del mundo 
+  en este tipo de aplicaciones o soluciones. Quiero que sea potente y que sea facil de mantener o muy intuitivo.
+
+- Quiero que busques la mejor solucion respecto de acceder al registro de una entrada de bitacora (me refiero a los nodos) y tambien 
+  a la pantalla de Bitacoras donde aparece la grilla. En qwue momento tener entradas separadas, o que el usuario seleccione
+  el nodo, no sé como sería una buena entrada a esas opciones. Investiga las mejores alternativas. Tienes que ver multiples casos de uso 
+  en la industria. Todo de fluir maravillosamente. El usuario debe estar feliz de registrar sus entradas, y feliz de encontrar lo que busca
+  rapidamente.
+
+- Recuerda considerar que mas adelante un usuario debiera buscar a traves de lenguaje natural sus datos, obtener resumenes,
+  todo lo que se pueda hacer con este tipo de herramientas con inteligencia artificial.
+
+  
+
