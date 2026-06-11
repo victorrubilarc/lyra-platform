@@ -10,6 +10,7 @@ import {
   isFieldVisible,
   isSectionEditableInState,
   logEntryListQuerySchema,
+  logEntrySectionStateDtoSchema,
   logEntryTimelineEventSchema,
   resolveEffectiveAt,
   saveLogEntrySectionRequestSchema,
@@ -39,6 +40,40 @@ describe("log-entries — requests", () => {
     ).toBe(true);
     expect(
       saveLogEntrySectionRequestSchema.safeParse({ expectedVersion: -1, values: [] }).success,
+    ).toBe(false);
+  });
+});
+
+describe("logEntrySectionStateDto — motivo de bloqueo (#4)", () => {
+  const base = {
+    sectionKey: "s1",
+    state: "PENDING",
+    filledById: null,
+    filledByName: null,
+    filledAt: null,
+    version: 0,
+    signature: null,
+    assignedRoleNames: [],
+    readOnlyFieldKeys: [],
+  };
+
+  it("editable sin motivo, y bloqueada con motivo del enum", () => {
+    expect(
+      logEntrySectionStateDtoSchema.safeParse({ ...base, editable: true, blockedReason: null }).success,
+    ).toBe(true);
+    expect(
+      logEntrySectionStateDtoSchema.safeParse({
+        ...base,
+        editable: false,
+        blockedReason: "MISSING_ROLE",
+        assignedRoleNames: ["Supervisor"],
+      }).success,
+    ).toBe(true);
+  });
+
+  it("rechaza un motivo fuera del enum", () => {
+    expect(
+      logEntrySectionStateDtoSchema.safeParse({ ...base, editable: false, blockedReason: "OTRA_COSA" }).success,
     ).toBe(false);
   });
 });
