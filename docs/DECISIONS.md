@@ -4,6 +4,59 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-11 · Fase 2.7.1 — Período contable gobernado (`OperationalPeriod`) — IMPLEMENTADO (forks resueltos)
+
+Segundo slice de la gobernanza temporal (#5). Los períodos (`periodKey` que ya estampa el `ShiftResolver`)
+pueden CERRARSE; toda escritura cuya `effectiveAt` caiga en período no abierto se bloquea con
+`blockedReason = PERIOD_CLOSED` salvo permiso de excepción configurable. Rama `feat/periodo-gobernado`.
+**4 forks resueltos con el dueño del producto (los 4 con la recomendación):**
+
+1. **Materialización LAZY ("ausencia = ABIERTO", patrón lock-date de Odoo).** No se pre-generan filas: un
+   período sin fila se trata como OPEN; cerrar/poner en cierre crea/actualiza la fila con motivo+permiso+
+   auditoría; reabrir la vuelve a OPEN (conserva el rastro de reapertura). El mantenedor LISTA los períodos
+   recientes DERIVADOS de la config del calendario (helper puro `enumeratePeriodKeys`, ventana −400/+45 días)
+   unidos con las filas explícitas. Motivo: `periodKey` es ilimitado y puede ser null (entradas sin calendario
+   = **ungobernadas, nunca bloqueadas**); generar filas exigiría un scheduler y rangos arbitrarios, contrario al
+   on-prem simple. El período se identifica por **(calendarId × periodKey)** porque la llave es calendar-specific.
+2. **Mantenedor como SECCIÓN dentro de `/calendario-operacional`** (no pantalla propia). Los períodos derivan de
+   la config del calendario (periodKind/ancla); co-ubicarlos mantiene el modelo mental. Promovible a pantalla
+   propia si aparece un perfil contable dedicado.
+3. **Hard lock irreversible DIFERIDO.** Solo soft-close + reapertura auditada en 2.7.1. La irreversibilidad por
+   diseño choca con ALCOA+ (cultura de corrección) y con el eje "mejor UX" (un clic sin retorno); NetSuite/SAP
+   casi nunca hacen lock duro real. Se deja el slot conceptual (`lockLevel`) para adoptarlo barato después.
+4. **La guarda aplica a TODAS las mutaciones, incluidas las transiciones de flujo; las lecturas y la verificación
+   de firma NUNCA se bloquean.** Una transición ES una transacción que muta y puede sellar dimensiones (Maximo
+   rechaza por fecha). El estado **CLOSING** permite que los flujos en vuelo de roles privilegiados continúen
+   (patrón SAP OB52); CLOSING y CLOSED bloquean por igual a los no privilegiados (difieren en intención).
+5. **(confirmado por diseño, no fork) Registro diferido en período cerrado → `PERIOD_CLOSED`.** `setDeferral`
+   recalcula `effectiveAt` y pasa por la MISMA guarda: declarar/corregir una fecha de evento en período cerrado
+   se rechaza con el mismo motivo visible.
+
+**Roles privilegiados = DATO, nada hardcodeado:** el permiso **`opsperiod:write-closed`** (clave RBAC asignable a
+roles, patrón authorization group de SAP OB52) habilita el bypass de la guarda. Catálogo **50→54**:
+`opsperiod:view/close/reopen/write-closed` (`reopen` separado de `close` por ser más sensible, patrón SAP/NetSuite).
+
+**Implementación:** migración aditiva `20260611200225_add_operational_period` (`OperationalPeriod` calendarId×
+periodKey + enum `PeriodStatus` OPEN|CLOSING|CLOSED + cierre/reapertura, FK `onDelete: Cascade`, índice
+(calendarId,status)). Contrato `@lyra/contracts/operational-periods` (DTOs + `closePeriodRequest`/`reopenPeriodRequest`
+con motivo ≥5) + `PERIOD_CLOSED` sumado a `SECTION_BLOCKED_REASONS` (enum extensible que dejó listo el Afinamiento #4) +
+helper puro `enumeratePeriodKeys` en el contrato de calendario. `ShiftResolver` gana `resolveWithCalendar` (devuelve
+`calendarId` + resolución) como fuente única para la guarda. `OperationalPeriodService.assertWritable(at, orgNodeId,
+perms)` = guarda única invocada en `create`/`saveSection`/`setDeferral`/`submit`/`executeTransition` sobre la
+`effectiveAt` que el write persistiría; en `getDetail`, si el actor sin excepción tiene una entrada en período cerrado,
+TODAS las secciones reportan `PERIOD_CLOSED` y no se ofrecen transiciones (huella proactiva, patrón Afinamiento #4).
+La guarda se evalúa ANTES de la completitud/validación de campos y del re-auth (gate duro; evita el círculo vicioso de
+"complete las secciones" en período cerrado y no consume códigos de recuperación). `OperationalPeriodController`
+(`/operational-periods` list/close/reopen) gateado y auditado (`opsperiod.closed|reopened` con before/after). Web:
+`PeriodsSection` en el detalle del calendario (lista con estado, cerrar/reabrir con modal de motivo) + caso
+`PERIOD_CLOSED` en la huella del llenado + i18n `opsPeriod`. **Degradación elegante:** `periodKey` null (sin calendario)
+⇒ ungobernado ⇒ nunca bloquea. Tests: contracts **125** (+5) · API **180** (+11). Smoke en vivo **17/17** (rol+usuario
+temporal SIN bypass para observar el bloqueo + demo CON bypass para la excepción; datos creados y LIMPIADOS, conteos
+verificados; la guarda de `executeTransition` quedó cubierta por código+unit — la plantilla de prueba no ofrecía
+transición al usuario sin bypass). **Siguiente: 2.7.2 ventana de edición.**
+
+---
+
 ### 2026-06-11 · Plan de fases post-2.6.0 APROBADO + Fase 2.7.0 Registro diferido — IMPLEMENTADO (forks resueltos)
 
 El dueño del producto **APROBÓ tal cual** el plan de fases propuesto abajo (2.7 Gobernanza temporal → 2.8

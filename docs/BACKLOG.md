@@ -5,10 +5,11 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-11** (**Fase 2.7.0 Registro diferido ✅** — `entryOrigin` DECLARADO + motivo obligatorio +
-> gesto mínimo + huella en grilla/visor/timeline. El **plan de fases 2.7/2.8/2.9 fue APROBADO** por el dueño del
-> producto (DECISIONS 2026-06-11); siguiente: **2.7.1 Período contable gobernado**. Anotada deuda **2.8.2**:
-> creación de entrada sin borradores huérfanos + descarte de borrador).
+> actualización: **2026-06-11** (**Fase 2.7.1 Período contable gobernado ✅** — `OperationalPeriod` OPEN/CLOSING/CLOSED,
+> guarda `assertWritable` por `effectiveAt` con `PERIOD_CLOSED`, bypass `opsperiod:write-closed`, cierre/reapertura
+> auditada + mantenedor en `/calendario-operacional`. Catálogo **54**. El **plan de fases 2.7/2.8/2.9 fue APROBADO**
+> por el dueño del producto (DECISIONS 2026-06-11); siguiente: **2.7.2 Ventana de edición**. Sigue anotada deuda
+> **2.8.2**: creación de entrada sin borradores huérfanos + descarte de borrador).
 
 ---
 
@@ -55,7 +56,8 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Fase 2.5 Ejecución de flujo + firmas Part 11** (`LogEntryTransition`/`LogEntrySignature` + `executeTransition` + `ReauthService` + modales de firma) | `main` (fusionado desde `feat/ejecucion-flujo`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Fase 2.6.0 Módulo de Bitácoras — núcleo de lectura** (folio + estampados + `LogbookQueryService` + `/bitacoras` + record viewer + verificación de firmas) | `main` (fusionado desde `feat/bitacoras-auditor`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Afinamiento #4** (triage 10 mejoras + guardado por sección autoexplicativo + `submit` objetivo + motivos de bloqueo) | `main` (fusionado desde `feat/afinamiento-llenado`) | ✅ fusionado y publicado en `origin/main` | ninguna |
-| **Fase 2.7.0 Registro diferido** (`entryOrigin` + `setDeferral` + gesto mínimo + huella grilla/visor/timeline) | `main` (fusionado desde `feat/registro-diferido`) | ✅ fusionado y publicado en `origin/main` | ninguna |
+| **Fase 2.7.0 Registro diferido** (`entryOrigin` + `setDeferral` + gesto mínimo + huella grilla/visor/timeline) | `main` (fusionado desde `feat/registro-diferido`) | ✅ fusionado y publicado en `origin/main` |
+| **Fase 2.7.1 Período contable gobernado** (`OperationalPeriod` + guarda `assertWritable` + cierre/reapertura auditada + mantenedor) | `main` (fusionado desde `feat/periodo-gobernado`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 
 **Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
@@ -325,13 +327,19 @@ nunca queda más de una sesión atrás.
               **(b)** KPI/faceta "Diferidas" en `/bitacoras` (hoy hay filtro+chip; el conteo llega natural con las
               facetas de 2.6.2); **(c)** al QUITAR la marca el campo `EFFECTIVE_DATE` escrito por el gesto se
               conserva (decisión: es dato del canal normal) — reevaluar si confunde en la práctica.
-      - [ ] **2.7.1 (#5) Período contable gobernado** **← siguiente.** Entidad `OperationalPeriod` (calendario × periodKey) con
-            OPEN/CLOSING/CLOSED, cierre/reapertura con motivo+permiso+auditoría, guardas de escritura por
-            `effectiveAt`, roles privilegiados configurables. Referentes: SAP OB52 / NetSuite / Odoo lock dates /
-            Maximo financial periods (destilado en DECISIONS).
-      - [ ] **2.7.2 (#6) Ventana de edición configurable** `{ancla RECORDED|EFFECTIVE, duración}` por plantilla
+      - [x] **2.7.1 (#5) Período contable gobernado** ✅ (2026-06-11, `feat/periodo-gobernado` → `main`). Entidad
+            `OperationalPeriod` (calendario × periodKey) OPEN/CLOSING/CLOSED, **modelo LAZY** (ausencia=abierto), cierre/
+            reapertura con motivo+permiso+auditoría (`opsperiod.closed|reopened`), guarda única `assertWritable` por
+            `effectiveAt` en create/saveSection/setDeferral/submit/executeTransition (`PERIOD_CLOSED`), bypass DATO
+            `opsperiod:write-closed` (catálogo **54**), huella proactiva en getDetail + mantenedor en
+            `/calendario-operacional`. 4 forks resueltos en DECISIONS 2026-06-11. Tests: contracts 125 · API 180.
+            Smoke 17/17. **Pendiente: smoke VISUAL** (§4) + guarda de executeTransition live (cubierta por código+unit).
+        - [ ] **Diferidos de 2.7.1 (aditivos):** **(a)** **hard lock irreversible** (Odoo) como opción de config
+              (`lockLevel` SOFT|HARD) — diferido; soft-close + reapertura cubre el 95%; **(b)** KPI/indicador de
+              períodos cerrados en `/bitacoras`; **(c)** vista "¿qué entradas caen en este período?" desde el mantenedor.
+      - [ ] **2.7.2 (#6) Ventana de edición configurable** **← siguiente.** `{ancla RECORDED|EFFECTIVE, duración}` por plantilla
             (fallback global); fuera de ventana solo privilegio explícito con motivo auditado; con período gana
-            la restricción MÁS estricta.
+            la restricción MÁS estricta. Extiende `blockedReason` con `EDIT_WINDOW_EXPIRED` (enum ya extensible).
       - [ ] **2.7.3 (#7) Permisos sección × tiempo**: matriz administrable rol×sección×ventana aplicada en
             servidor; extiende `blockedReason` (+PERIOD_CLOSED, +EDIT_WINDOW_EXPIRED) para que la UI siempre
             diga POR QUÉ.
@@ -580,6 +588,17 @@ probatoria (hash+timestamp). Ref: `DECISIONS.md` (sección de recomendaciones).
       indicador "Diferida" en la fila (tooltip = motivo), export CSV con las columnas nuevas; en `/bitacoras/:id`:
       chip + nota "el evento ocurrió el… · declarado por…" + evento "Registro diferido declarado" en la timeline;
       modo claro y oscuro. App en `:5173`.
+- [ ] **Período contable gobernado 2.7.1 — smoke VISUAL en navegador** (se verificó typecheck/lint/test/build web +
+      smoke por API 17/17; falta el clic): en `/calendario-operacional` → detalle de un calendario → sección
+      "Períodos contables": lista de períodos recientes con estado (Abierto/En cierre/Cerrado), cerrar un período
+      (modal con estado destino CLOSING/CLOSED + motivo obligatorio), ver el chip pasar a Cerrado + "Cerrado por…",
+      reabrir (modal de motivo) → vuelve a Abierto; con un usuario SIN `opsperiod:write-closed`: en el llenado de una
+      entrada cuya fecha cae en el período cerrado, todas las secciones muestran "Período cerrado" (solo lectura) y no
+      hay botones de transición; con permiso de excepción, sí puede escribir; modo claro y oscuro. App en `:5173`.
+- [ ] **Período gobernado 2.7.1 — guarda de `executeTransition` en vivo** (cubierta por código + unit test; el smoke
+      por API no la ejerció en vivo porque la plantilla de prueba no ofrecía una transición disponible al usuario sin
+      bypass). Verificar con una plantilla CON flujo + un estado con transición de rol abierto + período cerrado:
+      executeTransition debe dar 403 `PERIOD_CLOSED` (la guarda corre antes de la completitud y del re-auth).
 - [ ] **Afinamiento #4 — smoke VISUAL en navegador** (se verificó typecheck/lint/test/build + smoke por API 22/22;
       falta el clic): en `/nueva-entrada/:id` con una plantilla cuyas secciones tengan roles asignados y un campo con
       override: chip "N de M secciones completadas" en cabecera; chip "Asignada a: <rol>" por sección; sección ajena

@@ -1,11 +1,12 @@
 # Progreso — Lyra WatchLog
 
 Última actualización: 2026-06-11 (**Fase 1 completa**; **Fase 2.1/2.1.1/2.2/2.x/2.3.0/2.4/2.5/2.6.0 ✅** +
-**Afinamiento #4 ✅** + **Fase 2.7.0 — Registro diferido ✅**: `entryOrigin` DECLARADO ONLINE|DEFERRED + motivo
-obligatorio + gesto mínimo "Registrar con otra fecha/hora" + huella en llenado/grilla/visor/timeline). El **plan de
+**Afinamiento #4 ✅** + **Fase 2.7.0 — Registro diferido ✅** + **Fase 2.7.1 — Período contable gobernado ✅**:
+`OperationalPeriod` OPEN/CLOSING/CLOSED con cierre/reapertura auditada (motivo obligatorio) y guarda de escritura por
+`effectiveAt` (`blockedReason = PERIOD_CLOSED`), bypass configurable `opsperiod:write-closed`. El **plan de
 fases 2.7 (Gobernanza temporal) / 2.8 (Alcance+acceso) / 2.9 (Plantillas inteligentes) fue APROBADO TAL CUAL por el
 dueño del producto** (DECISIONS 2026-06-11).
-**Siguiente: 2.7.1 — Período contable gobernado (`OperationalPeriod`, #5).**
+**Siguiente: 2.7.2 — Ventana de edición configurable (#6).**
 
 ## Estado por fase
 
@@ -824,13 +825,47 @@ marca y la UX encima de `recordedAt`/`effectiveAt`/`resolveEffectiveAt`/`ShiftRe
   editarse. Datos de prueba LIMPIADOS (conteos verificados en BD).
 - **NO probado**: smoke VISUAL en navegador del gesto/chips/filtro (ver BACKLOG §4).
 
+## Hecho en Fase 2.7.1 (2026-06-11 — Período contable gobernado, #5)
+
+**4 forks resueltos con la recomendación** (LAZY "ausencia=abierto" · sección dentro de `/calendario-operacional` ·
+hard lock diferido · guarda en TODAS las mutaciones incl. transiciones, lecturas/verificación nunca — ver DECISIONS
+2026-06-11). Rama `feat/periodo-gobernado`. La mecánica de dimensiones no se tocó: la guarda se monta sobre
+`effectiveAt`/`periodKey`/`ShiftResolver`.
+
+- **Prisma** (migración aditiva `20260611200225_add_operational_period`): modelo **`OperationalPeriod`**
+  (`calendarId` FK `onDelete: Cascade` × `periodKey`, **`@@unique`** + índice `(calendarId,status)`) + enum
+  **`PeriodStatus`** OPEN|CLOSING|CLOSED + cierre (`closedById/At/Reason`) y reapertura (`reopenedById/At/Reason`).
+  **Modelo LAZY**: solo hay fila cuando el período NO está abierto. No toca `LogEntry`.
+- **Contratos**: `@lyra/contracts/operational-periods` (DTO + `closePeriodRequest`/`reopenPeriodRequest`, motivo ≥5) +
+  **`PERIOD_CLOSED`** sumado a `SECTION_BLOCKED_REASONS` + helper puro **`enumeratePeriodKeys`** en el contrato de
+  calendario (enumera llaves de período del rango, para listar sin pre-generar). **+5 specs** (contracts **125**).
+- **Backend**: `ShiftResolver` gana **`resolveWithCalendar`** (calendarId + resolución). **`OperationalPeriodService`**
+  = guarda única `assertWritable(at, orgNodeId, perms)` (resuelve calendario×periodKey, 403 `PERIOD_CLOSED` salvo
+  bypass) + `list` (derivados ∪ explícitos) + `close`/`reopen` auditados (`opsperiod.closed|reopened`). Inyectada en
+  `create`/`saveSection`/`setDeferral`/`submit`/`executeTransition` sobre la `effectiveAt` que el write persistiría,
+  **antes** de completitud/validación y re-auth (gate duro; en transición evita el círculo vicioso y no consume
+  recovery codes). `getDetail`: si el actor sin excepción tiene una entrada en período cerrado, todas las secciones
+  reportan `PERIOD_CLOSED` y no se ofrecen transiciones. `OperationalPeriodController` (`/operational-periods`
+  list/close/reopen) gateado. **4 permisos nuevos** (catálogo **50→54**): `opsperiod:view/close/reopen/write-closed`
+  (bypass = dato RBAC). **+11 tests** (API **180**: 9 del service + 2 de cableado/huella en LogEntries).
+- **Web**: **`PeriodsSection`** en el detalle de `/calendario-operacional` (lista de períodos con estado/colores,
+  cerrar/reabrir con modal de motivo, gateada por permiso) + capa de datos `operational-periods-api/queries` + caso
+  **`PERIOD_CLOSED`** en la huella del llenado (`EntryFillPage`) + i18n `opsPeriod.*` y `logbook.fill.blockedPeriodClosed`.
+- **Verificación**: `typecheck` (6 paquetes) · `lint` (0 errores; 1 warning preexistente OrgTree) · `build`
+  contracts+web (API por watch: typecheck+test) · `test` (**contracts 125** +5 · permissions 5 · **API 180** +11) en
+  verde. **Smoke en vivo 17/17** (rol+usuario temporal SIN bypass para el bloqueo + demo CON bypass para la excepción):
+  list HTTP · create en período abierto · close→`PERIOD_CLOSED` en getDetail + sin transiciones · saveSection/setDeferral
+  (fork 5)/create bloqueados 403 · bypass del demo escribe 200 · reopen→OPEN · saveSection tras reabrir 200 · AuditLog
+  close+reopen. Datos LIMPIADOS (conteos en 0; AuditLog inmutable conserva su rastro por diseño).
+- **NO probado**: la guarda de `executeTransition` quedó cubierta por **código + unit** (la plantilla de prueba no
+  ofrecía transición disponible al usuario sin bypass para ejercitarla en vivo); smoke VISUAL en navegador del
+  mantenedor de períodos y de la huella (ver BACKLOG §4).
+
 ## Próximo paso
-**Fase 2.7.0 completa y publicada.** **Sesión siguiente: 2.7.1 — Período contable gobernado (#5)**: entidad
-`OperationalPeriod` (calendario × `periodKey`) OPEN/CLOSING/CLOSED, cierre/reapertura con motivo+permiso+auditoría,
-guardas de ESCRITURA por `effectiveAt` (toda mutación cuya fecha efectiva caiga en período no abierto se bloquea salvo
-rol privilegiado configurable). Referentes ya destilados en DECISIONS 2026-06-11 (SAP OB52 / NetSuite / Odoo lock
-dates / Maximo). `entryOrigin` quedó diseñado para que esas guardas se le sumen sin migrar (`blockedReason` extensible
-a `PERIOD_CLOSED`). Luego 2.7.2 Ventana de edición (#6) y 2.7.3 matriz sección×tiempo (#7).
+**Fase 2.7.1 completa y publicada.** **Sesión siguiente: 2.7.2 — Ventana de edición configurable (#6)**: por plantilla
+(fallback global) `{ancla RECORDED|EFFECTIVE, duración}`; fuera de ventana solo privilegio explícito con motivo
+auditado; con período **gana la restricción MÁS estricta**. Extiende `blockedReason` con `EDIT_WINDOW_EXPIRED` (enum ya
+extensible). Luego 2.7.3 matriz rol×sección×tiempo (#7).
 
 **Mejora futura registrada (BACKLOG §2):** seguridad a nivel de nodo en el mantenedor de Estructura (ABAC
 enterprise: asignar usuarios/roles a nodos desde el propio árbol, "quién accede a este nodo"). El modelo ya

@@ -144,6 +144,24 @@ se comporta como un form simple (degradación elegante).
   (operacional). **Reversa/anulación de transición** (corrección GxP con su firma y motivo) **diferida**.
   Ver BACKLOG §2/§3.
 
+### Gobernanza temporal — Período contable (Fase 2.7.1)
+Cierre de la ESCRITURA por ventana de tiempo (refs SAP OB52 / NetSuite / Odoo lock dates / Maximo).
+- **Guarda 100% en backend**: `OperationalPeriodService.assertWritable(effectiveAt, orgNodeId, perms)` se invoca
+  en TODAS las mutaciones de bitácora (`create`/`saveSection`/`setDeferral`/`submit`/`executeTransition`) sobre la
+  `effectiveAt` que el write persistiría. Si el período (calendario × `periodKey`) está **CLOSING/CLOSED** y el actor
+  no tiene **`opsperiod:write-closed`**, lanza 403 con `blockedReason = PERIOD_CLOSED`. Se evalúa **antes** de la
+  completitud/validación de campos y del re-auth (gate duro; no consume códigos de recuperación). Las **lecturas y la
+  verificación de firma nunca se bloquean** (la verificación es un acto de revisión, no una escritura).
+- **Permisos nuevos (catálogo 50→54)**: `opsperiod:view` (ver estado), `opsperiod:close` (cerrar/poner en cierre),
+  `opsperiod:reopen` (reabrir — separado por ser más sensible, patrón SAP/NetSuite), `opsperiod:write-closed`
+  (**bypass** = excepción de escritura en período cerrado). El "rol privilegiado" es **DATO RBAC** (clave asignable a
+  roles, patrón authorization group de SAP OB52), **nunca hardcodeado**.
+- **Cierre/reapertura con motivo obligatorio (≥5) + auditoría**: `opsperiod.closed`/`opsperiod.reopened` con
+  before/after en `AuditLog` inmutable. El registro tardío (diferido) en período cerrado se rechaza con el mismo
+  `PERIOD_CLOSED` (la guarda es única). **Degradación elegante**: sin calendario (periodKey null) = ungobernado.
+- **Residual**: hard lock irreversible (Odoo) **diferido** (solo soft-close + reapertura auditada); ventana de edición
+  por plantilla y matriz rol×sección×tiempo llegan en 2.7.2/2.7.3.
+
 ## Estado
 - **Fase 0:** cabeceras (Helmet) y validación de entorno activas.
 - **Fase 1 (backend, ✅):** auth local Argon2id; access JWT (15 min) + refresh rotativo httpOnly con detección de reuso por familia; CSRF de doble envío en refresh/logout; lockout por fuerza bruta (contador en BD); **MFA TOTP** completo (enrolamiento + recovery codes, secreto cifrado en reposo); `PermissionsGuard` + `@RequirePermission` (dims. 1–3) globales; `ScopeService` (dim. 4) con ruta materializada; catálogo de permisos en `@lyra/contracts`; `AuditLog` append-only con **trigger Postgres** que rechaza UPDATE/DELETE; política de contraseñas configurable + historial; seed idempotente con admin de arranque (forzado a cambiar contraseña).
