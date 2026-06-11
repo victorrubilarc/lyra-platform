@@ -303,6 +303,44 @@ nunca queda más de una sesión atrás.
         resolver el calendario o facetas), **export con columnas de valores al filtrar por UNA plantilla**,
         contador de cambios por campo inline en sección (popover). Formato LONG de export diferido hasta demanda BI.
   - [ ] **2.7 (cruce Fase 4)** reglas de umbral que disparan incidencias (con el motor de incidencias).
+        *Nota 2026-06-11: con el plan post-2.6.0 los números 2.7/2.8/2.9 se reasignan a las fases nuevas (abajo);
+        este cruce umbral→incidencia pasa a vivir dentro de la Fase 4.*
+  - [ ] **MEJORAS POST-2.6.0 (revisión del dueño del producto, 2026-06-11)** — 10 mejoras registradas; texto
+        íntegro fuente de verdad en `docs/NEXT_SESSION.md`; triage + plan de fases PROPUESTO en DECISIONS
+        2026-06-11 (**pendiente de visto bueno**; orden recomendado 2.7 → 2.8 → 2.9):
+    - [x] **#4 Rediseño "Guardar sección"/"Guardar y completar" + garantía por sección en servidor** ✅
+          (2026-06-11, esta sesión). Auditado ANTES de declarar bug: el backend ya gateaba (sin agujero); causas
+          reales = datos demo sin roles por sección + DTO sin "porqué" + gap REAL en `submit` sin flujo (sellaba
+          sin secciones COMPLETED ⇒ eludía la firma de sección). Ver DECISIONS 2026-06-11.
+    - [ ] **Fase 2.7 — Gobernanza temporal del registro** (interdependientes; alta prioridad por integridad):
+      - [ ] **2.7.0 (#1) Registro diferido**: UX gesto mínimo sobre `effectiveAt` (modelo YA resuelto) + marca
+            explícita `entryOrigin` ONLINE|DEFERRED + motivo + huella en grilla/visor/timeline. Valida contra
+            período (2.7.1) y ventana (2.7.2) cuando existan.
+      - [ ] **2.7.1 (#5) Período contable gobernado**: entidad `OperationalPeriod` (calendario × periodKey) con
+            OPEN/CLOSING/CLOSED, cierre/reapertura con motivo+permiso+auditoría, guardas de escritura por
+            `effectiveAt`, roles privilegiados configurables. Referentes: SAP OB52 / NetSuite / Odoo lock dates /
+            Maximo financial periods (destilado en DECISIONS).
+      - [ ] **2.7.2 (#6) Ventana de edición configurable** `{ancla RECORDED|EFFECTIVE, duración}` por plantilla
+            (fallback global); fuera de ventana solo privilegio explícito con motivo auditado; con período gana
+            la restricción MÁS estricta.
+      - [ ] **2.7.3 (#7) Permisos sección × tiempo**: matriz administrable rol×sección×ventana aplicada en
+            servidor; extiende `blockedReason` (+PERIOD_CLOSED, +EDIT_WINDOW_EXPIRED) para que la UI siempre
+            diga POR QUÉ.
+    - [ ] **Fase 2.8 — Alcance de plantilla + acceso** (absorbe diferido (a) de 2.4 y la 2.6.1 planificada):
+      - [ ] **2.8.0 (#2) Plantillas multi-nodo**: N:M `TemplateNodeAssignment` (nodo + `includeDescendants`),
+            3 modos (uno/varios/"todos los hijos de X" incl. nodos futuros), migración de datos, selector de
+            nodo al crear entrada filtrado por asignación ∩ ABAC.
+      - [ ] **2.8.1 (#9) UX de acceso nodo↔grilla** (+ SavedView/gestor de columnas de 2.6.1 FUSIONADOS aquí):
+            presentar 2–3 alternativas con pros/contras ANTES de implementar; "mis nodos"/recientes/favoritos,
+            búsqueda, filtros persistentes.
+    - [ ] **Fase 2.9 — Plantillas inteligentes**:
+      - [ ] **2.9.0 (#3) Layouts modernos**: modo por versión (clásico/pestañas/wizard/colapsable) + grilla
+            responsiva de campos (1/1, 1/2, 1/3) + separadores/ayudas, como DATO de la versión.
+      - [ ] **2.9.1 (#8) Motor de reglas de negocio**: condición→acción como dato versionado (mostrar/ocultar,
+            habilitar, exigir, calcular, validar entre campos), misma fuente única back↔front (generaliza
+            `visibleWhen`/`validateFieldValue`); admin visual sin código; extensible a notificar/escalar/incidente.
+    - [ ] **#10 IA-ready**: restricción TRANSVERSAL de diseño (no fase): metadatos estructurados + reglas como
+          datos + claves estables; documentar por fase qué habilita. La IA sigue detrás de `LlmProvider`.
   - [ ] **Expansión de tipos de campo (incremental, cada uno pequeño).** Alto valor industrial: **Conforme/No
         conforme/N.A.** (tri-estado), **lookup/picker de referencia** (single/multi, tras 2.x), **picker de
         Equipo/Usuario/Nodo** (`reference`), **grupo repetible / tabla-matriz**, **campo calculado/fórmula**,
