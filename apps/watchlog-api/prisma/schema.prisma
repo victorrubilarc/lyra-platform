@@ -477,6 +477,15 @@ enum PeriodKind {
   CUSTOM
 }
 
+// Estado de gobernanza de un período contable (Fase 2.7.1). La ausencia de fila =
+// OPEN (modelo lazy "ausencia = abierto", patrón lock-date de Odoo). CLOSING y
+// CLOSED bloquean la escritura a los no privilegiados; difieren en intención.
+enum PeriodStatus {
+  OPEN
+  CLOSING
+  CLOSED
+}
+
 // Capa 2 del campo: tipo de dato (cómo se almacena/valida/reporta), derivado del
 // `type` de presentación (ver DECISIONS 2026-06-09). Enum aditivo: incluye
 // valores sin productor aún (TIME/FILE/GEO/COMPUTED) para la taxonomía futura.
@@ -881,8 +890,36 @@ model OperationalCalendar {
 
   shifts        OperationalShift[]
   assignedNodes OrgNode[]
+  periods       OperationalPeriod[]
 
   @@index([deletedAt])
+}
+
+// Período contable gobernado (Fase 2.7.1): estado de cierre de una llave de período
+// (`periodKey`, la que estampa el ShiftResolver en LogEntry) dentro de un calendario.
+// Modelo LAZY: solo existe fila cuando el período NO está OPEN (se cierra/pone en
+// cierre). Reabrir lo vuelve a OPEN (la fila se conserva con el rastro de reapertura).
+// El historial completo de cierres/reaperturas vive en AuditLog (inmutable).
+model OperationalPeriod {
+  id           String       @id @default(cuid())
+  calendarId   String
+  periodKey    String
+  status       PeriodStatus @default(OPEN)
+  // Cierre vigente.
+  closedById   String?
+  closedAt     DateTime?
+  closeReason  String?
+  // Última reapertura (si la hubo).
+  reopenedById String?
+  reopenedAt   DateTime?
+  reopenReason String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  calendar OperationalCalendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+
+  @@unique([calendarId, periodKey])
+  @@index([calendarId, status])
 }
 
 model OperationalShift {

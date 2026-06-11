@@ -125,6 +125,8 @@ export function EntryFillPage() {
           "";
         return t("logbook.fill.blockedWrongState", { state: stateName });
       }
+      case "PERIOD_CLOSED":
+        return t("logbook.fill.blockedPeriodClosed", { period: entry?.periodKey ?? "" });
       default:
         return t("logbook.fill.blockedEntryClosed");
     }

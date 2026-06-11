@@ -111,12 +111,14 @@ export type LogEntrySignatureSummaryDto = z.infer<typeof logEntrySignatureSummar
 /**
  * Por qué ESTE usuario no puede editar la sección ahora (la UI lo comunica tal
  * cual; el backend lo decide). Enum EXTENSIBLE: la gobernanza temporal (Fase 2.7)
- * sumará PERIOD_CLOSED / EDIT_WINDOW_EXPIRED sin romper a los consumidores.
+ * seguirá sumando motivos (EDIT_WINDOW_EXPIRED en 2.7.2) sin romper a los consumidores.
  *  - ENTRY_CLOSED: la entrada ya fue enviada/anulada (registro sellado).
  *  - WRONG_STATE: la sección se edita en OTRO estado del flujo.
  *  - MISSING_ROLE: la sección está asignada a roles que el usuario no tiene.
+ *  - PERIOD_CLOSED: la fecha efectiva del registro cae en un período contable
+ *    cerrado/en cierre y el usuario no tiene el permiso de excepción (Fase 2.7.1).
  */
-export const SECTION_BLOCKED_REASONS = ["ENTRY_CLOSED", "WRONG_STATE", "MISSING_ROLE"] as const;
+export const SECTION_BLOCKED_REASONS = ["ENTRY_CLOSED", "WRONG_STATE", "MISSING_ROLE", "PERIOD_CLOSED"] as const;
 export const sectionBlockedReasonSchema = z.enum(SECTION_BLOCKED_REASONS);
 export type SectionBlockedReason = z.infer<typeof sectionBlockedReasonSchema>;
 

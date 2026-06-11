@@ -15,6 +15,12 @@ import { toResolverCalendar } from "./operational-calendar.service";
  * aplica (por nodo, heredando por la ruta materializada; si no, el por defecto) y
  * delega.
  */
+/** Resolución de turno junto con el calendario que la produjo (para la guarda de período). */
+export interface ShiftResolutionWithCalendar {
+  calendarId: string;
+  resolution: ShiftResolution;
+}
+
 export abstract class ShiftResolver {
   /**
    * Resuelve un instante a sus dimensiones operacionales usando el calendario que
@@ -22,6 +28,13 @@ export abstract class ShiftResolver {
    * configurado (degradación elegante: la entrada queda sin clasificar).
    */
   abstract resolve(at: Date, orgNodeId?: string | null): Promise<ShiftResolution | null>;
+
+  /**
+   * Igual que `resolve`, pero devuelve también el `calendarId` que aplicó. Lo usa la
+   * gobernanza de períodos (Fase 2.7.1): el período se identifica por (calendario ×
+   * periodKey), así que la guarda necesita saber qué calendario resolvió la fecha.
+   */
+  abstract resolveWithCalendar(at: Date, orgNodeId?: string | null): Promise<ShiftResolutionWithCalendar | null>;
 }
 
 @Injectable()
@@ -31,6 +44,11 @@ export class ShiftResolverService extends ShiftResolver {
   }
 
   async resolve(at: Date, orgNodeId?: string | null): Promise<ShiftResolution | null> {
+    const r = await this.resolveWithCalendar(at, orgNodeId);
+    return r?.resolution ?? null;
+  }
+
+  async resolveWithCalendar(at: Date, orgNodeId?: string | null): Promise<ShiftResolutionWithCalendar | null> {
     const calendarId = await this.calendarIdForNode(orgNodeId);
     if (!calendarId) return null;
     const cal = await this.prisma.operationalCalendar.findFirst({
@@ -38,7 +56,7 @@ export class ShiftResolverService extends ShiftResolver {
       include: { shifts: true },
     });
     if (!cal) return null;
-    return resolveShift(at, toResolverCalendar(cal));
+    return { calendarId: cal.id, resolution: resolveShift(at, toResolverCalendar(cal)) };
   }
 
   /**

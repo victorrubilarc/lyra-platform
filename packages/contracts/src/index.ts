@@ -32,5 +32,8 @@ export * from "./reference-data/reference-data.js";
 // Calendario operacional (turnos + periodo contable) (Fase 2.3.0)
 export * from "./operational-calendar/operational-calendar.js";
 
+// Período contable gobernado (cierre/reapertura) (Fase 2.7.1)
+export * from "./operational-periods/operational-periods.js";
+
 // Llenado de bitácoras / ejecución (Fase 2.4)
 export * from "./log-entries/log-entries.js";

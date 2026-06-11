@@ -6,6 +6,8 @@ import type { ReauthService } from "../auth/reauth.service";
 import type { ScopeService } from "../authz/scope.service";
 import type { EncryptionService } from "../crypto/encryption.service";
 import type { ShiftResolver } from "../operational-calendar/shift-resolver";
+import type { OperationalPeriodService } from "../operational-periods/operational-periods.service";
+import type { PermissionService } from "../authz/permission.service";
 import type { PrismaService } from "../prisma/prisma.service";
 
 const ctx = { actorId: "u1", actorEmail: "u@x.cl", ip: null, userAgent: null };
@@ -53,7 +55,13 @@ const versionGraph = (sections: Field[], over: Field = {}): Field => ({
 
 function makeService(
   prismaOver: Record<string, unknown> = {},
-  opts: { dims?: unknown; scope?: Partial<ScopeService>; reauth?: Partial<ReauthService> } = {},
+  opts: {
+    dims?: unknown;
+    scope?: Partial<ScopeService>;
+    reauth?: Partial<ReauthService>;
+    periods?: Partial<OperationalPeriodService>;
+    perms?: string[];
+  } = {},
 ) {
   const tx = {
     logEntryValue: { upsert: vi.fn().mockResolvedValue({}), findUnique: vi.fn().mockResolvedValue(null) },
@@ -92,7 +100,25 @@ function makeService(
     ...opts.reauth,
   } as unknown as ReauthService;
   const enc = { sha256: vi.fn().mockReturnValue("deadbeef") } as unknown as EncryptionService;
-  return { service: new LogEntriesService(prisma, audit, scope, shiftResolver, reauth, enc), prisma, audit, shiftResolver, reauth, enc, tx };
+  const periods = {
+    assertWritable: vi.fn().mockResolvedValue(undefined),
+    isWriteBlocked: vi.fn().mockResolvedValue(false),
+    ...opts.periods,
+  } as unknown as OperationalPeriodService;
+  const permissions = {
+    getEffectivePermissions: vi.fn().mockResolvedValue(new Set(opts.perms ?? [])),
+  } as unknown as PermissionService;
+  return {
+    service: new LogEntriesService(prisma, audit, scope, shiftResolver, reauth, enc, periods, permissions),
+    prisma,
+    audit,
+    shiftResolver,
+    reauth,
+    enc,
+    periods,
+    permissions,
+    tx,
+  };
 }
 
 /** Construye una versión de flujo congelada (estados + transiciones) para los tests. */
@@ -162,6 +188,23 @@ describe("LogEntriesService — create", () => {
       template: { findFirst: vi.fn().mockResolvedValue({ id: "t1", status: "PUBLISHED", currentVersionId: "v1", orgNodeId: null }) },
     });
     await expect(service.create("u1", { templateId: "t1" }, ctx)).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it("guarda de período (2.7.1): create propaga el rechazo y NO persiste si el período está cerrado", async () => {
+    const { service, prisma } = makeService(
+      {
+        template: {
+          findFirst: vi.fn().mockResolvedValue({ id: "t1", status: "PUBLISHED", currentVersionId: "v1", orgNodeId: "n1" }),
+          findUnique: vi.fn().mockResolvedValue({ name: "Turno" }),
+        },
+        templateVersion: {
+          findFirst: vi.fn().mockResolvedValue(versionGraph([section("s1", [field({ key: "obs", type: "TEXT", dataType: "STRING", label: "Obs" })])])),
+        },
+      },
+      { periods: { assertWritable: vi.fn().mockRejectedValue(new ForbiddenException("Período cerrado")) } },
+    );
+    await expect(service.create("u1", { templateId: "t1" }, ctx)).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.logEntry.create).not.toHaveBeenCalled();
   });
 });
 
@@ -348,6 +391,30 @@ describe("LogEntriesService — getDetail (motivos de bloqueo #4)", () => {
     const detail = await service.getDetail("u1", "e1");
     expect(detail.sectionStates[0]!.editable).toBe(false);
     expect(detail.sectionStates[0]!.blockedReason).toBe("ENTRY_CLOSED");
+  });
+
+  it("expone PERIOD_CLOSED en una entrada en borrador cuyo período está cerrado y el actor no tiene excepción (2.7.1)", async () => {
+    const { service } = makeService(
+      {
+        logEntry: {
+          findFirst: vi.fn().mockResolvedValue({
+            id: "e1", entryNumber: 8, status: "DRAFT", orgNodeId: "n1", templateId: "t1", templateVersionId: "v1",
+            workflowDefinitionId: null, workflowDefinitionVersionId: null, currentStateKey: null, equipmentId: null,
+            recordedAt: new Date(), effectiveAt: new Date(), shiftCode: null, operationalDate: null, periodKey: "2026-06",
+            sealedAt: null, createdById: "u1", createdAt: new Date(), updatedAt: new Date(),
+          }),
+          update: vi.fn(), create: vi.fn(), findMany: vi.fn(),
+        },
+        templateVersion: {
+          findUnique: vi.fn().mockResolvedValue(versionGraph([section("s1", [field({ key: "obs", type: "TEXT", dataType: "STRING", label: "Obs" })])])),
+        },
+      },
+      { periods: { isWriteBlocked: vi.fn().mockResolvedValue(true) } },
+    );
+
+    const detail = await service.getDetail("u1", "e1");
+    expect(detail.sectionStates[0]!.editable).toBe(false);
+    expect(detail.sectionStates[0]!.blockedReason).toBe("PERIOD_CLOSED");
   });
 });
 

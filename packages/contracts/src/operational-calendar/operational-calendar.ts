@@ -476,3 +476,31 @@ function derivePeriodKey(operationalDate: string, cal: ShiftResolverCalendar): s
     }
   }
 }
+
+/** Deriva la llave del periodo contable de un día operacional "YYYY-MM-DD" (público). */
+export function periodKeyForOperationalDate(operationalDate: string, cal: ShiftResolverCalendar): string | null {
+  return derivePeriodKey(operationalDate, cal);
+}
+
+/**
+ * Enumera las llaves de periodo contable DISTINTAS que caen entre dos días
+ * operacionales (inclusive), en orden cronológico. Función PURA reutilizable por
+ * el mantenedor de períodos (Fase 2.7.1): permite listar los períodos recientes de
+ * un calendario para gobernarlos SIN pre-generar filas (modelo lazy "ausencia =
+ * abierto"). El rango se acota en el llamador para no recorrer rangos enormes.
+ */
+export function enumeratePeriodKeys(cal: ShiftResolverCalendar, fromDate: string, toDate: string): string[] {
+  const keys: string[] = [];
+  const seen = new Set<string>();
+  const [fy, fm, fd] = fromDate.split("-").map(Number);
+  const total = daysBetween(fromDate, toDate);
+  for (let i = 0; i <= total; i++) {
+    const day = addDays(fy!, fm!, fd!, i);
+    const key = derivePeriodKey(day, cal);
+    if (key != null && !seen.has(key)) {
+      seen.add(key);
+      keys.push(key);
+    }
+  }
+  return keys;
+}

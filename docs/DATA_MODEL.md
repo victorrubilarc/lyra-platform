@@ -211,6 +211,30 @@
   solapes, huecos permitidos) = fuente única contrato+backend+web. Endpoint `POST /operational-calendars/:id/preview`
   para el probador/verificación.
 
+### Período contable gobernado
+> **Fase 2.7.1 (implementado):** migración `20260611200225_add_operational_period`. Gobierna el CIERRE de la
+> escritura por ventana de tiempo (refs SAP OB52 / NetSuite / Odoo lock dates / Maximo). Ver DECISIONS 2026-06-11.
+- **OperationalPeriod** *(implementado)* — estado de gobernanza de una llave de período DENTRO de un calendario:
+  `calendarId` (FK `onDelete: Cascade`), `periodKey` (la que estampa el `ShiftResolver`), `status`
+  (**PeriodStatus** OPEN | CLOSING | CLOSED), `closedById?`/`closedAt?`/`closeReason?`, `reopenedById?`/
+  `reopenedAt?`/`reopenReason?`. **`@@unique([calendarId, periodKey])`** + índice `(calendarId, status)`. El historial
+  completo de cierres/reaperturas vive en **AuditLog** (`opsperiod.closed|reopened`, inmutable).
+- **Modelo LAZY** — la AUSENCIA de fila = OPEN (patrón lock-date de Odoo); no se pre-generan filas. El mantenedor
+  LISTA los períodos recientes DERIVADOS de la config del calendario (**`enumeratePeriodKeys`**, función pura en
+  `@lyra/contracts`, ventana −400/+45 días) unidos con las filas explícitas. El período se identifica por
+  **(calendarId × periodKey)** (la llave es calendar-specific).
+- **Guarda de escritura** — **`OperationalPeriodService.assertWritable(at, orgNodeId, perms)`** (fuente única) resuelve
+  calendario+`periodKey` vía **`ShiftResolver.resolveWithCalendar`** y lanza 403 con `blockedReason = PERIOD_CLOSED`
+  si el período está CLOSING/CLOSED y el actor no tiene **`opsperiod:write-closed`** (bypass = DATO RBAC, patrón
+  authorization group SAP OB52). Invocada en `create`/`saveSection`/`setDeferral`/`submit`/`executeTransition` sobre la
+  `effectiveAt` que el write persistiría, **antes** de la completitud/validación y del re-auth. Las LECTURAS y la
+  verificación de firma nunca se bloquean. `periodKey` null (sin calendario) ⇒ ungobernado ⇒ nunca bloquea.
+- **Huella proactiva** — en `getDetail`, si el actor sin excepción tiene una entrada en período cerrado, todas las
+  secciones reportan `PERIOD_CLOSED` (precede a las reglas de sección) y no se ofrecen transiciones.
+- **Endpoints** — `GET /operational-periods?calendarId=` (derivados ∪ explícitos), `POST .../close` (CLOSING|CLOSED +
+  motivo ≥5), `POST .../reopen` (motivo ≥5); `periodKey` por query (puede contener "/"). Permisos
+  `opsperiod:view/close/reopen` (`reopen` separado por ser más sensible).
+
 ### Orígenes de datos
 - **DataSource** — URL base, tipo de auth, **credencial cifrada en reposo**. *1—N* **DataSourceEndpoint** (path, método, mapeo JSONPath, TTL). Caché en Redis. **Espejo ENTRANTE:** en Fase 3 un endpoint puede **alimentar/materializar** una `ReferenceList` (`source=EXTERNAL`).
 

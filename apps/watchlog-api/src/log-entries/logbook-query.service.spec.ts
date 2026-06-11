@@ -139,8 +139,15 @@ function makeServices(prismaOver: Record<string, unknown> = {}, scopeOver: Parti
   } as unknown as ScopeService;
   const shiftResolver = { resolve: vi.fn().mockResolvedValue(null) } as unknown as ShiftResolver;
   const reauth = { verifyForSignature: vi.fn() } as unknown as ReauthService;
+  const periods = {
+    assertWritable: vi.fn().mockResolvedValue(undefined),
+    isWriteBlocked: vi.fn().mockResolvedValue(false),
+  } as unknown as import("../operational-periods/operational-periods.service").OperationalPeriodService;
+  const permissions = {
+    getEffectivePermissions: vi.fn().mockResolvedValue(new Set<string>()),
+  } as unknown as import("../authz/permission.service").PermissionService;
 
-  const entries = new LogEntriesService(prisma, audit, scope, shiftResolver, reauth, enc);
+  const entries = new LogEntriesService(prisma, audit, scope, shiftResolver, reauth, enc, periods, permissions);
   const logbook = new LogbookQueryService(prisma, scope, audit, enc, entries);
   return { logbook, entries, prisma, audit, scope };
 }
