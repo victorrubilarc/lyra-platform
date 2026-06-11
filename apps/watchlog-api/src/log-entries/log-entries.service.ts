@@ -40,9 +40,11 @@ import {
 import { Prisma } from "@prisma/client";
 import { ReauthService } from "../auth/reauth.service";
 import { AuditService, type AuditContext } from "../audit/audit.service";
+import { PermissionService } from "../authz/permission.service";
 import { ScopeService } from "../authz/scope.service";
 import { EncryptionService } from "../crypto/encryption.service";
 import { ShiftResolver } from "../operational-calendar/shift-resolver";
+import { OperationalPeriodService, PERIOD_WRITE_CLOSED_PERMISSION } from "../operational-periods/operational-periods.service";
 import { PrismaService } from "../prisma/prisma.service";
 
 /** Significado por defecto de la firma de completitud de sección (las secciones no
@@ -135,6 +137,8 @@ export class LogEntriesService {
     private readonly shiftResolver: ShiftResolver,
     private readonly reauth: ReauthService,
     private readonly enc: EncryptionService,
+    private readonly periods: OperationalPeriodService,
+    private readonly permissions: PermissionService,
   ) {}
 
   // --- Crear (abrir) una entrada ---------------------------------------------
@@ -186,6 +190,11 @@ export class LogEntriesService {
       recordedAt,
       declaredAt,
     );
+    // Guarda de período (2.7.1): no se puede abrir una entrada cuya fecha efectiva
+    // caiga en un período en cierre/cerrado, salvo permiso de excepción. Cubre el
+    // diferido: declarar una fecha en período cerrado se rechaza con PERIOD_CLOSED.
+    await this.periods.assertWritable(effectiveAt, orgNodeId, await this.permissions.getEffectivePermissions(userId));
+
     const dims = await this.shiftResolver.resolve(effectiveAt, orgNodeId);
 
     const data = {
@@ -281,14 +290,25 @@ export class LogEntriesService {
       version.sections.flatMap((s) => s.roles.map((r) => r.roleId)),
     );
 
+    // Huella de período (2.7.1): si la fecha efectiva cae en un período en cierre/
+    // cerrado y el actor NO tiene la excepción, todas las secciones quedan bloqueadas
+    // con PERIOD_CLOSED (la congelación del período es un gate uniforme de la entrada).
+    const periodBlocked =
+      editable &&
+      !(await this.permissions.getEffectivePermissions(userId)).has(PERIOD_WRITE_CLOSED_PERMISSION) &&
+      (await this.periods.isWriteBlocked(entry.effectiveAt, entry.orgNodeId));
+
     const sectionStates: LogEntrySectionStateDto[] = version.sections.map((def) => {
       const row = sectionRows.find((r) => r.sectionKey === def.key);
       const sig = row?.signatureId ? sigById.get(row.signatureId) : undefined;
       const sectionRoleIds = def.roles.map((r) => r.roleId);
-      // Motivo de bloqueo para ESTE usuario (la UI lo comunica tal cual).
+      // Motivo de bloqueo para ESTE usuario (la UI lo comunica tal cual). Orden de
+      // precedencia: registro sellado → período cerrado → reglas de la sección.
       const blockedReason: SectionBlockedReason | null = !editable
         ? "ENTRY_CLOSED"
-        : this.sectionBlockedReasonFor(def.editableInStateKey, sectionRoleIds, entry.currentStateKey, roleIds);
+        : periodBlocked
+          ? "PERIOD_CLOSED"
+          : this.sectionBlockedReasonFor(def.editableInStateKey, sectionRoleIds, entry.currentStateKey, roleIds);
       return {
         sectionKey: def.key,
         state: row?.state ?? "PENDING",
@@ -318,7 +338,7 @@ export class LogEntriesService {
     // Transiciones que ESTE usuario puede ejecutar ahora (solo si sigue editable).
     const labelByKey = new Map((wfVersion?.transitions ?? []).map((t) => [t.key, t.label]));
     const availableTransitions: AvailableTransitionDto[] =
-      editable && wfVersion
+      editable && !periodBlocked && wfVersion
         ? availableTransitionsFor(
             wfVersion.transitions.map((t) => ({
               key: t.key,
@@ -453,6 +473,24 @@ export class LogEntriesService {
     const valuesByKey: Record<string, unknown> = {};
     for (const v of existing) valuesByKey[v.fieldKey] = (v.value ?? null) as unknown;
     for (const input of dto.values) valuesByKey[input.fieldKey] = input.value ?? null;
+
+    // Guarda de período (2.7.1): la effectiveAt que ESTE guardado dejaría (la
+    // congelada si ya está sellada; la recalculada de los valores si sigue en
+    // borrador) no puede caer en un período en cierre/cerrado sin excepción. Se
+    // valida antes de la validación de campos (gate duro de la entrada completa).
+    const prospectiveEffectiveAt = entry.sealedAt
+      ? entry.effectiveAt
+      : resolveEffectiveAt(
+          version.sections.map((s) => ({ fields: s.fields.map((f) => this.toFieldDtoLite(f)) })),
+          valuesByKey,
+          entry.recordedAt,
+          entry.declaredEffectiveAt,
+        );
+    await this.periods.assertWritable(
+      prospectiveEffectiveAt,
+      entry.orgNodeId,
+      await this.permissions.getEffectivePermissions(userId),
+    );
 
     // Validación 100% en servidor (tipo/rango/umbral/formato/catálogo), saltando
     // campos ocultos por visibleWhen. Los obligatorios solo se exigen al completar.
@@ -628,6 +666,9 @@ export class LogEntriesService {
 
     const sealedAt = new Date();
     const seal = await this.computeSeal(entry, version, valuesByKey);
+    // Guarda de período (2.7.1): sellar es el commit GxP; su effectiveAt no puede
+    // caer en un período en cierre/cerrado sin permiso de excepción.
+    await this.periods.assertWritable(seal.effectiveAt, entry.orgNodeId, await this.permissions.getEffectivePermissions(userId));
     await this.prisma.logEntry.update({
       where: { id },
       data: { status: "SUBMITTED", sealedAt, ...seal, updatedById: userId },
@@ -682,6 +723,11 @@ export class LogEntriesService {
       entry.recordedAt,
       declaredAt,
     );
+    // Guarda de período (2.7.1, fork 5): declarar/corregir una fecha de evento que
+    // cae en un período en cierre/cerrado se rechaza con PERIOD_CLOSED (misma guarda
+    // y mismo motivo visible que el resto de las escrituras), salvo excepción.
+    await this.periods.assertWritable(effectiveAt, entry.orgNodeId, await this.permissions.getEffectivePermissions(userId));
+
     const dims = await this.shiftResolver.resolve(effectiveAt, entry.orgNodeId);
 
     await this.prisma.$transaction(async (tx) => {
@@ -859,8 +905,6 @@ export class LogEntriesService {
       throw new ForbiddenException("No tiene un rol autorizado para ejecutar esta transición");
     }
 
-    // (d) completitud: las secciones editables en el estado de ORIGEN deben estar
-    // marcadas COMPLETED y sin errores de validación (defensa en profundidad).
     const version = await this.loadVersion(entry.templateVersionId);
     const valuesByKey = await this.loadValuesByKey(id);
     const sectionRows = await this.prisma.logEntrySection.findMany({ where: { logEntryId: id } });
@@ -868,6 +912,29 @@ export class LogEntriesService {
     const editableInFrom = (section: VersionWithGraph["sections"][number]): boolean =>
       isSectionEditableInState(section.editableInStateKey, fromStateKey);
 
+    // Guarda de período (2.7.1): una transición ES una transacción que muta y puede
+    // sellar dimensiones (Maximo rechaza por fecha). Se valida ANTES de la completitud
+    // (gate duro: en período cerrado no tiene sentido pedir "complete las secciones" —
+    // ni siquiera se pueden completar) y ANTES del re-auth (no consumir un código de
+    // recuperación si bloquea). effectiveAt = la que se sellaría (1ª salida del inicial)
+    // o la ya congelada. Las lecturas y la verificación de firma nunca se tocan.
+    const sealsHere = !entry.sealedAt && wfVersion.states.find((s) => s.key === transition.fromState.key)!.isInitial;
+    const transitionEffectiveAt = sealsHere
+      ? resolveEffectiveAt(
+          version.sections.map((s) => ({ fields: s.fields.map((f) => this.toFieldDtoLite(f)) })),
+          valuesByKey,
+          entry.recordedAt,
+          entry.declaredEffectiveAt,
+        )
+      : entry.effectiveAt;
+    await this.periods.assertWritable(
+      transitionEffectiveAt,
+      entry.orgNodeId,
+      await this.permissions.getEffectivePermissions(userId),
+    );
+
+    // (d) completitud: las secciones editables en el estado de ORIGEN deben estar
+    // marcadas COMPLETED y sin errores de validación (defensa en profundidad).
     const errors = await this.collectCompletionErrors(version, valuesByKey, editableInFrom);
     for (const section of version.sections) {
       if (!editableInFrom(section) || section.fields.length === 0) continue;
