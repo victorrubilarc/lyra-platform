@@ -952,6 +952,15 @@ enum SignatureMethod {
   PASSWORD_MFA
 }
 
+// Origen del registro (Fase 2.7.0, GxP/ALCOA+ "contemporaneous"): ONLINE =
+// registrado en el momento del evento; DEFERRED = registro tardío DECLARADO por
+// el operador (no inferido por relojes). La entrada tardía es legítima si queda
+// identificada: fecha del evento vs fecha de captura, quién y por qué.
+enum LogEntryOrigin {
+  ONLINE
+  DEFERRED
+}
+
 model LogEntry {
   id                          String         @id @default(cuid())
   // Folio humano correlativo (Fase 2.6): referencia estable para auditoría/terreno
@@ -980,6 +989,19 @@ model LogEntry {
   periodKey                   String?
   // Instante en que se congelaron effectiveAt + dimensiones (al enviar). null = DRAFT.
   sealedAt                    DateTime?
+  // --- Registro diferido (Fase 2.7.0) ---------------------------------------
+  // Origen DECLARADO del registro (default ONLINE; ver enum LogEntryOrigin).
+  entryOrigin                 LogEntryOrigin @default(ONLINE)
+  // Fecha/hora REAL del evento declarada a NIVEL DE ENTRADA. Es el fallback
+  // intermedio de resolveEffectiveAt (campo EFFECTIVE_DATE → declarada →
+  // recordedAt); si la plantilla tiene campo EFFECTIVE_DATE, el gesto lo
+  // escribe y ese campo sigue mandando.
+  declaredEffectiveAt         DateTime?
+  // Motivo del diferimiento (obligatorio al declarar; práctica GxP late entry).
+  deferredReason              String?
+  // Quién y cuándo declaró el diferimiento (huella ALCOA+ / timeline).
+  deferredDeclaredById        String?
+  deferredDeclaredAt          DateTime?
   // Autoría (referencia blanda, sin FK dura; igual que Template/AuditLog).
   createdById                 String?
   updatedById                 String?
@@ -1007,6 +1029,7 @@ model LogEntry {
   @@index([operationalDate])
   @@index([periodKey])
   @@index([createdById])
+  @@index([entryOrigin])
   @@index([deletedAt])
 }
 
