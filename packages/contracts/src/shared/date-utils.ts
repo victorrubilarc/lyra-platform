@@ -1,0 +1,60 @@
+import { z } from "zod";
+
+/**
+ * Utilidades de fecha PURAS y deterministas (sin dependencias salvo `Intl` donde
+ * aplica) compartidas por el eje TURNO (`operational-calendar`) y el eje PERÍODO
+ * (`fiscal-calendar`). Centralizar la aritmética de calendario evita duplicar la
+ * lógica entre ambos ejes ahora que están desacoplados (ver DECISIONS 2026-06-11).
+ *
+ * Toda fecha-solo se representa como "YYYY-MM-DD" en UTC para que la aritmética sea
+ * estable y no dependa de la TZ del proceso.
+ */
+
+/** Fecha-solo "YYYY-MM-DD" (sin hora ni TZ: una fecha de calendario local). */
+export const localDateSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Use el formato "YYYY-MM-DD"')
+  .refine((s) => {
+    const [y, m, d] = s.split("-").map(Number);
+    if (m! < 1 || m! > 12 || d! < 1 || d! > 31) return false;
+    const dt = new Date(Date.UTC(y!, m! - 1, d!));
+    return dt.getUTCFullYear() === y && dt.getUTCMonth() === m! - 1 && dt.getUTCDate() === d;
+  }, "Fecha inválida");
+
+/** Suma `days` (puede ser negativo) a una fecha local Y-M-D; devuelve "YYYY-MM-DD". */
+export function addDays(year: number, month: number, day: number, days: number): string {
+  const dt = new Date(Date.UTC(year, month - 1, day + days));
+  return dt.toISOString().slice(0, 10);
+}
+
+/** Suma `days` a una fecha "YYYY-MM-DD"; devuelve "YYYY-MM-DD". */
+export function addDaysToIso(date: string, days: number): string {
+  const [y, m, d] = date.split("-").map(Number);
+  return addDays(y!, m!, d!, days);
+}
+
+/** Día de la semana ISO (1=Lun..7=Dom) de una fecha "YYYY-MM-DD". */
+export function isoWeekdayOf(date: string): number {
+  const [y, m, d] = date.split("-").map(Number);
+  const dow = new Date(Date.UTC(y!, m! - 1, d!)).getUTCDay(); // 0=Dom..6=Sáb
+  return dow === 0 ? 7 : dow;
+}
+
+/** Días enteros entre dos fechas "YYYY-MM-DD" (b - a), con signo. */
+export function daysBetween(a: string, b: string): number {
+  const [ay, am, ad] = a.split("-").map(Number);
+  const [by, bm, bd] = b.split("-").map(Number);
+  const ms = Date.UTC(by!, bm! - 1, bd!) - Date.UTC(ay!, am! - 1, ad!);
+  return Math.round(ms / 86_400_000);
+}
+
+/** ¿La TZ es una zona IANA válida y soportada por el runtime? */
+export function isValidTimezone(tz: string): boolean {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+}

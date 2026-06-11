@@ -1,53 +1,49 @@
 import { describe, expect, it } from "vitest";
 import {
   closePeriodRequestSchema,
+  generatePeriodsRequestSchema,
+  lockPeriodRequestSchema,
   periodStatusSchema,
   reopenPeriodRequestSchema,
+  unlockPeriodRequestSchema,
+  yearRange,
 } from "./operational-periods.js";
-import { enumeratePeriodKeys, type ShiftResolverCalendar } from "../operational-calendar/operational-calendar.js";
 
 describe("operational-periods contract", () => {
-  it("acepta los tres estados de gobernanza", () => {
+  it("acepta los cuatro estados de gobernanza (CLOSING deprecado, retenido para parseo)", () => {
     expect(periodStatusSchema.safeParse("OPEN").success).toBe(true);
-    expect(periodStatusSchema.safeParse("CLOSING").success).toBe(true);
     expect(periodStatusSchema.safeParse("CLOSED").success).toBe(true);
+    expect(periodStatusSchema.safeParse("LOCKED").success).toBe(true);
+    expect(periodStatusSchema.safeParse("CLOSING").success).toBe(true);
     expect(periodStatusSchema.safeParse("FROZEN").success).toBe(false);
   });
 
-  it("cerrar exige estado destino válido y motivo de longitud mínima", () => {
-    expect(closePeriodRequestSchema.safeParse({ status: "CLOSED", reason: "Cierre contable mensual" }).success).toBe(
-      true,
-    );
-    // OPEN no es un destino de cierre.
-    expect(closePeriodRequestSchema.safeParse({ status: "OPEN", reason: "Cierre contable" }).success).toBe(false);
-    // Motivo demasiado corto.
-    expect(closePeriodRequestSchema.safeParse({ status: "CLOSED", reason: "no" }).success).toBe(false);
+  it("cerrar exige motivo de longitud mínima", () => {
+    expect(closePeriodRequestSchema.safeParse({ reason: "Cierre contable mensual" }).success).toBe(true);
+    expect(closePeriodRequestSchema.safeParse({ reason: "no" }).success).toBe(false);
   });
 
-  it("reabrir exige motivo", () => {
+  it("lock/unlock exigen motivo", () => {
+    expect(lockPeriodRequestSchema.safeParse({ reason: "Bloqueo definitivo del período" }).success).toBe(true);
+    expect(lockPeriodRequestSchema.safeParse({ reason: "" }).success).toBe(false);
+    expect(unlockPeriodRequestSchema.safeParse({ reason: "Reapertura autorizada por gerencia" }).success).toBe(true);
+  });
+
+  it("reabrir exige motivo y acepta el acuse de posteriores cerrados", () => {
     expect(reopenPeriodRequestSchema.safeParse({ reason: "Ajuste posterior autorizado" }).success).toBe(true);
+    expect(
+      reopenPeriodRequestSchema.safeParse({ reason: "Ajuste posterior autorizado", acknowledgeLaterClosed: true })
+        .success,
+    ).toBe(true);
     expect(reopenPeriodRequestSchema.safeParse({ reason: "" }).success).toBe(false);
   });
-});
 
-describe("enumeratePeriodKeys", () => {
-  const monthly: ShiftResolverCalendar = {
-    timezone: "America/Santiago",
-    shifts: [],
-    dayStartShiftCode: null,
-    periodKind: "MONTH",
-    periodAnchorDay: 1,
-  };
-
-  it("devuelve las llaves de período DISTINTAS del rango, en orden", () => {
-    const keys = enumeratePeriodKeys(monthly, "2026-01-15", "2026-03-10");
-    expect(keys).toEqual(["2026-01", "2026-02", "2026-03"]);
+  it("generar exige un año válido", () => {
+    expect(generatePeriodsRequestSchema.safeParse({ year: 2026 }).success).toBe(true);
+    expect(generatePeriodsRequestSchema.safeParse({ year: 1999 }).success).toBe(false);
   });
 
-  it("respeta el día-ancla (el mes arranca en el día configurado)", () => {
-    const anchored: ShiftResolverCalendar = { ...monthly, periodAnchorDay: 26 };
-    // 2026-01-25 cae en el período que arranca el 26-dic (2025-12); el 26-ene abre 2026-01.
-    const keys = enumeratePeriodKeys(anchored, "2026-01-25", "2026-01-26");
-    expect(keys).toEqual(["2025-12", "2026-01"]);
+  it("yearRange produce el rango civil del año", () => {
+    expect(yearRange(2026)).toEqual({ fromDate: "2026-01-01", toDate: "2026-12-31" });
   });
 });

@@ -29,10 +29,16 @@ export * from "./workflows/workflows.js";
 // Datos de referencia / Listas (Fase 2.x)
 export * from "./reference-data/reference-data.js";
 
-// Calendario operacional (turnos + periodo contable) (Fase 2.3.0)
+// Utilidades de fecha compartidas (eje turno + eje período)
+export * from "./shared/date-utils.js";
+
+// Calendario operacional (turnos + día operacional) (Fase 2.3.0)
 export * from "./operational-calendar/operational-calendar.js";
 
-// Período contable gobernado (cierre/reapertura) (Fase 2.7.1)
+// Calendario FISCAL (período contable transversal) (Fase 2.7.1.1)
+export * from "./fiscal-calendar/fiscal-calendar.js";
+
+// Período contable gobernado (generación/cierre/lock) (Fase 2.7.1 → 2.7.1.1)
 export * from "./operational-periods/operational-periods.js";
 
 // Llenado de bitácoras / ejecución (Fase 2.4)
