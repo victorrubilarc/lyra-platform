@@ -221,6 +221,24 @@ function TimelineEvent({ event }: { event: LogEntryTimelineEvent }) {
           {event.reason && <div className={styles.eventReason}>“{event.reason}”</div>}
         </div>
       );
+    case "DEFERRED_DECLARED":
+      return (
+        <div className={`${styles.eventItem} ${styles.eventChange}`}>
+          <div className={styles.eventHead}>
+            <span className={styles.eventTitle}>
+              <History size={14} /> {t("logbook.viewer.event.deferredDeclared")}
+            </span>
+            <span className={styles.eventWhen}>
+              {event.actorName ? `${event.actorName} · ` : ""}
+              {formatDateTime(event.at)}
+            </span>
+          </div>
+          <div className={styles.eventBody}>
+            {t("logbook.deferral.eventBody", { at: formatDateTime(event.declaredEffectiveAt) })}
+          </div>
+          {event.reason && <div className={styles.eventReason}>“{event.reason}”</div>}
+        </div>
+      );
     case "SECTION_SIGNED":
       return (
         <div className={`${styles.eventItem} ${styles.eventSignature}`}>
@@ -321,6 +339,7 @@ export function EntryViewerPage() {
             <div className={fillStyles.entryNode}>{entry.orgNodePath ?? "—"}</div>
           </div>
           <div className={fillStyles.entryHeadChips}>
+            {entry.entryOrigin === "DEFERRED" && <Chip variant="warning" label={t("logbook.origin.DEFERRED")} />}
             {entry.currentStateName && (
               <span
                 className={styles.stateChip}
@@ -386,6 +405,20 @@ export function EntryViewerPage() {
             </span>
           )}
         </div>
+
+        {/* Huella del registro diferido (2.7.0): qué se declaró, quién y por qué. */}
+        {entry.entryOrigin === "DEFERRED" && (
+          <div className={fillStyles.deferredNote}>
+            <History size={13} />
+            <span>
+              {t("logbook.deferral.viewerNote", {
+                at: entry.declaredEffectiveAt ? formatDateTime(entry.declaredEffectiveAt) : "—",
+                by: entry.deferredDeclaredByName ?? "—",
+              })}
+              {entry.deferredReason ? ` — “${entry.deferredReason}”` : ""}
+            </span>
+          </div>
+        )}
       </Card>
 
       {/* Secciones con valores resueltos (read-only) */}

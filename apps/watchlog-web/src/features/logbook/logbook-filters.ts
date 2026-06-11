@@ -23,6 +23,8 @@ export interface LogbookGridState {
   onlyMine: boolean;
   pendingSignature: boolean;
   thresholdBand: "" | "WARN" | "CRIT" | "ANY";
+  /** Origen del registro (2.7.0): "" = todos. */
+  entryOrigin: "" | "ONLINE" | "DEFERRED";
   sort: LogEntrySortField;
   dir: "asc" | "desc";
 }
@@ -44,6 +46,7 @@ export const DEFAULT_GRID_STATE: LogbookGridState = {
   onlyMine: false,
   pendingSignature: false,
   thresholdBand: "",
+  entryOrigin: "",
   sort: "recordedAt",
   dir: "desc",
 };
@@ -76,6 +79,7 @@ export function toListQuery(state: LogbookGridState, currentUserId: string | nul
     createdById: state.onlyMine && currentUserId ? currentUserId : undefined,
     pendingSignature: state.pendingSignature || undefined,
     thresholdBand: state.thresholdBand || undefined,
+    entryOrigin: state.entryOrigin || undefined,
     sort: state.sort,
     dir: state.dir,
   };
@@ -121,6 +125,8 @@ export function gridStateFromParams(params: URLSearchParams): LogbookGridState {
   if (status === "DRAFT" || status === "SUBMITTED" || status === "VOID") state.status = status;
   const band = params.get("thresholdBand");
   if (band === "WARN" || band === "CRIT" || band === "ANY") state.thresholdBand = band;
+  const origin = params.get("entryOrigin");
+  if (origin === "ONLINE" || origin === "DEFERRED") state.entryOrigin = origin;
   const sort = params.get("sort");
   if (sort === "recordedAt" || sort === "effectiveAt" || sort === "entryNumber") state.sort = sort;
   const dir = params.get("dir");

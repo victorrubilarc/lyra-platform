@@ -56,10 +56,10 @@ function makeService(
   opts: { dims?: unknown; scope?: Partial<ScopeService>; reauth?: Partial<ReauthService> } = {},
 ) {
   const tx = {
-    logEntryValue: { upsert: vi.fn().mockResolvedValue({}) },
+    logEntryValue: { upsert: vi.fn().mockResolvedValue({}), findUnique: vi.fn().mockResolvedValue(null) },
     logEntryFieldChange: { create: vi.fn().mockResolvedValue({}) },
-    logEntrySection: { update: vi.fn().mockResolvedValue({}) },
-    logEntry: { update: vi.fn().mockResolvedValue({}) },
+    logEntrySection: { update: vi.fn().mockResolvedValue({}), updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+    logEntry: { update: vi.fn().mockResolvedValue({}), create: vi.fn().mockResolvedValue({ id: "e1" }) },
     logEntryTransition: { create: vi.fn().mockResolvedValue({ id: "tr1" }) },
     logEntrySignature: { create: vi.fn().mockResolvedValue({ id: "sig1" }) },
   };
@@ -425,6 +425,156 @@ describe("LogEntriesService — submit", () => {
       logEntry: { findFirst: vi.fn().mockResolvedValue({ ...entry, workflowDefinitionVersionId: "wfv1", currentStateKey: "open" }), update: vi.fn(), create: vi.fn(), findMany: vi.fn() },
     });
     await expect(service.submit("u1", "e1", {}, ctx)).rejects.toBeInstanceOf(BadRequestException);
+  });
+});
+
+describe("LogEntriesService — registro diferido (2.7.0)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const publishedTemplate = {
+    findFirst: vi.fn().mockResolvedValue({ id: "t1", status: "PUBLISHED", currentVersionId: "v1", orgNodeId: "n1" }),
+    findUnique: vi.fn().mockResolvedValue({ name: "Turno" }),
+  };
+  const deferred = { effectiveAt: "2026-06-10T22:30:00.000Z", reason: "Sin señal en terreno" };
+
+  it("create DIFERIDA sin campo EFFECTIVE_DATE: marca origen, declara fecha y estampa dims desde la declarada", async () => {
+    const { service, prisma, shiftResolver, audit } = makeService({
+      template: publishedTemplate,
+      templateVersion: {
+        findFirst: vi.fn().mockResolvedValue(versionGraph([section("s1", [field({ key: "obs", type: "TEXT", dataType: "STRING", label: "Obs" })])])),
+      },
+    });
+    vi.spyOn(service, "getDetail").mockResolvedValue({ id: "e1" } as never);
+
+    await service.create("u1", { templateId: "t1", deferred }, ctx);
+
+    expect(shiftResolver.resolve).toHaveBeenCalledWith(new Date(deferred.effectiveAt), "n1");
+    expect(prisma.logEntry.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          entryOrigin: "DEFERRED",
+          declaredEffectiveAt: new Date(deferred.effectiveAt),
+          effectiveAt: new Date(deferred.effectiveAt),
+          deferredReason: deferred.reason,
+          deferredDeclaredById: "u1",
+        }),
+      }),
+    );
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "logentry.created", after: expect.objectContaining({ entryOrigin: "DEFERRED" }) }),
+    );
+  });
+
+  it("create DIFERIDA con campo EFFECTIVE_DATE: el gesto ESCRIBE el campo (DATE conserva la fecha civil) con FieldChange", async () => {
+    const { service, tx } = makeService({
+      template: publishedTemplate,
+      templateVersion: {
+        findFirst: vi.fn().mockResolvedValue(
+          versionGraph([
+            section("s1", [field({ key: "fechaEvento", type: "DATE", dataType: "DATE", label: "Fecha del evento", semanticRole: "EFFECTIVE_DATE" })]),
+          ]),
+        ),
+      },
+    });
+    vi.spyOn(service, "getDetail").mockResolvedValue({ id: "e1" } as never);
+
+    // -04:00: el instante UTC cae al día siguiente; la fecha CIVIL del operador debe conservarse.
+    await service.create("u1", { templateId: "t1", deferred: { effectiveAt: "2026-06-10T23:30:00-04:00", reason: "Turno sin acceso" } }, ctx);
+
+    expect(tx.logEntry.create).toHaveBeenCalled();
+    expect(tx.logEntryValue.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ create: expect.objectContaining({ fieldKey: "fechaEvento", value: "2026-06-10" }) }),
+    );
+    expect(tx.logEntryFieldChange.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ fieldKey: "fechaEvento", after: "2026-06-10", reason: "Turno sin acceso" }) }),
+    );
+    expect(tx.logEntrySection.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { version: { increment: 1 } } }),
+    );
+  });
+
+  it("rechaza diferir si el campo EFFECTIVE_DATE está reservado a otro rol (sin bypass del override)", async () => {
+    const { service } = makeService({
+      template: publishedTemplate,
+      templateVersion: {
+        findFirst: vi.fn().mockResolvedValue(
+          versionGraph([
+            section("s1", [
+              field({ key: "fechaEvento", type: "DATETIME", dataType: "DATETIME", label: "Fecha del evento", semanticRole: "EFFECTIVE_DATE", roles: [{ roleId: "supervisor" }] }),
+            ]),
+          ]),
+        ),
+      },
+      userRole: { findMany: vi.fn().mockResolvedValue([{ roleId: "operador" }]) },
+    });
+    await expect(service.create("u1", { templateId: "t1", deferred }, ctx)).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  const draftEntry = {
+    id: "e1", status: "DRAFT", orgNodeId: "n1", templateVersionId: "v1", currentStateKey: null,
+    recordedAt: new Date("2026-06-11T10:00:00.000Z"), sealedAt: null,
+    entryOrigin: "ONLINE", declaredEffectiveAt: null, deferredReason: null,
+  };
+
+  function setupDeferral(entryOver: Record<string, unknown> = {}) {
+    const m = makeService({
+      logEntry: { findFirst: vi.fn().mockResolvedValue({ ...draftEntry, ...entryOver }), update: vi.fn(), create: vi.fn(), findMany: vi.fn() },
+      templateVersion: {
+        findUnique: vi.fn().mockResolvedValue(versionGraph([section("s1", [field({ key: "obs", type: "TEXT", dataType: "STRING", label: "Obs" })])])),
+      },
+    });
+    vi.spyOn(m.service, "getDetail").mockResolvedValue({ id: "e1" } as never);
+    return m;
+  }
+
+  it("setDeferral declara sobre un borrador: actualiza marca + effectiveAt + dims y audita", async () => {
+    const { service, tx, audit, shiftResolver } = setupDeferral();
+
+    await service.setDeferral("u1", "e1", { deferred }, ctx);
+
+    expect(shiftResolver.resolve).toHaveBeenCalledWith(new Date(deferred.effectiveAt), "n1");
+    expect(tx.logEntry.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          entryOrigin: "DEFERRED",
+          declaredEffectiveAt: new Date(deferred.effectiveAt),
+          effectiveAt: new Date(deferred.effectiveAt),
+          deferredReason: deferred.reason,
+          shiftCode: "A",
+        }),
+      }),
+    );
+    expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({ action: "logentry.deferral.declared" }));
+  });
+
+  it("setDeferral con null QUITA la marca y vuelve a recordedAt (sin campo de fecha)", async () => {
+    const { service, tx, audit } = setupDeferral({
+      entryOrigin: "DEFERRED",
+      declaredEffectiveAt: new Date("2026-06-10T22:30:00.000Z"),
+      deferredReason: "x",
+    });
+
+    await service.setDeferral("u1", "e1", { deferred: null }, ctx);
+
+    expect(tx.logEntry.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          entryOrigin: "ONLINE",
+          declaredEffectiveAt: null,
+          deferredReason: null,
+          effectiveAt: new Date("2026-06-11T10:00:00.000Z"),
+        }),
+      }),
+    );
+    expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({ action: "logentry.deferral.cleared" }));
+  });
+
+  it("rechaza declarar/quitar en una entrada sellada o enviada (origen inmutable)", async () => {
+    const sealed = setupDeferral({ sealedAt: new Date() });
+    await expect(sealed.service.setDeferral("u1", "e1", { deferred }, ctx)).rejects.toBeInstanceOf(BadRequestException);
+
+    const submitted = setupDeferral({ status: "SUBMITTED" });
+    await expect(submitted.service.setDeferral("u1", "e1", { deferred: null }, ctx)).rejects.toBeInstanceOf(BadRequestException);
   });
 });
 

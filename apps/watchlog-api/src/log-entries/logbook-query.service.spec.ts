@@ -174,6 +174,13 @@ describe("LogbookQueryService — list", () => {
     expect(orClause.OR).toContainEqual({ entryNumber: 7 });
   });
 
+  it("filtra por entryOrigin (registro diferido 2.7.0) en el where", async () => {
+    const { logbook, prisma } = makeServices();
+    await logbook.list("u1", { entryOrigin: "DEFERRED" });
+    const arg = (prisma.logEntry.findMany as ReturnType<typeof vi.fn>).mock.calls[0]![0];
+    expect(arg.where.AND).toContainEqual({ entryOrigin: "DEFERRED" });
+  });
+
   it("filtra una rama completa con includeDescendants (ruta materializada)", async () => {
     const { logbook, prisma } = makeServices();
     await logbook.list("u1", { orgNodeId: "n1", includeDescendants: true });
@@ -368,6 +375,34 @@ describe("LogbookQueryService — timeline", () => {
     const small = await logbook.timeline("u1", "e1", { take: 2 });
     expect(small.events).toHaveLength(2);
     expect(small.nextCursor).not.toBeNull();
+  });
+
+  it("una entrada DIFERIDA emite el evento DEFERRED_DECLARED con quién/cuándo/por qué (2.7.0)", async () => {
+    const { logbook } = makeServices({
+      logEntry: {
+        findFirst: vi.fn().mockResolvedValue(
+          baseEntry({
+            entryOrigin: "DEFERRED",
+            declaredEffectiveAt: new Date("2026-06-09T22:30:00.000Z"),
+            deferredReason: "Sin señal en terreno",
+            deferredDeclaredById: "u1",
+            deferredDeclaredAt: new Date("2026-06-10T10:00:00.000Z"),
+          }),
+        ),
+        findMany: vi.fn(),
+        count: vi.fn(),
+        groupBy: vi.fn(),
+      },
+    });
+
+    const page = await logbook.timeline("u1", "e1", {});
+    const deferredEvent = page.events.find((e) => e.kind === "DEFERRED_DECLARED");
+    expect(deferredEvent).toMatchObject({
+      kind: "DEFERRED_DECLARED",
+      actorName: "Demo User",
+      declaredEffectiveAt: "2026-06-09T22:30:00.000Z",
+      reason: "Sin señal en terreno",
+    });
   });
 });
 

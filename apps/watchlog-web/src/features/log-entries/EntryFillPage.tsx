@@ -14,6 +14,7 @@ import {
   Send,
   TriangleAlert,
 } from "lucide-react";
+import { DeferralModal } from "./DeferralModal.js";
 import { Button, Card, Chip, EmptyState, Spinner, useToast } from "@lyra/ui";
 import {
   isFieldVisible,
@@ -32,6 +33,7 @@ import {
   useExecuteTransition,
   useLogEntry,
   useSaveLogEntrySection,
+  useSetDeferral,
   useSubmitLogEntry,
 } from "./log-entries-queries.js";
 import { SectionSignModal } from "./SectionSignModal.js";
@@ -62,9 +64,11 @@ export function EntryFillPage() {
   const save = useSaveLogEntrySection(id);
   const submit = useSubmitLogEntry(id);
   const transition = useExecuteTransition(id);
+  const setDeferral = useSetDeferral(id);
 
   const [draft, setDraft] = useState<Draft>({});
   const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [deferralOpen, setDeferralOpen] = useState(false);
   const [activeTransition, setActiveTransition] = useState<AvailableTransitionDto | null>(null);
   const [signingSection, setSigningSection] = useState<{ section: TemplateSectionDto; st: LogEntrySectionStateDto } | null>(null);
 
@@ -199,6 +203,7 @@ export function EntryFillPage() {
             <div className={styles.entryNode}>{entry.orgNodePath ?? "—"}</div>
           </div>
           <div className={styles.entryHeadChips}>
+            {entry.entryOrigin === "DEFERRED" && <Chip variant="warning" label={t("logbook.deferral.chip")} />}
             {entry.currentStateName && <Chip variant="info" label={entry.currentStateName} />}
             <Chip
               variant={entry.status === "SUBMITTED" ? "success" : entry.status === "VOID" ? "default" : "warning"}
@@ -231,7 +236,38 @@ export function EntryFillPage() {
               {t("logbook.fill.period")}: <b>{entry.periodKey}</b>
             </span>
           )}
+          {entry.entryOrigin === "DEFERRED" && (
+            <span className={styles.dimChip}>
+              <History size={13} /> {t("logbook.fill.recordedAt")}:{" "}
+              <b>{new Date(entry.recordedAt).toLocaleString("es-CL")}</b>
+            </span>
+          )}
         </div>
+
+        {/* Registro diferido (2.7.0): huella visible + gesto para declarar/corregir. */}
+        {entry.entryOrigin === "DEFERRED" && (
+          <div className={styles.deferredNote}>
+            <History size={13} />
+            <span>
+              {t("logbook.deferral.note", {
+                at: entry.declaredEffectiveAt ? new Date(entry.declaredEffectiveAt).toLocaleString("es-CL") : "—",
+              })}
+              {entry.deferredReason ? ` — “${entry.deferredReason}”` : ""}
+            </span>
+            {isDraft && !entry.sealedAt && (
+              <button type="button" className={styles.deferralToggleLabel} onClick={() => setDeferralOpen(true)}>
+                {t("logbook.deferral.edit")}
+              </button>
+            )}
+          </div>
+        )}
+        {entry.entryOrigin === "ONLINE" && isDraft && !entry.sealedAt && (
+          <div className={styles.deferredNote}>
+            <button type="button" className={styles.deferralToggleLabel} onClick={() => setDeferralOpen(true)}>
+              <History size={14} /> {t("logbook.deferral.toggleLabel")}
+            </button>
+          </div>
+        )}
       </Card>
 
       {entry.status === "SUBMITTED" && (
@@ -391,6 +427,42 @@ export function EntryFillPage() {
           loading={savingKey === signingSection.section.key + ":complete"}
           onConfirm={(password) => saveSection(signingSection.section, signingSection.st, true, password)}
           onClose={() => setSigningSection(null)}
+        />
+      )}
+
+      {deferralOpen && (
+        <DeferralModal
+          initial={
+            entry.entryOrigin === "DEFERRED" && entry.declaredEffectiveAt
+              ? { effectiveAt: entry.declaredEffectiveAt, reason: entry.deferredReason ?? "" }
+              : null
+          }
+          loading={setDeferral.isPending}
+          onConfirm={(deferred) =>
+            setDeferral.mutate(
+              { deferred },
+              {
+                onSuccess: () => {
+                  toast.success(t("logbook.deferral.declared"));
+                  setDeferralOpen(false);
+                },
+                onError: (e) => toast.error(e instanceof ApiError ? e.message : t("common.errorGeneric")),
+              },
+            )
+          }
+          onRemove={() =>
+            setDeferral.mutate(
+              { deferred: null },
+              {
+                onSuccess: () => {
+                  toast.success(t("logbook.deferral.removed"));
+                  setDeferralOpen(false);
+                },
+                onError: (e) => toast.error(e instanceof ApiError ? e.message : t("common.errorGeneric")),
+              },
+            )
+          }
+          onClose={() => setDeferralOpen(false)}
         />
       )}
     </div>
