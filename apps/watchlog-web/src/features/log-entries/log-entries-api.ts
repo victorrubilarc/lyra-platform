@@ -3,11 +3,13 @@ import {
   executeTransitionRequestSchema,
   logEntryDetailSchema,
   saveLogEntrySectionRequestSchema,
+  setDeferralRequestSchema,
   submitLogEntryRequestSchema,
   type CreateLogEntryRequest,
   type ExecuteTransitionRequest,
   type LogEntryDetail,
   type SaveLogEntrySectionRequest,
+  type SetDeferralRequest,
   type SubmitLogEntryRequest,
 } from "@lyra/contracts";
 import { apiJson } from "../../lib/api-client.js";
@@ -35,6 +37,12 @@ export function saveLogEntrySection(
     method: "PUT",
     body: dto,
   });
+}
+
+/** Declara, corrige o quita (deferred: null) el registro DIFERIDO de un borrador (2.7.0). */
+export function setLogEntryDeferral(id: string, dto: SetDeferralRequest): Promise<LogEntryDetail> {
+  setDeferralRequestSchema.parse(dto);
+  return apiJson(`/log-entries/${id}/deferral`, logEntryDetailSchema, { method: "PUT", body: dto });
 }
 
 export function submitLogEntry(id: string, dto: SubmitLogEntryRequest = {}): Promise<LogEntryDetail> {

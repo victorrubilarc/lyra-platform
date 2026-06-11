@@ -1,11 +1,13 @@
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
-import { ChevronRight, ClipboardList, FileStack, Layers, Lock, Network, TriangleAlert } from "lucide-react";
-import { Card, EmptyState, Skeleton, useToast } from "@lyra/ui";
+import { CalendarClock, ChevronRight, ClipboardList, FileStack, History, Layers, Lock, Network, TriangleAlert } from "lucide-react";
+import { Card, EmptyState, FormField, Input, Skeleton, Textarea, Toggle, useToast } from "@lyra/ui";
 import type { TemplateListItem } from "@lyra/contracts";
 import { ApiError } from "../../lib/api-client.js";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { useTemplates } from "../templates/templates-queries.js";
+import { localInputToIso } from "./datetime-local.js";
 import { useCreateLogEntry } from "./log-entries-queries.js";
 import styles from "./LogEntries.module.css";
 
@@ -19,6 +21,14 @@ export function NewEntryPage() {
   const { data: templates = [], isLoading, isError } = useTemplates({ status: "PUBLISHED" });
   const create = useCreateLogEntry();
 
+  // Gesto mínimo de registro DIFERIDO (2.7.0): por defecto la entrada es "en
+  // línea" (fecha/hora automática); el toggle declara la fecha/hora REAL del
+  // evento + motivo, y la entrada nace MARCADA como diferida.
+  const [deferredOn, setDeferredOn] = useState(false);
+  const [eventAt, setEventAt] = useState("");
+  const [reason, setReason] = useState("");
+  const deferralReady = !deferredOn || (eventAt.trim() !== "" && reason.trim().length >= 5);
+
   if (!perms.can("module:logbook:view")) {
     return (
       <div className={styles.page}>
@@ -29,8 +39,16 @@ export function NewEntryPage() {
 
   function start(tpl: TemplateListItem) {
     if (create.isPending) return;
+    if (!deferralReady) {
+      toast.error(t("logbook.deferral.incomplete"));
+      return;
+    }
     create.mutate(
-      { templateId: tpl.id, ...(tpl.orgNodeId ? { orgNodeId: tpl.orgNodeId } : {}) },
+      {
+        templateId: tpl.id,
+        ...(tpl.orgNodeId ? { orgNodeId: tpl.orgNodeId } : {}),
+        ...(deferredOn ? { deferred: { effectiveAt: localInputToIso(eventAt), reason: reason.trim() } } : {}),
+      },
       {
         onSuccess: (entry) => navigate(`/nueva-entrada/${entry.id}`),
         onError: (e) => toast.error(e instanceof ApiError ? e.message : t("common.errorGeneric")),
@@ -48,6 +66,44 @@ export function NewEntryPage() {
           <p className={styles.subtitle}>{t("logbook.new.subtitle")}</p>
         </div>
       </div>
+
+      {/* Registro diferido (2.7.0): gesto mínimo, apagado por defecto. */}
+      <Card className={styles.deferralCard}>
+        <div className={styles.deferralToggleRow}>
+          <Toggle checked={deferredOn} onChange={setDeferredOn} aria-label={t("logbook.deferral.toggleLabel")} />
+          <button type="button" className={styles.deferralToggleLabel} onClick={() => setDeferredOn(!deferredOn)}>
+            <History size={15} /> {t("logbook.deferral.toggleLabel")}
+          </button>
+          {!deferredOn && <span className={styles.deferralHint}>{t("logbook.deferral.toggleHint")}</span>}
+        </div>
+        {deferredOn && (
+          <div className={styles.deferralFields}>
+            <FormField label={t("logbook.deferral.effectiveAt")} required>
+              {(field) => (
+                <Input
+                  {...field}
+                  type="datetime-local"
+                  value={eventAt}
+                  onChange={(e) => setEventAt(e.target.value)}
+                  rightSlot={<CalendarClock size={15} />}
+                />
+              )}
+            </FormField>
+            <FormField label={t("logbook.deferral.reason")} required hint={t("logbook.deferral.reasonHint")}>
+              {(field) => (
+                <Textarea
+                  {...field}
+                  value={reason}
+                  rows={2}
+                  placeholder={t("logbook.deferral.reasonPlaceholder")}
+                  onChange={(e) => setReason(e.target.value)}
+                />
+              )}
+            </FormField>
+            <p className={styles.deferralExplain}>{t("logbook.deferral.explain")}</p>
+          </div>
+        )}
+      </Card>
 
       {isLoading ? (
         <div className={styles.grid}>

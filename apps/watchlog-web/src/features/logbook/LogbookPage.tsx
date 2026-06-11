@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { BookOpenCheck, Download, FilterX, GitBranch, Lock, PenLine, TriangleAlert } from "lucide-react";
+import { BookOpenCheck, Download, FilterX, GitBranch, History, Lock, PenLine, TriangleAlert } from "lucide-react";
 import {
   Button,
   Checkbox,
@@ -69,6 +69,11 @@ function Indicators({ row }: { row: LogEntryListItem }) {
   const ind = row.indicators;
   return (
     <span className={styles.indicators}>
+      {row.entryOrigin === "DEFERRED" && (
+        <span className={`${styles.indicator} ${styles.indicatorWarn}`} title={row.deferredReason ?? t("logbook.list.deferredHint")}>
+          <History size={12} /> {t("logbook.origin.DEFERRED")}
+        </span>
+      )}
       <span className={styles.indicator} title={t("logbook.list.sectionsHint")}>
         {ind.sectionsCompleted}/{ind.sectionsTotal}
       </span>
@@ -287,6 +292,7 @@ export function LogbookPage() {
   if (state.onlyMine) activeChips.push({ key: "mine", label: t("logbook.filters.onlyMine"), clear: () => patch({ onlyMine: false }) });
   if (state.pendingSignature) activeChips.push({ key: "pending", label: t("logbook.filters.pendingSignature"), clear: () => patch({ pendingSignature: false }) });
   if (state.thresholdBand) activeChips.push({ key: "band", label: t(`logbook.bandFilter.${state.thresholdBand}`), clear: () => patch({ thresholdBand: "" }) });
+  if (state.entryOrigin) activeChips.push({ key: "origin", label: t(`logbook.origin.${state.entryOrigin}`), clear: () => patch({ entryOrigin: "" }) });
 
   return (
     <div className={styles.page}>
@@ -417,6 +423,14 @@ export function LogbookPage() {
             <option value="ANY">{t("logbook.bandFilter.ANY")}</option>
             <option value="WARN">{t("logbook.bandFilter.WARN")}</option>
             <option value="CRIT">{t("logbook.bandFilter.CRIT")}</option>
+          </Select>
+        </label>
+        <label className={styles.filterField}>
+          <span className={styles.filterLabel}>{t("logbook.filters.origin")}</span>
+          <Select value={state.entryOrigin} onChange={(e) => patch({ entryOrigin: e.target.value as LogbookGridState["entryOrigin"] })}>
+            <option value="">{t("logbook.filters.all")}</option>
+            <option value="ONLINE">{t("logbook.origin.ONLINE")}</option>
+            <option value="DEFERRED">{t("logbook.origin.DEFERRED")}</option>
           </Select>
         </label>
         <div className={styles.filterChecks}>

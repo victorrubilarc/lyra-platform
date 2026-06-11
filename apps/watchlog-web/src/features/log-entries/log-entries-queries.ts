@@ -3,6 +3,7 @@ import type {
   CreateLogEntryRequest,
   ExecuteTransitionRequest,
   SaveLogEntrySectionRequest,
+  SetDeferralRequest,
   SubmitLogEntryRequest,
 } from "@lyra/contracts";
 import {
@@ -10,6 +11,7 @@ import {
   executeTransition,
   fetchLogEntry,
   saveLogEntrySection,
+  setLogEntryDeferral,
   submitLogEntry,
 } from "./log-entries-api.js";
 
@@ -43,6 +45,17 @@ export function useSaveLogEntrySection(id: string) {
     mutationFn: ({ sectionKey, dto }: { sectionKey: string; dto: SaveLogEntrySectionRequest }) =>
       saveLogEntrySection(id, sectionKey, dto),
     onSuccess: (data) => qc.setQueryData(LOG_ENTRY_KEYS.detail(id), data),
+  });
+}
+
+export function useSetDeferral(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (dto: SetDeferralRequest) => setLogEntryDeferral(id, dto),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: LOG_ENTRY_KEYS.all });
+      qc.setQueryData(LOG_ENTRY_KEYS.detail(id), data);
+    },
   });
 }
 

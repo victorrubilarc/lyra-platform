@@ -284,3 +284,63 @@
   color: var(--color-text-muted);
   margin-top: 4px;
 }
+
+/* --- Registro diferido (2.7.0) --- */
+.deferralCard {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 18px;
+  margin-top: 14px;
+}
+.deferralToggleRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.deferralToggleLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  min-height: 44px;
+}
+.deferralHint {
+  font-size: 12.5px;
+  color: var(--color-text-muted);
+}
+.deferralFields {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) 1fr;
+  gap: 14px;
+  align-items: start;
+}
+@media (max-width: 720px) {
+  .deferralFields {
+    grid-template-columns: 1fr;
+  }
+}
+.deferralFields > p {
+  grid-column: 1 / -1;
+}
+.deferralExplain {
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+.deferredNote {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+}
