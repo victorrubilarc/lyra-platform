@@ -15,6 +15,7 @@ import { Can } from "../../auth/Can.js";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { ApiError } from "../../lib/api-client.js";
 import { AssignNodesModal } from "./AssignNodesModal.js";
+import { PeriodsSection } from "./PeriodsSection.js";
 import { useOrgTree } from "../structure/structure-queries.js";
 import {
   useAssignCalendarNodes,
@@ -468,6 +469,9 @@ export function CalendarDetailPanel({ calendarId, onDeleted }: CalendarDetailPan
           )}
         </div>
       </div>
+
+      {/* Períodos contables gobernados (2.7.1) */}
+      <PeriodsSection calendarId={cal.id} />
 
       {/* Probador */}
       <div className={styles.section}>

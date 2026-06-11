@@ -255,6 +255,43 @@
   margin: 0;
 }
 
+/* ── Períodos contables gobernados (2.7.1) ──────────────────────────────── */
+.periodList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.periodRow {
+  display: grid;
+  grid-template-columns: 120px auto 1fr auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface-2);
+}
+
+.periodKey {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.periodMeta {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.periodActions {
+  justify-self: end;
+}
+
 /* ── Editor de turnos (filas) ───────────────────────────────────────────── */
 .shiftRow {
   display: grid;
