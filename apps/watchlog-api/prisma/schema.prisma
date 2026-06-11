@@ -302,6 +302,9 @@ model OrgNode {
   // Calendario operacional asignado directamente a este nodo (Fase 2.3.0). Null =
   // hereda del ancestro más cercano que tenga uno, o el calendario por defecto.
   operationalCalendarId String?
+  // Calendario FISCAL asignado directamente a este nodo (Fase 2.7.1.1). Null =
+  // hereda del ancestro más cercano que tenga uno, o el calendario fiscal por defecto.
+  fiscalCalendarId String?
   parentId     String?
   levelId      String
   // Ruta materializada de ancestros incluyéndose: "/<id>/<id>/.../". Permite
@@ -320,11 +323,13 @@ model OrgNode {
   templates Template[]
   logEntries LogEntry[]
   operationalCalendar OperationalCalendar? @relation(fields: [operationalCalendarId], references: [id], onDelete: SetNull)
+  fiscalCalendar      FiscalCalendar?      @relation(fields: [fiscalCalendarId], references: [id], onDelete: SetNull)
 
   @@index([parentId])
   @@index([levelId])
   @@index([path])
   @@index([operationalCalendarId])
+  @@index([fiscalCalendarId])
 }
 
 // ===========================================================================
@@ -477,13 +482,16 @@ enum PeriodKind {
   CUSTOM
 }
 
-// Estado de gobernanza de un período contable (Fase 2.7.1). La ausencia de fila =
-// OPEN (modelo lazy "ausencia = abierto", patrón lock-date de Odoo). CLOSING y
-// CLOSED bloquean la escritura a los no privilegiados; difieren en intención.
+// Estado de gobernanza de un período contable (Fase 2.7.1 → 2.7.1.1). Tri-estado
+// industrial OPEN → CLOSED → LOCKED (backbone Maximo + NetSuite). CLOSED bloquea a
+// los no privilegiados (bypass `opsperiod:write-closed`); LOCKED bloquea a TODOS
+// (incl. bypass; reabrir exige `opsperiod:unlock`). CLOSING queda DEPRECADO (modelo
+// lazy de 2.7.1); se conserva en el enum solo para no romper filas históricas.
 enum PeriodStatus {
   OPEN
   CLOSING
   CLOSED
+  LOCKED
 }
 
 // Capa 2 del campo: tipo de dato (cómo se almacena/valida/reporta), derivado del
@@ -877,38 +885,73 @@ model OperationalCalendar {
   active      Boolean    @default(true)
   // Turno cuyo inicio marca el arranque del día operacional (por código, no FK:
   // los turnos se reemplazan en bloque al guardar). Null = el día arranca a las 00:00.
+  // El PERÍODO contable se desacopló a FiscalCalendar en 2.7.1.1 (este calendario
+  // solo gobierna turnos + día operacional).
   dayStartShiftCode String?
-  // Definición del periodo contable.
-  periodKind         PeriodKind @default(MONTH)
-  periodAnchorDay    Int?       @default(1) // MONTH: día civil que abre el mes (1..28)
-  periodStartWeekday Int?       @default(1) // WEEK: 1=Lun..7=Dom (ISO-8601)
-  periodLengthDays   Int? // CUSTOM: largo del ciclo en días operacionales
-  periodAnchorDate   String? // CUSTOM: fecha de referencia "YYYY-MM-DD"
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
   deletedAt   DateTime? // borrado lógico
 
   shifts        OperationalShift[]
   assignedNodes OrgNode[]
+
+  @@index([deletedAt])
+}
+
+// Calendario FISCAL (período contable) — Fase 2.7.1.1. Entidad TRANSVERSAL,
+// desacoplada de los turnos (ver DECISIONS 2026-06-11). Define el tipo de período
+// (MONTH/WEEK/CUSTOM + ancla) con default + asignación por nodo (mismo patrón de
+// resolución por ruta que OperationalCalendar). El estándar pone el período a nivel
+// organización (SAP company code / Maximo Organization / NetSuite subsidiaria).
+model FiscalCalendar {
+  id          String  @id @default(cuid())
+  key         String  @unique
+  name        String
+  description String?
+  // TZ IANA para ubicar "hoy" al generar / marcar el período Actual.
+  timezone    String
+  isDefault   Boolean @default(false)
+  active      Boolean @default(true)
+  // Definición del período contable.
+  periodKind         PeriodKind @default(MONTH)
+  periodAnchorDay    Int?       @default(1) // MONTH: día civil que abre el mes (1..28)
+  periodStartWeekday Int?       @default(1) // WEEK: 1=Lun..7=Dom (ISO-8601)
+  periodLengthDays   Int? // CUSTOM: largo del ciclo en días operacionales
+  periodAnchorDate   String? // CUSTOM: fecha de referencia "YYYY-MM-DD"
+  // Rigor estricto Maximo: una fecha SIN período generado se bloquea (opt-in).
+  requirePeriod Boolean @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime? // borrado lógico
+
+  assignedNodes OrgNode[]
   periods       OperationalPeriod[]
 
   @@index([deletedAt])
 }
 
-// Período contable gobernado (Fase 2.7.1): estado de cierre de una llave de período
-// (`periodKey`, la que estampa el ShiftResolver en LogEntry) dentro de un calendario.
-// Modelo LAZY: solo existe fila cuando el período NO está OPEN (se cierra/pone en
-// cierre). Reabrir lo vuelve a OPEN (la fila se conserva con el rastro de reapertura).
-// El historial completo de cierres/reaperturas vive en AuditLog (inmutable).
+// Período contable gobernado (Fase 2.7.1 → 2.7.1.1): fila MATERIALIZADA de una llave
+// de período (`periodKey`, la que estampa el FiscalResolver en LogEntry) dentro de un
+// calendario FISCAL, con su rango contiguo [periodStart, periodEnd) en días
+// operacionales. Generación EXPLÍCITA (no lazy): "Generar períodos" materializa filas
+// contiguas idempotentes. Tri-estado OPEN→CLOSED→LOCKED. El historial completo de
+// cierres/lock/reaperturas vive en AuditLog (inmutable).
 model OperationalPeriod {
-  id           String       @id @default(cuid())
-  calendarId   String
-  periodKey    String
-  status       PeriodStatus @default(OPEN)
+  id               String       @id @default(cuid())
+  fiscalCalendarId String
+  periodKey        String
+  // Rango contiguo en días operacionales: [periodStart, periodEnd) "YYYY-MM-DD".
+  periodStart      String
+  periodEnd        String
+  status           PeriodStatus @default(OPEN)
   // Cierre vigente.
   closedById   String?
   closedAt     DateTime?
   closeReason  String?
+  // Bloqueo duro (LOCKED).
+  lockedById   String?
+  lockedAt     DateTime?
+  lockReason   String?
   // Última reapertura (si la hubo).
   reopenedById String?
   reopenedAt   DateTime?
@@ -916,10 +959,10 @@ model OperationalPeriod {
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 
-  calendar OperationalCalendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  fiscalCalendar FiscalCalendar @relation(fields: [fiscalCalendarId], references: [id], onDelete: Cascade)
 
-  @@unique([calendarId, periodKey])
-  @@index([calendarId, status])
+  @@unique([fiscalCalendarId, periodKey])
+  @@index([fiscalCalendarId, status])
 }
 
 model OperationalShift {
