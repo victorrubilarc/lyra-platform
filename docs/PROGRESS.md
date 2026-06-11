@@ -1,11 +1,11 @@
 # Progreso — Lyra WatchLog
 
 Última actualización: 2026-06-11 (**Fase 1 completa**; **Fase 2.1/2.1.1/2.2/2.x/2.3.0/2.4/2.5/2.6.0 ✅** +
-**Afinamiento #4 ✅** — flujo de guardado por sección autoexplicativo + garantía de permisos por sección/campo en el
-servidor + `submit` objetivo que cierra la elusión de la firma de sección). Las **10 mejoras post-2.6.0** del dueño del
-producto quedaron registradas en BACKLOG §2 y el **plan de fases 2.7 (Gobernanza temporal) / 2.8 (Alcance+acceso) /
-2.9 (Plantillas inteligentes) está PROPUESTO en DECISIONS 2026-06-11, pendiente de visto bueno**.
-**Siguiente: aprobar el plan y arrancar 2.7.0 — Registro diferido (#1).**
+**Afinamiento #4 ✅** + **Fase 2.7.0 — Registro diferido ✅**: `entryOrigin` DECLARADO ONLINE|DEFERRED + motivo
+obligatorio + gesto mínimo "Registrar con otra fecha/hora" + huella en llenado/grilla/visor/timeline). El **plan de
+fases 2.7 (Gobernanza temporal) / 2.8 (Alcance+acceso) / 2.9 (Plantillas inteligentes) fue APROBADO TAL CUAL por el
+dueño del producto** (DECISIONS 2026-06-11).
+**Siguiente: 2.7.1 — Período contable gobernado (`OperationalPeriod`, #5).**
 
 ## Estado por fase
 
@@ -13,7 +13,7 @@ producto quedaron registradas en BACKLOG §2 y el **plan de fases 2.7 (Gobernanz
 |---|---|---|
 | 0 | **Cimientos** (monorepo, Docker, Design System tokens, contratos, API health) | ✅ Hecho |
 | 1 | Seguridad (auth + RBAC/ABAC) + Estructura organizacional + AuditLog | ✅ Backend ✅ · UI: Login ✅ · **Estructura ✅ (+ Equipos ✅)** · **Seguridad ✅** |
-| 2 | Plantillas / Form Builder + Bitácoras | 🔄 **2.1 ✅** + **2.1.1 ✅** + **2.2 ✅** + **2.x ✅** + **2.3.0 ✅** + **2.4 ✅** + **2.5 ✅** + **2.6.0 ✅** (Form Builder + Flujos + Datos de referencia + Calendario operacional + Llenado + Ejecución de flujo/firmas + **Bitácoras núcleo de lectura**) · 2.3 Rondas, 2.6.1/2.6.2, 2.7 pendientes |
+| 2 | Plantillas / Form Builder + Bitácoras | 🔄 **2.1 ✅** + **2.1.1 ✅** + **2.2 ✅** + **2.x ✅** + **2.3.0 ✅** + **2.4 ✅** + **2.5 ✅** + **2.6.0 ✅** + **2.7.0 ✅** (Form Builder + Flujos + Datos de referencia + Calendario operacional + Llenado + Ejecución de flujo/firmas + **Bitácoras núcleo de lectura** + **Registro diferido**) · 2.3 Rondas, 2.6.2, 2.7.1–2.7.3, 2.8, 2.9 pendientes |
 | 3 | Orígenes de datos | ⬜ Pendiente |
 | 4 | Motor de incidencias | ⬜ Pendiente |
 | 5 | Cambio de turno + IA (resumen) | ⬜ Pendiente |
@@ -787,11 +787,50 @@ PROPUESTO en DECISIONS 2026-06-11) con UN entregable codificado: el **fix #4**. 
   con todo COMPLETED 200 SUBMITTED; ENTRY_CLOSED tras enviar). Datos de prueba eliminados (BD limpia verificada).
 - **NO probado**: smoke VISUAL en navegador de la nueva UI (ver BACKLOG §4).
 
+## Hecho en Fase 2.7.0 (2026-06-11 — Registro diferido / late entry GxP)
+
+**Plan de fases 2.7→2.8→2.9 APROBADO TAL CUAL** por el dueño del producto al abrir la sesión; los **3 forks de 2.7.0
+se resolvieron con la recomendación** (híbrido campo/entrada · motivo OBLIGATORIO · DECLARADO, no inferido — ver
+DECISIONS 2026-06-11). Rama `feat/registro-diferido`. La mecánica temporal existente NO se tocó: se construyó la
+marca y la UX encima de `recordedAt`/`effectiveAt`/`resolveEffectiveAt`/`ShiftResolver`.
+
+- **Prisma** (migración aditiva `20260611183427_add_log_entry_origin`): enum `LogEntryOrigin` (ONLINE|DEFERRED) +
+  `LogEntry.entryOrigin` (default ONLINE, indexado), `declaredEffectiveAt?`, `deferredReason?`,
+  `deferredDeclaredById?/At?`.
+- **Contratos**: `logEntryOriginSchema` + `deferralInputSchema` (fecha ISO con offset + motivo ≥5) + `deferred?` en
+  create + `setDeferralRequestSchema` (declara/corrige/quita con null) + filtro `entryOrigin` en la list query +
+  evento **`DEFERRED_DECLARED`** en la timeline + **`resolveEffectiveAt` gana el fallback intermedio**
+  `campo → declarada → recordedAt` (4.º parámetro opcional, compatible). **+5 specs** (contracts **120**).
+- **Backend** (`LogEntriesService`): `create` acepta `deferred` (estampa marca + dims desde la fecha declarada);
+  **`setDeferral`** (`PUT /log-entries/:id/deferral`, `logentry:fill` + ABAC, SOLO DRAFT sin sellar) declara/corrige/
+  quita recalculando `effectiveAt`+dims y auditando `logentry.deferral.declared|cleared`. **Híbrido fork 1**: si la
+  versión tiene campo `EFFECTIVE_DATE`, el gesto LO ESCRIBE con las mismas guardas que `saveSection` (sin bypass de
+  rol/estado), `FieldChange` con el motivo, bump de versión de sección, y preservando la **fecha civil** para campos
+  DATE (del string ISO con offset). `LogbookQueryService`: filtro `entryOrigin` en el `where`, columnas CSV
+  (Origen/Fecha evento declarada/Motivo diferido) y evento `DEFERRED_DECLARED` en la timeline (declaración vigente;
+  correcciones en AuditLog+FieldChange). **Sin permisos nuevos** (catálogo sigue en 50). **+8 tests** (API **169**).
+- **Web**: `/nueva-entrada` gana el **toggle "Registrar con otra fecha/hora"** (apagado por defecto: cero fricción;
+  fecha/hora + motivo inline); el llenado muestra chip **"Diferida"** + fecha de captura junto a la efectiva + nota
+  con la declaración y **`DeferralModal`** para declarar/corregir/quitar en borrador; `/bitacoras` gana **filtro
+  "Origen"** (+ chip removible + deep-link) e indicador "Diferida" por fila (tooltip = motivo); el visor muestra chip +
+  nota "evento ocurrió el X · declarado por Y — motivo" + evento en la timeline. Helpers `datetime-local.ts`
+  (ISO con offset local ↔ `datetime-local`). i18n `logbook.deferral.*`/`origin.*` (es-CL).
+- **Verificación**: `typecheck` (6 paquetes) · `lint` (0 errores; 1 warning preexistente OrgTree) · `build`
+  contracts+web (API no se buildea por el watch; typecheck+test sí) · `test` (**contracts 120** +5 · permissions 5 ·
+  **API 169** +8) en verde. **Smoke en vivo 14/14**: default ONLINE · crear diferida (effectiveAt=declarada, dims) ·
+  motivo corto 400 · filtro DEFERRED/ONLINE · corrección por PUT · timeline con evento+actor+motivo · quitar marca
+  (vuelve a recordedAt) · submit sella la declarada y deferral post-sellado 400 · export CSV con columnas · campo
+  EFFECTIVE_DATE escrito con fecha civil correcta (offset -04:00) + FieldChange con motivo · el campo MANDA al
+  editarse. Datos de prueba LIMPIADOS (conteos verificados en BD).
+- **NO probado**: smoke VISUAL en navegador del gesto/chips/filtro (ver BACKLOG §4).
+
 ## Próximo paso
-**Afinamiento #4 completo y publicado.** **Sesión siguiente: revisar/aprobar el plan de fases de DECISIONS 2026-06-11**
-(2.7 Gobernanza temporal → 2.8 Alcance+acceso → 2.9 Plantillas inteligentes; #10 IA-ready transversal) **y arrancar
-2.7.0 — Registro diferido (#1)** (UX sobre `effectiveAt` + marca `entryOrigin` + auditoría). La 2.6.1 (SavedView +
-columnas) queda FUSIONADA en 2.8.1; 2.6.2 intercalable tras 2.8; el viejo "2.7 umbral→incidencia" pasa a Fase 4.
+**Fase 2.7.0 completa y publicada.** **Sesión siguiente: 2.7.1 — Período contable gobernado (#5)**: entidad
+`OperationalPeriod` (calendario × `periodKey`) OPEN/CLOSING/CLOSED, cierre/reapertura con motivo+permiso+auditoría,
+guardas de ESCRITURA por `effectiveAt` (toda mutación cuya fecha efectiva caiga en período no abierto se bloquea salvo
+rol privilegiado configurable). Referentes ya destilados en DECISIONS 2026-06-11 (SAP OB52 / NetSuite / Odoo lock
+dates / Maximo). `entryOrigin` quedó diseñado para que esas guardas se le sumen sin migrar (`blockedReason` extensible
+a `PERIOD_CLOSED`). Luego 2.7.2 Ventana de edición (#6) y 2.7.3 matriz sección×tiempo (#7).
 
 **Mejora futura registrada (BACKLOG §2):** seguridad a nivel de nodo en el mantenedor de Estructura (ABAC
 enterprise: asignar usuarios/roles a nodos desde el propio árbol, "quién accede a este nodo"). El modelo ya

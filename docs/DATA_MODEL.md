@@ -71,9 +71,24 @@
   - **`workflowDefinitionVersionId` DENORMALIZADO** (+ `workflowDefinitionId`): al crear la entrada se **copia** la
     versión de flujo que congeló su `TemplateVersion`. La entrada vive TODO su ciclo bajo **esa** versión aunque el
     flujo publique v(n+1) después. Re-basar = operación explícita y auditada (por defecto NO; estilo GxP).
-  - **`effectiveAt`** (columna indexada) = fecha efectiva de negocio. Se promueve del valor del campo con
-    `semanticRole = EFFECTIVE_DATE` (`resolveEffectiveAt` en `@lyra/contracts`); fallback `recordedAt`. Se **recalcula
-    en cada guardado mientras la entrada es DRAFT** y se **CONGELA al enviar** (`sealedAt`).
+  - **`effectiveAt`** (columna indexada) = fecha efectiva de negocio. Se promueve con la **cadena de prioridad** de
+    `resolveEffectiveAt` en `@lyra/contracts`: valor del campo con `semanticRole = EFFECTIVE_DATE` → **fecha declarada
+    a nivel de entrada** (`declaredEffectiveAt`, registro diferido 2.7.0) → `recordedAt`. Se **recalcula en cada
+    guardado mientras la entrada es DRAFT** y se **CONGELA al enviar** (`sealedAt`).
+  - **Registro diferido** *(Fase 2.7.0, migración `20260611183427_add_log_entry_origin`)* — la entrada tardía es
+    legítima si queda IDENTIFICADA (GxP/ALCOA+ *contemporaneous*; lo fraudulento es ocultarla):
+    - **`entryOrigin`** (enum `ONLINE`|`DEFERRED`, default `ONLINE`, indexado) — origen **DECLARADO por el operador**
+      (atestación; nunca inferido por diferencia de relojes). Filtro de grilla/export; las guardas de período (2.7.1)
+      y ventana de edición (2.7.2) se le suman sin migrar.
+    - **`declaredEffectiveAt?`** — fecha/hora REAL del evento declarada a nivel de entrada. Si la versión tiene campo
+      `EFFECTIVE_DATE`, el gesto **escribe ese campo** (con las MISMAS guardas de sección/rol que `saveSection`,
+      `FieldChange` auditado con el motivo y bump de `version` de la sección) y el campo sigue mandando; si no existe,
+      la declarada alimenta `effectiveAt` como fallback intermedio. Una sola fuente resuelta por entrada.
+    - **`deferredReason?`** — motivo del diferimiento, **obligatorio al declarar** (práctica GxP de late entry).
+    - **`deferredDeclaredById?` / `deferredDeclaredAt?`** — quién y cuándo declaró (evento `DEFERRED_DECLARED` en la
+      timeline ALCOA+; correcciones previas quedan en AuditLog `logentry.deferral.declared|cleared` y en los
+      `FieldChange`). Declarar/corregir/quitar solo en DRAFT sin sellar (`PUT /log-entries/:id/deferral`,
+      permiso `logentry:fill` + ABAC); el sellado congela el origen.
   - **Dimensiones de turno/periodo estampadas:** `shiftCode?`, `operationalDate?`, `periodKey?` (columnas indexadas,
     nullable) se derivan vía **`ShiftResolver`** (a partir de `effectiveAt`, con el calendario que aplica al
     `orgNodeId`). Sin calendario → null (degradación elegante). Reportabilidad por turno/periodo sin recalcular.

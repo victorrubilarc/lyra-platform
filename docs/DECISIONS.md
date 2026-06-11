@@ -4,7 +4,51 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
-### 2026-06-11 · Revisión del dueño del producto: 10 mejoras post-2.6.0 — triage, auditoría del #4 y plan de fases (PROPUESTO)
+### 2026-06-11 · Plan de fases post-2.6.0 APROBADO + Fase 2.7.0 Registro diferido — IMPLEMENTADO (forks resueltos)
+
+El dueño del producto **APROBÓ tal cual** el plan de fases propuesto abajo (2.7 Gobernanza temporal → 2.8
+Alcance+acceso → 2.9 Plantillas inteligentes; #10 IA-ready transversal; 2.8.0 multi-nodo adelantable si Eagon lo
+exige). Esta sesión ejecutó **2.7.0 — Registro diferido (#1)** (rama `feat/registro-diferido`). **3 forks resueltos
+con el dueño del producto:**
+
+1. **Dónde se declara la fecha del evento → HÍBRIDO (a).** Si la versión congelada tiene campo
+   `semanticRole = EFFECTIVE_DATE`, el gesto **escribe ESE campo** (sigue siendo la única fuente viva) aplicando las
+   MISMAS guardas que `saveSection` (sección editable en el estado × rol de sección × override de rol por campo — sin
+   bypass), con `LogEntryFieldChange` auditado (el motivo del diferimiento queda como `reason`) y **bump de la
+   `version` de la sección** (editores concurrentes ven 409). Si NO existe, la fecha declarada vive a nivel de entrada
+   (`LogEntry.declaredEffectiveAt`) y entra a `resolveEffectiveAt` como **fallback intermedio**:
+   `campo → declarada → recordedAt`. Motivo: exigir el campo en la plantilla (opción b) rompía la degradación elegante
+   y obligaba a re-versionar plantillas publicadas; la cadena de prioridad mantiene UNA fuente resuelta por entrada.
+   Detalle de exactitud: para campos DATE se preserva la **fecha civil** del operador tomándola del string ISO con
+   offset (no de la conversión UTC, que puede correr un día).
+2. **Motivo del diferimiento → OBLIGATORIO** (mín. 5 caracteres, contrato + backend). Práctica GxP de late entry
+   (MHRA Data Integrity 2018, FDA DI Q&A 2018, ALCOA+ *contemporaneous*): la anotación tardía se identifica CON
+   justificación. Hacerlo configurable hoy sería parametrizar por parametrizar; relajarlo después es aditivo
+   (lo contrario dejaría históricos sin motivo).
+3. **Diferido DECLARADO, no inferido.** `entryOrigin` es una **atestación del operador** (línea confirmada por el
+   dueño del producto): inferir por diferencia de relojes produce falsos positivos (drift, guardados lentos, TZ) y
+   convierte una declaración de integridad en una adivinanza. Complemento registrado en BACKLOG para 2.7.2: *nudge*
+   suave de UI (no guarda de servidor) si `effectiveAt` difiere mucho de `recordedAt` sin declaración.
+
+**Implementación:** migración aditiva `20260611183427_add_log_entry_origin` (`LogEntryOrigin` ONLINE|DEFERRED default
+ONLINE + `declaredEffectiveAt?` + `deferredReason?` + `deferredDeclaredById?/At?` + índice). Contratos: enum +
+`deferralInputSchema` + `deferred?` en create + `setDeferralRequestSchema` (PUT declara/corrige/quita con null) +
+filtro `entryOrigin` en la list query + evento `DEFERRED_DECLARED` en la timeline + `resolveEffectiveAt` con 4.º
+parámetro opcional (compatible). Backend: `create` acepta `deferred`; **`setDeferral`** (`PUT /log-entries/:id/deferral`,
+permiso `logentry:fill` + ABAC, SOLO en DRAFT sin sellar — el sellado congela el origen) recalcula `effectiveAt` +
+dimensiones vía `ShiftResolver` y audita `logentry.deferral.declared|cleared` (before/after); quitar la marca NO toca
+el campo de fecha (es dato visible del canal normal). El evento de timeline refleja la declaración VIGENTE; las
+correcciones quedan en AuditLog + FieldChange. Export CSV gana columnas Origen / Fecha evento declarada / Motivo
+diferido. **Sin permisos nuevos** (declarar el diferido es parte de llenar; las guardas privilegiadas llegan con
+2.7.1/2.7.2). Web: toggle "Registrar con otra fecha/hora" en `/nueva-entrada` (apagado por defecto = cero fricción),
+`DeferralModal` en el llenado (declarar/corregir/quitar en borrador), chip/indicador "Diferida" + ambas fechas en
+llenado/grilla/visor, filtro "Origen" + chip removible en `/bitacoras`, evento en la timeline del visor.
+Tests: contracts **120** (+5) · API **169** (+8). Smoke en vivo **14/14** (datos creados y LIMPIADOS, conteos
+verificados en BD).
+
+---
+
+### 2026-06-11 · Revisión del dueño del producto: 10 mejoras post-2.6.0 — triage, auditoría del #4 y plan de fases (APROBADO el 2026-06-11; ver la entrada de arriba)
 
 El dueño del producto entregó **10 mejoras** tras una revisión exhaustiva en el navegador (texto íntegro en
 `docs/BACKLOG.md` §2 "Mejoras post-2.6.0" y en `docs/NEXT_SESSION.md`). Esta sesión hizo triage + investigación +

@@ -5,10 +5,9 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-11** (**Afinamiento #4 ✅** — guardado por sección autoexplicativo + `submit` objetivo +
-> motivos de bloqueo en contrato/UI. Las **10 mejoras post-2.6.0** quedaron registradas en §2 y el **plan de fases
-> 2.7/2.8/2.9 está PROPUESTO en DECISIONS 2026-06-11, pendiente de visto bueno**; siguiente: aprobar el plan y
-> arrancar **2.7.0 Registro diferido**).
+> actualización: **2026-06-11** (**Fase 2.7.0 Registro diferido ✅** — `entryOrigin` DECLARADO + motivo obligatorio +
+> gesto mínimo + huella en grilla/visor/timeline. El **plan de fases 2.7/2.8/2.9 fue APROBADO** por el dueño del
+> producto (DECISIONS 2026-06-11); siguiente: **2.7.1 Período contable gobernado**).
 
 ---
 
@@ -55,6 +54,7 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Fase 2.5 Ejecución de flujo + firmas Part 11** (`LogEntryTransition`/`LogEntrySignature` + `executeTransition` + `ReauthService` + modales de firma) | `main` (fusionado desde `feat/ejecucion-flujo`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Fase 2.6.0 Módulo de Bitácoras — núcleo de lectura** (folio + estampados + `LogbookQueryService` + `/bitacoras` + record viewer + verificación de firmas) | `main` (fusionado desde `feat/bitacoras-auditor`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Afinamiento #4** (triage 10 mejoras + guardado por sección autoexplicativo + `submit` objetivo + motivos de bloqueo) | `main` (fusionado desde `feat/afinamiento-llenado`) | ✅ fusionado y publicado en `origin/main` | ninguna |
+| **Fase 2.7.0 Registro diferido** (`entryOrigin` + `setDeferral` + gesto mínimo + huella grilla/visor/timeline) | `main` (fusionado desde `feat/registro-diferido`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 
 **Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
@@ -307,17 +307,24 @@ nunca queda más de una sesión atrás.
         *Nota 2026-06-11: con el plan post-2.6.0 los números 2.7/2.8/2.9 se reasignan a las fases nuevas (abajo);
         este cruce umbral→incidencia pasa a vivir dentro de la Fase 4.*
   - [ ] **MEJORAS POST-2.6.0 (revisión del dueño del producto, 2026-06-11)** — 10 mejoras registradas; texto
-        íntegro fuente de verdad en `docs/NEXT_SESSION.md`; triage + plan de fases PROPUESTO en DECISIONS
-        2026-06-11 (**pendiente de visto bueno**; orden recomendado 2.7 → 2.8 → 2.9):
+        íntegro en el historial de git de `docs/NEXT_SESSION.md` (commit `db17981`); triage + plan de fases en
+        DECISIONS 2026-06-11 (**APROBADO TAL CUAL por el dueño del producto el 2026-06-11**; orden 2.7 → 2.8 → 2.9):
     - [x] **#4 Rediseño "Guardar sección"/"Guardar y completar" + garantía por sección en servidor** ✅
           (2026-06-11, esta sesión). Auditado ANTES de declarar bug: el backend ya gateaba (sin agujero); causas
           reales = datos demo sin roles por sección + DTO sin "porqué" + gap REAL en `submit` sin flujo (sellaba
           sin secciones COMPLETED ⇒ eludía la firma de sección). Ver DECISIONS 2026-06-11.
     - [ ] **Fase 2.7 — Gobernanza temporal del registro** (interdependientes; alta prioridad por integridad):
-      - [ ] **2.7.0 (#1) Registro diferido**: UX gesto mínimo sobre `effectiveAt` (modelo YA resuelto) + marca
-            explícita `entryOrigin` ONLINE|DEFERRED + motivo + huella en grilla/visor/timeline. Valida contra
-            período (2.7.1) y ventana (2.7.2) cuando existan.
-      - [ ] **2.7.1 (#5) Período contable gobernado**: entidad `OperationalPeriod` (calendario × periodKey) con
+      - [x] **2.7.0 (#1) Registro diferido** ✅ (2026-06-11, `feat/registro-diferido` → `main`). `entryOrigin`
+            ONLINE|DEFERRED DECLARADO + `declaredEffectiveAt`/`deferredReason` (obligatorio)/declarante +
+            `PUT :id/deferral` + cadena `campo → declarada → recordedAt` en `resolveEffectiveAt` + huella en
+            llenado/grilla (filtro+chip)/visor/timeline (`DEFERRED_DECLARED`) + export CSV. 3 forks resueltos en
+            DECISIONS 2026-06-11. Tests: contracts 120 · API 169. Smoke 14/14. **Pendiente: smoke VISUAL** (§4).
+        - [ ] **Diferidos de 2.7.0 (aditivos):** **(a)** *nudge* suave de UI cuando `effectiveAt` difiere mucho de
+              `recordedAt` sin declaración (invita a declarar; NO guarda de servidor — diseñar con 2.7.2);
+              **(b)** KPI/faceta "Diferidas" en `/bitacoras` (hoy hay filtro+chip; el conteo llega natural con las
+              facetas de 2.6.2); **(c)** al QUITAR la marca el campo `EFFECTIVE_DATE` escrito por el gesto se
+              conserva (decisión: es dato del canal normal) — reevaluar si confunde en la práctica.
+      - [ ] **2.7.1 (#5) Período contable gobernado** **← siguiente.** Entidad `OperationalPeriod` (calendario × periodKey) con
             OPEN/CLOSING/CLOSED, cierre/reapertura con motivo+permiso+auditoría, guardas de escritura por
             `effectiveAt`, roles privilegiados configurables. Referentes: SAP OB52 / NetSuite / Odoo lock dates /
             Maximo financial periods (destilado en DECISIONS).
@@ -552,6 +559,15 @@ probatoria (hash+timestamp). Ref: `DECISIONS.md` (sección de recomendaciones).
       **verificar integridad** [VALID y VALID_RECORD_CHANGED_AFTER tras editar], timeline unificada + cargar más,
       log de cambios antes→después, relacionadas navegables, **imprimir** [solo contenido, sin chrome]); ítem
       "Bitácoras" en sidebar y ⌘K; modo claro y oscuro; tablet. App en `:5173`.
+- [ ] **Registro diferido 2.7.0 — smoke VISUAL en navegador** (se verificó typecheck/lint/test/build web + smoke por
+      API 14/14; falta el clic): en `/nueva-entrada` el toggle "Registrar con otra fecha/hora" (apagado por defecto;
+      al activarlo aparecen fecha/hora + motivo; crear sin motivo válido muestra el aviso); crear una entrada diferida
+      → en el llenado: chip "Diferida", fecha de captura junto a la efectiva, nota con la declaración y el motivo,
+      "Editar diferimiento" (corregir fecha/motivo y QUITAR la marca); con una plantilla CON campo fecha efectiva
+      verificar que el gesto lo deja escrito en el formulario; en `/bitacoras`: filtro "Origen", chip removible,
+      indicador "Diferida" en la fila (tooltip = motivo), export CSV con las columnas nuevas; en `/bitacoras/:id`:
+      chip + nota "el evento ocurrió el… · declarado por…" + evento "Registro diferido declarado" en la timeline;
+      modo claro y oscuro. App en `:5173`.
 - [ ] **Afinamiento #4 — smoke VISUAL en navegador** (se verificó typecheck/lint/test/build + smoke por API 22/22;
       falta el clic): en `/nueva-entrada/:id` con una plantilla cuyas secciones tengan roles asignados y un campo con
       override: chip "N de M secciones completadas" en cabecera; chip "Asignada a: <rol>" por sección; sección ajena
