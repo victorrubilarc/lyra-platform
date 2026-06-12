@@ -43,3 +43,6 @@ export * from "./operational-periods/operational-periods.js";
 
 // Llenado de bitácoras / ejecución (Fase 2.4)
 export * from "./log-entries/log-entries.js";
+
+// Configuración del sistema (Fase 2.7.1.1 UX)
+export * from "./system-settings/system-settings.js";

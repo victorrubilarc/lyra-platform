@@ -4,12 +4,16 @@ import {
   yearRange,
   type ListOperationalPeriodsResponse,
   type OperationalPeriodDto,
+  type PeriodGovernanceAction,
+  type PeriodHistoryResponse,
 } from "@lyra/contracts";
 import type { FiscalCalendar, OperationalPeriod } from "@prisma/client";
 import { AuditService, type AuditContext } from "../audit/audit.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { ShiftResolver } from "../operational-calendar/shift-resolver";
 import { FiscalResolver, toFiscalConfig } from "../fiscal-calendar/fiscal-resolver";
+import { ReauthService, type ReauthCredentials } from "../auth/reauth.service";
+import { SettingsService } from "../settings/settings.service";
 
 /** Permiso de excepción que permite escribir en períodos CLOSED (no aplica a LOCKED). */
 export const PERIOD_WRITE_CLOSED_PERMISSION = "opsperiod:write-closed";
@@ -35,7 +39,24 @@ export class OperationalPeriodService {
     private readonly shiftResolver: ShiftResolver,
     private readonly fiscalResolver: FiscalResolver,
     private readonly audit: AuditService,
+    private readonly settings: SettingsService,
+    private readonly reauth: ReauthService,
   ) {}
+
+  /**
+   * Re-autenticación con MFA (step-up) para gobernar un período, SI el ajuste de esa
+   * ACCIÓN está activo (configurable por separado: close/reopen/lock/unlock). Reutiliza
+   * `ReauthService` (mismo motor de las firmas Part 11). Devuelve si se verificó MFA, para
+   * dejarlo ESTAMPADO en la auditoría (el ajuste puede cambiar después: el registro
+   * histórico debe ser auto-descriptivo).
+   */
+  private async assertReauth(actorId: string, creds: ReauthCredentials, action: PeriodGovernanceAction): Promise<boolean> {
+    if (await this.settings.requireMfaFor(action)) {
+      await this.reauth.verifyForSignature(actorId, creds, { requireMfa: true });
+      return true;
+    }
+    return false;
+  }
 
   // --- Guarda de escritura ---------------------------------------------------
 
@@ -106,7 +127,43 @@ export class OperationalPeriodService {
     });
     const today = todayInTimezone(cal.timezone);
     const names = await this.namesByUserId(rows.flatMap((r) => [r.closedById, r.lockedById, r.reopenedById]));
-    return { fiscalCalendarId, periods: rows.map((r) => this.toDto(r, today, names)) };
+    const requireReauth = await this.settings.periodReauthMap();
+    return { fiscalCalendarId, periods: rows.map((r) => this.toDto(r, today, names)), requireReauth };
+  }
+
+  /**
+   * Historial de gobernanza de un período, derivado del AuditLog INMUTABLE (quién/cuándo
+   * cerró/reabrió/bloqueó/desbloqueó, con motivo). Más reciente primero.
+   */
+  async history(fiscalCalendarId: string, periodKey: string): Promise<PeriodHistoryResponse> {
+    await this.assertCalendarExists(fiscalCalendarId);
+    const row = await this.prisma.operationalPeriod.findUnique({
+      where: { fiscalCalendarId_periodKey: { fiscalCalendarId, periodKey } },
+      select: { id: true },
+    });
+    if (!row) return { fiscalCalendarId, periodKey, entries: [] };
+    const logs = await this.prisma.auditLog.findMany({
+      where: { entityType: "OperationalPeriod", entityId: row.id },
+      orderBy: { occurredAt: "desc" },
+      select: { action: true, actorEmail: true, occurredAt: true, before: true, after: true, metadata: true },
+    });
+    const actorNames = await this.namesByEmail(logs.map((l) => l.actorEmail));
+    const entries = logs.map((l) => {
+      const before = (l.before ?? {}) as { status?: string };
+      const after = (l.after ?? {}) as { status?: string; reason?: string };
+      const meta = (l.metadata ?? {}) as { mfaVerified?: boolean };
+      return {
+        action: l.action,
+        actorName: l.actorEmail ? (actorNames.get(l.actorEmail) ?? l.actorEmail) : null,
+        occurredAt: l.occurredAt.toISOString(),
+        fromStatus: before.status ?? null,
+        toStatus: after.status ?? null,
+        reason: after.reason ?? null,
+        // null para registros previos a estampar la huella (no se asume nada).
+        mfaVerified: typeof meta.mfaVerified === "boolean" ? meta.mfaVerified : null,
+      };
+    });
+    return { fiscalCalendarId, periodKey, entries };
   }
 
   /**
@@ -148,7 +205,8 @@ export class OperationalPeriodService {
   }
 
   /** Cierra un período (OPEN → CLOSED) con guarda SECUENCIAL: no hay un anterior abierto. */
-  async close(fiscalCalendarId: string, periodKey: string, reason: string, actorId: string, ctx: AuditContext): Promise<OperationalPeriodDto> {
+  async close(fiscalCalendarId: string, periodKey: string, reason: string, creds: ReauthCredentials, actorId: string, ctx: AuditContext): Promise<OperationalPeriodDto> {
+    const mfaVerified = await this.assertReauth(actorId, creds, "close");
     const cal = await this.assertCalendarExists(fiscalCalendarId);
     const row = await this.getRow(fiscalCalendarId, periodKey);
     if (row.status !== "OPEN") {
@@ -167,12 +225,13 @@ export class OperationalPeriodService {
       where: { id: row.id },
       data: { status: "CLOSED", closedById: actorId, closedAt: new Date(), closeReason: reason, reopenedById: null, reopenedAt: null, reopenReason: null },
     });
-    await this.recordTransition("opsperiod.closed", updated, row.status, reason, ctx);
+    await this.recordTransition("opsperiod.closed", updated, row.status, reason, ctx, mfaVerified);
     return this.dtoWithNames(cal, updated);
   }
 
   /** Bloquea en duro un período (CLOSED → LOCKED). */
-  async lock(fiscalCalendarId: string, periodKey: string, reason: string, actorId: string, ctx: AuditContext): Promise<OperationalPeriodDto> {
+  async lock(fiscalCalendarId: string, periodKey: string, reason: string, creds: ReauthCredentials, actorId: string, ctx: AuditContext): Promise<OperationalPeriodDto> {
+    const mfaVerified = await this.assertReauth(actorId, creds, "lock");
     const cal = await this.assertCalendarExists(fiscalCalendarId);
     const row = await this.getRow(fiscalCalendarId, periodKey);
     if (row.status !== "CLOSED" && row.status !== "CLOSING") {
@@ -182,12 +241,13 @@ export class OperationalPeriodService {
       where: { id: row.id },
       data: { status: "LOCKED", lockedById: actorId, lockedAt: new Date(), lockReason: reason },
     });
-    await this.recordTransition("opsperiod.locked", updated, row.status, reason, ctx);
+    await this.recordTransition("opsperiod.locked", updated, row.status, reason, ctx, mfaVerified);
     return this.dtoWithNames(cal, updated);
   }
 
   /** Desbloquea un período (LOCKED → CLOSED, two-key). */
-  async unlock(fiscalCalendarId: string, periodKey: string, reason: string, actorId: string, ctx: AuditContext): Promise<OperationalPeriodDto> {
+  async unlock(fiscalCalendarId: string, periodKey: string, reason: string, creds: ReauthCredentials, actorId: string, ctx: AuditContext): Promise<OperationalPeriodDto> {
+    const mfaVerified = await this.assertReauth(actorId, creds, "unlock");
     const cal = await this.assertCalendarExists(fiscalCalendarId);
     const row = await this.getRow(fiscalCalendarId, periodKey);
     if (row.status !== "LOCKED") {
@@ -197,7 +257,7 @@ export class OperationalPeriodService {
       where: { id: row.id },
       data: { status: "CLOSED", lockedById: actorId, lockedAt: new Date(), lockReason: reason },
     });
-    await this.recordTransition("opsperiod.unlocked", updated, row.status, reason, ctx);
+    await this.recordTransition("opsperiod.unlocked", updated, row.status, reason, ctx, mfaVerified);
     return this.dtoWithNames(cal, updated);
   }
 
@@ -210,9 +270,11 @@ export class OperationalPeriodService {
     periodKey: string,
     reason: string,
     acknowledgeLaterClosed: boolean,
+    creds: ReauthCredentials,
     actorId: string,
     ctx: AuditContext,
   ): Promise<OperationalPeriodDto> {
+    const mfaVerified = await this.assertReauth(actorId, creds, "reopen");
     const cal = await this.assertCalendarExists(fiscalCalendarId);
     const row = await this.getRow(fiscalCalendarId, periodKey);
     if (row.status !== "CLOSED" && row.status !== "CLOSING") {
@@ -241,7 +303,7 @@ export class OperationalPeriodService {
       where: { id: row.id },
       data: { status: "OPEN", reopenedById: actorId, reopenedAt: new Date(), reopenReason: reason },
     });
-    await this.recordTransition("opsperiod.reopened", updated, row.status, reason, ctx);
+    await this.recordTransition("opsperiod.reopened", updated, row.status, reason, ctx, mfaVerified);
     return this.dtoWithNames(cal, updated);
   }
 
@@ -269,6 +331,7 @@ export class OperationalPeriodService {
     fromStatus: string,
     reason: string,
     ctx: AuditContext,
+    mfaVerified: boolean,
   ): Promise<void> {
     await this.audit.record({
       ...ctx,
@@ -277,6 +340,9 @@ export class OperationalPeriodService {
       entityId: row.id,
       before: { status: fromStatus },
       after: { fiscalCalendarId: row.fiscalCalendarId, periodKey: row.periodKey, status: row.status, reason },
+      // Huella ESTAMPADA: ¿la acción se re-autenticó con MFA en ESE momento? El ajuste
+      // puede cambiar después; el historial debe ser auto-descriptivo.
+      metadata: { mfaVerified },
     });
   }
 
@@ -313,6 +379,13 @@ export class OperationalPeriodService {
     if (unique.length === 0) return new Map();
     const users = await this.prisma.user.findMany({ where: { id: { in: unique } }, select: { id: true, displayName: true } });
     return new Map(users.map((u) => [u.id, u.displayName]));
+  }
+
+  private async namesByEmail(emails: (string | null)[]): Promise<Map<string, string>> {
+    const unique = [...new Set(emails.filter((e): e is string => Boolean(e)))];
+    if (unique.length === 0) return new Map();
+    const users = await this.prisma.user.findMany({ where: { email: { in: unique } }, select: { email: true, displayName: true } });
+    return new Map(users.map((u) => [u.email, u.displayName]));
   }
 }
 

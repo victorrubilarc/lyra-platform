@@ -378,6 +378,20 @@ export const PERMISSION_CATALOG = [
     description: "Excepción: registrar o modificar entradas cuya fecha cae en un período cerrado (no aplica a LOCKED).",
   },
 
+  // --- Configuración del sistema (Fase 2.7.1.1 UX) ---
+  {
+    key: "module:settings:view",
+    dimension: "MODULE",
+    group: "settings",
+    description: "Ver la pantalla de configuración del sistema.",
+  },
+  {
+    key: "settings:manage",
+    dimension: "ACTION",
+    group: "settings",
+    description: "Editar los ajustes del sistema (p. ej. exigir MFA para gobernar períodos).",
+  },
+
   // --- Dimensión 1: módulo de bitácoras / llenado (Fase 2.4) ---
   // Nota: QUIÉN puede llenar cada SECCIÓN es DATO (roles por sección de la
   // plantilla, TemplateSectionRole), no una clave de catálogo. Estas claves

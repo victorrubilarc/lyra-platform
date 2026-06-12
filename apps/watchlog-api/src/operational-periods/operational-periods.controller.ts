@@ -33,6 +33,13 @@ export class OperationalPeriodController {
     return this.periods.list(fiscalCalendarId);
   }
 
+  /** Historial de gobernanza de un período (quién/cuándo cerró/reabrió/bloqueó), del AuditLog. */
+  @Get("history")
+  @RequirePermission("opsperiod:view")
+  history(@Query("fiscalCalendarId") fiscalCalendarId: string, @Query("periodKey") periodKey: string) {
+    return this.periods.history(fiscalCalendarId, periodKey);
+  }
+
   /** Generar (materializar) los períodos de un año. Acción de configuración del calendario. */
   @Post("generate")
   @RequirePermission("opscalendar:manage")
@@ -54,7 +61,7 @@ export class OperationalPeriodController {
     @CurrentUser() user: RequestUser,
     @Req() req: FastifyRequest,
   ) {
-    return this.periods.close(fiscalCalendarId, periodKey, dto.reason, user.id, this.ctx(user, req));
+    return this.periods.close(fiscalCalendarId, periodKey, dto.reason, { password: dto.password, mfaCode: dto.mfaCode }, user.id, this.ctx(user, req));
   }
 
   @Post("reopen")
@@ -71,6 +78,7 @@ export class OperationalPeriodController {
       periodKey,
       dto.reason,
       dto.acknowledgeLaterClosed ?? false,
+      { password: dto.password, mfaCode: dto.mfaCode },
       user.id,
       this.ctx(user, req),
     );
@@ -85,7 +93,7 @@ export class OperationalPeriodController {
     @CurrentUser() user: RequestUser,
     @Req() req: FastifyRequest,
   ) {
-    return this.periods.lock(fiscalCalendarId, periodKey, dto.reason, user.id, this.ctx(user, req));
+    return this.periods.lock(fiscalCalendarId, periodKey, dto.reason, { password: dto.password, mfaCode: dto.mfaCode }, user.id, this.ctx(user, req));
   }
 
   @Post("unlock")
@@ -97,7 +105,7 @@ export class OperationalPeriodController {
     @CurrentUser() user: RequestUser,
     @Req() req: FastifyRequest,
   ) {
-    return this.periods.unlock(fiscalCalendarId, periodKey, dto.reason, user.id, this.ctx(user, req));
+    return this.periods.unlock(fiscalCalendarId, periodKey, dto.reason, { password: dto.password, mfaCode: dto.mfaCode }, user.id, this.ctx(user, req));
   }
 
   private ctx(user: RequestUser, req: FastifyRequest): AuditContext {

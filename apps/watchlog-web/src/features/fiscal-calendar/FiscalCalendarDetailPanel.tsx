@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { CalendarRange, Star, Trash2 } from "lucide-react";
-import { Button, Chip, Input, Modal, Select, Skeleton, Textarea, Toggle, useToast } from "@lyra/ui";
+import { CalendarDays, CalendarRange, Network, Settings2, SlidersHorizontal, Star, Trash2 } from "lucide-react";
+import { Button, Chip, Input, Modal, Select, Skeleton, Textarea, Toggle, cx, useToast } from "@lyra/ui";
 import { PERIOD_KINDS, validateFiscalCalendar, type PeriodKind } from "@lyra/contracts";
 import { Can } from "../../auth/Can.js";
 import { usePermissions } from "../../auth/use-permissions.js";
@@ -9,6 +9,7 @@ import { ApiError } from "../../lib/api-client.js";
 import { AssignNodesModal } from "../operational-calendar/AssignNodesModal.js";
 import { COMMON_TIMEZONES } from "../operational-calendar/timezones.js";
 import { FiscalPeriodsSection } from "./FiscalPeriodsSection.js";
+import { PeriodKindHelp } from "./PeriodKindHelp.js";
 import {
   useAssignFiscalNodes,
   useDeleteFiscalCalendar,
@@ -17,6 +18,9 @@ import {
   useUpdateFiscalCalendar,
 } from "./fiscal-calendar-queries.js";
 import styles from "../operational-calendar/OperationalCalendarPage.module.css";
+import fx from "./FiscalCalendar.module.css";
+
+type FiscalTab = "general" | "period" | "nodes" | "periods";
 
 interface EditableState {
   name: string;
@@ -48,6 +52,7 @@ export function FiscalCalendarDetailPanel({ calendarId, onDeleted }: { calendarI
   const [loaded, setLoaded] = useState<EditableState | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
+  const [tab, setTab] = useState<FiscalTab>("general");
 
   useEffect(() => {
     if (!cal) {
@@ -140,10 +145,10 @@ export function FiscalCalendarDetailPanel({ calendarId, onDeleted }: { calendarI
   };
 
   return (
-    <div className={styles.detail}>
-      <div className={styles.detailHeader}>
+    <div className={cx(styles.detail, fx.detailFill)}>
+      <div className={cx(styles.detailHeader, fx.headerFixed)}>
         <div>
-          <h2 className={styles.detailTitle}>
+          <h2 className={styles.detailName}>
             <CalendarRange size={20} /> {cal.name}
             {cal.isDefault && <Chip label={t("fiscalCal.default")} variant="info" size="sm" />}
             {!cal.active && <Chip label={t("fiscalCal.inactive")} variant="default" size="sm" />}
@@ -169,101 +174,127 @@ export function FiscalCalendarDetailPanel({ calendarId, onDeleted }: { calendarI
         </Can>
       </div>
 
-      {/* Datos básicos */}
-      <div className={styles.section}>
-        <h3 className={styles.sectionTitle}>{t("fiscalCal.basics")}</h3>
-        <div className={styles.fieldGrid}>
-          <div>
-            <label className={styles.fieldLabel}>{t("fiscalCal.name")}</label>
-            <Input value={state.name} onChange={(e) => set("name", e.target.value)} disabled={!canManage} />
-          </div>
-          <div>
-            <label className={styles.fieldLabel}>{t("fiscalCal.timezone")}</label>
-            <Select value={state.timezone} onChange={(e) => set("timezone", e.target.value)} disabled={!canManage}>
-              {COMMON_TIMEZONES.map((tz) => (
-                <option key={tz} value={tz}>{tz}</option>
-              ))}
-            </Select>
-          </div>
-          <div style={{ gridColumn: "1 / -1" }}>
-            <label className={styles.fieldLabel}>{t("fiscalCal.description")}</label>
-            <Textarea value={state.description} onChange={(e) => set("description", e.target.value)} rows={2} disabled={!canManage} />
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <Toggle checked={state.active} onChange={(v) => set("active", v)} disabled={!canManage} />
-            <span className={styles.fieldLabel} style={{ margin: 0 }}>{t("fiscalCal.active")}</span>
-          </div>
-        </div>
-      </div>
+      <div className={fx.tabLayout}>
+        <nav className={fx.tabNav} aria-label={t("fiscalCal.tabs.aria")}>
+          {([
+            { id: "general", label: t("fiscalCal.tabs.general"), icon: <SlidersHorizontal size={16} /> },
+            { id: "period", label: t("fiscalCal.tabs.period"), icon: <Settings2 size={16} /> },
+            { id: "nodes", label: t("fiscalCal.tabs.nodes"), icon: <Network size={16} /> },
+            { id: "periods", label: t("fiscalCal.tabs.periods"), icon: <CalendarDays size={16} /> },
+          ] as const).map((tb) => (
+            <button
+              key={tb.id}
+              type="button"
+              className={cx(fx.tabBtn, tab === tb.id && fx.tabBtnActive)}
+              onClick={() => setTab(tb.id)}
+              aria-current={tab === tb.id}
+            >
+              {tb.icon} {tb.label}
+            </button>
+          ))}
+        </nav>
 
-      {/* Configuración del período */}
-      <div className={styles.section}>
-        <h3 className={styles.sectionTitle}>{t("fiscalCal.periodConfig")}</h3>
-        <div className={styles.fieldGrid}>
-          <div>
-            <label className={styles.fieldLabel}>{t("fiscalCal.periodKind")}</label>
-            <Select value={state.periodKind} onChange={(e) => set("periodKind", e.target.value as PeriodKind)} disabled={!canManage}>
-              {PERIOD_KINDS.map((k) => (
-                <option key={k} value={k}>{t(`fiscalCal.period.kind.${k}`)}</option>
-              ))}
-            </Select>
-          </div>
-          {state.periodKind === "MONTH" && (
-            <div>
-              <label className={styles.fieldLabel}>{t("fiscalCal.anchorDay")}</label>
-              <Input type="number" min={1} max={28} value={state.periodAnchorDay} onChange={(e) => set("periodAnchorDay", Number(e.target.value))} disabled={!canManage} />
-              <p className={styles.hint}>{t("fiscalCal.anchorDayHint")}</p>
-            </div>
-          )}
-          {state.periodKind === "WEEK" && (
-            <div>
-              <label className={styles.fieldLabel}>{t("fiscalCal.startWeekday")}</label>
-              <Select value={state.periodStartWeekday} onChange={(e) => set("periodStartWeekday", Number(e.target.value))} disabled={!canManage}>
-                {[1, 2, 3, 4, 5, 6, 7].map((d) => (
-                  <option key={d} value={d}>{t(`fiscalCal.weekday.${d}`)}</option>
-                ))}
-              </Select>
-            </div>
-          )}
-          {state.periodKind === "CUSTOM" && (
-            <>
-              <div>
-                <label className={styles.fieldLabel}>{t("fiscalCal.lengthDays")}</label>
-                <Input type="number" min={1} max={366} value={state.periodLengthDays} onChange={(e) => set("periodLengthDays", Number(e.target.value))} disabled={!canManage} />
+        <div className={fx.tabContent}>
+          {tab === "general" && (
+            <div className={styles.section}>
+              <h3 className={styles.sectionTitle}>{t("fiscalCal.basics")}</h3>
+              <div className={styles.fieldGrid}>
+                <div className={fx.nameField}>
+                  <label className={styles.fieldLabel}>{t("fiscalCal.name")}</label>
+                  <Input value={state.name} onChange={(e) => set("name", e.target.value)} disabled={!canManage} />
+                </div>
+                <div>
+                  <label className={styles.fieldLabel}>{t("fiscalCal.timezone")}</label>
+                  <Select value={state.timezone} onChange={(e) => set("timezone", e.target.value)} disabled={!canManage}>
+                    {COMMON_TIMEZONES.map((tz) => (
+                      <option key={tz} value={tz}>{tz}</option>
+                    ))}
+                  </Select>
+                </div>
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <label className={styles.fieldLabel}>{t("fiscalCal.description")}</label>
+                  <Textarea value={state.description} onChange={(e) => set("description", e.target.value)} rows={2} disabled={!canManage} />
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <Toggle checked={state.active} onChange={(v) => set("active", v)} disabled={!canManage} />
+                  <span className={styles.fieldLabel} style={{ margin: 0 }}>{t("fiscalCal.active")}</span>
+                </div>
               </div>
-              <div>
-                <label className={styles.fieldLabel}>{t("fiscalCal.anchorDate")}</label>
-                <Input type="date" value={state.periodAnchorDate} onChange={(e) => set("periodAnchorDate", e.target.value)} disabled={!canManage} invalid={errors.some((x) => x.includes("ciclo"))} />
-              </div>
-            </>
-          )}
-          <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 10 }}>
-            <Toggle checked={state.requirePeriod} onChange={(v) => set("requirePeriod", v)} disabled={!canManage} />
-            <div>
-              <span className={styles.fieldLabel} style={{ margin: 0 }}>{t("fiscalCal.requirePeriod")}</span>
-              <p className={styles.hint}>{t("fiscalCal.requirePeriodHint")}</p>
             </div>
-          </div>
-        </div>
-        {errors.length > 0 && <div className={styles.validation}>{errors.join(" ")}</div>}
-      </div>
-
-      {/* Asignación de nodos */}
-      <div className={styles.section}>
-        <h3 className={styles.sectionTitle}>{t("fiscalCal.nodes")}</h3>
-        <p className={styles.hint}>{t("fiscalCal.nodesHint")}</p>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
-          <Chip label={t("fiscalCal.nodeCount", { count: state.assignedNodeIds.length })} variant="default" size="sm" />
-          {canManage && (
-            <Button variant="secondary" onClick={() => setAssignOpen(true)}>
-              {t("fiscalCal.manageNodes")}
-            </Button>
           )}
+
+          {tab === "period" && (
+            <div className={styles.section}>
+              <h3 className={styles.sectionTitle}>{t("fiscalCal.periodConfig")}</h3>
+              <div className={styles.fieldGrid}>
+                <div>
+                  <label className={styles.fieldLabel}>{t("fiscalCal.periodKind")}</label>
+                  <Select value={state.periodKind} onChange={(e) => set("periodKind", e.target.value as PeriodKind)} disabled={!canManage}>
+                    {PERIOD_KINDS.map((k) => (
+                      <option key={k} value={k}>{t(`fiscalCal.period.kind.${k}`)}</option>
+                    ))}
+                  </Select>
+                </div>
+                {state.periodKind === "MONTH" && (
+                  <div>
+                    <label className={styles.fieldLabel}>{t("fiscalCal.anchorDay")}</label>
+                    <Input type="number" min={1} max={28} value={state.periodAnchorDay} onChange={(e) => set("periodAnchorDay", Number(e.target.value))} disabled={!canManage} />
+                    <p className={styles.hint}>{t("fiscalCal.anchorDayHint")}</p>
+                  </div>
+                )}
+                {state.periodKind === "WEEK" && (
+                  <div>
+                    <label className={styles.fieldLabel}>{t("fiscalCal.startWeekday")}</label>
+                    <Select value={state.periodStartWeekday} onChange={(e) => set("periodStartWeekday", Number(e.target.value))} disabled={!canManage}>
+                      {[1, 2, 3, 4, 5, 6, 7].map((d) => (
+                        <option key={d} value={d}>{t(`fiscalCal.weekday.${d}`)}</option>
+                      ))}
+                    </Select>
+                  </div>
+                )}
+                {state.periodKind === "CUSTOM" && (
+                  <>
+                    <div>
+                      <label className={styles.fieldLabel}>{t("fiscalCal.lengthDays")}</label>
+                      <Input type="number" min={1} max={366} value={state.periodLengthDays} onChange={(e) => set("periodLengthDays", Number(e.target.value))} disabled={!canManage} />
+                    </div>
+                    <div>
+                      <label className={styles.fieldLabel}>{t("fiscalCal.anchorDate")}</label>
+                      <Input type="date" value={state.periodAnchorDate} onChange={(e) => set("periodAnchorDate", e.target.value)} disabled={!canManage} invalid={errors.some((x) => x.includes("ciclo"))} />
+                    </div>
+                  </>
+                )}
+                <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 10 }}>
+                  <Toggle checked={state.requirePeriod} onChange={(v) => set("requirePeriod", v)} disabled={!canManage} />
+                  <div>
+                    <span className={styles.fieldLabel} style={{ margin: 0 }}>{t("fiscalCal.requirePeriod")}</span>
+                    <p className={styles.hint}>{t("fiscalCal.requirePeriodHint")}</p>
+                  </div>
+                </div>
+              </div>
+              <PeriodKindHelp kind={state.periodKind} />
+              {errors.length > 0 && <div className={styles.validation}>{errors.join(" ")}</div>}
+            </div>
+          )}
+
+          {tab === "nodes" && (
+            <div className={styles.section}>
+              <h3 className={styles.sectionTitle}>{t("fiscalCal.nodes")}</h3>
+              <p className={styles.hint}>{t("fiscalCal.nodesHint")}</p>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
+                <Chip label={t("fiscalCal.nodeCount", { count: state.assignedNodeIds.length })} variant="default" size="sm" />
+                {canManage && (
+                  <Button variant="secondary" onClick={() => setAssignOpen(true)}>
+                    {t("fiscalCal.manageNodes")}
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {tab === "periods" && <FiscalPeriodsSection cal={cal} />}
         </div>
       </div>
-
-      {/* Períodos gobernados */}
-      <FiscalPeriodsSection fiscalCalendarId={cal.id} />
 
       {confirmDelete && (
         <Modal

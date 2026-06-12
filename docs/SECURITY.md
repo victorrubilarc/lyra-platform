@@ -164,6 +164,14 @@ período se desacopló al **calendario FISCAL** (transversal) y se endureció al
   se bloquea si hay un posterior LOCKED y exige acuse si hay un posterior CLOSED (consistencia del prefijo cerrado).
 - **Motivo obligatorio (≥5) + auditoría** en cada transición (`opsperiod.generated|closed|locked|unlocked|reopened`,
   before/after en `AuditLog` inmutable). **Degradación elegante**: sin día operacional/calendario fiscal = ungobernado.
+- **Re-autenticación MFA POR ACCIÓN (configurable)** — `SystemSettings` (singleton) tiene 4 flags
+  `requireMfaPeriod{Close,Reopen,Lock,Unlock}`. Si la acción está activa, `OperationalPeriodService` exige step-up MFA vía
+  **`ReauthService`** (mismo motor de las firmas Part 11) ANTES de ejecutar; sin segundo factor enrolado ⇒ 400. El listado de
+  períodos expone `requireReauth` como mapa para que la UI pida credenciales solo donde aplica. La huella de **si se usó MFA**
+  queda ESTAMPADA en el AuditLog (`metadata.mfaVerified`) — el registro es auto-descriptivo aunque el ajuste cambie después.
+  Pantalla `/configuracion` (permisos nuevos **`module:settings:view`** + **`settings:manage`**, catálogo **56→58**).
+- **Historial de período** — `GET /operational-periods/history` (gateado `opsperiod:view`) reconstruye el rastro de gobernanza
+  de un período desde el AuditLog inmutable (quién/cuándo/motivo/MFA). Solo lectura.
 - **Residual**: ventana de edición por plantilla (#6) y matriz rol×sección×tiempo (#7) llegan en 2.7.2/2.7.3.
 
 ## Estado

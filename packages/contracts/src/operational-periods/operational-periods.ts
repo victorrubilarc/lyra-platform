@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { periodReauthMapSchema } from "../system-settings/system-settings.js";
 
 /**
  * Período contable gobernado — Fase 2.7.1 → endurecido en 2.7.1.1.
@@ -40,6 +41,16 @@ const periodReasonSchema = z
   .max(1000);
 
 /**
+ * Credenciales de re-autenticación, OPCIONALES en el contrato pero EXIGIDAS por el
+ * backend cuando `SystemSettings.requireMfaForPeriodGovernance` está activo (step-up
+ * MFA vía `ReauthService`). El backend re-verifica; nunca se confía en el cliente.
+ */
+const reauthFields = {
+  password: z.string().min(1).max(200).optional(),
+  mfaCode: z.string().min(1).max(32).optional(),
+};
+
+/**
  * Estado de un período materializado tal como lo expone el mantenedor. Los campos de
  * cierre/lock/reapertura son null hasta que ocurre la acción correspondiente.
  */
@@ -71,8 +82,34 @@ export type OperationalPeriodDto = z.infer<typeof operationalPeriodDtoSchema>;
 export const listOperationalPeriodsResponseSchema = z.object({
   fiscalCalendarId: z.string(),
   periods: z.array(operationalPeriodDtoSchema),
+  /** ¿Cada acción de gobernanza exige re-autenticación MFA? (POR ACCIÓN, configurable). */
+  requireReauth: periodReauthMapSchema,
 });
 export type ListOperationalPeriodsResponse = z.infer<typeof listOperationalPeriodsResponseSchema>;
+
+/** Una entrada del HISTORIAL de un período (derivada del AuditLog inmutable). */
+export const periodHistoryEntrySchema = z.object({
+  action: z.string(), // opsperiod.closed | locked | unlocked | reopened
+  actorName: z.string().nullable(),
+  occurredAt: z.string(),
+  fromStatus: z.string().nullable(),
+  toStatus: z.string().nullable(),
+  reason: z.string().nullable(),
+  /**
+   * ¿La acción se ejecutó con re-autenticación MFA en ESE momento? (estampado, no
+   * derivado del ajuste actual). null = registro previo a la huella.
+   */
+  mfaVerified: z.boolean().nullable(),
+});
+export type PeriodHistoryEntry = z.infer<typeof periodHistoryEntrySchema>;
+
+/** Respuesta del historial de un período (cronológico, más reciente primero). */
+export const periodHistoryResponseSchema = z.object({
+  fiscalCalendarId: z.string(),
+  periodKey: z.string(),
+  entries: z.array(periodHistoryEntrySchema),
+});
+export type PeriodHistoryResponse = z.infer<typeof periodHistoryResponseSchema>;
 
 /**
  * Generar (materializar) los períodos de un año calendario, idempotente: crea las
@@ -87,18 +124,21 @@ export type GeneratePeriodsRequest = z.infer<typeof generatePeriodsRequestSchema
 /** Cerrar un período (OPEN → CLOSED): motivo obligatorio. */
 export const closePeriodRequestSchema = z.object({
   reason: periodReasonSchema,
+  ...reauthFields,
 });
 export type ClosePeriodRequest = z.infer<typeof closePeriodRequestSchema>;
 
 /** Bloquear en duro un período (CLOSED → LOCKED): motivo obligatorio. */
 export const lockPeriodRequestSchema = z.object({
   reason: periodReasonSchema,
+  ...reauthFields,
 });
 export type LockPeriodRequest = z.infer<typeof lockPeriodRequestSchema>;
 
 /** Desbloquear un período (LOCKED → CLOSED, two-key): motivo obligatorio. */
 export const unlockPeriodRequestSchema = z.object({
   reason: periodReasonSchema,
+  ...reauthFields,
 });
 export type UnlockPeriodRequest = z.infer<typeof unlockPeriodRequestSchema>;
 
@@ -111,6 +151,7 @@ export type UnlockPeriodRequest = z.infer<typeof unlockPeriodRequestSchema>;
 export const reopenPeriodRequestSchema = z.object({
   reason: periodReasonSchema,
   acknowledgeLaterClosed: z.boolean().optional(),
+  ...reauthFields,
 });
 export type ReopenPeriodRequest = z.infer<typeof reopenPeriodRequestSchema>;
 

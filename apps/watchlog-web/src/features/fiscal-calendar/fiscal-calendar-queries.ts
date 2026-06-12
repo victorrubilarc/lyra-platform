@@ -17,6 +17,7 @@ import {
   fetchFiscalCalendar,
   fetchFiscalCalendars,
   fetchFiscalPeriods,
+  fetchPeriodHistory,
   generateFiscalPeriods,
   lockFiscalPeriod,
   reopenFiscalPeriod,
@@ -94,6 +95,14 @@ export function useFiscalPeriods(fiscalCalendarId: string | null) {
     queryKey: FISCAL_KEYS.periods(fiscalCalendarId ?? ""),
     queryFn: () => fetchFiscalPeriods(fiscalCalendarId!),
     enabled: !!fiscalCalendarId,
+  });
+}
+
+export function usePeriodHistory(fiscalCalendarId: string, periodKey: string | null) {
+  return useQuery({
+    queryKey: ["fiscal-period-history", fiscalCalendarId, periodKey],
+    queryFn: () => fetchPeriodHistory(fiscalCalendarId, periodKey!),
+    enabled: !!periodKey,
   });
 }
 

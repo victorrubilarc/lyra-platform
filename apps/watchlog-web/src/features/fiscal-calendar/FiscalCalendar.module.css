@@ -1,0 +1,295 @@
+/* El panel fiscal LLENA el alto del pane derecho: cabecera fija + contenido con scroll
+   propio (así la grilla pagina/scrollea sin perder los botones de Guardar/Eliminar). */
+.detailFill {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.headerFixed {
+  flex-shrink: 0;
+}
+
+/* Layout de pestañas verticales del detalle del calendario fiscal (Fase 2.7.1.1 UX). */
+.tabLayout {
+  display: grid;
+  grid-template-columns: 188px 1fr;
+  gap: var(--space-5);
+  align-items: stretch;
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-4);
+}
+
+.tabNav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  position: sticky;
+  top: 0;
+}
+
+.tabBtn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  min-height: 44px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--text-body-sm-size);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.tabBtn:hover {
+  background: var(--color-hover);
+  color: var(--color-text-primary);
+}
+
+.tabBtnActive {
+  background: var(--color-surface-2);
+  border-color: var(--color-border-active);
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+
+.tabContent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: var(--space-2);
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-active) transparent;
+}
+
+.tabContent::-webkit-scrollbar {
+  width: 8px;
+}
+
+.tabContent::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 8px;
+}
+
+.tabContent::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-active);
+}
+
+.tabContent::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Callout informativo (ayuda del tipo de período). */
+.help {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-accent-secondary);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-accent-secondary) 7%, transparent);
+}
+
+.helpTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 600;
+  font-size: var(--text-body-sm-size);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.helpBody {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.helpExample {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.helpExample b {
+  color: var(--color-text-secondary);
+}
+
+/* Barra de filtro/generación de la grilla de períodos (por año). */
+.periodToolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface-2);
+}
+
+.periodToolbarGroup {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+
+/* El grupo de generación se separa visualmente (acción), con un divisor sutil. */
+.periodToolbarGenerate {
+  padding-left: var(--space-4);
+  border-left: 1px solid var(--color-border);
+}
+
+@media (max-width: 720px) {
+  .periodToolbarGenerate {
+    padding-left: 0;
+    border-left: none;
+  }
+}
+
+.nameField {
+  grid-column: 1 / -1;
+}
+
+/* La sección de períodos LLENA el alto del contenido de la pestaña; el título/ayuda/
+   toolbar quedan fijos y SOLO la grilla scrollea internamente. */
+.periodsFill {
+  height: 100%;
+  min-height: 0;
+}
+
+.periodsFill > h3,
+.periodsFill > p,
+.periodsFill > .periodToolbar {
+  flex-shrink: 0;
+}
+
+/* Grilla de períodos: scroll INTERNO (thead/footer sticky), filas compactas. */
+.periodGrid {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* El wrapper del Table de @lyra/ui (div directo) es el contenedor con scroll. */
+.periodGrid > div {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-active) transparent;
+}
+
+.periodGrid > div::-webkit-scrollbar {
+  width: 8px;
+}
+
+.periodGrid > div::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 8px;
+}
+
+/* Cabecera de columnas pegada arriba; footer de paginación pegado abajo. */
+.periodGrid thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--color-surface-1);
+}
+
+.periodGrid > div > div {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background: var(--color-surface-1);
+  border-top: 1px solid var(--color-border);
+}
+
+/* Filas compactas: más bajas que el alto táctil por defecto (superficie de
+   contador/admin en escritorio, no terreno con guantes). Los selectores de elemento
+   (td/button) no se renombran en CSS modules, así que aplican sobre el Table. */
+.periodGrid td {
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+
+.periodGrid button {
+  min-height: 30px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+/* Timeline del historial de un período (modal). */
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.timelineItem {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+
+.timelineIcon {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  color: var(--color-accent-secondary);
+}
+
+.timelineBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.timelineHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  color: var(--color-text-primary);
+  font-size: 13px;
+}
+
+.timelineStatus {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.timelineMeta {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.timelineReason {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  font-style: italic;
+}

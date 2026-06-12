@@ -60,6 +60,7 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Fase 2.7.0 Registro diferido** (`entryOrigin` + `setDeferral` + gesto mínimo + huella grilla/visor/timeline) | `main` (fusionado desde `feat/registro-diferido`) | ✅ fusionado y publicado en `origin/main` |
 | **Fase 2.7.1 Período contable gobernado** (`OperationalPeriod` + guarda `assertWritable` + cierre/reapertura auditada + mantenedor) | `main` (fusionado desde `feat/periodo-gobernado`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Fase 2.7.1.1 Calendario FISCAL transversal** (`FiscalCalendar` + `FiscalResolver` + período materializado OPEN→CLOSED→LOCKED + generate/lock/unlock + pantalla `/calendario-fiscal`) | `main` (fusionado desde `feat/calendario-fiscal`) | ✅ fusionado y publicado en `origin/main` | ninguna |
+| **Fase 2.7.1.1 Afinamiento UX + Configuración** (panel a pestañas + grilla scroll/orden + historial por período c/MFA estampado + `/configuracion` MFA por acción + formato regional + fix Toast z-index) | `main` (fusionado desde `feat/calendario-fiscal-ux`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 
 **Estado:** **nada vive solo en local.** `main` = `origin/main`.
 

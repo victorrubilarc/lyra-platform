@@ -8,6 +8,7 @@ import { Button, Drawer, FormField, Input, Select, useToast } from "@lyra/ui";
 import { PERIOD_KINDS, type PeriodKind } from "@lyra/contracts";
 import { ApiError } from "../../lib/api-client.js";
 import { COMMON_TIMEZONES } from "../operational-calendar/timezones.js";
+import { PeriodKindHelp } from "./PeriodKindHelp.js";
 import { useCreateFiscalCalendar } from "./fiscal-calendar-queries.js";
 
 const formSchema = z.object({
@@ -116,6 +117,7 @@ export function FiscalCalendarDrawer({ open, onClose, onCreated }: Props) {
             </Select>
           )}
         </FormField>
+        <PeriodKindHelp kind={periodKind} />
         {periodKind === "MONTH" && (
           <FormField label={t("fiscalCal.anchorDay")} hint={t("fiscalCal.anchorDayHint")}>
             {() => <Input type="number" min={1} max={28} value={anchorDay} onChange={(e) => setAnchorDay(Number(e.target.value))} />}
