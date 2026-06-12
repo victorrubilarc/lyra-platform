@@ -16,6 +16,7 @@ import {
   Printer,
   ShieldCheck,
   Sparkles,
+  TimerOff,
   TriangleAlert,
 } from "lucide-react";
 import { Button, Card, Chip, EmptyState, Spinner, useToast } from "@lyra/ui";
@@ -420,6 +421,26 @@ export function EntryViewerPage() {
           </div>
         )}
       </Card>
+
+      {/* Ventana de edición (2.7.2): mismo banner informativo que el llenado, solo
+          mientras la entrada sigue editable (DRAFT). En registros sellados es moot. */}
+      {entry.status === "DRAFT" &&
+        entry.editWindow &&
+        (entry.editWindow.expired ? (
+          <div className={`${fillStyles.editWindowBanner} ${fillStyles.editWindowExpired}`}>
+            <TimerOff size={18} />
+            <span>
+              {entry.editWindow.canOverride
+                ? t("logbook.fill.windowExpiredOverrideBanner", { until: formatDateTime(entry.editWindow.expiresAt) })
+                : t("logbook.fill.windowExpiredReadonlyBanner", { until: formatDateTime(entry.editWindow.expiresAt) })}
+            </span>
+          </div>
+        ) : (
+          <div className={`${fillStyles.editWindowBanner} ${fillStyles.editWindowOk}`}>
+            <Clock size={18} />
+            <span>{t("logbook.fill.windowOpenBanner", { until: formatDateTime(entry.editWindow.expiresAt) })}</span>
+          </div>
+        ))}
 
       {/* Secciones con valores resueltos (read-only) */}
       {entry.version.sections.map((section) => {
