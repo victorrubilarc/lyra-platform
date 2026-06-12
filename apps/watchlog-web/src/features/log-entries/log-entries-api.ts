@@ -6,6 +6,7 @@ import {
   saveLogEntrySectionRequestSchema,
   setDeferralRequestSchema,
   submitLogEntryRequestSchema,
+  templateEligibleNodesSchema,
   templateListItemSchema,
   type CreateLogEntryRequest,
   type ExecuteTransitionRequest,
@@ -13,6 +14,7 @@ import {
   type SaveLogEntrySectionRequest,
   type SetDeferralRequest,
   type SubmitLogEntryRequest,
+  type TemplateEligibleNodes,
   type TemplateListItem,
 } from "@lyra/contracts";
 import { apiJson } from "../../lib/api-client.js";
@@ -24,6 +26,15 @@ import { apiJson } from "../../lib/api-client.js";
  */
 export function fetchAvailableTemplates(): Promise<TemplateListItem[]> {
   return apiJson("/log-entries/templates", z.array(templateListItemSchema));
+}
+
+/**
+ * Nodos en los que el usuario puede crear una entrada con esta plantilla (multi-
+ * nodo 2.8.0): asignaciones de la plantilla ∩ alcance de nodo del usuario. La web
+ * autoselecciona si hay 1 y obliga a elegir si hay más de 1.
+ */
+export function fetchTemplateEligibleNodes(templateId: string): Promise<TemplateEligibleNodes> {
+  return apiJson(`/log-entries/templates/${encodeURIComponent(templateId)}/nodes`, templateEligibleNodesSchema);
 }
 
 // El LISTADO de entradas vive en `features/logbook` (módulo de Bitácoras 2.6,

@@ -26,8 +26,13 @@ export function CreateTemplateModal({ open, onClose }: CreateTemplateModalProps)
 
   function submit() {
     if (!name.trim()) return;
+    // Alta mínima: 0 o 1 nodo (vacío = global). El alcance multi-nodo completo se
+    // edita luego en el builder (2.8.0).
     create.mutate(
-      { name: name.trim(), orgNodeId: orgNodeId || null },
+      {
+        name: name.trim(),
+        nodeAssignments: orgNodeId ? [{ orgNodeId, includeDescendants: false }] : [],
+      },
       {
         onSuccess: (detail) => {
           setName("");

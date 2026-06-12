@@ -8,6 +8,7 @@ export const esCL = {
     search: "Buscar",
     close: "Cerrar",
     cancel: "Cancelar",
+    continue: "Continuar",
     save: "Guardar",
     add: "Agregar",
     edit: "Editar",
@@ -267,6 +268,8 @@ export const esCL = {
     fields_one: "{{count}} campo",
     fields_other: "{{count}} campos",
     globalNode: "Global (sin nodo)",
+    nodeBranchSuffix: "y subnodos",
+    nodeCount: "{{count}} nodos",
     status: {
       all: "Todos los estados",
       draft: "Borrador",
@@ -297,7 +300,7 @@ export const esCL = {
       name: "Nombre",
       namePlaceholder: "Ej: Turno Mina — Chancado Primario",
       node: "Nodo de la estructura",
-      nodeHint: "Ancla la plantilla a un nodo (opcional). Determina su alcance.",
+      nodeHint: "Nodo inicial (opcional). El alcance multi-nodo completo se edita luego en el builder.",
       submit: "Crear y abrir el builder",
     },
     builder: {
@@ -326,6 +329,10 @@ export const esCL = {
       name: "Nombre",
       description: "Descripción",
       node: "Nodo de la estructura",
+      nodeScope: "Alcance de estructura (nodos)",
+      nodeScopeHint:
+        "Nodos donde la plantilla es visible y se puede usar. Marca un nodo (solo ese) o activa «incluye descendientes» para toda la rama. Sin nodos = global (visible en todo nodo).",
+      nodeScopeGlobal: "Sin nodos seleccionados: la plantilla es GLOBAL (visible en todo nodo).",
       requireSignature: "Exigir firma electrónica (Part 11)",
       requireSignatureHint: "Opt-in. La firma se aplica al ejecutar la bitácora (Fase 2.5).",
       sectionTitle: "Título de la sección",
@@ -1069,6 +1076,11 @@ export const esCL = {
       empty: "Sin plantillas disponibles",
       emptyDesc: "No hay plantillas publicadas a tu alcance para registrar una entrada.",
       globalNode: "Global",
+      noEligibleNodes: "No tienes nodos disponibles para registrar con esta plantilla.",
+      chooseNode: "Elige el nodo de la entrada",
+      chooseNodeHint: "Esta plantilla aplica a varios nodos. Indica en cuál registras esta entrada.",
+      node: "Nodo de la estructura",
+      nodePlaceholder: "Seleccionar nodo…",
     },
     fill: {
       back: "Volver",

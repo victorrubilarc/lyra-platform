@@ -11,6 +11,12 @@ interface ScopeTreePickerProps {
   value: ScopeEntry[];
   onChange: (next: ScopeEntry[]) => void;
   disabled?: boolean;
+  /**
+   * Valor de `includeDescendants` al marcar un nodo. Para el alcance ABAC de
+   * usuario/rol el default es heredar (true); para asignar plantillas a nodos
+   * (multi-nodo 2.8.0) el default es "solo este nodo" (false), más preciso.
+   */
+  defaultIncludeDescendants?: boolean;
 }
 
 /** Normaliza para buscar sin distinción de mayúsculas ni acentos (es-CL). */
@@ -51,7 +57,13 @@ function filterTree(nodes: OrgNodeTree[], q: string): OrgNodeTree[] {
  * árbol y resumen de seleccionados para árboles extensos. La autorización real la
  * aplica el `ScopeService`; aquí solo se compone la lista.
  */
-export function ScopeTreePicker({ tree, value, onChange, disabled }: ScopeTreePickerProps) {
+export function ScopeTreePicker({
+  tree,
+  value,
+  onChange,
+  disabled,
+  defaultIncludeDescendants = true,
+}: ScopeTreePickerProps) {
   const { t } = useTranslation();
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState("");
@@ -66,7 +78,7 @@ export function ScopeTreePicker({ tree, value, onChange, disabled }: ScopeTreePi
   function setNode(nodeId: string, checked: boolean) {
     if (checked) {
       if (byId.has(nodeId)) return;
-      onChange([...value, { orgNodeId: nodeId, includeDescendants: true }]);
+      onChange([...value, { orgNodeId: nodeId, includeDescendants: defaultIncludeDescendants }]);
     } else {
       onChange(value.filter((e) => e.orgNodeId !== nodeId));
     }

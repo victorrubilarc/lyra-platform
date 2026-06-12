@@ -2,12 +2,23 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { CalendarClock, ChevronRight, ClipboardList, FileStack, History, Layers, Lock, Network, TriangleAlert } from "lucide-react";
-import { Card, EmptyState, FormField, Input, Skeleton, Textarea, Toggle, useToast } from "@lyra/ui";
-import type { TemplateListItem } from "@lyra/contracts";
+import { Button, Card, Combobox, EmptyState, FormField, Input, Modal, Skeleton, Textarea, Toggle, useToast } from "@lyra/ui";
+import type { EligibleNode, TemplateListItem } from "@lyra/contracts";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { localInputToIso } from "./datetime-local.js";
+import { fetchTemplateEligibleNodes } from "./log-entries-api.js";
 import { useAvailableTemplates } from "./log-entries-queries.js";
 import styles from "./LogEntries.module.css";
+
+/** Resumen del alcance de estructura de una plantilla para mostrar en la card. */
+function nodeScopeLabel(tpl: TemplateListItem, globalLabel: string, branchSuffix: string, nodesLabel: (n: number) => string): string {
+  if (tpl.nodeAssignments.length === 0) return globalLabel;
+  if (tpl.nodeAssignments.length === 1) {
+    const a = tpl.nodeAssignments[0]!;
+    return `${a.orgNodePath ?? a.orgNodeId}${a.includeDescendants ? ` ${branchSuffix}` : ""}`;
+  }
+  return nodesLabel(tpl.nodeAssignments.length);
+}
 
 /** Selección de plantilla para una nueva entrada (anclada al prototipo: PickTpl). */
 export function NewEntryPage() {
@@ -26,6 +37,12 @@ export function NewEntryPage() {
   const [reason, setReason] = useState("");
   const deferralReady = !deferredOn || (eventAt.trim() !== "" && reason.trim().length >= 5);
 
+  // Selección de NODO al crear (multi-nodo 2.8.0): si la plantilla resuelve a un
+  // solo nodo se autoselecciona; si resuelve a varios, se obliga a elegir.
+  const [resolvingId, setResolvingId] = useState<string | null>(null);
+  const [nodeChoice, setNodeChoice] = useState<{ template: TemplateListItem; nodes: EligibleNode[] } | null>(null);
+  const [chosenNode, setChosenNode] = useState("");
+
   // Crear una entrada requiere `logentry:create` (mismo permiso que el endpoint de
   // plantillas disponibles). Quien solo llena/revisa no entra aquí — usa Bitácoras.
   if (!perms.can("logentry:create")) {
@@ -39,17 +56,40 @@ export function NewEntryPage() {
   // Elegir una plantilla NO crea nada (2.8.2): abre el formulario en modo compose;
   // la entrada se materializa recién en el primer guardado real. El diferido
   // declarado aquí viaja por el state de navegación y se aplica al materializar.
-  function start(tpl: TemplateListItem) {
+  function goCompose(templateId: string, orgNodeId: string) {
+    navigate(`/nueva-entrada/comenzar/${templateId}`, {
+      state: {
+        orgNodeId,
+        deferred: deferredOn ? { effectiveAt: localInputToIso(eventAt), reason: reason.trim() } : null,
+      },
+    });
+  }
+
+  // Resuelve los nodos elegibles de la plantilla (asignaciones ∩ alcance del
+  // usuario). 1 nodo → autoselección; >1 → modal que obliga a elegir.
+  async function start(tpl: TemplateListItem) {
     if (!deferralReady) {
       toast.error(t("logbook.deferral.incomplete"));
       return;
     }
-    navigate(`/nueva-entrada/comenzar/${tpl.id}`, {
-      state: {
-        orgNodeId: tpl.orgNodeId ?? null,
-        deferred: deferredOn ? { effectiveAt: localInputToIso(eventAt), reason: reason.trim() } : null,
-      },
-    });
+    setResolvingId(tpl.id);
+    try {
+      const { nodes } = await fetchTemplateEligibleNodes(tpl.id);
+      if (nodes.length === 0) {
+        toast.error(t("logbook.new.noEligibleNodes"));
+        return;
+      }
+      if (nodes.length === 1) {
+        goCompose(tpl.id, nodes[0]!.id);
+        return;
+      }
+      setChosenNode("");
+      setNodeChoice({ template: tpl, nodes });
+    } catch {
+      toast.error(t("logbook.new.loadError"));
+    } finally {
+      setResolvingId(null);
+    }
   }
 
   return (
@@ -121,14 +161,22 @@ export function NewEntryPage() {
               key={tpl.id}
               className={styles.card}
               hoverable
-              style={{ cursor: "pointer" }}
-              onClick={() => start(tpl)}
+              style={{ cursor: resolvingId ? "wait" : "pointer", opacity: resolvingId && resolvingId !== tpl.id ? 0.6 : 1 }}
+              onClick={() => !resolvingId && start(tpl)}
             >
               <div className={styles.cardTop}>
                 <ClipboardList size={22} color="var(--color-accent-primary, #6366f1)" />
-                <span className={styles.nodeTag}>
+                <span
+                  className={styles.nodeTag}
+                  title={tpl.nodeAssignments.map((a) => a.orgNodePath ?? a.orgNodeId).join(" · ")}
+                >
                   <Network size={11} />
-                  {tpl.orgNodePath ?? t("logbook.new.globalNode")}
+                  {nodeScopeLabel(
+                    tpl,
+                    t("logbook.new.globalNode"),
+                    t("templates.nodeBranchSuffix"),
+                    (n) => t("templates.nodeCount", { count: n }),
+                  )}
                 </span>
               </div>
               <div className={styles.cardName}>{tpl.name}</div>
@@ -143,6 +191,49 @@ export function NewEntryPage() {
           ))}
         </div>
       )}
+
+      {/* Selección de NODO obligatoria cuando la plantilla resuelve a varios (2.8.0). */}
+      <Modal
+        open={nodeChoice !== null}
+        onClose={() => setNodeChoice(null)}
+        title={t("logbook.new.chooseNode")}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setNodeChoice(null)}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              variant="primary"
+              disabled={!chosenNode}
+              onClick={() => {
+                if (nodeChoice && chosenNode) {
+                  const tplId = nodeChoice.template.id;
+                  setNodeChoice(null);
+                  goCompose(tplId, chosenNode);
+                }
+              }}
+            >
+              {t("common.continue")}
+            </Button>
+          </>
+        }
+      >
+        {nodeChoice && (
+          <FormField label={t("logbook.new.node")} hint={t("logbook.new.chooseNodeHint")}>
+            {({ id }) => (
+              <Combobox
+                id={id}
+                value={chosenNode}
+                onChange={setChosenNode}
+                options={nodeChoice.nodes.map((n) => ({ value: n.id, label: n.path }))}
+                placeholder={t("logbook.new.nodePlaceholder")}
+                searchPlaceholder={t("common.search")}
+                ariaLabel={t("logbook.new.node")}
+              />
+            )}
+          </FormField>
+        )}
+      </Modal>
     </div>
   );
 }

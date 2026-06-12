@@ -18,6 +18,7 @@ import type { FieldType, TemplateDetail } from "@lyra/contracts";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { EditWindowDurationField } from "../settings/EditWindowDurationField.js";
 import { fetchRoles } from "../security/security-api.js";
+import { ScopeTreePicker } from "../security/ScopeTreePicker.js";
 import { useOrgTree } from "../structure/structure-queries.js";
 import {
   FIELD_TYPE_META,
@@ -27,7 +28,6 @@ import {
   detailToEditState,
   editStateToDraftRequest,
   fieldTypeMeta,
-  flattenNodeOptions,
   nextUid,
   slugifyKey,
   totalFields,
@@ -73,7 +73,6 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
   const assignedWorkflow = useWorkflow(state.workflowDefinitionId);
   const workflowStates = assignedWorkflow.data?.version.states ?? [];
 
-  const nodeOptions = useMemo(() => flattenNodeOptions(tree), [tree]);
   const canEdit = perms.can("template:edit");
   const isPublishedView = detail.version.status === "PUBLISHED";
 
@@ -286,26 +285,31 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
           {/* Lienzo */}
           <div className={styles.canvas}>
             <Card className={styles.metaCard}>
-              <div className={styles.metaGrid}>
-                <FormField label={t("templates.builder.name")}>
-                  {({ id }) => <Input id={id} value={state.name} onChange={(e) => patchState({ ...state, name: e.target.value })} />}
-                </FormField>
-                <FormField label={t("templates.builder.node")}>
-                  {({ id }) => (
-                    <Select id={id} value={state.orgNodeId ?? ""} onChange={(e) => patchState({ ...state, orgNodeId: e.target.value || null })}>
-                      <option value="">{t("templates.globalNode")}</option>
-                      {nodeOptions.map((n) => (
-                        <option key={n.id} value={n.id}>
-                          {n.label}
-                        </option>
-                      ))}
-                    </Select>
-                  )}
-                </FormField>
-              </div>
+              <FormField label={t("templates.builder.name")}>
+                {({ id }) => <Input id={id} value={state.name} onChange={(e) => patchState({ ...state, name: e.target.value })} />}
+              </FormField>
               <FormField label={t("templates.builder.description")}>
                 {({ id }) => (
                   <Textarea id={id} rows={2} value={state.description} onChange={(e) => patchState({ ...state, description: e.target.value })} />
+                )}
+              </FormField>
+              {/* Alcance de estructura (multi-nodo 2.8.0): nodos donde la plantilla es
+                  visible/usable. Vacío = GLOBAL (todo nodo). "Solo este nodo" por
+                  defecto; el toggle extiende a todo el subárbol (incl. nodos futuros). */}
+              <FormField label={t("templates.builder.nodeScope")} hint={t("templates.builder.nodeScopeHint")}>
+                {() => (
+                  <>
+                    {state.nodeAssignments.length === 0 && (
+                      <p className={styles.nodeScopeGlobal}>{t("templates.builder.nodeScopeGlobal")}</p>
+                    )}
+                    <ScopeTreePicker
+                      tree={tree}
+                      value={state.nodeAssignments}
+                      onChange={(next) => patchState({ ...state, nodeAssignments: next })}
+                      disabled={!canEdit}
+                      defaultIncludeDescendants={false}
+                    />
+                  </>
                 )}
               </FormField>
               <FormField label={t("templates.builder.workflow")} hint={t("templates.builder.workflowHint")}>
