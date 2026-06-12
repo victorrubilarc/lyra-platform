@@ -162,3 +162,18 @@
 .nameField {
   grid-column: 1 / -1;
 }
+
+/* Grilla de períodos compacta: filas más bajas que el alto táctil por defecto
+   (superficie de contador/admin en escritorio, no terreno con guantes). Override
+   scoped al wrapper; los selectores de elemento (td/button) no se renombran en
+   CSS modules, así que aplican sobre el Table de @lyra/ui. */
+.periodGrid td {
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+
+.periodGrid button {
+  min-height: 32px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}

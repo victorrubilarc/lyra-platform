@@ -256,16 +256,18 @@ export function FiscalPeriodsSection({ cal }: { cal: FiscalCalendarDto }) {
         )}
       </div>
 
-      <Table
-        columns={columns}
-        data={visible}
-        rowKey={(p) => p.periodKey}
-        loading={isLoading}
-        emptyState={<span className={styles.hint}>{t("fiscalCal.period.empty")}</span>}
-        paginated
-        defaultPageSize={10}
-        pageSizeOptions={[10, 25, 50]}
-      />
+      <div className={fx.periodGrid}>
+        <Table
+          columns={columns}
+          data={visible}
+          rowKey={(p) => p.periodKey}
+          loading={isLoading}
+          emptyState={<span className={styles.hint}>{t("fiscalCal.period.empty")}</span>}
+          paginated
+          defaultPageSize={10}
+          pageSizeOptions={[10, 25, 50]}
+        />
+      </div>
 
       {/* Confirmación de generación */}
       {confirmGen && (
