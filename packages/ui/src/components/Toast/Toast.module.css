@@ -7,7 +7,10 @@
   flex-direction: column;
   align-items: center;
   gap: var(--space-2);
-  z-index: 99;
+  /* Por encima de modales y drawers (overlay z-index 100): los toasts son la capa
+     superior para que los avisos (p. ej. errores de re-autenticación) se lean aunque
+     haya un modal abierto. */
+  z-index: 1000;
   width: max-content;
   max-width: min(640px, calc(100vw - 32px));
   pointer-events: none;
