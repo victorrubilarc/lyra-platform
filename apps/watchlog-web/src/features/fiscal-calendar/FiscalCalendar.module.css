@@ -1,9 +1,24 @@
+/* El panel fiscal LLENA el alto del pane derecho: cabecera fija + contenido con scroll
+   propio (así la grilla pagina/scrollea sin perder los botones de Guardar/Eliminar). */
+.detailFill {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.headerFixed {
+  flex-shrink: 0;
+}
+
 /* Layout de pestañas verticales del detalle del calendario fiscal (Fase 2.7.1.1 UX). */
 .tabLayout {
   display: grid;
   grid-template-columns: 188px 1fr;
   gap: var(--space-5);
-  align-items: start;
+  align-items: stretch;
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-4);
 }
 
 .tabNav {
@@ -49,6 +64,28 @@
   flex-direction: column;
   gap: var(--space-5);
   min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: var(--space-2);
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-active) transparent;
+}
+
+.tabContent::-webkit-scrollbar {
+  width: 8px;
+}
+
+.tabContent::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 8px;
+}
+
+.tabContent::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-active);
+}
+
+.tabContent::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 /* Callout informativo (ayuda del tipo de período). */
@@ -90,19 +127,36 @@
   color: var(--color-text-secondary);
 }
 
-/* Barra de filtro de la grilla de períodos (por año). */
+/* Barra de filtro/generación de la grilla de períodos (por año). */
 .periodToolbar {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  gap: var(--space-3);
+  gap: var(--space-4);
   flex-wrap: wrap;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface-2);
 }
 
 .periodToolbarGroup {
   display: flex;
   align-items: flex-end;
-  gap: var(--space-2);
+  gap: var(--space-3);
+}
+
+/* El grupo de generación se separa visualmente (acción), con un divisor sutil. */
+.periodToolbarGenerate {
+  padding-left: var(--space-4);
+  border-left: 1px solid var(--color-border);
+}
+
+@media (max-width: 720px) {
+  .periodToolbarGenerate {
+    padding-left: 0;
+    border-left: none;
+  }
 }
 
 .nameField {

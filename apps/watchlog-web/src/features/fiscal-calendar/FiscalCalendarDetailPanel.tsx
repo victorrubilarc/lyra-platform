@@ -145,10 +145,10 @@ export function FiscalCalendarDetailPanel({ calendarId, onDeleted }: { calendarI
   };
 
   return (
-    <div className={styles.detail}>
-      <div className={styles.detailHeader}>
+    <div className={cx(styles.detail, fx.detailFill)}>
+      <div className={cx(styles.detailHeader, fx.headerFixed)}>
         <div>
-          <h2 className={styles.detailTitle}>
+          <h2 className={styles.detailName}>
             <CalendarRange size={20} /> {cal.name}
             {cal.isDefault && <Chip label={t("fiscalCal.default")} variant="info" size="sm" />}
             {!cal.active && <Chip label={t("fiscalCal.inactive")} variant="default" size="sm" />}

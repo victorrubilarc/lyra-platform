@@ -240,7 +240,7 @@ export function FiscalPeriodsSection({ cal }: { cal: FiscalCalendarDto }) {
           </div>
         </div>
         {can.generate && (
-          <div className={fx.periodToolbarGroup}>
+          <div className={`${fx.periodToolbarGroup} ${fx.periodToolbarGenerate}`}>
             <div>
               <label className={styles.fieldLabel}>{t("fiscalCal.period.year")}</label>
               <Select value={genYear} onChange={(e) => setGenYear(Number(e.target.value))} style={{ width: 110 }}>
@@ -249,7 +249,7 @@ export function FiscalPeriodsSection({ cal }: { cal: FiscalCalendarDto }) {
                 ))}
               </Select>
             </div>
-            <Button variant="secondary" leftIcon={<Sparkles size={14} />} onClick={() => setConfirmGen(true)} loading={generateMut.isPending}>
+            <Button variant="primary" leftIcon={<Sparkles size={15} />} onClick={() => setConfirmGen(true)} loading={generateMut.isPending}>
               {t("fiscalCal.period.generate")}
             </Button>
           </div>
@@ -263,8 +263,8 @@ export function FiscalPeriodsSection({ cal }: { cal: FiscalCalendarDto }) {
         loading={isLoading}
         emptyState={<span className={styles.hint}>{t("fiscalCal.period.empty")}</span>}
         paginated
-        defaultPageSize={13}
-        pageSizeOptions={[13, 26, 53]}
+        defaultPageSize={10}
+        pageSizeOptions={[10, 25, 50]}
       />
 
       {/* Confirmación de generación */}
