@@ -1,0 +1,110 @@
+/* Layout de pestañas verticales del detalle del calendario fiscal (Fase 2.7.1.1 UX). */
+.tabLayout {
+  display: grid;
+  grid-template-columns: 188px 1fr;
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.tabNav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  position: sticky;
+  top: 0;
+}
+
+.tabBtn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  min-height: 44px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--text-body-sm-size);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.tabBtn:hover {
+  background: var(--color-hover);
+  color: var(--color-text-primary);
+}
+
+.tabBtnActive {
+  background: var(--color-surface-2);
+  border-color: var(--color-border-active);
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+
+.tabContent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+/* Callout informativo (ayuda del tipo de período). */
+.help {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-accent-secondary);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-accent-secondary) 7%, transparent);
+}
+
+.helpTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 600;
+  font-size: var(--text-body-sm-size);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.helpBody {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.helpExample {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.helpExample b {
+  color: var(--color-text-secondary);
+}
+
+/* Barra de filtro de la grilla de períodos (por año). */
+.periodToolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.periodToolbarGroup {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+
+.nameField {
+  grid-column: 1 / -1;
+}
