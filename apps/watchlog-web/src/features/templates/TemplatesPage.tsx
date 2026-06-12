@@ -123,9 +123,13 @@ export function TemplatesPage() {
             return (
               <Card key={tpl.id} className={styles.card}>
                 <div className={styles.cardTop}>
-                  <span className={styles.nodeTag}>
+                  <span className={styles.nodeTag} title={tpl.nodeAssignments.map((a) => a.orgNodePath ?? a.orgNodeId).join(" · ")}>
                     <Network size={11} />
-                    {tpl.orgNodePath ?? t("templates.globalNode")}
+                    {tpl.nodeAssignments.length === 0
+                      ? t("templates.globalNode")
+                      : tpl.nodeAssignments.length === 1
+                        ? `${tpl.nodeAssignments[0]!.orgNodePath ?? tpl.nodeAssignments[0]!.orgNodeId}${tpl.nodeAssignments[0]!.includeDescendants ? ` ${t("templates.nodeBranchSuffix")}` : ""}`
+                        : t("templates.nodeCount", { count: tpl.nodeAssignments.length })}
                   </span>
                   <Chip variant={chip.variant} label={t(chip.key)} />
                 </div>

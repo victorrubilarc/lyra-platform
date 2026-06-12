@@ -400,6 +400,27 @@ export const createLogEntryRequestSchema = z.object({
 export type CreateLogEntryRequest = z.infer<typeof createLogEntryRequestSchema>;
 
 /**
+ * Nodo elegible para CREAR una entrada con una plantilla (Fase 2.8.0): pertenece
+ * a la intersección de las asignaciones de la plantilla (expandidas por subárbol)
+ * con el alcance de NODO del usuario. La web autoselecciona si hay exactamente 1
+ * y OBLIGA a elegir si hay más de 1 (sin default silencioso); el backend re-valida
+ * la membresía al crear.
+ */
+export const eligibleNodeSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  /** Ruta legible (nombres) del nodo, para desambiguar en el selector. */
+  path: z.string(),
+});
+export type EligibleNode = z.infer<typeof eligibleNodeSchema>;
+
+export const templateEligibleNodesSchema = z.object({
+  templateId: z.string(),
+  nodes: z.array(eligibleNodeSchema),
+});
+export type TemplateEligibleNodes = z.infer<typeof templateEligibleNodesSchema>;
+
+/**
  * Motivo del override de ventana de edición (2.7.2). OBLIGATORIO al escribir fuera
  * de ventana aunque se tenga el permiso (GxP: la corrección excepcional se
  * identifica CON justificación — MHRA Data Integrity 2018 / FDA DI Q&A 2018).

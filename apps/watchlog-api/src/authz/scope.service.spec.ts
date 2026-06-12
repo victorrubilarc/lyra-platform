@@ -90,3 +90,52 @@ describe("ScopeService — alcance por PLANTILLA (2.º eje ABAC)", () => {
     await expect(restricted.assertTemplateInScope("u1", "t1")).resolves.toBeUndefined();
   });
 });
+
+describe("ScopeService — visibilidad de plantilla por NODO (multi-nodo 2.8.0)", () => {
+  const service = new ScopeService({} as unknown as PrismaService);
+
+  it("usuario sin restricción de nodo (access=null) ve cualquier asignación", () => {
+    expect(service.nodeAssignmentInScope({ orgNodeId: "x", includeDescendants: false, orgNodePath: "/x/" }, null)).toBe(true);
+  });
+
+  it("asignación directa: solo si el usuario alcanza ese nodo", () => {
+    const access = { ids: new Set(["a"]), paths: new Set(["/a/"]) };
+    expect(service.nodeAssignmentInScope({ orgNodeId: "a", includeDescendants: false, orgNodePath: "/a/" }, access)).toBe(true);
+    expect(service.nodeAssignmentInScope({ orgNodeId: "b", includeDescendants: false, orgNodePath: "/b/" }, access)).toBe(false);
+  });
+
+  it("asignación con descendientes intersecta si el usuario alcanza un nodo BAJO la rama", () => {
+    // El usuario solo alcanza un descendiente del nodo de la asignación.
+    const access = { ids: new Set(["a-1"]), paths: new Set(["/a/a-1/"]) };
+    expect(service.nodeAssignmentInScope({ orgNodeId: "a", includeDescendants: true, orgNodePath: "/a/" }, access)).toBe(true);
+    // Sin descendientes, no alcanza la raíz de la rama => no visible.
+    expect(service.nodeAssignmentInScope({ orgNodeId: "a", includeDescendants: false, orgNodePath: "/a/" }, access)).toBe(false);
+  });
+
+  it("el prefijo de ruta no colisiona entre hermanos (termina en /)", () => {
+    const access = { ids: new Set(["ab"]), paths: new Set(["/ab/"]) };
+    expect(service.nodeAssignmentInScope({ orgNodeId: "a", includeDescendants: true, orgNodePath: "/a/" }, access)).toBe(false);
+  });
+
+  it("isTemplateVisibleByNode: cero asignaciones = GLOBAL (visible siempre)", () => {
+    const access = { ids: new Set(["a"]), paths: new Set(["/a/"]) };
+    expect(service.isTemplateVisibleByNode([], access)).toBe(true);
+    expect(service.isTemplateVisibleByNode([], null)).toBe(true);
+  });
+
+  it("isTemplateVisibleByNode: con asignaciones, basta que ALGUNA intersecte", () => {
+    const access = { ids: new Set(["a"]), paths: new Set(["/a/"]) };
+    expect(
+      service.isTemplateVisibleByNode(
+        [
+          { orgNodeId: "z", includeDescendants: false, orgNodePath: "/z/" },
+          { orgNodeId: "a", includeDescendants: false, orgNodePath: "/a/" },
+        ],
+        access,
+      ),
+    ).toBe(true);
+    expect(
+      service.isTemplateVisibleByNode([{ orgNodeId: "z", includeDescendants: false, orgNodePath: "/z/" }], access),
+    ).toBe(false);
+  });
+});

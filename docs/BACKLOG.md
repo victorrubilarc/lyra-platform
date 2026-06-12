@@ -5,13 +5,15 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-12** (**Fase 2.8 Alcance por PLANTILLA — 2.º eje ABAC ✅**: entidad `TemplateScope`
-> [`userId|roleId` XOR + `templateId`], eje ORTOGONAL al de nodo que combina en **AND**, semántica **PERMISIVA**
-> [sin scope = ve todas, migración sin backfill]. Filtra **picker** `GET /log-entries/templates` + **grilla/stats/export**
-> de `/bitacoras` + `assertTemplateInScope` en lectura/llenado; el admin `/plantillas` NO. Asignación por **usuario y rol**
-> [`PUT …/template-scope`] + `TemplateScopePicker`. **Sin permisos nuevos — catálogo 59.** Tests contracts 149 · API 205.
-> Smoke 14/14. El **plan 2.7/2.8/2.9 sigue vigente**; siguiente recomendado: **2.8.0 plantillas multi-nodo** o **2.7.3
-> matriz rol×sección×tiempo**. Sigue anotada deuda **2.8.2** [VOID de borradores + ruta de edición propia]).
+> actualización: **2026-06-12** (**Fase 2.8.0 Plantillas MULTI-NODO ✅** — eje de NODO de la visibilidad de plantilla:
+> entidad `TemplateNodeAssignment` [templateId × orgNodeId + `includeDescendants`, N:M] = fuente de verdad única; 3 modos
+> [uno/varios/"todos los hijos de X"]; **0 asignaciones = GLOBAL** [permisivo]; `Template.orgNodeId` = nodo primario DERIVADO
+> [deprecado, DROP en §3]. `ScopeService.getAccessibleNodes`+`isTemplateVisibleByNode`; selector de nodo al crear acotado a
+> asignaciones ∩ ABAC [autoselección si 1, **obliga si >1**] vía `eligibleNodesForTemplate` + `assertNodeAllowedForTemplate`
+> [**cierra el diferido (a) de 2.4**]. UI en `TemplateBuilder` [reusa `ScopeTreePicker`] + `NewEntryPage`. **Sin permisos
+> nuevos — catálogo 59.** Tests contracts 149 · API **213**. Smoke 15/15. Siguiente recomendado: **2.8.1 UX de acceso
+> nodo↔grilla** (fusiona 2.6.1 SavedView) o **2.7.3 matriz rol×sección×tiempo**. Deuda abierta: **2.8.2** [VOID de borradores
+> + ruta de edición propia] y el DROP de `Template.orgNodeId` [§3]).
 
 ---
 
@@ -65,6 +67,7 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Fase 2.7.2 Ventana de edición configurable** (`Template.editWindow*` + `SystemSettings` global/MFA + guarda `assertEditWindowWritable` + override `logentry:write-expired` con motivo + huella `editWindow` + UI builder/`/configuracion`/llenado) | `main` (fusionado desde `feat/ventana-edicion`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Fase 2.8 Alcance por PLANTILLA (2.º eje ABAC)** (`TemplateScope` + `getAccessibleTemplateIds`/`assertTemplateInScope` + filtro picker/grilla + `PUT users\|roles/:id/template-scope` + options + `TemplateScopePicker`) | `main` (fusionado desde `feat/alcance-plantilla`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Fase 2.8 Afinamiento** (fix anclaje de selectores + Combobox/MultiSelect premium + filtro de Bitácoras con alcance `GET /log-entries/filter-templates` + RoleDrawer a pestañas + acceso por rol desde la plantilla `GET/PUT /templates/:id/role-scope` + `TemplateAccessModal`) | `feat/afinamiento-2.8` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
+| **Fase 2.8.0 Plantillas MULTI-NODO** (`TemplateNodeAssignment` N:M + `getAccessibleNodes`/`isTemplateVisibleByNode` + selector de nodo al crear `eligibleNodesForTemplate` + `assertNodeAllowedForTemplate` + UI builder/NewEntryPage) | `feat/plantillas-multinodo` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 
 **Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
@@ -275,9 +278,9 @@ nunca queda más de una sesión atrás.
         `periodKey` (nullable = degradación elegante). `workflowDefinitionVersionId` DENORMALIZADO. Web: `FieldControl`
         compartido + `/nueva-entrada` (picker) + `/nueva-entrada/:id` (llenado). 4 permisos (catálogo **49**). Tests:
         contracts 97, API 129. Ver DECISIONS/PROGRESS 2026-06-10. **Pendiente: smoke VISUAL** (§4).
-    - [ ] **Diferidos de 2.4 (seguimientos, aditivos):** **(a)** selector de NODO para plantillas GLOBALES al crear
-          una entrada (hoy se usa el nodo de la plantilla; las globales requieren `orgNodeId` y el picker muestra el
-          error del backend). **(b)** re-seed del borrador local al resolver un **409** (hoy se recarga la query pero el
+    - [ ] **Diferidos de 2.4 (seguimientos, aditivos):** **(a) ✅ RESUELTO en 2.8.0** — selector de NODO al crear (para
+          globales y multi-nodo): `NewEntryPage` ofrece los nodos elegibles (asignaciones ∩ ABAC), autoselecciona si hay
+          1 y obliga si >1; el backend valida la membresía. **(b)** re-seed del borrador local al resolver un **409** (hoy se recarga la query pero el
           borrador conserva los valores intentados; falta refrescar el editor con lo del servidor sin perder lo no
           guardado). **(c)** edición de una entrada ya enviada (`logentry:edit`/anulación con motivo) — hoy SUBMITTED es
           inmutable. **(d)** hard-delete real de ítem de Lista con `code` en uso (ahora ya hay `LogEntryValue` para
@@ -381,9 +384,15 @@ nunca queda más de una sesión atrás.
             servidor; extiende `blockedReason` (+PERIOD_CLOSED, +EDIT_WINDOW_EXPIRED) para que la UI siempre
             diga POR QUÉ.
     - [ ] **Fase 2.8 — Alcance de plantilla + acceso** (absorbe diferido (a) de 2.4 y la 2.6.1 planificada):
-      - [ ] **2.8.0 (#2) Plantillas multi-nodo**: N:M `TemplateNodeAssignment` (nodo + `includeDescendants`),
-            3 modos (uno/varios/"todos los hijos de X" incl. nodos futuros), migración de datos, selector de
-            nodo al crear entrada filtrado por asignación ∩ ABAC.
+      - [x] **2.8.0 (#2) Plantillas multi-nodo** ✅ (2026-06-12, `feat/plantillas-multinodo` → `main`). N:M
+            **`TemplateNodeAssignment`** (nodo + `includeDescendants`) = fuente de verdad única de la visibilidad por
+            nodo; `Template.orgNodeId` = nodo primario DERIVADO (deprecado, DROP en §3). 3 modos (uno/varios/"todos los
+            hijos de X"); **0 asignaciones = GLOBAL** (permisivo). `ScopeService.getAccessibleNodes`+`isTemplateVisibleByNode`;
+            selector de nodo al crear **acotado a asignaciones ∩ ABAC** (autoselección si 1, **obliga si >1**),
+            `assertNodeAllowedForTemplate` en create/previewNew (**cierra el diferido (a) de 2.4**), endpoint
+            `GET /log-entries/templates/:id/nodes`. UI en `TemplateBuilder` (reusa `ScopeTreePicker`) + `NewEntryPage`.
+            Sin permisos nuevos (catálogo 59). Tests API **213** (+8). Smoke 15/15. 6 forks en DECISIONS 2026-06-12.
+            **Pendiente: smoke VISUAL.**
       - [ ] **2.8.1 (#9) UX de acceso nodo↔grilla** (+ SavedView/gestor de columnas de 2.6.1 FUSIONADOS aquí):
             presentar 2–3 alternativas con pros/contras ANTES de implementar; "mis nodos"/recientes/favoritos,
             búsqueda, filtros persistentes.
@@ -461,6 +470,11 @@ nunca queda más de una sesión atrás.
 
 > Items con fundamento ya discutidos; aquí para que no se diluyan en `DECISIONS.md`.
 
+- [ ] **DROP de `Template.orgNodeId` (deprecado tras 2.8.0).** Con `TemplateNodeAssignment` como fuente de verdad de
+      la visibilidad por nodo, `Template.orgNodeId` quedó como "nodo primario" DERIVADO (no editable por separado; sin
+      drift). Limpieza mecánica pendiente: quitar la columna de la lógica restante (proyección/audit), del contrato
+      (`templateSchema.orgNodeId` y los `@deprecated` en create/update/saveDraft), de la web que aún lo lea, y migración
+      de DROP. **No urgente** (la columna es inerte). Ver DECISIONS 2026-06-12 (fork 1).
 - [ ] **`OrgNode.externalCode` plano → migrar a `ExternalReference`.** El campo único `externalCode`
       de OrgNode (Fase Estructura) quedó como atajo de un solo sistema; con `ExternalReference`
       polimórfica ya disponible, debe unificarse ahí (un nodo puede mapear a varios sistemas). Migración

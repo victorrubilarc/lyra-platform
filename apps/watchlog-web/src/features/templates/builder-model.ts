@@ -18,6 +18,7 @@ import type {
   OrgNodeTree,
   SaveTemplateDraftRequest,
   TemplateDetail,
+  TemplateNodeAssignmentInput,
   VisibleWhen,
 } from "@lyra/contracts";
 
@@ -93,7 +94,8 @@ export interface EditSection {
 export interface EditState {
   name: string;
   description: string;
-  orgNodeId: string | null;
+  /** Alcance de estructura (multi-nodo 2.8.0). Vacío = GLOBAL. Fuente de verdad. */
+  nodeAssignments: TemplateNodeAssignmentInput[];
   requireSignature: boolean;
   /** Flujo reutilizable asignado a la versión (Fase 2.2). null = sin flujo. */
   workflowDefinitionId: string | null;
@@ -144,7 +146,10 @@ export function detailToEditState(detail: TemplateDetail): EditState {
   return {
     name: detail.name,
     description: detail.description ?? "",
-    orgNodeId: detail.orgNodeId,
+    nodeAssignments: detail.nodeAssignments.map((a) => ({
+      orgNodeId: a.orgNodeId,
+      includeDescendants: a.includeDescendants,
+    })),
     requireSignature: detail.version.requireSignature,
     workflowDefinitionId: detail.version.workflowDefinitionId,
     workflowDefinitionVersionId: detail.version.workflowDefinitionVersionId,
@@ -194,7 +199,8 @@ export function editStateToDraftRequest(state: EditState): SaveTemplateDraftRequ
   return {
     name: state.name.trim() || "Sin título",
     description: state.description.trim() || null,
-    orgNodeId: state.orgNodeId,
+    // Alcance de estructura (2.8.0): fuente de verdad; el backend deriva orgNodeId.
+    nodeAssignments: state.nodeAssignments,
     requireSignature: state.requireSignature,
     workflowDefinitionId: state.workflowDefinitionId,
     workflowDefinitionVersionId: state.workflowDefinitionVersionId,

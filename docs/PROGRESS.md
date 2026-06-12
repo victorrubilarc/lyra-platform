@@ -55,6 +55,22 @@ Bitácoras** — el selector de plantilla usaba `GET /templates` (solo nodo); nu
 `setRoleScope` solo toca las filas de esa plantilla (no borra el resto del alcance del rol). Auditado. Smoke **8/8** +
 **14/14** sin regresión. Pendiente: smoke VISUAL.
 
+**Fase 2.8.0 — Plantillas MULTI-NODO ✅ (2026-06-12, `feat/plantillas-multinodo` → `main`).** Eje de NODO de la
+visibilidad de plantilla: una plantilla puede vivir en VARIOS nodos con 3 modos (un nodo / varios / "todos los hijos de
+X" incl. nodos futuros vía `includeDescendants`). Entidad nueva **`TemplateNodeAssignment`** (templateId × orgNodeId +
+includeDescendants, N:M, aditiva) = **fuente de verdad única** de la visibilidad por nodo; `Template.orgNodeId` queda como
+**nodo primario DERIVADO** (deprecado, DROP en BACKLOG §3). **CERO asignaciones = GLOBAL** (semántica permisiva). Migración
+`…_add_template_node_assignment` con backfill (1 fila por plantilla anclada; globales → 0 filas). `ScopeService.getAccessibleNodes`
+(ids + rutas) + `isTemplateVisibleByNode`/`nodeAssignmentInScope` (puros, intersección de subárbol por ruta materializada).
+`TemplatesService` filtra/persistte/deriva por asignaciones (audit before/after; `updateMeta` ahora transaccional). Al CREAR
+una entrada: selector de nodo acotado a **asignaciones ∩ accesibles** — autoselección con 1, **elección obligada con >1**
+(sin default silencioso); el backend AUTORIZA la membresía en `create` y `previewNew` (`assertNodeAllowedForTemplate`),
+cerrando el diferido (a) de 2.4. Endpoint `GET /log-entries/templates/:id/nodes` (`eligibleNodesForTemplate`). Web: sección
+"Alcance de estructura (nodos)" en el `TemplateBuilder` reutilizando `ScopeTreePicker` (prop nuevo `defaultIncludeDescendants`),
+selector de nodo en `NewEntryPage` (modal `Combobox` si >1), display "Global / N nodos / nodo (y subnodos)". **Sin permisos
+nuevos — catálogo 59.** Tests: contracts 149 · API **213** (+8). **Smoke en vivo 15/15** (`scripts/smoke-template-multinode.py`,
+crea y limpia por ID). 6 forks en DECISIONS 2026-06-12. Pendiente: smoke VISUAL.
+
 ## Hecho en Fase 2.7.2 (Ventana de edición configurable — gobernanza temporal #6)
 
 2.º eslabón de la gobernanza temporal: plazo para CORREGIR un registro; vencido, solo se edita con privilegio explícito
