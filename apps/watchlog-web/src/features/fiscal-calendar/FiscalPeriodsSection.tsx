@@ -14,6 +14,7 @@ import {
 } from "@lyra/contracts";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { ApiError } from "../../lib/api-client.js";
+import { formatLocalDate } from "../../lib/format.js";
 import { PeriodHistoryModal } from "./PeriodHistoryModal.js";
 import {
   useCloseFiscalPeriod,
@@ -202,7 +203,7 @@ export function FiscalPeriodsSection({ cal }: { cal: FiscalCalendarDto }) {
       sortable: true,
       render: (p) => (
         <span style={{ color: "var(--color-text-secondary)", fontSize: 13 }}>
-          {p.periodStart} → {addDaysToIso(p.periodEnd, -1)}
+          {formatLocalDate(p.periodStart)} → {formatLocalDate(addDaysToIso(p.periodEnd, -1))}
         </span>
       ),
     },

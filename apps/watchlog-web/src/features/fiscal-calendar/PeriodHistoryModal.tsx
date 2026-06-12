@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import { History, Lock, LockOpen, ShieldCheck, ShieldOff } from "lucide-react";
 import { Button, Chip, Modal, Skeleton } from "@lyra/ui";
 import type { PeriodHistoryEntry } from "@lyra/contracts";
+import { formatDateTime } from "../../lib/format.js";
 import { usePeriodHistory } from "./fiscal-calendar-queries.js";
 import fx from "./FiscalCalendar.module.css";
 
@@ -11,10 +12,6 @@ const ACTION_ICON: Record<string, React.ReactNode> = {
   "opsperiod.locked": <ShieldCheck size={15} />,
   "opsperiod.unlocked": <ShieldOff size={15} />,
 };
-
-function fmt(iso: string): string {
-  return new Date(iso).toLocaleString("es-CL", { dateStyle: "medium", timeStyle: "short" });
-}
 
 export function PeriodHistoryModal({
   fiscalCalendarId,
@@ -70,7 +67,7 @@ export function PeriodHistoryModal({
                   )}
                 </div>
                 <div className={fx.timelineMeta}>
-                  {e.actorName ?? "—"} · {fmt(e.occurredAt)}
+                  {e.actorName ?? "—"} · {formatDateTime(e.occurredAt)}
                 </div>
                 {e.reason && <div className={fx.timelineReason}>“{e.reason}”</div>}
               </div>
