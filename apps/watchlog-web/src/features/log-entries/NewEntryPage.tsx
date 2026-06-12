@@ -5,8 +5,8 @@ import { CalendarClock, ChevronRight, ClipboardList, FileStack, History, Layers,
 import { Card, EmptyState, FormField, Input, Skeleton, Textarea, Toggle, useToast } from "@lyra/ui";
 import type { TemplateListItem } from "@lyra/contracts";
 import { usePermissions } from "../../auth/use-permissions.js";
-import { useTemplates } from "../templates/templates-queries.js";
 import { localInputToIso } from "./datetime-local.js";
+import { useAvailableTemplates } from "./log-entries-queries.js";
 import styles from "./LogEntries.module.css";
 
 /** Selección de plantilla para una nueva entrada (anclada al prototipo: PickTpl). */
@@ -16,7 +16,7 @@ export function NewEntryPage() {
   const navigate = useNavigate();
   const toast = useToast();
 
-  const { data: templates = [], isLoading, isError } = useTemplates({ status: "PUBLISHED" });
+  const { data: templates = [], isLoading, isError } = useAvailableTemplates();
 
   // Gesto mínimo de registro DIFERIDO (2.7.0): por defecto la entrada es "en
   // línea" (fecha/hora automática); el toggle declara la fecha/hora REAL del
@@ -26,7 +26,9 @@ export function NewEntryPage() {
   const [reason, setReason] = useState("");
   const deferralReady = !deferredOn || (eventAt.trim() !== "" && reason.trim().length >= 5);
 
-  if (!perms.can("module:logbook:view")) {
+  // Crear una entrada requiere `logentry:create` (mismo permiso que el endpoint de
+  // plantillas disponibles). Quien solo llena/revisa no entra aquí — usa Bitácoras.
+  if (!perms.can("logentry:create")) {
     return (
       <div className={styles.page}>
         <EmptyState icon={<Lock size={36} />} title={t("logbook.noAccess")} description={t("logbook.noAccessDesc")} />

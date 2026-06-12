@@ -381,7 +381,9 @@ export function EntryFillPage() {
 
   return (
     <div className={styles.page}>
-      <Button variant="secondary" className={styles.backBtn} onClick={() => navigate("/nueva-entrada")}>
+      {/* "Volver": una entrada NUEVA aún sin crear vuelve al picker; una entrada ya
+          existente (se llegó desde Bitácoras) vuelve a Bitácoras. */}
+      <Button variant="secondary" className={styles.backBtn} onClick={() => navigate(composeActive ? "/nueva-entrada" : "/bitacoras")}>
         <ArrowLeft size={15} /> {t("logbook.fill.back")}
       </Button>
 

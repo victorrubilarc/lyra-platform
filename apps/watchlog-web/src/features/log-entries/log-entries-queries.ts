@@ -9,6 +9,7 @@ import type {
 import {
   createLogEntry,
   executeTransition,
+  fetchAvailableTemplates,
   fetchLogEntry,
   fetchNewLogEntryPreview,
   saveLogEntrySection,
@@ -21,6 +22,14 @@ export const LOG_ENTRY_KEYS = {
   detail: (id: string) => ["log-entries", "detail", id] as const,
   preview: (templateId: string, orgNodeId: string | null) => ["log-entries", "preview", templateId, orgNodeId ?? ""] as const,
 };
+
+/** Plantillas disponibles para crear una entrada (gateado por logentry:create). */
+export function useAvailableTemplates() {
+  return useQuery({
+    queryKey: ["log-entries", "available-templates"] as const,
+    queryFn: fetchAvailableTemplates,
+  });
+}
 
 export function useLogEntry(id: string | null) {
   return useQuery({

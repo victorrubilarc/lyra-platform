@@ -14,7 +14,16 @@ por el dueño del producto** (DECISIONS 2026-06-11).
 `SystemSettings`), ancla **RECORDED|EFFECTIVE**; fuera de ventana solo `logentry:write-expired` + **motivo auditado**
 (+ MFA opt-in); en **AND** con el período ("gana la más estricta"), `blockedReason` extendido con `EDIT_WINDOW_EXPIRED`.
 Catálogo **59**. Tests contracts 149 · API 200. Smoke en vivo 21/21.
-**Siguiente: 2.7.3 — Matriz rol×sección×tiempo (#7).**
+**+ Afinamiento UX 2.7.2 ✅** (2026-06-12, rama `feat/ventana-edicion-ux`): duración en **minutos u horas** (unidad
+canónica = minutos; migración `…_edit_window_minutes` ×60); **banner prominente** de ventana en llenado y visor; fix
+alineación "Sellada"; **botón "Editar"** desde grilla/visor (acceso a entradas en curso). **+ Fase 2.8.2 ✅ (parcial): no
+crear borradores huérfanos** — `GET /log-entries/new` (preview sin persistir vía `buildDetail`) + modo **compose** que
+materializa la entrada al primer guardado real. **+ Arreglos de la demo en vivo**: endpoint `GET /log-entries/templates`
+(picker gateado por `logentry:create`, no exige permiso de admin de plantillas); ítem de menú "Nueva entrada" gateado por
+`logentry:create`; "Volver" contextual (a Bitácoras o al picker); indicador "secciones completadas" cuenta LOCKED (un
+registro aprobado muestra M/M, no 0/M).
+**Siguiente: 2.7.3 — Matriz rol×sección×tiempo (#7)** · luego Fase 2.8 (alcance por plantilla + 2.8.2 completo: VOID,
+ruta de edición propia).
 
 ## Hecho en Fase 2.7.2 (Ventana de edición configurable — gobernanza temporal #6)
 
