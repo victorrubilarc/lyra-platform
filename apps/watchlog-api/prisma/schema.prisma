@@ -60,6 +60,7 @@ model User {
 
   roles           UserRole[]
   scopes          Scope[]
+  templateScopes  TemplateScope[]
   sessions        Session[]
   refreshTokens   RefreshToken[]
   mfaSecret       MfaSecret?
@@ -105,6 +106,7 @@ model Role {
   users       UserRole[]
   permissions RolePermission[]
   scopes      Scope[]
+  templateScopes       TemplateScope[]
   templateSectionRoles TemplateSectionRole[]
   templateFieldRoles   TemplateFieldRole[]
   workflowTransitionRoles WorkflowTransitionRole[]
@@ -164,6 +166,27 @@ model Scope {
   @@unique([userId, orgNodeId])
   @@unique([roleId, orgNodeId])
   @@index([orgNodeId])
+}
+
+// Alcance por PLANTILLA (dimensión 4, 2.º eje ABAC — Fase 2.8). Eje ORTOGONAL al
+// de nodo (Scope): combina en AND ("gana la más estricta"). Sujeto polimórfico:
+// exactamente uno de userId/roleId presente (check constraint en la migración).
+// Semántica PERMISIVA: la AUSENCIA total de filas para un usuario (propias + de
+// sus roles) significa "sin restricción de plantilla" (ve todas). Set plano: no
+// hay jerarquía de plantillas (sin includeDescendants).
+model TemplateScope {
+  id         String @id @default(cuid())
+  userId     String?
+  roleId     String?
+  templateId String
+
+  user     User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role     Role?    @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  template Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, templateId])
+  @@unique([roleId, templateId])
+  @@index([templateId])
 }
 
 // ===========================================================================
@@ -555,6 +578,7 @@ model Template {
   versions       TemplateVersion[] @relation("TemplateVersions")
   currentVersion TemplateVersion?  @relation("TemplateCurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
   logEntries     LogEntry[]
+  templateScopes TemplateScope[]
 
   @@index([orgNodeId])
   @@index([status])

@@ -18,6 +18,27 @@ export const scopeEntrySchema = z.object({
 });
 export type ScopeEntry = z.infer<typeof scopeEntrySchema>;
 
+/**
+ * Alcance por PLANTILLA (2.ª dimensión ABAC, Fase 2.8). Lista plana de ids de
+ * plantilla a las que el usuario/rol tiene acceso operacional. **Semántica
+ * permisiva**: ausencia total de entradas = sin restricción (ve TODAS), igual
+ * que el alcance por nodo. Es un eje ortogonal al de nodo y combina en AND.
+ * Sin `includeDescendants` (no hay jerarquía de plantillas).
+ */
+export const templateScopeEntrySchema = z.object({
+  templateId: z.string().min(1),
+});
+export type TemplateScopeEntry = z.infer<typeof templateScopeEntrySchema>;
+
+/** Una plantilla asignable, para poblar el selector de alcance por plantilla. */
+export const templateScopeOptionSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  /** Nodo de la plantilla; `null` = plantilla global (sin nodo). */
+  orgNodePath: z.string().nullable(),
+});
+export type TemplateScopeOption = z.infer<typeof templateScopeOptionSchema>;
+
 /** Resumen de usuario para listados. */
 export const userSummarySchema = z.object({
   id: z.string(),
@@ -37,6 +58,8 @@ export const userDetailSchema = userSummarySchema.extend({
   /** El rol del usuario exige MFA (según el modo global). Derivado en el backend. */
   mfaRequired: z.boolean(),
   scopes: z.array(scopeEntrySchema),
+  /** Alcance por plantilla (ids). Vacío = sin restricción de plantilla (ve todas). */
+  templateScopes: z.array(z.string()),
 });
 export type UserDetail = z.infer<typeof userDetailSchema>;
 
@@ -63,11 +86,17 @@ export const assignRolesRequestSchema = z.object({
 });
 export type AssignRolesRequest = z.infer<typeof assignRolesRequestSchema>;
 
-/** Reemplaza el alcance de datos del usuario. */
+/** Reemplaza el alcance de datos (por nodo) del usuario. */
 export const assignScopeRequestSchema = z.object({
   scopes: z.array(scopeEntrySchema),
 });
 export type AssignScopeRequest = z.infer<typeof assignScopeRequestSchema>;
+
+/** Reemplaza el alcance por plantilla del usuario (lista plana de ids). */
+export const assignTemplateScopeRequestSchema = z.object({
+  templateIds: z.array(z.string().min(1)),
+});
+export type AssignTemplateScopeRequest = z.infer<typeof assignTemplateScopeRequestSchema>;
 
 /**
  * Reset de contraseña por un administrador: fija una contraseña temporal. El
