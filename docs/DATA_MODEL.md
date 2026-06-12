@@ -11,7 +11,8 @@
 ### Identidad y seguridad
 - **User** — credenciales (hash Argon2id), estado, MFA. `User` *N—N* `Role` (vía **UserRole**).
 - **Role** *N—N* **Permission** (vía **RolePermission**). Permisos atómicos de 4 dimensiones (ver `SECURITY.md`).
-- **UserScope** — alcance de datos: liga `User`/`Role` a uno o más `OrgNode` (con herencia a descendientes) y/o a `Template` específicos.
+- **Scope** *(implementado)* — alcance de datos por NODO (1.er eje ABAC): liga `User` **o** `Role` (XOR, check constraint) a un `OrgNode` con `includeDescendants` (herencia por ruta materializada). Ausencia total ⇒ sin restricción.
+- **TemplateScope** *(implementado — Fase 2.8)* — alcance de datos por PLANTILLA (2.º eje ABAC): liga `User` **o** `Role` (XOR, check constraint) a un `Template`. Set plano (sin descendientes). Eje ORTOGONAL al de nodo: el alcance efectivo combina ambos en **AND**. **Semántica permisiva**: ausencia total de filas (propias + de roles) ⇒ sin restricción de plantilla (ve todas). Únicos `[userId,templateId]`/`[roleId,templateId]`. Filtra el picker de llenado y la grilla/stats/export de bitácoras; NO el módulo admin de plantillas.
 - **Session / RefreshToken** — sesiones y refresh tokens rotativos. **MfaSecret** (TOTP).
 - **PasswordResetToken** — recuperación self-service: se guarda solo el hash del token; single-use y con TTL corto (ver `SECURITY.md` §6).
 - **PasswordPolicy** — política configurable (longitud, expiración, etc.).

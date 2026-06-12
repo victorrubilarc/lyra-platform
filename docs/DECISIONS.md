@@ -4,6 +4,49 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-12 · Fase 2.8 — Alcance por PLANTILLA (2.ª dimensión ABAC) — ✅ IMPLEMENTADO
+
+Hoy quien tiene `module:logbook:view`/`logentry:create` + alcance de **nodo** ve/usa **todas** las plantillas y entradas de
+ese nodo, sin importar a qué plantillas tiene privilegio (detectado en vivo en la demo 2.8.2; SECURITY §2.4 ya lo contemplaba).
+Se agrega la **2.ª dimensión de alcance de datos**: limitar **qué plantillas** ve/usa cada usuario y filtrar con eso el
+**picker** de `/nueva-entrada` y la **grilla/stats/export** de `/bitacoras`. Los **roles por sección** (ya implementados)
+limitan QUÉ edita dentro de una plantilla, NO su visibilidad — son ejes distintos, no se mezclan. **6 forks resueltos con el
+dueño (recomendación primero):**
+
+1. **Modelo — entidad aparte `TemplateScope`, NO extender `Scope`.** El `Scope` de nodo es intrínsecamente jerárquico
+   (`orgNodeId` obligatorio + `includeDescendants` + ruta materializada + únicos `[user,node]`/`[role,node]`). Meter
+   `templateId` XOR `orgNodeId` obligaría a `orgNodeId` nullable (rompe los únicos: PG trata NULLs como distintos) y a
+   arrastrar `includeDescendants` sin sentido. Son ejes **ortogonales que combinan en AND** — el patrón de SAP PM/Maximo
+   (alcance por sitio/planta ≠ autorización por tipo de objeto; el perfil las combina). Tabla dedicada espejo del patrón
+   polimórfico: `TemplateScope { userId?|roleId? (XOR), templateId, @@unique([userId,templateId]), @@unique([roleId,templateId]) }`,
+   set plano sin descendientes. Migración 100% **aditiva**, no toca `Scope`.
+2. **Semántica por defecto — PERMISIVA: "sin scope de plantilla = ve TODAS".** Idéntica al contrato del scope de nodo
+   (`null` = sin restricción) y a SAP (sin restricción de valor = '*') / Maximo (grupo sin data-restriction ve todo lo que la
+   app permite). El *least privilege* se cumple en la capa de **permiso** (`logentry:create`/`logbook:view`) y de **nodo**;
+   el scope de plantilla es un estrechamiento **opcional adicional**. Ventaja decisiva: **migración sin backfill, cero
+   ruptura** (todo sigue igual hasta que un admin asigne) y **consistencia** con el otro eje. Deny-by-default queda como flag
+   configurable a futuro si un cliente lo exige (registrado en BACKLOG).
+3. **Combinación nodo × plantilla — AND ("gana la más estricta").** Ve T si: (nodo) `T.orgNodeId ∈ accesibles` ∨
+   `T.orgNodeId null` (global) ∨ `nodos=null`; **Y** (plantilla) `plantillas=null` ∨ `T.id ∈ accesibles`. Las **globales**
+   pasan el eje de nodo siempre, pero **sí** quedan sujetas al eje de plantilla (si hay allow-list y no están, no se ven).
+4. **Granularidad — plantilla individual.** No hay categorías de plantilla hoy; introducirlas es otra feature. Asignación
+   plana, precisa, mínima superficie. La semántica permisiva mitiga "plantilla nueva no cubierta". Categorías/etiquetas como
+   agrupador → BACKLOG.
+5. **Superficies — solo las OPERACIONALES; el admin `/plantillas` queda fuera.** El scope de plantilla gobierna uso/visibilidad
+   operacional (llenar/ver entradas), no la administración. Como el picker y el admin comparten `TemplatesService.list`, se
+   parametriza con `applyTemplateScope` (default `false` = admin **idéntico**; el picker pasa `true`). Se filtra además
+   `LogbookQueryService.list/stats/export` (por `LogEntry.templateId`) y se gatea por `assertTemplateInScope` en
+   getDetail/saveSection/submit/transition (defensa en profundidad: bloquea también el fill por API directa).
+6. **UI + asignación — por usuario Y por rol (decisión del dueño), permiso reutilizado.** Sección "Plantillas" hermana de
+   "Estructura organizacional" en la pestaña *Alcance* del detalle de usuario + sección nueva en el detalle de rol (selector
+   plano searchable, reutiliza primitivos premium). Endpoints **separados** `PUT /security/users/:id/template-scope` (gate
+   `user:assign-scope`) y `PUT /security/roles/:id/template-scope` (gate `role:manage`), guardado independiente + audit
+   propio (`user.templatescope.assigned` / `role.templatescope.assigned`). `GET /security/template-scope/options` (gate
+   `user:assign-scope` OR `role:manage`) sirve la lista de plantillas asignables sin exigir `template:view`. **Sin permisos
+   nuevos** — catálogo se queda en **59**. El read-time une scopes de usuario + de sus roles (espejo de `getAccessibleNodeIds`).
+
+---
+
 ### 2026-06-12 · Fase 2.8.2 (parcial) — No crear borradores huérfanos + arreglos de la demo — ✅ IMPLEMENTADO
 
 Durante la prueba en vivo de la ventana de edición, el dueño detectó que **elegir una plantilla creaba un `LogEntry`

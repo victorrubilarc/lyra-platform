@@ -32,10 +32,12 @@ Keycloak **descartado** para el MVP (complejidad operacional); si un cliente lo 
 1. **Pantallas/módulos** — ej. `module:dashboard:view`, `module:security:manage`.
 2. **Funcionalidades/acciones** — ej. `entry:create`, `entry:edit`, `incident:assign`, `template:publish`, `data:export`.
 3. **Workflows** — permiso por transición: ej. `incident:transition:open->assigned`, `handover:deliver`, `handover:ack`.
-4. **Datos (ABAC)** — `UserScope` ata usuario/rol a **nodos** de la estructura (con herencia a descendientes) y/o a **plantillas** específicas.
+4. **Datos (ABAC)** — DOS ejes ortogonales que combinan en **AND** ("gana la más estricta"), ambos **implementados**:
+   - **Por NODO** (`Scope`): ata usuario/rol a `OrgNode` con herencia a descendientes (ruta materializada). `ScopeService.getAccessibleNodeIds` (null = sin restricción).
+   - **Por PLANTILLA** (`TemplateScope`, Fase 2.8): ata usuario/rol a `Template` (set plano). `ScopeService.getAccessibleTemplateIds` (null = sin restricción, semántica PERMISIVA = ve todas). Filtra el **picker** de llenado y la **grilla/stats/export** de bitácoras + `assertTemplateInScope` en lectura/llenado de entrada; NO el módulo admin de plantillas (otra responsabilidad). Asignable por usuario (`user:assign-scope`) y por rol (`role:manage`), auditado. Es eje de **visibilidad/uso**, distinto de los roles por sección (que limitan QUÉ se edita dentro de una plantilla).
 
 ### Aplicación (regla de oro)
-- **El backend SIEMPRE decide.** `PermissionsGuard` (NestJS) + decorador `@RequirePermission(...)` cubren dimensiones 1–3; un `ScopeService` aplica la dimensión 4 filtrando filas por `OrgNode`/template.
+- **El backend SIEMPRE decide.** `PermissionsGuard` (NestJS) + decorador `@RequirePermission(...)` cubren dimensiones 1–3; el `ScopeService` aplica la dimensión 4 filtrando filas por `OrgNode` **y** `Template` (AND de los dos ejes).
 - **La UI solo oculta** (mejor UX), nunca es la fuente de verdad.
 - El **catálogo de permisos** vive en `@lyra/contracts` (enum tipado), compartido por UI y backend.
 
