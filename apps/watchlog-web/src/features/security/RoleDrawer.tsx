@@ -5,10 +5,13 @@ import { Button, Drawer, FormField, Input, Skeleton, Toggle, useToast } from "@l
 import { roleKeySchema } from "@lyra/contracts";
 import { ApiError } from "../../lib/api-client.js";
 import { PermissionMatrix } from "./PermissionMatrix.js";
+import { TemplateScopePicker } from "./TemplateScopePicker.js";
 import {
+  useAssignRoleTemplateScope,
   useCreateRole,
   usePermissionCatalog,
   useRole,
+  useTemplateScopeOptions,
   useUpdateRole,
 } from "./security-queries.js";
 import shared from "./security-shared.module.css";
@@ -26,6 +29,8 @@ interface FormState {
   description: string;
   requireMfa: boolean;
   permissions: Set<string>;
+  /** Alcance por plantilla del rol (ids). Vacío = sin restricción. */
+  templateScope: string[];
 }
 
 const EMPTY: FormState = {
@@ -34,7 +39,14 @@ const EMPTY: FormState = {
   description: "",
   requireMfa: false,
   permissions: new Set(),
+  templateScope: [],
 };
+
+function sameSet(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  const setB = new Set(b);
+  return a.every((x) => setB.has(x));
+}
 
 export function RoleDrawer({ open, roleId, onClose }: RoleDrawerProps) {
   const { t } = useTranslation();
@@ -43,8 +55,10 @@ export function RoleDrawer({ open, roleId, onClose }: RoleDrawerProps) {
 
   const { data: catalog = [] } = usePermissionCatalog();
   const { data: role, isLoading: roleLoading } = useRole(open && isEdit ? roleId : null);
+  const { data: templateOptions = [] } = useTemplateScopeOptions(open && isEdit);
   const createRole = useCreateRole();
   const updateRole = useUpdateRole();
+  const assignTemplateScope = useAssignRoleTemplateScope();
 
   const [state, setState] = useState<FormState>(EMPTY);
   const [keyError, setKeyError] = useState<string | null>(null);
@@ -60,6 +74,7 @@ export function RoleDrawer({ open, roleId, onClose }: RoleDrawerProps) {
         description: role.description ?? "",
         requireMfa: role.requireMfa,
         permissions: new Set(role.permissionKeys),
+        templateScope: role.templateScopes,
       });
     } else if (!isEdit) {
       setState(EMPTY);
@@ -68,7 +83,7 @@ export function RoleDrawer({ open, roleId, onClose }: RoleDrawerProps) {
     setNameError(null);
   }, [open, isEdit, role]);
 
-  const busy = createRole.isPending || updateRole.isPending;
+  const busy = createRole.isPending || updateRole.isPending || assignTemplateScope.isPending;
   const isSystem = role?.isSystem ?? false;
 
   function validate(): boolean {
@@ -101,6 +116,10 @@ export function RoleDrawer({ open, roleId, onClose }: RoleDrawerProps) {
             permissionKeys: [...state.permissions],
           },
         });
+        // Alcance por plantilla: endpoint propio, solo si cambió (eje aparte).
+        if (!sameSet(state.templateScope, role.templateScopes)) {
+          await assignTemplateScope.mutateAsync({ id: role.id, dto: { templateIds: state.templateScope } });
+        }
         toast.success(t("security.roles.updated"));
       } else {
         await createRole.mutateAsync({
@@ -215,6 +234,28 @@ export function RoleDrawer({ open, roleId, onClose }: RoleDrawerProps) {
               disabled={busy}
             />
           </div>
+
+          {/* Alcance por PLANTILLA del rol (2.º eje ABAC, Fase 2.8). Solo en
+              edición: necesita el id del rol. Se suma (unión) al alcance de sus
+              usuarios; vacío = el rol no aporta restricción. */}
+          {isEdit && (
+            <div>
+              <div style={{ fontSize: "var(--text-label-size)", fontWeight: 600, marginBottom: 4, color: "var(--color-text-primary)" }}>
+                {t("security.users.templateScope.section")}
+              </div>
+              <p className={shared.controlHint} style={{ margin: "0 0 8px" }}>
+                {state.templateScope.length === 0
+                  ? t("security.roles.templateScopeAll")
+                  : t("security.users.templateScope.desc")}
+              </p>
+              <TemplateScopePicker
+                options={templateOptions}
+                value={state.templateScope}
+                onChange={(next) => setState((s) => ({ ...s, templateScope: next }))}
+                disabled={busy}
+              />
+            </div>
+          )}
         </div>
       )}
     </Drawer>

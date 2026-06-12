@@ -2,12 +2,14 @@ import {
   adminResetPasswordRequestSchema,
   assignRolesRequestSchema,
   assignScopeRequestSchema,
+  assignTemplateScopeRequestSchema,
   auditLogEntrySchema,
   createRoleRequestSchema,
   createUserRequestSchema,
   passwordPolicySchema,
   roleDetailSchema,
   roleSummarySchema,
+  templateScopeOptionSchema,
   updatePasswordPolicyRequestSchema,
   updateRoleRequestSchema,
   updateUserRequestSchema,
@@ -15,6 +17,7 @@ import {
   userSummarySchema,
   type AssignRolesRequest,
   type AssignScopeRequest,
+  type AssignTemplateScopeRequest,
   type AuditFilters,
   type AuditLogEntry,
   type CreateRoleRequest,
@@ -23,6 +26,7 @@ import {
   type PermissionDef,
   type RoleDetail,
   type RoleSummary,
+  type TemplateScopeOption,
   type UpdatePasswordPolicyRequest,
   type UpdateRoleRequest,
   type UpdateUserRequest,
@@ -62,6 +66,11 @@ export function assignUserScope(id: string, dto: AssignScopeRequest): Promise<Us
   return apiJson(`/security/users/${id}/scope`, userDetailSchema, { method: "PUT", body: dto });
 }
 
+export function assignUserTemplateScope(id: string, dto: AssignTemplateScopeRequest): Promise<UserDetail> {
+  assignTemplateScopeRequestSchema.parse(dto);
+  return apiJson(`/security/users/${id}/template-scope`, userDetailSchema, { method: "PUT", body: dto });
+}
+
 export function resetUserMfa(id: string): Promise<UserDetail> {
   return apiJson(`/security/users/${id}/mfa/reset`, userDetailSchema, { method: "POST" });
 }
@@ -93,6 +102,17 @@ export function updateRole(id: string, dto: UpdateRoleRequest): Promise<RoleDeta
 
 export function deleteRole(id: string): Promise<void> {
   return apiVoid(`/security/roles/${id}`, { method: "DELETE" });
+}
+
+export function assignRoleTemplateScope(id: string, dto: AssignTemplateScopeRequest): Promise<RoleDetail> {
+  assignTemplateScopeRequestSchema.parse(dto);
+  return apiJson(`/security/roles/${id}/template-scope`, roleDetailSchema, { method: "PUT", body: dto });
+}
+
+// ─── Alcance por plantilla (opciones del selector) ─────────────────────────
+
+export function fetchTemplateScopeOptions(): Promise<TemplateScopeOption[]> {
+  return apiJson("/security/template-scope/options", z.array(templateScopeOptionSchema));
 }
 
 // ─── Catálogo de permisos ──────────────────────────────────────────────────

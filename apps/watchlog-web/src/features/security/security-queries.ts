@@ -7,6 +7,7 @@ import {
 import type {
   AssignRolesRequest,
   AssignScopeRequest,
+  AssignTemplateScopeRequest,
   AuditFilters,
   CreateRoleRequest,
   CreateUserRequest,
@@ -15,8 +16,10 @@ import type {
   UpdateUserRequest,
 } from "@lyra/contracts";
 import {
+  assignRoleTemplateScope,
   assignUserRoles,
   assignUserScope,
+  assignUserTemplateScope,
   createRole,
   createUser,
   deleteRole,
@@ -25,6 +28,7 @@ import {
   fetchPermissionCatalog,
   fetchRole,
   fetchRoles,
+  fetchTemplateScopeOptions,
   fetchUser,
   fetchUsers,
   resetUserMfa,
@@ -42,6 +46,7 @@ export const SECURITY_KEYS = {
   permissions: ["security", "permissions"] as const,
   policy: ["security", "policy"] as const,
   audit: ["security", "audit"] as const,
+  templateScopeOptions: ["security", "template-scope-options"] as const,
 };
 
 const AUDIT_PAGE_SIZE = 50;
@@ -98,6 +103,15 @@ export function useAssignUserScope() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, dto }: { id: string; dto: AssignScopeRequest }) => assignUserScope(id, dto),
+    onSuccess: (u) => invalidateUser(qc, u.id),
+  });
+}
+
+export function useAssignUserTemplateScope() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, dto }: { id: string; dto: AssignTemplateScopeRequest }) =>
+      assignUserTemplateScope(id, dto),
     onSuccess: (u) => invalidateUser(qc, u.id),
   });
 }
@@ -164,6 +178,30 @@ export function useDeleteRole() {
   return useMutation({
     mutationFn: (id: string) => deleteRole(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: SECURITY_KEYS.roles }),
+  });
+}
+
+export function useAssignRoleTemplateScope() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, dto }: { id: string; dto: AssignTemplateScopeRequest }) =>
+      assignRoleTemplateScope(id, dto),
+    onSuccess: (r) => {
+      void qc.invalidateQueries({ queryKey: SECURITY_KEYS.role(r.id) });
+      // El alcance por rol cambia el alcance efectivo de sus usuarios.
+      void qc.invalidateQueries({ queryKey: SECURITY_KEYS.users });
+    },
+  });
+}
+
+// ─── Alcance por plantilla (opciones) ───────────────────────────────────────
+
+export function useTemplateScopeOptions(enabled = true) {
+  return useQuery({
+    queryKey: SECURITY_KEYS.templateScopeOptions,
+    queryFn: fetchTemplateScopeOptions,
+    enabled,
+    staleTime: 60_000,
   });
 }
 
