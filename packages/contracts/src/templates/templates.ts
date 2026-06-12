@@ -32,6 +32,25 @@ const keySchema = z
 export const templateStatusSchema = z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]);
 export type TemplateStatus = z.infer<typeof templateStatusSchema>;
 
+/**
+ * Ancla de la VENTANA DE EDICIÓN (Fase 2.7.2): desde qué instante corre el plazo
+ * para editar una entrada.
+ *  - RECORDED (default): desde la captura (`recordedAt`, inmutable). El operador
+ *    siempre dispone de la ventana completa desde que crea la entrada — un registro
+ *    diferido legítimo (2.7.0) no nace vencido.
+ *  - EFFECTIVE: desde la fecha del evento (`effectiveAt`). Más estricta: un registro
+ *    declarado tarde puede nacer fuera de ventana y exigir el override.
+ */
+export const EDIT_WINDOW_ANCHORS = ["RECORDED", "EFFECTIVE"] as const;
+export const editWindowAnchorSchema = z.enum(EDIT_WINDOW_ANCHORS);
+export type EditWindowAnchor = z.infer<typeof editWindowAnchorSchema>;
+
+/**
+ * Horas de la ventana de edición. Tri-estado a nivel de plantilla:
+ * null = hereda la configuración global · 0 = SIN ventana (explícito) · >0 = ventana propia.
+ */
+export const editWindowHoursSchema = z.number().int().min(0).max(8760);
+
 export const templateVersionStatusSchema = z.enum(["DRAFT", "PUBLISHED"]);
 export type TemplateVersionStatus = z.infer<typeof templateVersionStatusSchema>;
 
@@ -96,6 +115,14 @@ export const templateSchema = z.object({
   orgNodeId: z.string().nullable(),
   status: templateStatusSchema,
   currentVersionId: z.string().nullable(),
+  /**
+   * Ventana de edición (2.7.2) — GOBERNANZA VIVA en el contenedor mutable (patrón
+   * SAP OB52 / Odoo lock dates: cambiarla aplica de inmediato a TODAS las entradas
+   * de la plantilla, sin republicar). null = hereda el ancla/horas globales.
+   */
+  editWindowAnchor: editWindowAnchorSchema.nullable(),
+  /** null = hereda global · 0 = sin ventana (explícito) · >0 = horas propias. */
+  editWindowHours: z.number().int().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -126,6 +153,8 @@ export const createTemplateRequestSchema = z.object({
   name: z.string().trim().min(1).max(140),
   description: z.string().trim().max(1000).optional(),
   orgNodeId: z.string().nullable().optional(),
+  editWindowAnchor: editWindowAnchorSchema.nullable().optional(),
+  editWindowHours: editWindowHoursSchema.nullable().optional(),
 });
 export type CreateTemplateRequest = z.infer<typeof createTemplateRequestSchema>;
 
@@ -133,6 +162,8 @@ export const updateTemplateRequestSchema = z.object({
   name: z.string().trim().min(1).max(140).optional(),
   description: z.string().trim().max(1000).nullable().optional(),
   orgNodeId: z.string().nullable().optional(),
+  editWindowAnchor: editWindowAnchorSchema.nullable().optional(),
+  editWindowHours: editWindowHoursSchema.nullable().optional(),
 });
 export type UpdateTemplateRequest = z.infer<typeof updateTemplateRequestSchema>;
 
