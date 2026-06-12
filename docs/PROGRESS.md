@@ -22,8 +22,9 @@ materializa la entrada al primer guardado real. **+ Arreglos de la demo en vivo*
 (picker gateado por `logentry:create`, no exige permiso de admin de plantillas); ítem de menú "Nueva entrada" gateado por
 `logentry:create`; "Volver" contextual (a Bitácoras o al picker); indicador "secciones completadas" cuenta LOCKED (un
 registro aprobado muestra M/M, no 0/M).
-**Siguiente: 2.7.3 — Matriz rol×sección×tiempo (#7)** · luego Fase 2.8 (alcance por plantilla + 2.8.2 completo: VOID,
-ruta de edición propia).
+**REPRIORIZADO (2026-06-12, dueño):** **Siguiente = Fase 2.8 — Alcance + acceso**, empezando por **Alcance por PLANTILLA
+(2.ª dimensión ABAC)** — detectado en vivo: hoy quien tiene módulo + alcance de nodo ve TODAS las plantillas. **2.7.3
+(matriz rol×sección×tiempo) y el resto de la gobernanza temporal quedan en prioridades siguientes.**
 
 ## Hecho en Fase 2.7.2 (Ventana de edición configurable — gobernanza temporal #6)
 
