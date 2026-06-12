@@ -959,6 +959,7 @@ export const esCL = {
       folio: "Folio",
       template: "Plantilla",
       node: "Nodo",
+      editEntry: "Editar",
       state: "Estado del flujo",
       status: "Estado",
       shift: "Turno",
@@ -1011,6 +1012,7 @@ export const esCL = {
     viewer: {
       back: "Volver a bitácoras",
       print: "Imprimir",
+      edit: "Editar",
       versionLabel: "Versión",
       equipment: "Equipo",
       sealedAt: "Sellada",

@@ -255,6 +255,27 @@ export function LogbookPage() {
       render: (r) => <span>{r.createdByName ?? "—"}</span>,
     },
     { key: "indicators", header: t("logbook.list.indicators"), render: (r) => <Indicators row={r} /> },
+    {
+      // Acción: abrir para EDITAR (llenado/avance de flujo). Solo en registros aún
+      // en curso (DRAFT) y si el usuario puede llenar; el clic en la fila sigue
+      // abriendo el visor de lectura. El backend reaplica la autorización por sección.
+      key: "actions",
+      header: "",
+      width: 120,
+      render: (r) =>
+        can("logentry:fill") && r.status === "DRAFT" ? (
+          <Button
+            variant="secondary"
+            leftIcon={<PenLine size={14} />}
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/nueva-entrada/${r.id}`);
+            }}
+          >
+            {t("logbook.list.editEntry")}
+          </Button>
+        ) : null,
+    },
   ];
 
   const activeChips: { key: string; label: string; clear: () => void }[] = [];
