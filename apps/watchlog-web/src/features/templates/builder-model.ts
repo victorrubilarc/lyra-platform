@@ -12,6 +12,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type {
+  EditWindowAnchor,
   FieldSemanticRole,
   FieldType,
   OrgNodeTree,
@@ -97,6 +98,10 @@ export interface EditState {
   /** Flujo reutilizable asignado a la versión (Fase 2.2). null = sin flujo. */
   workflowDefinitionId: string | null;
   workflowDefinitionVersionId: string | null;
+  /** Ventana de edición (2.7.2), config del CONTENEDOR (gobernanza viva):
+   * hours null = hereda global · 0 = sin ventana · >0 = propia. */
+  editWindowAnchor: EditWindowAnchor | null;
+  editWindowHours: number | null;
   sections: EditSection[];
 }
 
@@ -143,6 +148,8 @@ export function detailToEditState(detail: TemplateDetail): EditState {
     requireSignature: detail.version.requireSignature,
     workflowDefinitionId: detail.version.workflowDefinitionId,
     workflowDefinitionVersionId: detail.version.workflowDefinitionVersionId,
+    editWindowAnchor: detail.editWindowAnchor,
+    editWindowHours: detail.editWindowHours,
     sections: detail.version.sections.map((s) => ({
       uid: nextUid(),
       key: s.key,
@@ -191,6 +198,8 @@ export function editStateToDraftRequest(state: EditState): SaveTemplateDraftRequ
     requireSignature: state.requireSignature,
     workflowDefinitionId: state.workflowDefinitionId,
     workflowDefinitionVersionId: state.workflowDefinitionVersionId,
+    editWindowAnchor: state.editWindowAnchor,
+    editWindowHours: state.editWindowHours,
     sections: state.sections.map((s, si) => ({
       key: s.key,
       title: s.title.trim() || `Sección ${si + 1}`,

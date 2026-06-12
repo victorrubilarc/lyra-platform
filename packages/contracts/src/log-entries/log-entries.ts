@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { templateVersionSchema, type TemplateFieldDto, type TemplateSectionDto } from "../templates/templates.js";
+import {
+  editWindowAnchorSchema,
+  templateVersionSchema,
+  type EditWindowAnchor,
+  type TemplateFieldDto,
+  type TemplateSectionDto,
+} from "../templates/templates.js";
 import type { VisibleWhen } from "../templates/field-types.js";
 import { workflowVersionSchema } from "../workflows/workflows.js";
 
@@ -117,8 +123,17 @@ export type LogEntrySignatureSummaryDto = z.infer<typeof logEntrySignatureSummar
  *  - MISSING_ROLE: la sección está asignada a roles que el usuario no tiene.
  *  - PERIOD_CLOSED: la fecha efectiva del registro cae en un período contable
  *    cerrado/en cierre y el usuario no tiene el permiso de excepción (Fase 2.7.1).
+ *  - EDIT_WINDOW_EXPIRED: la ventana de edición de la plantilla venció y el usuario
+ *    no tiene el permiso de override (Fase 2.7.2). Con período cerrado Y ventana
+ *    vencida gana la restricción MÁS estricta y se comunica PERIOD_CLOSED.
  */
-export const SECTION_BLOCKED_REASONS = ["ENTRY_CLOSED", "WRONG_STATE", "MISSING_ROLE", "PERIOD_CLOSED"] as const;
+export const SECTION_BLOCKED_REASONS = [
+  "ENTRY_CLOSED",
+  "WRONG_STATE",
+  "MISSING_ROLE",
+  "PERIOD_CLOSED",
+  "EDIT_WINDOW_EXPIRED",
+] as const;
 export const sectionBlockedReasonSchema = z.enum(SECTION_BLOCKED_REASONS);
 export type SectionBlockedReason = z.infer<typeof sectionBlockedReasonSchema>;
 
@@ -228,6 +243,25 @@ export const logEntrySchema = z.object({
 export type LogEntryDto = z.infer<typeof logEntrySchema>;
 
 /**
+ * Huella de la VENTANA DE EDICIÓN (2.7.2) que el backend resuelve para el actor:
+ * la UI muestra proactivamente "Editable hasta <expiresAt>" y, si venció, por qué
+ * está bloqueado y si este usuario puede hacer el override (con motivo auditado).
+ * null en el detalle = sin ventana configurada (plantilla y global sin límite).
+ */
+export const editWindowInfoSchema = z.object({
+  anchor: editWindowAnchorSchema,
+  windowHours: z.number().int(),
+  /** Instante en que vence/venció la ventana (ancla + horas), ISO UTC. */
+  expiresAt: z.string(),
+  expired: z.boolean(),
+  /** ¿Puede ESTE usuario escribir fuera de ventana? (permiso de override). */
+  canOverride: z.boolean(),
+  /** ¿El override exige re-autenticación con MFA? (ajuste del sistema). */
+  overrideRequiresMfa: z.boolean(),
+});
+export type EditWindowInfo = z.infer<typeof editWindowInfoSchema>;
+
+/**
  * Detalle de llenado: cabecera + DEFINICIÓN congelada (la versión de plantilla,
  * para renderizar) + ESTADO de ejecución por sección + valores actuales. El
  * cliente une definición y ejecución por `sectionKey`/`fieldKey`.
@@ -247,6 +281,8 @@ export const logEntryDetailSchema = logEntrySchema.extend({
   equipmentName: z.string().nullable(),
   /** Quién declaró el diferimiento (2.7.0). null = entrada en línea. */
   deferredDeclaredByName: z.string().nullable(),
+  /** Ventana de edición resuelta para el actor (2.7.2). null = sin ventana. */
+  editWindow: editWindowInfoSchema.nullable(),
   sectionStates: z.array(logEntrySectionStateDtoSchema),
   values: z.array(logEntryValueSchema),
   /** Transiciones que ESTE usuario puede ejecutar ahora (gateado en backend). */
@@ -351,9 +387,21 @@ export const createLogEntryRequestSchema = z.object({
 });
 export type CreateLogEntryRequest = z.infer<typeof createLogEntryRequestSchema>;
 
+/**
+ * Motivo del override de ventana de edición (2.7.2). OBLIGATORIO al escribir fuera
+ * de ventana aunque se tenga el permiso (GxP: la corrección excepcional se
+ * identifica CON justificación — MHRA Data Integrity 2018 / FDA DI Q&A 2018).
+ */
+const editWindowOverrideReasonSchema = z.string().trim().min(5).max(500);
+
 /** Declara, corrige o quita (null) el diferimiento de una entrada en borrador. */
 export const setDeferralRequestSchema = z.object({
   deferred: deferralInputSchema.nullable(),
+  /** Motivo del override, requerido SOLO si la ventana de edición venció (2.7.2). */
+  overrideReason: editWindowOverrideReasonSchema.optional(),
+  /** Re-auth del override (solo si el ajuste de MFA para override está activo). */
+  password: z.string().min(1).max(200).optional(),
+  mfaCode: z.string().trim().min(1).max(20).optional(),
 });
 export type SetDeferralRequest = z.infer<typeof setDeferralRequestSchema>;
 
@@ -372,15 +420,25 @@ export const saveLogEntrySectionRequestSchema = z.object({
   markComplete: z.boolean().optional(),
   /**
    * Contraseña para firmar la completitud, SOLO si la sección exige firma
-   * (`TemplateSection.requireSignature`) y se está completando. El backend
+   * (`TemplateSection.requireSignature`) y se está completando. También re-autentica
+   * el override fuera de ventana cuando el ajuste de MFA lo exige (2.7.2). El backend
    * re-verifica; nunca se confía en el cliente.
    */
   password: z.string().min(1).max(200).optional(),
+  /** Segundo factor para el override fuera de ventana (si el ajuste lo exige). */
+  mfaCode: z.string().trim().min(1).max(20).optional(),
+  /** Motivo del override, requerido SOLO si la ventana de edición venció (2.7.2). */
+  overrideReason: editWindowOverrideReasonSchema.optional(),
 });
 export type SaveLogEntrySectionRequest = z.infer<typeof saveLogEntrySectionRequestSchema>;
 
 export const submitLogEntryRequestSchema = z.object({
   note: z.string().trim().max(500).optional(),
+  /** Motivo del override, requerido SOLO si la ventana de edición venció (2.7.2). */
+  overrideReason: editWindowOverrideReasonSchema.optional(),
+  /** Re-auth del override (solo si el ajuste de MFA para override está activo). */
+  password: z.string().min(1).max(200).optional(),
+  mfaCode: z.string().trim().min(1).max(20).optional(),
 });
 export type SubmitLogEntryRequest = z.infer<typeof submitLogEntryRequestSchema>;
 
@@ -818,6 +876,43 @@ export function resolveEffectiveAt(
     }
   }
   return fallback;
+}
+
+// === Ventana de edición (Fase 2.7.2 — fuente única back↔front) ===============
+
+/** Ventana de edición EFECTIVA (ya resuelta la herencia plantilla→global). */
+export interface EditWindowConfig {
+  anchor: EditWindowAnchor;
+  windowHours: number;
+}
+
+/**
+ * Resuelve la ventana de edición efectiva: la plantilla manda; null hereda el
+ * global. `hours` 0 o null final = SIN ventana (se edita sin límite temporal).
+ * Es gobernanza VIVA (patrón SAP OB52 / Odoo lock dates): cambiar la config
+ * aplica de inmediato a todas las entradas, sin republicar plantillas.
+ */
+export function resolveEditWindow(
+  template: { editWindowAnchor: EditWindowAnchor | null; editWindowHours: number | null },
+  globalConfig: { editWindowAnchor: EditWindowAnchor; editWindowHours: number | null },
+): EditWindowConfig | null {
+  const hours = template.editWindowHours ?? globalConfig.editWindowHours;
+  if (hours === null || hours <= 0) return null;
+  return { anchor: template.editWindowAnchor ?? globalConfig.editWindowAnchor, windowHours: hours };
+}
+
+/**
+ * Instante en que vence la ventana: ancla (RECORDED = captura inmutable;
+ * EFFECTIVE = fecha del evento vigente) + horas configuradas.
+ */
+export function editWindowDeadline(config: EditWindowConfig, recordedAt: Date, effectiveAt: Date): Date {
+  const base = config.anchor === "EFFECTIVE" ? effectiveAt : recordedAt;
+  return new Date(base.getTime() + config.windowHours * 3_600_000);
+}
+
+/** ¿Está vencida la ventana en `now`? (vencida = ya NO se edita por el canal normal). */
+export function isEditWindowExpired(deadline: Date, now: Date): boolean {
+  return now.getTime() > deadline.getTime();
 }
 
 /** ¿Es la sección editable en el estado de flujo dado? (parte de la editabilidad). */

@@ -1,10 +1,11 @@
 import { z } from "zod";
+import { editWindowAnchorSchema, editWindowHoursSchema } from "../templates/templates.js";
 
 /**
  * Configuración del sistema — Fase 2.7.1.1 (UX). Ajustes operativos globales del
  * single-tenant, persistidos en una fila singleton. Hoy alberga el control de
- * seguridad de gobernanza de períodos (re-autenticación MFA POR ACCIÓN, configurable);
- * extensible a futuros ajustes del sistema.
+ * seguridad de gobernanza de períodos (re-autenticación MFA POR ACCIÓN, configurable)
+ * y la VENTANA DE EDICIÓN global (Fase 2.7.2); extensible a futuros ajustes.
  */
 
 /** Acciones de gobernanza de período que pueden exigir step-up MFA, por separado. */
@@ -22,6 +23,16 @@ export const systemSettingsSchema = z.object({
   requireMfaPeriodReopen: z.boolean(),
   requireMfaPeriodLock: z.boolean(),
   requireMfaPeriodUnlock: z.boolean(),
+  /**
+   * Ventana de edición GLOBAL (Fase 2.7.2): fallback para plantillas que no definen
+   * la suya. `editWindowHours` null o 0 = sin ventana (las entradas se editan sin
+   * límite temporal, comportamiento pre-2.7.2). El ancla global SIEMPRE tiene valor
+   * (default RECORDED): es el último eslabón de la cadena de herencia.
+   */
+  editWindowAnchor: editWindowAnchorSchema,
+  editWindowHours: editWindowHoursSchema.nullable(),
+  /** Exigir re-auth con MFA al editar FUERA de ventana (override privilegiado). */
+  requireMfaEditWindowOverride: z.boolean(),
   updatedAt: z.string(),
   updatedByName: z.string().nullable(),
 });
@@ -33,6 +44,9 @@ export const updateSystemSettingsRequestSchema = z.object({
   requireMfaPeriodReopen: z.boolean().optional(),
   requireMfaPeriodLock: z.boolean().optional(),
   requireMfaPeriodUnlock: z.boolean().optional(),
+  editWindowAnchor: editWindowAnchorSchema.optional(),
+  editWindowHours: editWindowHoursSchema.nullable().optional(),
+  requireMfaEditWindowOverride: z.boolean().optional(),
 });
 export type UpdateSystemSettingsRequest = z.infer<typeof updateSystemSettingsRequestSchema>;
 

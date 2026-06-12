@@ -1,6 +1,6 @@
 # Progreso — Lyra WatchLog
 
-Última actualización: 2026-06-11 (**Fase 1 completa**; **Fase 2.1/2.1.1/2.2/2.x/2.3.0/2.4/2.5/2.6.0 ✅** +
+Última actualización: 2026-06-12 (**Fase 1 completa**; **Fase 2.1/2.1.1/2.2/2.x/2.3.0/2.4/2.5/2.6.0 ✅** +
 **Afinamiento #4 ✅** + **Fase 2.7.0 — Registro diferido ✅** + **Fase 2.7.1 — Período contable gobernado ✅** +
 **Fase 2.7.1.1 — Calendario FISCAL transversal ✅**: el período se DESACOPLÓ de los turnos a la entidad transversal
 `FiscalCalendar` (default + asignación por nodo); `OperationalPeriod` re-scopeada a `fiscalCalendarId × periodKey` con
@@ -10,7 +10,43 @@ incl. bypass) y `requirePeriod`. **+ Afinamiento UX 2.7.1.1 ✅** (pantalla fisc
 historial por período + **Configuración del sistema `/configuracion` con MFA por acción** + formato regional centralizado).
 El **plan de fases 2.7 (Gobernanza temporal) / 2.8 (Alcance+acceso) / 2.9 (Plantillas inteligentes) fue APROBADO TAL CUAL
 por el dueño del producto** (DECISIONS 2026-06-11).
-**Siguiente: 2.7.2 — Ventana de edición configurable (#6).**
+**+ Fase 2.7.2 — Ventana de edición configurable ✅** (2026-06-12): plazo de corrección por plantilla (fallback global en
+`SystemSettings`), ancla **RECORDED|EFFECTIVE**; fuera de ventana solo `logentry:write-expired` + **motivo auditado**
+(+ MFA opt-in); en **AND** con el período ("gana la más estricta"), `blockedReason` extendido con `EDIT_WINDOW_EXPIRED`.
+Catálogo **59**. Tests contracts 149 · API 200. Smoke en vivo 21/21.
+**Siguiente: 2.7.3 — Matriz rol×sección×tiempo (#7).**
+
+## Hecho en Fase 2.7.2 (Ventana de edición configurable — gobernanza temporal #6)
+
+2.º eslabón de la gobernanza temporal: plazo para CORREGIR un registro; vencido, solo se edita con privilegio explícito
+y motivo auditado. Investigado el estándar (MHRA/FDA late entry; SAP OB52 / Odoo lock dates = config VIVA; Maximo). 5
+forks resueltos con la opción recomendada (DECISIONS 2026-06-12). Rama `feat/ventana-edicion` (4 commits por capa).
+
+- **Migración aditiva `20260612025159_add_edit_window`**: enum `EditWindowAnchor` (RECORDED|EFFECTIVE);
+  `Template.editWindowAnchor?/editWindowHours?` (config en el CONTENEDOR mutable = gobernanza viva, sin republicar);
+  `SystemSettings.editWindowAnchor`(default RECORDED)/`editWindowHours?`(null=sin ventana)/`requireMfaEditWindowOverride`;
+  check constraints 0..8760 h. Aplicada con `migrate deploy` (EPERM del DLL con watch).
+- **Contratos** (`@lyra/contracts`): `EDIT_WINDOW_ANCHORS` + `editWindowHoursSchema` (tri-estado null/0/>0);
+  `EDIT_WINDOW_EXPIRED` sumado a `SECTION_BLOCKED_REASONS`; `editWindowInfoSchema` en el detalle; `overrideReason`(≥5) +
+  creds en `saveSection`/`setDeferral`/`submit`. **Fuente única back↔front**: `resolveEditWindow` (herencia plantilla→
+  global) / `editWindowDeadline` (ancla+horas) / `isEditWindowExpired` (borde NO inclusivo). Permiso nuevo
+  **`logentry:write-expired`** (catálogo **58→59**).
+- **Backend** (`LogEntriesService`): `assertEditWindowWritable` en saveSection/setDeferral/submit (NO create ni
+  executeTransition: gobierna datos, no el avance del flujo). Vencida ⇒ exige el permiso + motivo (+ MFA si el ajuste lo
+  pide, vía `ReauthService`); en **AND** con la guarda de período, cada una con su bypass. Override auditado con evento
+  DEDICADO `logentry.editwindow.override` + `reason` en `LogEntryFieldChange`. `getDetail` expone `editWindow {anchor,
+  windowHours, expiresAt, expired, canOverride, overrideRequiresMfa}` y `EDIT_WINDOW_EXPIRED` (precedencia ENTRY_CLOSED →
+  PERIOD_CLOSED → EDIT_WINDOW_EXPIRED → reglas de sección). `TemplatesService` persiste/mapea la config (audit
+  before/after); `SettingsService.editWindowSettings()` (1 lectura); `LogEntriesModule` importa `SettingsModule`.
+- **Web**: control "Ventana de edición" en el `TemplateBuilder` (heredar/sin ventana/propia con horas+ancla); pestaña
+  **Bitácoras** en `/configuracion` (ventana global + toggle MFA del override); en el llenado, chip "Editable hasta X",
+  aviso de ventana vencida y **`EditWindowOverrideModal`** (motivo + contraseña/MFA si aplica) interceptando Guardar
+  avance / Completar(+firma en un paso) / Enviar / diferido. `EntryFillPage` migrada a `lib/format.ts`. i18n es-CL.
+- **Verificación**: `typecheck` (todos) · `lint` (0 errores, 1 warning preexistente OrgTree) · `build` web OK · `test`
+  **contracts 149** (+5) · **API 200** (+10). **Smoke en vivo 21/21** (round-trip settings; ventana propia EFFECTIVE/24h;
+  diferida 3d ⇒ vencida; 400 sin motivo / 200 con motivo + FieldChange + AuditLog dedicado; usuario sin permiso ⇒ 403 +
+  EDIT_WINDOW_EXPIRED; MFA exigido sin enrolar ⇒ rechazo; entrada vigente ⇒ huella + canal normal intacto). Datos de
+  prueba creados y LIMPIADOS (conteos en 0; AuditLog inmutable conserva el rastro). **Pendiente: smoke VISUAL** (§4).
 
 ## Estado por fase
 

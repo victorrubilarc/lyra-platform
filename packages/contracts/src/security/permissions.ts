@@ -429,6 +429,16 @@ export const PERMISSION_CATALOG = [
     description:
       "Ejecutar transiciones de flujo y firmar una entrada (QUIÉN puede cada transición es dato: roles por transición del flujo).",
   },
+  // Espejo de `opsperiod:write-closed` (2.7.2): escribir pasada una guarda temporal.
+  // A diferencia del bypass de período (silencioso), este override EXIGE motivo
+  // auditado en cada escritura (GxP: la corrección excepcional se justifica).
+  {
+    key: "logentry:write-expired",
+    dimension: "ACTION",
+    group: "logbook",
+    description:
+      "Excepción: editar una entrada con la ventana de edición vencida (exige motivo auditado en cada escritura).",
+  },
 ] as const satisfies readonly PermissionDef[];
 
 /** Unión literal de todas las claves de permiso conocidas. */

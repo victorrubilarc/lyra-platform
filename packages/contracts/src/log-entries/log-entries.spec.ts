@@ -4,17 +4,23 @@ import {
   canonicalSignaturePayload,
   canonicalSignatureValues,
   createLogEntryRequestSchema,
+  editWindowDeadline,
+  editWindowInfoSchema,
   executeTransitionRequestSchema,
   formatEntryFolio,
+  isEditWindowExpired,
   isEmptyValue,
   isFieldVisible,
   isSectionEditableInState,
   logEntryListQuerySchema,
   logEntrySectionStateDtoSchema,
   logEntryTimelineEventSchema,
+  resolveEditWindow,
   resolveEffectiveAt,
   saveLogEntrySectionRequestSchema,
+  sectionBlockedReasonSchema,
   setDeferralRequestSchema,
+  submitLogEntryRequestSchema,
   thresholdBandFor,
   validateFieldValue,
   type FieldForValidation,
@@ -469,5 +475,71 @@ describe("logEntryTimelineEventSchema", () => {
         reason: "Sin señal en terreno",
       }).success,
     ).toBe(true);
+  });
+});
+
+describe("ventana de edición (2.7.2)", () => {
+  const recordedAt = new Date("2026-06-10T12:00:00.000Z");
+  const effectiveAt = new Date("2026-06-08T20:00:00.000Z");
+  const global48 = { editWindowAnchor: "RECORDED" as const, editWindowHours: 48 };
+
+  it("resuelve la herencia plantilla → global (null hereda; 0 apaga)", () => {
+    expect(resolveEditWindow({ editWindowAnchor: null, editWindowHours: null }, global48)).toEqual({
+      anchor: "RECORDED",
+      windowHours: 48,
+    });
+    expect(resolveEditWindow({ editWindowAnchor: "EFFECTIVE", editWindowHours: 24 }, global48)).toEqual({
+      anchor: "EFFECTIVE",
+      windowHours: 24,
+    });
+    // 0 explícito en la plantilla = SIN ventana aunque el global tenga una.
+    expect(resolveEditWindow({ editWindowAnchor: null, editWindowHours: 0 }, global48)).toBeNull();
+    expect(
+      resolveEditWindow(
+        { editWindowAnchor: null, editWindowHours: null },
+        { editWindowAnchor: "RECORDED", editWindowHours: null },
+      ),
+    ).toBeNull();
+  });
+
+  it("calcula el vencimiento según el ancla", () => {
+    expect(
+      editWindowDeadline({ anchor: "RECORDED", windowHours: 48 }, recordedAt, effectiveAt).toISOString(),
+    ).toBe("2026-06-12T12:00:00.000Z");
+    expect(
+      editWindowDeadline({ anchor: "EFFECTIVE", windowHours: 48 }, recordedAt, effectiveAt).toISOString(),
+    ).toBe("2026-06-10T20:00:00.000Z");
+  });
+
+  it("decide expiración con borde no-inclusivo (en el límite aún se edita)", () => {
+    const deadline = new Date("2026-06-12T12:00:00.000Z");
+    expect(isEditWindowExpired(deadline, new Date("2026-06-12T11:59:59.999Z"))).toBe(false);
+    expect(isEditWindowExpired(deadline, deadline)).toBe(false);
+    expect(isEditWindowExpired(deadline, new Date("2026-06-12T12:00:00.001Z"))).toBe(true);
+  });
+
+  it("EDIT_WINDOW_EXPIRED es un blockedReason válido y el DTO de detalle acepta editWindow", () => {
+    expect(sectionBlockedReasonSchema.safeParse("EDIT_WINDOW_EXPIRED").success).toBe(true);
+    expect(
+      editWindowInfoSchema.safeParse({
+        anchor: "RECORDED",
+        windowHours: 48,
+        expiresAt: "2026-06-12T12:00:00.000Z",
+        expired: true,
+        canOverride: false,
+        overrideRequiresMfa: false,
+      }).success,
+    ).toBe(true);
+  });
+
+  it("los requests de escritura aceptan overrideReason ≥5 y lo rechazan corto", () => {
+    const save = { expectedVersion: 0, values: [] };
+    expect(
+      saveLogEntrySectionRequestSchema.safeParse({ ...save, overrideReason: "Corrección autorizada" }).success,
+    ).toBe(true);
+    expect(saveLogEntrySectionRequestSchema.safeParse({ ...save, overrideReason: "ok" }).success).toBe(false);
+    expect(setDeferralRequestSchema.safeParse({ deferred: null, overrideReason: "Ajuste tardío" }).success).toBe(true);
+    expect(submitLogEntryRequestSchema.safeParse({ overrideReason: "Cierre tardío del turno" }).success).toBe(true);
+    expect(submitLogEntryRequestSchema.safeParse({ overrideReason: "no" }).success).toBe(false);
   });
 });

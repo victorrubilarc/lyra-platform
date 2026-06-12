@@ -149,8 +149,13 @@ function makeServices(prismaOver: Record<string, unknown> = {}, scopeOver: Parti
   const permissions = {
     getEffectivePermissions: vi.fn().mockResolvedValue(new Set<string>()),
   } as unknown as import("../authz/permission.service").PermissionService;
+  const settings = {
+    editWindowSettings: vi
+      .fn()
+      .mockResolvedValue({ editWindowAnchor: "RECORDED", editWindowHours: null, requireMfaEditWindowOverride: false }),
+  } as unknown as import("../settings/settings.service").SettingsService;
 
-  const entries = new LogEntriesService(prisma, audit, scope, shiftResolver, fiscalResolver, reauth, enc, periods, permissions);
+  const entries = new LogEntriesService(prisma, audit, scope, shiftResolver, fiscalResolver, reauth, enc, periods, permissions, settings);
   const logbook = new LogbookQueryService(prisma, scope, audit, enc, entries);
   return { logbook, entries, prisma, audit, scope };
 }

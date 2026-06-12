@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Lock, ShieldCheck } from "lucide-react";
-import { EmptyState, Skeleton, Toggle, cx, useToast } from "@lyra/ui";
+import { BookOpenCheck, Lock, ShieldCheck } from "lucide-react";
+import { EmptyState, Input, Select, Skeleton, Toggle, cx, useToast } from "@lyra/ui";
 import type { LucideIcon } from "lucide-react";
-import type { SystemSettingsDto, UpdateSystemSettingsRequest } from "@lyra/contracts";
+import type { EditWindowAnchor, SystemSettingsDto, UpdateSystemSettingsRequest } from "@lyra/contracts";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { ApiError } from "../../lib/api-client.js";
 import { useSystemSettings, useUpdateSystemSettings } from "./settings-queries.js";
@@ -17,7 +17,7 @@ const MFA_ACTIONS: { field: keyof UpdateSystemSettingsRequest; labelKey: string 
   { field: "requireMfaPeriodUnlock", labelKey: "settings.mfa.unlock" },
 ];
 
-type Category = "security";
+type Category = "security" | "logbook";
 
 interface CategoryDef {
   id: Category;
@@ -25,7 +25,10 @@ interface CategoryDef {
   icon: LucideIcon;
 }
 
-const CATEGORIES: CategoryDef[] = [{ id: "security", labelKey: "settings.cat.security", icon: ShieldCheck }];
+const CATEGORIES: CategoryDef[] = [
+  { id: "security", labelKey: "settings.cat.security", icon: ShieldCheck },
+  { id: "logbook", labelKey: "settings.cat.logbook", icon: BookOpenCheck },
+];
 
 export function SettingsPage() {
   const { t } = useTranslation();
@@ -37,6 +40,11 @@ export function SettingsPage() {
   const update = useUpdateSystemSettings();
 
   const [tab, setTab] = useState<Category>("security");
+  // Horas de la ventana global como texto local ("" = sin ventana); se persiste al salir del campo.
+  const [hoursDraft, setHoursDraft] = useState("");
+  useEffect(() => {
+    setHoursDraft(data?.editWindowHours != null && data.editWindowHours > 0 ? String(data.editWindowHours) : "");
+  }, [data?.editWindowHours]);
 
   if (!perms.can("module:settings:view")) {
     return (
@@ -46,13 +54,23 @@ export function SettingsPage() {
     );
   }
 
-  const toggle = async (field: keyof UpdateSystemSettingsRequest, next: boolean) => {
+  const patch = async (dto: UpdateSystemSettingsRequest) => {
     try {
-      await update.mutateAsync({ [field]: next });
+      await update.mutateAsync(dto);
       toast.success(t("settings.saved"));
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : t("common.errorGeneric"));
     }
+  };
+  const toggle = (field: keyof UpdateSystemSettingsRequest, next: boolean) => patch({ [field]: next });
+
+  /** Persiste las horas de la ventana global ("" o 0 ⇒ sin ventana = null). */
+  const saveHours = () => {
+    if (!data) return;
+    const n = Number(hoursDraft);
+    const next = hoursDraft.trim() === "" || !Number.isFinite(n) || n <= 0 ? null : Math.min(Math.trunc(n), 8760);
+    if (next === data.editWindowHours) return;
+    void patch({ editWindowHours: next });
   };
 
   return (
@@ -115,6 +133,66 @@ export function SettingsPage() {
               )}
 
               {data?.updatedByName && <p className={styles.meta}>{t("settings.updatedBy", { name: data.updatedByName })}</p>}
+              {!canManage && <p className={styles.meta}>{t("settings.readOnly")}</p>}
+            </section>
+          )}
+
+          {tab === "logbook" && (
+            <section className={styles.section}>
+              <header className={styles.sectionHead}>
+                <h2 className={styles.sectionTitle}>
+                  <BookOpenCheck size={18} /> {t("settings.cat.logbook")}
+                </h2>
+                <p className={styles.sectionDesc}>{t("settings.logbookDesc")}</p>
+              </header>
+
+              <div className={styles.settingGroupHead}>
+                <span className={styles.settingLabel}>{t("settings.editWindow")}</span>
+                <p className={styles.settingHint}>{t("settings.editWindowHint")}</p>
+              </div>
+
+              {isLoading || !data ? (
+                <Skeleton height={140} width="100%" />
+              ) : (
+                <div className={styles.toggleList}>
+                  <div className={styles.settingRow}>
+                    <span className={styles.toggleLabel}>{t("settings.editWindowHours")}</span>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={8760}
+                      value={hoursDraft}
+                      placeholder={t("settings.editWindowNoLimit")}
+                      disabled={!canManage || update.isPending}
+                      onChange={(e) => setHoursDraft(e.target.value)}
+                      onBlur={saveHours}
+                      onKeyDown={(e) => e.key === "Enter" && saveHours()}
+                      aria-label={t("settings.editWindowHours")}
+                    />
+                  </div>
+                  <div className={styles.settingRow}>
+                    <span className={styles.toggleLabel}>{t("settings.editWindowAnchor")}</span>
+                    <Select
+                      value={data.editWindowAnchor}
+                      disabled={!canManage || update.isPending}
+                      aria-label={t("settings.editWindowAnchor")}
+                      onChange={(e) => void patch({ editWindowAnchor: e.target.value as EditWindowAnchor })}
+                    >
+                      <option value="RECORDED">{t("settings.editWindowAnchorRecorded")}</option>
+                      <option value="EFFECTIVE">{t("settings.editWindowAnchorEffective")}</option>
+                    </Select>
+                  </div>
+                  <div className={styles.settingRow}>
+                    <span className={styles.toggleLabel}>{t("settings.editWindowMfa")}</span>
+                    <Toggle
+                      checked={Boolean((data as SystemSettingsDto).requireMfaEditWindowOverride)}
+                      disabled={!canManage || update.isPending}
+                      onChange={(v) => void toggle("requireMfaEditWindowOverride", v)}
+                    />
+                  </div>
+                </div>
+              )}
+
               {!canManage && <p className={styles.meta}>{t("settings.readOnly")}</p>}
             </section>
           )}
