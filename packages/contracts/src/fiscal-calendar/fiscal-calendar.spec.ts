@@ -110,8 +110,8 @@ describe("periodBoundsFor — MONTH con meses de largo variable (28/29/30/31)", 
   });
 
   it("meses de 31 y 30 días conservan su largo real", () => {
-    expect(periodBoundsFor("2026-01-10", MONTHLY).periodEnd).toBe("2026-02-01"); // enero 31 días
-    expect(periodBoundsFor("2026-04-10", MONTHLY).periodEnd).toBe("2026-05-01"); // abril 30 días
+    expect(periodBoundsFor("2026-01-10", MONTHLY)?.periodEnd).toBe("2026-02-01"); // enero 31 días
+    expect(periodBoundsFor("2026-04-10", MONTHLY)?.periodEnd).toBe("2026-05-01"); // abril 30 días
   });
 
   it("ancla 28: el período cruza el fin de mes corto sin perder días", () => {

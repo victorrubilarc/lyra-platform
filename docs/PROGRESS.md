@@ -6,8 +6,10 @@
 `FiscalCalendar` (default + asignación por nodo); `OperationalPeriod` re-scopeada a `fiscalCalendarId × periodKey` con
 rango `[periodStart, periodEnd)`; tri-estado **OPEN→CLOSED→LOCKED** (NetSuite) con **generación explícita** (Maximo),
 cierre **secuencial**, lock/unlock two-key, reapertura con secuencialidad inversa; `assertWritable` gana LOCKED (bloquea
-incl. bypass) y `requirePeriod`. El **plan de fases 2.7 (Gobernanza temporal) / 2.8 (Alcance+acceso) / 2.9 (Plantillas
-inteligentes) fue APROBADO TAL CUAL por el dueño del producto** (DECISIONS 2026-06-11).
+incl. bypass) y `requirePeriod`. **+ Afinamiento UX 2.7.1.1 ✅** (pantalla fiscal a pestañas + grilla con scroll/orden +
+historial por período + **Configuración del sistema `/configuracion` con MFA por acción** + formato regional centralizado).
+El **plan de fases 2.7 (Gobernanza temporal) / 2.8 (Alcance+acceso) / 2.9 (Plantillas inteligentes) fue APROBADO TAL CUAL
+por el dueño del producto** (DECISIONS 2026-06-11).
 **Siguiente: 2.7.2 — Ventana de edición configurable (#6).**
 
 ## Estado por fase
@@ -902,8 +904,38 @@ config distinta + reasignar nodos · `periodStart/periodEnd` almacenados · unlo
   `cmq7eglvm…` quedó con `fecha=2026-06-09` y `version` de sección +1 (un saveSection en estado OPEN; dato de demo, benigno).
 - **Pendiente**: smoke **VISUAL** en navegador (mantenedor fiscal, generar, marca Actual, lock/unlock, modo claro) — BACKLOG §4.
 
+## Hecho en Fase 2.7.1.1 — Afinamiento UX + Configuración del sistema (2026-06-11/12)
+
+Iteración de inspección visual del dueño del producto sobre la pantalla fiscal recién construida. Rama
+`feat/calendario-fiscal-ux`. Todo aditivo.
+
+- **Panel fiscal a pestañas verticales** (General / Período / Nodos / Períodos) — descongestiona; cabecera
+  (Guardar/Eliminar) **fija** y solo el contenido scrollea. Input de nombre a ancho completo.
+- **Ayuda por tipo de período** (`PeriodKindHelp`): callout con explicación + ejemplo práctico (MENSUAL/SEMANAL/CICLO),
+  en panel y drawer. Aclarado el MENSUAL con **meses de largo variable** (28/29/30/31): el período toma el largo real del
+  mes; el día-ancla se limita a 1–28 para que el borde exista siempre. **+6 tests** de contrato (feb 28/29, 30/31, ancla 28).
+- **Grilla de períodos** (`@lyra/ui` `Table`): **scroll INTERNO** (thead/footer sticky, altura acotada — la grilla es la
+  que scrollea, no el panel), **orden por columnas** (período/rango/estado), filtro por año, confirmación al **Generar**
+  (muestra cuántos períodos, idempotente), filas compactas, **fechas en formato regional**.
+- **Historial por período** (`PeriodHistoryModal` + `GET /operational-periods/history`): timeline desde el AuditLog
+  inmutable (quién/cuándo/motivo de close/reopen/lock/unlock). Estampa y muestra si la acción se ejecutó **con/ sin MFA**
+  (`metadata.mfaVerified`), porque el ajuste puede cambiar después (registro auto-descriptivo).
+- **Configuración del sistema** `/configuracion` (pantalla nueva, pestañas verticales por categoría): categoría
+  **Seguridad** con **MFA por acción** de gobernanza de período (4 toggles independientes close/reopen/lock/unlock).
+  Modelo `SystemSettings` singleton; gate en `OperationalPeriodService` vía `ReauthService` (step-up MFA) según la acción;
+  el listado de períodos expone `requireReauth` como mapa para que la UI pida credenciales solo donde aplica. Permisos
+  nuevos `module:settings:view` + `settings:manage` (catálogo **56→58**).
+- **Formato regional centralizado** (`apps/watchlog-web/src/lib/format.ts`): `formatDateTime/Date/LocalDate/Number/Currency`
+  leen el locale activo del i18n (es-CL, CLP por defecto). Regla del proyecto guardada en memoria. (Componentes previos aún
+  formatean inline — migrar al tocarlos.)
+- **Fix `@lyra/ui`**: `Toast` z-index 1000 (sobre modales/drawers) — los avisos de error ya no quedan difuminados bajo un modal.
+- **Verificación**: typecheck/lint/build (web 1971) verdes; tests contracts **144** · permissions 5 · API **190**. Migraciones
+  `add_system_settings` + `period_mfa_per_action`. **Smoke en vivo**: settings GET/PATCH per-acción; gate selectivo (solo
+  reopen exige MFA → cerrar 201 / reabrir sin creds 401 / con password sin MFA 400); historial con `mfaVerified=false`;
+  periodKey preservado; limpieza (0 períodos). **Pendiente**: smoke VISUAL del usuario (en curso).
+
 ## Próximo paso
-**Fase 2.7.1.1 completa y publicada.** **Sesión siguiente: 2.7.2 — Ventana de edición configurable (#6)**: por plantilla
+**Fase 2.7.1.1 (núcleo + afinamiento UX) completa y publicada.** **Sesión siguiente: 2.7.2 — Ventana de edición configurable (#6)**: por plantilla
 (fallback global) `{ancla RECORDED|EFFECTIVE, duración}`; fuera de ventana solo privilegio explícito con motivo
 auditado; con período **gana la restricción MÁS estricta**. Extiende `blockedReason` con `EDIT_WINDOW_EXPIRED` (enum ya
 extensible). Luego 2.7.3 matriz rol×sección×tiempo (#7).

@@ -252,9 +252,17 @@
   Sin día operacional/calendario fiscal ⇒ ungobernado ⇒ nunca bloquea.
 - **Huella proactiva** — en `getDetail`, si el actor sin excepción tiene una entrada en período cerrado, todas las
   secciones reportan `PERIOD_CLOSED` (precede a las reglas de sección) y no se ofrecen transiciones.
-- **Endpoints** — `GET /operational-periods?calendarId=` (derivados ∪ explícitos), `POST .../close` (CLOSING|CLOSED +
-  motivo ≥5), `POST .../reopen` (motivo ≥5); `periodKey` por query (puede contener "/"). Permisos
-  `opsperiod:view/close/reopen` (`reopen` separado por ser más sensible).
+- **Endpoints** — `GET /operational-periods?fiscalCalendarId=` (filas + `requireReauth` mapa), `POST .../generate`,
+  `.../close`, `.../reopen`, `.../lock`, `.../unlock` (motivo ≥5 + creds opcionales), `GET .../history` (rastro del
+  AuditLog). `periodKey`/`fiscalCalendarId` por query.
+
+### Configuración del sistema (Fase 2.7.1.1 UX)
+> Migraciones `add_system_settings` + `period_mfa_per_action`.
+- **SystemSettings** *(implementado)* — fila **singleton** (`id="system"`): 4 flags
+  `requireMfaPeriod{Close,Reopen,Lock,Unlock}` (re-autenticación MFA por acción de gobernanza de período), `updatedById?`,
+  `updatedAt`. `SettingsService.requireMfaFor(action)`/`periodReauthMap()` lo consume `OperationalPeriodService` (gate vía
+  `ReauthService`); la huella `mfaVerified` se estampa en el AuditLog de cada transición. Pantalla `/configuracion`
+  (`module:settings:view` + `settings:manage`).
 
 ### Orígenes de datos
 - **DataSource** — URL base, tipo de auth, **credencial cifrada en reposo**. *1—N* **DataSourceEndpoint** (path, método, mapeo JSONPath, TTL). Caché en Redis. **Espejo ENTRANTE:** en Fase 3 un endpoint puede **alimentar/materializar** una `ReferenceList` (`source=EXTERNAL`).

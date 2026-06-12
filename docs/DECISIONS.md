@@ -4,6 +4,24 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-12 · Fase 2.7.1.1 — Afinamiento UX + Configuración del sistema — ✅ IMPLEMENTADO Y PUBLICADO
+
+Iteración de inspección visual del dueño sobre la pantalla fiscal. Decisiones tomadas en la sesión:
+- **MFA de gobernanza de período = POR ACCIÓN** (no un flag único): pedido del dueño para flexibilidad (p. ej. exigir MFA
+  solo al reabrir/bloquear, no al cerrar). `SystemSettings` con 4 booleanos; gate per-action vía `ReauthService`.
+- **Configuración del sistema = pantalla propia `/configuracion`** (no dentro de la política de seguridad), con **pestañas
+  verticales por categoría** (scaffold enterprise para crecer). Permisos `module:settings:view` + `settings:manage` (→58).
+- **El historial de período estampa `mfaVerified`** (si la acción se re-autenticó con MFA en ESE momento): el ajuste puede
+  cambiar después, así que el registro de auditoría debe ser auto-descriptivo (no derivarse del ajuste actual).
+- **Grilla = el componente que scrollea/pagina** (thead/footer sticky, altura acotada), no el panel; **orden por columnas**
+  como en el resto del sistema; **historial por período** (drill-down al AuditLog).
+- **Período MENSUAL con meses de largo variable**: confirmado correcto — el período es `[ancla mes M, ancla mes M+1)`, toma
+  el largo real (28/29/30/31); el día-ancla se acota a 1–28 para que el borde exista en todos los meses (patrón SAP).
+- **Regla permanente: formato regional** para fechas/números/monedas (helper único `lib/format.ts` que lee el locale activo;
+  CLP por defecto). Fix transversal `@lyra/ui`: `Toast` z-index sobre modales/drawers.
+
+---
+
 ### 2026-06-11 · Fase 2.7.1.1 — Calendario FISCAL transversal + período al estándar industrial — ✅ IMPLEMENTADO Y PUBLICADO
 
 Tras revisar la pantalla de 2.7.1, el dueño del producto pidió alinear los períodos al estándar de los grandes
