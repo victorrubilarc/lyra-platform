@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { CalendarDays, KeyRound, Lock, LockOpen, ShieldCheck, ShieldOff, Sparkles } from "lucide-react";
-import { Button, Chip, Input, Modal, Select, Table, Textarea, useToast } from "@lyra/ui";
-import type { ChipProps, TableColumn } from "@lyra/ui";
+import { CalendarDays, History, KeyRound, Lock, LockOpen, ShieldCheck, ShieldOff, Sparkles } from "lucide-react";
+import { Button, Chip, Input, Modal, Select, Table, Textarea, cx, useToast } from "@lyra/ui";
+import type { ChipProps, TableColumn, TableSort } from "@lyra/ui";
 import {
   PERIOD_REASON_MIN,
   addDaysToIso,
@@ -14,6 +14,7 @@ import {
 } from "@lyra/contracts";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { ApiError } from "../../lib/api-client.js";
+import { PeriodHistoryModal } from "./PeriodHistoryModal.js";
 import {
   useCloseFiscalPeriod,
   useFiscalPeriods,
@@ -24,6 +25,9 @@ import {
 } from "./fiscal-calendar-queries.js";
 import styles from "../operational-calendar/OperationalCalendarPage.module.css";
 import fx from "./FiscalCalendar.module.css";
+
+/** Orden de los estados para ordenar la columna Estado de forma significativa. */
+const STATUS_ORDER: Record<PeriodStatus, number> = { OPEN: 0, CLOSING: 1, CLOSED: 2, LOCKED: 3 };
 
 const STATUS_VARIANT: Record<PeriodStatus, ChipProps["variant"]> = {
   OPEN: "success",
@@ -66,9 +70,12 @@ export function FiscalPeriodsSection({ cal }: { cal: FiscalCalendarDto }) {
   const [ackLaterClosed, setAckLaterClosed] = useState(false);
   const [password, setPassword] = useState("");
   const [mfaCode, setMfaCode] = useState("");
+  const [sort, setSort] = useState<TableSort>({ key: "periodKey", direction: "desc" });
+  const [historyKey, setHistoryKey] = useState<string | null>(null);
 
   const periods = useMemo(() => data?.periods ?? [], [data]);
-  const requireReauth = data?.requireReauth ?? false;
+  const reauthMap = data?.requireReauth ?? { close: false, reopen: false, lock: false, unlock: false };
+  const needsReauth = dialog ? reauthMap[dialog.action] : false;
 
   // Años presentes (desc) para el filtro de la grilla.
   const years = useMemo(() => {
@@ -79,10 +86,21 @@ export function FiscalPeriodsSection({ cal }: { cal: FiscalCalendarDto }) {
   const [filterYear, setFilterYear] = useState<string | null>(null);
   // Año visible: el filtro elegido, o el del período Actual, o el más reciente.
   const activeYear = filterYear ?? periods.find((p) => p.isCurrent)?.periodStart.slice(0, 4) ?? years[0] ?? null;
-  const visible = useMemo(
-    () => (activeYear ? periods.filter((p) => p.periodStart.slice(0, 4) === activeYear) : periods),
-    [periods, activeYear],
-  );
+  const visible = useMemo(() => {
+    const rows = activeYear ? periods.filter((p) => p.periodStart.slice(0, 4) === activeYear) : [...periods];
+    const dir = sort.direction === "asc" ? 1 : -1;
+    const cmp = (a: OperationalPeriodDto, b: OperationalPeriodDto): number => {
+      switch (sort.key) {
+        case "status":
+          return (STATUS_ORDER[a.status] - STATUS_ORDER[b.status]) * dir;
+        case "range":
+          return (a.periodStart < b.periodStart ? -1 : a.periodStart > b.periodStart ? 1 : 0) * dir;
+        default: // periodKey
+          return (a.periodKey < b.periodKey ? -1 : a.periodKey > b.periodKey ? 1 : 0) * dir;
+      }
+    };
+    return rows.sort(cmp);
+  }, [periods, activeYear, sort]);
 
   // Cuántos períodos materializaría la generación del año (para la confirmación).
   const genCount = useMemo(() => {
@@ -111,7 +129,7 @@ export function FiscalPeriodsSection({ cal }: { cal: FiscalCalendarDto }) {
   };
 
   const pending = closeMut.isPending || reopenMut.isPending || lockMut.isPending || unlockMut.isPending;
-  const creds = requireReauth ? { password, mfaCode: mfaCode.trim() } : {};
+  const creds = needsReauth ? { password, mfaCode: mfaCode.trim() } : {};
 
   const submit = async () => {
     if (!dialog) return;
@@ -170,6 +188,7 @@ export function FiscalPeriodsSection({ cal }: { cal: FiscalCalendarDto }) {
     {
       key: "periodKey",
       header: t("fiscalCal.period.col.period"),
+      sortable: true,
       render: (p) => (
         <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontFamily: "ui-monospace, Menlo, monospace", fontWeight: 600 }}>
           {p.periodKey}
@@ -180,6 +199,7 @@ export function FiscalPeriodsSection({ cal }: { cal: FiscalCalendarDto }) {
     {
       key: "range",
       header: t("fiscalCal.period.col.range"),
+      sortable: true,
       render: (p) => (
         <span style={{ color: "var(--color-text-secondary)", fontSize: 13 }}>
           {p.periodStart} → {addDaysToIso(p.periodEnd, -1)}
@@ -189,6 +209,7 @@ export function FiscalPeriodsSection({ cal }: { cal: FiscalCalendarDto }) {
     {
       key: "status",
       header: t("fiscalCal.period.col.status"),
+      sortable: true,
       render: (p) => <Chip label={t(`fiscalCal.period.status.${p.status}`)} variant={STATUS_VARIANT[p.status]} size="sm" />,
     },
     {
@@ -205,6 +226,14 @@ export function FiscalPeriodsSection({ cal }: { cal: FiscalCalendarDto }) {
       align: "right",
       render: (p) => (
         <span style={{ display: "inline-flex", gap: 6, justifyContent: "flex-end" }}>
+          <Button
+            variant="secondary"
+            leftIcon={<History size={14} />}
+            onClick={() => setHistoryKey(p.periodKey)}
+            title={t("fiscalCal.period.history")}
+          >
+            {t("fiscalCal.period.history")}
+          </Button>
           {actionsFor(p).map((act) => (
             <Button key={act.a} variant="secondary" leftIcon={act.icon} onClick={() => openDialog(p, act.a)}>
               {act.label}
@@ -216,7 +245,7 @@ export function FiscalPeriodsSection({ cal }: { cal: FiscalCalendarDto }) {
   ];
 
   return (
-    <div className={styles.section}>
+    <div className={cx(styles.section, fx.periodsFill)}>
       <h3 className={styles.sectionTitle}>
         <CalendarDays size={14} /> {t("fiscalCal.period.title")}
       </h3>
@@ -263,9 +292,11 @@ export function FiscalPeriodsSection({ cal }: { cal: FiscalCalendarDto }) {
           rowKey={(p) => p.periodKey}
           loading={isLoading}
           emptyState={<span className={styles.hint}>{t("fiscalCal.period.empty")}</span>}
+          sort={sort}
+          onSort={(key, direction) => setSort({ key, direction })}
           paginated
-          defaultPageSize={10}
-          pageSizeOptions={[10, 25, 50]}
+          defaultPageSize={12}
+          pageSizeOptions={[12, 24, 60]}
         />
       </div>
 
@@ -304,7 +335,7 @@ export function FiscalPeriodsSection({ cal }: { cal: FiscalCalendarDto }) {
                 variant={dialog.action === "close" || dialog.action === "lock" ? "danger" : "primary"}
                 onClick={() => void submit()}
                 loading={pending}
-                disabled={reasonInvalid || (requireReauth && (!password || !mfaCode.trim()))}
+                disabled={reasonInvalid || (needsReauth && (!password || !mfaCode.trim()))}
               >
                 {ackLaterClosed && dialog.action === "reopen" ? t("fiscalCal.period.reopenAnyway") : t(`fiscalCal.period.${dialog.action}`)}
               </Button>
@@ -320,7 +351,7 @@ export function FiscalPeriodsSection({ cal }: { cal: FiscalCalendarDto }) {
               <label className={styles.fieldLabel}>{t("fiscalCal.period.reason")}</label>
               <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} placeholder={t("fiscalCal.period.reasonPlaceholder")} />
             </div>
-            {requireReauth && (
+            {needsReauth && (
               <>
                 <p style={{ color: "var(--color-text-secondary)", fontSize: 12 }}>{t("fiscalCal.period.reauth.notice")}</p>
                 <div>
@@ -349,6 +380,10 @@ export function FiscalPeriodsSection({ cal }: { cal: FiscalCalendarDto }) {
             )}
           </div>
         </Modal>
+      )}
+
+      {historyKey && (
+        <PeriodHistoryModal fiscalCalendarId={fiscalCalendarId} periodKey={historyKey} onClose={() => setHistoryKey(null)} />
       )}
     </div>
   );

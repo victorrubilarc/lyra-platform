@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { periodReauthMapSchema } from "../system-settings/system-settings.js";
 
 /**
  * Período contable gobernado — Fase 2.7.1 → endurecido en 2.7.1.1.
@@ -81,10 +82,29 @@ export type OperationalPeriodDto = z.infer<typeof operationalPeriodDtoSchema>;
 export const listOperationalPeriodsResponseSchema = z.object({
   fiscalCalendarId: z.string(),
   periods: z.array(operationalPeriodDtoSchema),
-  /** ¿Gobernar un período (cerrar/reabrir/lock/unlock) exige re-autenticación MFA? */
-  requireReauth: z.boolean(),
+  /** ¿Cada acción de gobernanza exige re-autenticación MFA? (POR ACCIÓN, configurable). */
+  requireReauth: periodReauthMapSchema,
 });
 export type ListOperationalPeriodsResponse = z.infer<typeof listOperationalPeriodsResponseSchema>;
+
+/** Una entrada del HISTORIAL de un período (derivada del AuditLog inmutable). */
+export const periodHistoryEntrySchema = z.object({
+  action: z.string(), // opsperiod.closed | locked | unlocked | reopened
+  actorName: z.string().nullable(),
+  occurredAt: z.string(),
+  fromStatus: z.string().nullable(),
+  toStatus: z.string().nullable(),
+  reason: z.string().nullable(),
+});
+export type PeriodHistoryEntry = z.infer<typeof periodHistoryEntrySchema>;
+
+/** Respuesta del historial de un período (cronológico, más reciente primero). */
+export const periodHistoryResponseSchema = z.object({
+  fiscalCalendarId: z.string(),
+  periodKey: z.string(),
+  entries: z.array(periodHistoryEntrySchema),
+});
+export type PeriodHistoryResponse = z.infer<typeof periodHistoryResponseSchema>;
 
 /**
  * Generar (materializar) los períodos de un año calendario, idempotente: crea las

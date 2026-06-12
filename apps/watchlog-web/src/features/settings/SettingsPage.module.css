@@ -132,6 +132,36 @@
   line-height: 1.5;
 }
 
+.settingGroupHead {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.toggleList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.toggleList .settingRow {
+  padding: 12px var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  align-items: center;
+}
+
+.toggleList .settingRow:last-child {
+  border-bottom: none;
+}
+
+.toggleLabel {
+  font-size: 14px;
+  color: var(--color-text-primary);
+}
+
 .settingRow {
   display: flex;
   align-items: flex-start;

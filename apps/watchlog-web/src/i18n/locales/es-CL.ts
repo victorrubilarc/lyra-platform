@@ -730,7 +730,13 @@ export const esCL = {
     securityDesc: "Controles de seguridad que aplican a toda la plataforma. Los cambios quedan auditados.",
     requireMfaPeriods: "Exigir MFA para gobernar períodos",
     requireMfaPeriodsHint:
-      "Si está activo, cerrar, reabrir, bloquear o desbloquear un período contable exige re-autenticación con segundo factor (MFA). El actor debe tener MFA enrolado.",
+      "Exige re-autenticación con segundo factor (MFA) para cada acción de gobernanza de período, configurable por separado. El actor debe tener MFA enrolado.",
+    mfa: {
+      close: "Al cerrar un período (OPEN → CLOSED)",
+      reopen: "Al reabrir un período (CLOSED → OPEN)",
+      lock: "Al bloquear un período (CLOSED → LOCKED)",
+      unlock: "Al desbloquear un período (LOCKED → CLOSED)",
+    },
     updatedBy: "Última modificación por {{name}}",
     readOnly: "Solo lectura: no tienes permiso para editar los ajustes.",
     saved: "Configuración guardada",
@@ -807,6 +813,15 @@ export const esCL = {
       empty: "No hay períodos generados. Usa «Generar períodos» para materializar un año.",
       current: "Actual",
       col: { period: "Período", range: "Rango (día operacional)", status: "Estado", responsible: "Responsable" },
+      history: "Historial",
+      historyTitle: "Historial del período {{key}}",
+      historyEmpty: "Sin movimientos: este período no ha sido cerrado, reabierto ni bloqueado.",
+      historyAction: {
+        "opsperiod.closed": "Cerrado",
+        "opsperiod.reopened": "Reabierto",
+        "opsperiod.locked": "Bloqueado",
+        "opsperiod.unlocked": "Desbloqueado",
+      },
       help: {
         exampleLabel: "Ejemplo",
         MONTH: {

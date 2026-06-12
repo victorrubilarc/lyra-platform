@@ -33,6 +33,13 @@ export class OperationalPeriodController {
     return this.periods.list(fiscalCalendarId);
   }
 
+  /** Historial de gobernanza de un período (quién/cuándo cerró/reabrió/bloqueó), del AuditLog. */
+  @Get("history")
+  @RequirePermission("opsperiod:view")
+  history(@Query("fiscalCalendarId") fiscalCalendarId: string, @Query("periodKey") periodKey: string) {
+    return this.periods.history(fiscalCalendarId, periodKey);
+  }
+
   /** Generar (materializar) los períodos de un año. Acción de configuración del calendario. */
   @Post("generate")
   @RequirePermission("opscalendar:manage")

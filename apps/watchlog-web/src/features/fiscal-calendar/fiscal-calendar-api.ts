@@ -6,6 +6,7 @@ import {
   listOperationalPeriodsResponseSchema,
   lockPeriodRequestSchema,
   operationalPeriodDtoSchema,
+  periodHistoryResponseSchema,
   reopenPeriodRequestSchema,
   unlockPeriodRequestSchema,
   updateFiscalCalendarRequestSchema,
@@ -17,6 +18,7 @@ import {
   type ListOperationalPeriodsResponse,
   type LockPeriodRequest,
   type OperationalPeriodDto,
+  type PeriodHistoryResponse,
   type ReopenPeriodRequest,
   type UnlockPeriodRequest,
   type UpdateFiscalCalendarRequest,
@@ -65,6 +67,10 @@ const q = (fiscalCalendarId: string, periodKey?: string) =>
 
 export function fetchFiscalPeriods(fiscalCalendarId: string): Promise<ListOperationalPeriodsResponse> {
   return apiJson(`/operational-periods?${q(fiscalCalendarId)}`, listOperationalPeriodsResponseSchema);
+}
+
+export function fetchPeriodHistory(fiscalCalendarId: string, periodKey: string): Promise<PeriodHistoryResponse> {
+  return apiJson(`/operational-periods/history?${q(fiscalCalendarId, periodKey)}`, periodHistoryResponseSchema);
 }
 
 export function generateFiscalPeriods(

@@ -163,17 +163,133 @@
   grid-column: 1 / -1;
 }
 
-/* Grilla de períodos compacta: filas más bajas que el alto táctil por defecto
-   (superficie de contador/admin en escritorio, no terreno con guantes). Override
-   scoped al wrapper; los selectores de elemento (td/button) no se renombran en
-   CSS modules, así que aplican sobre el Table de @lyra/ui. */
+/* La sección de períodos LLENA el alto del contenido de la pestaña; el título/ayuda/
+   toolbar quedan fijos y SOLO la grilla scrollea internamente. */
+.periodsFill {
+  height: 100%;
+  min-height: 0;
+}
+
+.periodsFill > h3,
+.periodsFill > p,
+.periodsFill > .periodToolbar {
+  flex-shrink: 0;
+}
+
+/* Grilla de períodos: scroll INTERNO (thead/footer sticky), filas compactas. */
+.periodGrid {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* El wrapper del Table de @lyra/ui (div directo) es el contenedor con scroll. */
+.periodGrid > div {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-active) transparent;
+}
+
+.periodGrid > div::-webkit-scrollbar {
+  width: 8px;
+}
+
+.periodGrid > div::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 8px;
+}
+
+/* Cabecera de columnas pegada arriba; footer de paginación pegado abajo. */
+.periodGrid thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--color-surface-1);
+}
+
+.periodGrid > div > div {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background: var(--color-surface-1);
+  border-top: 1px solid var(--color-border);
+}
+
+/* Filas compactas: más bajas que el alto táctil por defecto (superficie de
+   contador/admin en escritorio, no terreno con guantes). Los selectores de elemento
+   (td/button) no se renombran en CSS modules, así que aplican sobre el Table. */
 .periodGrid td {
   padding-top: 5px;
   padding-bottom: 5px;
 }
 
 .periodGrid button {
-  min-height: 32px;
+  min-height: 30px;
   padding-top: 4px;
   padding-bottom: 4px;
+}
+
+/* Timeline del historial de un período (modal). */
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.timelineItem {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+
+.timelineIcon {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  color: var(--color-accent-secondary);
+}
+
+.timelineBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.timelineHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  color: var(--color-text-primary);
+  font-size: 13px;
+}
+
+.timelineStatus {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.timelineMeta {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.timelineReason {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  font-style: italic;
 }

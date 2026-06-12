@@ -74,8 +74,10 @@ function make(opts: MakeOpts = {}) {
   } as unknown as FiscalResolver;
 
   const audit = { record: vi.fn().mockResolvedValue(undefined) } as unknown as AuditService;
+  const mfa = opts.requireMfa ?? false;
   const settings = {
-    requireMfaForPeriodGovernance: vi.fn().mockResolvedValue(opts.requireMfa ?? false),
+    requireMfaFor: vi.fn().mockResolvedValue(mfa),
+    periodReauthMap: vi.fn().mockResolvedValue({ close: mfa, reopen: mfa, lock: mfa, unlock: mfa }),
   } as unknown as SettingsService;
   const reauth = { verifyForSignature: vi.fn().mockResolvedValue({ method: "PASSWORD_MFA", signerName: "U" }) } as unknown as ReauthService;
   return {

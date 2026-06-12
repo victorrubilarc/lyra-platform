@@ -4,6 +4,8 @@ import {
   yearRange,
   type ListOperationalPeriodsResponse,
   type OperationalPeriodDto,
+  type PeriodGovernanceAction,
+  type PeriodHistoryResponse,
 } from "@lyra/contracts";
 import type { FiscalCalendar, OperationalPeriod } from "@prisma/client";
 import { AuditService, type AuditContext } from "../audit/audit.service";
@@ -42,12 +44,12 @@ export class OperationalPeriodService {
   ) {}
 
   /**
-   * Re-autenticación con MFA (step-up) para gobernar un período, SI el ajuste
-   * `requireMfaForPeriodGovernance` está activo. Reutiliza `ReauthService` (mismo
-   * motor de las firmas Part 11). Se evalúa al inicio de cada acción de gobernanza.
+   * Re-autenticación con MFA (step-up) para gobernar un período, SI el ajuste de esa
+   * ACCIÓN está activo (configurable por separado: close/reopen/lock/unlock). Reutiliza
+   * `ReauthService` (mismo motor de las firmas Part 11).
    */
-  private async assertReauth(actorId: string, creds: ReauthCredentials): Promise<void> {
-    if (await this.settings.requireMfaForPeriodGovernance()) {
+  private async assertReauth(actorId: string, creds: ReauthCredentials, action: PeriodGovernanceAction): Promise<void> {
+    if (await this.settings.requireMfaFor(action)) {
       await this.reauth.verifyForSignature(actorId, creds, { requireMfa: true });
     }
   }
@@ -121,8 +123,40 @@ export class OperationalPeriodService {
     });
     const today = todayInTimezone(cal.timezone);
     const names = await this.namesByUserId(rows.flatMap((r) => [r.closedById, r.lockedById, r.reopenedById]));
-    const requireReauth = await this.settings.requireMfaForPeriodGovernance();
+    const requireReauth = await this.settings.periodReauthMap();
     return { fiscalCalendarId, periods: rows.map((r) => this.toDto(r, today, names)), requireReauth };
+  }
+
+  /**
+   * Historial de gobernanza de un período, derivado del AuditLog INMUTABLE (quién/cuándo
+   * cerró/reabrió/bloqueó/desbloqueó, con motivo). Más reciente primero.
+   */
+  async history(fiscalCalendarId: string, periodKey: string): Promise<PeriodHistoryResponse> {
+    await this.assertCalendarExists(fiscalCalendarId);
+    const row = await this.prisma.operationalPeriod.findUnique({
+      where: { fiscalCalendarId_periodKey: { fiscalCalendarId, periodKey } },
+      select: { id: true },
+    });
+    if (!row) return { fiscalCalendarId, periodKey, entries: [] };
+    const logs = await this.prisma.auditLog.findMany({
+      where: { entityType: "OperationalPeriod", entityId: row.id },
+      orderBy: { occurredAt: "desc" },
+      select: { action: true, actorEmail: true, occurredAt: true, before: true, after: true },
+    });
+    const actorNames = await this.namesByEmail(logs.map((l) => l.actorEmail));
+    const entries = logs.map((l) => {
+      const before = (l.before ?? {}) as { status?: string };
+      const after = (l.after ?? {}) as { status?: string; reason?: string };
+      return {
+        action: l.action,
+        actorName: l.actorEmail ? (actorNames.get(l.actorEmail) ?? l.actorEmail) : null,
+        occurredAt: l.occurredAt.toISOString(),
+        fromStatus: before.status ?? null,
+        toStatus: after.status ?? null,
+        reason: after.reason ?? null,
+      };
+    });
+    return { fiscalCalendarId, periodKey, entries };
   }
 
   /**
@@ -165,7 +199,7 @@ export class OperationalPeriodService {
 
   /** Cierra un período (OPEN → CLOSED) con guarda SECUENCIAL: no hay un anterior abierto. */
   async close(fiscalCalendarId: string, periodKey: string, reason: string, creds: ReauthCredentials, actorId: string, ctx: AuditContext): Promise<OperationalPeriodDto> {
-    await this.assertReauth(actorId, creds);
+    await this.assertReauth(actorId, creds, "close");
     const cal = await this.assertCalendarExists(fiscalCalendarId);
     const row = await this.getRow(fiscalCalendarId, periodKey);
     if (row.status !== "OPEN") {
@@ -190,7 +224,7 @@ export class OperationalPeriodService {
 
   /** Bloquea en duro un período (CLOSED → LOCKED). */
   async lock(fiscalCalendarId: string, periodKey: string, reason: string, creds: ReauthCredentials, actorId: string, ctx: AuditContext): Promise<OperationalPeriodDto> {
-    await this.assertReauth(actorId, creds);
+    await this.assertReauth(actorId, creds, "lock");
     const cal = await this.assertCalendarExists(fiscalCalendarId);
     const row = await this.getRow(fiscalCalendarId, periodKey);
     if (row.status !== "CLOSED" && row.status !== "CLOSING") {
@@ -206,7 +240,7 @@ export class OperationalPeriodService {
 
   /** Desbloquea un período (LOCKED → CLOSED, two-key). */
   async unlock(fiscalCalendarId: string, periodKey: string, reason: string, creds: ReauthCredentials, actorId: string, ctx: AuditContext): Promise<OperationalPeriodDto> {
-    await this.assertReauth(actorId, creds);
+    await this.assertReauth(actorId, creds, "unlock");
     const cal = await this.assertCalendarExists(fiscalCalendarId);
     const row = await this.getRow(fiscalCalendarId, periodKey);
     if (row.status !== "LOCKED") {
@@ -233,7 +267,7 @@ export class OperationalPeriodService {
     actorId: string,
     ctx: AuditContext,
   ): Promise<OperationalPeriodDto> {
-    await this.assertReauth(actorId, creds);
+    await this.assertReauth(actorId, creds, "reopen");
     const cal = await this.assertCalendarExists(fiscalCalendarId);
     const row = await this.getRow(fiscalCalendarId, periodKey);
     if (row.status !== "CLOSED" && row.status !== "CLOSING") {
@@ -334,6 +368,13 @@ export class OperationalPeriodService {
     if (unique.length === 0) return new Map();
     const users = await this.prisma.user.findMany({ where: { id: { in: unique } }, select: { id: true, displayName: true } });
     return new Map(users.map((u) => [u.id, u.displayName]));
+  }
+
+  private async namesByEmail(emails: (string | null)[]): Promise<Map<string, string>> {
+    const unique = [...new Set(emails.filter((e): e is string => Boolean(e)))];
+    if (unique.length === 0) return new Map();
+    const users = await this.prisma.user.findMany({ where: { email: { in: unique } }, select: { email: true, displayName: true } });
+    return new Map(users.map((u) => [u.email, u.displayName]));
   }
 }
 
