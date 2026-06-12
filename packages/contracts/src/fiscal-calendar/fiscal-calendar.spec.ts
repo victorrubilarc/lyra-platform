@@ -90,6 +90,57 @@ describe("periodBoundsFor — rango contiguo [inicio, fin)", () => {
   });
 });
 
+describe("periodBoundsFor — MONTH con meses de largo variable (28/29/30/31)", () => {
+  // El período mensual NO es de 30 días: toma el largo real del mes, acotado por el
+  // día-ancla del mes siguiente. El ancla ≤ 28 garantiza que el borde existe siempre.
+  it("febrero NO bisiesto = 28 días (ancla 1)", () => {
+    expect(periodBoundsFor("2026-02-15", MONTHLY)).toEqual({
+      periodKey: "2026-02",
+      periodStart: "2026-02-01",
+      periodEnd: "2026-03-01", // exclusivo → último día inclusive = 28-feb
+    });
+  });
+
+  it("febrero BISIESTO = 29 días (ancla 1, 2028)", () => {
+    expect(periodBoundsFor("2028-02-15", MONTHLY)).toEqual({
+      periodKey: "2028-02",
+      periodStart: "2028-02-01",
+      periodEnd: "2028-03-01", // último día inclusive = 29-feb
+    });
+  });
+
+  it("meses de 31 y 30 días conservan su largo real", () => {
+    expect(periodBoundsFor("2026-01-10", MONTHLY).periodEnd).toBe("2026-02-01"); // enero 31 días
+    expect(periodBoundsFor("2026-04-10", MONTHLY).periodEnd).toBe("2026-05-01"); // abril 30 días
+  });
+
+  it("ancla 28: el período cruza el fin de mes corto sin perder días", () => {
+    const anchored: FiscalConfig = { periodKind: "MONTH", periodAnchorDay: 28 };
+    // El 27-feb pertenece al período que arrancó el 28-ene.
+    expect(periodBoundsFor("2026-02-27", anchored)).toEqual({
+      periodKey: "2026-01",
+      periodStart: "2026-01-28",
+      periodEnd: "2026-02-28",
+    });
+    // El 28-feb abre el período de febrero (28-feb → 28-mar).
+    expect(periodBoundsFor("2026-02-28", anchored)).toEqual({
+      periodKey: "2026-02",
+      periodStart: "2026-02-28",
+      periodEnd: "2026-03-28",
+    });
+  });
+
+  it("cobertura contigua sin huecos cruzando febrero", () => {
+    const periods = enumeratePeriods(MONTHLY, "2026-01-15", "2026-03-10");
+    expect(periods.map((p) => p.periodKey)).toEqual(["2026-01", "2026-02", "2026-03"]);
+    // El fin de enero = inicio de febrero, y fin de febrero = inicio de marzo (sin huecos).
+    expect(periods[0]!.periodEnd).toBe(periods[1]!.periodStart);
+    expect(periods[1]!.periodEnd).toBe(periods[2]!.periodStart);
+    expect(periods[1]!.periodStart).toBe("2026-02-01");
+    expect(periods[2]!.periodStart).toBe("2026-03-01");
+  });
+});
+
 describe("enumeratePeriods — contigüidad", () => {
   it("devuelve períodos contiguos sin huecos (fin de uno = inicio del siguiente)", () => {
     const periods = enumeratePeriods(MONTHLY, "2026-01-15", "2026-03-10");

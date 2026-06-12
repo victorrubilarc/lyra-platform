@@ -772,8 +772,9 @@ export const esCL = {
     basics: "Datos básicos",
     periodConfig: "Configuración del período",
     periodKind: "Tipo de período",
-    anchorDay: "Día de inicio del mes",
-    anchorDayHint: "1 = el mes parte el día 1. Ej. 26 = el mes corre del 26 al 25.",
+    anchorDay: "Día de inicio del mes (1–28)",
+    anchorDayHint:
+      "1 = el mes parte el día 1. Ej. 26 = el mes corre del 26 al 25. Se limita a 28 para que el día de inicio exista en TODOS los meses (febrero incluido); cada período toma el largo real de su mes (28–31 días).",
     startWeekday: "Día de inicio de semana",
     weekday: { "1": "Lunes", "2": "Martes", "3": "Miércoles", "4": "Jueves", "5": "Viernes", "6": "Sábado", "7": "Domingo" },
     lengthDays: "Largo del ciclo (días)",
@@ -808,8 +809,8 @@ export const esCL = {
         exampleLabel: "Ejemplo",
         MONTH: {
           title: "Período mensual",
-          body: "Cada período es un mes contable. El «día de inicio del mes» permite que el mes NO arranque el día 1 (común cuando el cierre operacional cae a mitad de mes).",
-          example: "Día de inicio 1 → enero = 01-ene a 31-ene. Día de inicio 26 → el mes «junio» corre del 26-may al 25-jun (típico en faenas con corte de turno a fin de mes).",
+          body: "Cada período es un mes contable, del «día de inicio» de un mes al mismo día del siguiente. NO es de 30 días fijos: toma el largo real del mes (28, 29, 30 o 31). El día de inicio se limita a 1–28 para que exista en todos los meses (así febrero nunca queda sin borde).",
+          example: "Día de inicio 1 → febrero = 01-feb a 28-feb (29-feb en año bisiesto); enero = 01-ene a 31-ene. Día de inicio 26 → el mes «junio» corre del 26-may al 25-jun (típico en faenas con corte a fin de mes).",
         },
         WEEK: {
           title: "Período semanal",
