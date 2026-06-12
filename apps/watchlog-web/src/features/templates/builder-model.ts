@@ -202,8 +202,13 @@ export function editStateToDraftRequest(state: EditState): SaveTemplateDraftRequ
     // Alcance de estructura (2.8.0): fuente de verdad; el backend deriva orgNodeId.
     nodeAssignments: state.nodeAssignments,
     requireSignature: state.requireSignature,
+    // Flujo: enviamos solo la DEFINICIÓN; el backend ata SIEMPRE su versión
+    // publicada vigente (`resolveWorkflowBinding` exige la actual). Reenviar la
+    // versión congelada de una versión anterior rompía al editar una plantilla
+    // cuyo flujo fue republicado ("Solo puede asignarse la versión publicada
+    // vigente del flujo"). null = el binding se resuelve a la versión vigente.
     workflowDefinitionId: state.workflowDefinitionId,
-    workflowDefinitionVersionId: state.workflowDefinitionVersionId,
+    workflowDefinitionVersionId: null,
     editWindowAnchor: state.editWindowAnchor,
     editWindowMinutes: state.editWindowMinutes,
     sections: state.sections.map((s, si) => ({
