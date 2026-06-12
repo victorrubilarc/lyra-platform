@@ -45,6 +45,16 @@ agrupado por nodo, chips) en la pestaña *Alcance* del usuario (sección "Planti
 · API **205** (+5). **Smoke en vivo 14/14** (picker/grilla filtran; getDetail 403 fuera / 200 dentro; options gateado 200/403;
 admin intacto; scope por rol restringe; limpieza restaura permisivo; datos limpios). Pendiente: smoke VISUAL.
 
+**+ Afinamiento 2.8 (QA del dueño, `feat/afinamiento-2.8` → `main`):** (1) **bug de anclaje de TODOS los selectores** —
+el panel flotante se encogía al arrastrar su scrollbar (`useAnchoredPanel` escuchaba el scroll interno en captura y
+`maxHeight` se realimentaba de `scrollHeight` recortado); fix = ignorar scroll interno + tope absoluto por viewport. **+
+rediseño premium** de `Combobox`/`MultiSelect` (iconos Lucide, glass, estados con acento). (2) **fuga del filtro de
+Bitácoras** — el selector de plantilla usaba `GET /templates` (solo nodo); nuevo `GET /log-entries/filter-templates`
+(`logentry:view`) con el mismo alcance que la grilla. (3) **RoleDrawer a pestañas** (Datos/Permisos/Alcance) + más ancho.
+(4) **acceso por rol desde la PLANTILLA** (`GET/PUT /templates/:id/role-scope`, `template:edit`, `TemplateAccessModal`):
+`setRoleScope` solo toca las filas de esa plantilla (no borra el resto del alcance del rol). Auditado. Smoke **8/8** +
+**14/14** sin regresión. Pendiente: smoke VISUAL.
+
 ## Hecho en Fase 2.7.2 (Ventana de edición configurable — gobernanza temporal #6)
 
 2.º eslabón de la gobernanza temporal: plazo para CORREGIR un registro; vencido, solo se edita con privilegio explícito
