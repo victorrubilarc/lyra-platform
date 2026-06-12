@@ -9,15 +9,28 @@ import { PrismaService } from "../prisma/prisma.service";
  * `null` significa "sin restricción" (acceso a toda la estructura): se da cuando
  * el usuario no tiene NINGÚN scope asignado. Un Set (posiblemente vacío) acota.
  */
+/**
+ * Conjunto de nodos accesibles (ids + rutas materializadas, ya expandido a
+ * descendientes), o `null` si el usuario no tiene restricción de alcance. Las
+ * rutas habilitan comprobar intersección con el SUBÁRBOL de una asignación de
+ * plantilla (multi-nodo, Fase 2.8.0) sin volver a consultar la BD.
+ */
+export interface AccessibleNodes {
+  ids: Set<string>;
+  paths: Set<string>;
+}
+
 @Injectable()
 export class ScopeService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Ids de nodos accesibles, o `null` si el usuario no tiene restricción de
-   * alcance. Un Set vacío significa "no accede a ningún nodo".
+   * Nodos accesibles (ids + rutas), o `null` si el usuario no tiene restricción.
+   * Un conjunto vacío significa "no accede a ningún nodo". Fuente única que
+   * usan `getAccessibleNodeIds`, `canAccessNode` y la visibilidad por nodo de
+   * las plantillas multi-nodo.
    */
-  async getAccessibleNodeIds(userId: string): Promise<Set<string> | null> {
+  async getAccessibleNodes(userId: string): Promise<AccessibleNodes | null> {
     const scopes = await this.prisma.scope.findMany({
       where: { OR: [{ userId }, { role: { users: { some: { userId } } } }] },
       select: {
@@ -30,10 +43,13 @@ export class ScopeService {
     // Sin scopes => sin restricción (acceso total).
     if (scopes.length === 0) return null;
 
-    const direct = new Set<string>();
+    const ids = new Set<string>();
+    const paths = new Set<string>();
+    const directPathById = new Map<string, string>();
     const descendantPrefixes: string[] = [];
     for (const s of scopes) {
-      direct.add(s.orgNodeId);
+      ids.add(s.orgNodeId);
+      directPathById.set(s.orgNodeId, s.orgNode.path);
       if (s.includeDescendants) {
         // La ruta del propio nodo es el prefijo de las rutas de sus descendientes.
         descendantPrefixes.push(s.orgNode.path);
@@ -46,18 +62,69 @@ export class ScopeService {
           deletedAt: null,
           OR: descendantPrefixes.map((prefix) => ({ path: { startsWith: prefix } })),
         },
-        select: { id: true },
+        select: { id: true, path: true },
       });
-      for (const d of descendants) direct.add(d.id);
+      for (const d of descendants) {
+        ids.add(d.id);
+        paths.add(d.path);
+      }
     }
+    // Garantiza la ruta de los nodos directos sin descendientes (no salieron del query de arriba).
+    for (const [, p] of directPathById) paths.add(p);
 
-    return direct;
+    return { ids, paths };
+  }
+
+  /**
+   * Ids de nodos accesibles, o `null` si el usuario no tiene restricción de
+   * alcance. Un Set vacío significa "no accede a ningún nodo".
+   */
+  async getAccessibleNodeIds(userId: string): Promise<Set<string> | null> {
+    const access = await this.getAccessibleNodes(userId);
+    return access === null ? null : access.ids;
   }
 
   /** ¿El usuario puede acceder a este nodo según su alcance? */
   async canAccessNode(userId: string, orgNodeId: string): Promise<boolean> {
     const accessible = await this.getAccessibleNodeIds(userId);
     return accessible === null || accessible.has(orgNodeId);
+  }
+
+  /**
+   * ¿Una asignación de plantilla a un nodo cae dentro del alcance del usuario?
+   * (Fase 2.8.0 multi-nodo.) La asignación cubre el nodo `orgNodeId` y, si
+   * `includeDescendants`, todo su subárbol (`orgNodePath` = ruta materializada).
+   * Hay intersección si el usuario alcanza ese nodo directamente, o —cuando la
+   * asignación incluye descendientes— si alcanza CUALQUIER nodo bajo él.
+   */
+  nodeAssignmentInScope(
+    assignment: { orgNodeId: string; includeDescendants: boolean; orgNodePath: string },
+    access: AccessibleNodes | null,
+  ): boolean {
+    if (access === null) return true; // usuario sin restricción de nodo
+    if (access.ids.has(assignment.orgNodeId)) return true;
+    if (assignment.includeDescendants) {
+      // La ruta materializada termina en "/", así que el prefijo no colisiona
+      // entre nodos hermanos ("/a/" no es prefijo de "/ab/").
+      for (const p of access.paths) {
+        if (p.startsWith(assignment.orgNodePath)) return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * ¿La plantilla es visible/usable por el usuario según el eje de NODO?
+   * (Fase 2.8.0.) CERO asignaciones = GLOBAL (visible en todo nodo). Con
+   * asignaciones, basta que ALGUNA intersecte el alcance del usuario.
+   */
+  isTemplateVisibleByNode(
+    assignments: Array<{ orgNodeId: string; includeDescendants: boolean; orgNodePath: string }>,
+    access: AccessibleNodes | null,
+  ): boolean {
+    if (assignments.length === 0) return true; // global
+    if (access === null) return true; // usuario sin restricción
+    return assignments.some((a) => this.nodeAssignmentInScope(a, access));
   }
 
   /**

@@ -6,6 +6,8 @@ import type {
   TemplateDetail,
   TemplateListItem,
   TemplateListQuery,
+  TemplateNodeAssignmentDto,
+  TemplateNodeAssignmentInput,
   TemplateRoleScope,
   TemplateScopeOption,
   TemplateVersionDto,
@@ -16,6 +18,35 @@ import { Prisma } from "@prisma/client";
 import { AuditService, type AuditContext } from "../audit/audit.service";
 import { ScopeService } from "../authz/scope.service";
 import { PrismaService } from "../prisma/prisma.service";
+
+/** Asignación de nodo con la ruta materializada (para el chequeo de subárbol). */
+type AssignmentRow = { orgNodeId: string; includeDescendants: boolean; orgNode: { path: string } };
+
+/** Cambio de asignaciones de nodo resuelto desde un request (null = no tocar). */
+type AssignmentChange = { assignments: TemplateNodeAssignmentInput[]; orgNodeId: string | null };
+
+/** Proyecta las filas de asignación a la forma que consume `ScopeService` (ruta materializada). */
+function toScopeAssignments(
+  rows: AssignmentRow[],
+): Array<{ orgNodeId: string; includeDescendants: boolean; orgNodePath: string }> {
+  return rows.map((a) => ({
+    orgNodeId: a.orgNodeId,
+    includeDescendants: a.includeDescendants,
+    orgNodePath: a.orgNode.path,
+  }));
+}
+
+/** Proyecta las asignaciones a la forma de respuesta (ruta LEGIBLE para mostrar). */
+function mapAssignmentsDto(
+  rows: Array<{ orgNodeId: string; includeDescendants: boolean }>,
+  readablePaths: Map<string, string>,
+): TemplateNodeAssignmentDto[] {
+  return rows.map((a) => ({
+    orgNodeId: a.orgNodeId,
+    includeDescendants: a.includeDescendants,
+    orgNodePath: readablePaths.get(a.orgNodeId) ?? null,
+  }));
+}
 
 /** Incluye la versión completa (secciones → campos → roles) para el detalle. */
 const versionInclude = {
@@ -67,14 +98,15 @@ export class TemplatesService {
     query: TemplateListQuery,
     opts: { applyTemplateScope?: boolean } = {},
   ): Promise<TemplateListItem[]> {
-    const accessible = await this.scope.getAccessibleNodeIds(userId);
+    const access = await this.scope.getAccessibleNodes(userId);
     const accessibleTemplates = opts.applyTemplateScope
       ? await this.scope.getAccessibleTemplateIds(userId)
       : null;
 
     const where: Prisma.TemplateWhereInput = { deletedAt: null };
     if (query.status) where.status = query.status;
-    if (query.orgNodeId) where.orgNodeId = query.orgNodeId;
+    // Filtro explícito por nodo: la plantilla tiene una asignación a ese nodo.
+    if (query.orgNodeId) where.nodeAssignments = { some: { orgNodeId: query.orgNodeId } };
     if (query.search) {
       where.OR = [
         { name: { contains: query.search, mode: "insensitive" } },
@@ -85,17 +117,22 @@ export class TemplatesService {
     const templates = await this.prisma.template.findMany({
       where,
       orderBy: { updatedAt: "desc" },
-      include: { versions: { select: { id: true, versionNumber: true, status: true } } },
+      include: {
+        versions: { select: { id: true, versionNumber: true, status: true } },
+        nodeAssignments: {
+          select: { orgNodeId: true, includeDescendants: true, orgNode: { select: { path: true } } },
+        },
+      },
     });
 
     // Alcance ABAC en AND de dos ejes:
-    //  - NODO: las globales (sin nodo) son visibles para todos; las ancladas, solo
-    //    si el usuario tiene ese nodo en su alcance.
+    //  - NODO (multi-nodo 2.8.0): las globales (sin asignaciones) son visibles para
+    //    todos; con asignaciones, basta que ALGUNA intersecte el alcance del usuario.
     //  - PLANTILLA (opt-in operacional): si el usuario tiene allow-list de
     //    plantillas, la plantilla debe estar en ella (incluidas las globales).
     const scoped = templates.filter(
       (t) =>
-        (accessible === null || t.orgNodeId === null || accessible.has(t.orgNodeId)) &&
+        this.scope.isTemplateVisibleByNode(toScopeAssignments(t.nodeAssignments), access) &&
         (accessibleTemplates === null || accessibleTemplates.has(t.id)),
     );
 
@@ -104,6 +141,7 @@ export class TemplatesService {
     const nodeIds = new Set<string>();
     for (const t of scoped) {
       if (t.orgNodeId) nodeIds.add(t.orgNodeId);
+      for (const a of t.nodeAssignments) nodeIds.add(a.orgNodeId);
       const published = t.versions.find((v) => v.id === t.currentVersionId);
       const latestDraft = [...t.versions]
         .filter((v) => v.status === "DRAFT")
@@ -147,6 +185,7 @@ export class TemplatesService {
         createdAt: t.createdAt.toISOString(),
         updatedAt: t.updatedAt.toISOString(),
         orgNodePath: t.orgNodeId ? (nodePaths.get(t.orgNodeId) ?? null) : null,
+        nodeAssignments: mapAssignmentsDto(t.nodeAssignments, nodePaths),
         sectionCount: c.sections,
         fieldCount: c.fields,
         draftVersionNumber: latestDraft?.versionNumber ?? null,
@@ -211,9 +250,16 @@ export class TemplatesService {
 
   /** Detalle con la versión editable (borrador) o, si se pide, una versión concreta. */
   async getDetail(userId: string, id: string, versionId?: string): Promise<TemplateDetail> {
-    const template = await this.prisma.template.findFirst({ where: { id, deletedAt: null } });
+    const template = await this.prisma.template.findFirst({
+      where: { id, deletedAt: null },
+      include: {
+        nodeAssignments: {
+          select: { orgNodeId: true, includeDescendants: true, orgNode: { select: { path: true } } },
+        },
+      },
+    });
     if (!template) throw new NotFoundException("Plantilla no encontrada");
-    await this.assertNodeInScope(userId, template.orgNodeId);
+    await this.assertTemplateNodeVisible(userId, template.nodeAssignments);
 
     const versions = await this.prisma.templateVersion.findMany({
       where: { templateId: id },
@@ -231,6 +277,10 @@ export class TemplatesService {
     });
     if (!version) throw new NotFoundException("Versión no encontrada");
 
+    const nodeIds = new Set<string>(template.nodeAssignments.map((a) => a.orgNodeId));
+    if (template.orgNodeId) nodeIds.add(template.orgNodeId);
+    const nodePaths = await this.buildNodePaths(nodeIds);
+
     return {
       id: template.id,
       name: template.name,
@@ -244,78 +294,102 @@ export class TemplatesService {
       updatedAt: template.updatedAt.toISOString(),
       version: this.mapVersion(version),
       hasDraft: Boolean(draft),
+      nodeAssignments: mapAssignmentsDto(template.nodeAssignments, nodePaths),
     };
   }
 
   // --- Crear -----------------------------------------------------------------
 
   async create(userId: string, dto: CreateTemplateRequest, ctx: AuditContext): Promise<TemplateDetail> {
-    if (dto.orgNodeId) await this.assertNodeExists(dto.orgNodeId);
+    // Alcance de estructura (2.8.0): nodeAssignments es la fuente de verdad; un
+    // orgNodeId suelto (legacy) se traduce a una asignación simple. Sin nada = global.
+    const change = this.resolveAssignmentChange(dto) ?? { assignments: [], orgNodeId: null };
+    await this.assertAssignmentNodesExist(change.assignments);
 
     const template = await this.prisma.template.create({
       data: {
         name: dto.name,
         description: dto.description ?? null,
-        orgNodeId: dto.orgNodeId ?? null,
+        orgNodeId: change.orgNodeId,
         status: "DRAFT",
         editWindowAnchor: dto.editWindowAnchor ?? null,
         editWindowMinutes: dto.editWindowMinutes ?? null,
         createdById: userId,
         updatedById: userId,
+        nodeAssignments: {
+          create: change.assignments.map((a) => ({ orgNodeId: a.orgNodeId, includeDescendants: a.includeDescendants })),
+        },
         versions: {
           create: { versionNumber: 1, status: "DRAFT", name: dto.name, description: dto.description ?? null },
         },
       },
     });
-    await this.audit.record({ ...ctx, action: "template.created", entityType: "Template", entityId: template.id, after: { name: template.name, orgNodeId: template.orgNodeId } });
+    await this.audit.record({
+      ...ctx,
+      action: "template.created",
+      entityType: "Template",
+      entityId: template.id,
+      after: { name: template.name, orgNodeId: template.orgNodeId, nodeAssignments: change.assignments },
+    });
     return this.getDetail(userId, template.id);
   }
 
   // --- Editar metadata -------------------------------------------------------
 
   async updateMeta(userId: string, id: string, dto: UpdateTemplateRequest, ctx: AuditContext): Promise<TemplateDetail> {
-    const before = await this.prisma.template.findFirst({ where: { id, deletedAt: null } });
-    if (!before) throw new NotFoundException("Plantilla no encontrada");
-    if (dto.orgNodeId) await this.assertNodeExists(dto.orgNodeId);
-
-    const updated = await this.prisma.template.update({
-      where: { id },
-      data: {
-        name: dto.name ?? undefined,
-        description: dto.description === undefined ? undefined : dto.description,
-        orgNodeId: dto.orgNodeId === undefined ? undefined : dto.orgNodeId,
-        // Ventana de edición (2.7.2): gobernanza viva, editable sin republicar.
-        editWindowAnchor: dto.editWindowAnchor === undefined ? undefined : dto.editWindowAnchor,
-        editWindowMinutes: dto.editWindowMinutes === undefined ? undefined : dto.editWindowMinutes,
-        updatedById: userId,
-      },
+    const before = await this.prisma.template.findFirst({
+      where: { id, deletedAt: null },
+      include: { nodeAssignments: { select: { orgNodeId: true, includeDescendants: true } } },
     });
-    // Si hay borrador abierto, refleja el nombre/descripción en su snapshot.
-    const draft = await this.prisma.templateVersion.findFirst({ where: { templateId: id, status: "DRAFT" } });
-    if (draft && (dto.name !== undefined || dto.description !== undefined)) {
-      await this.prisma.templateVersion.update({
-        where: { id: draft.id },
+    if (!before) throw new NotFoundException("Plantilla no encontrada");
+    // Alcance de estructura (2.8.0): null = no tocar; si viene, reemplaza el set.
+    const change = this.resolveAssignmentChange(dto);
+    if (change) await this.assertAssignmentNodesExist(change.assignments);
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const t = await tx.template.update({
+        where: { id },
         data: {
           name: dto.name ?? undefined,
           description: dto.description === undefined ? undefined : dto.description,
+          orgNodeId: change ? change.orgNodeId : undefined,
+          // Ventana de edición (2.7.2): gobernanza viva, editable sin republicar.
+          editWindowAnchor: dto.editWindowAnchor === undefined ? undefined : dto.editWindowAnchor,
+          editWindowMinutes: dto.editWindowMinutes === undefined ? undefined : dto.editWindowMinutes,
+          updatedById: userId,
         },
       });
-    }
+      if (change) await this.replaceNodeAssignments(tx, id, change.assignments);
+      // Si hay borrador abierto, refleja el nombre/descripción en su snapshot.
+      const draft = await tx.templateVersion.findFirst({ where: { templateId: id, status: "DRAFT" } });
+      if (draft && (dto.name !== undefined || dto.description !== undefined)) {
+        await tx.templateVersion.update({
+          where: { id: draft.id },
+          data: {
+            name: dto.name ?? undefined,
+            description: dto.description === undefined ? undefined : dto.description,
+          },
+        });
+      }
+      return t;
+    });
     await this.audit.record({
       ...ctx,
       action: "template.updated",
       entityType: "Template",
       entityId: id,
-      // La ventana de edición es config de GOBERNANZA: su cambio queda con before/after.
+      // La ventana de edición y el alcance de nodo son config de GOBERNANZA: su cambio queda con before/after.
       before: {
         name: before.name,
         orgNodeId: before.orgNodeId,
+        nodeAssignments: before.nodeAssignments,
         editWindowAnchor: before.editWindowAnchor,
         editWindowMinutes: before.editWindowMinutes,
       },
       after: {
         name: updated.name,
         orgNodeId: updated.orgNodeId,
+        nodeAssignments: change ? change.assignments : before.nodeAssignments,
         editWindowAnchor: updated.editWindowAnchor,
         editWindowMinutes: updated.editWindowMinutes,
       },
@@ -329,8 +403,9 @@ export class TemplatesService {
     const template = await this.prisma.template.findFirst({ where: { id, deletedAt: null } });
     if (!template) throw new NotFoundException("Plantilla no encontrada");
 
-    const targetNode = dto.orgNodeId === undefined ? template.orgNodeId : dto.orgNodeId;
-    if (targetNode) await this.assertNodeExists(targetNode);
+    // Alcance de estructura (2.8.0): el builder envía nodeAssignments; null = no tocar.
+    const change = this.resolveAssignmentChange(dto);
+    if (change) await this.assertAssignmentNodesExist(change.assignments);
     await this.assertRolesExist(dto);
     // Valida el binding del flujo (existe/publicado/versión congelada) y que las
     // claves de estado de sección pertenezcan a esa versión de flujo.
@@ -347,13 +422,14 @@ export class TemplatesService {
         data: {
           name: dto.name ?? undefined,
           description: dto.description === undefined ? undefined : dto.description,
-          orgNodeId: dto.orgNodeId === undefined ? undefined : dto.orgNodeId,
+          orgNodeId: change ? change.orgNodeId : undefined,
           // Ventana de edición (2.7.2): config del contenedor, viaja con el builder.
           editWindowAnchor: dto.editWindowAnchor === undefined ? undefined : dto.editWindowAnchor,
           editWindowMinutes: dto.editWindowMinutes === undefined ? undefined : dto.editWindowMinutes,
           updatedById: userId,
         },
       });
+      if (change) await this.replaceNodeAssignments(tx, id, change.assignments);
       await tx.templateVersion.update({
         where: { id: draft.id },
         data: {
@@ -596,15 +672,79 @@ export class TemplatesService {
     return result;
   }
 
-  private async assertNodeExists(orgNodeId: string): Promise<void> {
-    const exists = await this.prisma.orgNode.count({ where: { id: orgNodeId, deletedAt: null } });
-    if (exists === 0) throw new BadRequestException("El nodo indicado no existe");
+  // --- Alcance de estructura (asignaciones de nodo, Fase 2.8.0) ---------------
+
+  /**
+   * Resuelve el cambio de asignaciones desde un request. `nodeAssignments` es la
+   * fuente de verdad; si falta, se traduce un `orgNodeId` suelto (legacy/deprecado)
+   * a una asignación de nodo simple. `null` = no tocar (ningún campo presente).
+   */
+  private resolveAssignmentChange(dto: {
+    nodeAssignments?: TemplateNodeAssignmentInput[];
+    orgNodeId?: string | null;
+  }): AssignmentChange | null {
+    if (dto.nodeAssignments !== undefined) {
+      const assignments = this.dedupeAssignments(dto.nodeAssignments);
+      return { assignments, orgNodeId: this.deriveOrgNodeId(assignments) };
+    }
+    if (dto.orgNodeId !== undefined) {
+      const assignments = dto.orgNodeId ? [{ orgNodeId: dto.orgNodeId, includeDescendants: false }] : [];
+      return { assignments, orgNodeId: dto.orgNodeId ?? null };
+    }
+    return null;
   }
 
-  private async assertNodeInScope(userId: string, orgNodeId: string | null): Promise<void> {
-    if (!orgNodeId) return; // plantilla global: visible para todos
-    const ok = await this.scope.canAccessNode(userId, orgNodeId);
-    if (!ok) throw new ForbiddenException("La plantilla está fuera de su alcance");
+  /** Colapsa asignaciones repetidas por nodo (incluir-descendientes = OR). */
+  private dedupeAssignments(input: TemplateNodeAssignmentInput[]): TemplateNodeAssignmentInput[] {
+    const byNode = new Map<string, boolean>();
+    for (const a of input) byNode.set(a.orgNodeId, (byNode.get(a.orgNodeId) ?? false) || a.includeDescendants);
+    return [...byNode].map(([orgNodeId, includeDescendants]) => ({ orgNodeId, includeDescendants }));
+  }
+
+  /**
+   * Nodo PRIMARIO derivado (columna `orgNodeId`, deprecada): solo cuando hay una
+   * única asignación de nodo simple. En global / varios / rama queda `null` ⇒ crear
+   * una entrada exige elegir el nodo explícitamente (no hay default silencioso).
+   */
+  private deriveOrgNodeId(assignments: TemplateNodeAssignmentInput[]): string | null {
+    return assignments.length === 1 && !assignments[0]!.includeDescendants ? assignments[0]!.orgNodeId : null;
+  }
+
+  private async assertAssignmentNodesExist(assignments: TemplateNodeAssignmentInput[]): Promise<void> {
+    const ids = [...new Set(assignments.map((a) => a.orgNodeId))];
+    if (ids.length === 0) return;
+    const found = await this.prisma.orgNode.count({ where: { id: { in: ids }, deletedAt: null } });
+    if (found !== ids.length) throw new BadRequestException("Uno o más nodos de la asignación no existen");
+  }
+
+  /** Reemplaza por completo el set de asignaciones de la plantilla (dentro de una tx). */
+  private async replaceNodeAssignments(
+    tx: Prisma.TransactionClient,
+    templateId: string,
+    assignments: TemplateNodeAssignmentInput[],
+  ): Promise<void> {
+    await tx.templateNodeAssignment.deleteMany({ where: { templateId } });
+    if (assignments.length > 0) {
+      await tx.templateNodeAssignment.createMany({
+        data: assignments.map((a) => ({
+          templateId,
+          orgNodeId: a.orgNodeId,
+          includeDescendants: a.includeDescendants,
+        })),
+      });
+    }
+  }
+
+  /**
+   * Gate de visibilidad por NODO en el admin de plantillas (2.8.0). Un diseñador
+   * con `template:view` ve la plantilla si ALGUNA asignación intersecta su alcance,
+   * o si es global (sin asignaciones). El eje de PLANTILLA (2.8) no se aplica aquí.
+   */
+  private async assertTemplateNodeVisible(userId: string, assignments: AssignmentRow[]): Promise<void> {
+    const access = await this.scope.getAccessibleNodes(userId);
+    if (!this.scope.isTemplateVisibleByNode(toScopeAssignments(assignments), access)) {
+      throw new ForbiddenException("La plantilla está fuera de su alcance");
+    }
   }
 
   private async assertRolesExist(dto: SaveTemplateDraftRequest): Promise<void> {

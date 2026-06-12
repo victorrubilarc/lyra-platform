@@ -56,6 +56,27 @@ export const editWindowMinutesSchema = z.number().int().min(0).max(525_600);
 export const templateVersionStatusSchema = z.enum(["DRAFT", "PUBLISHED"]);
 export type TemplateVersionStatus = z.infer<typeof templateVersionStatusSchema>;
 
+/**
+ * Asignación de la plantilla a un NODO de la estructura (Fase 2.8.0 — multi-nodo).
+ * Es el eje de NODO de la visibilidad de plantilla y la FUENTE DE VERDAD ÚNICA:
+ * una plantilla es visible/usable en un nodo si ALGUNA de sus asignaciones lo
+ * cubre (el nodo, o su subárbol si `includeDescendants`). Los 3 modos se componen
+ * de filas: un nodo · varios nodos · "todos los hijos de X" (1 fila con
+ * `includeDescendants`). CERO asignaciones = GLOBAL (visible en todo nodo),
+ * consistente con la semántica PERMISIVA del ABAC.
+ */
+export const templateNodeAssignmentInputSchema = z.object({
+  orgNodeId: z.string().min(1),
+  includeDescendants: z.boolean(),
+});
+export type TemplateNodeAssignmentInput = z.infer<typeof templateNodeAssignmentInputSchema>;
+
+/** Forma de respuesta: la asignación + la ruta legible del nodo para mostrar. */
+export const templateNodeAssignmentSchema = templateNodeAssignmentInputSchema.extend({
+  orgNodePath: z.string().nullable(),
+});
+export type TemplateNodeAssignmentDto = z.infer<typeof templateNodeAssignmentSchema>;
+
 // === Entidades (forma de respuesta; fechas como ISO string) ==================
 
 export const templateFieldSchema = z.object({
@@ -132,8 +153,13 @@ export type TemplateDto = z.infer<typeof templateSchema>;
 
 /** Ítem de listado: plantilla + conteos y números de versión para las cards. */
 export const templateListItemSchema = templateSchema.extend({
-  /** Ruta del nodo de la estructura (legible), si está anclada. */
+  /**
+   * Ruta del nodo PRIMARIO (derivado, deprecado) — legible, si está anclada.
+   * Para la visibilidad/alcance usa `nodeAssignments` (multi-nodo, 2.8.0).
+   */
   orgNodePath: z.string().nullable(),
+  /** Alcance de estructura: nodos asignados (vacío = GLOBAL). Fuente de verdad. */
+  nodeAssignments: z.array(templateNodeAssignmentSchema),
   sectionCount: z.number().int(),
   fieldCount: z.number().int(),
   draftVersionNumber: z.number().int().nullable(),
@@ -146,6 +172,8 @@ export const templateDetailSchema = templateSchema.extend({
   version: templateVersionSchema,
   /** Hay una versión en borrador editable (distinta de la publicada). */
   hasDraft: z.boolean(),
+  /** Alcance de estructura: nodos asignados (vacío = GLOBAL). Fuente de verdad. */
+  nodeAssignments: z.array(templateNodeAssignmentSchema),
 });
 export type TemplateDetail = z.infer<typeof templateDetailSchema>;
 
@@ -154,7 +182,10 @@ export type TemplateDetail = z.infer<typeof templateDetailSchema>;
 export const createTemplateRequestSchema = z.object({
   name: z.string().trim().min(1).max(140),
   description: z.string().trim().max(1000).optional(),
+  /** @deprecated Nodo primario (derivado de `nodeAssignments`). Usar `nodeAssignments`. */
   orgNodeId: z.string().nullable().optional(),
+  /** Alcance de estructura (2.8.0). Si se envía, REEMPLAZA el set. Vacío = GLOBAL. */
+  nodeAssignments: z.array(templateNodeAssignmentInputSchema).max(200).optional(),
   editWindowAnchor: editWindowAnchorSchema.nullable().optional(),
   editWindowMinutes: editWindowMinutesSchema.nullable().optional(),
 });
@@ -163,7 +194,10 @@ export type CreateTemplateRequest = z.infer<typeof createTemplateRequestSchema>;
 export const updateTemplateRequestSchema = z.object({
   name: z.string().trim().min(1).max(140).optional(),
   description: z.string().trim().max(1000).nullable().optional(),
+  /** @deprecated Nodo primario (derivado de `nodeAssignments`). Usar `nodeAssignments`. */
   orgNodeId: z.string().nullable().optional(),
+  /** Alcance de estructura (2.8.0). Si se envía, REEMPLAZA el set. Vacío = GLOBAL. */
+  nodeAssignments: z.array(templateNodeAssignmentInputSchema).max(200).optional(),
   editWindowAnchor: editWindowAnchorSchema.nullable().optional(),
   editWindowMinutes: editWindowMinutesSchema.nullable().optional(),
 });
@@ -228,7 +262,10 @@ export const saveTemplateDraftRequestSchema = z
     // Metadata opcional (el builder puede guardarla junto a la estructura).
     name: z.string().trim().min(1).max(140).optional(),
     description: z.string().trim().max(1000).nullable().optional(),
+    /** @deprecated Nodo primario (derivado de `nodeAssignments`). Usar `nodeAssignments`. */
     orgNodeId: z.string().nullable().optional(),
+    /** Alcance de estructura (2.8.0). Si se envía, REEMPLAZA el set. Vacío = GLOBAL. */
+    nodeAssignments: z.array(templateNodeAssignmentInputSchema).max(200).optional(),
     // Ventana de edición (2.7.2): vive en el CONTENEDOR (gobernanza viva), pero el
     // builder la guarda por este mismo canal junto al resto de la metadata.
     editWindowAnchor: editWindowAnchorSchema.nullable().optional(),

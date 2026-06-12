@@ -2,7 +2,7 @@ import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TemplatesService } from "./templates.service";
 import type { AuditService } from "../audit/audit.service";
-import type { ScopeService } from "../authz/scope.service";
+import { ScopeService } from "../authz/scope.service";
 import type { PrismaService } from "../prisma/prisma.service";
 
 const ctx = { actorId: "admin", actorEmail: "a@x.cl", ip: null, userAgent: null };
@@ -31,9 +31,14 @@ function makeService(overrides: Record<string, unknown> = {}, scopeImpl: Partial
     ...overrides,
   } as unknown as PrismaService;
   const audit = { record: vi.fn().mockResolvedValue(undefined) } as unknown as AuditService;
+  // Métodos PUROS reales (no tocan prisma): visibilidad por asignaciones de nodo.
+  const realScope = new ScopeService(null as unknown as PrismaService);
   const scope = {
     getAccessibleNodeIds: vi.fn().mockResolvedValue(null),
+    getAccessibleNodes: vi.fn().mockResolvedValue(null),
     canAccessNode: vi.fn().mockResolvedValue(true),
+    isTemplateVisibleByNode: realScope.isTemplateVisibleByNode.bind(realScope),
+    nodeAssignmentInScope: realScope.nodeAssignmentInScope.bind(realScope),
     ...scopeImpl,
   } as unknown as ScopeService;
   return { service: new TemplatesService(prisma, audit, scope), prisma, audit, scope };
@@ -158,9 +163,9 @@ describe("TemplatesService", () => {
 
   it("listar aplica el alcance ABAC: oculta plantillas de nodos fuera de alcance", async () => {
     const templates = [
-      { id: "t1", name: "A", description: null, orgNodeId: "n1", status: "DRAFT", currentVersionId: null, createdAt: new Date(), updatedAt: new Date(), versions: [{ id: "v1", versionNumber: 1, status: "DRAFT" }] },
-      { id: "t2", name: "B", description: null, orgNodeId: "n2", status: "DRAFT", currentVersionId: null, createdAt: new Date(), updatedAt: new Date(), versions: [{ id: "v2", versionNumber: 1, status: "DRAFT" }] },
-      { id: "t3", name: "C", description: null, orgNodeId: null, status: "DRAFT", currentVersionId: null, createdAt: new Date(), updatedAt: new Date(), versions: [{ id: "v3", versionNumber: 1, status: "DRAFT" }] },
+      { id: "t1", name: "A", description: null, orgNodeId: "n1", status: "DRAFT", currentVersionId: null, createdAt: new Date(), updatedAt: new Date(), versions: [{ id: "v1", versionNumber: 1, status: "DRAFT" }], nodeAssignments: [{ orgNodeId: "n1", includeDescendants: false, orgNode: { path: "/n1/" } }] },
+      { id: "t2", name: "B", description: null, orgNodeId: "n2", status: "DRAFT", currentVersionId: null, createdAt: new Date(), updatedAt: new Date(), versions: [{ id: "v2", versionNumber: 1, status: "DRAFT" }], nodeAssignments: [{ orgNodeId: "n2", includeDescendants: false, orgNode: { path: "/n2/" } }] },
+      { id: "t3", name: "C", description: null, orgNodeId: null, status: "DRAFT", currentVersionId: null, createdAt: new Date(), updatedAt: new Date(), versions: [{ id: "v3", versionNumber: 1, status: "DRAFT" }], nodeAssignments: [] },
     ];
     const { service } = makeService(
       {
@@ -168,7 +173,7 @@ describe("TemplatesService", () => {
         templateSection: { findMany: vi.fn().mockResolvedValue([]) },
         orgNode: { findMany: vi.fn().mockResolvedValue([{ id: "n1", name: "Planta", path: "/n1/" }]) },
       },
-      { getAccessibleNodeIds: vi.fn().mockResolvedValue(new Set(["n1"])) },
+      { getAccessibleNodes: vi.fn().mockResolvedValue({ ids: new Set(["n1"]), paths: new Set(["/n1/"]) }) },
     );
     const result = await service.list("u1", {});
     const ids = result.map((t) => t.id).sort();
@@ -177,8 +182,8 @@ describe("TemplatesService", () => {
 
   it("alcance por PLANTILLA (Fase 2.8): applyTemplateScope filtra el picker; el admin lo ignora", async () => {
     const templates = [
-      { id: "t1", name: "A", description: null, orgNodeId: null, status: "PUBLISHED", currentVersionId: "v1", createdAt: new Date(), updatedAt: new Date(), versions: [{ id: "v1", versionNumber: 1, status: "PUBLISHED" }] },
-      { id: "t2", name: "B", description: null, orgNodeId: null, status: "PUBLISHED", currentVersionId: "v2", createdAt: new Date(), updatedAt: new Date(), versions: [{ id: "v2", versionNumber: 1, status: "PUBLISHED" }] },
+      { id: "t1", name: "A", description: null, orgNodeId: null, status: "PUBLISHED", currentVersionId: "v1", createdAt: new Date(), updatedAt: new Date(), versions: [{ id: "v1", versionNumber: 1, status: "PUBLISHED" }], nodeAssignments: [] },
+      { id: "t2", name: "B", description: null, orgNodeId: null, status: "PUBLISHED", currentVersionId: "v2", createdAt: new Date(), updatedAt: new Date(), versions: [{ id: "v2", versionNumber: 1, status: "PUBLISHED" }], nodeAssignments: [] },
     ];
     const makeWithTemplateScope = () =>
       makeService(

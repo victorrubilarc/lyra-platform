@@ -166,7 +166,7 @@ describe("LogEntriesService — create", () => {
   it("instancia secciones, estampa dimensiones vía ShiftResolver y audita", async () => {
     const { service, prisma, audit, shiftResolver } = makeService({
       template: {
-        findFirst: vi.fn().mockResolvedValue({ id: "t1", status: "PUBLISHED", currentVersionId: "v1", orgNodeId: "n1" }),
+        findFirst: vi.fn().mockResolvedValue({ id: "t1", status: "PUBLISHED", currentVersionId: "v1", orgNodeId: "n1", nodeAssignments: [] }),
         findUnique: vi.fn().mockResolvedValue({ name: "Turno" }),
       },
       templateVersion: {
@@ -201,16 +201,57 @@ describe("LogEntriesService — create", () => {
 
   it("rechaza si la plantilla global no aporta nodo", async () => {
     const { service } = makeService({
-      template: { findFirst: vi.fn().mockResolvedValue({ id: "t1", status: "PUBLISHED", currentVersionId: "v1", orgNodeId: null }) },
+      template: { findFirst: vi.fn().mockResolvedValue({ id: "t1", status: "PUBLISHED", currentVersionId: "v1", orgNodeId: null, nodeAssignments: [] }) },
     });
     await expect(service.create("u1", { templateId: "t1" }, ctx)).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it("multi-nodo (2.8.0): rechaza un nodo que NO pertenece al alcance de estructura de la plantilla", async () => {
+    // La plantilla está asignada a n1 (nodo simple); se intenta crear en n2.
+    const { service } = makeService({
+      template: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "t1",
+          status: "PUBLISHED",
+          currentVersionId: "v1",
+          orgNodeId: "n1",
+          nodeAssignments: [{ orgNodeId: "n1", includeDescendants: false, orgNode: { path: "/n1/" } }],
+        }),
+      },
+    });
+    await expect(service.create("u1", { templateId: "t1", orgNodeId: "n2" }, ctx)).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it("multi-nodo (2.8.0): acepta un nodo descendiente cuando la asignación incluye la rama", async () => {
+    // Asignación a n1 con descendientes; el nodo n1-x (ruta bajo /n1/) debe aceptarse.
+    const { service, prisma } = makeService({
+      template: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "t1",
+          status: "PUBLISHED",
+          currentVersionId: "v1",
+          orgNodeId: null,
+          nodeAssignments: [{ orgNodeId: "n1", includeDescendants: true, orgNode: { path: "/n1/" } }],
+        }),
+        findUnique: vi.fn().mockResolvedValue({ name: "Turno" }),
+      },
+      orgNode: { count: vi.fn().mockResolvedValue(1), findUnique: vi.fn().mockResolvedValue({ path: "/n1/n1-x/" }), findMany: vi.fn().mockResolvedValue([]) },
+      templateVersion: {
+        findFirst: vi.fn().mockResolvedValue(versionGraph([section("s1", [field({ key: "obs", type: "TEXT", dataType: "STRING", label: "Obs" })])])),
+      },
+    });
+    vi.spyOn(service, "getDetail").mockResolvedValue({ id: "e1" } as never);
+
+    await service.create("u1", { templateId: "t1", orgNodeId: "n1-x" }, ctx);
+    expect(prisma.orgNode.findUnique).toHaveBeenCalled(); // validó la rama por ruta
+    expect(prisma.logEntry.create).toHaveBeenCalled();
   });
 
   it("guarda de período (2.7.1): create propaga el rechazo y NO persiste si el período está cerrado", async () => {
     const { service, prisma } = makeService(
       {
         template: {
-          findFirst: vi.fn().mockResolvedValue({ id: "t1", status: "PUBLISHED", currentVersionId: "v1", orgNodeId: "n1" }),
+          findFirst: vi.fn().mockResolvedValue({ id: "t1", status: "PUBLISHED", currentVersionId: "v1", orgNodeId: "n1", nodeAssignments: [] }),
           findUnique: vi.fn().mockResolvedValue({ name: "Turno" }),
         },
         templateVersion: {
@@ -515,7 +556,7 @@ describe("LogEntriesService — registro diferido (2.7.0)", () => {
   beforeEach(() => vi.clearAllMocks());
 
   const publishedTemplate = {
-    findFirst: vi.fn().mockResolvedValue({ id: "t1", status: "PUBLISHED", currentVersionId: "v1", orgNodeId: "n1" }),
+    findFirst: vi.fn().mockResolvedValue({ id: "t1", status: "PUBLISHED", currentVersionId: "v1", orgNodeId: "n1", nodeAssignments: [] }),
     findUnique: vi.fn().mockResolvedValue({ name: "Turno" }),
   };
   const deferred = { effectiveAt: "2026-06-10T22:30:00.000Z", reason: "Sin señal en terreno" };

@@ -65,6 +65,18 @@ export class LogEntriesController {
     return this.templates.list(user.id, { status: "PUBLISHED" }, { applyTemplateScope: true });
   }
 
+  /**
+   * Nodos en los que el usuario puede crear una entrada con esta plantilla (multi-
+   * nodo, Fase 2.8.0): asignaciones de la plantilla ∩ alcance de nodo del usuario.
+   * La web autoselecciona si hay 1 y obliga a elegir si hay más de 1. Va ANTES de
+   * `:id` para que "templates" no se interprete como un id.
+   */
+  @Get("templates/:templateId/nodes")
+  @RequirePermission("logentry:create")
+  eligibleNodes(@Param("templateId") templateId: string, @CurrentUser() user: RequestUser) {
+    return this.entries.eligibleNodesForTemplate(user.id, templateId);
+  }
+
   @Get()
   @RequirePermission("logentry:view")
   list(@Query(new ZodValidationPipe(logEntryListQuerySchema)) query: LogEntryListQuery, @CurrentUser() user: RequestUser) {

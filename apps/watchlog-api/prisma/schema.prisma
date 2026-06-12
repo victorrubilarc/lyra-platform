@@ -189,6 +189,29 @@ model TemplateScope {
   @@index([templateId])
 }
 
+// Asignación de PLANTILLA a NODOS de la estructura (Fase 2.8.0 — multi-nodo).
+// Es el eje de NODO de la visibilidad de plantilla y FUENTE DE VERDAD ÚNICA: una
+// plantilla es visible/usable en un nodo si ALGUNA de sus asignaciones lo cubre
+// (el nodo, o su subárbol si `includeDescendants`). Los 3 modos del producto se
+// componen de filas: un nodo (1 fila incDesc=false) · varios (N filas) · "todos
+// los hijos de X" incl. nodos futuros (1 fila incDesc=true). CERO asignaciones =
+// GLOBAL (visible en todo nodo), consistente con la semántica PERMISIVA del ABAC
+// (ausencia = sin restricción). `Template.orgNodeId` queda DERIVADO de estas filas
+// (nodo primario, deprecado; su DROP es deuda técnica — ver BACKLOG §3).
+model TemplateNodeAssignment {
+  id                 String  @id @default(cuid())
+  templateId         String
+  orgNodeId          String
+  // Si true, la asignación cubre también el subárbol del nodo (incl. nodos futuros).
+  includeDescendants Boolean @default(false)
+
+  template Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  orgNode  OrgNode  @relation(fields: [orgNodeId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, orgNodeId])
+  @@index([orgNodeId])
+}
+
 // ===========================================================================
 //  Sesiones y credenciales
 // ===========================================================================
@@ -344,6 +367,7 @@ model OrgNode {
   equipment Equipment[]
   externalRefs ExternalReference[]
   templates Template[]
+  templateNodeAssignments TemplateNodeAssignment[]
   logEntries LogEntry[]
   operationalCalendar OperationalCalendar? @relation(fields: [operationalCalendarId], references: [id], onDelete: SetNull)
   fiscalCalendar      FiscalCalendar?      @relation(fields: [fiscalCalendarId], references: [id], onDelete: SetNull)
@@ -579,6 +603,7 @@ model Template {
   currentVersion TemplateVersion?  @relation("TemplateCurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
   logEntries     LogEntry[]
   templateScopes TemplateScope[]
+  nodeAssignments TemplateNodeAssignment[]
 
   @@index([orgNodeId])
   @@index([status])

@@ -25,6 +25,7 @@ import type {
   SignatureContext,
   SignatureMethod,
   SubmitLogEntryRequest,
+  TemplateEligibleNodes,
   TemplateVersionDto,
   WorkflowVersionDto,
 } from "@lyra/contracts";
@@ -201,7 +202,10 @@ export class LogEntriesService {
   // --- Crear (abrir) una entrada ---------------------------------------------
 
   async create(userId: string, dto: CreateLogEntryRequest, ctx: AuditContext): Promise<LogEntryDetail> {
-    const template = await this.prisma.template.findFirst({ where: { id: dto.templateId, deletedAt: null } });
+    const template = await this.prisma.template.findFirst({
+      where: { id: dto.templateId, deletedAt: null },
+      include: { nodeAssignments: { select: { orgNodeId: true, includeDescendants: true, orgNode: { select: { path: true } } } } },
+    });
     if (!template) throw new NotFoundException("Plantilla no encontrada");
     if (template.status !== "PUBLISHED" || !template.currentVersionId) {
       throw new BadRequestException("La plantilla debe estar publicada para registrar entradas");
@@ -215,6 +219,8 @@ export class LogEntriesService {
     if (!(await this.scope.canAccessNode(userId, orgNodeId))) {
       throw new ForbiddenException("El nodo indicado está fuera de su alcance");
     }
+    // Multi-nodo (2.8.0): el nodo debe pertenecer al alcance de estructura de la plantilla.
+    await this.assertNodeAllowedForTemplate(orgNodeId, template.nodeAssignments);
     // 2.º eje ABAC (Fase 2.8): la plantilla debe estar en el alcance del usuario.
     await this.scope.assertTemplateInScope(userId, template.id);
     if (dto.equipmentId) await this.assertEquipmentExists(dto.equipmentId);
@@ -353,7 +359,10 @@ export class LogEntriesService {
     userId: string,
     q: { templateId: string; orgNodeId?: string | null; equipmentId?: string | null },
   ): Promise<LogEntryDetail> {
-    const template = await this.prisma.template.findFirst({ where: { id: q.templateId, deletedAt: null } });
+    const template = await this.prisma.template.findFirst({
+      where: { id: q.templateId, deletedAt: null },
+      include: { nodeAssignments: { select: { orgNodeId: true, includeDescendants: true, orgNode: { select: { path: true } } } } },
+    });
     if (!template) throw new NotFoundException("Plantilla no encontrada");
     if (template.status !== "PUBLISHED" || !template.currentVersionId) {
       throw new BadRequestException("La plantilla debe estar publicada para registrar entradas");
@@ -364,6 +373,10 @@ export class LogEntriesService {
     if (!(await this.scope.canAccessNode(userId, orgNodeId))) {
       throw new ForbiddenException("El nodo indicado está fuera de su alcance");
     }
+    // Multi-nodo (2.8.0): el nodo debe pertenecer al alcance de estructura de la plantilla.
+    await this.assertNodeAllowedForTemplate(orgNodeId, template.nodeAssignments);
+    // 2.º eje ABAC (Fase 2.8): defensa en profundidad también en la vista previa.
+    await this.scope.assertTemplateInScope(userId, template.id);
     if (q.equipmentId) await this.assertEquipmentExists(q.equipmentId);
 
     const version = await this.loadVersion(template.currentVersionId);
@@ -1759,6 +1772,82 @@ export class LogEntriesService {
   private async assertEquipmentExists(equipmentId: string): Promise<void> {
     const exists = await this.prisma.equipment.count({ where: { id: equipmentId, deletedAt: null } });
     if (exists === 0) throw new BadRequestException("El equipo indicado no existe");
+  }
+
+  // --- Alcance de estructura de la plantilla (multi-nodo, Fase 2.8.0) ---------
+
+  /**
+   * Valida que el nodo elegido pertenezca al alcance de estructura de la plantilla:
+   * cubierto por una asignación directa, o dentro del subárbol de una asignación con
+   * `includeDescendants`. CERO asignaciones = GLOBAL ⇒ cualquier nodo accesible vale
+   * (la accesibilidad ya se validó aparte). Cierra el diferido (a) de 2.4: el backend
+   * AUTORIZA el nodo, el front solo lo ofrece.
+   */
+  private async assertNodeAllowedForTemplate(
+    orgNodeId: string,
+    assignments: Array<{ orgNodeId: string; includeDescendants: boolean; orgNode: { path: string } }>,
+  ): Promise<void> {
+    if (assignments.length === 0) return; // global
+    if (assignments.some((a) => !a.includeDescendants && a.orgNodeId === orgNodeId)) return;
+    const branches = assignments.filter((a) => a.includeDescendants);
+    if (branches.length > 0) {
+      const node = await this.prisma.orgNode.findUnique({ where: { id: orgNodeId }, select: { path: true } });
+      if (node && branches.some((a) => node.path.startsWith(a.orgNode.path))) return;
+    }
+    throw new BadRequestException("El nodo indicado no pertenece al alcance de la plantilla");
+  }
+
+  /**
+   * Nodos en los que el usuario PUEDE crear una entrada con esta plantilla (Fase
+   * 2.8.0): intersección de las asignaciones de la plantilla (expandidas por
+   * subárbol) con el alcance de NODO del usuario. Para una plantilla GLOBAL = todos
+   * los nodos accesibles. El front autoselecciona si hay 1 y obliga a elegir si >1.
+   */
+  async eligibleNodesForTemplate(userId: string, templateId: string): Promise<TemplateEligibleNodes> {
+    const template = await this.prisma.template.findFirst({
+      where: { id: templateId, deletedAt: null },
+      include: { nodeAssignments: { select: { orgNodeId: true, includeDescendants: true, orgNode: { select: { path: true } } } } },
+    });
+    if (!template) throw new NotFoundException("Plantilla no encontrada");
+    // Eje de PLANTILLA (2.8): si está fuera de alcance, no hay nodos elegibles.
+    await this.scope.assertTemplateInScope(userId, template.id);
+
+    const access = await this.scope.getAccessibleNodes(userId);
+
+    // Universo candidato por asignaciones (expandido), o null = todos (global).
+    let candidateIds: Set<string> | null = null;
+    if (template.nodeAssignments.length > 0) {
+      candidateIds = new Set<string>();
+      const branchPaths: string[] = [];
+      for (const a of template.nodeAssignments) {
+        candidateIds.add(a.orgNodeId);
+        if (a.includeDescendants) branchPaths.push(a.orgNode.path);
+      }
+      if (branchPaths.length > 0) {
+        const desc = await this.prisma.orgNode.findMany({
+          where: { deletedAt: null, OR: branchPaths.map((p) => ({ path: { startsWith: p } })) },
+          select: { id: true },
+        });
+        for (const d of desc) candidateIds.add(d.id);
+      }
+    }
+
+    // Intersección con el alcance de nodo del usuario.
+    const where: Prisma.OrgNodeWhereInput = { deletedAt: null };
+    if (candidateIds !== null && access !== null) {
+      where.id = { in: [...candidateIds].filter((id) => access.ids.has(id)) };
+    } else if (candidateIds !== null) {
+      where.id = { in: [...candidateIds] };
+    } else if (access !== null) {
+      where.id = { in: [...access.ids] };
+    }
+
+    const rows = await this.prisma.orgNode.findMany({ where, select: { id: true, name: true } });
+    const readable = await this.nodePaths(new Set(rows.map((r) => r.id)));
+    const nodes = rows
+      .map((r) => ({ id: r.id, name: r.name, path: readable.get(r.id) ?? r.name }))
+      .sort((a, b) => a.path.localeCompare(b.path, "es"));
+    return { templateId: template.id, nodes };
   }
 
   /** Interno: ABAC — 403 si el nodo de la entrada está fuera del alcance del usuario. */
