@@ -4,6 +4,36 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-12 · Fase 2.8.0.1 — Equipo OPCIONAL al crear entrada (objeto de referencia EAM) — ✅ IMPLEMENTADO
+
+Tras el selector de nodo (2.8.0), el dueño observó que un nodo puede tener equipos y pidió poder **tagear la bitácora a
+una máquina concreta**. Se investigó el estándar industrial antes de decidir (respaldo en el chat): EAM/CMMS modelan un
+**objeto de referencia de dos ejes** — **ubicación funcional** [nuestro nodo] + **activo/equipo** — donde SAP PM permite
+equipo *o* ubicación (opcional según lo que se reporta) y al elegir el equipo **deriva la ubicación donde está instalado**;
+Maximo lleva **ambos** en el registro. **ISO 14224** fundamenta el grano: la analítica de confiabilidad (RCM/RCA, modos de
+falla por clase) requiere el dato a nivel de **equipo/ítem mantenible**, no solo de área — registrar el equipo es lo que
+habilita la analítica y el motor de incidencias (Fase 4). Las bitácoras de turno comerciales (j5/Hexagon) taggean la entrada
+a la unidad/activo. El modelo de Lyra **ya contemplaba** `LogEntry.equipmentId` (create/previewNew lo aceptaban desde 2.4);
+solo faltaba exponerlo.
+
+**Decisión (con el dueño): implementar AHORA el "opción A" (equipo OPCIONAL contextual) y AGENDAR el "opción B" (modo de
+equipo por plantilla).** Fundamento: A no es un atajo, es la **mecánica del objeto de referencia** (nodo siempre + equipo
+opcional instalado en ese nodo, con el backend validando consistencia), que es exactamente cómo SAP capa el modelo (el campo
+existe siempre; la obligatoriedad por tipo de registro se añade después). B (`equipmentMode` por plantilla:
+`ninguno/opcional/requerido`, patrón notification-type de SAP / WO-type de Maximo) es el end-state de gobernanza y queda como
+slice propio con migración + control en el TemplateBuilder (BACKLOG §2, 2.8.0.2).
+
+**Implementación (A).** Contrato: `eligibleEquipmentSchema` + `equipment[]` dentro de `eligibleNodeSchema`. Backend:
+`eligibleNodesForTemplate` carga los equipos ACTIVOS por nodo (1 query, agrupados); **`assertEquipmentInNode`** en
+`create`/`previewNew` valida que el equipo exista, esté activo y **pertenezca al nodo** de la entrada (defensa en profundidad
+— el front ya ofrece solo los del nodo). Web: el modal "Elige el nodo" gana un selector de **equipo opcional** (Combobox,
+"(sin equipo)") que aparece solo si el nodo elegido tiene equipos; el modal ahora se abre también cuando hay **1 nodo con
+equipos** (antes solo con >1 nodo). `equipmentId` viaja por compose→create (y previewNew). i18n es-CL. Verde: typecheck/lint
+(0 err)/web build · tests API 213 · smoke en vivo **18/18** (`smoke-template-multinode.py` +3: elegibles con equipo, preview
+con equipo del nodo 200, equipo de otro nodo 400). Pendiente: smoke VISUAL.
+
+---
+
 ### 2026-06-12 · Fase 2.8.0 — Plantillas MULTI-NODO (eje de NODO de la visibilidad de plantilla) — ✅ IMPLEMENTADO
 
 Hoy `Template.orgNodeId` ataba cada plantilla a **un solo nodo** (o global). Se introduce la asignación N:M
