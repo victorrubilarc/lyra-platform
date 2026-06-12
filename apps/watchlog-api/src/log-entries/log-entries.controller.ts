@@ -49,7 +49,8 @@ export class LogEntriesController {
   @Get("templates")
   @RequirePermission("logentry:create")
   availableTemplates(@CurrentUser() user: RequestUser) {
-    return this.templates.list(user.id, { status: "PUBLISHED" });
+    // Picker operacional: aplica el 2.º eje ABAC (alcance por plantilla).
+    return this.templates.list(user.id, { status: "PUBLISHED" }, { applyTemplateScope: true });
   }
 
   @Get()

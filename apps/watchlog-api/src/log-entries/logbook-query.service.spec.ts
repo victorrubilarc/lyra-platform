@@ -135,6 +135,9 @@ function makeServices(prismaOver: Record<string, unknown> = {}, scopeOver: Parti
   const scope = {
     getAccessibleNodeIds: vi.fn().mockResolvedValue(null),
     canAccessNode: vi.fn().mockResolvedValue(true),
+    getAccessibleTemplateIds: vi.fn().mockResolvedValue(null),
+    canAccessTemplate: vi.fn().mockResolvedValue(true),
+    assertTemplateInScope: vi.fn().mockResolvedValue(undefined),
     ...scopeOver,
   } as unknown as ScopeService;
   const shiftResolver = { resolve: vi.fn().mockResolvedValue(null) } as unknown as ShiftResolver;

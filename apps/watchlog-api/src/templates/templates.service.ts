@@ -6,6 +6,7 @@ import type {
   TemplateDetail,
   TemplateListItem,
   TemplateListQuery,
+  TemplateScopeOption,
   TemplateVersionDto,
   UpdateTemplateRequest,
 } from "@lyra/contracts";
@@ -53,8 +54,22 @@ export class TemplatesService {
 
   // --- Listado ---------------------------------------------------------------
 
-  async list(userId: string, query: TemplateListQuery): Promise<TemplateListItem[]> {
+  /**
+   * Lista de plantillas con alcance ABAC de NODO. `applyTemplateScope` (Fase 2.8)
+   * añade el 2.º eje (alcance por PLANTILLA) y SOLO debe activarse en superficies
+   * OPERACIONALES (picker de llenado), NO en el admin de plantillas: un diseñador
+   * con `template:view` debe seguir viendo todas las plantillas de su nodo para
+   * editarlas. Por defecto `false` ⇒ el módulo admin queda idéntico.
+   */
+  async list(
+    userId: string,
+    query: TemplateListQuery,
+    opts: { applyTemplateScope?: boolean } = {},
+  ): Promise<TemplateListItem[]> {
     const accessible = await this.scope.getAccessibleNodeIds(userId);
+    const accessibleTemplates = opts.applyTemplateScope
+      ? await this.scope.getAccessibleTemplateIds(userId)
+      : null;
 
     const where: Prisma.TemplateWhereInput = { deletedAt: null };
     if (query.status) where.status = query.status;
@@ -72,10 +87,15 @@ export class TemplatesService {
       include: { versions: { select: { id: true, versionNumber: true, status: true } } },
     });
 
-    // Alcance ABAC: las plantillas globales (sin nodo) son visibles para todos;
-    // las ancladas a un nodo, solo si el usuario tiene ese nodo en su alcance.
+    // Alcance ABAC en AND de dos ejes:
+    //  - NODO: las globales (sin nodo) son visibles para todos; las ancladas, solo
+    //    si el usuario tiene ese nodo en su alcance.
+    //  - PLANTILLA (opt-in operacional): si el usuario tiene allow-list de
+    //    plantillas, la plantilla debe estar en ella (incluidas las globales).
     const scoped = templates.filter(
-      (t) => accessible === null || t.orgNodeId === null || accessible.has(t.orgNodeId),
+      (t) =>
+        (accessible === null || t.orgNodeId === null || accessible.has(t.orgNodeId)) &&
+        (accessibleTemplates === null || accessibleTemplates.has(t.id)),
     );
 
     // Versión "a mostrar" por plantilla: la publicada si existe, si no el borrador.
@@ -132,6 +152,17 @@ export class TemplatesService {
         publishedVersionNumber: published?.versionNumber ?? null,
       };
     });
+  }
+
+  /**
+   * Plantillas asignables como ALCANCE por plantilla (Fase 2.8). Reusa `list`
+   * (respeta el alcance de NODO del admin que asigna, incluye todos los estados)
+   * y proyecta la forma ligera del selector. NO aplica el eje de plantilla: el
+   * admin debe ver el universo asignable.
+   */
+  async listScopeOptions(userId: string): Promise<TemplateScopeOption[]> {
+    const items = await this.list(userId, {});
+    return items.map((t) => ({ id: t.id, name: t.name, orgNodePath: t.orgNodePath }));
   }
 
   // --- Detalle ---------------------------------------------------------------

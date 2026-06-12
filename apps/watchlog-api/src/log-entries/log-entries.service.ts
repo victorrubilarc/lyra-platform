@@ -215,6 +215,8 @@ export class LogEntriesService {
     if (!(await this.scope.canAccessNode(userId, orgNodeId))) {
       throw new ForbiddenException("El nodo indicado está fuera de su alcance");
     }
+    // 2.º eje ABAC (Fase 2.8): la plantilla debe estar en el alcance del usuario.
+    await this.scope.assertTemplateInScope(userId, template.id);
     if (dto.equipmentId) await this.assertEquipmentExists(dto.equipmentId);
 
     const version = await this.prisma.templateVersion.findFirst({
@@ -320,6 +322,7 @@ export class LogEntriesService {
   async getDetail(userId: string, id: string): Promise<LogEntryDetail> {
     const entry = await this.loadEntry(id);
     await this.assertNodeInScope(userId, entry.orgNodeId);
+    await this.scope.assertTemplateInScope(userId, entry.templateId);
 
     const version = await this.loadVersion(entry.templateVersionId);
     const template = await this.prisma.template.findUnique({ where: { id: entry.templateId } });
@@ -596,6 +599,7 @@ export class LogEntriesService {
     const entry = await this.loadEntry(id);
     if (entry.status !== "DRAFT") throw new BadRequestException("La entrada ya fue enviada o anulada");
     await this.assertNodeInScope(userId, entry.orgNodeId);
+    await this.scope.assertTemplateInScope(userId, entry.templateId);
 
     const version = await this.loadVersion(entry.templateVersionId);
     const sectionDef = version.sections.find((s) => s.key === sectionKey);
@@ -830,6 +834,7 @@ export class LogEntriesService {
     const entry = await this.loadEntry(id);
     if (entry.status !== "DRAFT") throw new BadRequestException("La entrada ya fue finalizada o anulada");
     await this.assertNodeInScope(userId, entry.orgNodeId);
+    await this.scope.assertTemplateInScope(userId, entry.templateId);
 
     // Degradación elegante: `submit` finaliza SOLO plantillas sin flujo. Con flujo,
     // la finalización ocurre al transicionar a un estado final (executeTransition).
@@ -906,6 +911,7 @@ export class LogEntriesService {
       throw new BadRequestException("La entrada ya fue sellada: el origen del registro es inmutable");
     }
     await this.assertNodeInScope(userId, entry.orgNodeId);
+    await this.scope.assertTemplateInScope(userId, entry.templateId);
 
     const version = await this.loadVersion(entry.templateVersionId);
     const now = new Date();
@@ -1096,6 +1102,7 @@ export class LogEntriesService {
     const entry = await this.loadEntry(id);
     if (entry.status !== "DRAFT") throw new BadRequestException("La entrada ya fue finalizada o anulada");
     await this.assertNodeInScope(userId, entry.orgNodeId); // guarda (c) ABAC
+    await this.scope.assertTemplateInScope(userId, entry.templateId);
     if (!entry.workflowDefinitionVersionId || !entry.currentStateKey) {
       throw new BadRequestException("La entrada no tiene un flujo configurado");
     }

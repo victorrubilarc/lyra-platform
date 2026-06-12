@@ -174,4 +174,34 @@ describe("TemplatesService", () => {
     const ids = result.map((t) => t.id).sort();
     expect(ids).toEqual(["t1", "t3"]); // t2 (n2) oculta; t3 global visible
   });
+
+  it("alcance por PLANTILLA (Fase 2.8): applyTemplateScope filtra el picker; el admin lo ignora", async () => {
+    const templates = [
+      { id: "t1", name: "A", description: null, orgNodeId: null, status: "PUBLISHED", currentVersionId: "v1", createdAt: new Date(), updatedAt: new Date(), versions: [{ id: "v1", versionNumber: 1, status: "PUBLISHED" }] },
+      { id: "t2", name: "B", description: null, orgNodeId: null, status: "PUBLISHED", currentVersionId: "v2", createdAt: new Date(), updatedAt: new Date(), versions: [{ id: "v2", versionNumber: 1, status: "PUBLISHED" }] },
+    ];
+    const makeWithTemplateScope = () =>
+      makeService(
+        {
+          template: { findMany: vi.fn().mockResolvedValue(templates) },
+          templateSection: { findMany: vi.fn().mockResolvedValue([]) },
+          orgNode: { findMany: vi.fn().mockResolvedValue([]) },
+        },
+        {
+          getAccessibleNodeIds: vi.fn().mockResolvedValue(null), // sin restricción de nodo
+          getAccessibleTemplateIds: vi.fn().mockResolvedValue(new Set(["t1"])), // allow-list = t1
+        },
+      );
+
+    // Picker operacional: el eje de plantilla acota a t1 (AND con nodo).
+    const picker = makeWithTemplateScope();
+    const operational = await picker.service.list("u1", {}, { applyTemplateScope: true });
+    expect(operational.map((t) => t.id)).toEqual(["t1"]);
+
+    // Admin de plantillas: NO consulta el eje de plantilla; ve todas.
+    const admin = makeWithTemplateScope();
+    const all = await admin.service.list("u1", {});
+    expect(all.map((t) => t.id).sort()).toEqual(["t1", "t2"]);
+    expect(admin.scope.getAccessibleTemplateIds).not.toHaveBeenCalled();
+  });
 });

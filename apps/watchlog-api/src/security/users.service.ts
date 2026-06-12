@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from "@nestjs/comm
 import type {
   AssignRolesRequest,
   AssignScopeRequest,
+  AssignTemplateScopeRequest,
   CreateUserRequest,
   UpdateUserRequest,
   UserDetail,
@@ -43,7 +44,11 @@ export class UsersService {
   async get(id: string): Promise<UserDetail> {
     const user = await this.prisma.user.findUnique({
       where: { id },
-      include: { ...userInclude, scopes: { where: { userId: id } } },
+      include: {
+        ...userInclude,
+        scopes: { where: { userId: id } },
+        templateScopes: { where: { userId: id }, select: { templateId: true } },
+      },
     });
     if (!user) throw new NotFoundException("Usuario no encontrado");
     const mfaRequired = await this.mfaRequirement.isRequiredForUser(id);
@@ -52,6 +57,7 @@ export class UsersService {
       forcePasswordChange: user.forcePasswordChange,
       mfaRequired,
       scopes: user.scopes.map((s) => ({ orgNodeId: s.orgNodeId, includeDescendants: s.includeDescendants })),
+      templateScopes: user.templateScopes.map((s) => s.templateId),
     };
   }
 
@@ -141,6 +147,30 @@ export class UsersService {
       }),
     ]);
     await this.audit.record({ ...ctx, action: "user.scope.assigned", entityType: "User", entityId: id, after: { scopes: dto.scopes } });
+    return this.get(id);
+  }
+
+  /**
+   * Reemplaza el alcance por PLANTILLA del usuario (2.º eje ABAC, Fase 2.8).
+   * Lista vacía ⇒ sin restricción (ve todas). Audita el cambio de scope.
+   */
+  async assignTemplateScope(id: string, dto: AssignTemplateScopeRequest, ctx: AuditContext): Promise<UserDetail> {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new NotFoundException("Usuario no encontrado");
+
+    const templateIds = [...new Set(dto.templateIds)];
+    if (templateIds.length > 0) {
+      const found = await this.prisma.template.count({ where: { id: { in: templateIds }, deletedAt: null } });
+      if (found !== templateIds.length) throw new BadRequestException("Una o más plantillas no existen");
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.templateScope.deleteMany({ where: { userId: id } }),
+      this.prisma.templateScope.createMany({
+        data: templateIds.map((templateId) => ({ userId: id, templateId })),
+      }),
+    ]);
+    await this.audit.record({ ...ctx, action: "user.templatescope.assigned", entityType: "User", entityId: id, after: { templateIds } });
     return this.get(id);
   }
 

@@ -1,8 +1,10 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Req } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Put, Req } from "@nestjs/common";
 import type { FastifyRequest } from "fastify";
 import {
+  assignTemplateScopeRequestSchema,
   createRoleRequestSchema,
   updateRoleRequestSchema,
+  type AssignTemplateScopeRequest,
   type CreateRoleRequest,
   type UpdateRoleRequest,
 } from "@lyra/contracts";
@@ -47,6 +49,18 @@ export class RolesController {
     @Req() req: FastifyRequest,
   ) {
     return this.roles.update(id, dto, this.ctx(user, req));
+  }
+
+  /** Alcance por PLANTILLA del rol (2.º eje ABAC, Fase 2.8). */
+  @Put(":id/template-scope")
+  @RequirePermission("role:manage")
+  assignTemplateScope(
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(assignTemplateScopeRequestSchema)) dto: AssignTemplateScopeRequest,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.roles.assignTemplateScope(id, dto, this.ctx(user, req));
   }
 
   @Delete(":id")

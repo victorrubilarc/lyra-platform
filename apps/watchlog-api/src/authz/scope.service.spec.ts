@@ -55,3 +55,38 @@ describe("ScopeService (ABAC, dimensión 4)", () => {
     expect(await unrestricted.canAccessNode("u1", "cualquiera")).toBe(true);
   });
 });
+
+function makeTemplatePrisma(rows: { templateId: string }[]): PrismaService {
+  return {
+    templateScope: { findMany: vi.fn().mockResolvedValue(rows) },
+  } as unknown as PrismaService;
+}
+
+describe("ScopeService — alcance por PLANTILLA (2.º eje ABAC)", () => {
+  it("sin scopes de plantilla => null (semántica PERMISIVA: ve todas)", async () => {
+    const service = new ScopeService(makeTemplatePrisma([]));
+    expect(await service.getAccessibleTemplateIds("u1")).toBeNull();
+  });
+
+  it("con scopes => Set de ids (incluye propios + de roles, ya unidos por el OR)", async () => {
+    const service = new ScopeService(makeTemplatePrisma([{ templateId: "t1" }, { templateId: "t2" }]));
+    const ids = await service.getAccessibleTemplateIds("u1");
+    expect(ids).not.toBeNull();
+    expect([...ids!].sort()).toEqual(["t1", "t2"]);
+  });
+
+  it("canAccessTemplate: restringido respeta la allow-list; sin restricción todo pasa", async () => {
+    const restricted = new ScopeService(makeTemplatePrisma([{ templateId: "t1" }]));
+    expect(await restricted.canAccessTemplate("u1", "t1")).toBe(true);
+    expect(await restricted.canAccessTemplate("u1", "t9")).toBe(false);
+
+    const unrestricted = new ScopeService(makeTemplatePrisma([]));
+    expect(await unrestricted.canAccessTemplate("u1", "cualquiera")).toBe(true);
+  });
+
+  it("assertTemplateInScope lanza 403 cuando la plantilla está fuera del alcance", async () => {
+    const restricted = new ScopeService(makeTemplatePrisma([{ templateId: "t1" }]));
+    await expect(restricted.assertTemplateInScope("u1", "t9")).rejects.toThrow();
+    await expect(restricted.assertTemplateInScope("u1", "t1")).resolves.toBeUndefined();
+  });
+});

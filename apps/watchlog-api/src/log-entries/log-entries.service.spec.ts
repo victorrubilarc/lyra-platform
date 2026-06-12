@@ -96,7 +96,7 @@ function makeService(
     ...prismaOver,
   } as unknown as PrismaService;
   const audit = { record: vi.fn().mockResolvedValue(undefined) } as unknown as AuditService;
-  const scope = { getAccessibleNodeIds: vi.fn().mockResolvedValue(null), canAccessNode: vi.fn().mockResolvedValue(true), ...opts.scope } as unknown as ScopeService;
+  const scope = { getAccessibleNodeIds: vi.fn().mockResolvedValue(null), canAccessNode: vi.fn().mockResolvedValue(true), getAccessibleTemplateIds: vi.fn().mockResolvedValue(null), canAccessTemplate: vi.fn().mockResolvedValue(true), assertTemplateInScope: vi.fn().mockResolvedValue(undefined), ...opts.scope } as unknown as ScopeService;
   const shiftResolver = {
     resolve: vi.fn().mockResolvedValue(opts.dims ?? { operationalDate: "2026-06-09", shiftCode: "A", shiftLabel: "A" }),
   } as unknown as ShiftResolver;

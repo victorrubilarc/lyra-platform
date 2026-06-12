@@ -4,11 +4,13 @@ import {
   adminResetPasswordRequestSchema,
   assignRolesRequestSchema,
   assignScopeRequestSchema,
+  assignTemplateScopeRequestSchema,
   createUserRequestSchema,
   updateUserRequestSchema,
   type AdminResetPasswordRequest,
   type AssignRolesRequest,
   type AssignScopeRequest,
+  type AssignTemplateScopeRequest,
   type CreateUserRequest,
   type UpdateUserRequest,
 } from "@lyra/contracts";
@@ -75,6 +77,18 @@ export class UsersController {
     @Req() req: FastifyRequest,
   ) {
     return this.users.assignScope(id, dto, this.ctx(user, req));
+  }
+
+  /** Alcance por PLANTILLA (2.º eje ABAC, Fase 2.8). Reusa el permiso de scope. */
+  @Put(":id/template-scope")
+  @RequirePermission("user:assign-scope")
+  assignTemplateScope(
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(assignTemplateScopeRequestSchema)) dto: AssignTemplateScopeRequest,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.users.assignTemplateScope(id, dto, this.ctx(user, req));
   }
 
   /** Restablece el MFA del usuario (dispositivo perdido). El admin nunca enrola por él. */
