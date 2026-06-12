@@ -4,6 +4,27 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-12 · Fase 2.7.2 — Afinamiento UX (QA del dueño) — ✅ IMPLEMENTADO
+
+Iteración visual tras probar 2.7.2 en el navegador:
+- **Duración en MINUTOS u HORAS** (pedido del dueño): se cambió la unidad canónica de almacenamiento de **horas a
+  MINUTOS** (`editWindowHours`→`editWindowMinutes` en `Template` y `SystemSettings`; migración `…_edit_window_minutes`
+  renombra + **convierte ×60** + check 0..525600 = 365 d). La UI ofrece **número + selector de unidad** (Minutos/Horas)
+  vía componente reutilizable `EditWindowDurationField` (normaliza a minutos; vacío = sin límite). `editWindowDeadline`
+  pasa a `×60_000`. Motivo: granularidad operacional real (correcciones de minutos), sin ambigüedad (una sola unidad
+  canónica; la UI presenta la cómoda). Extensible a "días" después.
+- **Banner PROMINENTE de ventana en el llenado** (antes era un chip gris perdido entre las dimensiones): franja de
+  ancho completo bajo la cabecera — **info (cian)** "editable hasta X" cuando vigente, **warning (ámbar)** cuando
+  vencida (con override: "indica un motivo…"; sin override: "solo lectura"). El chip viejo se eliminó.
+- **Fix de alineación** del ítem "Sellada" en el visor (`/bitacoras`): cada ítem de `viewerMetaRow` es `inline-flex`
+  (ícono ✓ no se separa de su texto al envolver). Aclaración: **"Sellada"** = instante en que se congelaron
+  effectiveAt + dimensiones (1ª transición con flujo, o submit sin flujo).
+- **Aprendizaje operacional**: el cleanup de un smoke borró (lógico) la plantilla real del dueño por filtrar el listado
+  por nombre. Regla: los smokes limpian **solo por ID de lo que el propio script creó**, nunca por filtro sobre el
+  listado. La plantilla se restauró (deletedAt → null; sin pérdida de versiones/secciones).
+
+---
+
 ### 2026-06-12 · Fase 2.7.2 — Ventana de edición configurable (#6) — ✅ IMPLEMENTADO Y PUBLICADO
 
 Segundo eslabón de la **gobernanza temporal** (tras 2.7.0 registro diferido y 2.7.1/2.7.1.1 período gobernado):

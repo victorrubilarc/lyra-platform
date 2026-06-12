@@ -65,7 +65,7 @@ function makeService(
     periods?: Partial<OperationalPeriodService>;
     perms?: string[];
     /** Ventana de edición global (2.7.2). Default: sin ventana (hours null). */
-    editWindow?: { editWindowAnchor: "RECORDED" | "EFFECTIVE"; editWindowHours: number | null; requireMfaEditWindowOverride: boolean };
+    editWindow?: { editWindowAnchor: "RECORDED" | "EFFECTIVE"; editWindowMinutes: number | null; requireMfaEditWindowOverride: boolean };
   } = {},
 ) {
   const tx = {
@@ -120,7 +120,7 @@ function makeService(
     editWindowSettings: vi
       .fn()
       .mockResolvedValue(
-        opts.editWindow ?? { editWindowAnchor: "RECORDED", editWindowHours: null, requireMfaEditWindowOverride: false },
+        opts.editWindow ?? { editWindowAnchor: "RECORDED", editWindowMinutes: null, requireMfaEditWindowOverride: false },
       ),
   } as unknown as SettingsService;
   return {
@@ -826,7 +826,7 @@ describe("LogEntriesService — ventana de edición (2.7.2)", () => {
         perms: opts.perms ?? [],
         editWindow: {
           editWindowAnchor: "RECORDED",
-          editWindowHours: opts.hours === undefined ? 48 : opts.hours,
+          editWindowMinutes: opts.hours === undefined ? 48 : opts.hours,
           requireMfaEditWindowOverride: Boolean(opts.requireMfa),
         },
       },
@@ -932,7 +932,7 @@ describe("LogEntriesService — ventana de edición (2.7.2)", () => {
       {
         perms: ["logentry:write-expired"],
         periods: { assertWritable: vi.fn().mockRejectedValue(new ForbiddenException("Período cerrado")) },
-        editWindow: { editWindowAnchor: "RECORDED", editWindowHours: 48, requireMfaEditWindowOverride: false },
+        editWindow: { editWindowAnchor: "RECORDED", editWindowMinutes: 48, requireMfaEditWindowOverride: false },
       },
     );
     await expect(
@@ -981,7 +981,7 @@ describe("LogEntriesService — ventana de edición (2.7.2)", () => {
 
     const detail = await service.getDetail("u1", "e1");
 
-    expect(detail.editWindow).toMatchObject({ anchor: "RECORDED", windowHours: 48, expired: true, canOverride: false });
+    expect(detail.editWindow).toMatchObject({ anchor: "RECORDED", windowMinutes: 48, expired: true, canOverride: false });
     expect(detail.sectionStates[0]).toMatchObject({ editable: false, blockedReason: "EDIT_WINDOW_EXPIRED" });
   });
 

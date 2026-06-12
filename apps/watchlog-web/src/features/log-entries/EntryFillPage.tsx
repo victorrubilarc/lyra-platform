@@ -280,12 +280,6 @@ export function EntryFillPage() {
           <span className={styles.dimChip}>
             <Clock size={13} /> {t("logbook.fill.effectiveAt")}: <b>{formatDateTime(entry.effectiveAt)}</b>
           </span>
-          {/* Ventana de edición (2.7.2): huella proactiva — vigente o vencida. */}
-          {isDraft && editWindow && !editWindow.expired && (
-            <span className={styles.dimChip}>
-              <TimerOff size={13} /> {t("logbook.fill.editableUntil")}: <b>{formatDateTime(editWindow.expiresAt)}</b>
-            </span>
-          )}
           {entry.shiftCode && (
             <span className={styles.dimChip}>
               <CalendarClock size={13} /> {t("logbook.fill.shift")}: <b>{entry.shiftCode}</b>
@@ -307,15 +301,6 @@ export function EntryFillPage() {
             </span>
           )}
         </div>
-
-        {/* Ventana vencida: aviso para quien puede hacer el override (motivo en cada
-            guardado); para quien NO puede, cada sección ya dice el porqué. */}
-        {isDraft && editWindow?.expired && editWindow.canOverride && (
-          <div className={styles.deferredNote}>
-            <TimerOff size={13} />
-            <span>{t("logbook.fill.windowExpiredOverride", { until: formatDateTime(editWindow.expiresAt) })}</span>
-          </div>
-        )}
 
         {/* Registro diferido (2.7.0): huella visible + gesto para declarar/corregir. */}
         {entry.entryOrigin === "DEFERRED" && (
@@ -342,6 +327,26 @@ export function EntryFillPage() {
           </div>
         )}
       </Card>
+
+      {/* Ventana de edición (2.7.2): banner PROMINENTE en ambos estados — vigente
+          (info) con la fecha límite, o vencida (warning) con el efecto para el actor. */}
+      {isDraft &&
+        editWindow &&
+        (editWindow.expired ? (
+          <div className={`${styles.editWindowBanner} ${styles.editWindowExpired}`}>
+            <TimerOff size={18} />
+            <span>
+              {editWindow.canOverride
+                ? t("logbook.fill.windowExpiredOverrideBanner", { until: formatDateTime(editWindow.expiresAt) })
+                : t("logbook.fill.windowExpiredReadonlyBanner", { until: formatDateTime(editWindow.expiresAt) })}
+            </span>
+          </div>
+        ) : (
+          <div className={`${styles.editWindowBanner} ${styles.editWindowOk}`}>
+            <Clock size={18} />
+            <span>{t("logbook.fill.windowOpenBanner", { until: formatDateTime(editWindow.expiresAt) })}</span>
+          </div>
+        ))}
 
       {entry.status === "SUBMITTED" && (
         <div className={styles.sealedBanner}>

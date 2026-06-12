@@ -1,11 +1,12 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { BookOpenCheck, Lock, ShieldCheck } from "lucide-react";
-import { EmptyState, Input, Select, Skeleton, Toggle, cx, useToast } from "@lyra/ui";
+import { EmptyState, Select, Skeleton, Toggle, cx, useToast } from "@lyra/ui";
 import type { LucideIcon } from "lucide-react";
 import type { EditWindowAnchor, SystemSettingsDto, UpdateSystemSettingsRequest } from "@lyra/contracts";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { ApiError } from "../../lib/api-client.js";
+import { EditWindowDurationField } from "./EditWindowDurationField.js";
 import { useSystemSettings, useUpdateSystemSettings } from "./settings-queries.js";
 import styles from "./SettingsPage.module.css";
 
@@ -40,11 +41,6 @@ export function SettingsPage() {
   const update = useUpdateSystemSettings();
 
   const [tab, setTab] = useState<Category>("security");
-  // Horas de la ventana global como texto local ("" = sin ventana); se persiste al salir del campo.
-  const [hoursDraft, setHoursDraft] = useState("");
-  useEffect(() => {
-    setHoursDraft(data?.editWindowHours != null && data.editWindowHours > 0 ? String(data.editWindowHours) : "");
-  }, [data?.editWindowHours]);
 
   if (!perms.can("module:settings:view")) {
     return (
@@ -63,15 +59,6 @@ export function SettingsPage() {
     }
   };
   const toggle = (field: keyof UpdateSystemSettingsRequest, next: boolean) => patch({ [field]: next });
-
-  /** Persiste las horas de la ventana global ("" o 0 ⇒ sin ventana = null). */
-  const saveHours = () => {
-    if (!data) return;
-    const n = Number(hoursDraft);
-    const next = hoursDraft.trim() === "" || !Number.isFinite(n) || n <= 0 ? null : Math.min(Math.trunc(n), 8760);
-    if (next === data.editWindowHours) return;
-    void patch({ editWindowHours: next });
-  };
 
   return (
     <div className={styles.page}>
@@ -156,18 +143,15 @@ export function SettingsPage() {
               ) : (
                 <div className={styles.toggleList}>
                   <div className={styles.settingRow}>
-                    <span className={styles.toggleLabel}>{t("settings.editWindowHours")}</span>
-                    <Input
-                      type="number"
-                      min={1}
-                      max={8760}
-                      value={hoursDraft}
-                      placeholder={t("settings.editWindowNoLimit")}
+                    <span className={styles.toggleLabel}>{t("settings.editWindowDuration")}</span>
+                    <EditWindowDurationField
+                      minutes={data.editWindowMinutes}
                       disabled={!canManage || update.isPending}
-                      onChange={(e) => setHoursDraft(e.target.value)}
-                      onBlur={saveHours}
-                      onKeyDown={(e) => e.key === "Enter" && saveHours()}
-                      aria-label={t("settings.editWindowHours")}
+                      placeholder={t("settings.editWindowNoLimit")}
+                      commitOnBlur
+                      onChange={(minutes) => {
+                        if (minutes !== data.editWindowMinutes) void patch({ editWindowMinutes: minutes });
+                      }}
                     />
                   </div>
                   <div className={styles.settingRow}>

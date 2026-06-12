@@ -250,8 +250,8 @@ export type LogEntryDto = z.infer<typeof logEntrySchema>;
  */
 export const editWindowInfoSchema = z.object({
   anchor: editWindowAnchorSchema,
-  windowHours: z.number().int(),
-  /** Instante en que vence/venció la ventana (ancla + horas), ISO UTC. */
+  windowMinutes: z.number().int(),
+  /** Instante en que vence/venció la ventana (ancla + duración), ISO UTC. */
   expiresAt: z.string(),
   expired: z.boolean(),
   /** ¿Puede ESTE usuario escribir fuera de ventana? (permiso de override). */
@@ -883,31 +883,31 @@ export function resolveEffectiveAt(
 /** Ventana de edición EFECTIVA (ya resuelta la herencia plantilla→global). */
 export interface EditWindowConfig {
   anchor: EditWindowAnchor;
-  windowHours: number;
+  windowMinutes: number;
 }
 
 /**
  * Resuelve la ventana de edición efectiva: la plantilla manda; null hereda el
- * global. `hours` 0 o null final = SIN ventana (se edita sin límite temporal).
+ * global. `minutes` 0 o null final = SIN ventana (se edita sin límite temporal).
  * Es gobernanza VIVA (patrón SAP OB52 / Odoo lock dates): cambiar la config
  * aplica de inmediato a todas las entradas, sin republicar plantillas.
  */
 export function resolveEditWindow(
-  template: { editWindowAnchor: EditWindowAnchor | null; editWindowHours: number | null },
-  globalConfig: { editWindowAnchor: EditWindowAnchor; editWindowHours: number | null },
+  template: { editWindowAnchor: EditWindowAnchor | null; editWindowMinutes: number | null },
+  globalConfig: { editWindowAnchor: EditWindowAnchor; editWindowMinutes: number | null },
 ): EditWindowConfig | null {
-  const hours = template.editWindowHours ?? globalConfig.editWindowHours;
-  if (hours === null || hours <= 0) return null;
-  return { anchor: template.editWindowAnchor ?? globalConfig.editWindowAnchor, windowHours: hours };
+  const minutes = template.editWindowMinutes ?? globalConfig.editWindowMinutes;
+  if (minutes === null || minutes <= 0) return null;
+  return { anchor: template.editWindowAnchor ?? globalConfig.editWindowAnchor, windowMinutes: minutes };
 }
 
 /**
  * Instante en que vence la ventana: ancla (RECORDED = captura inmutable;
- * EFFECTIVE = fecha del evento vigente) + horas configuradas.
+ * EFFECTIVE = fecha del evento vigente) + duración configurada (minutos).
  */
 export function editWindowDeadline(config: EditWindowConfig, recordedAt: Date, effectiveAt: Date): Date {
   const base = config.anchor === "EFFECTIVE" ? effectiveAt : recordedAt;
-  return new Date(base.getTime() + config.windowHours * 3_600_000);
+  return new Date(base.getTime() + config.windowMinutes * 60_000);
 }
 
 /** ¿Está vencida la ventana en `now`? (vencida = ya NO se edita por el canal normal). */

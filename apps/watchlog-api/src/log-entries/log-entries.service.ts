@@ -327,7 +327,7 @@ export class LogEntriesService {
     const windowCfg = resolveEditWindow(
       {
         editWindowAnchor: template?.editWindowAnchor ?? null,
-        editWindowHours: template?.editWindowHours ?? null,
+        editWindowMinutes: template?.editWindowMinutes ?? null,
       },
       windowSettings,
     );
@@ -339,7 +339,7 @@ export class LogEntriesService {
       const canOverride = perms.has(EDIT_WINDOW_OVERRIDE_PERMISSION);
       editWindow = {
         anchor: windowCfg.anchor,
-        windowHours: windowCfg.windowHours,
+        windowMinutes: windowCfg.windowMinutes,
         expiresAt: deadline.toISOString(),
         expired,
         canOverride,
@@ -1389,12 +1389,12 @@ export class LogEntriesService {
   private async editWindowConfigFor(templateId: string) {
     const template = await this.prisma.template.findUnique({
       where: { id: templateId },
-      select: { editWindowAnchor: true, editWindowHours: true },
+      select: { editWindowAnchor: true, editWindowMinutes: true },
     });
     const globalCfg = await this.settings.editWindowSettings();
     return {
       config: resolveEditWindow(
-        { editWindowAnchor: template?.editWindowAnchor ?? null, editWindowHours: template?.editWindowHours ?? null },
+        { editWindowAnchor: template?.editWindowAnchor ?? null, editWindowMinutes: template?.editWindowMinutes ?? null },
         globalCfg,
       ),
       requireMfaOverride: globalCfg.requireMfaEditWindowOverride,

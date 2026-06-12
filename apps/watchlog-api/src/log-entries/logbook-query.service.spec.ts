@@ -152,7 +152,7 @@ function makeServices(prismaOver: Record<string, unknown> = {}, scopeOver: Parti
   const settings = {
     editWindowSettings: vi
       .fn()
-      .mockResolvedValue({ editWindowAnchor: "RECORDED", editWindowHours: null, requireMfaEditWindowOverride: false }),
+      .mockResolvedValue({ editWindowAnchor: "RECORDED", editWindowMinutes: null, requireMfaEditWindowOverride: false }),
   } as unknown as import("../settings/settings.service").SettingsService;
 
   const entries = new LogEntriesService(prisma, audit, scope, shiftResolver, fiscalResolver, reauth, enc, periods, permissions, settings);

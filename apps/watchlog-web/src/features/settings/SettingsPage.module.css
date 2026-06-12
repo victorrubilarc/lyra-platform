@@ -7,6 +7,19 @@
   min-height: 520px;
 }
 
+/* Campo de duración (número + selector de unidad) de la ventana de edición. */
+.durationField {
+  display: flex;
+  gap: 8px;
+  min-width: 260px;
+}
+.durationField > :first-child {
+  flex: 1;
+}
+.durationField > :last-child {
+  flex: 0 0 120px;
+}
+
 .header {
   display: flex;
   flex-direction: column;

@@ -16,6 +16,7 @@ import {
 import { Button, Card, Chip, FormField, Input, Modal, Select, Textarea, useToast } from "@lyra/ui";
 import type { FieldType, TemplateDetail } from "@lyra/contracts";
 import { usePermissions } from "../../auth/use-permissions.js";
+import { EditWindowDurationField } from "../settings/EditWindowDurationField.js";
 import { fetchRoles } from "../security/security-api.js";
 import { useOrgTree } from "../structure/structure-queries.js";
 import {
@@ -333,13 +334,14 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
                   <div className={styles.metaGrid}>
                     <Select
                       id={id}
-                      value={state.editWindowHours === null ? "inherit" : state.editWindowHours === 0 ? "none" : "custom"}
+                      value={state.editWindowMinutes === null ? "inherit" : state.editWindowMinutes === 0 ? "none" : "custom"}
                       disabled={!canEdit}
                       onChange={(e) => {
                         const mode = e.target.value;
                         patchState({
                           ...state,
-                          editWindowHours: mode === "inherit" ? null : mode === "none" ? 0 : (state.editWindowHours ?? 0) > 0 ? state.editWindowHours : 48,
+                          editWindowMinutes:
+                            mode === "inherit" ? null : mode === "none" ? 0 : (state.editWindowMinutes ?? 0) > 0 ? state.editWindowMinutes : 120,
                           editWindowAnchor: mode === "custom" ? (state.editWindowAnchor ?? "RECORDED") : null,
                         });
                       }}
@@ -348,20 +350,13 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
                       <option value="none">{t("templates.builder.editWindowNone")}</option>
                       <option value="custom">{t("templates.builder.editWindowCustom")}</option>
                     </Select>
-                    {(state.editWindowHours ?? 0) > 0 && (
+                    {(state.editWindowMinutes ?? 0) > 0 && (
                       <>
-                        <Input
-                          type="number"
-                          min={1}
-                          max={8760}
-                          value={state.editWindowHours ?? 48}
+                        <EditWindowDurationField
+                          key={detail.id}
+                          minutes={state.editWindowMinutes}
                           disabled={!canEdit}
-                          aria-label={t("templates.builder.editWindowHours")}
-                          onChange={(e) => {
-                            const n = Number(e.target.value);
-                            patchState({ ...state, editWindowHours: Number.isFinite(n) && n > 0 ? Math.min(Math.trunc(n), 8760) : 1 });
-                          }}
-                          rightSlot={<span>{t("templates.builder.editWindowHoursUnit")}</span>}
+                          onChange={(min) => patchState({ ...state, editWindowMinutes: min && min > 0 ? min : 1 })}
                         />
                         <Select
                           value={state.editWindowAnchor ?? "RECORDED"}
