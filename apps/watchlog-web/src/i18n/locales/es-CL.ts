@@ -1081,6 +1081,9 @@ export const esCL = {
       chooseNodeHint: "Esta plantilla aplica a varios nodos. Indica en cuál registras esta entrada.",
       node: "Nodo de la estructura",
       nodePlaceholder: "Seleccionar nodo…",
+      equipment: "Equipo (opcional)",
+      equipmentHint: "Asocia la bitácora a una máquina del nodo, o déjalo en blanco para registrar a nivel de nodo.",
+      equipmentNone: "Sin equipo (a nivel de nodo)",
     },
     fill: {
       back: "Volver",

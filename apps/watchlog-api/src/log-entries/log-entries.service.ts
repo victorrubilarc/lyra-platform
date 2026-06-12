@@ -223,7 +223,7 @@ export class LogEntriesService {
     await this.assertNodeAllowedForTemplate(orgNodeId, template.nodeAssignments);
     // 2.º eje ABAC (Fase 2.8): la plantilla debe estar en el alcance del usuario.
     await this.scope.assertTemplateInScope(userId, template.id);
-    if (dto.equipmentId) await this.assertEquipmentExists(dto.equipmentId);
+    if (dto.equipmentId) await this.assertEquipmentInNode(dto.equipmentId, orgNodeId);
 
     const version = await this.prisma.templateVersion.findFirst({
       where: { id: template.currentVersionId },
@@ -377,7 +377,7 @@ export class LogEntriesService {
     await this.assertNodeAllowedForTemplate(orgNodeId, template.nodeAssignments);
     // 2.º eje ABAC (Fase 2.8): defensa en profundidad también en la vista previa.
     await this.scope.assertTemplateInScope(userId, template.id);
-    if (q.equipmentId) await this.assertEquipmentExists(q.equipmentId);
+    if (q.equipmentId) await this.assertEquipmentInNode(q.equipmentId, orgNodeId);
 
     const version = await this.loadVersion(template.currentVersionId);
     const currentStateKey = await this.initialStateKey(version.workflowDefinitionVersionId);
@@ -1769,9 +1769,19 @@ export class LogEntriesService {
     if (exists === 0) throw new BadRequestException("El nodo indicado no existe");
   }
 
-  private async assertEquipmentExists(equipmentId: string): Promise<void> {
-    const exists = await this.prisma.equipment.count({ where: { id: equipmentId, deletedAt: null } });
-    if (exists === 0) throw new BadRequestException("El equipo indicado no existe");
+  /**
+   * Valida que el equipo (activo) esté INSTALADO en el nodo de la entrada
+   * (objeto de referencia EAM, 2.8.0.1): la ubicación funcional [nodo] y el activo
+   * [equipo] deben ser consistentes. El front ya ofrece solo los equipos del nodo;
+   * el backend AUTORIZA la coherencia.
+   */
+  private async assertEquipmentInNode(equipmentId: string, orgNodeId: string): Promise<void> {
+    const eq = await this.prisma.equipment.findFirst({
+      where: { id: equipmentId, deletedAt: null },
+      select: { orgNodeId: true, active: true },
+    });
+    if (!eq || !eq.active) throw new BadRequestException("El equipo indicado no existe o está inactivo");
+    if (eq.orgNodeId !== orgNodeId) throw new BadRequestException("El equipo no pertenece al nodo de la entrada");
   }
 
   // --- Alcance de estructura de la plantilla (multi-nodo, Fase 2.8.0) ---------
@@ -1843,9 +1853,32 @@ export class LogEntriesService {
     }
 
     const rows = await this.prisma.orgNode.findMany({ where, select: { id: true, name: true } });
-    const readable = await this.nodePaths(new Set(rows.map((r) => r.id)));
+    const nodeIdList = rows.map((r) => r.id);
+    const readable = await this.nodePaths(new Set(nodeIdList));
+
+    // Equipos ACTIVOS instalados en esos nodos (objeto de referencia EAM, 2.8.0.1):
+    // el equipo en la entrada es OPCIONAL y se ofrece por nodo.
+    const equip = nodeIdList.length
+      ? await this.prisma.equipment.findMany({
+          where: { orgNodeId: { in: nodeIdList }, deletedAt: null, active: true },
+          select: { id: true, name: true, tag: true, orgNodeId: true },
+          orderBy: [{ reportOrder: "asc" }, { name: "asc" }],
+        })
+      : [];
+    const equipByNode = new Map<string, Array<{ id: string; name: string; tag: string | null }>>();
+    for (const e of equip) {
+      const list = equipByNode.get(e.orgNodeId) ?? [];
+      list.push({ id: e.id, name: e.name, tag: e.tag });
+      equipByNode.set(e.orgNodeId, list);
+    }
+
     const nodes = rows
-      .map((r) => ({ id: r.id, name: r.name, path: readable.get(r.id) ?? r.name }))
+      .map((r) => ({
+        id: r.id,
+        name: r.name,
+        path: readable.get(r.id) ?? r.name,
+        equipment: equipByNode.get(r.id) ?? [],
+      }))
       .sort((a, b) => a.path.localeCompare(b.path, "es"));
     return { templateId: template.id, nodes };
   }

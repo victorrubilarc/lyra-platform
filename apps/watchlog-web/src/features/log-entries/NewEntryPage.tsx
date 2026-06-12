@@ -42,6 +42,7 @@ export function NewEntryPage() {
   const [resolvingId, setResolvingId] = useState<string | null>(null);
   const [nodeChoice, setNodeChoice] = useState<{ template: TemplateListItem; nodes: EligibleNode[] } | null>(null);
   const [chosenNode, setChosenNode] = useState("");
+  const [chosenEquipment, setChosenEquipment] = useState("");
 
   // Crear una entrada requiere `logentry:create` (mismo permiso que el endpoint de
   // plantillas disponibles). Quien solo llena/revisa no entra aquí — usa Bitácoras.
@@ -56,17 +57,19 @@ export function NewEntryPage() {
   // Elegir una plantilla NO crea nada (2.8.2): abre el formulario en modo compose;
   // la entrada se materializa recién en el primer guardado real. El diferido
   // declarado aquí viaja por el state de navegación y se aplica al materializar.
-  function goCompose(templateId: string, orgNodeId: string) {
+  function goCompose(templateId: string, orgNodeId: string, equipmentId: string | null) {
     navigate(`/nueva-entrada/comenzar/${templateId}`, {
       state: {
         orgNodeId,
+        equipmentId,
         deferred: deferredOn ? { effectiveAt: localInputToIso(eventAt), reason: reason.trim() } : null,
       },
     });
   }
 
-  // Resuelve los nodos elegibles de la plantilla (asignaciones ∩ alcance del
-  // usuario). 1 nodo → autoselección; >1 → modal que obliga a elegir.
+  // Resuelve los nodos elegibles (asignaciones ∩ alcance) y sus equipos. Se abre el
+  // modal si hay que elegir nodo (>1) y/o equipo (el nodo resuelto tiene equipos,
+  // opcional). 1 nodo sin equipos → directo a compose (cero fricción).
   async function start(tpl: TemplateListItem) {
     if (!deferralReady) {
       toast.error(t("logbook.deferral.incomplete"));
@@ -79,11 +82,12 @@ export function NewEntryPage() {
         toast.error(t("logbook.new.noEligibleNodes"));
         return;
       }
-      if (nodes.length === 1) {
-        goCompose(tpl.id, nodes[0]!.id);
+      if (nodes.length === 1 && nodes[0]!.equipment.length === 0) {
+        goCompose(tpl.id, nodes[0]!.id, null);
         return;
       }
-      setChosenNode("");
+      setChosenNode(nodes.length === 1 ? nodes[0]!.id : "");
+      setChosenEquipment("");
       setNodeChoice({ template: tpl, nodes });
     } catch {
       toast.error(t("logbook.new.loadError"));
@@ -192,7 +196,7 @@ export function NewEntryPage() {
         </div>
       )}
 
-      {/* Selección de NODO obligatoria cuando la plantilla resuelve a varios (2.8.0). */}
+      {/* Nodo (obligatorio si >1) + equipo OPCIONAL del nodo elegido (2.8.0 / 2.8.0.1). */}
       <Modal
         open={nodeChoice !== null}
         onClose={() => setNodeChoice(null)}
@@ -208,8 +212,9 @@ export function NewEntryPage() {
               onClick={() => {
                 if (nodeChoice && chosenNode) {
                   const tplId = nodeChoice.template.id;
+                  const equip = chosenEquipment || null;
                   setNodeChoice(null);
-                  goCompose(tplId, chosenNode);
+                  goCompose(tplId, chosenNode, equip);
                 }
               }}
             >
@@ -218,21 +223,58 @@ export function NewEntryPage() {
           </>
         }
       >
-        {nodeChoice && (
-          <FormField label={t("logbook.new.node")} hint={t("logbook.new.chooseNodeHint")}>
-            {({ id }) => (
-              <Combobox
-                id={id}
-                value={chosenNode}
-                onChange={setChosenNode}
-                options={nodeChoice.nodes.map((n) => ({ value: n.id, label: n.path }))}
-                placeholder={t("logbook.new.nodePlaceholder")}
-                searchPlaceholder={t("common.search")}
-                ariaLabel={t("logbook.new.node")}
-              />
-            )}
-          </FormField>
-        )}
+        {nodeChoice &&
+          (() => {
+            const multiNode = nodeChoice.nodes.length > 1;
+            const current = nodeChoice.nodes.find((n) => n.id === chosenNode) ?? null;
+            const equipment = current?.equipment ?? [];
+            return (
+              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+                {multiNode ? (
+                  <FormField label={t("logbook.new.node")} hint={t("logbook.new.chooseNodeHint")}>
+                    {({ id }) => (
+                      <Combobox
+                        id={id}
+                        value={chosenNode}
+                        onChange={(v) => {
+                          setChosenNode(v);
+                          setChosenEquipment(""); // el equipo depende del nodo
+                        }}
+                        options={nodeChoice.nodes.map((n) => ({ value: n.id, label: n.path }))}
+                        placeholder={t("logbook.new.nodePlaceholder")}
+                        searchPlaceholder={t("common.search")}
+                        ariaLabel={t("logbook.new.node")}
+                      />
+                    )}
+                  </FormField>
+                ) : (
+                  <FormField label={t("logbook.new.node")}>
+                    {() => <div className={styles.nodeFixed}>{current?.path}</div>}
+                  </FormField>
+                )}
+
+                {/* Equipo OPCIONAL: solo si el nodo elegido tiene equipos activos. */}
+                {equipment.length > 0 && (
+                  <FormField label={t("logbook.new.equipment")} hint={t("logbook.new.equipmentHint")}>
+                    {({ id }) => (
+                      <Combobox
+                        id={id}
+                        value={chosenEquipment}
+                        onChange={setChosenEquipment}
+                        options={[
+                          { value: "", label: t("logbook.new.equipmentNone") },
+                          ...equipment.map((e) => ({ value: e.id, label: e.tag ? `${e.name} · ${e.tag}` : e.name })),
+                        ]}
+                        placeholder={t("logbook.new.equipmentNone")}
+                        searchPlaceholder={t("common.search")}
+                        ariaLabel={t("logbook.new.equipment")}
+                      />
+                    )}
+                  </FormField>
+                )}
+              </div>
+            );
+          })()}
       </Modal>
     </div>
   );

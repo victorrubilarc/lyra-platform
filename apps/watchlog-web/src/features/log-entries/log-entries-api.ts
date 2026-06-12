@@ -50,9 +50,14 @@ export function fetchLogEntry(id: string): Promise<LogEntryDetail> {
  * detalle que produciría crear+abrir, con `id: ""`. La entrada se materializa
  * recién en el primer guardado real.
  */
-export function fetchNewLogEntryPreview(templateId: string, orgNodeId?: string | null): Promise<LogEntryDetail> {
+export function fetchNewLogEntryPreview(
+  templateId: string,
+  orgNodeId?: string | null,
+  equipmentId?: string | null,
+): Promise<LogEntryDetail> {
   const qs = new URLSearchParams({ templateId });
   if (orgNodeId) qs.set("orgNodeId", orgNodeId);
+  if (equipmentId) qs.set("equipmentId", equipmentId);
   return apiJson(`/log-entries/new?${qs.toString()}`, logEntryDetailSchema);
 }
 
