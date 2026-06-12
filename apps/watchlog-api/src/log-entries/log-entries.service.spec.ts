@@ -10,6 +10,7 @@ import type { FiscalResolver } from "../fiscal-calendar/fiscal-resolver";
 import type { OperationalPeriodService } from "../operational-periods/operational-periods.service";
 import type { PermissionService } from "../authz/permission.service";
 import type { PrismaService } from "../prisma/prisma.service";
+import type { SettingsService } from "../settings/settings.service";
 
 const ctx = { actorId: "u1", actorEmail: "u@x.cl", ip: null, userAgent: null };
 
@@ -63,6 +64,8 @@ function makeService(
     reauth?: Partial<ReauthService>;
     periods?: Partial<OperationalPeriodService>;
     perms?: string[];
+    /** Ventana de edición global (2.7.2). Default: sin ventana (hours null). */
+    editWindow?: { editWindowAnchor: "RECORDED" | "EFFECTIVE"; editWindowHours: number | null; requireMfaEditWindowOverride: boolean };
   } = {},
 ) {
   const tx = {
@@ -113,8 +116,15 @@ function makeService(
   const permissions = {
     getEffectivePermissions: vi.fn().mockResolvedValue(new Set(opts.perms ?? [])),
   } as unknown as PermissionService;
+  const settings = {
+    editWindowSettings: vi
+      .fn()
+      .mockResolvedValue(
+        opts.editWindow ?? { editWindowAnchor: "RECORDED", editWindowHours: null, requireMfaEditWindowOverride: false },
+      ),
+  } as unknown as SettingsService;
   return {
-    service: new LogEntriesService(prisma, audit, scope, shiftResolver, fiscalResolver, reauth, enc, periods, permissions),
+    service: new LogEntriesService(prisma, audit, scope, shiftResolver, fiscalResolver, reauth, enc, periods, permissions, settings),
     prisma,
     audit,
     shiftResolver,
@@ -122,6 +132,7 @@ function makeService(
     enc,
     periods,
     permissions,
+    settings,
     tx,
   };
 }
@@ -766,5 +777,238 @@ describe("LogEntriesService — executeTransition", () => {
 
     await service.executeTransition("u1", "e1", { transitionKey: "approve", password: "x", mfaCode: "123456" }, ctx);
     expect(reauth.verifyForSignature).toHaveBeenCalledWith("u1", expect.objectContaining({ mfaCode: "123456" }), { requireMfa: true });
+  });
+});
+
+describe("LogEntriesService — ventana de edición (2.7.2)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  /** Entrada capturada hace 72 h (ventana global de 48 h ⇒ VENCIDA). */
+  const oldEntry = {
+    id: "e1",
+    status: "DRAFT",
+    orgNodeId: "n1",
+    templateId: "t1",
+    templateVersionId: "v1",
+    currentStateKey: null,
+    sealedAt: null,
+    recordedAt: new Date(Date.now() - 72 * 3_600_000),
+    effectiveAt: new Date(Date.now() - 72 * 3_600_000),
+    declaredEffectiveAt: null,
+  };
+
+  function setupWindow(
+    opts: { perms?: string[]; requireMfa?: boolean; hours?: number | null; entry?: Record<string, unknown> } = {},
+    prismaOver: Record<string, unknown> = {},
+  ) {
+    const m = makeService(
+      {
+        logEntry: {
+          findFirst: vi.fn().mockResolvedValue({ ...oldEntry, ...(opts.entry ?? {}) }),
+          update: vi.fn().mockResolvedValue({}),
+          create: vi.fn(),
+          findMany: vi.fn(),
+        },
+        templateVersion: {
+          findUnique: vi
+            .fn()
+            .mockResolvedValue(versionGraph([section("s1", [field({ key: "obs", type: "TEXT", dataType: "STRING", label: "Obs" })])])),
+        },
+        logEntrySection: {
+          findUnique: vi.fn().mockResolvedValue({ id: "ls1", version: 0 }),
+          findMany: vi.fn().mockResolvedValue([]),
+          update: vi.fn(),
+        },
+        logEntryValue: { findMany: vi.fn().mockResolvedValue([]) },
+        ...prismaOver,
+      },
+      {
+        perms: opts.perms ?? [],
+        editWindow: {
+          editWindowAnchor: "RECORDED",
+          editWindowHours: opts.hours === undefined ? 48 : opts.hours,
+          requireMfaEditWindowOverride: Boolean(opts.requireMfa),
+        },
+      },
+    );
+    return m;
+  }
+
+  it("vencida SIN permiso de excepción → 403 y nada se persiste", async () => {
+    const { service, tx } = setupWindow();
+    await expect(
+      service.saveSection("u1", "e1", "s1", { expectedVersion: 0, values: [{ fieldKey: "obs", value: "x" }] }, ctx),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(tx.logEntryValue.upsert).not.toHaveBeenCalled();
+  });
+
+  it("vencida CON permiso pero SIN motivo → 400 (el motivo es obligatorio, GxP)", async () => {
+    const { service } = setupWindow({ perms: ["logentry:write-expired"] });
+    await expect(
+      service.saveSection("u1", "e1", "s1", { expectedVersion: 0, values: [{ fieldKey: "obs", value: "x" }] }, ctx),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it("vencida CON permiso + motivo → guarda, el FieldChange lleva el motivo y se audita el override", async () => {
+    const { service, tx, audit } = setupWindow({ perms: ["logentry:write-expired"] });
+    vi.spyOn(service, "getDetail").mockResolvedValue({ id: "e1" } as never);
+
+    await service.saveSection(
+      "u1",
+      "e1",
+      "s1",
+      { expectedVersion: 0, values: [{ fieldKey: "obs", value: "x" }], overrideReason: "Corrección autorizada por QA" },
+      ctx,
+    );
+
+    expect(tx.logEntryFieldChange.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ reason: "Corrección autorizada por QA" }) }),
+    );
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "logentry.editwindow.override",
+        metadata: expect.objectContaining({ operation: "section.saved", reason: "Corrección autorizada por QA", mfaVerified: false }),
+      }),
+    );
+  });
+
+  it("override con MFA exigido por el ajuste → re-auth step-up y mfaVerified estampado", async () => {
+    const { service, reauth, audit } = setupWindow({ perms: ["logentry:write-expired"], requireMfa: true });
+    vi.spyOn(service, "getDetail").mockResolvedValue({ id: "e1" } as never);
+
+    await service.saveSection(
+      "u1",
+      "e1",
+      "s1",
+      {
+        expectedVersion: 0,
+        values: [{ fieldKey: "obs", value: "x" }],
+        overrideReason: "Corrección autorizada",
+        password: "pw",
+        mfaCode: "123456",
+      },
+      ctx,
+    );
+
+    expect(reauth.verifyForSignature).toHaveBeenCalledWith(
+      "u1",
+      expect.objectContaining({ password: "pw", mfaCode: "123456" }),
+      { requireMfa: true },
+    );
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "logentry.editwindow.override",
+        metadata: expect.objectContaining({ mfaVerified: true }),
+      }),
+    );
+  });
+
+  it("dentro de ventana NO exige motivo (el canal normal no cambia)", async () => {
+    const { service, tx } = setupWindow({ entry: { recordedAt: new Date(), effectiveAt: new Date() } });
+    vi.spyOn(service, "getDetail").mockResolvedValue({ id: "e1" } as never);
+    await service.saveSection("u1", "e1", "s1", { expectedVersion: 0, values: [{ fieldKey: "obs", value: "x" }] }, ctx);
+    expect(tx.logEntryValue.upsert).toHaveBeenCalled();
+  });
+
+  it("sin ventana configurada (hours null) nunca bloquea", async () => {
+    const { service, tx } = setupWindow({ hours: null });
+    vi.spyOn(service, "getDetail").mockResolvedValue({ id: "e1" } as never);
+    await service.saveSection("u1", "e1", "s1", { expectedVersion: 0, values: [{ fieldKey: "obs", value: "x" }] }, ctx);
+    expect(tx.logEntryValue.upsert).toHaveBeenCalled();
+  });
+
+  it("'gana la más estricta': el período cerrado bloquea aunque el actor tenga el override de ventana", async () => {
+    const m = makeService(
+      {
+        logEntry: { findFirst: vi.fn().mockResolvedValue(oldEntry), update: vi.fn(), create: vi.fn(), findMany: vi.fn() },
+        templateVersion: {
+          findUnique: vi
+            .fn()
+            .mockResolvedValue(versionGraph([section("s1", [field({ key: "obs", type: "TEXT", dataType: "STRING", label: "Obs" })])])),
+        },
+        logEntrySection: { findUnique: vi.fn().mockResolvedValue({ id: "ls1", version: 0 }), update: vi.fn() },
+        logEntryValue: { findMany: vi.fn().mockResolvedValue([]) },
+      },
+      {
+        perms: ["logentry:write-expired"],
+        periods: { assertWritable: vi.fn().mockRejectedValue(new ForbiddenException("Período cerrado")) },
+        editWindow: { editWindowAnchor: "RECORDED", editWindowHours: 48, requireMfaEditWindowOverride: false },
+      },
+    );
+    await expect(
+      m.service.saveSection(
+        "u1",
+        "e1",
+        "s1",
+        { expectedVersion: 0, values: [{ fieldKey: "obs", value: "x" }], overrideReason: "Corrección autorizada" },
+        ctx,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(m.audit.record).not.toHaveBeenCalledWith(expect.objectContaining({ action: "logentry.editwindow.override" }));
+  });
+
+  it("setDeferral fuera de ventana sin permiso → 403 (declarar el diferido es corrección de dato)", async () => {
+    const { service } = setupWindow();
+    await expect(
+      service.setDeferral(
+        "u1",
+        "e1",
+        { deferred: { effectiveAt: new Date().toISOString(), reason: "Llegó tarde el reporte" } },
+        ctx,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it("getDetail expone la huella editWindow y blockedReason EDIT_WINDOW_EXPIRED para el actor sin permiso", async () => {
+    const { service } = setupWindow({
+      entry: {
+        entryNumber: 7,
+        workflowDefinitionId: null,
+        workflowDefinitionVersionId: null,
+        equipmentId: null,
+        shiftCode: null,
+        operationalDate: null,
+        periodKey: null,
+        entryOrigin: "ONLINE",
+        deferredReason: null,
+        deferredDeclaredAt: null,
+        deferredDeclaredById: null,
+        createdById: "u1",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    });
+
+    const detail = await service.getDetail("u1", "e1");
+
+    expect(detail.editWindow).toMatchObject({ anchor: "RECORDED", windowHours: 48, expired: true, canOverride: false });
+    expect(detail.sectionStates[0]).toMatchObject({ editable: false, blockedReason: "EDIT_WINDOW_EXPIRED" });
+  });
+
+  it("getDetail con el permiso de override: la sección sigue editable y canOverride = true", async () => {
+    const { service } = setupWindow({
+      perms: ["logentry:write-expired"],
+      entry: {
+        entryNumber: 7,
+        workflowDefinitionId: null,
+        workflowDefinitionVersionId: null,
+        equipmentId: null,
+        shiftCode: null,
+        operationalDate: null,
+        periodKey: null,
+        entryOrigin: "ONLINE",
+        deferredReason: null,
+        deferredDeclaredAt: null,
+        deferredDeclaredById: null,
+        createdById: "u1",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    });
+
+    const detail = await service.getDetail("u1", "e1");
+
+    expect(detail.editWindow).toMatchObject({ expired: true, canOverride: true });
+    expect(detail.sectionStates[0]).toMatchObject({ editable: true, blockedReason: null });
   });
 });

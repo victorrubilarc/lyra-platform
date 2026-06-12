@@ -1,5 +1,11 @@
 import { Injectable } from "@nestjs/common";
-import type { PeriodGovernanceAction, PeriodReauthMap, SystemSettingsDto, UpdateSystemSettingsRequest } from "@lyra/contracts";
+import type {
+  EditWindowAnchor,
+  PeriodGovernanceAction,
+  PeriodReauthMap,
+  SystemSettingsDto,
+  UpdateSystemSettingsRequest,
+} from "@lyra/contracts";
 import { AuditService, type AuditContext } from "../audit/audit.service";
 import { PrismaService } from "../prisma/prisma.service";
 
@@ -10,12 +16,35 @@ type SettingsRow = {
   requireMfaPeriodReopen: boolean;
   requireMfaPeriodLock: boolean;
   requireMfaPeriodUnlock: boolean;
+  editWindowAnchor: EditWindowAnchor;
+  editWindowHours: number | null;
+  requireMfaEditWindowOverride: boolean;
+};
+
+const SETTINGS_SELECT = {
+  requireMfaPeriodClose: true,
+  requireMfaPeriodReopen: true,
+  requireMfaPeriodLock: true,
+  requireMfaPeriodUnlock: true,
+  editWindowAnchor: true,
+  editWindowHours: true,
+  requireMfaEditWindowOverride: true,
+} as const;
+
+const SETTINGS_DEFAULTS: SettingsRow = {
+  requireMfaPeriodClose: false,
+  requireMfaPeriodReopen: false,
+  requireMfaPeriodLock: false,
+  requireMfaPeriodUnlock: false,
+  editWindowAnchor: "RECORDED",
+  editWindowHours: null,
+  requireMfaEditWindowOverride: false,
 };
 
 /**
- * Configuración del sistema (Fase 2.7.1.1 UX). Fila singleton (`id="system"`).
- * Hoy alberga la re-autenticación MFA de gobernanza de período POR ACCIÓN; exporta el
- * helper que consume `OperationalPeriodService` para el gate.
+ * Configuración del sistema (Fase 2.7.1.1 UX → 2.7.2). Fila singleton (`id="system"`).
+ * Alberga la re-autenticación MFA de gobernanza de período POR ACCIÓN y la VENTANA DE
+ * EDICIÓN global (fallback de las plantillas) con su propio gate de MFA para el override.
  */
 @Injectable()
 export class SettingsService {
@@ -36,6 +65,9 @@ export class SettingsService {
       requireMfaPeriodReopen: row.requireMfaPeriodReopen,
       requireMfaPeriodLock: row.requireMfaPeriodLock,
       requireMfaPeriodUnlock: row.requireMfaPeriodUnlock,
+      editWindowAnchor: row.editWindowAnchor,
+      editWindowHours: row.editWindowHours,
+      requireMfaEditWindowOverride: row.requireMfaEditWindowOverride,
       updatedAt: row.updatedAt.toISOString(),
       updatedByName,
     };
@@ -58,6 +90,24 @@ export class SettingsService {
     return map[action];
   }
 
+  /**
+   * Ventana de edición GLOBAL (2.7.2): fallback de las plantillas sin config propia
+   * + el gate de MFA del override, en UNA lectura (la guarda y la huella de
+   * `getDetail` necesitan ambos).
+   */
+  async editWindowSettings(): Promise<{
+    editWindowAnchor: EditWindowAnchor;
+    editWindowHours: number | null;
+    requireMfaEditWindowOverride: boolean;
+  }> {
+    const row = await this.read();
+    return {
+      editWindowAnchor: row.editWindowAnchor,
+      editWindowHours: row.editWindowHours,
+      requireMfaEditWindowOverride: row.requireMfaEditWindowOverride,
+    };
+  }
+
   async update(dto: UpdateSystemSettingsRequest, actorId: string, ctx: AuditContext): Promise<SystemSettingsDto> {
     const before = await this.get();
     await this.prisma.systemSettings.upsert({
@@ -71,39 +121,30 @@ export class SettingsService {
       action: "settings.updated",
       entityType: "SystemSettings",
       entityId: SINGLETON_ID,
-      before: {
-        requireMfaPeriodClose: before.requireMfaPeriodClose,
-        requireMfaPeriodReopen: before.requireMfaPeriodReopen,
-        requireMfaPeriodLock: before.requireMfaPeriodLock,
-        requireMfaPeriodUnlock: before.requireMfaPeriodUnlock,
-      },
-      after: {
-        requireMfaPeriodClose: after.requireMfaPeriodClose,
-        requireMfaPeriodReopen: after.requireMfaPeriodReopen,
-        requireMfaPeriodLock: after.requireMfaPeriodLock,
-        requireMfaPeriodUnlock: after.requireMfaPeriodUnlock,
-      },
+      before: this.auditShape(before),
+      after: this.auditShape(after),
     });
     return after;
+  }
+
+  /** Foto auditable de los ajustes (sin metadatos de actualización). */
+  private auditShape(dto: SystemSettingsDto) {
+    return {
+      requireMfaPeriodClose: dto.requireMfaPeriodClose,
+      requireMfaPeriodReopen: dto.requireMfaPeriodReopen,
+      requireMfaPeriodLock: dto.requireMfaPeriodLock,
+      requireMfaPeriodUnlock: dto.requireMfaPeriodUnlock,
+      editWindowAnchor: dto.editWindowAnchor,
+      editWindowHours: dto.editWindowHours,
+      requireMfaEditWindowOverride: dto.requireMfaEditWindowOverride,
+    };
   }
 
   private async read(): Promise<SettingsRow> {
     const row = await this.prisma.systemSettings.findUnique({
       where: { id: SINGLETON_ID },
-      select: {
-        requireMfaPeriodClose: true,
-        requireMfaPeriodReopen: true,
-        requireMfaPeriodLock: true,
-        requireMfaPeriodUnlock: true,
-      },
+      select: SETTINGS_SELECT,
     });
-    return (
-      row ?? {
-        requireMfaPeriodClose: false,
-        requireMfaPeriodReopen: false,
-        requireMfaPeriodLock: false,
-        requireMfaPeriodUnlock: false,
-      }
-    );
+    return row ?? SETTINGS_DEFAULTS;
   }
 }

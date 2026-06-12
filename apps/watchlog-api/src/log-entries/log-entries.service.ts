@@ -8,6 +8,7 @@ import {
 import type {
   AvailableTransitionDto,
   CreateLogEntryRequest,
+  EditWindowInfo,
   ExecuteTransitionRequest,
   FieldForValidation,
   LogEntryDetail,
@@ -29,9 +30,12 @@ import type {
 import {
   availableTransitionsFor,
   canonicalSignaturePayload,
+  editWindowDeadline,
+  isEditWindowExpired,
   isEmptyValue,
   isFieldVisible,
   isSectionEditableInState,
+  resolveEditWindow,
   resolveEffectiveAt,
   thresholdBandFor,
   upgradeFieldConfig,
@@ -47,10 +51,25 @@ import { ShiftResolver } from "../operational-calendar/shift-resolver";
 import { FiscalResolver } from "../fiscal-calendar/fiscal-resolver";
 import { OperationalPeriodService } from "../operational-periods/operational-periods.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { SettingsService } from "../settings/settings.service";
 
 /** Significado por defecto de la firma de completitud de sección (las secciones no
  * portan un campo de significado; las transiciones sí vía `signatureMeaning`). */
 const SECTION_SIGNATURE_MEANING = "Sección completada y firmada";
+
+/**
+ * Permiso de excepción que permite escribir con la ventana de edición VENCIDA
+ * (Fase 2.7.2). Espejo de `opsperiod:write-closed`, con una diferencia GxP: este
+ * override exige MOTIVO auditado en cada escritura (corrección excepcional).
+ */
+export const EDIT_WINDOW_OVERRIDE_PERMISSION = "logentry:write-expired";
+
+/** Huella de un override de ventana de edición concedido (para estampar/auditar). */
+interface EditWindowOverride {
+  reason: string;
+  mfaVerified: boolean;
+  windowExpiredAt: string;
+}
 
 /** Versión completa (secciones → campos → roles) para renderizar y validar. */
 export const versionInclude = {
@@ -141,6 +160,7 @@ export class LogEntriesService {
     private readonly enc: EncryptionService,
     private readonly periods: OperationalPeriodService,
     private readonly permissions: PermissionService,
+    private readonly settings: SettingsService,
   ) {}
 
   // --- Crear (abrir) una entrada ---------------------------------------------
@@ -292,28 +312,56 @@ export class LogEntriesService {
       version.sections.flatMap((s) => s.roles.map((r) => r.roleId)),
     );
 
+    const perms = await this.permissions.getEffectivePermissions(userId);
+
     // Huella de período (2.7.1): si la fecha efectiva cae en un período en cierre/
     // cerrado y el actor NO tiene la excepción, todas las secciones quedan bloqueadas
     // con PERIOD_CLOSED (la congelación del período es un gate uniforme de la entrada).
     const periodBlocked =
-      editable &&
-      (await this.periods.isWriteBlockedForActor(
-        entry.effectiveAt,
-        entry.orgNodeId,
-        await this.permissions.getEffectivePermissions(userId),
-      ));
+      editable && (await this.periods.isWriteBlockedForActor(entry.effectiveAt, entry.orgNodeId, perms));
+
+    // Huella de ventana de edición (2.7.2): la UI muestra proactivamente "Editable
+    // hasta X" y, vencida, el motivo del bloqueo. Quien tiene el override NO queda
+    // bloqueado (la UI le pedirá motivo al guardar; el backend lo exige igual).
+    const windowSettings = await this.settings.editWindowSettings();
+    const windowCfg = resolveEditWindow(
+      {
+        editWindowAnchor: template?.editWindowAnchor ?? null,
+        editWindowHours: template?.editWindowHours ?? null,
+      },
+      windowSettings,
+    );
+    let editWindow: EditWindowInfo | null = null;
+    let windowBlocked = false;
+    if (windowCfg) {
+      const deadline = editWindowDeadline(windowCfg, entry.recordedAt, entry.effectiveAt);
+      const expired = isEditWindowExpired(deadline, new Date());
+      const canOverride = perms.has(EDIT_WINDOW_OVERRIDE_PERMISSION);
+      editWindow = {
+        anchor: windowCfg.anchor,
+        windowHours: windowCfg.windowHours,
+        expiresAt: deadline.toISOString(),
+        expired,
+        canOverride,
+        overrideRequiresMfa: windowSettings.requireMfaEditWindowOverride,
+      };
+      windowBlocked = editable && expired && !canOverride;
+    }
 
     const sectionStates: LogEntrySectionStateDto[] = version.sections.map((def) => {
       const row = sectionRows.find((r) => r.sectionKey === def.key);
       const sig = row?.signatureId ? sigById.get(row.signatureId) : undefined;
       const sectionRoleIds = def.roles.map((r) => r.roleId);
       // Motivo de bloqueo para ESTE usuario (la UI lo comunica tal cual). Orden de
-      // precedencia: registro sellado → período cerrado → reglas de la sección.
+      // precedencia (del menos al más accionable): registro sellado → período
+      // cerrado → ventana vencida → reglas de la sección.
       const blockedReason: SectionBlockedReason | null = !editable
         ? "ENTRY_CLOSED"
         : periodBlocked
           ? "PERIOD_CLOSED"
-          : this.sectionBlockedReasonFor(def.editableInStateKey, sectionRoleIds, entry.currentStateKey, roleIds);
+          : windowBlocked
+            ? "EDIT_WINDOW_EXPIRED"
+            : this.sectionBlockedReasonFor(def.editableInStateKey, sectionRoleIds, entry.currentStateKey, roleIds);
       return {
         sectionKey: def.key,
         state: row?.state ?? "PENDING",
@@ -400,6 +448,7 @@ export class LogEntriesService {
       deferredDeclaredByName: entry.deferredDeclaredById
         ? (actorNames.get(entry.deferredDeclaredById) ?? null)
         : null,
+      editWindow,
       version: this.mapVersion(version),
       workflowVersion: wfVersion ? this.mapWorkflowVersion(wfVersion) : null,
       currentStateName,
@@ -496,6 +545,10 @@ export class LogEntriesService {
       entry.orgNodeId,
       await this.permissions.getEffectivePermissions(userId),
     );
+    // Guarda de ventana de edición (2.7.2), en AND con la de período ("gana la
+    // más estricta", cada una con su propio bypass). Vencida ⇒ exige permiso de
+    // excepción + motivo (+ MFA si el ajuste lo pide).
+    const windowOverride = await this.assertEditWindowWritable(entry, userId, dto);
 
     // Validación 100% en servidor (tipo/rango/umbral/formato/catálogo), saltando
     // campos ocultos por visibleWhen. Los obligatorios solo se exigen al completar.
@@ -563,6 +616,9 @@ export class LogEntriesService {
             fieldKey: input.fieldKey,
             before: this.toJson(beforeVal),
             after: this.toJson(afterVal),
+            // Cambio hecho FUERA de ventana: el motivo del override queda también
+            // en el historial por campo (no solo en el AuditLog), patrón GxP.
+            reason: windowOverride?.reason ?? null,
             changedById: userId,
             // Mismo instante que la firma de completitud (si la hay): el rebobinado
             // de la verificación de integridad excluye con `> signedAt` exactamente
@@ -625,19 +681,28 @@ export class LogEntriesService {
       }
     });
 
+    if (windowOverride) {
+      await this.auditEditWindowOverride(ctx, id, "section.saved", windowOverride, { sectionKey });
+    }
     await this.audit.record({
       ...ctx,
       action: "logentry.section.saved",
       entityType: "LogEntry",
       entityId: id,
-      metadata: { sectionKey, complete: Boolean(dto.markComplete), signed: mustSign, warnings: warnings.length },
+      metadata: {
+        sectionKey,
+        complete: Boolean(dto.markComplete),
+        signed: mustSign,
+        warnings: warnings.length,
+        ...(windowOverride ? { editWindowOverride: true } : {}),
+      },
     });
     return this.getDetail(userId, id);
   }
 
   // --- Enviar (finaliza un form SIN flujo; sella las dimensiones) -------------
 
-  async submit(userId: string, id: string, _dto: SubmitLogEntryRequest, ctx: AuditContext): Promise<LogEntryDetail> {
+  async submit(userId: string, id: string, dto: SubmitLogEntryRequest, ctx: AuditContext): Promise<LogEntryDetail> {
     const entry = await this.loadEntry(id);
     if (entry.status !== "DRAFT") throw new BadRequestException("La entrada ya fue finalizada o anulada");
     await this.assertNodeInScope(userId, entry.orgNodeId);
@@ -674,16 +739,27 @@ export class LogEntriesService {
     // Guarda de período (2.7.1): sellar es el commit GxP; su effectiveAt no puede
     // caer en un período en cierre/cerrado sin permiso de excepción.
     await this.periods.assertWritable(seal.effectiveAt, entry.orgNodeId, await this.permissions.getEffectivePermissions(userId));
+    // Guarda de ventana (2.7.2): sellar tarde un borrador abandonado es exactamente
+    // la finalización tardía que GxP exige flaguear (override con motivo).
+    const windowOverride = await this.assertEditWindowWritable(entry, userId, dto);
     await this.prisma.logEntry.update({
       where: { id },
       data: { status: "SUBMITTED", sealedAt, ...seal, updatedById: userId },
     });
+    if (windowOverride) {
+      await this.auditEditWindowOverride(ctx, id, "submitted", windowOverride);
+    }
     await this.audit.record({
       ...ctx,
       action: "logentry.submitted",
       entityType: "LogEntry",
       entityId: id,
-      after: { effectiveAt: seal.effectiveAt.toISOString(), shiftCode: seal.shiftCode, periodKey: seal.periodKey },
+      after: {
+        effectiveAt: seal.effectiveAt.toISOString(),
+        shiftCode: seal.shiftCode,
+        periodKey: seal.periodKey,
+        ...(windowOverride ? { editWindowOverride: true } : {}),
+      },
     });
     return this.getDetail(userId, id);
   }
@@ -732,6 +808,9 @@ export class LogEntriesService {
     // cae en un período en cierre/cerrado se rechaza con PERIOD_CLOSED (misma guarda
     // y mismo motivo visible que el resto de las escrituras), salvo excepción.
     await this.periods.assertWritable(effectiveAt, entry.orgNodeId, await this.permissions.getEffectivePermissions(userId));
+    // Guarda de ventana (2.7.2): declarar/corregir/quitar el diferimiento MUTA la
+    // fecha efectiva (es corrección de dato) ⇒ misma guarda que saveSection.
+    const windowOverride = await this.assertEditWindowWritable(entry, userId, dto);
 
     const dims = await this.resolveDims(effectiveAt, entry.orgNodeId);
 
@@ -756,6 +835,9 @@ export class LogEntriesService {
       });
     });
 
+    if (windowOverride) {
+      await this.auditEditWindowOverride(ctx, id, dto.deferred ? "deferral.declared" : "deferral.cleared", windowOverride);
+    }
     await this.audit.record({
       ...ctx,
       action: dto.deferred ? "logentry.deferral.declared" : "logentry.deferral.cleared",
@@ -1298,6 +1380,97 @@ export class LogEntriesService {
       }
     }
     return result;
+  }
+
+  /**
+   * Ventana de edición EFECTIVA de la entrada (2.7.2): config de la plantilla
+   * (contenedor mutable) con fallback global. null = sin ventana.
+   */
+  private async editWindowConfigFor(templateId: string) {
+    const template = await this.prisma.template.findUnique({
+      where: { id: templateId },
+      select: { editWindowAnchor: true, editWindowHours: true },
+    });
+    const globalCfg = await this.settings.editWindowSettings();
+    return {
+      config: resolveEditWindow(
+        { editWindowAnchor: template?.editWindowAnchor ?? null, editWindowHours: template?.editWindowHours ?? null },
+        globalCfg,
+      ),
+      requireMfaOverride: globalCfg.requireMfaEditWindowOverride,
+    };
+  }
+
+  /**
+   * Guarda de VENTANA DE EDICIÓN (Fase 2.7.2) sobre una escritura de la entrada
+   * (saveSection / setDeferral / submit; NO create ni executeTransition — la
+   * ventana gobierna la corrección de DATOS, no el avance del flujo). Si la
+   * ventana venció: exige el permiso de excepción `logentry:write-expired` +
+   * MOTIVO (GxP: corrección excepcional justificada) y, si el ajuste lo pide,
+   * re-auth con MFA. Devuelve la huella del override para estampar en la
+   * auditoría, o null si la escritura está dentro de ventana.
+   *
+   * Convive con la guarda de período en AND ("gana la más estricta"): cada guarda
+   * tiene su PROPIO bypass; ésta se evalúa DESPUÉS (PERIOD_CLOSED precede). El
+   * ancla EFFECTIVE usa la effectiveAt PERSISTIDA (pre-edición): editar el campo
+   * de fecha efectiva no puede "reabrir" la ventana en el mismo guardado.
+   */
+  private async assertEditWindowWritable(
+    entry: Pick<LogEntryRow, "templateId" | "recordedAt" | "effectiveAt">,
+    userId: string,
+    dto: { overrideReason?: string; password?: string; mfaCode?: string },
+  ): Promise<EditWindowOverride | null> {
+    const { config, requireMfaOverride } = await this.editWindowConfigFor(entry.templateId);
+    if (!config) return null;
+    const deadline = editWindowDeadline(config, entry.recordedAt, entry.effectiveAt);
+    if (!isEditWindowExpired(deadline, new Date())) return null;
+
+    const perms = await this.permissions.getEffectivePermissions(userId);
+    if (!perms.has(EDIT_WINDOW_OVERRIDE_PERMISSION)) {
+      throw new ForbiddenException(
+        "La ventana de edición de este registro venció: no puede modificarlo (se requiere permiso de excepción).",
+      );
+    }
+    const reason = dto.overrideReason?.trim();
+    if (!reason || reason.length < 5) {
+      throw new BadRequestException(
+        "Editar fuera de la ventana exige un motivo (mínimo 5 caracteres): la corrección excepcional queda justificada y auditada.",
+      );
+    }
+    let mfaVerified = false;
+    if (requireMfaOverride) {
+      // Mismo motor que las firmas Part 11 / gobernanza de período (step-up NIST).
+      await this.reauth.verifyForSignature(userId, { password: dto.password, mfaCode: dto.mfaCode }, { requireMfa: true });
+      mfaVerified = true;
+    }
+    return { reason, mfaVerified, windowExpiredAt: deadline.toISOString() };
+  }
+
+  /**
+   * Evento de auditoría DEDICADO del override de ventana (consultable por acción:
+   * "todas las ediciones fuera de ventana" es una pregunta de auditor GxP). Se
+   * registra DESPUÉS de que la escritura se persistió.
+   */
+  private async auditEditWindowOverride(
+    ctx: AuditContext,
+    entryId: string,
+    operation: string,
+    override: EditWindowOverride,
+    extra: Record<string, unknown> = {},
+  ): Promise<void> {
+    await this.audit.record({
+      ...ctx,
+      action: "logentry.editwindow.override",
+      entityType: "LogEntry",
+      entityId: entryId,
+      metadata: {
+        operation,
+        reason: override.reason,
+        mfaVerified: override.mfaVerified,
+        windowExpiredAt: override.windowExpiredAt,
+        ...extra,
+      },
+    });
   }
 
   /**

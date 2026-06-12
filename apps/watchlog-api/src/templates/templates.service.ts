@@ -121,6 +121,8 @@ export class TemplatesService {
         orgNodeId: t.orgNodeId,
         status: t.status,
         currentVersionId: t.currentVersionId,
+        editWindowAnchor: t.editWindowAnchor,
+        editWindowHours: t.editWindowHours,
         createdAt: t.createdAt.toISOString(),
         updatedAt: t.updatedAt.toISOString(),
         orgNodePath: t.orgNodeId ? (nodePaths.get(t.orgNodeId) ?? null) : null,
@@ -163,6 +165,8 @@ export class TemplatesService {
       orgNodeId: template.orgNodeId,
       status: template.status,
       currentVersionId: template.currentVersionId,
+      editWindowAnchor: template.editWindowAnchor,
+      editWindowHours: template.editWindowHours,
       createdAt: template.createdAt.toISOString(),
       updatedAt: template.updatedAt.toISOString(),
       version: this.mapVersion(version),
@@ -181,6 +185,8 @@ export class TemplatesService {
         description: dto.description ?? null,
         orgNodeId: dto.orgNodeId ?? null,
         status: "DRAFT",
+        editWindowAnchor: dto.editWindowAnchor ?? null,
+        editWindowHours: dto.editWindowHours ?? null,
         createdById: userId,
         updatedById: userId,
         versions: {
@@ -199,12 +205,15 @@ export class TemplatesService {
     if (!before) throw new NotFoundException("Plantilla no encontrada");
     if (dto.orgNodeId) await this.assertNodeExists(dto.orgNodeId);
 
-    await this.prisma.template.update({
+    const updated = await this.prisma.template.update({
       where: { id },
       data: {
         name: dto.name ?? undefined,
         description: dto.description === undefined ? undefined : dto.description,
         orgNodeId: dto.orgNodeId === undefined ? undefined : dto.orgNodeId,
+        // Ventana de edición (2.7.2): gobernanza viva, editable sin republicar.
+        editWindowAnchor: dto.editWindowAnchor === undefined ? undefined : dto.editWindowAnchor,
+        editWindowHours: dto.editWindowHours === undefined ? undefined : dto.editWindowHours,
         updatedById: userId,
       },
     });
@@ -219,7 +228,25 @@ export class TemplatesService {
         },
       });
     }
-    await this.audit.record({ ...ctx, action: "template.updated", entityType: "Template", entityId: id, before: { name: before.name, orgNodeId: before.orgNodeId } });
+    await this.audit.record({
+      ...ctx,
+      action: "template.updated",
+      entityType: "Template",
+      entityId: id,
+      // La ventana de edición es config de GOBERNANZA: su cambio queda con before/after.
+      before: {
+        name: before.name,
+        orgNodeId: before.orgNodeId,
+        editWindowAnchor: before.editWindowAnchor,
+        editWindowHours: before.editWindowHours,
+      },
+      after: {
+        name: updated.name,
+        orgNodeId: updated.orgNodeId,
+        editWindowAnchor: updated.editWindowAnchor,
+        editWindowHours: updated.editWindowHours,
+      },
+    });
     return this.getDetail(userId, id);
   }
 
