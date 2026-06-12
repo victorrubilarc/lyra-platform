@@ -326,6 +326,57 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
                   </Select>
                 )}
               </FormField>
+              {/* Ventana de edición (2.7.2): gobernanza VIVA del contenedor — aplica de
+                  inmediato a todas las entradas, sin republicar la versión. */}
+              <FormField label={t("templates.builder.editWindow")} hint={t("templates.builder.editWindowHint")}>
+                {({ id }) => (
+                  <div className={styles.metaGrid}>
+                    <Select
+                      id={id}
+                      value={state.editWindowHours === null ? "inherit" : state.editWindowHours === 0 ? "none" : "custom"}
+                      disabled={!canEdit}
+                      onChange={(e) => {
+                        const mode = e.target.value;
+                        patchState({
+                          ...state,
+                          editWindowHours: mode === "inherit" ? null : mode === "none" ? 0 : (state.editWindowHours ?? 0) > 0 ? state.editWindowHours : 48,
+                          editWindowAnchor: mode === "custom" ? (state.editWindowAnchor ?? "RECORDED") : null,
+                        });
+                      }}
+                    >
+                      <option value="inherit">{t("templates.builder.editWindowInherit")}</option>
+                      <option value="none">{t("templates.builder.editWindowNone")}</option>
+                      <option value="custom">{t("templates.builder.editWindowCustom")}</option>
+                    </Select>
+                    {(state.editWindowHours ?? 0) > 0 && (
+                      <>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={8760}
+                          value={state.editWindowHours ?? 48}
+                          disabled={!canEdit}
+                          aria-label={t("templates.builder.editWindowHours")}
+                          onChange={(e) => {
+                            const n = Number(e.target.value);
+                            patchState({ ...state, editWindowHours: Number.isFinite(n) && n > 0 ? Math.min(Math.trunc(n), 8760) : 1 });
+                          }}
+                          rightSlot={<span>{t("templates.builder.editWindowHoursUnit")}</span>}
+                        />
+                        <Select
+                          value={state.editWindowAnchor ?? "RECORDED"}
+                          disabled={!canEdit}
+                          aria-label={t("templates.builder.editWindowAnchor")}
+                          onChange={(e) => patchState({ ...state, editWindowAnchor: e.target.value as "RECORDED" | "EFFECTIVE" })}
+                        >
+                          <option value="RECORDED">{t("templates.builder.editWindowAnchorRecorded")}</option>
+                          <option value="EFFECTIVE">{t("templates.builder.editWindowAnchorEffective")}</option>
+                        </Select>
+                      </>
+                    )}
+                  </div>
+                )}
+              </FormField>
             </Card>
 
             {state.sections.length === 0 ? (

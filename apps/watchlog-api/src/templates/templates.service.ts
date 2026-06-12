@@ -275,6 +275,9 @@ export class TemplatesService {
           name: dto.name ?? undefined,
           description: dto.description === undefined ? undefined : dto.description,
           orgNodeId: dto.orgNodeId === undefined ? undefined : dto.orgNodeId,
+          // Ventana de edición (2.7.2): config del contenedor, viaja con el builder.
+          editWindowAnchor: dto.editWindowAnchor === undefined ? undefined : dto.editWindowAnchor,
+          editWindowHours: dto.editWindowHours === undefined ? undefined : dto.editWindowHours,
           updatedById: userId,
         },
       });

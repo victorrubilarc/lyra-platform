@@ -12,9 +12,11 @@ import {
   Lock,
   PenLine,
   Send,
+  TimerOff,
   TriangleAlert,
 } from "lucide-react";
 import { DeferralModal } from "./DeferralModal.js";
+import { EditWindowOverrideModal, type EditWindowOverrideFields } from "./EditWindowOverrideModal.js";
 import { Button, Card, Chip, EmptyState, Spinner, useToast } from "@lyra/ui";
 import {
   isFieldVisible,
@@ -27,6 +29,7 @@ import {
 } from "@lyra/contracts";
 import { useQueryClient } from "@tanstack/react-query";
 import { ApiError } from "../../lib/api-client.js";
+import { formatDateTime } from "../../lib/format.js";
 import { FieldControl } from "../templates/FieldControl.js";
 import {
   LOG_ENTRY_KEYS,
@@ -71,6 +74,12 @@ export function EntryFillPage() {
   const [deferralOpen, setDeferralOpen] = useState(false);
   const [activeTransition, setActiveTransition] = useState<AvailableTransitionDto | null>(null);
   const [signingSection, setSigningSection] = useState<{ section: TemplateSectionDto; st: LogEntrySectionStateDto } | null>(null);
+  // Override de ventana de edición pendiente (2.7.2): el modal recolecta motivo
+  // (+ credenciales si corresponde) y reanuda la acción interceptada.
+  const [overrideRequest, setOverrideRequest] = useState<{
+    requirePassword: boolean;
+    run: (fields: EditWindowOverrideFields) => void;
+  } | null>(null);
 
   // Semilla del borrador local desde los valores del servidor (una vez por entrada).
   useEffect(() => {
@@ -101,6 +110,23 @@ export function EntryFillPage() {
   const isDraft = entry.status === "DRAFT";
   const stateBySection = new Map(entry.sectionStates.map((s) => [s.sectionKey, s]));
 
+  // Ventana de edición (2.7.2): vencida + permiso de override ⇒ toda escritura
+  // pasa por el modal de motivo (el backend exige el motivo igual; la UI anticipa).
+  const editWindow = entry.editWindow;
+  const needsOverride = isDraft && Boolean(editWindow?.expired && editWindow.canOverride);
+
+  /** Intercepta una escritura: dentro de ventana corre directo; vencida, pide motivo. */
+  function withOverride(run: (fields?: EditWindowOverrideFields) => void, opts?: { requirePassword?: boolean }) {
+    if (!needsOverride) return run();
+    setOverrideRequest({
+      requirePassword: Boolean(opts?.requirePassword),
+      run: (fields) => {
+        setOverrideRequest(null);
+        run(fields);
+      },
+    });
+  }
+
   // Progreso y completitud (espejo del guard del backend: secciones CON campos).
   const sectionsWithFields = entry.version.sections.filter((s) => s.fields.length > 0);
   const completedCount = sectionsWithFields.filter((s) => stateBySection.get(s.key)?.state === "COMPLETED").length;
@@ -127,6 +153,10 @@ export function EntryFillPage() {
       }
       case "PERIOD_CLOSED":
         return t("logbook.fill.blockedPeriodClosed", { period: entry?.periodKey ?? "" });
+      case "EDIT_WINDOW_EXPIRED":
+        return t("logbook.fill.blockedWindowExpired", {
+          until: editWindow ? formatDateTime(editWindow.expiresAt) : "—",
+        });
       default:
         return t("logbook.fill.blockedEntryClosed");
     }
@@ -137,6 +167,7 @@ export function EntryFillPage() {
     st: LogEntrySectionStateDto,
     markComplete: boolean,
     password?: string,
+    override?: EditWindowOverrideFields,
   ) {
     // No se envían los campos reservados a otro rol (el usuario no puede modificarlos).
     const restricted = new Set(st.readOnlyFieldKeys);
@@ -144,7 +175,17 @@ export function EntryFillPage() {
     const values = visible.map((f) => ({ fieldKey: f.key, value: draft[f.key] ?? null }));
     setSavingKey(section.key + (markComplete ? ":complete" : ""));
     save.mutate(
-      { sectionKey: section.key, dto: { expectedVersion: st.version, values, markComplete, password } },
+      {
+        sectionKey: section.key,
+        dto: {
+          expectedVersion: st.version,
+          values,
+          markComplete,
+          password: password ?? override?.password,
+          mfaCode: override?.mfaCode,
+          overrideReason: override?.overrideReason,
+        },
+      },
       {
         onSuccess: () => {
           toast.success(markComplete ? t("logbook.fill.sectionCompleted") : t("logbook.fill.sectionSaved"));
@@ -161,19 +202,35 @@ export function EntryFillPage() {
     );
   }
 
-  /** Completar: si la sección exige firma (Part 11), pide contraseña antes de completar. */
+  /** Guardar avance: fuera de ventana pasa por el modal de motivo (2.7.2). */
+  function saveProgress(section: TemplateSectionDto, st: LogEntrySectionStateDto) {
+    withOverride((ov) => saveSection(section, st, false, undefined, ov));
+  }
+
+  /**
+   * Completar: si la sección exige firma (Part 11), pide contraseña. Fuera de
+   * ventana, el modal de override recolecta motivo + contraseña en UN paso (la
+   * misma contraseña re-autentica la firma y el override).
+   */
   function completeSection(section: TemplateSectionDto, st: LogEntrySectionStateDto) {
-    if (section.requireSignature) setSigningSection({ section, st });
-    else saveSection(section, st, true);
+    if (needsOverride) {
+      withOverride((ov) => saveSection(section, st, true, undefined, ov), { requirePassword: section.requireSignature });
+    } else if (section.requireSignature) {
+      setSigningSection({ section, st });
+    } else {
+      saveSection(section, st, true);
+    }
   }
 
   function doSubmit() {
-    submit.mutate(
-      {},
-      {
-        onSuccess: () => toast.success(t("logbook.fill.submitted")),
-        onError: (e) => toast.error(e instanceof ApiError ? e.message : t("common.errorGeneric")),
-      },
+    withOverride((ov) =>
+      submit.mutate(
+        { overrideReason: ov?.overrideReason, password: ov?.password, mfaCode: ov?.mfaCode },
+        {
+          onSuccess: () => toast.success(t("logbook.fill.submitted")),
+          onError: (e) => toast.error(e instanceof ApiError ? e.message : t("common.errorGeneric")),
+        },
+      ),
     );
   }
 
@@ -221,8 +278,14 @@ export function EntryFillPage() {
         </div>
         <div className={styles.dimsRow}>
           <span className={styles.dimChip}>
-            <Clock size={13} /> {t("logbook.fill.effectiveAt")}: <b>{new Date(entry.effectiveAt).toLocaleString("es-CL")}</b>
+            <Clock size={13} /> {t("logbook.fill.effectiveAt")}: <b>{formatDateTime(entry.effectiveAt)}</b>
           </span>
+          {/* Ventana de edición (2.7.2): huella proactiva — vigente o vencida. */}
+          {isDraft && editWindow && !editWindow.expired && (
+            <span className={styles.dimChip}>
+              <TimerOff size={13} /> {t("logbook.fill.editableUntil")}: <b>{formatDateTime(editWindow.expiresAt)}</b>
+            </span>
+          )}
           {entry.shiftCode && (
             <span className={styles.dimChip}>
               <CalendarClock size={13} /> {t("logbook.fill.shift")}: <b>{entry.shiftCode}</b>
@@ -240,11 +303,19 @@ export function EntryFillPage() {
           )}
           {entry.entryOrigin === "DEFERRED" && (
             <span className={styles.dimChip}>
-              <History size={13} /> {t("logbook.fill.recordedAt")}:{" "}
-              <b>{new Date(entry.recordedAt).toLocaleString("es-CL")}</b>
+              <History size={13} /> {t("logbook.fill.recordedAt")}: <b>{formatDateTime(entry.recordedAt)}</b>
             </span>
           )}
         </div>
+
+        {/* Ventana vencida: aviso para quien puede hacer el override (motivo en cada
+            guardado); para quien NO puede, cada sección ya dice el porqué. */}
+        {isDraft && editWindow?.expired && editWindow.canOverride && (
+          <div className={styles.deferredNote}>
+            <TimerOff size={13} />
+            <span>{t("logbook.fill.windowExpiredOverride", { until: formatDateTime(editWindow.expiresAt) })}</span>
+          </div>
+        )}
 
         {/* Registro diferido (2.7.0): huella visible + gesto para declarar/corregir. */}
         {entry.entryOrigin === "DEFERRED" && (
@@ -252,7 +323,7 @@ export function EntryFillPage() {
             <History size={13} />
             <span>
               {t("logbook.deferral.note", {
-                at: entry.declaredEffectiveAt ? new Date(entry.declaredEffectiveAt).toLocaleString("es-CL") : "—",
+                at: entry.declaredEffectiveAt ? formatDateTime(entry.declaredEffectiveAt) : "—",
               })}
               {entry.deferredReason ? ` — “${entry.deferredReason}”` : ""}
             </span>
@@ -274,7 +345,7 @@ export function EntryFillPage() {
 
       {entry.status === "SUBMITTED" && (
         <div className={styles.sealedBanner}>
-          <CheckCircle2 size={16} /> {t("logbook.fill.sealedBanner", { at: entry.sealedAt ? new Date(entry.sealedAt).toLocaleString("es-CL") : "" })}
+          <CheckCircle2 size={16} /> {t("logbook.fill.sealedBanner", { at: entry.sealedAt ? formatDateTime(entry.sealedAt) : "" })}
         </div>
       )}
 
@@ -335,7 +406,7 @@ export function EntryFillPage() {
 
             {editable && st && (
               <div className={styles.sectionFooter}>
-                <Button variant="secondary" loading={savingKey === section.key} onClick={() => saveSection(section, st, false)}>
+                <Button variant="secondary" loading={savingKey === section.key} onClick={() => saveProgress(section, st)}>
                   {t("logbook.fill.saveSection")}
                 </Button>
                 <Button variant="primary" loading={savingKey === section.key + ":complete"} onClick={() => completeSection(section, st)}>
@@ -405,7 +476,7 @@ export function EntryFillPage() {
                   )}
                 </div>
                 <div className={styles.timelineMeta}>
-                  {tr.actorName ?? "—"} · {new Date(tr.occurredAt).toLocaleString("es-CL")}
+                  {tr.actorName ?? "—"} · {formatDateTime(tr.occurredAt)}
                 </div>
                 {tr.reason && <div className={styles.timelineReason}>“{tr.reason}”</div>}
               </li>
@@ -441,30 +512,45 @@ export function EntryFillPage() {
           }
           loading={setDeferral.isPending}
           onConfirm={(deferred) =>
-            setDeferral.mutate(
-              { deferred },
-              {
-                onSuccess: () => {
-                  toast.success(t("logbook.deferral.declared"));
-                  setDeferralOpen(false);
+            withOverride((ov) =>
+              setDeferral.mutate(
+                { deferred, overrideReason: ov?.overrideReason, password: ov?.password, mfaCode: ov?.mfaCode },
+                {
+                  onSuccess: () => {
+                    toast.success(t("logbook.deferral.declared"));
+                    setDeferralOpen(false);
+                  },
+                  onError: (e) => toast.error(e instanceof ApiError ? e.message : t("common.errorGeneric")),
                 },
-                onError: (e) => toast.error(e instanceof ApiError ? e.message : t("common.errorGeneric")),
-              },
+              ),
             )
           }
           onRemove={() =>
-            setDeferral.mutate(
-              { deferred: null },
-              {
-                onSuccess: () => {
-                  toast.success(t("logbook.deferral.removed"));
-                  setDeferralOpen(false);
+            withOverride((ov) =>
+              setDeferral.mutate(
+                { deferred: null, overrideReason: ov?.overrideReason, password: ov?.password, mfaCode: ov?.mfaCode },
+                {
+                  onSuccess: () => {
+                    toast.success(t("logbook.deferral.removed"));
+                    setDeferralOpen(false);
+                  },
+                  onError: (e) => toast.error(e instanceof ApiError ? e.message : t("common.errorGeneric")),
                 },
-                onError: (e) => toast.error(e instanceof ApiError ? e.message : t("common.errorGeneric")),
-              },
+              ),
             )
           }
           onClose={() => setDeferralOpen(false)}
+        />
+      )}
+
+      {/* Edición fuera de ventana (2.7.2): motivo obligatorio + credenciales si aplica. */}
+      {overrideRequest && editWindow && (
+        <EditWindowOverrideModal
+          requirePassword={overrideRequest.requirePassword}
+          requireMfa={editWindow.overrideRequiresMfa}
+          loading={save.isPending || submit.isPending || setDeferral.isPending}
+          onConfirm={overrideRequest.run}
+          onClose={() => setOverrideRequest(null)}
         />
       )}
     </div>

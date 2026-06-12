@@ -227,6 +227,10 @@ export const saveTemplateDraftRequestSchema = z
     name: z.string().trim().min(1).max(140).optional(),
     description: z.string().trim().max(1000).nullable().optional(),
     orgNodeId: z.string().nullable().optional(),
+    // Ventana de edición (2.7.2): vive en el CONTENEDOR (gobernanza viva), pero el
+    // builder la guarda por este mismo canal junto al resto de la metadata.
+    editWindowAnchor: editWindowAnchorSchema.nullable().optional(),
+    editWindowHours: editWindowHoursSchema.nullable().optional(),
     requireSignature: z.boolean().optional(),
     recurrenceKind: recurrenceKindSchema.optional(),
     recurrenceConfig: recurrenceConfigSchema.nullable().optional(),
