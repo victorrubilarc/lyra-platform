@@ -725,7 +725,9 @@ export const esCL = {
     subtitle: "Ajustes operativos globales de la plataforma.",
     noAccess: "Sin acceso",
     noAccessDesc: "No tienes permiso para ver la configuración del sistema.",
-    security: "Seguridad",
+    tabsAria: "Categorías de configuración",
+    cat: { security: "Seguridad" },
+    securityDesc: "Controles de seguridad que aplican a toda la plataforma. Los cambios quedan auditados.",
     requireMfaPeriods: "Exigir MFA para gobernar períodos",
     requireMfaPeriodsHint:
       "Si está activo, cerrar, reabrir, bloquear o desbloquear un período contable exige re-autenticación con segundo factor (MFA). El actor debe tener MFA enrolado.",
