@@ -30,14 +30,18 @@ export function useAnchoredPanel(
     // Espacio REAL disponible para el panel a cada lado del trigger.
     const spaceBelow = vh - r.bottom - margin - gap;
     const spaceAbove = r.top - margin - gap;
-    // Altura natural del contenido (medida tras montar; 0 en el primer paso).
-    const natural = panelRef.current?.scrollHeight ?? 0;
-    const fitsBelow = natural > 0 && natural <= spaceBelow;
+    // Tope absoluto independiente del estado previo: evita que `maxHeight` se
+    // REALIMENTE de un `scrollHeight` ya recortado (lo que encogía el panel a
+    // cada recálculo). Con un tope constante por viewport, la altura converge.
+    const absCap = Math.round(vh * 0.7);
+    const natural = panelRef.current?.scrollHeight || absCap;
+    // Altura deseada acotada al tope (no a la medición previa del panel).
+    const wantHeight = Math.min(natural, absCap);
     // Abre hacia arriba si no cabe abajo y arriba hay más espacio.
-    const openUp = !fitsBelow && spaceAbove > spaceBelow;
+    const openUp = wantHeight > spaceBelow && spaceAbove > spaceBelow;
     const avail = openUp ? spaceAbove : spaceBelow;
     // La altura NUNCA excede el espacio disponible → jamás se sale del viewport.
-    const maxHeight = Math.max(0, Math.min(natural || avail, avail));
+    const maxHeight = Math.max(120, Math.min(wantHeight, avail));
     const left = Math.max(margin, Math.min(r.left, vw - width - margin));
     const next: CSSProperties = { position: "fixed", left, width, maxHeight, visibility: "visible" };
     if (openUp) next.bottom = vh - r.top + gap;
@@ -51,12 +55,21 @@ export function useAnchoredPanel(
       return;
     }
     compute();
-    const onMove = () => compute();
-    window.addEventListener("scroll", onMove, true);
-    window.addEventListener("resize", onMove);
+    // Recalcula al hacer scroll/resize del DOCUMENTO o de un ancestro, pero NO
+    // cuando el scroll proviene de DENTRO del propio panel (el scroll de la lista
+    // no debe re-anclar ni re-medir el panel: causaba el encogimiento al arrastrar
+    // la barra del selector).
+    const onScroll = (e: Event) => {
+      const target = e.target as Node | null;
+      if (target && panelRef.current?.contains(target)) return;
+      compute();
+    };
+    const onResize = () => compute();
+    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", onResize);
     return () => {
-      window.removeEventListener("scroll", onMove, true);
-      window.removeEventListener("resize", onMove);
+      window.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("resize", onResize);
     };
   }, [open, compute, ...deps]);
 
