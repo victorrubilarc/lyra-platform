@@ -1,4 +1,4 @@
-import { BookOpenCheck, CalendarClock, CalendarRange, FilePlus2, GitBranch, LayoutDashboard, Layers, ListChecks, Network, ShieldCheck, UserCog, type LucideIcon } from "lucide-react";
+import { BookOpenCheck, CalendarClock, CalendarRange, FilePlus2, GitBranch, LayoutDashboard, Layers, ListChecks, Network, Settings, ShieldCheck, UserCog, type LucideIcon } from "lucide-react";
 import type { Permission } from "@lyra/permissions";
 
 /**
@@ -82,6 +82,13 @@ export const ROUTES: readonly NavRoute[] = [
     labelKey: "nav.security",
     icon: ShieldCheck,
     permission: "module:security:view",
+    inSidebar: true,
+  },
+  {
+    path: "/configuracion",
+    labelKey: "nav.settings",
+    icon: Settings,
+    permission: "module:settings:view",
     inSidebar: true,
   },
   { path: "/perfil/seguridad", labelKey: "topbar.mySecurity", icon: UserCog },

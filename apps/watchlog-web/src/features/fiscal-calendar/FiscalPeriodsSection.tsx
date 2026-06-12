@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { CalendarDays, Lock, LockOpen, ShieldCheck, ShieldOff, Sparkles } from "lucide-react";
-import { Button, Chip, Modal, Select, Table, Textarea, useToast } from "@lyra/ui";
+import { CalendarDays, KeyRound, Lock, LockOpen, ShieldCheck, ShieldOff, Sparkles } from "lucide-react";
+import { Button, Chip, Input, Modal, Select, Table, Textarea, useToast } from "@lyra/ui";
 import type { ChipProps, TableColumn } from "@lyra/ui";
 import {
   PERIOD_REASON_MIN,
@@ -64,8 +64,11 @@ export function FiscalPeriodsSection({ cal }: { cal: FiscalCalendarDto }) {
   const [dialog, setDialog] = useState<DialogState | null>(null);
   const [reason, setReason] = useState("");
   const [ackLaterClosed, setAckLaterClosed] = useState(false);
+  const [password, setPassword] = useState("");
+  const [mfaCode, setMfaCode] = useState("");
 
   const periods = useMemo(() => data?.periods ?? [], [data]);
+  const requireReauth = data?.requireReauth ?? false;
 
   // Años presentes (desc) para el filtro de la grilla.
   const years = useMemo(() => {
@@ -103,19 +106,22 @@ export function FiscalPeriodsSection({ cal }: { cal: FiscalCalendarDto }) {
     setDialog({ period, action });
     setReason("");
     setAckLaterClosed(false);
+    setPassword("");
+    setMfaCode("");
   };
 
   const pending = closeMut.isPending || reopenMut.isPending || lockMut.isPending || unlockMut.isPending;
+  const creds = requireReauth ? { password, mfaCode: mfaCode.trim() } : {};
 
   const submit = async () => {
     if (!dialog) return;
     const { period, action } = dialog;
     const base = { fiscalCalendarId, periodKey: period.periodKey };
     try {
-      if (action === "close") await closeMut.mutateAsync({ ...base, dto: { reason } });
-      else if (action === "reopen") await reopenMut.mutateAsync({ ...base, dto: { reason, acknowledgeLaterClosed: ackLaterClosed } });
-      else if (action === "lock") await lockMut.mutateAsync({ ...base, dto: { reason } });
-      else await unlockMut.mutateAsync({ ...base, dto: { reason } });
+      if (action === "close") await closeMut.mutateAsync({ ...base, dto: { reason, ...creds } });
+      else if (action === "reopen") await reopenMut.mutateAsync({ ...base, dto: { reason, acknowledgeLaterClosed: ackLaterClosed, ...creds } });
+      else if (action === "lock") await lockMut.mutateAsync({ ...base, dto: { reason, ...creds } });
+      else await unlockMut.mutateAsync({ ...base, dto: { reason, ...creds } });
       toast.success(t(`fiscalCal.period.done.${action}`));
       setDialog(null);
     } catch (err) {
@@ -296,7 +302,7 @@ export function FiscalPeriodsSection({ cal }: { cal: FiscalCalendarDto }) {
                 variant={dialog.action === "close" || dialog.action === "lock" ? "danger" : "primary"}
                 onClick={() => void submit()}
                 loading={pending}
-                disabled={reasonInvalid}
+                disabled={reasonInvalid || (requireReauth && (!password || !mfaCode.trim()))}
               >
                 {ackLaterClosed && dialog.action === "reopen" ? t("fiscalCal.period.reopenAnyway") : t(`fiscalCal.period.${dialog.action}`)}
               </Button>
@@ -312,6 +318,33 @@ export function FiscalPeriodsSection({ cal }: { cal: FiscalCalendarDto }) {
               <label className={styles.fieldLabel}>{t("fiscalCal.period.reason")}</label>
               <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} placeholder={t("fiscalCal.period.reasonPlaceholder")} />
             </div>
+            {requireReauth && (
+              <>
+                <p style={{ color: "var(--color-text-secondary)", fontSize: 12 }}>{t("fiscalCal.period.reauth.notice")}</p>
+                <div>
+                  <label className={styles.fieldLabel}>{t("fiscalCal.period.reauth.password")}</label>
+                  <Input
+                    type="password"
+                    value={password}
+                    autoComplete="current-password"
+                    onChange={(e) => setPassword(e.target.value)}
+                    rightSlot={<KeyRound size={15} />}
+                  />
+                </div>
+                <div>
+                  <label className={styles.fieldLabel}>{t("fiscalCal.period.reauth.mfaCode")}</label>
+                  <Input
+                    mono
+                    inputMode="numeric"
+                    value={mfaCode}
+                    autoComplete="one-time-code"
+                    placeholder="123456"
+                    onChange={(e) => setMfaCode(e.target.value)}
+                  />
+                  <p className={styles.hint}>{t("fiscalCal.period.reauth.mfaHint")}</p>
+                </div>
+              </>
+            )}
           </div>
         </Modal>
       )}

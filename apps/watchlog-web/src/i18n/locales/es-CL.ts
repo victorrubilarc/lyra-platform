@@ -35,6 +35,7 @@ export const esCL = {
     referenceData: "Datos de referencia",
     opsCalendar: "Calendario operacional",
     fiscalCalendar: "Calendario fiscal",
+    settings: "Configuración",
     dataSources: "Orígenes de datos",
     incidents: "Incidencias",
   },
@@ -718,6 +719,20 @@ export const esCL = {
     closed: "Período cerrado",
     reopened: "Período reabierto",
   },
+  settings: {
+    title: "Configuración del",
+    titleAccent: "sistema",
+    subtitle: "Ajustes operativos globales de la plataforma.",
+    noAccess: "Sin acceso",
+    noAccessDesc: "No tienes permiso para ver la configuración del sistema.",
+    security: "Seguridad",
+    requireMfaPeriods: "Exigir MFA para gobernar períodos",
+    requireMfaPeriodsHint:
+      "Si está activo, cerrar, reabrir, bloquear o desbloquear un período contable exige re-autenticación con segundo factor (MFA). El actor debe tener MFA enrolado.",
+    updatedBy: "Última modificación por {{name}}",
+    readOnly: "Solo lectura: no tienes permiso para editar los ajustes.",
+    saved: "Configuración guardada",
+  },
   fiscalCal: {
     title: "Calendario",
     titleAccent: "fiscal",
@@ -820,6 +835,12 @@ export const esCL = {
       reasonPlaceholder: "Motivo de la acción (obligatorio)",
       ackNeeded: "Hay períodos posteriores cerrados. Confirma para reabrir de todos modos.",
       ackWarning: "Reabrir este período rompe la secuencia (hay posteriores cerrados). Quedará auditado.",
+      reauth: {
+        notice: "Esta acción exige re-autenticación con segundo factor (configurado en Configuración del sistema).",
+        password: "Contraseña",
+        mfaCode: "Código MFA",
+        mfaHint: "Código de tu app de autenticación (o un código de recuperación).",
+      },
       dialog: {
         close: "Cerrar período {{key}}",
         reopen: "Reabrir período {{key}}",

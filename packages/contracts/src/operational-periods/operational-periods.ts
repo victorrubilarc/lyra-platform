@@ -40,6 +40,16 @@ const periodReasonSchema = z
   .max(1000);
 
 /**
+ * Credenciales de re-autenticación, OPCIONALES en el contrato pero EXIGIDAS por el
+ * backend cuando `SystemSettings.requireMfaForPeriodGovernance` está activo (step-up
+ * MFA vía `ReauthService`). El backend re-verifica; nunca se confía en el cliente.
+ */
+const reauthFields = {
+  password: z.string().min(1).max(200).optional(),
+  mfaCode: z.string().min(1).max(32).optional(),
+};
+
+/**
  * Estado de un período materializado tal como lo expone el mantenedor. Los campos de
  * cierre/lock/reapertura son null hasta que ocurre la acción correspondiente.
  */
@@ -71,6 +81,8 @@ export type OperationalPeriodDto = z.infer<typeof operationalPeriodDtoSchema>;
 export const listOperationalPeriodsResponseSchema = z.object({
   fiscalCalendarId: z.string(),
   periods: z.array(operationalPeriodDtoSchema),
+  /** ¿Gobernar un período (cerrar/reabrir/lock/unlock) exige re-autenticación MFA? */
+  requireReauth: z.boolean(),
 });
 export type ListOperationalPeriodsResponse = z.infer<typeof listOperationalPeriodsResponseSchema>;
 
@@ -87,18 +99,21 @@ export type GeneratePeriodsRequest = z.infer<typeof generatePeriodsRequestSchema
 /** Cerrar un período (OPEN → CLOSED): motivo obligatorio. */
 export const closePeriodRequestSchema = z.object({
   reason: periodReasonSchema,
+  ...reauthFields,
 });
 export type ClosePeriodRequest = z.infer<typeof closePeriodRequestSchema>;
 
 /** Bloquear en duro un período (CLOSED → LOCKED): motivo obligatorio. */
 export const lockPeriodRequestSchema = z.object({
   reason: periodReasonSchema,
+  ...reauthFields,
 });
 export type LockPeriodRequest = z.infer<typeof lockPeriodRequestSchema>;
 
 /** Desbloquear un período (LOCKED → CLOSED, two-key): motivo obligatorio. */
 export const unlockPeriodRequestSchema = z.object({
   reason: periodReasonSchema,
+  ...reauthFields,
 });
 export type UnlockPeriodRequest = z.infer<typeof unlockPeriodRequestSchema>;
 
@@ -111,6 +126,7 @@ export type UnlockPeriodRequest = z.infer<typeof unlockPeriodRequestSchema>;
 export const reopenPeriodRequestSchema = z.object({
   reason: periodReasonSchema,
   acknowledgeLaterClosed: z.boolean().optional(),
+  ...reauthFields,
 });
 export type ReopenPeriodRequest = z.infer<typeof reopenPeriodRequestSchema>;
 

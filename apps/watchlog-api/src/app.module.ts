@@ -18,6 +18,7 @@ import { ReferenceListsModule } from "./reference-lists/reference-lists.module";
 import { OperationalCalendarModule } from "./operational-calendar/operational-calendar.module";
 import { FiscalCalendarModule } from "./fiscal-calendar/fiscal-calendar.module";
 import { OperationalPeriodModule } from "./operational-periods/operational-periods.module";
+import { SettingsModule } from "./settings/settings.module";
 import { LogEntriesModule } from "./log-entries/log-entries.module";
 import { SecurityModule } from "./security/security.module";
 
@@ -56,6 +57,7 @@ import { SecurityModule } from "./security/security.module";
     OperationalCalendarModule,
     FiscalCalendarModule,
     OperationalPeriodModule,
+    SettingsModule,
     LogEntriesModule,
     SecurityModule,
     HealthModule,

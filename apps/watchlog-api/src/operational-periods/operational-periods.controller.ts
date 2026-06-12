@@ -54,7 +54,7 @@ export class OperationalPeriodController {
     @CurrentUser() user: RequestUser,
     @Req() req: FastifyRequest,
   ) {
-    return this.periods.close(fiscalCalendarId, periodKey, dto.reason, user.id, this.ctx(user, req));
+    return this.periods.close(fiscalCalendarId, periodKey, dto.reason, { password: dto.password, mfaCode: dto.mfaCode }, user.id, this.ctx(user, req));
   }
 
   @Post("reopen")
@@ -71,6 +71,7 @@ export class OperationalPeriodController {
       periodKey,
       dto.reason,
       dto.acknowledgeLaterClosed ?? false,
+      { password: dto.password, mfaCode: dto.mfaCode },
       user.id,
       this.ctx(user, req),
     );
@@ -85,7 +86,7 @@ export class OperationalPeriodController {
     @CurrentUser() user: RequestUser,
     @Req() req: FastifyRequest,
   ) {
-    return this.periods.lock(fiscalCalendarId, periodKey, dto.reason, user.id, this.ctx(user, req));
+    return this.periods.lock(fiscalCalendarId, periodKey, dto.reason, { password: dto.password, mfaCode: dto.mfaCode }, user.id, this.ctx(user, req));
   }
 
   @Post("unlock")
@@ -97,7 +98,7 @@ export class OperationalPeriodController {
     @CurrentUser() user: RequestUser,
     @Req() req: FastifyRequest,
   ) {
-    return this.periods.unlock(fiscalCalendarId, periodKey, dto.reason, user.id, this.ctx(user, req));
+    return this.periods.unlock(fiscalCalendarId, periodKey, dto.reason, { password: dto.password, mfaCode: dto.mfaCode }, user.id, this.ctx(user, req));
   }
 
   private ctx(user: RequestUser, req: FastifyRequest): AuditContext {

@@ -10,6 +10,8 @@ import { AuditService, type AuditContext } from "../audit/audit.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { ShiftResolver } from "../operational-calendar/shift-resolver";
 import { FiscalResolver, toFiscalConfig } from "../fiscal-calendar/fiscal-resolver";
+import { ReauthService, type ReauthCredentials } from "../auth/reauth.service";
+import { SettingsService } from "../settings/settings.service";
 
 /** Permiso de excepción que permite escribir en períodos CLOSED (no aplica a LOCKED). */
 export const PERIOD_WRITE_CLOSED_PERMISSION = "opsperiod:write-closed";
@@ -35,7 +37,20 @@ export class OperationalPeriodService {
     private readonly shiftResolver: ShiftResolver,
     private readonly fiscalResolver: FiscalResolver,
     private readonly audit: AuditService,
+    private readonly settings: SettingsService,
+    private readonly reauth: ReauthService,
   ) {}
+
+  /**
+   * Re-autenticación con MFA (step-up) para gobernar un período, SI el ajuste
+   * `requireMfaForPeriodGovernance` está activo. Reutiliza `ReauthService` (mismo
+   * motor de las firmas Part 11). Se evalúa al inicio de cada acción de gobernanza.
+   */
+  private async assertReauth(actorId: string, creds: ReauthCredentials): Promise<void> {
+    if (await this.settings.requireMfaForPeriodGovernance()) {
+      await this.reauth.verifyForSignature(actorId, creds, { requireMfa: true });
+    }
+  }
 
   // --- Guarda de escritura ---------------------------------------------------
 
@@ -106,7 +121,8 @@ export class OperationalPeriodService {
     });
     const today = todayInTimezone(cal.timezone);
     const names = await this.namesByUserId(rows.flatMap((r) => [r.closedById, r.lockedById, r.reopenedById]));
-    return { fiscalCalendarId, periods: rows.map((r) => this.toDto(r, today, names)) };
+    const requireReauth = await this.settings.requireMfaForPeriodGovernance();
+    return { fiscalCalendarId, periods: rows.map((r) => this.toDto(r, today, names)), requireReauth };
   }
 
   /**
@@ -148,7 +164,8 @@ export class OperationalPeriodService {
   }
 
   /** Cierra un período (OPEN → CLOSED) con guarda SECUENCIAL: no hay un anterior abierto. */
-  async close(fiscalCalendarId: string, periodKey: string, reason: string, actorId: string, ctx: AuditContext): Promise<OperationalPeriodDto> {
+  async close(fiscalCalendarId: string, periodKey: string, reason: string, creds: ReauthCredentials, actorId: string, ctx: AuditContext): Promise<OperationalPeriodDto> {
+    await this.assertReauth(actorId, creds);
     const cal = await this.assertCalendarExists(fiscalCalendarId);
     const row = await this.getRow(fiscalCalendarId, periodKey);
     if (row.status !== "OPEN") {
@@ -172,7 +189,8 @@ export class OperationalPeriodService {
   }
 
   /** Bloquea en duro un período (CLOSED → LOCKED). */
-  async lock(fiscalCalendarId: string, periodKey: string, reason: string, actorId: string, ctx: AuditContext): Promise<OperationalPeriodDto> {
+  async lock(fiscalCalendarId: string, periodKey: string, reason: string, creds: ReauthCredentials, actorId: string, ctx: AuditContext): Promise<OperationalPeriodDto> {
+    await this.assertReauth(actorId, creds);
     const cal = await this.assertCalendarExists(fiscalCalendarId);
     const row = await this.getRow(fiscalCalendarId, periodKey);
     if (row.status !== "CLOSED" && row.status !== "CLOSING") {
@@ -187,7 +205,8 @@ export class OperationalPeriodService {
   }
 
   /** Desbloquea un período (LOCKED → CLOSED, two-key). */
-  async unlock(fiscalCalendarId: string, periodKey: string, reason: string, actorId: string, ctx: AuditContext): Promise<OperationalPeriodDto> {
+  async unlock(fiscalCalendarId: string, periodKey: string, reason: string, creds: ReauthCredentials, actorId: string, ctx: AuditContext): Promise<OperationalPeriodDto> {
+    await this.assertReauth(actorId, creds);
     const cal = await this.assertCalendarExists(fiscalCalendarId);
     const row = await this.getRow(fiscalCalendarId, periodKey);
     if (row.status !== "LOCKED") {
@@ -210,9 +229,11 @@ export class OperationalPeriodService {
     periodKey: string,
     reason: string,
     acknowledgeLaterClosed: boolean,
+    creds: ReauthCredentials,
     actorId: string,
     ctx: AuditContext,
   ): Promise<OperationalPeriodDto> {
+    await this.assertReauth(actorId, creds);
     const cal = await this.assertCalendarExists(fiscalCalendarId);
     const row = await this.getRow(fiscalCalendarId, periodKey);
     if (row.status !== "CLOSED" && row.status !== "CLOSING") {

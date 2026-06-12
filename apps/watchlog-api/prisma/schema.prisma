@@ -965,6 +965,15 @@ model OperationalPeriod {
   @@index([fiscalCalendarId, status])
 }
 
+// Configuración del sistema (Fase 2.7.1.1 UX). Fila SINGLETON (id fijo "system").
+// Ajustes operativos globales del single-tenant; hoy: exigir MFA para gobernar períodos.
+model SystemSettings {
+  id                            String   @id @default("system")
+  requireMfaForPeriodGovernance Boolean  @default(false)
+  updatedById                   String?
+  updatedAt                     DateTime @updatedAt
+}
+
 model OperationalShift {
   id              String  @id @default(cuid())
   calendarId      String
