@@ -4,6 +4,64 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-12 · Fase 2.7.2 — Ventana de edición configurable (#6) — ✅ IMPLEMENTADO Y PUBLICADO
+
+Segundo eslabón de la **gobernanza temporal** (tras 2.7.0 registro diferido y 2.7.1/2.7.1.1 período gobernado):
+un plazo configurable para corregir un registro; vencido, solo se edita con privilegio explícito y motivo auditado.
+Se investigó el estándar antes de codear (MHRA GxP Data Integrity 2018 / FDA DI Q&A: *contemporaneous* + corrección
+tardía **justificada y atribuida**, sin número normativo; SAP OB52 y Odoo lock dates = config **viva**, no congelada
+en el documento; Maximo rechaza por fecha; eLogbooks comerciales con ventanas/amendments configurables + audit trail).
+**5 forks resueltos, todos con la opción recomendada aprobada por el dueño ("avanza"):**
+
+1. **Dónde se configura = columnas en `Template` (contenedor mutable) + fallback en `SystemSettings`.** La ventana es
+   **gobernanza VIVA** (patrón SAP OB52 / Odoo): cambiar la política aplica de inmediato a TODAS las entradas, sin
+   republicar la versión. Congelarla en `TemplateVersion` obligaría a clonar versión por cada ajuste y dejaría
+   entradas viejas con ventanas obsoletas (un auditor lo objetaría). La integridad no la da congelar la política sino
+   **auditar cada override**. Fallback en `SystemSettings` (singleton de gobernanza, ya con UI en `/configuracion`),
+   NO en `PasswordPolicy` (dominio auth). Duración en **horas enteras** (1–8760); `editWindowHours` tri-estado:
+   `null`=hereda global · `0`=sin ventana (explícito) · `>0`=propia.
+2. **Ancla = ambas configurables por plantilla, default `RECORDED`.** Con `RECORDED` (desde `recordedAt` inmutable) el
+   operador SIEMPRE tiene la ventana completa desde que crea la entrada — un **registro diferido legítimo (2.7.0) no
+   nace vencido**. `EFFECTIVE` (desde la fecha del evento) queda para plantillas estrictas; quien la elige acepta que
+   los diferidos largos requieren override. La guarda con ancla EFFECTIVE usa la `effectiveAt` **persistida** (no la
+   prospectiva): editar el campo de fecha efectiva no puede "reabrir" la ventana en el mismo guardado.
+3. **Override = permiso nuevo `logentry:write-expired` (catálogo 58→59) + MOTIVO obligatorio + MFA configurable.**
+   Nombre espejo de `opsperiod:write-closed` (ambos = "escribir pasada una guarda temporal"). **Diferencia GxP frente
+   al bypass de período (silencioso): aquí el motivo es OBLIGATORIO** (≥5, patrón `deferredReason`) en CADA escritura
+   fuera de ventana → `AuditLog` (evento dedicado `logentry.editwindow.override`) + `LogEntryFieldChange.reason`. Sin
+   motivo ⇒ 400 aunque se tenga el permiso. MFA opt-in vía `SystemSettings.requireMfaEditWindowOverride` + `ReauthService`
+   (mismo patrón por-acción de períodos; `mfaVerified` estampado en la auditoría).
+4. **Composición con período = guardas independientes en AND ("gana la más estricta"), cada una con SU bypass.**
+   Escribible solo si AMBAS lo permiten: `logentry:write-expired` no salva un período cerrado y `opsperiod:write-closed`
+   no salva una ventana vencida; LOCKED bloquea a todos. **Precedencia del `blockedReason`** (del menos al más accionable
+   por el usuario): `ENTRY_CLOSED` → `PERIOD_CLOSED` → `EDIT_WINDOW_EXPIRED` → `WRONG_STATE`/`MISSING_ROLE`. La guarda de
+   período se evalúa ANTES (su 403 precede). `getDetail` expone `editWindow {anchor, windowHours, expiresAt, expired,
+   canOverride, overrideRequiresMfa}` para la huella proactiva ("Editable hasta X").
+5. **Alcance temporal = `saveSection` + `setDeferral` + `submit` SÍ; `create` y `executeTransition` NO.** La ventana
+   gobierna la **corrección de DATOS**, no el avance del flujo: incluir `executeTransition` obligaría a dar el override
+   a todos los aprobadores (un ciclo revisión→aprobación legítimamente excede 48h), vaciando el permiso — SAP/Maximo
+   bloquean *posteos* por período (eso ya lo hace la guarda de período, que SÍ aplica a transiciones), no aprobaciones.
+   `create` NO porque con RECORDED la ventana nace con la entrada y con EFFECTIVE bloquear la creación contradiría el
+   diferido declarado de 2.7.0. `setDeferral` SÍ (muta `effectiveAt` = corrección de dato); `submit` SÍ (sellar tarde un
+   borrador abandonado es la finalización tardía que GxP flaguea). El **nudge 2.7.0(a)** (aviso suave sin guarda) se
+   **difiere de nuevo** (UX pura; queda en BACKLOG).
+
+**Implementación.** Migración aditiva `20260612025159_add_edit_window`: enum `EditWindowAnchor` (RECORDED|EFFECTIVE);
+`Template.editWindowAnchor/Hours` nullable; `SystemSettings.editWindowAnchor` (default RECORDED) + `editWindowHours`
+(null) + `requireMfaEditWindowOverride`; check constraints 0..8760 h. Contratos: `EDIT_WINDOW_ANCHORS`,
+`editWindowHoursSchema`, `EDIT_WINDOW_EXPIRED` en `SECTION_BLOCKED_REASONS`, `editWindowInfoSchema` en el detalle,
+`overrideReason`+creds en save/deferral/submit, y **fuente única back↔front** `resolveEditWindow` / `editWindowDeadline`
+/ `isEditWindowExpired` (borde no inclusivo: en el límite aún se edita). Backend `LogEntriesService.assertEditWindowWritable`
+(en saveSection/setDeferral/submit) + huella en `getDetail`; `SettingsService.editWindowSettings()` en una lectura;
+`LogEntriesModule` importa `SettingsModule`. Web: control en el `TemplateBuilder`, pestaña "Bitácoras" en `/configuracion`,
+chip "Editable hasta X" + `EditWindowOverrideModal` (motivo + creds) interceptando guardar/completar/enviar/diferir;
+`EntryFillPage` migrada a `lib/format.ts`. Tests: contracts **149** (+5), API **200** (+10). Smoke en vivo **21/21**
+(round-trip settings, ventana propia EFFECTIVE/24h, diferida 3d ⇒ vencida, 400 sin motivo / 200 con motivo + FieldChange
++ AuditLog dedicado, usuario sin permiso ⇒ 403 + EDIT_WINDOW_EXPIRED, MFA exigido sin enrolar ⇒ rechazo, vigente ⇒ huella
++ canal normal intacto; datos creados y LIMPIADOS, conteos en 0). **Siguiente: 2.7.3 matriz rol×sección×tiempo.**
+
+---
+
 ### 2026-06-12 · Fase 2.7.1.1 — Afinamiento UX + Configuración del sistema — ✅ IMPLEMENTADO Y PUBLICADO
 
 Iteración de inspección visual del dueño sobre la pantalla fiscal. Decisiones tomadas en la sesión:

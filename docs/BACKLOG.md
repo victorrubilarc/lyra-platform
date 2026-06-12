@@ -5,12 +5,12 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-11** (**Fase 2.7.1.1 Calendario FISCAL transversal ✅** — período DESACOPLADO de los turnos a
-> `FiscalCalendar`; `OperationalPeriod` re-scopeada a `fiscalCalendarId × periodKey` con rango `[start,end)`; tri-estado
-> **OPEN→CLOSED→LOCKED**, generación explícita idempotente, cierre secuencial, lock/unlock two-key, reopen inverso;
-> `assertWritable` gana LOCKED [bloquea incl. bypass] + `requirePeriod`; pantalla propia `/calendario-fiscal`. Catálogo
-> **56** (`+opsperiod:lock/unlock`). El **plan de fases 2.7/2.8/2.9 sigue vigente**; siguiente: **2.7.2 Ventana de
-> edición**. Sigue anotada deuda **2.8.2**: creación de entrada sin borradores huérfanos + descarte de borrador).
+> actualización: **2026-06-12** (**Fase 2.7.2 Ventana de edición configurable ✅** — plazo de corrección por plantilla
+> [gobernanza VIVA en `Template`] + fallback global en `SystemSettings`, ancla **RECORDED|EFFECTIVE**; fuera de ventana
+> solo **`logentry:write-expired`** + **motivo auditado** [evento dedicado `logentry.editwindow.override`] + MFA opt-in;
+> en **AND** con el período ["gana la más estricta"], `blockedReason` += **`EDIT_WINDOW_EXPIRED`**. Catálogo **59**.
+> Tests contracts 149 · API 200. El **plan de fases 2.7/2.8/2.9 sigue vigente**; siguiente: **2.7.3 matriz
+> rol×sección×tiempo**. Sigue anotada deuda **2.8.2**: creación de entrada sin borradores huérfanos + descarte de borrador).
 
 ---
 
@@ -61,6 +61,7 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Fase 2.7.1 Período contable gobernado** (`OperationalPeriod` + guarda `assertWritable` + cierre/reapertura auditada + mantenedor) | `main` (fusionado desde `feat/periodo-gobernado`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Fase 2.7.1.1 Calendario FISCAL transversal** (`FiscalCalendar` + `FiscalResolver` + período materializado OPEN→CLOSED→LOCKED + generate/lock/unlock + pantalla `/calendario-fiscal`) | `main` (fusionado desde `feat/calendario-fiscal`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Fase 2.7.1.1 Afinamiento UX + Configuración** (panel a pestañas + grilla scroll/orden + historial por período c/MFA estampado + `/configuracion` MFA por acción + formato regional + fix Toast z-index) | `main` (fusionado desde `feat/calendario-fiscal-ux`) | ✅ fusionado y publicado en `origin/main` | ninguna |
+| **Fase 2.7.2 Ventana de edición configurable** (`Template.editWindow*` + `SystemSettings` global/MFA + guarda `assertEditWindowWritable` + override `logentry:write-expired` con motivo + huella `editWindow` + UI builder/`/configuracion`/llenado) | `main` (fusionado desde `feat/ventana-edicion`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 
 **Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
@@ -350,9 +351,19 @@ nunca queda más de una sesión atrás.
             (catálogo **54→56**). Supersede la presentación LAZY y el scope-por-turno de 2.7.1 (modelo de cierre/guarda
             se conserva y endurece). El `periodKey` estampado no se rompe (se migra la config de período). 4 forks +
             corrección estructural resueltos en DECISIONS 2026-06-11. **Su propia sesión.**
-      - [ ] **2.7.2 (#6) Ventana de edición configurable** `{ancla RECORDED|EFFECTIVE, duración}` por plantilla
-            (fallback global); fuera de ventana solo privilegio explícito con motivo auditado; con período gana
-            la restricción MÁS estricta. Extiende `blockedReason` con `EDIT_WINDOW_EXPIRED` (enum ya extensible).
+      - [x] **2.7.2 (#6) Ventana de edición configurable** ✅ (2026-06-12, `feat/ventana-edicion` → `main`).
+            `{ancla RECORDED|EFFECTIVE, duración}` en `Template` (gobernanza VIVA, sin republicar) + fallback global en
+            `SystemSettings`; fuera de ventana solo **`logentry:write-expired`** (catálogo **59**) + **motivo auditado**
+            (evento dedicado `logentry.editwindow.override` + `FieldChange.reason`) + MFA opt-in (`requireMfaEditWindowOverride`
+            vía `ReauthService`). En **AND** con el período ("gana la más estricta", cada guarda con su bypass);
+            `blockedReason` extendido con `EDIT_WINDOW_EXPIRED` (precedencia ENTRY_CLOSED→PERIOD_CLOSED→EDIT_WINDOW_EXPIRED→
+            reglas de sección). Guarda en `saveSection`/`setDeferral`/`submit` (NO create ni executeTransition); huella
+            `editWindow` en `getDetail`. Fuente única `resolveEditWindow`/`editWindowDeadline`/`isEditWindowExpired`. 5 forks
+            resueltos (DECISIONS 2026-06-12). Tests contracts 149 · API 200. Smoke 21/21. **Pendiente: smoke VISUAL** (§4).
+        - [ ] **Diferidos de 2.7.2 (aditivos):** **(a)** *nudge* suave de UI cuando `effectiveAt` difiere mucho de
+              `recordedAt` sin declaración (heredado de 2.7.0(a); UX pura, NO guarda de servidor); **(b)** KPI/faceta
+              "Editadas fuera de ventana" en `/bitacoras` (el conteo llega natural con las facetas de 2.6.2; el dato ya
+              está en AuditLog `logentry.editwindow.override`).
       - [ ] **2.7.3 (#7) Permisos sección × tiempo**: matriz administrable rol×sección×ventana aplicada en
             servidor; extiende `blockedReason` (+PERIOD_CLOSED, +EDIT_WINDOW_EXPIRED) para que la UI siempre
             diga POR QUÉ.
@@ -620,6 +631,15 @@ probatoria (hash+timestamp). Ref: `DECISIONS.md` (sección de recomendaciones).
       secuencialidad inversa si hay posteriores cerrados); verificar que `/calendario-operacional` ya **no** muestra
       config de período (solo turnos + ancla); modo claro y oscuro. App en `:5173`. **Nota**: el smoke por API dejó una
       entrada demo (`cmq7eglvm…`) con `fecha=2026-06-09` y `version` de sección +1 (benigno).
+- [ ] **Ventana de edición 2.7.2 — smoke VISUAL en navegador** (typecheck/lint/build + smoke por API 21/21 OK; falta
+      el clic): en el **`TemplateBuilder`** → control "Ventana de edición" en la metadata (heredar global / sin ventana /
+      propia con horas+ancla RECORDED|EFFECTIVE), guardar y publicar; en **`/configuracion` → pestaña Bitácoras** → fijar
+      ventana global (horas, ancla, toggle "Exigir MFA al editar fuera de ventana"). En `/nueva-entrada/:id`: con ventana
+      VIGENTE, chip "Editable hasta <fecha>" y guardado normal sin fricción; con ventana VENCIDA y permiso de override,
+      aviso de ventana vencida + cada acción (Guardar avance / Completar(+firma) / Enviar / declarar diferido) abre el
+      **`EditWindowOverrideModal`** pidiendo motivo (≥5) y, si el ajuste lo exige, contraseña + MFA; sin el permiso, las
+      secciones quedan en solo-lectura con el motivo "la ventana de edición venció el <fecha>". Verificar fechas con
+      formato regional (`lib/format.ts`); modo claro y oscuro. App en `:5173`.
 - [ ] **Afinamiento #4 — smoke VISUAL en navegador** (se verificó typecheck/lint/test/build + smoke por API 22/22;
       falta el clic): en `/nueva-entrada/:id` con una plantilla cuyas secciones tengan roles asignados y un campo con
       override: chip "N de M secciones completadas" en cabecera; chip "Asignada a: <rol>" por sección; sección ajena

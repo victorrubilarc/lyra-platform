@@ -172,7 +172,23 @@ período se desacopló al **calendario FISCAL** (transversal) y se endureció al
   Pantalla `/configuracion` (permisos nuevos **`module:settings:view`** + **`settings:manage`**, catálogo **56→58**).
 - **Historial de período** — `GET /operational-periods/history` (gateado `opsperiod:view`) reconstruye el rastro de gobernanza
   de un período desde el AuditLog inmutable (quién/cuándo/motivo/MFA). Solo lectura.
-- **Residual**: ventana de edición por plantilla (#6) y matriz rol×sección×tiempo (#7) llegan en 2.7.2/2.7.3.
+
+### Gobernanza temporal — Ventana de edición (Fase 2.7.2)
+Plazo configurable para CORREGIR un registro (eje complementario al período: gobierna datos, no fechas contables). Ref
+GxP: MHRA Data Integrity 2018 / FDA DI Q&A (corrección tardía justificada + atribuida); SAP OB52 / Odoo lock dates (config viva).
+- **Guarda 100% en backend**: `LogEntriesService.assertEditWindowWritable(entry, userId, dto)` en `saveSection`/`setDeferral`/
+  `submit` (NO `create` ni `executeTransition` — la ventana NO frena el avance del flujo). Config en `Template` (gobernanza viva,
+  sin republicar) con fallback `SystemSettings`; resolución por fuente única `resolveEditWindow`/`editWindowDeadline`/
+  `isEditWindowExpired` (borde no inclusivo). Ancla **RECORDED** (default) o **EFFECTIVE** (usa la `effectiveAt` persistida).
+- **Override**: vencida ⇒ exige **`logentry:write-expired`** (catálogo **58→59**, DATO RBAC, espejo de `opsperiod:write-closed`)
+  **+ motivo `overrideReason` ≥5 OBLIGATORIO** (a diferencia del bypass de período, silencioso) **+ MFA** si
+  `SystemSettings.requireMfaEditWindowOverride` (vía `ReauthService`; sin 2.º factor enrolado ⇒ 400). Sin motivo ⇒ 400 aunque
+  se tenga el permiso. Auditoría: evento DEDICADO **`logentry.editwindow.override`** (operation/reason/mfaVerified/windowExpiredAt)
+  + `overrideReason` en `LogEntryFieldChange.reason`.
+- **Composición con período = AND ("gana la más estricta"), cada guarda con su bypass**. Precedencia del `blockedReason`:
+  `ENTRY_CLOSED` → `PERIOD_CLOSED` → **`EDIT_WINDOW_EXPIRED`** → `WRONG_STATE`/`MISSING_ROLE`. `getDetail` expone `editWindow`
+  (huella proactiva "Editable hasta X"); quien tiene el override no queda bloqueado (la UI le pide motivo al guardar).
+- **Residual**: matriz rol×sección×tiempo (#7) llega en 2.7.3.
 
 ## Estado
 - **Fase 0:** cabeceras (Helmet) y validación de entorno activas.
