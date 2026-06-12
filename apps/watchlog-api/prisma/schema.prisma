@@ -522,6 +522,13 @@ enum FieldSemanticRole {
   SEVERITY_DRIVER
 }
 
+// Ancla de la ventana de edición (2.7.2): desde cuándo corre el plazo de edición.
+// RECORDED = desde la captura (recordedAt); EFFECTIVE = desde la fecha del evento.
+enum EditWindowAnchor {
+  RECORDED
+  EFFECTIVE
+}
+
 model Template {
   id               String         @id @default(cuid())
   name             String
@@ -531,6 +538,12 @@ model Template {
   status           TemplateStatus @default(DRAFT)
   // Versión publicada "viva". Null mientras solo exista borrador.
   currentVersionId String?        @unique
+  // --- Ventana de edición (Fase 2.7.2) — GOBERNANZA VIVA en el contenedor -----
+  // mutable (patrón SAP OB52 / Odoo lock dates): cambiarla aplica de inmediato a
+  // todas las entradas, sin republicar la versión. null = hereda SystemSettings.
+  // editWindowHours: null = hereda global · 0 = SIN ventana (explícito) · >0 = horas.
+  editWindowAnchor EditWindowAnchor?
+  editWindowHours  Int?
   // Autoría (referencia blanda, sin FK: el usuario pudo borrarse — igual que AuditLog).
   createdById      String?
   updatedById      String?
@@ -974,6 +987,13 @@ model SystemSettings {
   requireMfaPeriodReopen Boolean  @default(false)
   requireMfaPeriodLock   Boolean  @default(false)
   requireMfaPeriodUnlock Boolean  @default(false)
+  // --- Ventana de edición GLOBAL (Fase 2.7.2) --------------------------------
+  // Fallback para plantillas sin config propia. hours null = sin ventana
+  // (comportamiento pre-2.7.2). El ancla siempre tiene valor (fin de la cadena).
+  editWindowAnchor             EditWindowAnchor @default(RECORDED)
+  editWindowHours              Int?
+  // Exigir re-auth con MFA al editar FUERA de ventana (override privilegiado).
+  requireMfaEditWindowOverride Boolean          @default(false)
   updatedById            String?
   updatedAt              DateTime @updatedAt
 }
