@@ -816,6 +816,8 @@ export const esCL = {
       history: "Historial",
       historyTitle: "Historial del período {{key}}",
       historyEmpty: "Sin movimientos: este período no ha sido cerrado, reabierto ni bloqueado.",
+      historyMfa: "con MFA",
+      historyNoMfa: "sin MFA",
       historyAction: {
         "opsperiod.closed": "Cerrado",
         "opsperiod.reopened": "Reabierto",

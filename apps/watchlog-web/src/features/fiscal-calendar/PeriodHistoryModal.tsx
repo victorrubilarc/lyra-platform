@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { History, Lock, LockOpen, ShieldCheck, ShieldOff } from "lucide-react";
-import { Button, Modal, Skeleton } from "@lyra/ui";
+import { Button, Chip, Modal, Skeleton } from "@lyra/ui";
 import type { PeriodHistoryEntry } from "@lyra/contracts";
 import { usePeriodHistory } from "./fiscal-calendar-queries.js";
 import fx from "./FiscalCalendar.module.css";
@@ -61,6 +61,12 @@ export function PeriodHistoryModal({
                       {t(`fiscalCal.period.status.${e.fromStatus}`, { defaultValue: e.fromStatus })} →{" "}
                       {t(`fiscalCal.period.status.${e.toStatus}`, { defaultValue: e.toStatus })}
                     </span>
+                  )}
+                  {e.mfaVerified === true && (
+                    <Chip label={t("fiscalCal.period.historyMfa")} variant="success" size="sm" />
+                  )}
+                  {e.mfaVerified === false && (
+                    <Chip label={t("fiscalCal.period.historyNoMfa")} variant="default" size="sm" />
                   )}
                 </div>
                 <div className={fx.timelineMeta}>

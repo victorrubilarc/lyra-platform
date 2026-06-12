@@ -95,6 +95,11 @@ export const periodHistoryEntrySchema = z.object({
   fromStatus: z.string().nullable(),
   toStatus: z.string().nullable(),
   reason: z.string().nullable(),
+  /**
+   * ¿La acción se ejecutó con re-autenticación MFA en ESE momento? (estampado, no
+   * derivado del ajuste actual). null = registro previo a la huella.
+   */
+  mfaVerified: z.boolean().nullable(),
 });
 export type PeriodHistoryEntry = z.infer<typeof periodHistoryEntrySchema>;
 
