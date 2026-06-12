@@ -26,6 +26,25 @@ registro aprobado muestra M/M, no 0/M).
 (2.ª dimensión ABAC)** — detectado en vivo: hoy quien tiene módulo + alcance de nodo ve TODAS las plantillas. **2.7.3
 (matriz rol×sección×tiempo) y el resto de la gobernanza temporal quedan en prioridades siguientes.**
 
+**Fase 2.8 — Alcance por PLANTILLA (2.ª dimensión ABAC) ✅ (2026-06-12, `feat/alcance-plantilla` → `main`).** 2.º eje de
+alcance de datos: limita QUÉ plantillas ve/usa cada usuario y con eso filtra el **picker** de `/nueva-entrada` y la **grilla/
+stats/export** de `/bitacoras`. **6 forks resueltos con el dueño (DECISIONS 2026-06-12):** (1) **entidad aparte `TemplateScope`**
+(`userId|roleId` XOR + `templateId`, sin `includeDescendants`), eje ORTOGONAL al `Scope` de nodo que combina en **AND** (patrón
+SAP PM/Maximo: sitio ≠ tipo de objeto); migración aditiva con check de sujeto exclusivo, **sin tocar `Scope`**. (2) **semántica
+PERMISIVA** (sin scope = ve TODAS), idéntica al eje de nodo (`null`=sin restricción) y a SAP/Maximo ⇒ **migración SIN backfill,
+cero ruptura**; deny-by-default queda como flag futuro. (3) **AND** nodo×plantilla ("gana la más estricta"); las globales pasan
+el eje de nodo pero quedan sujetas al de plantilla. (4) **plantilla individual** (sin categorías hoy; agrupador → BACKLOG). (5)
+**solo superficies operacionales**: el admin `/plantillas` (`template:view`) NO se filtra (parámetro `applyTemplateScope`, default
+`false` = admin idéntico; el picker pasa `true`); `assertTemplateInScope` en create/getDetail/saveSection/submit/setDeferral/
+executeTransition + timeline/changes/related/verify (defensa en profundidad). (6) **asignación por usuario Y por rol en la UI**.
+`ScopeService.getAccessibleTemplateIds` une scopes propios + de roles (espejo de `getAccessibleNodeIds`). Endpoints **separados**
+`PUT /security/users/:id/template-scope` (`user:assign-scope`) y `PUT /security/roles/:id/template-scope` (`role:manage`),
+auditados (`user|role.templatescope.assigned`); `GET /security/template-scope/options` (`user:assign-scope` OR `role:manage`,
+sin exigir `template:view`). **Sin permisos nuevos — catálogo sigue en 59.** Web: `TemplateScopePicker` (selector plano searchable
+agrupado por nodo, chips) en la pestaña *Alcance* del usuario (sección "Plantillas") y en el `RoleDrawer`. Tests: contracts **149**
+· API **205** (+5). **Smoke en vivo 14/14** (picker/grilla filtran; getDetail 403 fuera / 200 dentro; options gateado 200/403;
+admin intacto; scope por rol restringe; limpieza restaura permisivo; datos limpios). Pendiente: smoke VISUAL.
+
 ## Hecho en Fase 2.7.2 (Ventana de edición configurable — gobernanza temporal #6)
 
 2.º eslabón de la gobernanza temporal: plazo para CORREGIR un registro; vencido, solo se edita con privilegio explícito

@@ -26,6 +26,8 @@ export type RoleSummary = z.infer<typeof roleSummarySchema>;
 /** Detalle de rol con sus permisos. */
 export const roleDetailSchema = roleSummarySchema.extend({
   permissionKeys: z.array(z.string()),
+  /** Alcance por plantilla (ids) del rol. Vacío = sin restricción (ve todas). */
+  templateScopes: z.array(z.string()),
 });
 export type RoleDetail = z.infer<typeof roleDetailSchema>;
 

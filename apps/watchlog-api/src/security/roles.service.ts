@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type {
+  AssignTemplateScopeRequest,
   CreateRoleRequest,
   RoleDetail,
   RoleSummary,
@@ -39,6 +40,7 @@ export class RolesService {
       where: { id },
       include: {
         permissions: { select: { permission: { select: { key: true } } } },
+        templateScopes: { select: { templateId: true } },
         _count: { select: { permissions: true, users: true } },
       },
     });
@@ -53,7 +55,33 @@ export class RolesService {
       permissionCount: role._count.permissions,
       userCount: role._count.users,
       permissionKeys: role.permissions.map((p) => p.permission.key),
+      templateScopes: role.templateScopes.map((s) => s.templateId),
     };
+  }
+
+  /**
+   * Reemplaza el alcance por PLANTILLA del rol (2.º eje ABAC, Fase 2.8). Se suma
+   * en el read-time al alcance del usuario (unión user+roles). Vacío ⇒ el rol no
+   * aporta restricción de plantilla. Audita el cambio de scope.
+   */
+  async assignTemplateScope(id: string, dto: AssignTemplateScopeRequest, ctx: AuditContext): Promise<RoleDetail> {
+    const role = await this.prisma.role.findUnique({ where: { id } });
+    if (!role) throw new NotFoundException("Rol no encontrado");
+
+    const templateIds = [...new Set(dto.templateIds)];
+    if (templateIds.length > 0) {
+      const found = await this.prisma.template.count({ where: { id: { in: templateIds }, deletedAt: null } });
+      if (found !== templateIds.length) throw new BadRequestException("Una o más plantillas no existen");
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.templateScope.deleteMany({ where: { roleId: id } }),
+      this.prisma.templateScope.createMany({
+        data: templateIds.map((templateId) => ({ roleId: id, templateId })),
+      }),
+    ]);
+    await this.audit.record({ ...ctx, action: "role.templatescope.assigned", entityType: "Role", entityId: id, after: { templateIds } });
+    return this.get(id);
   }
 
   async create(dto: CreateRoleRequest, ctx: AuditContext): Promise<RoleDetail> {

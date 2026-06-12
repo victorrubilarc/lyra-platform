@@ -5,12 +5,13 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-12** (**Fase 2.7.2 Ventana de edición configurable ✅** — plazo de corrección por plantilla
-> [gobernanza VIVA en `Template`] + fallback global en `SystemSettings`, ancla **RECORDED|EFFECTIVE**; fuera de ventana
-> solo **`logentry:write-expired`** + **motivo auditado** [evento dedicado `logentry.editwindow.override`] + MFA opt-in;
-> en **AND** con el período ["gana la más estricta"], `blockedReason` += **`EDIT_WINDOW_EXPIRED`**. Catálogo **59**.
-> Tests contracts 149 · API 200. El **plan de fases 2.7/2.8/2.9 sigue vigente**; siguiente: **2.7.3 matriz
-> rol×sección×tiempo**. Sigue anotada deuda **2.8.2**: creación de entrada sin borradores huérfanos + descarte de borrador).
+> actualización: **2026-06-12** (**Fase 2.8 Alcance por PLANTILLA — 2.º eje ABAC ✅**: entidad `TemplateScope`
+> [`userId|roleId` XOR + `templateId`], eje ORTOGONAL al de nodo que combina en **AND**, semántica **PERMISIVA**
+> [sin scope = ve todas, migración sin backfill]. Filtra **picker** `GET /log-entries/templates` + **grilla/stats/export**
+> de `/bitacoras` + `assertTemplateInScope` en lectura/llenado; el admin `/plantillas` NO. Asignación por **usuario y rol**
+> [`PUT …/template-scope`] + `TemplateScopePicker`. **Sin permisos nuevos — catálogo 59.** Tests contracts 149 · API 205.
+> Smoke 14/14. El **plan 2.7/2.8/2.9 sigue vigente**; siguiente recomendado: **2.8.0 plantillas multi-nodo** o **2.7.3
+> matriz rol×sección×tiempo**. Sigue anotada deuda **2.8.2** [VOID de borradores + ruta de edición propia]).
 
 ---
 
@@ -62,6 +63,7 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Fase 2.7.1.1 Calendario FISCAL transversal** (`FiscalCalendar` + `FiscalResolver` + período materializado OPEN→CLOSED→LOCKED + generate/lock/unlock + pantalla `/calendario-fiscal`) | `main` (fusionado desde `feat/calendario-fiscal`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Fase 2.7.1.1 Afinamiento UX + Configuración** (panel a pestañas + grilla scroll/orden + historial por período c/MFA estampado + `/configuracion` MFA por acción + formato regional + fix Toast z-index) | `main` (fusionado desde `feat/calendario-fiscal-ux`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Fase 2.7.2 Ventana de edición configurable** (`Template.editWindow*` + `SystemSettings` global/MFA + guarda `assertEditWindowWritable` + override `logentry:write-expired` con motivo + huella `editWindow` + UI builder/`/configuracion`/llenado) | `main` (fusionado desde `feat/ventana-edicion`) | ✅ fusionado y publicado en `origin/main` | ninguna |
+| **Fase 2.8 Alcance por PLANTILLA (2.º eje ABAC)** (`TemplateScope` + `getAccessibleTemplateIds`/`assertTemplateInScope` + filtro picker/grilla + `PUT users\|roles/:id/template-scope` + options + `TemplateScopePicker`) | `main` (fusionado desde `feat/alcance-plantilla`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 
 **Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
@@ -113,18 +115,17 @@ nunca queda más de una sesión atrás.
       ✅ Fase Estructura (2026-06-07): Chip, Table, Select. Pendiente: nada para esta fase.
 
 ### Mejoras futuras de Estructura (enterprise, post-Seguridad)
-- [ ] **Alcance por plantillas (2.ª dimensión ABAC).** El modelo de seguridad contempla limitar el alcance
-      a **plantillas/bitácoras** además de nodos (SECURITY §2.4). Hoy solo hay nodos porque Plantillas es
-      Fase 2. La pestaña *Alcance* del detalle de usuario ya quedó **preparada como multi-dimensión**
-      (encabezado "Estructura organizacional"); cuando exista el módulo de Plantillas se suma una sección
-      hermana "Plantillas" (mismo patrón: selector + guardado por `PUT :id/scope` extendido). Pedido del
-      usuario (2026-06-08). **Prioridad: con Fase 2.**
-      **Re-confirmado en vivo (2026-06-12, demo 2.8.2):** hoy CUALQUIER usuario con `module:logbook:view` +
-      alcance de NODO ve **todas** las plantillas/entradas de ese alcance, sin importar a qué plantillas tiene
-      privilegio. Debe filtrar **el picker de `/nueva-entrada`** (endpoint `GET /log-entries/templates`) **y la
-      grilla de `/bitacoras`** por las plantillas asignadas al usuario. Los **roles por sección** (ya
-      implementados) limitan QUÉ edita dentro de una plantilla, pero NO restringen su **visibilidad** — son
-      ejes distintos. **Sigue siendo Fase 2.8 (alcance+acceso).**
+- [x] **Alcance por plantillas (2.ª dimensión ABAC) ✅ (2026-06-12, `feat/alcance-plantilla` → `main`).** Entidad
+      aparte **`TemplateScope`** (`userId|roleId` XOR + `templateId`, sin descendientes), eje ORTOGONAL al `Scope` de
+      nodo que combina en **AND**. Semántica **PERMISIVA** (sin scope = ve todas; migración aditiva sin backfill).
+      Filtra el **picker** `GET /log-entries/templates` (`applyTemplateScope`) y la **grilla/stats/export** de
+      `/bitacoras`; `assertTemplateInScope` en todas las rutas de lectura/llenado de entrada (defensa en profundidad).
+      El admin `/plantillas` **NO** se filtra. Asignación por **usuario** (`PUT users/:id/template-scope`) **y rol**
+      (`PUT roles/:id/template-scope`), UI `TemplateScopePicker` en pestaña *Alcance* + `RoleDrawer`. Sin permisos
+      nuevos (catálogo 59). Tests contracts 149 · API 205. Smoke 14/14. Ver DECISIONS/PROGRESS 2026-06-12.
+  - [ ] **Deuda 2.8 (aditiva):** **(a)** flag de instalación/rol "scope ESTRICTO de plantilla" (deny-by-default) si un
+        cliente lo exige; **(b)** **agrupador de plantillas** (categorías/etiquetas) para asignar alcance por grupo
+        (hoy es por plantilla individual; SAP/Maximo scopean por tipo de objeto); **(c)** smoke VISUAL en navegador.
 - [ ] **Demo de capacidades — re-probar con "ownership estricto por campo" (pedido 2026-06-12).** La plantilla
       demo «Bitácora de Turno — Demo Completa» quedó con la sección 2 **compartida** (Operador + Mantenedor) y
       solo `estado_mecanico` reservado. El usuario quiere luego cambiarla a **estricta** (override de rol en

@@ -211,6 +211,7 @@ export class LogbookQueryService {
   async timeline(userId: string, id: string, query: TimelineQuery): Promise<LogEntryTimelineResponse> {
     const entry = await this.entries.loadEntry(id);
     await this.entries.assertNodeInScope(userId, entry.orgNodeId);
+    await this.scope.assertTemplateInScope(userId, entry.templateId);
     const take = query.take ?? 50;
     const before = query.cursor ? decodeCursor<TimeCursor>(query.cursor) : null;
     if (query.cursor && !before) throw new BadRequestException("Cursor inválido");
@@ -361,6 +362,7 @@ export class LogbookQueryService {
   async changes(userId: string, id: string, query: TimelineQuery): Promise<LogEntryChangesResponse> {
     const entry = await this.entries.loadEntry(id);
     await this.entries.assertNodeInScope(userId, entry.orgNodeId);
+    await this.scope.assertTemplateInScope(userId, entry.templateId);
     const take = query.take ?? 50;
     const before = query.cursor ? decodeCursor<TimeCursor>(query.cursor) : null;
     if (query.cursor && !before) throw new BadRequestException("Cursor inválido");
@@ -405,6 +407,7 @@ export class LogbookQueryService {
   async related(userId: string, id: string): Promise<RelatedLogEntries> {
     const entry = await this.entries.loadEntry(id);
     await this.entries.assertNodeInScope(userId, entry.orgNodeId);
+    await this.scope.assertTemplateInScope(userId, entry.templateId);
     const accessible = await this.scope.getAccessibleNodeIds(userId);
 
     const base: Prisma.LogEntryWhereInput = { deletedAt: null, id: { not: id } };
@@ -454,6 +457,7 @@ export class LogbookQueryService {
   ): Promise<SignatureVerifyResult> {
     const entry = await this.entries.loadEntry(id);
     await this.entries.assertNodeInScope(userId, entry.orgNodeId);
+    await this.scope.assertTemplateInScope(userId, entry.templateId);
     const sig = await this.prisma.logEntrySignature.findFirst({ where: { id: signatureId, logEntryId: id } });
     if (!sig) throw new NotFoundException("Firma no encontrada en la entrada");
 
@@ -529,6 +533,11 @@ export class LogbookQueryService {
 
     const accessible = await this.scope.getAccessibleNodeIds(userId);
     if (accessible !== null) and.push({ orgNodeId: { in: [...accessible] } });
+
+    // 2.º eje ABAC (Fase 2.8): alcance por PLANTILLA. Allow-list ⇒ filtra la
+    // grilla/stats/export por las plantillas asignadas (AND con el eje de nodo).
+    const accessibleTemplates = await this.scope.getAccessibleTemplateIds(userId);
+    if (accessibleTemplates !== null) and.push({ templateId: { in: [...accessibleTemplates] } });
 
     if (query.orgNodeId) {
       if (query.includeDescendants) {

@@ -10,13 +10,16 @@ import { useOrgTree } from "../structure/structure-queries.js";
 import {
   useAssignUserRoles,
   useAssignUserScope,
+  useAssignUserTemplateScope,
   useResetUserMfa,
   useResetUserPassword,
   useRoles,
+  useTemplateScopeOptions,
   useUpdateUser,
   useUser,
 } from "./security-queries.js";
 import { ScopeTreePicker } from "./ScopeTreePicker.js";
+import { TemplateScopePicker } from "./TemplateScopePicker.js";
 import { ResetMfaModal } from "./ResetMfaModal.js";
 import { ResetPasswordModal } from "./ResetPasswordModal.js";
 import shared from "./security-shared.module.css";
@@ -60,10 +63,12 @@ export function UserDetail({ userId }: UserDetailProps) {
   const { data: user, isLoading } = useUser(userId);
   const { data: roles = [] } = useRoles();
   const { data: tree = [] } = useOrgTree();
+  const { data: templateOptions = [] } = useTemplateScopeOptions(perms.can("user:assign-scope"));
 
   const updateUser = useUpdateUser();
   const assignRoles = useAssignUserRoles();
   const assignScope = useAssignUserScope();
+  const assignTemplateScope = useAssignUserTemplateScope();
   const resetMfa = useResetUserMfa();
   const resetPassword = useResetUserPassword();
 
@@ -74,6 +79,7 @@ export function UserDetail({ userId }: UserDetailProps) {
   const [status, setStatus] = useState<UserStatus>("ACTIVE");
   const [roleIds, setRoleIds] = useState<string[]>([]);
   const [scope, setScope] = useState<ScopeEntry[]>([]);
+  const [templateScope, setTemplateScope] = useState<string[]>([]);
   const [resetOpen, setResetOpen] = useState(false);
   const [pwdResetOpen, setPwdResetOpen] = useState(false);
 
@@ -83,6 +89,7 @@ export function UserDetail({ userId }: UserDetailProps) {
     setStatus(user.status);
     setRoleIds(user.roles.map((r) => r.id));
     setScope(user.scopes);
+    setTemplateScope(user.templateScopes);
     setTab("basic");
   }, [user]);
 
@@ -108,6 +115,7 @@ export function UserDetail({ userId }: UserDetailProps) {
   const basicDirty = displayName.trim() !== user.displayName || status !== user.status;
   const rolesDirty = !sameSet(roleIds, user.roles.map((r) => r.id));
   const scopeDirty = !sameScope(scope, user.scopes);
+  const templateScopeDirty = !sameSet(templateScope, user.templateScopes);
 
   async function saveBasic() {
     if (!user) return;
@@ -134,6 +142,16 @@ export function UserDetail({ userId }: UserDetailProps) {
     try {
       await assignScope.mutateAsync({ id: user.id, dto: { scopes: scope } });
       toast.success(t("security.users.scopeSaved"));
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : t("common.errorGeneric"));
+    }
+  }
+
+  async function saveTemplateScope() {
+    if (!user) return;
+    try {
+      await assignTemplateScope.mutateAsync({ id: user.id, dto: { templateIds: templateScope } });
+      toast.success(t("security.users.templateScope.saved"));
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : t("common.errorGeneric"));
     }
@@ -303,6 +321,33 @@ export function UserDetail({ userId }: UserDetailProps) {
           <Can perform="user:assign-scope">
             <div className={shared.actionsFooter}>
               <Button variant="primary" onClick={saveScope} loading={assignScope.isPending} disabled={!scopeDirty}>
+                {t("common.save")}
+              </Button>
+            </div>
+          </Can>
+
+          {/* Dimensión: alcance por PLANTILLA (2.º eje ABAC, Fase 2.8). Eje
+              ortogonal al de nodo: combinan en AND. Vacío = ve todas. */}
+          <div className={styles.scopeSectionLabel}>{t("security.users.templateScope.section")}</div>
+          <p className={shared.panelDesc} style={{ margin: 0 }}>
+            {templateScope.length === 0
+              ? t("security.users.templateScope.allAccess")
+              : t("security.users.templateScope.desc")}
+          </p>
+          <TemplateScopePicker
+            options={templateOptions}
+            value={templateScope}
+            onChange={setTemplateScope}
+            disabled={!perms.can("user:assign-scope")}
+          />
+          <Can perform="user:assign-scope">
+            <div className={shared.actionsFooter}>
+              <Button
+                variant="primary"
+                onClick={saveTemplateScope}
+                loading={assignTemplateScope.isPending}
+                disabled={!templateScopeDirty}
+              >
                 {t("common.save")}
               </Button>
             </div>
