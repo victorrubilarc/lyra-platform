@@ -20,7 +20,8 @@ import {
 export const LOG_ENTRY_KEYS = {
   all: ["log-entries"] as const,
   detail: (id: string) => ["log-entries", "detail", id] as const,
-  preview: (templateId: string, orgNodeId: string | null) => ["log-entries", "preview", templateId, orgNodeId ?? ""] as const,
+  preview: (templateId: string, orgNodeId: string | null, equipmentId: string | null) =>
+    ["log-entries", "preview", templateId, orgNodeId ?? "", equipmentId ?? ""] as const,
 };
 
 /** Plantillas disponibles para crear una entrada (gateado por logentry:create). */
@@ -40,10 +41,15 @@ export function useLogEntry(id: string | null) {
 }
 
 /** Vista previa de una entrada nueva (modo compose 2.8.2): no persiste nada. */
-export function useNewLogEntryPreview(templateId: string | null, orgNodeId: string | null, enabled = true) {
+export function useNewLogEntryPreview(
+  templateId: string | null,
+  orgNodeId: string | null,
+  equipmentId: string | null = null,
+  enabled = true,
+) {
   return useQuery({
-    queryKey: LOG_ENTRY_KEYS.preview(templateId ?? "", orgNodeId),
-    queryFn: () => fetchNewLogEntryPreview(templateId!, orgNodeId),
+    queryKey: LOG_ENTRY_KEYS.preview(templateId ?? "", orgNodeId, equipmentId),
+    queryFn: () => fetchNewLogEntryPreview(templateId!, orgNodeId, equipmentId),
     enabled: enabled && !!templateId,
     // El preview depende del reloj/turno/periodo del momento: no lo caches agresivo.
     staleTime: 0,

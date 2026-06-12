@@ -406,11 +406,26 @@ export type CreateLogEntryRequest = z.infer<typeof createLogEntryRequestSchema>;
  * y OBLIGA a elegir si hay más de 1 (sin default silencioso); el backend re-valida
  * la membresía al crear.
  */
+/**
+ * Equipo (activo) instalado en un nodo, para tagear OPCIONALMENTE la entrada a una
+ * máquina concreta (Fase 2.8.0.1). Patrón EAM "objeto de referencia" (SAP PM /
+ * Maximo): ubicación funcional [nodo] + activo [equipo]; el grano por equipo habilita
+ * la analítica de confiabilidad (ISO 14224) y el motor de incidencias (Fase 4).
+ */
+export const eligibleEquipmentSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  tag: z.string().nullable(),
+});
+export type EligibleEquipment = z.infer<typeof eligibleEquipmentSchema>;
+
 export const eligibleNodeSchema = z.object({
   id: z.string(),
   name: z.string(),
   /** Ruta legible (nombres) del nodo, para desambiguar en el selector. */
   path: z.string(),
+  /** Equipos activos del nodo (vacío = ninguno). El equipo en la entrada es OPCIONAL. */
+  equipment: z.array(eligibleEquipmentSchema),
 });
 export type EligibleNode = z.infer<typeof eligibleNodeSchema>;
 

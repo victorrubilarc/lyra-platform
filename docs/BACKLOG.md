@@ -11,9 +11,11 @@
 > [deprecado, DROP en §3]. `ScopeService.getAccessibleNodes`+`isTemplateVisibleByNode`; selector de nodo al crear acotado a
 > asignaciones ∩ ABAC [autoselección si 1, **obliga si >1**] vía `eligibleNodesForTemplate` + `assertNodeAllowedForTemplate`
 > [**cierra el diferido (a) de 2.4**]. UI en `TemplateBuilder` [reusa `ScopeTreePicker`] + `NewEntryPage`. **Sin permisos
-> nuevos — catálogo 59.** Tests contracts 149 · API **213**. Smoke 15/15. Siguiente recomendado: **2.8.1 UX de acceso
-> nodo↔grilla** (fusiona 2.6.1 SavedView) o **2.7.3 matriz rol×sección×tiempo**. Deuda abierta: **2.8.2** [VOID de borradores
-> + ruta de edición propia] y el DROP de `Template.orgNodeId` [§3]).
+> nuevos — catálogo 59.** Tests contracts 149 · API **213**. **+ 2.8.0.1 Equipo OPCIONAL al crear** (objeto de referencia
+> EAM: nodo + equipo del nodo; `eligibleNode.equipment` + `assertEquipmentInNode`; modal con selector de equipo; smoke 18/18).
+> **+ fix re-binding de flujo** al guardar plantilla (preexistente 2.2). Siguiente recomendado: **2.8.0.2 modo de equipo por
+> plantilla** (gobernanza, opción B) · **2.8.1 UX de acceso nodo↔grilla** (fusiona 2.6.1 SavedView) o **2.7.3 matriz
+> rol×sección×tiempo**. Deuda abierta: **2.8.2** [VOID de borradores + ruta de edición propia] y el DROP de `Template.orgNodeId` [§3]).
 
 ---
 
@@ -68,6 +70,8 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Fase 2.8 Alcance por PLANTILLA (2.º eje ABAC)** (`TemplateScope` + `getAccessibleTemplateIds`/`assertTemplateInScope` + filtro picker/grilla + `PUT users\|roles/:id/template-scope` + options + `TemplateScopePicker`) | `main` (fusionado desde `feat/alcance-plantilla`) | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Fase 2.8 Afinamiento** (fix anclaje de selectores + Combobox/MultiSelect premium + filtro de Bitácoras con alcance `GET /log-entries/filter-templates` + RoleDrawer a pestañas + acceso por rol desde la plantilla `GET/PUT /templates/:id/role-scope` + `TemplateAccessModal`) | `feat/afinamiento-2.8` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Fase 2.8.0 Plantillas MULTI-NODO** (`TemplateNodeAssignment` N:M + `getAccessibleNodes`/`isTemplateVisibleByNode` + selector de nodo al crear `eligibleNodesForTemplate` + `assertNodeAllowedForTemplate` + UI builder/NewEntryPage) | `feat/plantillas-multinodo` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
+| **Fix re-binding de flujo al guardar plantilla** (el builder reenviaba la versión de flujo congelada; ahora ata la vigente — bug preexistente 2.2 detectado en el smoke visual de 2.8.0) | `main` (commit directo) | ✅ publicado en `origin/main` (`2a58d9f`) | ninguna |
+| **Fase 2.8.0.1 Equipo OPCIONAL al crear entrada** (`eligibleNode.equipment` + `assertEquipmentInNode` + selector de equipo en el modal de creación) | `feat/equipo-opcional-entrada` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 
 **Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
@@ -393,6 +397,17 @@ nunca queda más de una sesión atrás.
             `GET /log-entries/templates/:id/nodes`. UI en `TemplateBuilder` (reusa `ScopeTreePicker`) + `NewEntryPage`.
             Sin permisos nuevos (catálogo 59). Tests API **213** (+8). Smoke 15/15. 6 forks en DECISIONS 2026-06-12.
             **Pendiente: smoke VISUAL.**
+      - [x] **2.8.0.1 Equipo OPCIONAL al crear entrada (objeto de referencia EAM)** ✅ (2026-06-12,
+            `feat/equipo-opcional-entrada` → `main`). Tras elegir el nodo, selector de **equipo opcional** instalado en ese
+            nodo (patrón SAP PM/Maximo ubicación+activo; grano ISO 14224 para confiabilidad/Fase 4). `eligibleNodesForTemplate`
+            devuelve los equipos activos por nodo; `assertEquipmentInNode` valida pertenencia en create/previewNew; el modal
+            de creación se abre también con 1 nodo si tiene equipos. `LogEntry.equipmentId` ya existía (2.4). Smoke 18/18.
+            Ver DECISIONS 2026-06-12.
+      - [ ] **2.8.0.2 Modo de equipo por PLANTILLA (gobernanza, "opción B")**: `equipmentMode` en la plantilla
+            (`ninguno / opcional / requerido`) — patrón notification-type de SAP / WO-type de Maximo: el tipo de registro
+            decide si el equipo se oculta, se ofrece o es obligatorio (p. ej. mantención/inspección → requerido; turno/área
+            → opcional/oculto). Migración aditiva + control en el `TemplateBuilder` + enforcement en `create`/`submit`. Es la
+            capa de gobernanza sobre la mecánica de 2.8.0.1. **Su propia sesión.**
       - [ ] **2.8.1 (#9) UX de acceso nodo↔grilla** (+ SavedView/gestor de columnas de 2.6.1 FUSIONADOS aquí):
             presentar 2–3 alternativas con pros/contras ANTES de implementar; "mis nodos"/recientes/favoritos,
             búsqueda, filtros persistentes.

@@ -128,6 +128,27 @@ def main():
         sc, _ = call("GET", f"/log-entries/new?templateId={tpl_id}&orgNodeId={other_id}", atok)
         check("global: preview en cualquier nodo accesible => 200", sc == 200, str(sc))
 
+        # === 5b. EQUIPO opcional (objeto de referencia EAM, 2.8.0.1) =========
+        # Con la plantilla global, los nodos elegibles traen sus equipos.
+        _, eligG = req("GET", f"/log-entries/templates/{tpl_id}/nodes", atok)
+        nodes_eq = [n for n in eligG["nodes"] if n.get("equipment")]
+        if len(nodes_eq) >= 1:
+            nA = nodes_eq[0]
+            eqA = nA["equipment"][0]["id"]
+            check("nodos elegibles incluyen equipos del nodo", "equipment" in nA and len(nA["equipment"]) >= 1, f"n_equipos={len(nA['equipment'])}")
+            sc, _ = call("GET", f"/log-entries/new?templateId={tpl_id}&orgNodeId={nA['id']}&equipmentId={eqA}", atok)
+            check("preview con equipo DEL nodo => 200", sc == 200, str(sc))
+            # Equipo de OTRO nodo distinto => 400.
+            nB = next((n for n in nodes_eq if n["id"] != nA["id"] and n["equipment"]), None)
+            if nB:
+                eqB = nB["equipment"][0]["id"]
+                sc, _ = call("GET", f"/log-entries/new?templateId={tpl_id}&orgNodeId={nA['id']}&equipmentId={eqB}", atok)
+                check("preview con equipo de OTRO nodo => 400", sc == 400, str(sc))
+            else:
+                print("  (no hay un 2.º nodo con equipos para el caso negativo de equipo)")
+        else:
+            print("  (ningun nodo accesible tiene equipos activos; se omite el bloque de equipo)")
+
         # === 6. Filtrado del PICKER por alcance de NODO del usuario ==========
         _, users = req("GET", "/security/users", atok)
         op = next((u for u in users if u["email"] == "operador@watchlog.local"), None)

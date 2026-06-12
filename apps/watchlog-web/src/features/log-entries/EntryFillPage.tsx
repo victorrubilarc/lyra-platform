@@ -74,8 +74,14 @@ export function EntryFillPage() {
   const routeId = params.id ?? "";
   const compose = !!composeTemplateId;
 
-  const navState = (location.state ?? {}) as { orgNodeId?: string | null; deferred?: DeferralInput | null };
+  const navState = (location.state ?? {}) as {
+    orgNodeId?: string | null;
+    equipmentId?: string | null;
+    deferred?: DeferralInput | null;
+  };
   const [composeOrgNodeId] = useState<string | null>(navState.orgNodeId ?? null);
+  // Equipo OPCIONAL elegido en el picker (2.8.0.1): viaja por el state y se aplica al materializar.
+  const [composeEquipmentId] = useState<string | null>(navState.equipmentId ?? null);
   // Diferido declarado en compose (en memoria hasta materializar). Se aplica al crear.
   const [composeDeferred, setComposeDeferred] = useState<DeferralInput | null>(navState.deferred ?? null);
   const [creating, setCreating] = useState(false);
@@ -89,7 +95,7 @@ export function EntryFillPage() {
   const activeId = materializedId ?? routeId;
 
   const existing = useLogEntry(composeActive ? null : activeId);
-  const preview = useNewLogEntryPreview(composeTemplateId, composeOrgNodeId, composeActive);
+  const preview = useNewLogEntryPreview(composeTemplateId, composeOrgNodeId, composeEquipmentId, composeActive);
   const entry = composeActive ? preview.data : existing.data;
   const isLoading = composeActive ? preview.isLoading : existing.isLoading;
   const isError = composeActive ? preview.isError : existing.isError;
@@ -219,6 +225,7 @@ export function EntryFillPage() {
     const created = await createLogEntry({
       templateId: composeTemplateId!,
       ...(composeOrgNodeId ? { orgNodeId: composeOrgNodeId } : {}),
+      ...(composeEquipmentId ? { equipmentId: composeEquipmentId } : {}),
       ...(composeDeferred ? { deferred: composeDeferred } : {}),
     });
     createdIdRef.current = created.id;
