@@ -51,6 +51,9 @@ export const router = createBrowserRouter([
           { path: "/plantillas", element: <TemplatesPage /> },
           { path: "/plantillas/:id", element: <TemplateBuilderPage /> },
           { path: "/nueva-entrada", element: <NewEntryPage /> },
+          // Modo COMPOSE (2.8.2): abrir el formulario de una entrada NUEVA sin
+          // crearla; se materializa recién al primer guardado. Va antes de "/:id".
+          { path: "/nueva-entrada/comenzar/:templateId", element: <EntryFillPage /> },
           { path: "/nueva-entrada/:id", element: <EntryFillPage /> },
           { path: "/bitacoras", element: <LogbookPage /> },
           { path: "/bitacoras/:id", element: <EntryViewerPage /> },

@@ -4,6 +4,7 @@ import {
   createLogEntryRequestSchema,
   executeTransitionRequestSchema,
   logEntryListQuerySchema,
+  previewLogEntryQuerySchema,
   saveLogEntrySectionRequestSchema,
   setDeferralRequestSchema,
   submitLogEntryRequestSchema,
@@ -11,6 +12,7 @@ import {
   type CreateLogEntryRequest,
   type ExecuteTransitionRequest,
   type LogEntryListQuery,
+  type PreviewLogEntryQuery,
   type SaveLogEntrySectionRequest,
   type SetDeferralRequest,
   type SubmitLogEntryRequest,
@@ -64,6 +66,17 @@ export class LogEntriesController {
       .header("Content-Disposition", `attachment; filename="bitacoras-${stamp}.csv"`)
       .header("X-Export-Truncated", String(truncated))
       .send(csv);
+  }
+
+  /** Vista previa de una entrada NUEVA sin persistir (modo compose 2.8.2). Va ANTES
+   * de `:id` para que "new" no se interprete como un id. */
+  @Get("new")
+  @RequirePermission("logentry:create")
+  previewNew(
+    @Query(new ZodValidationPipe(previewLogEntryQuerySchema)) query: PreviewLogEntryQuery,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.entries.previewNew(user.id, query);
   }
 
   @Get(":id")

@@ -22,6 +22,17 @@ export function fetchLogEntry(id: string): Promise<LogEntryDetail> {
   return apiJson(`/log-entries/${id}`, logEntryDetailSchema);
 }
 
+/**
+ * Vista previa de una entrada NUEVA sin persistir (modo compose 2.8.2): el mismo
+ * detalle que produciría crear+abrir, con `id: ""`. La entrada se materializa
+ * recién en el primer guardado real.
+ */
+export function fetchNewLogEntryPreview(templateId: string, orgNodeId?: string | null): Promise<LogEntryDetail> {
+  const qs = new URLSearchParams({ templateId });
+  if (orgNodeId) qs.set("orgNodeId", orgNodeId);
+  return apiJson(`/log-entries/new?${qs.toString()}`, logEntryDetailSchema);
+}
+
 export function createLogEntry(dto: CreateLogEntryRequest): Promise<LogEntryDetail> {
   createLogEntryRequestSchema.parse(dto);
   return apiJson("/log-entries", logEntryDetailSchema, { method: "POST", body: dto });

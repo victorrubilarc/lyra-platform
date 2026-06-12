@@ -376,6 +376,18 @@ export const deferralInputSchema = z.object({
 });
 export type DeferralInput = z.infer<typeof deferralInputSchema>;
 
+/**
+ * Query de la VISTA PREVIA de una entrada nueva (Fase 2.8.2): arma el detalle sin
+ * persistir, para abrir el formulario en modo compose. Materializa recién al
+ * primer guardado. Mismos campos que identifican el contexto de creación.
+ */
+export const previewLogEntryQuerySchema = z.object({
+  templateId: z.string().min(1),
+  orgNodeId: z.string().optional(),
+  equipmentId: z.string().optional(),
+});
+export type PreviewLogEntryQuery = z.infer<typeof previewLogEntryQuerySchema>;
+
 export const createLogEntryRequestSchema = z.object({
   templateId: z.string().min(1),
   /** Nodo de la entrada. Si se omite, hereda el de la plantilla (debe existir uno). */

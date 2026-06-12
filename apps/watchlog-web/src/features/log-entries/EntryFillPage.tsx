@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -22,7 +22,9 @@ import {
   isFieldVisible,
   validateFieldValue,
   type AvailableTransitionDto,
+  type DeferralInput,
   type ExecuteTransitionRequest,
+  type LogEntryDetail,
   type LogEntrySectionStateDto,
   type TemplateFieldDto,
   type TemplateSectionDto,
@@ -31,10 +33,12 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ApiError } from "../../lib/api-client.js";
 import { formatDateTime } from "../../lib/format.js";
 import { FieldControl } from "../templates/FieldControl.js";
+import { createLogEntry, executeTransition as executeTransitionApi, saveLogEntrySection, submitLogEntry } from "./log-entries-api.js";
 import {
   LOG_ENTRY_KEYS,
   useExecuteTransition,
   useLogEntry,
+  useNewLogEntryPreview,
   useSaveLogEntrySection,
   useSetDeferral,
   useSubmitLogEntry,
@@ -58,16 +62,44 @@ function fieldForValidation(f: TemplateFieldDto) {
 
 export function EntryFillPage() {
   const { t } = useTranslation();
-  const { id = "" } = useParams();
+  const params = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
   const toast = useToast();
   const qc = useQueryClient();
 
-  const { data: entry, isLoading, isError } = useLogEntry(id);
-  const save = useSaveLogEntrySection(id);
-  const submit = useSubmitLogEntry(id);
-  const transition = useExecuteTransition(id);
-  const setDeferral = useSetDeferral(id);
+  // Dos rutas comparten esta pantalla: COMPOSE (`/nueva-entrada/comenzar/:templateId`,
+  // entrada NUEVA aún sin crear, 2.8.2) y EDICIÓN (`/nueva-entrada/:id`, entrada real).
+  const composeTemplateId = params.templateId ?? null;
+  const routeId = params.id ?? "";
+  const compose = !!composeTemplateId;
+
+  const navState = (location.state ?? {}) as { orgNodeId?: string | null; deferred?: DeferralInput | null };
+  const [composeOrgNodeId] = useState<string | null>(navState.orgNodeId ?? null);
+  // Diferido declarado en compose (en memoria hasta materializar). Se aplica al crear.
+  const [composeDeferred, setComposeDeferred] = useState<DeferralInput | null>(navState.deferred ?? null);
+  const [creating, setCreating] = useState(false);
+  // Id de la entrada YA materializada (tras el primer guardado en compose). Cambia
+  // la pantalla a modo edición SIN remontar (preserva el borrador local). El ref
+  // garantiza creación ÚNICA aunque la acción posterior falle y se reintente.
+  const [materializedId, setMaterializedId] = useState<string | null>(null);
+  const createdIdRef = useRef<string | null>(null);
+
+  const composeActive = compose && !materializedId;
+  const activeId = materializedId ?? routeId;
+
+  const existing = useLogEntry(composeActive ? null : activeId);
+  const preview = useNewLogEntryPreview(composeTemplateId, composeOrgNodeId, composeActive);
+  const entry = composeActive ? preview.data : existing.data;
+  const isLoading = composeActive ? preview.isLoading : existing.isLoading;
+  const isError = composeActive ? preview.isError : existing.isError;
+
+  // Mutaciones de la entrada REAL. En compose-activo se usan llamadas directas
+  // tras materializar; una vez materializada, estos hooks operan sobre su id.
+  const save = useSaveLogEntrySection(activeId);
+  const submit = useSubmitLogEntry(activeId);
+  const transition = useExecuteTransition(activeId);
+  const setDeferral = useSetDeferral(activeId);
 
   const [draft, setDraft] = useState<Draft>({});
   const [savingKey, setSavingKey] = useState<string | null>(null);
@@ -139,6 +171,12 @@ export function EntryFillPage() {
   );
   const missingTitles = missingSections.map((s) => `«${s.title}»`).join(", ");
 
+  // Huella del diferido, compatible con compose (declarado en memoria) y edición.
+  const showDeferred = composeActive ? !!composeDeferred : entry.entryOrigin === "DEFERRED";
+  const declaredAtDisplay = composeActive ? (composeDeferred?.effectiveAt ?? null) : entry.declaredEffectiveAt;
+  const deferredReasonDisplay = composeActive ? (composeDeferred?.reason ?? null) : entry.deferredReason;
+  const canDeclareDeferral = isDraft && !entry.sealedAt;
+
   /** Motivo de bloqueo de la sección, tal como lo decidió el backend. */
   function blockedMessage(section: TemplateSectionDto, st: LogEntrySectionStateDto): string {
     switch (st.blockedReason) {
@@ -162,6 +200,63 @@ export function EntryFillPage() {
     }
   }
 
+  /** Valores a enviar de una sección (sin los campos reservados a otro rol). */
+  function valuesFor(section: TemplateSectionDto, st: LogEntrySectionStateDto) {
+    const restricted = new Set(st.readOnlyFieldKeys);
+    const visible = section.fields.filter((f) => isFieldVisible(f.visibleWhen, draft) && !restricted.has(f.key));
+    return visible.map((f) => ({ fieldKey: f.key, value: draft[f.key] ?? null }));
+  }
+
+  /**
+   * COMPOSE (2.8.2): MATERIALIZA la entrada (crea el LogEntry con el diferido
+   * declarado, si lo hay) recién en el primer guardado real, y devuelve su id.
+   * Antes de esto, elegir plantilla y entrar/salir NO deja ningún registro. El ref
+   * asegura que un reintento tras un fallo NO cree una segunda entrada. Actualiza
+   * la URL a la entrada real (sin remontar) para que un reload cargue lo correcto.
+   */
+  async function materialize(): Promise<string> {
+    if (createdIdRef.current) return createdIdRef.current;
+    const created = await createLogEntry({
+      templateId: composeTemplateId!,
+      ...(composeOrgNodeId ? { orgNodeId: composeOrgNodeId } : {}),
+      ...(composeDeferred ? { deferred: composeDeferred } : {}),
+    });
+    createdIdRef.current = created.id;
+    window.history.replaceState(null, "", `/nueva-entrada/${created.id}`);
+    return created.id;
+  }
+
+  /** Compose: crea la entrada + guarda la 1ª sección en un gesto; queda en modo edición. */
+  async function composeSaveSection(
+    section: TemplateSectionDto,
+    st: LogEntrySectionStateDto,
+    markComplete: boolean,
+    password?: string,
+  ) {
+    setSavingKey(section.key + (markComplete ? ":complete" : ""));
+    setCreating(true);
+    try {
+      const newId = await materialize();
+      const detail = await saveLogEntrySection(newId, section.key, {
+        expectedVersion: 0,
+        values: valuesFor(section, st),
+        markComplete,
+        password,
+      });
+      qc.setQueryData(LOG_ENTRY_KEYS.detail(newId), detail);
+      toast.success(markComplete ? t("logbook.fill.sectionCompleted") : t("logbook.fill.sectionSaved"));
+      setSigningSection(null);
+      setMaterializedId(newId); // pasa a modo edición (sin remontar; preserva el borrador)
+    } catch (e) {
+      // Si la entrada llegó a crearse, cambia a ella para que el reintento no duplique.
+      if (createdIdRef.current) setMaterializedId(createdIdRef.current);
+      toast.error(e instanceof ApiError ? e.message : t("common.errorGeneric"));
+    } finally {
+      setCreating(false);
+      setSavingKey(null);
+    }
+  }
+
   function saveSection(
     section: TemplateSectionDto,
     st: LogEntrySectionStateDto,
@@ -169,17 +264,17 @@ export function EntryFillPage() {
     password?: string,
     override?: EditWindowOverrideFields,
   ) {
-    // No se envían los campos reservados a otro rol (el usuario no puede modificarlos).
-    const restricted = new Set(st.readOnlyFieldKeys);
-    const visible = section.fields.filter((f) => isFieldVisible(f.visibleWhen, draft) && !restricted.has(f.key));
-    const values = visible.map((f) => ({ fieldKey: f.key, value: draft[f.key] ?? null }));
+    if (composeActive) {
+      void composeSaveSection(section, st, markComplete, password);
+      return;
+    }
     setSavingKey(section.key + (markComplete ? ":complete" : ""));
     save.mutate(
       {
         sectionKey: section.key,
         dto: {
           expectedVersion: st.version,
-          values,
+          values: valuesFor(section, st),
           markComplete,
           password: password ?? override?.password,
           mfaCode: override?.mfaCode,
@@ -194,7 +289,7 @@ export function EntryFillPage() {
         onError: (e) => {
           if (e instanceof ApiError && e.status === 409) {
             toast.error(t("logbook.fill.conflict"));
-            void qc.invalidateQueries({ queryKey: LOG_ENTRY_KEYS.detail(id) });
+            void qc.invalidateQueries({ queryKey: LOG_ENTRY_KEYS.detail(routeId) });
           } else toast.error(e instanceof ApiError ? e.message : t("common.errorGeneric"));
         },
         onSettled: () => setSavingKey(null),
@@ -223,6 +318,10 @@ export function EntryFillPage() {
   }
 
   function doSubmit() {
+    if (composeActive) {
+      void composeFinalize((newId) => submitLogEntry(newId, {}), () => toast.success(t("logbook.fill.submitted")));
+      return;
+    }
     withOverride((ov) =>
       submit.mutate(
         { overrideReason: ov?.overrideReason, password: ov?.password, mfaCode: ov?.mfaCode },
@@ -236,16 +335,48 @@ export function EntryFillPage() {
 
   function runTransition(dto: Omit<ExecuteTransitionRequest, "transitionKey">) {
     if (!activeTransition) return;
+    const tr = activeTransition;
+    if (composeActive) {
+      void composeFinalize(
+        (newId) => executeTransitionApi(newId, { transitionKey: tr.transitionKey, ...dto }),
+        () => {
+          toast.success(t("logbook.transition.done", { state: tr.toStateName }));
+          setActiveTransition(null);
+        },
+      );
+      return;
+    }
     transition.mutate(
-      { transitionKey: activeTransition.transitionKey, ...dto },
+      { transitionKey: tr.transitionKey, ...dto },
       {
         onSuccess: () => {
-          toast.success(t("logbook.transition.done", { state: activeTransition.toStateName }));
+          toast.success(t("logbook.transition.done", { state: tr.toStateName }));
           setActiveTransition(null);
         },
         onError: (e) => toast.error(e instanceof ApiError ? e.message : t("common.errorGeneric")),
       },
     );
+  }
+
+  /**
+   * Compose: materializa y ejecuta una acción de finalización (enviar/transición),
+   * cebando la caché y pasando a modo edición. Creación única (ref); si la acción
+   * falla tras crear, igual cambia a la entrada real para no duplicar al reintentar.
+   */
+  async function composeFinalize(run: (newId: string) => Promise<LogEntryDetail>, onOk: () => void) {
+    setCreating(true);
+    try {
+      const newId = await materialize();
+      const detail = await run(newId);
+      qc.setQueryData(LOG_ENTRY_KEYS.detail(newId), detail);
+      onOk();
+      setMaterializedId(newId);
+    } catch (e) {
+      if (createdIdRef.current) setMaterializedId(createdIdRef.current);
+      toast.error(e instanceof ApiError ? e.message : t("common.errorGeneric"));
+    } finally {
+      setCreating(false);
+    }
   }
 
   return (
@@ -262,7 +393,7 @@ export function EntryFillPage() {
             <div className={styles.entryNode}>{entry.orgNodePath ?? "—"}</div>
           </div>
           <div className={styles.entryHeadChips}>
-            {entry.entryOrigin === "DEFERRED" && <Chip variant="warning" label={t("logbook.deferral.chip")} />}
+            {showDeferred && <Chip variant="warning" label={t("logbook.deferral.chip")} />}
             {entry.currentStateName && <Chip variant="info" label={entry.currentStateName} />}
             <Chip
               variant={entry.status === "SUBMITTED" ? "success" : entry.status === "VOID" ? "default" : "warning"}
@@ -295,7 +426,7 @@ export function EntryFillPage() {
               {t("logbook.fill.period")}: <b>{entry.periodKey}</b>
             </span>
           )}
-          {entry.entryOrigin === "DEFERRED" && (
+          {showDeferred && !compose && (
             <span className={styles.dimChip}>
               <History size={13} /> {t("logbook.fill.recordedAt")}: <b>{formatDateTime(entry.recordedAt)}</b>
             </span>
@@ -303,23 +434,21 @@ export function EntryFillPage() {
         </div>
 
         {/* Registro diferido (2.7.0): huella visible + gesto para declarar/corregir. */}
-        {entry.entryOrigin === "DEFERRED" && (
+        {showDeferred && (
           <div className={styles.deferredNote}>
             <History size={13} />
             <span>
-              {t("logbook.deferral.note", {
-                at: entry.declaredEffectiveAt ? formatDateTime(entry.declaredEffectiveAt) : "—",
-              })}
-              {entry.deferredReason ? ` — “${entry.deferredReason}”` : ""}
+              {t("logbook.deferral.note", { at: declaredAtDisplay ? formatDateTime(declaredAtDisplay) : "—" })}
+              {deferredReasonDisplay ? ` — “${deferredReasonDisplay}”` : ""}
             </span>
-            {isDraft && !entry.sealedAt && (
+            {canDeclareDeferral && (
               <button type="button" className={styles.deferralToggleLabel} onClick={() => setDeferralOpen(true)}>
                 {t("logbook.deferral.edit")}
               </button>
             )}
           </div>
         )}
-        {entry.entryOrigin === "ONLINE" && isDraft && !entry.sealedAt && (
+        {!showDeferred && canDeclareDeferral && (
           <div className={styles.deferredNote}>
             <button type="button" className={styles.deferralToggleLabel} onClick={() => setDeferralOpen(true)}>
               <History size={14} /> {t("logbook.deferral.toggleLabel")}
@@ -454,7 +583,7 @@ export function EntryFillPage() {
         </div>
       ) : isDraft ? (
         <div className={styles.submitBar}>
-          <Button variant="primary" loading={submit.isPending} disabled={missingSections.length > 0} onClick={doSubmit}>
+          <Button variant="primary" loading={submit.isPending || creating} disabled={missingSections.length > 0} onClick={doSubmit}>
             <Send size={15} /> {t("logbook.fill.submit")}
           </Button>
           <span className={styles.submitHint}>
@@ -493,7 +622,7 @@ export function EntryFillPage() {
       {activeTransition && (
         <TransitionModal
           transition={activeTransition}
-          loading={transition.isPending}
+          loading={transition.isPending || creating}
           onConfirm={runTransition}
           onClose={() => setActiveTransition(null)}
         />
@@ -510,13 +639,16 @@ export function EntryFillPage() {
 
       {deferralOpen && (
         <DeferralModal
-          initial={
-            entry.entryOrigin === "DEFERRED" && entry.declaredEffectiveAt
-              ? { effectiveAt: entry.declaredEffectiveAt, reason: entry.deferredReason ?? "" }
-              : null
-          }
+          initial={showDeferred && declaredAtDisplay ? { effectiveAt: declaredAtDisplay, reason: deferredReasonDisplay ?? "" } : null}
           loading={setDeferral.isPending}
-          onConfirm={(deferred) =>
+          onConfirm={(deferred) => {
+            // Compose: la declaración vive en memoria hasta materializar (sin API).
+            if (composeActive) {
+              setComposeDeferred(deferred);
+              toast.success(t("logbook.deferral.declared"));
+              setDeferralOpen(false);
+              return;
+            }
             withOverride((ov) =>
               setDeferral.mutate(
                 { deferred, overrideReason: ov?.overrideReason, password: ov?.password, mfaCode: ov?.mfaCode },
@@ -528,9 +660,15 @@ export function EntryFillPage() {
                   onError: (e) => toast.error(e instanceof ApiError ? e.message : t("common.errorGeneric")),
                 },
               ),
-            )
-          }
-          onRemove={() =>
+            );
+          }}
+          onRemove={() => {
+            if (composeActive) {
+              setComposeDeferred(null);
+              toast.success(t("logbook.deferral.removed"));
+              setDeferralOpen(false);
+              return;
+            }
             withOverride((ov) =>
               setDeferral.mutate(
                 { deferred: null, overrideReason: ov?.overrideReason, password: ov?.password, mfaCode: ov?.mfaCode },
@@ -542,8 +680,8 @@ export function EntryFillPage() {
                   onError: (e) => toast.error(e instanceof ApiError ? e.message : t("common.errorGeneric")),
                 },
               ),
-            )
-          }
+            );
+          }}
           onClose={() => setDeferralOpen(false)}
         />
       )}

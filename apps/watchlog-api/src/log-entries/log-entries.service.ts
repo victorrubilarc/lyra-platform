@@ -8,6 +8,7 @@ import {
 import type {
   AvailableTransitionDto,
   CreateLogEntryRequest,
+  EditWindowAnchor,
   EditWindowInfo,
   ExecuteTransitionRequest,
   FieldForValidation,
@@ -87,6 +88,40 @@ export const versionInclude = {
 
 export type VersionWithGraph = Prisma.TemplateVersionGetPayload<{ include: typeof versionInclude }>;
 export type LogEntryRow = Prisma.LogEntryGetPayload<Record<string, never>>;
+
+/**
+ * Subconjunto de la cabecera que `buildDetail`/`mapEntry` necesitan. Permite armar
+ * el detalle tanto de una entrada REAL (`LogEntryRow`, superconjunto asignable)
+ * como de una cabecera SINTÉTICA no persistida (vista previa de "nueva entrada",
+ * Fase 2.8.2).
+ */
+export type EntrySource = Pick<
+  LogEntryRow,
+  | "id"
+  | "entryNumber"
+  | "templateId"
+  | "templateVersionId"
+  | "workflowDefinitionId"
+  | "workflowDefinitionVersionId"
+  | "orgNodeId"
+  | "equipmentId"
+  | "currentStateKey"
+  | "status"
+  | "recordedAt"
+  | "effectiveAt"
+  | "shiftCode"
+  | "operationalDate"
+  | "periodKey"
+  | "sealedAt"
+  | "entryOrigin"
+  | "declaredEffectiveAt"
+  | "deferredReason"
+  | "deferredDeclaredById"
+  | "deferredDeclaredAt"
+  | "createdById"
+  | "createdAt"
+  | "updatedAt"
+>;
 
 /** Versión de flujo CONGELADA (estados + transiciones → roles) para ejecutar/render. */
 export const workflowVersionInclude = {
@@ -299,6 +334,95 @@ export class LogEntriesService {
         : Promise.resolve(null),
     ]);
 
+    return this.buildDetail(userId, entry, version, template, { sectionRows, valueRows, transitionRows, signatureRows }, wfVersion, equipment);
+  }
+
+  /**
+   * Vista previa de una entrada NUEVA sin PERSISTIR (Fase 2.8.2 — "no crear
+   * borradores huérfanos"): arma el MISMO `LogEntryDetail` que produciría
+   * `create` + `getDetail`, pero con una cabecera sintética (id="") y sin filas en
+   * BD. El frontend la usa para abrir el formulario en modo compose; la entrada
+   * se materializa recién en el primer guardado real. Reutiliza toda la lógica de
+   * `buildDetail` (editabilidad por sección/rol/estado, dimensiones, ventana de
+   * edición, transiciones del estado inicial) — cero duplicación en el cliente.
+   */
+  async previewNew(
+    userId: string,
+    q: { templateId: string; orgNodeId?: string | null; equipmentId?: string | null },
+  ): Promise<LogEntryDetail> {
+    const template = await this.prisma.template.findFirst({ where: { id: q.templateId, deletedAt: null } });
+    if (!template) throw new NotFoundException("Plantilla no encontrada");
+    if (template.status !== "PUBLISHED" || !template.currentVersionId) {
+      throw new BadRequestException("La plantilla debe estar publicada para registrar entradas");
+    }
+    const orgNodeId = q.orgNodeId ?? template.orgNodeId;
+    if (!orgNodeId) throw new BadRequestException("Debe indicar un nodo de la estructura para la entrada");
+    await this.assertNodeExists(orgNodeId);
+    if (!(await this.scope.canAccessNode(userId, orgNodeId))) {
+      throw new ForbiddenException("El nodo indicado está fuera de su alcance");
+    }
+    if (q.equipmentId) await this.assertEquipmentExists(q.equipmentId);
+
+    const version = await this.loadVersion(template.currentVersionId);
+    const currentStateKey = await this.initialStateKey(version.workflowDefinitionVersionId);
+    const now = new Date();
+    const dims = await this.resolveDims(now, orgNodeId);
+    const [wfVersion, equipment] = await Promise.all([
+      version.workflowDefinitionVersionId ? this.loadWorkflowVersion(version.workflowDefinitionVersionId) : Promise.resolve(null),
+      q.equipmentId ? this.prisma.equipment.findUnique({ where: { id: q.equipmentId }, select: { name: true } }) : Promise.resolve(null),
+    ]);
+
+    // Cabecera SINTÉTICA: no se escribe en BD. effectiveAt = ahora (la fecha real
+    // del diferido, si la hay, se aplica al materializar en `create`).
+    const synthetic: EntrySource = {
+      id: "",
+      entryNumber: 0,
+      templateId: template.id,
+      templateVersionId: version.id,
+      workflowDefinitionId: version.workflowDefinitionId,
+      workflowDefinitionVersionId: version.workflowDefinitionVersionId,
+      orgNodeId,
+      equipmentId: q.equipmentId ?? null,
+      currentStateKey,
+      status: "DRAFT",
+      recordedAt: now,
+      effectiveAt: now,
+      shiftCode: dims?.shiftCode ?? null,
+      operationalDate: dims?.operationalDate ?? null,
+      periodKey: dims?.periodKey ?? null,
+      sealedAt: null,
+      entryOrigin: "ONLINE",
+      declaredEffectiveAt: null,
+      deferredReason: null,
+      deferredDeclaredById: null,
+      deferredDeclaredAt: null,
+      createdById: userId,
+      createdAt: now,
+      updatedAt: now,
+    };
+    return this.buildDetail(userId, synthetic, version, template, { sectionRows: [], valueRows: [], transitionRows: [], signatureRows: [] }, wfVersion, equipment);
+  }
+
+  /**
+   * Arma el `LogEntryDetail` a partir de la cabecera (real o sintética) + las
+   * filas de ejecución (vacías en la vista previa). Fuente única de la decisión de
+   * editabilidad por sección, dimensiones, ventana de edición y transiciones.
+   */
+  private async buildDetail(
+    userId: string,
+    entry: EntrySource,
+    version: VersionWithGraph,
+    template: { name: string; editWindowAnchor: EditWindowAnchor | null; editWindowMinutes: number | null } | null,
+    rows: {
+      sectionRows: Array<{ sectionKey: string; state: LogEntrySectionState; filledById: string | null; filledAt: Date | null; version: number; signatureId: string | null }>;
+      valueRows: Array<{ fieldKey: string; value: unknown; updatedAt: Date; updatedById: string | null }>;
+      transitionRows: Array<{ id: string; transitionKey: string; fromStateKey: string; toStateKey: string; actorId: string | null; reason: string | null; signatureId: string | null; occurredAt: Date }>;
+      signatureRows: Array<{ id: string; logEntryId: string; context: SignatureContext; transitionKey: string | null; sectionKey: string | null; signerId: string | null; signerName: string; meaning: string; method: SignatureMethod; payloadHash: string; signedAt: Date }>;
+    },
+    wfVersion: WorkflowVersionWithGraph | null,
+    equipment: { name: string } | null,
+  ): Promise<LogEntryDetail> {
+    const { sectionRows, valueRows, transitionRows, signatureRows } = rows;
     const roleIds = await this.userRoleIds(userId);
     const actorNames = await this.namesByUserId([
       entry.createdById,
@@ -1516,7 +1640,7 @@ export class LogEntriesService {
   }
 
   /** Interno (lo comparte LogbookQueryService): cabecera de la entrada como DTO. */
-  mapEntry(e: LogEntryRow, templateName: string) {
+  mapEntry(e: EntrySource, templateName: string) {
     return {
       id: e.id,
       entryNumber: e.entryNumber,
