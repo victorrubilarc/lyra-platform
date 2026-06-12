@@ -1,13 +1,14 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
-import { FileStack, Layers, Lock, Network, Plus, Search, TriangleAlert } from "lucide-react";
+import { FileStack, Layers, Lock, Network, Plus, Search, TriangleAlert, Users } from "lucide-react";
 import { Button, Card, Chip, EmptyState, Input, Select, Skeleton, useToast } from "@lyra/ui";
 import type { TemplateListItem, TemplateStatus } from "@lyra/contracts";
 import { Can } from "../../auth/Can.js";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { useTemplates, useDeleteTemplate } from "./templates-queries.js";
 import { CreateTemplateModal } from "./CreateTemplateModal.js";
+import { TemplateAccessModal } from "./TemplateAccessModal.js";
 import { ConfirmDeleteModal } from "./ConfirmDeleteModal.js";
 import styles from "./TemplatesPage.module.css";
 
@@ -27,6 +28,7 @@ export function TemplatesPage() {
   const [status, setStatus] = useState<TemplateStatus | "">("");
   const [createOpen, setCreateOpen] = useState(false);
   const [toDelete, setToDelete] = useState<TemplateListItem | null>(null);
+  const [access, setAccess] = useState<TemplateListItem | null>(null);
 
   const query = useMemo(
     () => ({ ...(search.trim() ? { search: search.trim() } : {}), ...(status ? { status } : {}) }),
@@ -143,6 +145,11 @@ export function TemplatesPage() {
                   <Button variant="secondary" onClick={() => navigate(`/plantillas/${tpl.id}`)}>
                     {perms.can("template:edit") ? t("templates.actions.edit") : t("templates.actions.view")}
                   </Button>
+                  <Can perform="template:edit">
+                    <Button variant="secondary" onClick={() => setAccess(tpl)}>
+                      <Users size={15} aria-hidden /> {t("templates.actions.access")}
+                    </Button>
+                  </Can>
                   <Can perform="template:delete">
                     <Button variant="danger" onClick={() => setToDelete(tpl)}>
                       {t("templates.actions.delete")}
@@ -156,6 +163,12 @@ export function TemplatesPage() {
       )}
 
       <CreateTemplateModal open={createOpen} onClose={() => setCreateOpen(false)} />
+      <TemplateAccessModal
+        open={access !== null}
+        templateId={access?.id ?? null}
+        templateName={access?.name ?? ""}
+        onClose={() => setAccess(null)}
+      />
       <ConfirmDeleteModal
         open={toDelete !== null}
         title={t("templates.deleteTitle")}

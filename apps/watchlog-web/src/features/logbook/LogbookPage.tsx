@@ -21,9 +21,8 @@ import { formatEntryFolio, type LogEntryListItem, type OrgNodeTree } from "@lyra
 import { ApiError } from "../../lib/api-client.js";
 import { downloadBlob, fileStamp } from "../../lib/download.js";
 import { useOrgTree } from "../structure/structure-queries.js";
-import { useTemplates } from "../templates/templates-queries.js";
 import { exportLogbookCsv } from "./logbook-api.js";
-import { useLogbookList, useLogbookStats } from "./logbook-queries.js";
+import { useLogbookFilterTemplates, useLogbookList, useLogbookStats } from "./logbook-queries.js";
 import {
   DEFAULT_GRID_STATE,
   gridStateFromParams,
@@ -133,7 +132,7 @@ export function LogbookPage() {
   const list = useLogbookList(query);
   const stats = useLogbookStats(query);
   const { data: tree } = useOrgTree();
-  const { data: templates } = useTemplates({ status: "PUBLISHED" });
+  const { data: templates } = useLogbookFilterTemplates();
 
   const rows = useMemo(() => list.data?.pages.flatMap((p) => p.items) ?? [], [list.data]);
   const nodeOptions = useMemo(() => (tree ? flattenTree(tree) : []), [tree]);

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { Check, ChevronDown, Search, X } from "lucide-react";
 import { cx } from "../../cx.js";
 import { useAnchoredPanel } from "../../internal/useAnchoredPanel.js";
 import styles from "./MultiSelect.module.css";
@@ -141,7 +142,7 @@ export function MultiSelect({
                       if (!disabled) toggleValue(o.value);
                     }}
                   >
-                    ×
+                    <X size={12} aria-hidden />
                   </span>
                 </span>
               ))}
@@ -149,9 +150,7 @@ export function MultiSelect({
             </>
           )}
         </span>
-        <span className={styles.caret} aria-hidden>
-          ▾
-        </span>
+        <ChevronDown size={16} className={cx(styles.caret, open && styles.caretOpen)} aria-hidden />
       </button>
 
       {open && createPortal(
@@ -163,6 +162,7 @@ export function MultiSelect({
           style={panelStyle}
         >
           <div className={styles.searchRow}>
+            <Search size={15} className={styles.searchIcon} aria-hidden />
             <input
               ref={searchRef}
               className={styles.search}
@@ -192,7 +192,7 @@ export function MultiSelect({
                         onClick={() => toggleValue(o.value)}
                       >
                         <span className={cx(styles.box, on && styles.boxOn)} aria-hidden>
-                          {on ? "✓" : ""}
+                          {on && <Check size={12} strokeWidth={3} />}
                         </span>
                         <span className={styles.optLabel}>
                           {o.label}

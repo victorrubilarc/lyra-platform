@@ -53,6 +53,18 @@ export class LogEntriesController {
     return this.templates.list(user.id, { status: "PUBLISHED" }, { applyTemplateScope: true });
   }
 
+  /**
+   * Plantillas que el usuario puede VER en Bitácoras (poblar el filtro de la
+   * grilla). Gateado por `logentry:view` (audiencia de lectura) y acotado por el
+   * MISMO alcance que la grilla (nodo × plantilla) ⇒ el filtro nunca ofrece
+   * plantillas fuera de privilegio. Va antes de `:id`.
+   */
+  @Get("filter-templates")
+  @RequirePermission("logentry:view")
+  filterTemplates(@CurrentUser() user: RequestUser) {
+    return this.templates.list(user.id, { status: "PUBLISHED" }, { applyTemplateScope: true });
+  }
+
   @Get()
   @RequirePermission("logentry:view")
   list(@Query(new ZodValidationPipe(logEntryListQuerySchema)) query: LogEntryListQuery, @CurrentUser() user: RequestUser) {

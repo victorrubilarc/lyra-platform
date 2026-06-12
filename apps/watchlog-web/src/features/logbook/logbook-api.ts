@@ -13,7 +13,23 @@ import {
   type RelatedLogEntries,
   type SignatureVerifyResult,
 } from "@lyra/contracts";
+import { z } from "zod";
 import { apiBlob, apiJson } from "../../lib/api-client.js";
+
+/** Plantilla visible en el filtro de Bitácoras (id + nombre, con alcance aplicado). */
+const filterTemplateSchema = z.object({ id: z.string(), name: z.string() });
+export type FilterTemplate = z.infer<typeof filterTemplateSchema>;
+
+/**
+ * Plantillas que el usuario puede VER (poblar el filtro de la grilla). Acotadas
+ * por el MISMO alcance ABAC que la grilla (nodo × plantilla) ⇒ el filtro nunca
+ * ofrece plantillas fuera de privilegio. Endpoint de lectura (`logentry:view`).
+ */
+export function fetchLogbookFilterTemplates(): Promise<FilterTemplate[]> {
+  return apiJson("/log-entries/filter-templates", z.array(filterTemplateSchema.passthrough()).transform(
+    (rows) => rows.map((r) => ({ id: r.id, name: r.name })),
+  ));
+}
 
 /** Serializa la query del listado (omitiendo vacíos) para el backend. */
 export function listQueryString(query: LogEntryListQuery): string {

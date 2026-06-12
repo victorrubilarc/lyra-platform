@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { Check, ChevronDown, Search, X } from "lucide-react";
 import { cx } from "../../cx.js";
 import { useAnchoredPanel } from "../../internal/useAnchoredPanel.js";
 import styles from "./Combobox.module.css";
@@ -158,18 +159,17 @@ export function Combobox({
               onChange("");
             }}
           >
-            ×
+            <X size={14} aria-hidden />
           </span>
         )}
-        <span className={styles.caret} aria-hidden>
-          ▾
-        </span>
+        <ChevronDown size={16} className={cx(styles.caret, open && styles.caretOpen)} aria-hidden />
       </button>
 
       {open &&
         createPortal(
           <div ref={panelRef} className={styles.panel} role="listbox" style={panelStyle}>
             <div className={styles.searchRow}>
+              <Search size={15} className={styles.searchIcon} aria-hidden />
               <input
                 ref={searchRef}
                 className={styles.search}
@@ -203,11 +203,7 @@ export function Combobox({
                           {o.label}
                           {o.hint && <span className={styles.optHint}>{o.hint}</span>}
                         </span>
-                        {on && (
-                          <span className={styles.check} aria-hidden>
-                            ✓
-                          </span>
-                        )}
+                        {on && <Check size={15} className={styles.check} aria-hidden />}
                       </button>
                     );
                   })

@@ -4,6 +4,38 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-12 · Fase 2.8 — Afinamiento (QA del dueño) — ✅ IMPLEMENTADO
+
+Cuatro correcciones tras probar 2.8 en pantalla:
+
+1. **Selectores premium + bug de anclaje (todos los selectores).** El panel flotante se **encogía
+   progresivamente al arrastrar su propia barra de scroll**. Causa: `useAnchoredPanel` escuchaba `scroll` en
+   **captura** (catchea el scroll INTERNO del panel) y `maxHeight` se **realimentaba** de `panel.scrollHeight`
+   ya recortado. Fix: (a) ignorar los eventos de scroll cuyo `target` está dentro del panel; (b) `maxHeight` con
+   **tope absoluto por viewport** (no de la medición previa) ⇒ converge sin encoger. Además, rediseño visual de
+   `Combobox` y `MultiSelect` a estándar premium (iconos **Lucide** en vez de glifos ASCII, `ChevronDown` animado,
+   `Search` en el buscador, panel con glass/sombra/anim, estados de opción con acento). Dual-theme vía tokens.
+2. **Fuga del filtro de Bitácoras.** El `<Combobox>` de "Plantilla" en `/bitacoras` se poblaba con
+   `useTemplates` (`GET /templates`, alcance solo de NODO) ⇒ ofrecía plantillas fuera del alcance de plantilla.
+   Nuevo `GET /log-entries/filter-templates` (`logentry:view`) acotado por el **mismo alcance que la grilla**
+   (nodo × plantilla). La grilla ya filtraba bien (era solo el selector).
+3. **Editor de rol a pestañas.** El alcance por plantilla quedaba sepultado al final de la matriz de permisos.
+   `RoleDrawer` reorganizado a **pestañas (Datos / Permisos / Alcance)** y drawer más ancho (760px).
+4. **Acceso por rol desde la PLANTILLA (vista recíproca).** Pedido del dueño: asignar roles directamente desde
+   la pantalla de Plantillas. `GET/PUT /templates/:id/role-scope` con `TemplateAccessModal` (MultiSelect de
+   roles). **`setRoleScope` reemplaza SOLO las filas `TemplateScope` de esa plantilla con `roleId` no nulo** ⇒
+   "sin sacar de lo que existe en los roles": el resto del alcance de cada rol y las asignaciones por usuario
+   quedan intactos. **Gate = `template:edit`** (decisión): quien diseña la plantilla ya gobierna su nodo
+   (visibilidad por nodo), así que gobernar también su audiencia por rol es coherente y permite hacerlo "directo"
+   en Plantillas sin exigir permisos de admin de seguridad; si se requiere separación estricta, se puede regatear.
+   Auditado (`template.rolescope.assigned`).
+
+Verde: typecheck (6) · lint (0 err, 1 warn preexistente OrgTree) · web build · API **205** · smokes en vivo
+**14/14** (2.8) + **8/8** (afinamiento: filtro con alcance, role-scope desde plantilla, garantía de no-borrado del
+resto del alcance del rol). Pendiente: smoke VISUAL del dueño (selectores premium + pestañas del rol + modal de acceso).
+
+---
+
 ### 2026-06-12 · Fase 2.8 — Alcance por PLANTILLA (2.ª dimensión ABAC) — ✅ IMPLEMENTADO
 
 Hoy quien tiene `module:logbook:view`/`logentry:create` + alcance de **nodo** ve/usa **todas** las plantillas y entradas de
