@@ -69,15 +69,17 @@ cerrando el diferido (a) de 2.4. Endpoint `GET /log-entries/templates/:id/nodes`
 "Alcance de estructura (nodos)" en el `TemplateBuilder` reutilizando `ScopeTreePicker` (prop nuevo `defaultIncludeDescendants`),
 selector de nodo en `NewEntryPage` (modal `Combobox` si >1), display "Global / N nodos / nodo (y subnodos)". **Sin permisos
 nuevos — catálogo 59.** Tests: contracts 149 · API **213** (+8). **Smoke en vivo 15/15** (`scripts/smoke-template-multinode.py`,
-crea y limpia por ID). 6 forks en DECISIONS 2026-06-12. Pendiente: smoke VISUAL.
+crea y limpia por ID). 6 forks en DECISIONS 2026-06-12. **Smoke VISUAL ✅** (confirmado por el dueño 2026-06-12: selector de
+nodo al crear con elección obligada >1, publicar tras el fix de flujo).
 
 **+ Fase 2.8.0.1 — Equipo OPCIONAL al crear entrada ✅ (2026-06-12, `feat/equipo-opcional-entrada` → `main`).** Objeto de
 referencia EAM (SAP PM/Maximo: ubicación funcional [nodo] + activo [equipo]; grano ISO 14224 para confiabilidad/Fase 4).
 Tras elegir el nodo, selector de **equipo opcional** instalado en ese nodo: `eligibleNodesForTemplate` devuelve los equipos
 activos por nodo; `assertEquipmentInNode` valida pertenencia en create/previewNew; el modal de creación se abre también con
-1 nodo si tiene equipos. `LogEntry.equipmentId` ya existía (2.4). Smoke **18/18**. **Opción B agendada** (2.8.0.2: modo de
-equipo por plantilla, gobernanza). **+ fix de re-binding de flujo** al guardar plantilla (bug preexistente 2.2: el builder
-reenviaba la versión de flujo congelada; ahora ata la vigente).
+1 nodo si tiene equipos. `LogEntry.equipmentId` ya existía (2.4). El **equipo se muestra en la cabecera del llenado** (icono
++ nombre, consistente con visor/grilla). Smoke **18/18** + **VISUAL ✅** (confirmado por el dueño: elegir equipo y verlo en
+el formulario). **Opción B agendada** (2.8.0.2: modo de equipo por plantilla, gobernanza). **+ fix de re-binding de flujo**
+al guardar plantilla (bug preexistente 2.2: el builder reenviaba la versión de flujo congelada; ahora ata la vigente).
 
 ## Hecho en Fase 2.7.2 (Ventana de edición configurable — gobernanza temporal #6)
 

@@ -396,13 +396,13 @@ nunca queda más de una sesión atrás.
             `assertNodeAllowedForTemplate` en create/previewNew (**cierra el diferido (a) de 2.4**), endpoint
             `GET /log-entries/templates/:id/nodes`. UI en `TemplateBuilder` (reusa `ScopeTreePicker`) + `NewEntryPage`.
             Sin permisos nuevos (catálogo 59). Tests API **213** (+8). Smoke 15/15. 6 forks en DECISIONS 2026-06-12.
-            **Pendiente: smoke VISUAL.**
+            **Smoke VISUAL ✅** (confirmado por el dueño 2026-06-12).
       - [x] **2.8.0.1 Equipo OPCIONAL al crear entrada (objeto de referencia EAM)** ✅ (2026-06-12,
             `feat/equipo-opcional-entrada` → `main`). Tras elegir el nodo, selector de **equipo opcional** instalado en ese
             nodo (patrón SAP PM/Maximo ubicación+activo; grano ISO 14224 para confiabilidad/Fase 4). `eligibleNodesForTemplate`
             devuelve los equipos activos por nodo; `assertEquipmentInNode` valida pertenencia en create/previewNew; el modal
-            de creación se abre también con 1 nodo si tiene equipos. `LogEntry.equipmentId` ya existía (2.4). Smoke 18/18.
-            Ver DECISIONS 2026-06-12.
+            de creación se abre también con 1 nodo si tiene equipos. El **equipo se muestra en la cabecera del llenado**.
+            `LogEntry.equipmentId` ya existía (2.4). Smoke 18/18 + **VISUAL ✅** (confirmado por el dueño). Ver DECISIONS 2026-06-12.
       - [ ] **2.8.0.2 Modo de equipo por PLANTILLA (gobernanza, "opción B")**: `equipmentMode` en la plantilla
             (`ninguno / opcional / requerido`) — patrón notification-type de SAP / WO-type de Maximo: el tipo de registro
             decide si el equipo se oculta, se ofrece o es obligatorio (p. ej. mantención/inspección → requerido; turno/área
