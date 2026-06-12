@@ -46,10 +46,12 @@ export const editWindowAnchorSchema = z.enum(EDIT_WINDOW_ANCHORS);
 export type EditWindowAnchor = z.infer<typeof editWindowAnchorSchema>;
 
 /**
- * Horas de la ventana de edición. Tri-estado a nivel de plantilla:
+ * Duración de la ventana de edición en MINUTOS (unidad canónica de almacenamiento;
+ * la UI permite ingresarla en minutos u horas). Tri-estado a nivel de plantilla:
  * null = hereda la configuración global · 0 = SIN ventana (explícito) · >0 = ventana propia.
+ * Tope 525600 = 365 días.
  */
-export const editWindowHoursSchema = z.number().int().min(0).max(8760);
+export const editWindowMinutesSchema = z.number().int().min(0).max(525_600);
 
 export const templateVersionStatusSchema = z.enum(["DRAFT", "PUBLISHED"]);
 export type TemplateVersionStatus = z.infer<typeof templateVersionStatusSchema>;
@@ -121,8 +123,8 @@ export const templateSchema = z.object({
    * de la plantilla, sin republicar). null = hereda el ancla/horas globales.
    */
   editWindowAnchor: editWindowAnchorSchema.nullable(),
-  /** null = hereda global · 0 = sin ventana (explícito) · >0 = horas propias. */
-  editWindowHours: z.number().int().nullable(),
+  /** null = hereda global · 0 = sin ventana (explícito) · >0 = minutos propios. */
+  editWindowMinutes: z.number().int().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -154,7 +156,7 @@ export const createTemplateRequestSchema = z.object({
   description: z.string().trim().max(1000).optional(),
   orgNodeId: z.string().nullable().optional(),
   editWindowAnchor: editWindowAnchorSchema.nullable().optional(),
-  editWindowHours: editWindowHoursSchema.nullable().optional(),
+  editWindowMinutes: editWindowMinutesSchema.nullable().optional(),
 });
 export type CreateTemplateRequest = z.infer<typeof createTemplateRequestSchema>;
 
@@ -163,7 +165,7 @@ export const updateTemplateRequestSchema = z.object({
   description: z.string().trim().max(1000).nullable().optional(),
   orgNodeId: z.string().nullable().optional(),
   editWindowAnchor: editWindowAnchorSchema.nullable().optional(),
-  editWindowHours: editWindowHoursSchema.nullable().optional(),
+  editWindowMinutes: editWindowMinutesSchema.nullable().optional(),
 });
 export type UpdateTemplateRequest = z.infer<typeof updateTemplateRequestSchema>;
 
@@ -230,7 +232,7 @@ export const saveTemplateDraftRequestSchema = z
     // Ventana de edición (2.7.2): vive en el CONTENEDOR (gobernanza viva), pero el
     // builder la guarda por este mismo canal junto al resto de la metadata.
     editWindowAnchor: editWindowAnchorSchema.nullable().optional(),
-    editWindowHours: editWindowHoursSchema.nullable().optional(),
+    editWindowMinutes: editWindowMinutesSchema.nullable().optional(),
     requireSignature: z.boolean().optional(),
     recurrenceKind: recurrenceKindSchema.optional(),
     recurrenceConfig: recurrenceConfigSchema.nullable().optional(),

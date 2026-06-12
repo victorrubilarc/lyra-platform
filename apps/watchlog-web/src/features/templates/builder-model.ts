@@ -99,9 +99,9 @@ export interface EditState {
   workflowDefinitionId: string | null;
   workflowDefinitionVersionId: string | null;
   /** Ventana de edición (2.7.2), config del CONTENEDOR (gobernanza viva):
-   * hours null = hereda global · 0 = sin ventana · >0 = propia. */
+   * minutos null = hereda global · 0 = sin ventana · >0 = propia. */
   editWindowAnchor: EditWindowAnchor | null;
-  editWindowHours: number | null;
+  editWindowMinutes: number | null;
   sections: EditSection[];
 }
 
@@ -149,7 +149,7 @@ export function detailToEditState(detail: TemplateDetail): EditState {
     workflowDefinitionId: detail.version.workflowDefinitionId,
     workflowDefinitionVersionId: detail.version.workflowDefinitionVersionId,
     editWindowAnchor: detail.editWindowAnchor,
-    editWindowHours: detail.editWindowHours,
+    editWindowMinutes: detail.editWindowMinutes,
     sections: detail.version.sections.map((s) => ({
       uid: nextUid(),
       key: s.key,
@@ -199,7 +199,7 @@ export function editStateToDraftRequest(state: EditState): SaveTemplateDraftRequ
     workflowDefinitionId: state.workflowDefinitionId,
     workflowDefinitionVersionId: state.workflowDefinitionVersionId,
     editWindowAnchor: state.editWindowAnchor,
-    editWindowHours: state.editWindowHours,
+    editWindowMinutes: state.editWindowMinutes,
     sections: state.sections.map((s, si) => ({
       key: s.key,
       title: s.title.trim() || `Sección ${si + 1}`,

@@ -678,7 +678,11 @@ export class LogbookQueryService {
     for (const s of sectionRows) {
       const ind = indicatorsFor(s.logEntryId);
       ind.sectionsTotal += 1;
-      if (s.state === "COMPLETED") ind.sectionsCompleted += 1;
+      // "Completada" cuenta también LOCKED: una sección LOCKED es una que se
+      // completó y luego se SELLÓ al avanzar el flujo (si no se hubiera completado,
+      // la guarda de completitud habría bloqueado la transición). Así el contador
+      // refleja el avance real (p. ej. un registro aprobado muestra M/M, no 0/M).
+      if (s.state === "COMPLETED" || s.state === "LOCKED") ind.sectionsCompleted += 1;
       if (s.state === "LOCKED") ind.sectionsLocked += 1;
       if (s.requiresSignature && !s.signatureId) ind.pendingSignatures += 1;
     }

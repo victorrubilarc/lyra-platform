@@ -541,9 +541,9 @@ model Template {
   // --- Ventana de edición (Fase 2.7.2) — GOBERNANZA VIVA en el contenedor -----
   // mutable (patrón SAP OB52 / Odoo lock dates): cambiarla aplica de inmediato a
   // todas las entradas, sin republicar la versión. null = hereda SystemSettings.
-  // editWindowHours: null = hereda global · 0 = SIN ventana (explícito) · >0 = horas.
-  editWindowAnchor EditWindowAnchor?
-  editWindowHours  Int?
+  // editWindowMinutes: null = hereda global · 0 = SIN ventana (explícito) · >0 = minutos.
+  editWindowAnchor  EditWindowAnchor?
+  editWindowMinutes Int?
   // Autoría (referencia blanda, sin FK: el usuario pudo borrarse — igual que AuditLog).
   createdById      String?
   updatedById      String?
@@ -991,7 +991,7 @@ model SystemSettings {
   // Fallback para plantillas sin config propia. hours null = sin ventana
   // (comportamiento pre-2.7.2). El ancla siempre tiene valor (fin de la cadena).
   editWindowAnchor             EditWindowAnchor @default(RECORDED)
-  editWindowHours              Int?
+  editWindowMinutes            Int?
   // Exigir re-auth con MFA al editar FUERA de ventana (override privilegiado).
   requireMfaEditWindowOverride Boolean          @default(false)
   updatedById            String?

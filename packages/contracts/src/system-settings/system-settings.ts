@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { editWindowAnchorSchema, editWindowHoursSchema } from "../templates/templates.js";
+import { editWindowAnchorSchema, editWindowMinutesSchema } from "../templates/templates.js";
 
 /**
  * Configuración del sistema — Fase 2.7.1.1 (UX). Ajustes operativos globales del
@@ -25,12 +25,12 @@ export const systemSettingsSchema = z.object({
   requireMfaPeriodUnlock: z.boolean(),
   /**
    * Ventana de edición GLOBAL (Fase 2.7.2): fallback para plantillas que no definen
-   * la suya. `editWindowHours` null o 0 = sin ventana (las entradas se editan sin
+   * la suya. `editWindowMinutes` null o 0 = sin ventana (las entradas se editan sin
    * límite temporal, comportamiento pre-2.7.2). El ancla global SIEMPRE tiene valor
    * (default RECORDED): es el último eslabón de la cadena de herencia.
    */
   editWindowAnchor: editWindowAnchorSchema,
-  editWindowHours: editWindowHoursSchema.nullable(),
+  editWindowMinutes: editWindowMinutesSchema.nullable(),
   /** Exigir re-auth con MFA al editar FUERA de ventana (override privilegiado). */
   requireMfaEditWindowOverride: z.boolean(),
   updatedAt: z.string(),
@@ -45,7 +45,7 @@ export const updateSystemSettingsRequestSchema = z.object({
   requireMfaPeriodLock: z.boolean().optional(),
   requireMfaPeriodUnlock: z.boolean().optional(),
   editWindowAnchor: editWindowAnchorSchema.optional(),
-  editWindowHours: editWindowHoursSchema.nullable().optional(),
+  editWindowMinutes: editWindowMinutesSchema.nullable().optional(),
   requireMfaEditWindowOverride: z.boolean().optional(),
 });
 export type UpdateSystemSettingsRequest = z.infer<typeof updateSystemSettingsRequestSchema>;

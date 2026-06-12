@@ -17,7 +17,7 @@ type SettingsRow = {
   requireMfaPeriodLock: boolean;
   requireMfaPeriodUnlock: boolean;
   editWindowAnchor: EditWindowAnchor;
-  editWindowHours: number | null;
+  editWindowMinutes: number | null;
   requireMfaEditWindowOverride: boolean;
 };
 
@@ -27,7 +27,7 @@ const SETTINGS_SELECT = {
   requireMfaPeriodLock: true,
   requireMfaPeriodUnlock: true,
   editWindowAnchor: true,
-  editWindowHours: true,
+  editWindowMinutes: true,
   requireMfaEditWindowOverride: true,
 } as const;
 
@@ -37,7 +37,7 @@ const SETTINGS_DEFAULTS: SettingsRow = {
   requireMfaPeriodLock: false,
   requireMfaPeriodUnlock: false,
   editWindowAnchor: "RECORDED",
-  editWindowHours: null,
+  editWindowMinutes: null,
   requireMfaEditWindowOverride: false,
 };
 
@@ -66,7 +66,7 @@ export class SettingsService {
       requireMfaPeriodLock: row.requireMfaPeriodLock,
       requireMfaPeriodUnlock: row.requireMfaPeriodUnlock,
       editWindowAnchor: row.editWindowAnchor,
-      editWindowHours: row.editWindowHours,
+      editWindowMinutes: row.editWindowMinutes,
       requireMfaEditWindowOverride: row.requireMfaEditWindowOverride,
       updatedAt: row.updatedAt.toISOString(),
       updatedByName,
@@ -97,13 +97,13 @@ export class SettingsService {
    */
   async editWindowSettings(): Promise<{
     editWindowAnchor: EditWindowAnchor;
-    editWindowHours: number | null;
+    editWindowMinutes: number | null;
     requireMfaEditWindowOverride: boolean;
   }> {
     const row = await this.read();
     return {
       editWindowAnchor: row.editWindowAnchor,
-      editWindowHours: row.editWindowHours,
+      editWindowMinutes: row.editWindowMinutes,
       requireMfaEditWindowOverride: row.requireMfaEditWindowOverride,
     };
   }
@@ -135,7 +135,7 @@ export class SettingsService {
       requireMfaPeriodLock: dto.requireMfaPeriodLock,
       requireMfaPeriodUnlock: dto.requireMfaPeriodUnlock,
       editWindowAnchor: dto.editWindowAnchor,
-      editWindowHours: dto.editWindowHours,
+      editWindowMinutes: dto.editWindowMinutes,
       requireMfaEditWindowOverride: dto.requireMfaEditWindowOverride,
     };
   }

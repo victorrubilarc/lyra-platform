@@ -207,6 +207,35 @@
   margin-bottom: 18px;
 }
 
+/* Ventana de edición (2.7.2): banner PROMINENTE en ambos estados. */
+.editWindowBanner {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13.5px;
+  font-weight: 500;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin-bottom: 18px;
+}
+.editWindowBanner svg {
+  flex-shrink: 0;
+}
+.editWindowBanner b {
+  font-weight: 700;
+}
+.editWindowOk {
+  color: var(--color-info);
+  background: var(--color-info-bg);
+  border-color: color-mix(in srgb, var(--color-info) 30%, transparent);
+}
+.editWindowExpired {
+  color: var(--color-warning);
+  background: var(--color-warning-bg);
+  border-color: color-mix(in srgb, var(--color-warning) 34%, transparent);
+}
+
 /* --- Ejecución de flujo (Fase 2.5) --- */
 .entryHeadChips {
   display: flex;

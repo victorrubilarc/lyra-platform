@@ -4,11 +4,9 @@ import { useNavigate } from "react-router-dom";
 import { CalendarClock, ChevronRight, ClipboardList, FileStack, History, Layers, Lock, Network, TriangleAlert } from "lucide-react";
 import { Card, EmptyState, FormField, Input, Skeleton, Textarea, Toggle, useToast } from "@lyra/ui";
 import type { TemplateListItem } from "@lyra/contracts";
-import { ApiError } from "../../lib/api-client.js";
 import { usePermissions } from "../../auth/use-permissions.js";
-import { useTemplates } from "../templates/templates-queries.js";
 import { localInputToIso } from "./datetime-local.js";
-import { useCreateLogEntry } from "./log-entries-queries.js";
+import { useAvailableTemplates } from "./log-entries-queries.js";
 import styles from "./LogEntries.module.css";
 
 /** Selección de plantilla para una nueva entrada (anclada al prototipo: PickTpl). */
@@ -18,8 +16,7 @@ export function NewEntryPage() {
   const navigate = useNavigate();
   const toast = useToast();
 
-  const { data: templates = [], isLoading, isError } = useTemplates({ status: "PUBLISHED" });
-  const create = useCreateLogEntry();
+  const { data: templates = [], isLoading, isError } = useAvailableTemplates();
 
   // Gesto mínimo de registro DIFERIDO (2.7.0): por defecto la entrada es "en
   // línea" (fecha/hora automática); el toggle declara la fecha/hora REAL del
@@ -29,7 +26,9 @@ export function NewEntryPage() {
   const [reason, setReason] = useState("");
   const deferralReady = !deferredOn || (eventAt.trim() !== "" && reason.trim().length >= 5);
 
-  if (!perms.can("module:logbook:view")) {
+  // Crear una entrada requiere `logentry:create` (mismo permiso que el endpoint de
+  // plantillas disponibles). Quien solo llena/revisa no entra aquí — usa Bitácoras.
+  if (!perms.can("logentry:create")) {
     return (
       <div className={styles.page}>
         <EmptyState icon={<Lock size={36} />} title={t("logbook.noAccess")} description={t("logbook.noAccessDesc")} />
@@ -37,23 +36,20 @@ export function NewEntryPage() {
     );
   }
 
+  // Elegir una plantilla NO crea nada (2.8.2): abre el formulario en modo compose;
+  // la entrada se materializa recién en el primer guardado real. El diferido
+  // declarado aquí viaja por el state de navegación y se aplica al materializar.
   function start(tpl: TemplateListItem) {
-    if (create.isPending) return;
     if (!deferralReady) {
       toast.error(t("logbook.deferral.incomplete"));
       return;
     }
-    create.mutate(
-      {
-        templateId: tpl.id,
-        ...(tpl.orgNodeId ? { orgNodeId: tpl.orgNodeId } : {}),
-        ...(deferredOn ? { deferred: { effectiveAt: localInputToIso(eventAt), reason: reason.trim() } } : {}),
+    navigate(`/nueva-entrada/comenzar/${tpl.id}`, {
+      state: {
+        orgNodeId: tpl.orgNodeId ?? null,
+        deferred: deferredOn ? { effectiveAt: localInputToIso(eventAt), reason: reason.trim() } : null,
       },
-      {
-        onSuccess: (entry) => navigate(`/nueva-entrada/${entry.id}`),
-        onError: (e) => toast.error(e instanceof ApiError ? e.message : t("common.errorGeneric")),
-      },
-    );
+    });
   }
 
   return (
@@ -125,7 +121,7 @@ export function NewEntryPage() {
               key={tpl.id}
               className={styles.card}
               hoverable
-              style={{ cursor: create.isPending ? "wait" : "pointer" }}
+              style={{ cursor: "pointer" }}
               onClick={() => start(tpl)}
             >
               <div className={styles.cardTop}>

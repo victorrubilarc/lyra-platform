@@ -4,6 +4,57 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-12 · Fase 2.8.2 (parcial) — No crear borradores huérfanos + arreglos de la demo — ✅ IMPLEMENTADO
+
+Durante la prueba en vivo de la ventana de edición, el dueño detectó que **elegir una plantilla creaba un `LogEntry`
+de inmediato** (entrar y salir dejaba un borrador vacío). Se resolvió el frente (a) de la deuda 2.8.2 **diferir la creación**:
+- **`GET /log-entries/new`** (permiso `logentry:create`): arma el MISMO `LogEntryDetail` que produciría crear+abrir pero
+  **sin persistir** (`id:""`). Se refactorizó `getDetail` en `buildDetail(entry|sintético, …)` (tipo `EntrySource` = Pick),
+  reusando TODA la lógica de editabilidad/dimensiones/ventana/transiciones — **cero duplicación en el cliente**.
+- **Modo COMPOSE** en `EntryFillPage` (ruta `/nueva-entrada/comenzar/:templateId`): carga el preview; el **primer guardado
+  real** materializa la entrada (`createLogEntry` con el diferido declarado) y pasa a edición **sin remontar** (preserva el
+  borrador; URL vía `replaceState`). **Creación ÚNICA por `ref`**: si la acción falla tras crear, cambia a la entrada real
+  para no duplicar al reintentar. `NewEntryPage` solo navega (no crea).
+- Diferido (b)(c) de 2.8.2 (VOID de borradores con contenido + ruta de edición propia fuera de `/nueva-entrada`) **siguen abiertos**.
+
+**Arreglos surgidos de la demo (multi-actor por rol + flujo + firma):**
+- **`GET /log-entries/templates`** (permiso `logentry:create`, ABAC): el picker de "Nueva entrada" listaba plantillas con
+  `GET /templates` (exige `template:view`, permiso de ADMIN de plantillas) → un Operador no podía. El llenado de bitácora
+  no debe requerir acceso al módulo de Plantillas: endpoint propio del módulo de bitácoras.
+- Ítem de menú **"Nueva entrada" gateado por `logentry:create`** (antes `module:logbook:view`): quien solo llena/revisa
+  (Mantenedor, Supervisor) no lo ve; llega a las entradas por **Bitácoras → Editar**.
+- Botón **"Volver" contextual**: una entrada existente vuelve a Bitácoras; una entrada nueva sin crear, al picker.
+- Indicador **"secciones completadas" cuenta `COMPLETED` + `LOCKED`**: una sección LOCKED se completó antes de sellarse al
+  avanzar el flujo (la guarda de completitud no deja avanzar sin completar), así un registro aprobado muestra **M/M**, no 0/M.
+
+Tests: contracts 149 · API 200 (verde tras ajustar el assert del indicador). Demo de capacidades creada con `scripts/demo-bitacora.py`
+(3 roles + 3 usuarios + flujo + plantilla de 3 secciones; **fuera del commit**, es seeder de demo). **Pendiente
+(registrado en BACKLOG):** alcance por PLANTILLA (filtrar picker+grilla, Fase 2.8) y re-probar la demo con ownership
+estricto por campo.
+
+---
+
+### 2026-06-12 · Fase 2.7.2 — Afinamiento UX (QA del dueño) — ✅ IMPLEMENTADO
+
+Iteración visual tras probar 2.7.2 en el navegador:
+- **Duración en MINUTOS u HORAS** (pedido del dueño): se cambió la unidad canónica de almacenamiento de **horas a
+  MINUTOS** (`editWindowHours`→`editWindowMinutes` en `Template` y `SystemSettings`; migración `…_edit_window_minutes`
+  renombra + **convierte ×60** + check 0..525600 = 365 d). La UI ofrece **número + selector de unidad** (Minutos/Horas)
+  vía componente reutilizable `EditWindowDurationField` (normaliza a minutos; vacío = sin límite). `editWindowDeadline`
+  pasa a `×60_000`. Motivo: granularidad operacional real (correcciones de minutos), sin ambigüedad (una sola unidad
+  canónica; la UI presenta la cómoda). Extensible a "días" después.
+- **Banner PROMINENTE de ventana en el llenado** (antes era un chip gris perdido entre las dimensiones): franja de
+  ancho completo bajo la cabecera — **info (cian)** "editable hasta X" cuando vigente, **warning (ámbar)** cuando
+  vencida (con override: "indica un motivo…"; sin override: "solo lectura"). El chip viejo se eliminó.
+- **Fix de alineación** del ítem "Sellada" en el visor (`/bitacoras`): cada ítem de `viewerMetaRow` es `inline-flex`
+  (ícono ✓ no se separa de su texto al envolver). Aclaración: **"Sellada"** = instante en que se congelaron
+  effectiveAt + dimensiones (1ª transición con flujo, o submit sin flujo).
+- **Aprendizaje operacional**: el cleanup de un smoke borró (lógico) la plantilla real del dueño por filtrar el listado
+  por nombre. Regla: los smokes limpian **solo por ID de lo que el propio script creó**, nunca por filtro sobre el
+  listado. La plantilla se restauró (deletedAt → null; sin pérdida de versiones/secciones).
+
+---
+
 ### 2026-06-12 · Fase 2.7.2 — Ventana de edición configurable (#6) — ✅ IMPLEMENTADO Y PUBLICADO
 
 Segundo eslabón de la **gobernanza temporal** (tras 2.7.0 registro diferido y 2.7.1/2.7.1.1 período gobernado):

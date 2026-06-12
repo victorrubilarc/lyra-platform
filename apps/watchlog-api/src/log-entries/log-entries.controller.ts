@@ -4,6 +4,7 @@ import {
   createLogEntryRequestSchema,
   executeTransitionRequestSchema,
   logEntryListQuerySchema,
+  previewLogEntryQuerySchema,
   saveLogEntrySectionRequestSchema,
   setDeferralRequestSchema,
   submitLogEntryRequestSchema,
@@ -11,6 +12,7 @@ import {
   type CreateLogEntryRequest,
   type ExecuteTransitionRequest,
   type LogEntryListQuery,
+  type PreviewLogEntryQuery,
   type SaveLogEntrySectionRequest,
   type SetDeferralRequest,
   type SubmitLogEntryRequest,
@@ -20,6 +22,7 @@ import type { AuditContext } from "../audit/audit.service";
 import type { RequestUser } from "../authz/auth-user";
 import { CurrentUser, RequirePermission } from "../authz/authz.decorators";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
+import { TemplatesService } from "../templates/templates.service";
 import { LogEntriesService } from "./log-entries.service";
 import { LogbookQueryService } from "./logbook-query.service";
 
@@ -34,7 +37,20 @@ export class LogEntriesController {
   constructor(
     private readonly entries: LogEntriesService,
     private readonly logbook: LogbookQueryService,
+    private readonly templates: TemplatesService,
   ) {}
+
+  /**
+   * Plantillas PUBLICADAS que el usuario puede usar para CREAR una entrada (picker
+   * de "Nueva entrada"). Gateado por `logentry:create` y acotado por ABAC — NO
+   * exige el permiso de administración de plantillas (`template:view`): llenar una
+   * bitácora no requiere acceso al módulo de Plantillas. Va antes de `:id`.
+   */
+  @Get("templates")
+  @RequirePermission("logentry:create")
+  availableTemplates(@CurrentUser() user: RequestUser) {
+    return this.templates.list(user.id, { status: "PUBLISHED" });
+  }
 
   @Get()
   @RequirePermission("logentry:view")
@@ -64,6 +80,17 @@ export class LogEntriesController {
       .header("Content-Disposition", `attachment; filename="bitacoras-${stamp}.csv"`)
       .header("X-Export-Truncated", String(truncated))
       .send(csv);
+  }
+
+  /** Vista previa de una entrada NUEVA sin persistir (modo compose 2.8.2). Va ANTES
+   * de `:id` para que "new" no se interprete como un id. */
+  @Get("new")
+  @RequirePermission("logentry:create")
+  previewNew(
+    @Query(new ZodValidationPipe(previewLogEntryQuerySchema)) query: PreviewLogEntryQuery,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.entries.previewNew(user.id, query);
   }
 
   @Get(":id")

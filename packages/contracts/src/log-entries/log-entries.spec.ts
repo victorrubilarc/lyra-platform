@@ -481,34 +481,38 @@ describe("logEntryTimelineEventSchema", () => {
 describe("ventana de edición (2.7.2)", () => {
   const recordedAt = new Date("2026-06-10T12:00:00.000Z");
   const effectiveAt = new Date("2026-06-08T20:00:00.000Z");
-  const global48 = { editWindowAnchor: "RECORDED" as const, editWindowHours: 48 };
+  const global48 = { editWindowAnchor: "RECORDED" as const, editWindowMinutes: 2880 }; // 48 h
 
   it("resuelve la herencia plantilla → global (null hereda; 0 apaga)", () => {
-    expect(resolveEditWindow({ editWindowAnchor: null, editWindowHours: null }, global48)).toEqual({
+    expect(resolveEditWindow({ editWindowAnchor: null, editWindowMinutes: null }, global48)).toEqual({
       anchor: "RECORDED",
-      windowHours: 48,
+      windowMinutes: 2880,
     });
-    expect(resolveEditWindow({ editWindowAnchor: "EFFECTIVE", editWindowHours: 24 }, global48)).toEqual({
+    expect(resolveEditWindow({ editWindowAnchor: "EFFECTIVE", editWindowMinutes: 30 }, global48)).toEqual({
       anchor: "EFFECTIVE",
-      windowHours: 24,
+      windowMinutes: 30,
     });
     // 0 explícito en la plantilla = SIN ventana aunque el global tenga una.
-    expect(resolveEditWindow({ editWindowAnchor: null, editWindowHours: 0 }, global48)).toBeNull();
+    expect(resolveEditWindow({ editWindowAnchor: null, editWindowMinutes: 0 }, global48)).toBeNull();
     expect(
       resolveEditWindow(
-        { editWindowAnchor: null, editWindowHours: null },
-        { editWindowAnchor: "RECORDED", editWindowHours: null },
+        { editWindowAnchor: null, editWindowMinutes: null },
+        { editWindowAnchor: "RECORDED", editWindowMinutes: null },
       ),
     ).toBeNull();
   });
 
-  it("calcula el vencimiento según el ancla", () => {
+  it("calcula el vencimiento según el ancla (minutos)", () => {
     expect(
-      editWindowDeadline({ anchor: "RECORDED", windowHours: 48 }, recordedAt, effectiveAt).toISOString(),
+      editWindowDeadline({ anchor: "RECORDED", windowMinutes: 2880 }, recordedAt, effectiveAt).toISOString(),
     ).toBe("2026-06-12T12:00:00.000Z");
     expect(
-      editWindowDeadline({ anchor: "EFFECTIVE", windowHours: 48 }, recordedAt, effectiveAt).toISOString(),
+      editWindowDeadline({ anchor: "EFFECTIVE", windowMinutes: 2880 }, recordedAt, effectiveAt).toISOString(),
     ).toBe("2026-06-10T20:00:00.000Z");
+    // 90 minutos desde la captura.
+    expect(
+      editWindowDeadline({ anchor: "RECORDED", windowMinutes: 90 }, recordedAt, effectiveAt).toISOString(),
+    ).toBe("2026-06-10T13:30:00.000Z");
   });
 
   it("decide expiración con borde no-inclusivo (en el límite aún se edita)", () => {
@@ -523,7 +527,7 @@ describe("ventana de edición (2.7.2)", () => {
     expect(
       editWindowInfoSchema.safeParse({
         anchor: "RECORDED",
-        windowHours: 48,
+        windowMinutes: 2880,
         expiresAt: "2026-06-12T12:00:00.000Z",
         expired: true,
         canOverride: false,

@@ -16,6 +16,7 @@ import {
   Printer,
   ShieldCheck,
   Sparkles,
+  TimerOff,
   TriangleAlert,
 } from "lucide-react";
 import { Button, Card, Chip, EmptyState, Spinner, useToast } from "@lyra/ui";
@@ -30,6 +31,7 @@ import {
   type TemplateFieldDto,
 } from "@lyra/contracts";
 import { ApiError } from "../../lib/api-client.js";
+import { usePermissions } from "../../auth/use-permissions.js";
 import { FieldControl } from "../templates/FieldControl.js";
 import { useLogEntry } from "../log-entries/log-entries-queries.js";
 import {
@@ -287,6 +289,7 @@ export function EntryViewerPage() {
   const { t } = useTranslation();
   const { id = "" } = useParams();
   const navigate = useNavigate();
+  const { can } = usePermissions();
 
   const { data: entry, isLoading, isError } = useLogEntry(id);
   const timeline = useLogbookTimeline(id);
@@ -325,9 +328,18 @@ export function EntryViewerPage() {
         <Button variant="secondary" onClick={() => navigate("/bitacoras")}>
           <ArrowLeft size={15} /> {t("logbook.viewer.back")}
         </Button>
-        <Button variant="secondary" leftIcon={<Printer size={15} />} onClick={() => window.print()}>
-          {t("logbook.viewer.print")}
-        </Button>
+        <div className={styles.headerActions}>
+          {/* Abrir para EDITAR: solo si el registro sigue en curso (DRAFT) y el
+              usuario puede llenar. El backend reaplica la autorización por sección. */}
+          {can("logentry:fill") && entry.status === "DRAFT" && (
+            <Button variant="primary" leftIcon={<PenLine size={15} />} onClick={() => navigate(`/nueva-entrada/${entry.id}`)}>
+              {t("logbook.viewer.edit")}
+            </Button>
+          )}
+          <Button variant="secondary" leftIcon={<Printer size={15} />} onClick={() => window.print()}>
+            {t("logbook.viewer.print")}
+          </Button>
+        </div>
       </div>
 
       {/* Cabecera de identidad (record review) */}
@@ -420,6 +432,26 @@ export function EntryViewerPage() {
           </div>
         )}
       </Card>
+
+      {/* Ventana de edición (2.7.2): mismo banner informativo que el llenado, solo
+          mientras la entrada sigue editable (DRAFT). En registros sellados es moot. */}
+      {entry.status === "DRAFT" &&
+        entry.editWindow &&
+        (entry.editWindow.expired ? (
+          <div className={`${fillStyles.editWindowBanner} ${fillStyles.editWindowExpired}`}>
+            <TimerOff size={18} />
+            <span>
+              {entry.editWindow.canOverride
+                ? t("logbook.fill.windowExpiredOverrideBanner", { until: formatDateTime(entry.editWindow.expiresAt) })
+                : t("logbook.fill.windowExpiredReadonlyBanner", { until: formatDateTime(entry.editWindow.expiresAt) })}
+            </span>
+          </div>
+        ) : (
+          <div className={`${fillStyles.editWindowBanner} ${fillStyles.editWindowOk}`}>
+            <Clock size={18} />
+            <span>{t("logbook.fill.windowOpenBanner", { until: formatDateTime(entry.editWindow.expiresAt) })}</span>
+          </div>
+        ))}
 
       {/* Secciones con valores resueltos (read-only) */}
       {entry.version.sections.map((section) => {

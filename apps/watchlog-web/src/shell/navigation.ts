@@ -39,7 +39,9 @@ export const ROUTES: readonly NavRoute[] = [
     path: "/nueva-entrada",
     labelKey: "nav.newEntry",
     icon: FilePlus2,
-    permission: "module:logbook:view",
+    // Crear entradas requiere `logentry:create`; quien solo llena/revisa (sin crear)
+    // no ve este ítem y llega a las entradas por Bitácoras → Editar.
+    permission: "logentry:create",
     inSidebar: true,
   },
   {

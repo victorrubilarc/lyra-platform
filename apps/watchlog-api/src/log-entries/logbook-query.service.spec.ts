@@ -152,7 +152,7 @@ function makeServices(prismaOver: Record<string, unknown> = {}, scopeOver: Parti
   const settings = {
     editWindowSettings: vi
       .fn()
-      .mockResolvedValue({ editWindowAnchor: "RECORDED", editWindowHours: null, requireMfaEditWindowOverride: false }),
+      .mockResolvedValue({ editWindowAnchor: "RECORDED", editWindowMinutes: null, requireMfaEditWindowOverride: false }),
   } as unknown as import("../settings/settings.service").SettingsService;
 
   const entries = new LogEntriesService(prisma, audit, scope, shiftResolver, fiscalResolver, reauth, enc, periods, permissions, settings);
@@ -289,7 +289,8 @@ describe("LogbookQueryService — list", () => {
       currentStateColor: "#06B6D4",
       indicators: {
         sectionsTotal: 2,
-        sectionsCompleted: 1,
+        // COMPLETED + LOCKED cuentan como "hecha" (la LOCKED se completó antes de sellarse).
+        sectionsCompleted: 2,
         sectionsLocked: 1,
         pendingSignatures: 1,
         signaturesCount: 1,

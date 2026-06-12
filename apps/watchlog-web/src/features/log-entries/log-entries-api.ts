@@ -1,3 +1,4 @@
+import { z } from "zod";
 import {
   createLogEntryRequestSchema,
   executeTransitionRequestSchema,
@@ -5,14 +6,25 @@ import {
   saveLogEntrySectionRequestSchema,
   setDeferralRequestSchema,
   submitLogEntryRequestSchema,
+  templateListItemSchema,
   type CreateLogEntryRequest,
   type ExecuteTransitionRequest,
   type LogEntryDetail,
   type SaveLogEntrySectionRequest,
   type SetDeferralRequest,
   type SubmitLogEntryRequest,
+  type TemplateListItem,
 } from "@lyra/contracts";
 import { apiJson } from "../../lib/api-client.js";
+
+/**
+ * Plantillas publicadas que el usuario puede usar para CREAR una entrada (picker de
+ * "Nueva entrada"). Endpoint del módulo de bitácoras gateado por `logentry:create`
+ * — no exige el permiso de administración de plantillas.
+ */
+export function fetchAvailableTemplates(): Promise<TemplateListItem[]> {
+  return apiJson("/log-entries/templates", z.array(templateListItemSchema));
+}
 
 // El LISTADO de entradas vive en `features/logbook` (módulo de Bitácoras 2.6,
 // paginado por cursor); aquí queda solo el ciclo de LLENADO (crear/guardar/
@@ -20,6 +32,17 @@ import { apiJson } from "../../lib/api-client.js";
 
 export function fetchLogEntry(id: string): Promise<LogEntryDetail> {
   return apiJson(`/log-entries/${id}`, logEntryDetailSchema);
+}
+
+/**
+ * Vista previa de una entrada NUEVA sin persistir (modo compose 2.8.2): el mismo
+ * detalle que produciría crear+abrir, con `id: ""`. La entrada se materializa
+ * recién en el primer guardado real.
+ */
+export function fetchNewLogEntryPreview(templateId: string, orgNodeId?: string | null): Promise<LogEntryDetail> {
+  const qs = new URLSearchParams({ templateId });
+  if (orgNodeId) qs.set("orgNodeId", orgNodeId);
+  return apiJson(`/log-entries/new?${qs.toString()}`, logEntryDetailSchema);
 }
 
 export function createLogEntry(dto: CreateLogEntryRequest): Promise<LogEntryDetail> {

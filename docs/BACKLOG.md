@@ -119,6 +119,17 @@ nunca queda más de una sesión atrás.
       (encabezado "Estructura organizacional"); cuando exista el módulo de Plantillas se suma una sección
       hermana "Plantillas" (mismo patrón: selector + guardado por `PUT :id/scope` extendido). Pedido del
       usuario (2026-06-08). **Prioridad: con Fase 2.**
+      **Re-confirmado en vivo (2026-06-12, demo 2.8.2):** hoy CUALQUIER usuario con `module:logbook:view` +
+      alcance de NODO ve **todas** las plantillas/entradas de ese alcance, sin importar a qué plantillas tiene
+      privilegio. Debe filtrar **el picker de `/nueva-entrada`** (endpoint `GET /log-entries/templates`) **y la
+      grilla de `/bitacoras`** por las plantillas asignadas al usuario. Los **roles por sección** (ya
+      implementados) limitan QUÉ edita dentro de una plantilla, pero NO restringen su **visibilidad** — son
+      ejes distintos. **Sigue siendo Fase 2.8 (alcance+acceso).**
+- [ ] **Demo de capacidades — re-probar con "ownership estricto por campo" (pedido 2026-06-12).** La plantilla
+      demo «Bitácora de Turno — Demo Completa» quedó con la sección 2 **compartida** (Operador + Mantenedor) y
+      solo `estado_mecanico` reservado. El usuario quiere luego cambiarla a **estricta** (override de rol en
+      CADA campo → cada quien edita solo lo suyo) y volver a recorrer el flujo. Es solo config de la plantilla
+      (republica v3); aplica a entradas nuevas. Script `scripts/demo-bitacora.py`.
 - [ ] **Seguridad a nivel de nodo en el mantenedor de Estructura (ABAC enterprise).** Volver a
       `/estructura` para incorporar gestión de **alcance de datos por nodo** (asignar usuarios/roles a
       nodos con herencia a descendientes) desde el propio árbol/detalle, al estilo de los grandes

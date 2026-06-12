@@ -261,7 +261,7 @@
 - **SystemSettings** *(implementado)* — fila **singleton** (`id="system"`): 4 flags
   `requireMfaPeriod{Close,Reopen,Lock,Unlock}` (re-autenticación MFA por acción de gobernanza de período); **ventana de
   edición global (2.7.2)**: `editWindowAnchor` (**EditWindowAnchor** RECORDED|EFFECTIVE, default RECORDED),
-  `editWindowHours?` (null = sin ventana = comportamiento pre-2.7.2), `requireMfaEditWindowOverride`; `updatedById?`,
+  `editWindowMinutes?` (null = sin ventana = comportamiento pre-2.7.2; unidad canónica = minutos, la UI permite min/horas), `requireMfaEditWindowOverride`; `updatedById?`,
   `updatedAt`. `SettingsService.requireMfaFor(action)`/`periodReauthMap()` lo consume `OperationalPeriodService`;
   `editWindowSettings()` (una lectura) lo consume `LogEntriesService`. Gate MFA vía `ReauthService`; `mfaVerified`
   estampado en el AuditLog. Pantalla `/configuracion` (`module:settings:view` + `settings:manage`), pestañas Seguridad /
@@ -269,12 +269,14 @@
 
 ### Ventana de edición configurable (Fase 2.7.2)
 > Migración aditiva **`20260612025159_add_edit_window`**. 2.º eslabón de la gobernanza temporal (corrección de DATOS).
-- **`Template.editWindowAnchor?`/`editWindowHours?`** — config de la ventana en el **contenedor MUTABLE** (gobernanza
+- **`Template.editWindowAnchor?`/`editWindowMinutes?`** — config de la ventana en el **contenedor MUTABLE** (gobernanza
   VIVA, patrón SAP OB52 / Odoo lock dates: cambiarla aplica de inmediato a todas las entradas, **sin republicar la
-  versión**). `editWindowHours` tri-estado: `null`=hereda `SystemSettings` · `0`=sin ventana (explícito) · `>0`=propia.
+  versión**). Unidad canónica = **MINUTOS** (la UI ingresa min/horas vía `EditWindowDurationField`; migración
+  `…_edit_window_minutes` convirtió las horas previas ×60). Tri-estado: `null`=hereda `SystemSettings` · `0`=sin ventana
+  (explícito) · `>0`=propia.
   Check constraint BD 0..8760 h. Auditado con before/after en `template.updated`.
 - **Resolución (fuente única `@lyra/contracts`)** — `resolveEditWindow(template, global)` aplica la herencia →
-  `{anchor, windowHours}` o null (sin ventana); `editWindowDeadline(cfg, recordedAt, effectiveAt)` = ancla (RECORDED=
+  `{anchor, windowMinutes}` o null (sin ventana); `editWindowDeadline(cfg, recordedAt, effectiveAt)` = ancla (RECORDED=
   `recordedAt` inmutable / EFFECTIVE=`effectiveAt`) + horas; `isEditWindowExpired(deadline, now)` con borde **no
   inclusivo** (en el límite aún se edita).
 - **Guarda de escritura** — **`LogEntriesService.assertEditWindowWritable(entry, userId, dto)`** en
@@ -284,7 +286,7 @@
   con su bypass). Con ancla EFFECTIVE usa la `effectiveAt` **persistida** (no la prospectiva).
 - **Auditoría del override** — evento **dedicado** `logentry.editwindow.override` (`metadata` = operation/reason/
   mfaVerified/windowExpiredAt) + `overrideReason` copiado a **`LogEntryFieldChange.reason`** + flag en el audit del write.
-- **Huella en `getDetail`** — `editWindow {anchor, windowHours, expiresAt, expired, canOverride, overrideRequiresMfa}`
+- **Huella en `getDetail`** — `editWindow {anchor, windowMinutes, expiresAt, expired, canOverride, overrideRequiresMfa}`
   (null = sin ventana). Vencida + sin override ⇒ secciones reportan **`EDIT_WINDOW_EXPIRED`** (precede a `WRONG_STATE`/
   `MISSING_ROLE`; `PERIOD_CLOSED` precede a esta). La UI muestra "Editable hasta X" antes de vencer.
 

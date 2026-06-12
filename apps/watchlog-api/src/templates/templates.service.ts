@@ -122,7 +122,7 @@ export class TemplatesService {
         status: t.status,
         currentVersionId: t.currentVersionId,
         editWindowAnchor: t.editWindowAnchor,
-        editWindowHours: t.editWindowHours,
+        editWindowMinutes: t.editWindowMinutes,
         createdAt: t.createdAt.toISOString(),
         updatedAt: t.updatedAt.toISOString(),
         orgNodePath: t.orgNodeId ? (nodePaths.get(t.orgNodeId) ?? null) : null,
@@ -166,7 +166,7 @@ export class TemplatesService {
       status: template.status,
       currentVersionId: template.currentVersionId,
       editWindowAnchor: template.editWindowAnchor,
-      editWindowHours: template.editWindowHours,
+      editWindowMinutes: template.editWindowMinutes,
       createdAt: template.createdAt.toISOString(),
       updatedAt: template.updatedAt.toISOString(),
       version: this.mapVersion(version),
@@ -186,7 +186,7 @@ export class TemplatesService {
         orgNodeId: dto.orgNodeId ?? null,
         status: "DRAFT",
         editWindowAnchor: dto.editWindowAnchor ?? null,
-        editWindowHours: dto.editWindowHours ?? null,
+        editWindowMinutes: dto.editWindowMinutes ?? null,
         createdById: userId,
         updatedById: userId,
         versions: {
@@ -213,7 +213,7 @@ export class TemplatesService {
         orgNodeId: dto.orgNodeId === undefined ? undefined : dto.orgNodeId,
         // Ventana de edición (2.7.2): gobernanza viva, editable sin republicar.
         editWindowAnchor: dto.editWindowAnchor === undefined ? undefined : dto.editWindowAnchor,
-        editWindowHours: dto.editWindowHours === undefined ? undefined : dto.editWindowHours,
+        editWindowMinutes: dto.editWindowMinutes === undefined ? undefined : dto.editWindowMinutes,
         updatedById: userId,
       },
     });
@@ -238,13 +238,13 @@ export class TemplatesService {
         name: before.name,
         orgNodeId: before.orgNodeId,
         editWindowAnchor: before.editWindowAnchor,
-        editWindowHours: before.editWindowHours,
+        editWindowMinutes: before.editWindowMinutes,
       },
       after: {
         name: updated.name,
         orgNodeId: updated.orgNodeId,
         editWindowAnchor: updated.editWindowAnchor,
-        editWindowHours: updated.editWindowHours,
+        editWindowMinutes: updated.editWindowMinutes,
       },
     });
     return this.getDetail(userId, id);
@@ -277,7 +277,7 @@ export class TemplatesService {
           orgNodeId: dto.orgNodeId === undefined ? undefined : dto.orgNodeId,
           // Ventana de edición (2.7.2): config del contenedor, viaja con el builder.
           editWindowAnchor: dto.editWindowAnchor === undefined ? undefined : dto.editWindowAnchor,
-          editWindowHours: dto.editWindowHours === undefined ? undefined : dto.editWindowHours,
+          editWindowMinutes: dto.editWindowMinutes === undefined ? undefined : dto.editWindowMinutes,
           updatedById: userId,
         },
       });

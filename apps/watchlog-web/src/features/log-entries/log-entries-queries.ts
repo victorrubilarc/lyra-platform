@@ -9,7 +9,9 @@ import type {
 import {
   createLogEntry,
   executeTransition,
+  fetchAvailableTemplates,
   fetchLogEntry,
+  fetchNewLogEntryPreview,
   saveLogEntrySection,
   setLogEntryDeferral,
   submitLogEntry,
@@ -18,13 +20,34 @@ import {
 export const LOG_ENTRY_KEYS = {
   all: ["log-entries"] as const,
   detail: (id: string) => ["log-entries", "detail", id] as const,
+  preview: (templateId: string, orgNodeId: string | null) => ["log-entries", "preview", templateId, orgNodeId ?? ""] as const,
 };
+
+/** Plantillas disponibles para crear una entrada (gateado por logentry:create). */
+export function useAvailableTemplates() {
+  return useQuery({
+    queryKey: ["log-entries", "available-templates"] as const,
+    queryFn: fetchAvailableTemplates,
+  });
+}
 
 export function useLogEntry(id: string | null) {
   return useQuery({
     queryKey: LOG_ENTRY_KEYS.detail(id ?? ""),
     queryFn: () => fetchLogEntry(id!),
     enabled: !!id,
+  });
+}
+
+/** Vista previa de una entrada nueva (modo compose 2.8.2): no persiste nada. */
+export function useNewLogEntryPreview(templateId: string | null, orgNodeId: string | null, enabled = true) {
+  return useQuery({
+    queryKey: LOG_ENTRY_KEYS.preview(templateId ?? "", orgNodeId),
+    queryFn: () => fetchNewLogEntryPreview(templateId!, orgNodeId),
+    enabled: enabled && !!templateId,
+    // El preview depende del reloj/turno/periodo del momento: no lo caches agresivo.
+    staleTime: 0,
+    gcTime: 0,
   });
 }
 
