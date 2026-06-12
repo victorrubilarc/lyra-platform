@@ -1,16 +1,20 @@
 import {
+  assignTemplateRoleScopeRequestSchema,
   createTemplateRequestSchema,
   publishTemplateRequestSchema,
   saveTemplateDraftRequestSchema,
   templateDetailSchema,
   templateListItemSchema,
+  templateRoleScopeSchema,
   updateTemplateRequestSchema,
+  type AssignTemplateRoleScopeRequest,
   type CreateTemplateRequest,
   type PublishTemplateRequest,
   type SaveTemplateDraftRequest,
   type TemplateDetail,
   type TemplateListItem,
   type TemplateListQuery,
+  type TemplateRoleScope,
   type UpdateTemplateRequest,
 } from "@lyra/contracts";
 import { z } from "zod";
@@ -52,4 +56,15 @@ export function publishTemplate(id: string, dto: PublishTemplateRequest = {}): P
 
 export function deleteTemplate(id: string): Promise<void> {
   return apiVoid(`/templates/${id}`, { method: "DELETE" });
+}
+
+// ─── Acceso por rol (alcance por plantilla, lado de la plantilla) ───────────
+
+export function fetchTemplateRoleScope(id: string): Promise<TemplateRoleScope> {
+  return apiJson(`/templates/${id}/role-scope`, templateRoleScopeSchema);
+}
+
+export function assignTemplateRoleScope(id: string, dto: AssignTemplateRoleScopeRequest): Promise<TemplateRoleScope> {
+  assignTemplateRoleScopeRequestSchema.parse(dto);
+  return apiJson(`/templates/${id}/role-scope`, templateRoleScopeSchema, { method: "PUT", body: dto });
 }

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ShieldCheck } from "lucide-react";
-import { Button, Drawer, FormField, Input, Skeleton, Toggle, useToast } from "@lyra/ui";
+import { FileText, KeySquare, LayoutGrid, ShieldCheck } from "lucide-react";
+import { Button, Drawer, FormField, Input, Skeleton, Toggle, cx, useToast } from "@lyra/ui";
 import { roleKeySchema } from "@lyra/contracts";
 import { ApiError } from "../../lib/api-client.js";
 import { PermissionMatrix } from "./PermissionMatrix.js";
@@ -63,10 +63,12 @@ export function RoleDrawer({ open, roleId, onClose }: RoleDrawerProps) {
   const [state, setState] = useState<FormState>(EMPTY);
   const [keyError, setKeyError] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
+  const [tab, setTab] = useState<"datos" | "permisos" | "alcance">("datos");
 
   // Sincroniza el formulario al abrir / cuando llega el detalle.
   useEffect(() => {
     if (!open) return;
+    setTab("datos");
     if (isEdit && role) {
       setState({
         key: role.key,
@@ -137,11 +139,17 @@ export function RoleDrawer({ open, roleId, onClose }: RoleDrawerProps) {
     }
   }
 
+  const tabs = [
+    { key: "datos" as const, label: t("security.roles.tabs.data"), icon: FileText },
+    { key: "permisos" as const, label: t("security.roles.tabs.permissions"), icon: KeySquare, count: state.permissions.size },
+    { key: "alcance" as const, label: t("security.roles.tabs.scope"), icon: LayoutGrid, count: isEdit ? state.templateScope.length || undefined : undefined },
+  ];
+
   return (
     <Drawer
       open={open}
       onClose={onClose}
-      width={560}
+      width={760}
       title={
         <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <ShieldCheck size={18} />
@@ -166,94 +174,119 @@ export function RoleDrawer({ open, roleId, onClose }: RoleDrawerProps) {
           <Skeleton height={200} />
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ display: "flex", flexDirection: "column", minHeight: 0 }}>
           {isSystem && (
-            <div className={shared.errorBox} style={{ background: "var(--color-info-bg)", color: "var(--color-info)", borderColor: "rgba(6,182,212,0.22)" }}>
+            <div className={shared.errorBox} style={{ background: "var(--color-info-bg)", color: "var(--color-info)", borderColor: "rgba(6,182,212,0.22)", marginBottom: 12 }}>
               <ShieldCheck size={16} />
               {t("security.roles.systemHint")}
             </div>
           )}
 
-          <FormField label={t("security.roles.key")} error={keyError ?? undefined} required hint={isEdit ? t("security.roles.keyLocked") : t("security.roles.keyHint")}>
-            {(field) => (
-              <Input
-                {...field}
-                value={state.key}
-                onChange={(e) => setState((s) => ({ ...s, key: e.target.value }))}
-                placeholder="supervisor-turno"
-                mono
-                disabled={isEdit}
-                invalid={!!keyError}
-              />
-            )}
-          </FormField>
-
-          <FormField label={t("security.roles.name")} error={nameError ?? undefined} required>
-            {(field) => (
-              <Input
-                {...field}
-                value={state.name}
-                onChange={(e) => setState((s) => ({ ...s, name: e.target.value }))}
-                placeholder={t("security.roles.namePlaceholder")}
-                invalid={!!nameError}
-              />
-            )}
-          </FormField>
-
-          <FormField label={t("security.roles.description")}>
-            {(field) => (
-              <Input
-                {...field}
-                value={state.description}
-                onChange={(e) => setState((s) => ({ ...s, description: e.target.value }))}
-                placeholder={t("security.roles.descriptionPlaceholder")}
-              />
-            )}
-          </FormField>
-
-          <div className={shared.controlRow} style={{ borderTop: "none", padding: 0 }}>
-            <div className={shared.controlLabel}>
-              <span className={shared.controlName}>{t("security.roles.requireMfa")}</span>
-              <span className={shared.controlHint}>{t("security.roles.requireMfaHint")}</span>
-            </div>
-            <Toggle
-              checked={state.requireMfa}
-              onChange={(v) => setState((s) => ({ ...s, requireMfa: v }))}
-              aria-label={t("security.roles.requireMfa")}
-            />
+          <div className={shared.tabs} role="tablist">
+            {tabs.map((tb) => (
+              <button
+                key={tb.key}
+                type="button"
+                role="tab"
+                aria-selected={tab === tb.key}
+                className={cx(shared.tab, tab === tb.key && shared.tabActive)}
+                onClick={() => setTab(tb.key)}
+              >
+                <tb.icon size={15} aria-hidden />
+                {tb.label}
+                {tb.count != null && <span className={shared.tabCount}>{tb.count}</span>}
+              </button>
+            ))}
           </div>
 
-          <div>
-            <div style={{ fontSize: "var(--text-label-size)", fontWeight: 600, marginBottom: 8, color: "var(--color-text-primary)" }}>
-              {t("security.roles.permissions")} ({state.permissions.size})
-            </div>
-            <PermissionMatrix
-              catalog={catalog}
-              selected={state.permissions}
-              onChange={(next) => setState((s) => ({ ...s, permissions: next }))}
-              disabled={busy}
-            />
-          </div>
+          {/* ── Datos ── */}
+          {tab === "datos" && (
+            <div className={shared.tabPanel}>
+              <FormField label={t("security.roles.key")} error={keyError ?? undefined} required hint={isEdit ? t("security.roles.keyLocked") : t("security.roles.keyHint")}>
+                {(field) => (
+                  <Input
+                    {...field}
+                    value={state.key}
+                    onChange={(e) => setState((s) => ({ ...s, key: e.target.value }))}
+                    placeholder="supervisor-turno"
+                    mono
+                    disabled={isEdit}
+                    invalid={!!keyError}
+                  />
+                )}
+              </FormField>
 
-          {/* Alcance por PLANTILLA del rol (2.º eje ABAC, Fase 2.8). Solo en
-              edición: necesita el id del rol. Se suma (unión) al alcance de sus
-              usuarios; vacío = el rol no aporta restricción. */}
-          {isEdit && (
-            <div>
-              <div style={{ fontSize: "var(--text-label-size)", fontWeight: 600, marginBottom: 4, color: "var(--color-text-primary)" }}>
-                {t("security.users.templateScope.section")}
+              <FormField label={t("security.roles.name")} error={nameError ?? undefined} required>
+                {(field) => (
+                  <Input
+                    {...field}
+                    value={state.name}
+                    onChange={(e) => setState((s) => ({ ...s, name: e.target.value }))}
+                    placeholder={t("security.roles.namePlaceholder")}
+                    invalid={!!nameError}
+                  />
+                )}
+              </FormField>
+
+              <FormField label={t("security.roles.description")}>
+                {(field) => (
+                  <Input
+                    {...field}
+                    value={state.description}
+                    onChange={(e) => setState((s) => ({ ...s, description: e.target.value }))}
+                    placeholder={t("security.roles.descriptionPlaceholder")}
+                  />
+                )}
+              </FormField>
+
+              <div className={shared.controlRow} style={{ borderTop: "none", padding: 0 }}>
+                <div className={shared.controlLabel}>
+                  <span className={shared.controlName}>{t("security.roles.requireMfa")}</span>
+                  <span className={shared.controlHint}>{t("security.roles.requireMfaHint")}</span>
+                </div>
+                <Toggle
+                  checked={state.requireMfa}
+                  onChange={(v) => setState((s) => ({ ...s, requireMfa: v }))}
+                  aria-label={t("security.roles.requireMfa")}
+                />
               </div>
-              <p className={shared.controlHint} style={{ margin: "0 0 8px" }}>
-                {state.templateScope.length === 0
-                  ? t("security.roles.templateScopeAll")
-                  : t("security.users.templateScope.desc")}
-              </p>
-              <TemplateScopePicker
-                options={templateOptions}
-                value={state.templateScope}
-                onChange={(next) => setState((s) => ({ ...s, templateScope: next }))}
+            </div>
+          )}
+
+          {/* ── Permisos ── */}
+          {tab === "permisos" && (
+            <div className={shared.tabPanel}>
+              <PermissionMatrix
+                catalog={catalog}
+                selected={state.permissions}
+                onChange={(next) => setState((s) => ({ ...s, permissions: next }))}
                 disabled={busy}
               />
+            </div>
+          )}
+
+          {/* ── Alcance por PLANTILLA del rol (2.º eje ABAC, Fase 2.8) ── */}
+          {tab === "alcance" && (
+            <div className={shared.tabPanel}>
+              {isEdit ? (
+                <>
+                  <p className={shared.controlHint} style={{ margin: 0 }}>
+                    {state.templateScope.length === 0
+                      ? t("security.roles.templateScopeAll")
+                      : t("security.users.templateScope.desc")}
+                  </p>
+                  <TemplateScopePicker
+                    options={templateOptions}
+                    value={state.templateScope}
+                    onChange={(next) => setState((s) => ({ ...s, templateScope: next }))}
+                    disabled={busy}
+                  />
+                </>
+              ) : (
+                <p className={shared.controlHint} style={{ margin: 0 }}>
+                  {t("security.roles.templateScopeCreateHint")}
+                </p>
+              )}
             </div>
           )}
         </div>

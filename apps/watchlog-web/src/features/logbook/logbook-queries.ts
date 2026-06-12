@@ -2,6 +2,7 @@ import { useInfiniteQuery, useMutation, useQuery } from "@tanstack/react-query";
 import type { LogEntryListQuery } from "@lyra/contracts";
 import {
   fetchLogbookChanges,
+  fetchLogbookFilterTemplates,
   fetchLogbookList,
   fetchLogbookRelated,
   fetchLogbookStats,
@@ -15,7 +16,17 @@ export const LOGBOOK_KEYS = {
   timeline: (id: string) => ["logbook", "timeline", id] as const,
   changes: (id: string) => ["logbook", "changes", id] as const,
   related: (id: string) => ["logbook", "related", id] as const,
+  filterTemplates: ["logbook", "filter-templates"] as const,
 };
+
+/** Plantillas con alcance para el filtro de la grilla (no las del admin). */
+export function useLogbookFilterTemplates() {
+  return useQuery({
+    queryKey: LOGBOOK_KEYS.filterTemplates,
+    queryFn: fetchLogbookFilterTemplates,
+    staleTime: 60_000,
+  });
+}
 
 /** Listado paginado por cursor keyset (la query NO incluye `cursor`: lo maneja el hook). */
 export function useLogbookList(query: LogEntryListQuery) {
