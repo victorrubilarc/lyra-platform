@@ -29,9 +29,17 @@
 > **Fase 2.1 (implementado — lado DEFINICIÓN):** ver migración `20260609133247_add_template_definition`.
 > Un formulario es un **proceso de SECCIONES**, no una lista plana (ver DECISIONS 2026-06-09). El lado
 > EJECUCIÓN (LogEntry…) se diseña en contratos y se migra en 2.4.
-- **Template** *(implementado)* — contenedor lógico mutable: `name`, `description?`, `orgNodeId?` (ancla en
-  estructura; null = global), `status` (DRAFT/PUBLISHED/ARCHIVED), `currentVersionId?` (versión publicada
-  viva), `createdById/updatedById` (referencia blanda), `deletedAt` (borrado lógico).
+- **Template** *(implementado)* — contenedor lógico mutable: `name`, `description?`, `orgNodeId?` (**nodo PRIMARIO
+  DERIVADO**, deprecado tras 2.8.0 — la visibilidad por nodo la gobierna `TemplateNodeAssignment`; null = global/varios/
+  rama), `status` (DRAFT/PUBLISHED/ARCHIVED), `currentVersionId?` (versión publicada viva), `createdById/updatedById`
+  (referencia blanda), `deletedAt` (borrado lógico).
+- **TemplateNodeAssignment** *(implementado — Fase 2.8.0)* — asignación N:M **plantilla × nodo** = **fuente de verdad
+  única del eje de NODO** de la visibilidad de plantilla: `templateId`, `orgNodeId`, `includeDescendants` (si true cubre
+  el subárbol, incl. nodos futuros). Único `[templateId,orgNodeId]`. **CERO filas = GLOBAL** (visible en todo nodo,
+  semántica permisiva). Los 3 modos se componen de filas: un nodo · varios · "todos los hijos de X". `Template.orgNodeId`
+  se deriva de aquí (= el nodo si hay 1 asignación simple; null en otro caso). La plantilla es visible para un usuario si
+  alguna asignación intersecta `ScopeService.getAccessibleNodes` (ids + rutas; el caso `includeDescendants` testea prefijo
+  de ruta). Al crear una entrada el nodo elegible = `expand(asignaciones) ∩ accesibles`; el backend valida la membresía.
 - **Template** *1—N* **TemplateVersion** *(implementado)* — versión **INMUTABLE al publicar** (patrón MMR de
   21 CFR Part 11): `versionNumber`, `status` (DRAFT/PUBLISHED), `name/description` (snapshot), `publishedAt/By`.
   **Flujo congelado (Fase 2.2):** `workflowDefinitionId?` → `WorkflowDefinition` y `workflowDefinitionVersionId?`

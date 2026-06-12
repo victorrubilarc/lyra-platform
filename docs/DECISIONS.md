@@ -4,6 +4,60 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-12 · Fase 2.8.0 — Plantillas MULTI-NODO (eje de NODO de la visibilidad de plantilla) — ✅ IMPLEMENTADO
+
+Hoy `Template.orgNodeId` ataba cada plantilla a **un solo nodo** (o global). Se introduce la asignación N:M
+**plantilla × nodo** con 3 modos (un nodo / varios / "todos los hijos de X" incl. nodos futuros), que gobierna la
+**visibilidad por nodo** (picker + grilla admin) y, al CREAR una entrada, ofrece un selector de nodo acotado a
+(asignaciones de la plantilla ∩ nodos accesibles del usuario) — resolviendo también el diferido (a) de 2.4 (plantillas
+globales sin nodo al crear). **Es el eje de NODO** (no confundir con el alcance por PLANTILLA de 2.8, que limita QUÉ
+plantillas ve un USUARIO/ROL); ambos se mantienen ORTOGONALES y combinan en AND. **6 forks resueltos con el dueño:**
+
+1. **Modelo = entidad nueva `TemplateNodeAssignment` (templateId × orgNodeId + `includeDescendants`), N:M aditiva, FUENTE
+   DE VERDAD ÚNICA de la visibilidad por nodo.** `Template.orgNodeId` se **conserva como "nodo primario" DERIVADO**
+   (deprecado): se calcula = el nodo cuando hay UNA sola asignación de nodo simple, `null` en global/varios/rama; nunca se
+   edita por separado ⇒ **sin drift posible**. Se decidió NO dropear la columna ahora (rompería contratos/web a mitad de
+   feature); su DROP queda como **deuda técnica** en BACKLOG §3. Fundamento: una sola fuente de verdad normalizada en la ruta
+   de autorización (lo que un auditor exige), retirando la columna de la LÓGICA hoy y del ESQUEMA después — patrón SAP PM /
+   Maximo (la disponibilidad por sitio/ubicación es una relación N:M; cualquier "principal" es derivado, no verdad paralela).
+2. **Semántica "global" = CERO asignaciones** (sin filas = visible en todo nodo), consistente con la semántica **PERMISIVA**
+   ya adoptada en ambos ejes ABAC ("ausencia = sin restricción") y con SAP/Maximo (app sin restricción de sitio = disponible
+   en todos). Migración **sin backfill de globales** (las `orgNodeId=null` → 0 filas), cero ruptura. *"Todos los hijos de X"*
+   (1 fila `includeDescendants=true`) es DISTINTO de global: subárbol explícito sin abrir a toda la organización.
+3. **Combinación con el ABAC de nodo del usuario:** la plantilla es visible si el usuario no tiene restricción, o es global,
+   o **ALGUNA** asignación intersecta `getAccessibleNodes`. Intersección de `(M, incDesc)`: `M ∈ accesibles`, **o** (si
+   `incDesc`) algún nodo accesible es descendiente de M (`path.startsWith(M.path)`, ruta materializada con "/" final ⇒ sin
+   colisión entre hermanos). En **AND** con el eje de PLANTILLA (2.8), sin cambios en ese eje.
+4. **Selector de nodo al crear = FORZAR elección (decisión del dueño).** Opciones = `expand(asignaciones) ∩ accesibles`
+   (global = todos los accesibles). 1 nodo ⇒ autoselección (cero fricción, como hoy); **>1 ⇒ el operador DEBE elegir** (sin
+   default silencioso): correctitud sobre comodidad, una entrada estampada en el nodo equivocado corrompe la bitácora y es
+   difícil de revertir (sellado). **El backend AUTORIZA** la membresía en `create` y en `previewNew` (`assertNodeAllowedForTemplate`);
+   el front solo la ofrece. Endpoint `GET /log-entries/templates/:id/nodes` (gate `logentry:create`) sirve los elegibles.
+5. **Entradas YA creadas = histórico intacto** (confirmado por diseño). Las entradas estampan su `orgNodeId` (sellado
+   ALCOA+); quitar/cambiar una asignación gobierna la **creación y la visibilidad de la plantilla**, NO reescribe entradas.
+   La grilla `/bitacoras` sigue filtrando por el ABAC de nodo del USUARIO, no por las asignaciones actuales de la plantilla.
+6. **UI = en el TemplateBuilder (decisión del dueño), gate `template:edit`.** Sección "Alcance de estructura (nodos)" que
+   **reutiliza `ScopeTreePicker`** (mismo shape `{orgNodeId, includeDescendants}`) con un nuevo prop `defaultIncludeDescendants`
+   (default `true` en seguridad; `false` aquí = "solo este nodo", más preciso). 0 filas = aviso "GLOBAL". El alta rápida
+   (`CreateTemplateModal`) mantiene 0/1 nodo y el multi-nodo completo se edita en el builder. `NewEntryPage` autoselecciona
+   (1) o abre un modal de elección (>1, `Combobox` searchable). `TemplatesPage`/picker muestran "Global / N nodos / nodo (y
+   subnodos)".
+
+**Implementación.** Migración aditiva `20260612170000_add_template_node_assignment` (tabla + `@@unique([templateId,orgNodeId])`
++ índice + **backfill** 1 fila `incDesc=false` por plantilla con `orgNodeId`; globales → 0 filas; verificado 3→3, 0 globales).
+Contratos: `templateNodeAssignmentInput/Schema` + `nodeAssignments` en detail/list + en create/update/saveDraft requests
+(`orgNodeId` marcado `@deprecated`) + `eligibleNodeSchema`/`templateEligibleNodesSchema` en log-entries. `ScopeService`:
+`getAccessibleNodes` (ids + rutas, fuente única de la que cuelga `getAccessibleNodeIds`/`canAccessNode`), `nodeAssignmentInScope`,
+`isTemplateVisibleByNode` (puros). `TemplatesService.list/getDetail/create/updateMeta/saveDraft` filtran/persistten/derivan por
+asignaciones (audit before/after del set); `updateMeta` pasó a transacción por atomicidad. `LogEntriesService.create/previewNew`
+validan membresía; `eligibleNodesForTemplate` + endpoint. Web: `ScopeTreePicker` (prop nuevo), `TemplateBuilder`, `NewEntryPage`
+(selector), `TemplatesPage`, builder-model, api/queries, i18n es-CL. Verde: typecheck (todos) · lint (0 err, 1 warn preexistente
+OrgTree) · web build · tests **API 213** (+8: visibilidad por nodo/elegibles/rechazo) · contracts 149. **Smoke en vivo 15/15**
+(`scripts/smoke-template-multinode.py`: persistencia 1-nodo/rama/global, elegibles 1 vs 31, previewNew 200/400, picker filtrado
+por alcance de nodo del operador restringido; CREA plantilla + ajusta scope y **limpia TODO por ID**). Pendiente: smoke VISUAL.
+
+---
+
 ### 2026-06-12 · Fase 2.8 — Afinamiento (QA del dueño) — ✅ IMPLEMENTADO
 
 Cuatro correcciones tras probar 2.8 en pantalla:
