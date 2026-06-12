@@ -13,11 +13,13 @@ import {
 } from "@nestjs/common";
 import type { FastifyRequest } from "fastify";
 import {
+  assignTemplateRoleScopeRequestSchema,
   createTemplateRequestSchema,
   publishTemplateRequestSchema,
   saveTemplateDraftRequestSchema,
   templateListQuerySchema,
   updateTemplateRequestSchema,
+  type AssignTemplateRoleScopeRequest,
   type CreateTemplateRequest,
   type PublishTemplateRequest,
   type SaveTemplateDraftRequest,
@@ -51,6 +53,24 @@ export class TemplatesController {
     @Query("versionId") versionId?: string,
   ) {
     return this.templates.getDetail(user.id, id, versionId);
+  }
+
+  /** Acceso por ROL de la plantilla (qué roles la ven). Vista recíproca del alcance. */
+  @Get(":id/role-scope")
+  @RequirePermission("template:edit")
+  getRoleScope(@Param("id") id: string) {
+    return this.templates.getRoleScope(id);
+  }
+
+  @Put(":id/role-scope")
+  @RequirePermission("template:edit")
+  setRoleScope(
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(assignTemplateRoleScopeRequestSchema)) dto: AssignTemplateRoleScopeRequest,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.templates.setRoleScope(id, dto.roleIds, this.ctx(user, req));
   }
 
   @Post()

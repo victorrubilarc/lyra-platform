@@ -6,6 +6,7 @@ import type {
   TemplateDetail,
   TemplateListItem,
   TemplateListQuery,
+  TemplateRoleScope,
   TemplateScopeOption,
   TemplateVersionDto,
   UpdateTemplateRequest,
@@ -163,6 +164,47 @@ export class TemplatesService {
   async listScopeOptions(userId: string): Promise<TemplateScopeOption[]> {
     const items = await this.list(userId, {});
     return items.map((t) => ({ id: t.id, name: t.name, orgNodePath: t.orgNodePath }));
+  }
+
+  /**
+   * Acceso por ROL de UNA plantilla (vista recíproca del alcance por plantilla,
+   * Fase 2.8): lista de roles asignables + cuáles tienen esta plantilla en su
+   * alcance. Pensado para gobernar la audiencia desde la pantalla de Plantillas.
+   */
+  async getRoleScope(id: string): Promise<TemplateRoleScope> {
+    const template = await this.prisma.template.findFirst({ where: { id, deletedAt: null } });
+    if (!template) throw new NotFoundException("Plantilla no encontrada");
+    const [roles, assigned] = await Promise.all([
+      this.prisma.role.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, key: true } }),
+      this.prisma.templateScope.findMany({ where: { templateId: id, NOT: { roleId: null } }, select: { roleId: true } }),
+    ]);
+    return {
+      roles,
+      assignedRoleIds: assigned.map((s) => s.roleId).filter((r): r is string => r !== null),
+    };
+  }
+
+  /**
+   * Reemplaza el conjunto de ROLES que tienen ESTA plantilla en su alcance.
+   * SOLO toca las filas de esta plantilla (templateId=id, roleId no nulo): el
+   * resto del alcance de cada rol y las asignaciones por usuario quedan intactos.
+   */
+  async setRoleScope(id: string, roleIds: string[], ctx: AuditContext): Promise<TemplateRoleScope> {
+    const template = await this.prisma.template.findFirst({ where: { id, deletedAt: null } });
+    if (!template) throw new NotFoundException("Plantilla no encontrada");
+
+    const unique = [...new Set(roleIds)];
+    if (unique.length > 0) {
+      const found = await this.prisma.role.count({ where: { id: { in: unique } } });
+      if (found !== unique.length) throw new BadRequestException("Uno o más roles no existen");
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.templateScope.deleteMany({ where: { templateId: id, NOT: { roleId: null } } }),
+      this.prisma.templateScope.createMany({ data: unique.map((roleId) => ({ templateId: id, roleId })) }),
+    ]);
+    await this.audit.record({ ...ctx, action: "template.rolescope.assigned", entityType: "Template", entityId: id, after: { roleIds: unique } });
+    return this.getRoleScope(id);
   }
 
   // --- Detalle ---------------------------------------------------------------

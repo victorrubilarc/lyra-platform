@@ -288,3 +288,27 @@ export const templateListQuerySchema = z.object({
   orgNodeId: z.string().optional(),
 });
 export type TemplateListQuery = z.infer<typeof templateListQuerySchema>;
+
+/**
+ * Acceso por ROL desde el lado de la PLANTILLA (vista recíproca del alcance por
+ * plantilla, Fase 2.8): qué roles tienen esta plantilla en su alcance. Editar
+ * aquí solo afecta las filas de ESTA plantilla — no toca el resto del alcance de
+ * cada rol ni las asignaciones por usuario.
+ */
+export const templateRoleScopeOptionSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  key: z.string(),
+});
+export type TemplateRoleScopeOption = z.infer<typeof templateRoleScopeOptionSchema>;
+
+export const templateRoleScopeSchema = z.object({
+  roles: z.array(templateRoleScopeOptionSchema),
+  assignedRoleIds: z.array(z.string()),
+});
+export type TemplateRoleScope = z.infer<typeof templateRoleScopeSchema>;
+
+export const assignTemplateRoleScopeRequestSchema = z.object({
+  roleIds: z.array(z.string()),
+});
+export type AssignTemplateRoleScopeRequest = z.infer<typeof assignTemplateRoleScopeRequestSchema>;
