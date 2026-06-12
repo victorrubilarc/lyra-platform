@@ -14,6 +14,7 @@ import {
   Send,
   TimerOff,
   TriangleAlert,
+  Wrench,
 } from "lucide-react";
 import { DeferralModal } from "./DeferralModal.js";
 import { EditWindowOverrideModal, type EditWindowOverrideFields } from "./EditWindowOverrideModal.js";
@@ -400,6 +401,11 @@ export function EntryFillPage() {
           <div>
             <div className={styles.entryName}>{entry.templateName}</div>
             <div className={styles.entryNode}>{entry.orgNodePath ?? "—"}</div>
+            {entry.equipmentName && (
+              <div className={styles.entryEquipment}>
+                <Wrench size={13} aria-hidden="true" /> {entry.equipmentName}
+              </div>
+            )}
           </div>
           <div className={styles.entryHeadChips}>
             {showDeferred && <Chip variant="warning" label={t("logbook.deferral.chip")} />}
