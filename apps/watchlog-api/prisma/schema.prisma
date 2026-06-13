@@ -605,6 +605,13 @@ model Template {
   // Vive en el contenedor MUTABLE (gobernanza viva, sin republicar). Default OPTIONAL
   // = preserva el comportamiento contextual de 2.8.0.1 para plantillas existentes.
   equipmentMode     EquipmentMode  @default(OPTIONAL)
+  // --- Campos de resumen en la grilla de Bitácoras (Fase 2.8.1a) — GOBERNANZA VIVA ---
+  // Pool ORDENADO de `key` de campos candidatos a mostrarse como "Resumen" en /bitacoras
+  // ("el diseñador ofrece, el usuario dispone"). Keyed por el `key` ESTABLE del campo
+  // (el mismo que usa LogEntryValue.fieldKey), no por la versión inmutable: cambiarlo
+  // aplica en vivo a todas las entradas sin republicar (PATCH "Guardar configuración").
+  // Tope 6 (validado en contrato/backend). Key huérfano (campo eliminado) = se ignora.
+  gridFieldKeys     String[]       @default([])
   // Autoría (referencia blanda, sin FK: el usuario pudo borrarse — igual que AuditLog).
   createdById      String?
   updatedById      String?
