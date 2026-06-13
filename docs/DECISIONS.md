@@ -4,6 +4,45 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-12 · Fase 2.8.1a — Bitácoras: grilla orientada a contenido (MVP) — ✅ IMPLEMENTADO
+
+Primer sub-slice del plan 2.8.1 (ver entrada de plan más abajo). Resuelve la queja del dueño: la grilla es ciega
+al contenido. Entrega: campos candidatos de resumen marcados en la plantilla + **línea Resumen** + columna **Equipo**
++ **búsqueda por contenido**. **6 forks resueltos con el dueño (4 vía recomendación aceptada, 3 por criterio técnico):**
+
+1. **`showInGrid` vive en el CONTENEDOR mutable, NO en el campo versionado** (recomendación mía aceptada, corrige el
+   plan que nombró `TemplateField.showInGrid`). `TemplateField` vive en `TemplateVersion` **inmutable (MMR Part 11)**:
+   poner ahí el flag obligaría a clonar borrador + republicar una versión CONTROLADA solo por un *hint* de
+   visualización ⇒ ensucia el historial GxP y fuerza re-aprobación por algo no sustantivo. Decisión: `Template.gridFieldKeys
+   String[]` (lista ORDENADA de `key` estables — el mismo `key` que usa `LogEntryValue.fieldKey` en todo el sistema),
+   guardado con **"Guardar configuración"** vía `PATCH /templates/:id` (espejo exacto de `equipmentMode`/`editWindow`):
+   se aplica en vivo a todas las versiones/entradas SIN republicar (lo que el dueño pidió). Key huérfano (campo
+   renombrado/eliminado) = inofensivo (se ignora; se poda al publicar). La parte "viva/reactiva" real (qué columnas ve
+   CADA usuario) la cubre el USUARIO en 2.8.1b (SavedView); el nivel plantilla solo *ofrece* el pool ⇒ versionarlo no aporta.
+2. **Tope del pool = 6 candidatos.** Pool ilimitado = columnas/valores ilimitados que batch-cargar + Resumen
+   ininteligible. 6 cubre el default de 2–3 con holgura (Fiori smart columns son acotadas). Validado en contrato + backend.
+3. **Default = LÍNEA "Resumen" compuesta**, NO columnas individuales. La grilla mezcla entradas de muchas plantillas;
+   columnas por-campo solo tienen sentido con UNA plantilla filtrada (claves homogéneas) — como Fiori. Una celda
+   "Resumen" por fila (`Temp 78 °C · Presión 9 bar`, primeros 3 candidatos de SU plantilla) funciona en lista
+   heterogénea (cada fila se resume a sí misma). Columnas individuales = 2.8.1b (con gestor de columnas + SavedView).
+4. **Búsqueda por contenido acotada a los candidatos `showInGrid`** ("lo que ves es lo que buscas"). `EXISTS` sobre
+   `LogEntryValue` de los campos candidatos, `value::text ILIKE %q%`, **dentro del mismo `buildWhere`** (AND con ABAC,
+   OR con el `q` actual folio/plantilla/nodo). Índice GIN trigram (`pg_trgm`) sobre `(value::text)` para mantenerla
+   rápida on-prem. **Limitación honesta del MVP:** busca el valor ALMACENADO (texto/número/**code**); para SELECT de
+   lista de referencia el `code` no matchea el label (búsqueda por label = deuda, requeriría denormalizar el label).
+5. **Backend sin N+1** (criterio): extiende `enrich()` (batched por página) con 3 queries — `gridFieldKeys` de las
+   plantillas distintas + `LogEntryValue` de `logEntryId ∈ página AND fieldKey ∈ unión(candidatos)` + meta de campo
+   CONGELADA (`TemplateField` por `templateVersionId` distintos, para label/unidad/tipo/banda) + resolución batched
+   code→label de listas de referencia. **Formato regional**: el backend manda valor ESTRUCTURADO + meta (no string
+   pre-formateado); el CLIENTE formatea números/fechas con `lib/format.ts` (regla regional). Contrato:
+   `summaryValues: { fieldKey, label, dataType, value, unit?, optionLabel?, thresholdBand }[]` en `LogEntryListItem`.
+6. **Columna Equipo + ABAC** (criterio): `Equipment.tag` (único) + `name` ⇒ display **`TAG · Nombre`** (Maximo asset
+   num + descripción); orden EAM **Folio · Plantilla · Nodo · Equipo · Resumen · Estado · …**. Los valores se
+   batch-cargan SOLO para los `pageIds` ya filtrados por node+template ABAC en `buildWhere`; el `EXISTS` de búsqueda
+   vive DENTRO del mismo `where` ⇒ cero fuga de contenido fuera de alcance (confirmado por smoke).
+
+---
+
 ### 2026-06-12 · Plan de Fase 2.8.1 — Bitácoras: grilla ORIENTADA A CONTENIDO + personalización — 📋 ACORDADO (no implementado)
 
 El dueño detectó el problema raíz de `/bitacoras`: la grilla es **ciega al contenido**. Muestra metadatos (folio, plantilla,

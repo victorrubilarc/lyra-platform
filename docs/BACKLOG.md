@@ -78,6 +78,7 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Fase 2.8.0.1 Equipo OPCIONAL al crear entrada** (`eligibleNode.equipment` + `assertEquipmentInNode` + selector de equipo en el modal de creación) | `feat/equipo-opcional-entrada` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Fase 2.8.0.2 Modo de equipo por PLANTILLA** (`EquipmentMode` en `Template` + `assertEquipmentForMode` en `create` + `equipmentMode` en `eligibleNodes` + control en `TemplateBuilder`/`NewEntryPage`) | `feat/modo-equipo-plantilla` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Afinamiento UX TemplateBuilder** ("Guardar configuración" `PATCH` separado del borrador + `editStateToConfigRequest` + riel vertical/sub-pestañas + barra sticky + `ScopeTreePicker`/`Toast` premium) | `feat/builder-vistas-config` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
+| **Fase 2.8.1a Bitácoras grilla orientada a contenido** (`Template.gridFieldKeys` gobernanza viva + `summaryValues`/`equipmentTag` en el listado batched + búsqueda por contenido `pg_trgm` + checklist en builder + columnas Equipo/Resumen) | `feat/bitacoras-grilla-contenido` → `main` | ⏳ por publicar esta sesión | push de la rama + merge a `main` + push |
 
 **Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
@@ -428,9 +429,15 @@ nunca queda más de una sesión atrás.
             (3) **Equipo** [EAM, ya existe]. **Descriptor (fork resuelto):** la PLANTILLA marca el *pool* de campos
             candidatos (toggle **`showInGrid`** por campo, gobernanza viva) y el USUARIO elige cuáles ver (columnas o línea
             "Resumen") con default sensato — "el diseñador ofrece, el usuario dispone". **Entregar en 3 sub-slices:**
-        - [ ] **2.8.1a — Contenido reconocible (MVP, máximo impacto):** flag `showInGrid` en `TemplateField` (builder) +
-              exponer valores seleccionados en el listado (acotado/eficiente desde `LogEntryValue`) + columna(s) de valores/
-              **Resumen** + columna **Equipo** + **búsqueda por contenido**. *Resuelve la queja del dueño.*
+        - [x] **2.8.1a — Contenido reconocible (MVP) ✅ (2026-06-13, `feat/bitacoras-grilla-contenido` → `main`).** Pool de
+              candidatos = **`Template.gridFieldKeys String[]`** (gobernanza VIVA del contenedor, `PATCH` "Guardar
+              configuración", **NO** `TemplateField.showInGrid` — corrige el plan: poner el flag en la versión inmutable
+              forzaría republicar una versión GxP por un hint de visualización; ver DECISIONS). Cap 6 + sin dup +
+              `assertGridFieldKeysExist`. Listado expone `summaryValues[]` (batched, cero N+1, code→label, banda umbral) +
+              `equipmentTag`; default = línea **Resumen** (3); columna **Equipo** `TAG·Nombre`; **búsqueda por contenido**
+              (`EXISTS` sobre candidatos + `pg_trgm` GIN). MISMO where/ABAC ⇒ sin fuga. UI builder (checklist) + `LogbookPage`.
+              Sin permisos nuevos (59). Tests contracts 154 · API 216 · smoke 21/21. **Deuda:** búsqueda por LABEL del SELECT
+              (hoy matchea el code) · smoke VISUAL.
         - [ ] **2.8.1b — Vistas guardadas + gestor de columnas:** entidad **`SavedView`** de PLATAFORMA (`module`
               discriminador; config {filtros, búsqueda, orden, columnas{orden,ocultas,ancladas,anchos}, densidad}; CRUD del
               dueño; UNA default por usuario+módulo; vistas de sistema EN CÓDIGO: "Mi turno"/"Firmas pendientes"/"Excepciones"/
