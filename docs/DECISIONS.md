@@ -4,6 +4,36 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-12 · Plan de Fase 2.8.1 — Bitácoras: grilla ORIENTADA A CONTENIDO + personalización — 📋 ACORDADO (no implementado)
+
+El dueño detectó el problema raíz de `/bitacoras`: la grilla es **ciega al contenido**. Muestra metadatos (folio, plantilla,
+nodo, estado, fechas, autor, indicadores) pero **ningún dato del negocio** que la bitácora capturó (temperatura, presión,
+"operó normal", equipo) ⇒ es imposible *reconocer ni encontrar* un registro por su contenido. Analizado cómo lo resuelven los
+sistemas líderes (SAP Fiori, j5/Hexagon Operations Logbook, IBM Maximo, ServiceNow, Splunk/Kibana, EBR/Körber PAS-X). **Patrón
+común que a nosotros nos falta:** (1) un **descriptor/resumen legible** por registro, (2) **valores de negocio clave** como
+columnas, (3) **búsqueda por contenido** + **facetas con conteo**, (4) **peek/expand** para ver detalle sin salir, (5)
+**personalización = vistas guardadas + gestor de columnas**, (6) **review-by-exception**.
+
+**Diseño acordado (mi mejor propuesta, aprobada por el dueño):**
+- **Columnas en 3 niveles:** metadatos [hoy] · **valores de negocio/Resumen** [lo que falta] · **Equipo** [EAM, ya existe].
+- **Descriptor — fork resuelto con el dueño:** la **PLANTILLA marca el *pool* de campos candidatos** (toggle por campo
+  `showInGrid`, gobernanza viva, sin republicar) y **el USUARIO elige cuáles ver** (columnas individuales o una línea
+  "Resumen" compuesta), con un default sensato (primeros 2–3). Lema: *"el diseñador ofrece, el usuario dispone"* (= SAP Fiori
+  smart columns + variants). Preferencia explícita del dueño: marcar en la plantilla TODOS los candidatos, a gusto del usuario.
+- **Personalización (absorbe 2.6.1):** entidad **`SavedView`** de PLATAFORMA (`module` discriminador, reusable por Incidencias
+  Fase 4; config {filtros, búsqueda, orden, columnas{orden,ocultas,ancladas,anchos}, densidad}; una default por usuario+módulo;
+  vistas de sistema EN CÓDIGO) + **gestor de columnas** (evoluciona el `Table` de `@lyra/ui`) + densidad + recordar última vista.
+- **Buscar y encontrar:** búsqueda sobre VALORES de campo + **facetas con conteo** (estilo Splunk) + **vistazo (peek)** lateral
+  reusando `getDetail` (estilo ServiceNow) + **resaltado por excepción** (estilo EBR/MES).
+- **Entrega en 3 sub-slices** (sesión cerrable cada una): **2.8.1a** contenido reconocible (MVP: `showInGrid` + Resumen/valores
+  + Equipo + búsqueda por contenido) → **2.8.1b** SavedView + gestor de columnas + multi-sort → **2.8.1c** peek + facetas +
+  review-by-exception. La "Parte A" del #9 (acceso nodo↔grilla: mis nodos/recientes/favoritos) se intercala en a/b.
+- **Adiciones de modelo (aditivas):** `TemplateField.showInGrid` (flag, gobernanza viva) + entidad `SavedView`. El backend ya
+  guarda `LogEntryValue`; solo falta exponer los valores seleccionados en el listado de forma acotada y eficiente.
+- **Arrancar por 2.8.1a** (es lo que tiene "atado" al dueño hoy; bajo riesgo, alto impacto). Ver BACKLOG §2.
+
+---
+
 ### 2026-06-12 · Afinamiento UX del TemplateBuilder (vistas + guardado de gobernanza) — ✅ IMPLEMENTADO
 
 Iteración de UX del dueño sobre el builder de plantillas (tras 2.8.0.2). Cuatro decisiones:

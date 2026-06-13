@@ -418,9 +418,32 @@ nunca queda más de una sesión atrás.
             nuevos (catálogo 59). Migración `20260612180000_add_template_equipment_mode`. 6 forks en DECISIONS 2026-06-12.
             Tests contracts **151** · API **216**. Smoke **17/17** (`scripts/smoke-template-equipment-mode.py`, crea+limpia
             por ID). **Pendiente: smoke VISUAL** (§4). Deuda diferida: re-validar al sellar si el equipo REQUIRED se da de baja.
-      - [ ] **2.8.1 (#9) UX de acceso nodo↔grilla** (+ SavedView/gestor de columnas de 2.6.1 FUSIONADOS aquí):
-            presentar 2–3 alternativas con pros/contras ANTES de implementar; "mis nodos"/recientes/favoritos,
-            búsqueda, filtros persistentes.
+      - [ ] **2.8.1 Bitácoras — Grilla ORIENTADA A CONTENIDO + personalización (#9 + 2.6.1 fusionadas).** **PLAN ACORDADO
+            con el dueño (2026-06-12, ver DECISIONS).** Problema raíz detectado por el dueño: la grilla de `/bitacoras` es
+            **ciega al contenido** (solo metadatos: folio/plantilla/nodo/estado/fechas/autor) ⇒ no se puede *reconocer ni
+            encontrar* un registro por su negocio (temperatura, presión, "operó normal", equipo). Síntesis del estándar
+            (SAP Fiori smart columns+variants · j5/Hexagon línea de resumen · Maximo descripción+activo+saved queries ·
+            ServiceNow peek+facetas · Splunk facetas con conteo+búsqueda por contenido · EBR/PAS-X review-by-exception).
+            **Modelo de columnas en 3 niveles:** (1) metadatos [hoy] · (2) **valores de negocio/Resumen** [lo que falta] ·
+            (3) **Equipo** [EAM, ya existe]. **Descriptor (fork resuelto):** la PLANTILLA marca el *pool* de campos
+            candidatos (toggle **`showInGrid`** por campo, gobernanza viva) y el USUARIO elige cuáles ver (columnas o línea
+            "Resumen") con default sensato — "el diseñador ofrece, el usuario dispone". **Entregar en 3 sub-slices:**
+        - [ ] **2.8.1a — Contenido reconocible (MVP, máximo impacto):** flag `showInGrid` en `TemplateField` (builder) +
+              exponer valores seleccionados en el listado (acotado/eficiente desde `LogEntryValue`) + columna(s) de valores/
+              **Resumen** + columna **Equipo** + **búsqueda por contenido**. *Resuelve la queja del dueño.*
+        - [ ] **2.8.1b — Vistas guardadas + gestor de columnas:** entidad **`SavedView`** de PLATAFORMA (`module`
+              discriminador; config {filtros, búsqueda, orden, columnas{orden,ocultas,ancladas,anchos}, densidad}; CRUD del
+              dueño; UNA default por usuario+módulo; vistas de sistema EN CÓDIGO: "Mi turno"/"Firmas pendientes"/"Excepciones"/
+              "Últimas 24h"; compartir por rol DIFERIDO) + **gestor de columnas** (mostrar/ocultar/reordenar/anclar/redimensionar
+              — evoluciona el `Table` de `@lyra/ui`, reusable por Incidencias Fase 4) + densidad + recordar última vista +
+              **multi-sort**. Incluye las columnas de campos por plantilla (nivel 2/3).
+        - [ ] **2.8.1c — Peek + facetas + review-by-exception:** **vistazo** lateral (Drawer con el contenido del registro
+              reusando `getDetail`, sin salir de la lista; "Abrir ficha completa") + **facetas con conteo** por valor (estado/
+              turno/plantilla/equipo/banda de umbral, estilo Splunk/Kibana) + **resaltado por excepción** visual (umbral
+              CRÍT/ADV, firmas pendientes, fuera de ventana/período). Absorbe parte de 2.6.2.
+        - [ ] **Parte A del #9 (acceso nodo↔grilla):** selector de nodo ágil "mis nodos"/recientes/favoritos + filtros
+              persistentes. Intercalable en 2.8.1a/b (presentar micro-alternativa al llegar). El backend ya guarda
+              `LogEntryValue`; solo falta exponerlo acotado. Adiciones de modelo: `TemplateField.showInGrid` + `SavedView` (aditivas).
       - [ ] **2.8.2 Creación de entrada SIN borradores huérfanos + descarte de borrador** (deuda de UX/integridad
             detectada 2026-06-11). HOY elegir una plantilla en `/nueva-entrada` hace `POST /log-entries` de
             inmediato: persiste un `LogEntry` DRAFT en BD (incluido el diferimiento si se declaró) y la grilla lo
