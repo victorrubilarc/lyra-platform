@@ -979,6 +979,7 @@ export const esCL = {
     },
     peek: {
       openFull: "Abrir ficha completa",
+      viewFlow: "Ver flujo",
       sections: "secciones",
       pendingSig: "firmas pend.",
     },
