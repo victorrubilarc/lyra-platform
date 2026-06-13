@@ -597,13 +597,19 @@ export class LogbookQueryService {
       // que contengan el texto — "lo que ves es lo que buscas". Acotada a la unión de
       // los `gridFieldKeys` de TODAS las plantillas (un set chico) y combinada en OR
       // con folio/plantilla/nodo, todo DENTRO del AND con el ABAC ⇒ no fuga de alcance.
-      // Limitación MVP: matchea el valor ALMACENADO (texto/code); para SELECT de lista
-      // el code no coincide con el label (búsqueda por label = deuda, ver BACKLOG).
+      // ILIKE **insensible a mayúsculas** sobre `value::text` (usa el índice GIN trigram);
+      // se resuelve a un set de ids y se intersecta con el ABAC del where externo (no se
+      // confía en el set crudo). Limitación MVP: matchea el valor ALMACENADO (texto/code);
+      // para SELECT de lista el code no coincide con el label (búsqueda por label = deuda).
       const candidateKeys = await this.allGridFieldKeys();
       if (candidateKeys.length > 0) {
-        or.push({
-          values: { some: { fieldKey: { in: candidateKeys }, value: { string_contains: query.q } } },
-        });
+        const pattern = `%${query.q.replace(/[\\%_]/g, (c) => "\\" + c)}%`;
+        const matched = await this.prisma.$queryRaw<Array<{ logEntryId: string }>>`
+          SELECT DISTINCT v."logEntryId"
+          FROM "LogEntryValue" v
+          WHERE v."fieldKey" = ANY(${candidateKeys}::text[]) AND v.value::text ILIKE ${pattern}
+          LIMIT 5000`;
+        if (matched.length > 0) or.push({ id: { in: matched.map((m) => m.logEntryId) } });
       }
       // "BIT-000123", "000123" o "123" ⇒ además busca por folio exacto.
       const folio = /^(?:[A-Za-z]+-)?0*(\d+)$/.exec(query.q);
