@@ -42,6 +42,7 @@ import {
 } from "./logbook-queries.js";
 import fillStyles from "../log-entries/LogEntries.module.css";
 import styles from "./Logbook.module.css";
+import { WorkflowDiagram } from "./WorkflowDiagram.js";
 
 function formatDateTime(iso: string): string {
   return new Intl.DateTimeFormat("es-CL", { dateStyle: "short", timeStyle: "medium" }).format(new Date(iso));
@@ -494,6 +495,16 @@ export function EntryViewerPage() {
           </Card>
         );
       })}
+
+      {/* Recorrido del flujo: diagrama de la máquina de estados con el camino del registro */}
+      {entry.workflowVersion && (
+        <Card className={fillStyles.section}>
+          <div className={fillStyles.sectionTitle}>
+            <GitBranch size={16} /> {t("logbook.diagram.title")}
+          </div>
+          <WorkflowDiagram entry={entry} />
+        </Card>
+      )}
 
       {/* Firmas (§11.50) + verificación de integridad (§11.70) */}
       <SignaturesPanel entry={entry} />

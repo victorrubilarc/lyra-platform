@@ -1,0 +1,274 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.noFlow {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+/* ── Lienzo del diagrama ── */
+.canvasScroll {
+  overflow-x: auto;
+  padding: 4px;
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(120% 120% at 0% 0%, color-mix(in srgb, var(--color-accent-primary) 6%, transparent), transparent 60%),
+    var(--color-bg-surface-2);
+  border: 1px solid var(--color-border-subtle);
+}
+.canvas {
+  position: relative;
+}
+.edges {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Aristas: posibles (tenues, punteadas) vs. recorridas (sólidas, con acento). */
+.edge {
+  stroke: var(--color-border-default);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 4;
+  opacity: 0.55;
+}
+.edgeOn {
+  stroke: color-mix(in srgb, var(--color-accent-primary) 70%, var(--color-text-secondary));
+  stroke-width: 2.5;
+  stroke-dasharray: none;
+  opacity: 1;
+}
+.edgeHot {
+  stroke: var(--color-accent-secondary, #06b6d4);
+  stroke-width: 3;
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--color-accent-secondary, #06b6d4) 60%, transparent));
+}
+.arrowHead {
+  fill: var(--color-border-default);
+}
+.arrowHeadOn {
+  fill: color-mix(in srgb, var(--color-accent-primary) 70%, var(--color-text-secondary));
+}
+
+.edgeBadge {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  background: color-mix(in srgb, var(--color-accent-primary) 85%, #000);
+  border: 1px solid color-mix(in srgb, #fff 25%, transparent);
+  border-radius: 9px;
+  pointer-events: none;
+}
+.edgeBadgeHot {
+  background: var(--color-accent-secondary, #06b6d4);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--color-accent-secondary, #06b6d4) 60%, transparent);
+}
+
+/* ── Nodos de estado ── */
+.node {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 9px 11px;
+  border-radius: 12px;
+  background: var(--color-bg-surface-1);
+  border: 1px solid var(--color-border-subtle);
+  box-sizing: border-box;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+.nodePending {
+  opacity: 0.5;
+  border-style: dashed;
+}
+.nodeVisited {
+  border-color: color-mix(in srgb, var(--state-color) 50%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--state-color) 12%, var(--color-bg-surface-1)), var(--color-bg-surface-1));
+}
+.nodeCurrent {
+  border-color: var(--state-color);
+  box-shadow:
+    0 0 0 1px var(--state-color),
+    0 0 18px color-mix(in srgb, var(--state-color) 45%, transparent);
+  transform: translateY(-1px);
+}
+
+.nodeTop {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+.nodeMark {
+  flex-shrink: 0;
+  color: var(--state-color);
+}
+.nodeName {
+  font-family: var(--font-display, "Sora", sans-serif);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nodeBottom {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.stepBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--state-color);
+  border-radius: 50%;
+}
+.currentPill {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--state-color);
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--state-color) 16%, transparent);
+}
+.pendingText {
+  font-size: 10.5px;
+  color: var(--color-text-muted);
+}
+
+/* ── Historial de transiciones ── */
+.history {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: none;
+}
+.histItem {
+  display: flex;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface-1);
+  cursor: default;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.histItem:hover {
+  border-color: var(--color-border-active);
+  background: var(--color-hover);
+}
+.histIndex {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--color-accent-primary);
+  border-radius: 50%;
+}
+.histBody {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.histHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.histLabel {
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--color-text-primary);
+}
+.histFlow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.histFrom {
+  color: var(--color-text-muted);
+}
+.histArrow {
+  color: var(--color-text-muted);
+}
+.histTo {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+  color: var(--state-color);
+}
+.histTo::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--state-color);
+}
+.histSig {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-success, #22c55e);
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-success, #22c55e) 12%, transparent);
+}
+.histMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.histMeta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.histReason {
+  font-size: 12.5px;
+  font-style: italic;
+  color: var(--color-text-secondary);
+  padding: 4px 8px;
+  border-left: 2px solid var(--color-border-active);
+  background: var(--color-bg-surface-2);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
