@@ -11,6 +11,7 @@ interface Props {
   onClose: () => void;
   onOpenFull: (id: string) => void;
   onEdit: (id: string) => void;
+  onViewFlow: (id: string) => void;
   canEdit: boolean;
 }
 
@@ -19,7 +20,7 @@ interface Props {
  * se arma con los datos que la fila YA trae (cero round-trip), para hojear el negocio
  * sin salir de la lista. La ficha completa (detalle con `getDetail`) se abre aparte.
  */
-export function PeekDrawer({ row, onClose, onOpenFull, onEdit, canEdit }: Props) {
+export function PeekDrawer({ row, onClose, onOpenFull, onEdit, onViewFlow, canEdit }: Props) {
   const { t } = useTranslation();
 
   return (
@@ -30,6 +31,11 @@ export function PeekDrawer({ row, onClose, onOpenFull, onEdit, canEdit }: Props)
       footer={
         row ? (
           <div className={styles.peekFooter}>
+            {row.currentStateName && (
+              <Button variant="secondary" leftIcon={<GitBranch size={14} />} onClick={() => onViewFlow(row.id)}>
+                {t("logbook.peek.viewFlow")}
+              </Button>
+            )}
             {canEdit && row.status === "DRAFT" && (
               <Button variant="secondary" leftIcon={<PenLine size={14} />} onClick={() => onEdit(row.id)}>
                 {t("logbook.list.editEntry")}

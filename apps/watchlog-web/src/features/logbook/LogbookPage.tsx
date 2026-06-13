@@ -61,6 +61,7 @@ import {
 } from "./logbook-views.js";
 import { ColumnsDrawer, type ManagedColumnView } from "./ColumnsDrawer.js";
 import { ViewBar } from "./ViewBar.js";
+import { FlowModal } from "./FlowModal.js";
 import styles from "./Logbook.module.css";
 
 /** Comparación estable de configs (para el estado "modificada" de la vista). */
@@ -212,6 +213,7 @@ export function LogbookPage() {
   const [columnsOpen, setColumnsOpen] = useState(false);
   const [facetsOpen, setFacetsOpen] = useState(false);
   const [peekRow, setPeekRow] = useState<LogEntryListItem | null>(null);
+  const [flowEntryId, setFlowEntryId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
 
@@ -622,20 +624,36 @@ export function LogbookPage() {
       // abriendo el visor de lectura. El backend reaplica la autorización por sección.
       key: "actions",
       header: "",
-      width: 120,
-      render: (r) =>
-        can("logentry:fill") && r.status === "DRAFT" ? (
-          <Button
-            variant="secondary"
-            leftIcon={<PenLine size={14} />}
-            onClick={(e) => {
-              e.stopPropagation();
-              navigate(`/nueva-entrada/${r.id}`);
-            }}
-          >
-            {t("logbook.list.editEntry")}
-          </Button>
-        ) : null,
+      width: 150,
+      render: (r) => (
+        <div className={styles.rowActions}>
+          {r.currentStateName && (
+            <Button
+              variant="icon"
+              aria-label={t("logbook.peek.viewFlow")}
+              title={t("logbook.peek.viewFlow")}
+              onClick={(e) => {
+                e.stopPropagation();
+                setFlowEntryId(r.id);
+              }}
+            >
+              <GitBranch size={15} />
+            </Button>
+          )}
+          {can("logentry:fill") && r.status === "DRAFT" && (
+            <Button
+              variant="secondary"
+              leftIcon={<PenLine size={14} />}
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/nueva-entrada/${r.id}`);
+              }}
+            >
+              {t("logbook.list.editEntry")}
+            </Button>
+          )}
+        </div>
+      ),
     },
   ];
 
@@ -1007,7 +1025,18 @@ export function LogbookPage() {
         onClose={() => setPeekRow(null)}
         onOpenFull={(id) => navigate(`/bitacoras/${id}`)}
         onEdit={(id) => navigate(`/nueva-entrada/${id}`)}
+        onViewFlow={(id) => setFlowEntryId(id)}
         canEdit={can("logentry:fill")}
+      />
+
+      {/* Visor ligero del flujo (solo el recorrido, sin ir a la ficha completa) */}
+      <FlowModal
+        entryId={flowEntryId}
+        onClose={() => setFlowEntryId(null)}
+        onOpenFull={(id) => {
+          setFlowEntryId(null);
+          navigate(`/bitacoras/${id}`);
+        }}
       />
     </div>
   );
