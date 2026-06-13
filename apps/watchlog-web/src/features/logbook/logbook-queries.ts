@@ -1,12 +1,21 @@
-import { useInfiniteQuery, useMutation, useQuery } from "@tanstack/react-query";
-import type { LogEntryListQuery } from "@lyra/contracts";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type {
+  CreateSavedViewRequest,
+  LogEntryListQuery,
+  SavedViewModule,
+  UpdateSavedViewRequest,
+} from "@lyra/contracts";
 import {
+  createSavedView,
+  deleteSavedView,
   fetchLogbookChanges,
   fetchLogbookFilterTemplates,
   fetchLogbookList,
   fetchLogbookRelated,
   fetchLogbookStats,
   fetchLogbookTimeline,
+  fetchSavedViews,
+  updateSavedView,
   verifyLogbookSignature,
 } from "./logbook-api.js";
 
@@ -17,6 +26,7 @@ export const LOGBOOK_KEYS = {
   changes: (id: string) => ["logbook", "changes", id] as const,
   related: (id: string) => ["logbook", "related", id] as const,
   filterTemplates: ["logbook", "filter-templates"] as const,
+  savedViews: (module: SavedViewModule) => ["saved-views", module] as const,
 };
 
 /** Plantillas con alcance para el filtro de la grilla (no las del admin). */
@@ -67,4 +77,28 @@ export function useLogbookRelated(id: string) {
 /** Verificación on-demand (no se cachea: cada verificación es un acto auditado). */
 export function useVerifySignature(id: string) {
   return useMutation({ mutationFn: (signatureId: string) => verifyLogbookSignature(id, signatureId) });
+}
+
+// --- Vistas guardadas (Fase 2.8.1b) -----------------------------------------
+
+/** Vistas guardadas del usuario para un módulo (preferencia personal). */
+export function useSavedViews(module: SavedViewModule) {
+  return useQuery({
+    queryKey: LOGBOOK_KEYS.savedViews(module),
+    queryFn: () => fetchSavedViews(module).then((r) => r.views),
+    staleTime: 30_000,
+  });
+}
+
+/** Mutaciones de vistas (crear/actualizar/eliminar) con invalidación de la lista. */
+export function useSavedViewMutations(module: SavedViewModule) {
+  const qc = useQueryClient();
+  const invalidate = () => qc.invalidateQueries({ queryKey: LOGBOOK_KEYS.savedViews(module) });
+  const create = useMutation({ mutationFn: (body: CreateSavedViewRequest) => createSavedView(body), onSuccess: invalidate });
+  const update = useMutation({
+    mutationFn: ({ id, body }: { id: string; body: UpdateSavedViewRequest }) => updateSavedView(id, body),
+    onSuccess: invalidate,
+  });
+  const remove = useMutation({ mutationFn: (id: string) => deleteSavedView(id), onSuccess: invalidate });
+  return { create, update, remove };
 }
