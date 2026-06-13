@@ -354,13 +354,38 @@
   color: var(--color-text-muted);
   margin-top: 1px;
 }
-/* Resumen de contenido (2.8.1a): pares "etiqueta: valor" apilados, cada uno truncado. */
+/* Resumen de contenido (2.8.1a): pares "etiqueta: valor" apilados, cada uno truncado.
+   Llena el ANCHO de la celda (sin tope duro) ⇒ al redimensionar la columna, cada línea
+   revela más texto antes del ellipsis. */
 .summaryLine {
   display: flex;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
-  max-width: 360px;
+  max-width: 100%;
+}
+
+/* Celda de COLUMNA DE VALOR por plantilla (2.8.1b): texto largo acotado a 3 líneas con
+   ellipsis, respetando el ancho de la columna ⇒ reflowea al redimensionar (no celdas
+   gigantes). El valor completo va en el tooltip + ficha/peek. */
+.valueCell {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  max-width: 100%;
+  font-weight: 600;
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: var(--color-text-primary);
+  word-break: break-word;
+}
+.valWarn {
+  color: var(--color-warning, #f59e0b);
+}
+.valCrit {
+  color: var(--color-error, #ef4444);
 }
 .summaryItem {
   display: flex;

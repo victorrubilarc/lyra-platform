@@ -8,7 +8,8 @@
       "Bash(kill -0)",
       "Bash(:)",
       "Bash(wait)",
-      "Bash(pnpm --filter @lyra/ui run lint)"
+      "Bash(pnpm --filter @lyra/ui run lint)",
+      "Bash(grep -n \"GitBranch\\\\|import.*from \\\\\"./\\\\|Workflow\" apps/watchlog-web/src/features/logbook/EntryViewerPage.tsx)"
     ]
   }
 }

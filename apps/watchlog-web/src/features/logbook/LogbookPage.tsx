@@ -573,6 +573,7 @@ export function LogbookPage() {
       // Resumen de contenido (2.8.1a): valores de negocio para reconocer el registro.
       key: "summary",
       header: t("logbook.list.summary"),
+      width: 340, // ancho por defecto; redimensionable (el contenido sigue el ancho)
       render: (r) => <SummaryCell row={r} />,
     },
     { key: "state", header: t("logbook.list.state"), render: (r) => <StateChip row={r} /> },
@@ -664,16 +665,18 @@ export function LogbookPage() {
     return {
       key: vf.key,
       header: vf.label,
+      width: 220, // ancho por defecto; el usuario lo redimensiona (el texto reflowea)
       render: (r: LogEntryListItem) => {
         const sv = r.summaryValues.find((x) => x.fieldKey === fieldKey);
         if (!sv) return <span className={styles.cellSub}>—</span>;
-        // Reusa el resaltado de banda del Resumen (las reglas colorean el <strong> interno).
-        const cls =
-          sv.thresholdBand === "CRIT" ? styles.summaryCrit : sv.thresholdBand === "WARN" ? styles.summaryWarn : undefined;
+        const text = formatSummaryValue(sv);
+        // Texto largo (TEXTAREA) acotado a 3 líneas con ellipsis, respetando el ancho de
+        // la columna ⇒ al redimensionar reflowea. Valor completo en el tooltip.
+        const band = sv.thresholdBand === "CRIT" ? styles.valCrit : sv.thresholdBand === "WARN" ? styles.valWarn : "";
         return (
-          <span className={cls}>
-            <strong>{formatSummaryValue(sv)}</strong>
-          </span>
+          <div className={`${styles.valueCell} ${band}`} title={text}>
+            {text}
+          </div>
         );
       },
     };
@@ -840,7 +843,7 @@ export function LogbookPage() {
             placeholder={t("logbook.filters.allNodes")}
           />
         </label>
-        <label className={styles.filterField}>
+        <label className={`${styles.filterField} ${styles.filterFieldWide}`}>
           <span className={styles.filterLabel}>{t("logbook.list.template")}</span>
           <Combobox
             options={templateOptions}
