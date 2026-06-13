@@ -10,18 +10,22 @@
   color: var(--color-text-muted);
 }
 
-/* ── Lienzo del diagrama ── */
+/* ── Lienzo del diagrama (vertical: centrado horizontal, scroll vertical natural) ── */
 .canvasScroll {
-  overflow-x: auto;
-  padding: 4px;
+  display: flex;
+  justify-content: center;
+  overflow: auto;
+  max-height: 56vh;
+  padding: 8px;
   border-radius: var(--radius-lg);
   background:
-    radial-gradient(120% 120% at 0% 0%, color-mix(in srgb, var(--color-accent-primary) 6%, transparent), transparent 60%),
+    radial-gradient(120% 80% at 50% 0%, color-mix(in srgb, var(--color-accent-primary) 7%, transparent), transparent 60%),
     var(--color-bg-surface-2);
   border: 1px solid var(--color-border-subtle);
 }
 .canvas {
   position: relative;
+  flex-shrink: 0;
 }
 .edges {
   position: absolute;

@@ -5,11 +5,11 @@ import type { LogEntryDetail, WorkflowStateDto } from "@lyra/contracts";
 import { formatDateTime } from "../../lib/format.js";
 import styles from "./WorkflowDiagram.module.css";
 
-const NODE_W = 172;
-const NODE_H = 62;
-const H_GAP = 76;
-const V_GAP = 26;
-const PAD = 18;
+const NODE_W = 224;
+const NODE_H = 64;
+const ROW_GAP = 46; // separación vertical entre niveles (capas)
+const COL_GAP = 36; // separación horizontal entre ramas del mismo nivel
+const PAD = 20;
 
 interface NodePos {
   state: WorkflowStateDto;
@@ -21,11 +21,12 @@ interface Layout {
   nodes: Map<string, NodePos>;
   width: number;
   height: number;
-  colOf: Map<string, number>;
+  rowOf: Map<string, number>;
 }
 
-/** Layout por CAPAS (BFS desde el estado inicial). Coloca cada estado en su columna
- *  = distancia al inicial; dentro de la capa, ordena por `order` y centra vertical. */
+/** Layout VERTICAL por CAPAS (BFS desde el estado inicial). La capa = distancia al
+ *  inicial determina la FILA (de arriba hacia abajo); dentro de la fila, las ramas se
+ *  ordenan por `order` y se centran horizontalmente. Lee como un viaje + scroll natural. */
 function computeLayout(states: WorkflowStateDto[], transitions: { fromStateKey: string; toStateKey: string }[]): Layout {
   const initial = states.find((s) => s.isInitial) ?? states[0];
   const adj = new Map<string, string[]>();
@@ -47,7 +48,7 @@ function computeLayout(states: WorkflowStateDto[], transitions: { fromStateKey: 
       }
     }
   }
-  // Estados no alcanzados desde el inicial: a una columna nueva al final, por `order`.
+  // Estados no alcanzados desde el inicial: a una fila nueva al final, por `order`.
   let maxLayer = 0;
   layer.forEach((l) => (maxLayer = Math.max(maxLayer, l)));
   states
@@ -62,28 +63,33 @@ function computeLayout(states: WorkflowStateDto[], transitions: { fromStateKey: 
     byLayer.get(l)!.push(s);
   });
   byLayer.forEach((arr) => arr.sort((a, b) => a.order - b.order));
-  const cols = [...byLayer.keys()].sort((a, b) => a - b);
-  const colOf = new Map<string, number>();
-  cols.forEach((l, ci) => byLayer.get(l)!.forEach((s) => colOf.set(s.key, ci)));
+  const rows = [...byLayer.keys()].sort((a, b) => a - b);
+  const rowOf = new Map<string, number>();
+  rows.forEach((l, ri) => byLayer.get(l)!.forEach((s) => rowOf.set(s.key, ri)));
 
-  const maxRows = Math.max(1, ...[...byLayer.values()].map((a) => a.length));
-  const height = maxRows * NODE_H + (maxRows - 1) * V_GAP + PAD * 2;
-  const width = cols.length * NODE_W + (cols.length - 1) * H_GAP + PAD * 2;
+  const maxCols = Math.max(1, ...[...byLayer.values()].map((a) => a.length));
+  const contentWidth = maxCols * NODE_W + (maxCols - 1) * COL_GAP + PAD * 2;
+  const height = rows.length * NODE_H + (rows.length - 1) * ROW_GAP + PAD * 2;
+  // Las aristas de retorno/laterales y los self-loops bordean por la derecha: gutter.
+  const hasSideEdge = transitions.some(
+    (t) => t.fromStateKey === t.toStateKey || (rowOf.get(t.toStateKey) ?? 0) <= (rowOf.get(t.fromStateKey) ?? 0),
+  );
+  const width = contentWidth + (hasSideEdge ? 64 : 0);
 
   const nodes = new Map<string, NodePos>();
-  cols.forEach((l, ci) => {
+  rows.forEach((l, ri) => {
     const arr = byLayer.get(l)!;
-    const layerH = arr.length * NODE_H + (arr.length - 1) * V_GAP;
-    const startY = PAD + (height - PAD * 2 - layerH) / 2;
-    arr.forEach((s, ri) => {
+    const layerW = arr.length * NODE_W + (arr.length - 1) * COL_GAP;
+    const startX = PAD + (contentWidth - PAD * 2 - layerW) / 2;
+    arr.forEach((s, ci) => {
       nodes.set(s.key, {
         state: s,
-        x: PAD + ci * (NODE_W + H_GAP),
-        y: startY + ri * (NODE_H + V_GAP),
+        x: startX + ci * (NODE_W + COL_GAP),
+        y: PAD + ri * (NODE_H + ROW_GAP),
       });
     });
   });
-  return { nodes, width, height, colOf };
+  return { nodes, width, height, rowOf };
 }
 
 const FALLBACK_COLOR = "var(--color-accent-primary, #6366f1)";
@@ -129,29 +135,30 @@ export function WorkflowDiagram({ entry }: { entry: LogEntryDetail }) {
   function edgeGeometry(t0: { fromStateKey: string; toStateKey: string }) {
     const a = anchor(t0.fromStateKey);
     const b = anchor(t0.toStateKey);
-    const forward = (layout!.colOf.get(t0.toStateKey) ?? 0) > (layout!.colOf.get(t0.fromStateKey) ?? 0);
+    const forward = (layout!.rowOf.get(t0.toStateKey) ?? 0) > (layout!.rowOf.get(t0.fromStateKey) ?? 0);
     if (t0.fromStateKey === t0.toStateKey) {
-      // Self-loop (raro): pequeño bucle arriba.
-      const x = a.x + NODE_W / 2;
-      const y = a.y;
-      return { path: `M${x - 18},${y} C${x - 30},${y - 40} ${x + 30},${y - 40} ${x + 18},${y}`, mx: x, my: y - 34 };
+      // Self-loop (raro): pequeño bucle a la derecha.
+      const x = a.x + NODE_W;
+      const y = a.y + NODE_H / 2;
+      return { path: `M${x},${y - 14} C${x + 42},${y - 26} ${x + 42},${y + 26} ${x},${y + 14}`, mx: x + 34, my: y };
     }
     if (forward) {
-      const x1 = a.x + NODE_W;
-      const y1 = a.y + NODE_H / 2;
-      const x2 = b.x;
-      const y2 = b.y + NODE_H / 2;
-      const dx = Math.max(28, (x2 - x1) / 2);
-      return { path: `M${x1},${y1} C${x1 + dx},${y1} ${x2 - dx},${y2} ${x2},${y2}`, mx: (x1 + x2) / 2, my: (y1 + y2) / 2 };
+      // Hacia abajo: del borde inferior del origen al borde superior del destino.
+      const x1 = a.x + NODE_W / 2;
+      const y1 = a.y + NODE_H;
+      const x2 = b.x + NODE_W / 2;
+      const y2 = b.y;
+      const my = (y1 + y2) / 2;
+      return { path: `M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`, mx: (x1 + x2) / 2, my };
     }
-    // Retorno/lateral (reabrir, observar): arco por debajo.
-    const x1 = a.x + NODE_W / 2;
-    const y1 = a.y + NODE_H;
-    const x2 = b.x + NODE_W / 2;
-    const y2 = b.y + NODE_H;
-    const dip = 46;
-    const my = Math.max(y1, y2) + dip;
-    return { path: `M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`, mx: (x1 + x2) / 2, my: my - 6 };
+    // Retorno/lateral (reabrir, observar): arco por el LADO DERECHO.
+    const x1 = a.x + NODE_W;
+    const y1 = a.y + NODE_H / 2;
+    const x2 = b.x + NODE_W;
+    const y2 = b.y + NODE_H / 2;
+    const bulge = 48;
+    const mx = Math.max(x1, x2) + bulge;
+    return { path: `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`, mx: mx - 8, my: (y1 + y2) / 2 };
   }
 
   return (
