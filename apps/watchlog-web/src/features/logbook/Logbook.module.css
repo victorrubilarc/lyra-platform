@@ -928,15 +928,21 @@
   /* minmax(0,1fr): la columna de la grilla puede ENCOGER bajo el ancho de la tabla
      (evita el "grid blowout" que empujaba todo de lado al abrir las facetas). */
   grid-template-columns: 260px minmax(0, 1fr);
+  /* La fila se ACOTA a la altura disponible (no crece con el contenido): así tanto el
+     panel de facetas como la grilla scrollean cada uno por su cuenta en pantallas cortas. */
+  grid-template-rows: minmax(0, 1fr);
   gap: var(--space-4);
   align-items: stretch;
 }
 .gridWithFacets > .gridWrap {
   min-width: 0;
+  min-height: 0;
 }
 @media (max-width: 900px) {
   .gridWithFacets {
+    /* En estrecho, las facetas van arriba (con su propio tope de alto) y la grilla debajo. */
     grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, auto) minmax(0, 1fr);
   }
 }
 
@@ -948,9 +954,16 @@
   background: var(--color-bg-surface-1);
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-lg);
-  /* Ocupa el alto de la grilla y scrollea internamente si hay muchas facetas. */
-  max-height: 100%;
+  /* min-height:0 permite encoger el item del grid bajo su contenido; con la fila
+     acotada a 1fr, el panel scrollea internamente cuando hay muchas facetas. */
+  min-height: 0;
   overflow-y: auto;
+}
+@media (max-width: 900px) {
+  /* En estrecho, el panel no debe robarse toda la pantalla: tope propio + scroll. */
+  .facets {
+    max-height: 40vh;
+  }
 }
 .facetsHeader {
   display: flex;
