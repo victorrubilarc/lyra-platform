@@ -118,16 +118,18 @@ versión controlada por un *hint* de visualización). Validación: cap **6** + s
 `LogEntryListItem.summaryValues[]` (`{fieldKey,label,dataType,value,unit?,optionLabel?,thresholdBand}`) + `equipmentTag`;
 `LogbookQueryService.buildSummaries` los arma **BATCHED por página** (cero N+1): valores acotados a candidatos + meta de campo
 CONGELADA por versión + resolución code→label (inline + `referenceList`). Valor ESTRUCTURADO → el cliente formatea con
-`lib/format` (regional). **(3)** Default = **línea "Resumen"** compuesta (primeros 3, funciona en lista heterogénea); columnas
-individuales = 2.8.1b. **(4)** **Columna Equipo** `TAG · Nombre` (EAM). **(5)** **Búsqueda por contenido**: `q` extendido con
-`EXISTS` sobre `LogEntryValue` de los candidatos (`string_contains`), en OR con folio/plantilla/nodo, DENTRO del AND con ABAC;
-índice **GIN trigram** (`pg_trgm`) sobre `(value::text)`. **(6)** ABAC: valores batch-cargados solo para los `pageIds` ya
-filtrados ⇒ cero fuga. UI: checklist "Resumen en la grilla" en `TemplateBuilder` (Configuración) vía `editStateToConfigRequest`;
-columnas Equipo + Resumen en `LogbookPage` (banda de umbral resaltada). Migración aditiva `20260612190000_add_grid_field_keys`.
-**Sin permisos nuevos — catálogo 59.** Tests: contracts **154** (+3) · API **216**. **Smoke en vivo 21/21**
-(`scripts/smoke-grid-content.py`: PATCH+cap+órfano, summaryValues label/unidad/banda/code→label, equipmentTag, búsqueda
-hit/miss, 3 usuarios demo listan 200; crea+limpia por ID). Limitación MVP: la búsqueda matchea el code del SELECT, no su label
-(deuda). **Pendiente: smoke VISUAL.** Siguiente: **2.8.1b** (SavedView + gestor de columnas + multi-sort).
+`lib/format` (regional). **(3)** Default = **línea "Resumen"** con TODOS los candidatos con valor (pool ≤6; lista
+heterogénea); elección por usuario = 2.8.1b. **(4)** **Columna Equipo** `TAG · Nombre` (EAM). **(5)** **Búsqueda por
+contenido CASE-INSENSITIVE**: `q` extendido con `$queryRaw` `ILIKE` sobre `value::text` de los candidatos (índice **GIN
+trigram** `pg_trgm`), resuelto a ids e intersectado con el AND/ABAC del `where`. **(6)** ABAC: valores batch-cargados solo
+para los `pageIds` ya filtrados ⇒ cero fuga. UI: checklist "Resumen en la grilla" en `TemplateBuilder` (Configuración) vía
+`editStateToConfigRequest`; columnas Equipo + Resumen en `LogbookPage` (banda de umbral resaltada). Migración aditiva
+`20260612190000_add_grid_field_keys`. **Sin permisos nuevos — catálogo 59.** Tests: contracts **154** (+3) · API **216**.
+**Smoke en vivo 22/22** (`scripts/smoke-grid-content.py`: PATCH+cap+órfano, summaryValues label/unidad/banda/code→label,
+equipmentTag, búsqueda hit/miss/case-insensitive, 3 usuarios demo listan 200; crea+limpia por ID). **+ Afinamiento QA del
+dueño (2026-06-13):** mostrar todos los candidatos (no 3) + búsqueda case-insensitive (ILIKE crudo, reemplaza el
+`string_contains` sensible a mayúsculas). Limitación MVP: la búsqueda matchea el code del SELECT, no su label (deuda).
+**Pendiente: re-confirmación VISUAL del dueño tras los 2 ajustes.** Siguiente: **2.8.1b** (SavedView + gestor de columnas + multi-sort).
 
 ## Hecho en Fase 2.7.2 (Ventana de edición configurable — gobernanza temporal #6)
 

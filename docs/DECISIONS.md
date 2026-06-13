@@ -38,8 +38,16 @@ al contenido. Entrega: campos candidatos de resumen marcados en la plantilla + *
    `summaryValues: { fieldKey, label, dataType, value, unit?, optionLabel?, thresholdBand }[]` en `LogEntryListItem`.
 6. **Columna Equipo + ABAC** (criterio): `Equipment.tag` (único) + `name` ⇒ display **`TAG · Nombre`** (Maximo asset
    num + descripción); orden EAM **Folio · Plantilla · Nodo · Equipo · Resumen · Estado · …**. Los valores se
-   batch-cargan SOLO para los `pageIds` ya filtrados por node+template ABAC en `buildWhere`; el `EXISTS` de búsqueda
+   batch-cargan SOLO para los `pageIds` ya filtrados por node+template ABAC en `buildWhere`; la búsqueda por contenido
    vive DENTRO del mismo `where` ⇒ cero fuga de contenido fuera de alcance (confirmado por smoke).
+
+**Afinamiento QA del dueño (smoke visual, 2026-06-13) — 2 ajustes:** (a) **mostrar TODOS los candidatos con valor**, no
+los primeros 3. El dueño marcó 6 campos y solo veía 3 (el `slice(0,3)` del default) ⇒ "no se reflejan". Como el pool ya
+está acotado a 6, la línea Resumen muestra todos los marcados que tengan valor (la elección/orden por usuario sigue para
+2.8.1b). (b) **búsqueda por contenido CASE-INSENSITIVE**: el `string_contains` de Prisma sobre JSON era sensible a
+mayúsculas (`"Conforme"` no encontraba el code `conforme`). Reemplazado por un `$queryRaw` con **`ILIKE` sobre `value::text`**
+(usa el índice GIN trigram), resuelto a un set de ids que se intersecta con el ABAC del `where` externo. Persiste la deuda
+de buscar por **label** del SELECT (hoy matchea el code: `"No conforme"` no encuentra `no_conforme`).
 
 ---
 

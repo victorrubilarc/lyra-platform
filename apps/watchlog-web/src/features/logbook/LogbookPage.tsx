@@ -92,13 +92,13 @@ function formatSummaryValue(sv: LogEntrySummaryValue): string {
 }
 
 /**
- * Celda "Resumen" (2.8.1a): línea compuesta con los primeros valores de negocio que
- * la plantilla marcó como candidatos (`showInGrid`). Hace reconocible el registro sin
- * abrirlo. Default N=3 (el usuario podrá elegir/ordenar en 2.8.1b). Resalta la banda
- * de umbral ISA-18.2 (WARN ámbar / CRIT rojo).
+ * Celda "Resumen" (2.8.1a): línea compuesta con los valores de negocio que la plantilla
+ * marcó como candidatos (`gridFieldKeys`, pool acotado a 6). Hace reconocible el registro
+ * sin abrirlo. Se muestran TODOS los candidatos con valor (el diseñador marca el pool; la
+ * elección/orden por usuario llega en 2.8.1b). Resalta la banda ISA-18.2 (WARN/CRIT).
  */
 function SummaryCell({ row }: { row: LogEntryListItem }) {
-  const values = row.summaryValues.slice(0, 3);
+  const values = row.summaryValues;
   if (values.length === 0) return <span className={styles.cellSub}>—</span>;
   return (
     <div className={styles.summaryLine}>

@@ -157,6 +157,8 @@ def main():
         # === Búsqueda por contenido ===========================================
         s, items = find_row(atok, tpl_id, q=UNIQ)
         check("búsqueda por contenido (q=token de obs) ENCUENTRA la entrada", any(it["id"] == entry_id for it in items), f"{s} n={len(items)}")
+        s, items = find_row(atok, tpl_id, q=UNIQ.lower())
+        check("búsqueda por contenido es CASE-INSENSITIVE (q en minúsculas)", any(it["id"] == entry_id for it in items), f"{s} n={len(items)}")
         s, items = find_row(atok, tpl_id, q="op_normal")
         check("búsqueda por contenido (q=code del select) ENCUENTRA la entrada", any(it["id"] == entry_id for it in items), f"{s} n={len(items)}")
         s, items = find_row(atok, tpl_id, q="NADAQUECOINCIDA999")
