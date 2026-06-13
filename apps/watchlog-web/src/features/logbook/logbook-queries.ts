@@ -9,6 +9,7 @@ import {
   createSavedView,
   deleteSavedView,
   fetchLogbookChanges,
+  fetchLogbookFacets,
   fetchLogbookFilterTemplates,
   fetchLogbookList,
   fetchLogbookRelated,
@@ -22,6 +23,7 @@ import {
 export const LOGBOOK_KEYS = {
   list: (query: LogEntryListQuery) => ["logbook", "list", query] as const,
   stats: (query: LogEntryListQuery) => ["logbook", "stats", query] as const,
+  facets: (query: LogEntryListQuery) => ["logbook", "facets", query] as const,
   timeline: (id: string) => ["logbook", "timeline", id] as const,
   changes: (id: string) => ["logbook", "changes", id] as const,
   related: (id: string) => ["logbook", "related", id] as const,
@@ -50,6 +52,11 @@ export function useLogbookList(query: LogEntryListQuery) {
 
 export function useLogbookStats(query: LogEntryListQuery) {
   return useQuery({ queryKey: LOGBOOK_KEYS.stats(query), queryFn: () => fetchLogbookStats(query) });
+}
+
+/** Facetas con conteo del set filtrado (estilo Splunk/Kibana). */
+export function useLogbookFacets(query: LogEntryListQuery, enabled: boolean) {
+  return useQuery({ queryKey: LOGBOOK_KEYS.facets(query), queryFn: () => fetchLogbookFacets(query), enabled, staleTime: 15_000 });
 }
 
 export function useLogbookTimeline(id: string) {

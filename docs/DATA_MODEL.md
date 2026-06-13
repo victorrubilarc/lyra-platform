@@ -348,6 +348,12 @@
 - **Multi-sort** *(implementado, sin cambio de esquema)* — el listado acepta `sorts` (CSV `campo:dir`, máx 3 claves **indexadas**:
   `recordedAt`/`effectiveAt`/`entryNumber`; precedencia sobre `sort`/`dir` legacy). El cursor keyset se generalizó a **tupla
   lexicográfica** `(c1,c2,…,id)` para no perder filas en empates. Orden por columnas de VALOR a escala = Fase 7 (rompería keyset).
+- **Facetas / peek / "Mi turno" (Fase 2.8.1c, SOLO LECTURA, sin cambio de esquema)** — `GET /log-entries/facets` agrega por
+  dimensión (status/estado/plantilla/equipo/banda) con `GROUP BY`/`count` reusando el `buildWhere`+ABAC del listado, con
+  **conteos de HERMANOS** (cada faceta excluye su propio criterio). `GET /log-entries/my-shift` resuelve `{createdById,
+  operationalDate, shiftCode}` vía `ShiftResolver` (calendario por defecto). `exceptionsOnly` en la query = OR de umbral
+  WARN/CRIT y firma pendiente. El **peek** se sirve con los datos que la fila ya trae (`LogEntryListItem`), sin endpoint nuevo.
+  COUNT exacto hoy; a gran escala → rollups/aproximado (Fase 7, §3 del BACKLOG).
 
 ### Orígenes de datos
 - **DataSource** — URL base, tipo de auth, **credencial cifrada en reposo**. *1—N* **DataSourceEndpoint** (path, método, mapeo JSONPath, TTL). Caché en Redis. **Espejo ENTRANTE:** en Fase 3 un endpoint puede **alimentar/materializar** una `ReferenceList` (`source=EXTERNAL`).

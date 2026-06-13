@@ -8,6 +8,8 @@ import { sortKeysFromParam, sortKeysToParam, type LogEntryListQuery, type LogEnt
 export interface LogbookGridState {
   q: string;
   templateId: string;
+  /** Equipo (objeto de referencia EAM). Vacío = todos. Se filtra desde la faceta. */
+  equipmentId: string;
   /** Multi-nodo (2.8.1b-UX): varios nodos a la vez. Vacío = toda la estructura. */
   orgNodeIds: string[];
   includeDescendants: boolean;
@@ -23,6 +25,8 @@ export interface LogbookGridState {
   recordedToDay: string;
   onlyMine: boolean;
   pendingSignature: boolean;
+  /** Review-by-exception (2.8.1c): solo lo accionable (umbral WARN/CRIT OR firma pendiente). */
+  exceptionsOnly: boolean;
   thresholdBand: "" | "WARN" | "CRIT" | "ANY";
   /** Origen del registro (2.7.0): "" = todos. */
   entryOrigin: "" | "ONLINE" | "DEFERRED";
@@ -37,6 +41,7 @@ export const DEFAULT_SORTS: LogEntrySortKey[] = [{ field: "recordedAt", dir: "de
 export const DEFAULT_GRID_STATE: LogbookGridState = {
   q: "",
   templateId: "",
+  equipmentId: "",
   orgNodeIds: [],
   includeDescendants: true,
   status: "",
@@ -50,6 +55,7 @@ export const DEFAULT_GRID_STATE: LogbookGridState = {
   recordedToDay: "",
   onlyMine: false,
   pendingSignature: false,
+  exceptionsOnly: false,
   thresholdBand: "",
   entryOrigin: "",
   sorts: DEFAULT_SORTS,
@@ -69,6 +75,7 @@ export function toListQuery(state: LogbookGridState, currentUserId: string | nul
   return {
     q: state.q.trim() || undefined,
     templateId: state.templateId || undefined,
+    equipmentId: state.equipmentId || undefined,
     orgNodeIds: state.orgNodeIds.length ? state.orgNodeIds : undefined,
     includeDescendants: state.orgNodeIds.length ? state.includeDescendants : undefined,
     status: state.status || undefined,
@@ -82,6 +89,7 @@ export function toListQuery(state: LogbookGridState, currentUserId: string | nul
     recordedTo: state.recordedToDay ? dayEnd(state.recordedToDay) : undefined,
     createdById: state.onlyMine && currentUserId ? currentUserId : undefined,
     pendingSignature: state.pendingSignature || undefined,
+    exceptionsOnly: state.exceptionsOnly || undefined,
     thresholdBand: state.thresholdBand || undefined,
     entryOrigin: state.entryOrigin || undefined,
     sorts: state.sorts.length ? state.sorts : DEFAULT_SORTS,
@@ -120,6 +128,7 @@ export function gridStateFromParams(params: URLSearchParams): LogbookGridState {
   for (const key of [
     "q",
     "templateId",
+    "equipmentId",
     "stateKey",
     "shiftCode",
     "periodKey",
@@ -132,7 +141,7 @@ export function gridStateFromParams(params: URLSearchParams): LogbookGridState {
     const raw = params.get(key);
     if (raw !== null) state[key] = raw;
   }
-  for (const key of ["includeDescendants", "onlyMine", "pendingSignature"] as const) {
+  for (const key of ["includeDescendants", "onlyMine", "pendingSignature", "exceptionsOnly"] as const) {
     const raw = params.get(key);
     if (raw !== null) state[key] = raw === "true";
   }

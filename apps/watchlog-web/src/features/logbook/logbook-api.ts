@@ -1,8 +1,10 @@
 import {
   logEntryChangesResponseSchema,
+  logEntryFacetsSchema,
   logEntryListResponseSchema,
   logEntryStatsSchema,
   logEntryTimelineResponseSchema,
+  myShiftFilterSchema,
   relatedLogEntriesSchema,
   savedViewListResponseSchema,
   savedViewSchema,
@@ -12,8 +14,10 @@ import {
   type LogEntryChangesResponse,
   type LogEntryListQuery,
   type LogEntryListResponse,
+  type LogEntryFacets,
   type LogEntryStats,
   type LogEntryTimelineResponse,
+  type MyShiftFilter,
   type RelatedLogEntries,
   type SavedViewDto,
   type SavedViewListResponse,
@@ -59,6 +63,17 @@ export function fetchLogbookList(query: LogEntryListQuery): Promise<LogEntryList
 export function fetchLogbookStats(query: LogEntryListQuery): Promise<LogEntryStats> {
   const qs = listQueryString(query);
   return apiJson(`/log-entries/stats${qs ? `?${qs}` : ""}`, logEntryStatsSchema);
+}
+
+/** Facetas con conteo del set filtrado (mismo where+ABAC; conteos de hermanos). */
+export function fetchLogbookFacets(query: LogEntryListQuery): Promise<LogEntryFacets> {
+  const qs = listQueryString(query);
+  return apiJson(`/log-entries/facets${qs ? `?${qs}` : ""}`, logEntryFacetsSchema);
+}
+
+/** Filtros resueltos de "Mi turno" (turno/día vigentes + autor), resueltos por backend. */
+export function fetchMyShiftFilter(): Promise<MyShiftFilter> {
+  return apiJson(`/log-entries/my-shift`, myShiftFilterSchema);
 }
 
 /** Export CSV server-side del set COMPLETO filtrado (no solo la página). */
