@@ -76,7 +76,7 @@ export { LookupPicker } from "./components/LookupPicker/LookupPicker.js";
 export type { LookupPickerProps, LookupOption } from "./components/LookupPicker/LookupPicker.js";
 
 export { Table } from "./components/Table/Table.js";
-export type { TableProps, TableColumn, TableSort } from "./components/Table/Table.js";
+export type { TableProps, TableColumn, TableSort, TableColumnState } from "./components/Table/Table.js";
 
 export { ResizableSplit } from "./components/ResizableSplit/ResizableSplit.js";
 export type { ResizableSplitProps } from "./components/ResizableSplit/ResizableSplit.js";
