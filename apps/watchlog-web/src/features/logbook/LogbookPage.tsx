@@ -706,7 +706,7 @@ export function LogbookPage() {
   if (state.entryOrigin) activeChips.push({ key: "origin", label: t(`logbook.origin.${state.entryOrigin}`), clear: () => patch({ entryOrigin: "" }) });
 
   return (
-    <div className={styles.page}>
+    <div className={styles.page} data-fill-height>
       <div className={styles.header}>
         <div>
           <h1 className={styles.title}>
@@ -739,8 +739,13 @@ export function LogbookPage() {
           <Button variant="secondary" leftIcon={<Columns3 size={16} />} onClick={() => setColumnsOpen(true)}>
             {t("logbook.columns.button")}
           </Button>
-          <Button variant="secondary" leftIcon={<RefreshCw size={16} className={refreshing ? styles.spin : undefined} />} onClick={doRefresh}>
-            {t("logbook.list.refresh")}
+          <Button
+            variant="icon"
+            aria-label={t("logbook.list.refresh")}
+            title={t("logbook.list.refresh")}
+            onClick={doRefresh}
+          >
+            <RefreshCw size={16} className={refreshing ? styles.spin : undefined} />
           </Button>
           <Button variant="primary" leftIcon={<Download size={16} />} loading={exporting} onClick={doExport}>
             {t("common.export")}
@@ -950,13 +955,14 @@ export function LogbookPage() {
         </div>
       )}
 
-      <div className={facetsOpen ? styles.gridWithFacets : undefined}>
+      <div className={facetsOpen ? `${styles.gridShell} ${styles.gridWithFacets}` : styles.gridShell}>
         {facetsOpen && (
           <FacetsPanel facets={facets.data} loading={facets.isLoading} state={state} onToggle={toggleFacet} />
         )}
         <div className={styles.gridWrap}>
           {paginationBar}
           <Table
+            className={styles.tableScroll}
             columns={allColumns}
             data={visibleRows}
             rowKey={(r) => r.id}

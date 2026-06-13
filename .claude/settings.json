@@ -4,7 +4,11 @@
       "Bash(pnpm --filter @lyra/watchlog-web run lint)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"http://localhost:3000/api/log-entries/facets\")",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"http://localhost:3000/api/log-entries/my-shift\")",
-      "Bash(python scripts/smoke-facets-peek.py)"
+      "Bash(python scripts/smoke-facets-peek.py)",
+      "Bash(kill -0)",
+      "Bash(:)",
+      "Bash(wait)",
+      "Bash(pnpm --filter @lyra/ui run lint)"
     ]
   }
 }
