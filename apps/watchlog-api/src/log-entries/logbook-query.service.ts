@@ -8,6 +8,7 @@ import type {
   LogEntryListResponse,
   LogEntrySortField,
   LogEntryStats,
+  LogEntrySummaryValue,
   LogEntryTimelineEvent,
   LogEntryTimelineResponse,
   RelatedLogEntries,
@@ -16,7 +17,7 @@ import type {
   ThresholdBand,
   TimelineQuery,
 } from "@lyra/contracts";
-import { canonicalSignaturePayload, formatEntryFolio } from "@lyra/contracts";
+import { canonicalSignaturePayload, formatEntryFolio, upgradeFieldConfig } from "@lyra/contracts";
 import { Prisma } from "@prisma/client";
 import { AuditService, type AuditContext } from "../audit/audit.service";
 import { ScopeService } from "../authz/scope.service";
@@ -27,10 +28,10 @@ import { LogEntriesService } from "./log-entries.service";
 
 /** Relaciones mínimas para pintar una fila del listado (payload LIGERO: sin valores). */
 const listInclude = {
-  template: { select: { name: true } },
+  template: { select: { name: true, gridFieldKeys: true } },
   templateVersion: { select: { versionNumber: true } },
   orgNode: { select: { name: true } },
-  equipment: { select: { name: true } },
+  equipment: { select: { name: true, tag: true } },
 } satisfies Prisma.LogEntryInclude;
 
 type ListRow = Prisma.LogEntryGetPayload<{ include: typeof listInclude }>;
@@ -592,6 +593,18 @@ export class LogbookQueryService {
         { template: { name: { contains: query.q, mode: "insensitive" } } },
         { orgNode: { name: { contains: query.q, mode: "insensitive" } } },
       ];
+      // Búsqueda por CONTENIDO (2.8.1a): valores de los campos candidatos `showInGrid`
+      // que contengan el texto — "lo que ves es lo que buscas". Acotada a la unión de
+      // los `gridFieldKeys` de TODAS las plantillas (un set chico) y combinada en OR
+      // con folio/plantilla/nodo, todo DENTRO del AND con el ABAC ⇒ no fuga de alcance.
+      // Limitación MVP: matchea el valor ALMACENADO (texto/code); para SELECT de lista
+      // el code no coincide con el label (búsqueda por label = deuda, ver BACKLOG).
+      const candidateKeys = await this.allGridFieldKeys();
+      if (candidateKeys.length > 0) {
+        or.push({
+          values: { some: { fieldKey: { in: candidateKeys }, value: { string_contains: query.q } } },
+        });
+      }
       // "BIT-000123", "000123" o "123" ⇒ además busca por folio exacto.
       const folio = /^(?:[A-Za-z]+-)?0*(\d+)$/.exec(query.q);
       if (folio?.[1]) {
@@ -704,6 +717,10 @@ export class LogbookQueryService {
       }
     }
 
+    // Valores de RESUMEN de negocio (2.8.1a): campos candidatos `showInGrid` de cada
+    // plantilla, con su meta CONGELADA. Todo batched (sin N+1); ver buildSummaries.
+    const summariesById = await this.buildSummaries(rows);
+
     return rows.map((row) => {
       const state =
         row.workflowDefinitionVersionId && row.currentStateKey
@@ -715,11 +732,146 @@ export class LogbookQueryService {
         orgNodeName: row.orgNode.name,
         orgNodePath: paths.get(row.orgNodeId) ?? null,
         equipmentName: row.equipment?.name ?? null,
+        equipmentTag: row.equipment?.tag ?? null,
         createdByName: row.createdById ? (names.get(row.createdById) ?? null) : null,
         currentStateName: state?.name ?? null,
         currentStateColor: state?.color ?? null,
         indicators: indicatorsById.get(row.id) ?? blank(),
+        summaryValues: summariesById.get(row.id) ?? [],
       };
     });
   }
+
+  /** Unión de los `gridFieldKeys` de TODAS las plantillas (set chico, para la
+   * búsqueda por contenido). Una sola query; vacío = ninguna plantilla configuró resumen. */
+  private async allGridFieldKeys(): Promise<string[]> {
+    const rows = await this.prisma.template.findMany({
+      where: { deletedAt: null, NOT: { gridFieldKeys: { isEmpty: true } } },
+      select: { gridFieldKeys: true },
+    });
+    return [...new Set(rows.flatMap((r) => r.gridFieldKeys))];
+  }
+
+  /**
+   * Construye los valores de RESUMEN por entrada (2.8.1a), batched (cero N+1):
+   *  1) `gridFieldKeys` de las plantillas distintas de la página;
+   *  2) `LogEntryValue` de esas entradas acotado a la unión de campos candidatos;
+   *  3) meta CONGELADA del campo (label/dataType/config) por versión de plantilla;
+   *  4) resolución batched de code→label para SELECT (inline desde la config; de
+   *     `referenceList` desde `ReferenceItem`).
+   * El valor viaja ESTRUCTURADO (no pre-formateado): el cliente aplica el formato
+   * regional (números/fechas) con lib/format. Orden = el de `gridFieldKeys`; se
+   * omiten los campos sin valor (el Resumen muestra solo lo lleno).
+   */
+  private async buildSummaries(rows: ListRow[]): Promise<Map<string, LogEntrySummaryValue[]>> {
+    const result = new Map<string, LogEntrySummaryValue[]>();
+    // gridFieldKeys por plantilla (de la fila, ya incluida en listInclude).
+    const keysByTemplate = new Map<string, string[]>();
+    for (const r of rows) keysByTemplate.set(r.templateId, r.template.gridFieldKeys ?? []);
+    const allKeys = [...new Set([...keysByTemplate.values()].flat())].filter((k) => k);
+    if (allKeys.length === 0) return result;
+
+    const ids = rows.map((r) => r.id);
+    const versionIds = [...new Set(rows.map((r) => r.templateVersionId))];
+
+    const [valueRows, fieldRows] = await Promise.all([
+      this.prisma.logEntryValue.findMany({
+        where: { logEntryId: { in: ids }, fieldKey: { in: allKeys } },
+        select: { logEntryId: true, fieldKey: true, value: true, dataType: true, thresholdBand: true },
+      }),
+      this.prisma.templateField.findMany({
+        where: { section: { templateVersionId: { in: versionIds } }, key: { in: allKeys } },
+        select: { key: true, type: true, label: true, dataType: true, config: true, section: { select: { templateVersionId: true } } },
+      }),
+    ]);
+
+    // Meta de campo congelada por (versión, key).
+    type FieldMeta = { label: string; unit: string | null; inlineLabels: Map<string, string>; refListKey: string | null };
+    const metaByVersionKey = new Map<string, FieldMeta>();
+    const refListKeys = new Set<string>();
+    for (const f of fieldRows) {
+      const cfg = upgradeFieldConfig(f.type, (f.config ?? {}) as Record<string, unknown>);
+      const unit = typeof cfg.unit === "string" ? cfg.unit : null;
+      const inlineLabels = new Map<string, string>();
+      let refListKey: string | null = null;
+      const src = cfg.optionSource as { kind?: string; items?: Array<{ code: string; label: string }>; listKey?: string } | undefined;
+      if (src?.kind === "inline") for (const it of src.items ?? []) inlineLabels.set(it.code, it.label);
+      else if (src?.kind === "referenceList" && typeof src.listKey === "string") {
+        refListKey = src.listKey;
+        refListKeys.add(src.listKey);
+      }
+      metaByVersionKey.set(`${f.section.templateVersionId}:${f.key}`, { label: f.label, unit, inlineLabels, refListKey });
+    }
+
+    // Resolución de code→label de listas de referencia (solo las usadas), batched.
+    const refLabel = new Map<string, string>(); // `${listKey} ${code}` → label
+    if (refListKeys.size > 0) {
+      // Códigos efectivamente presentes en los valores de campos de tipo referenceList.
+      const refFieldKeys = new Set(
+        fieldRows.filter((f) => metaByVersionKey.get(`${f.section.templateVersionId}:${f.key}`)?.refListKey).map((f) => f.key),
+      );
+      const codes = new Set<string>();
+      for (const v of valueRows) {
+        if (!refFieldKeys.has(v.fieldKey)) continue;
+        for (const c of asCodes(v.value)) codes.add(c);
+      }
+      if (codes.size > 0) {
+        const lists = await this.prisma.referenceList.findMany({
+          where: { key: { in: [...refListKeys] }, deletedAt: null },
+          select: { id: true, key: true },
+        });
+        const listKeyById = new Map(lists.map((l) => [l.id, l.key]));
+        const items = await this.prisma.referenceItem.findMany({
+          where: { listId: { in: lists.map((l) => l.id) }, code: { in: [...codes] } },
+          select: { listId: true, code: true, label: true },
+        });
+        for (const it of items) {
+          const lk = listKeyById.get(it.listId);
+          if (lk) refLabel.set(`${lk} ${it.code}`, it.label);
+        }
+      }
+    }
+
+    // Valor por (entrada, key).
+    const valueByEntryKey = new Map<string, (typeof valueRows)[number]>();
+    for (const v of valueRows) valueByEntryKey.set(`${v.logEntryId}:${v.fieldKey}`, v);
+
+    for (const row of rows) {
+      const keys = keysByTemplate.get(row.templateId) ?? [];
+      if (keys.length === 0) continue;
+      const out: LogEntrySummaryValue[] = [];
+      for (const key of keys) {
+        const v = valueByEntryKey.get(`${row.id}:${key}`);
+        if (!v || v.value === null || v.value === undefined) continue;
+        const meta = metaByVersionKey.get(`${row.templateVersionId}:${key}`);
+        let optionLabel: string | null = null;
+        if (meta) {
+          if (meta.inlineLabels.size > 0) {
+            optionLabel = asCodes(v.value).map((c) => meta.inlineLabels.get(c) ?? c).join(", ") || null;
+          } else if (meta.refListKey) {
+            const lk = meta.refListKey;
+            optionLabel = asCodes(v.value).map((c) => refLabel.get(`${lk} ${c}`) ?? c).join(", ") || null;
+          }
+        }
+        out.push({
+          fieldKey: key,
+          label: meta?.label ?? key,
+          dataType: v.dataType,
+          value: v.value as unknown,
+          unit: meta?.unit ?? null,
+          optionLabel,
+          thresholdBand: v.thresholdBand,
+        });
+      }
+      if (out.length > 0) result.set(row.id, out);
+    }
+    return result;
+  }
+}
+
+/** Normaliza un value de SELECT/MULTISELECT a un arreglo de codes (string). */
+function asCodes(value: unknown): string[] {
+  if (typeof value === "string") return [value];
+  if (Array.isArray(value)) return value.filter((v): v is string => typeof v === "string");
+  return [];
 }

@@ -107,6 +107,28 @@ derecha, filas sin tinte —el check basta—, resumen como panel con cabecera +
 lint(0)/build verdes. **Smoke VISUAL ✅** (dueño). Saneamiento de dato demo: la v5 publicada de «Demo Completa» tenía config
 `{}` (republicación antigua); restaurada desde la v2 (código actual verificado con round-trips, conserva la config).
 
+**+ Fase 2.8.1a — Bitácoras: grilla ORIENTADA A CONTENIDO (MVP) ✅ (2026-06-13, `feat/bitacoras-grilla-contenido` → `main`).**
+La grilla de `/bitacoras` dejó de ser CIEGA AL CONTENIDO: ahora se reconoce/encuentra un registro por su negocio. **6 forks
+resueltos (4 recomendación aceptada + 2 criterio; DECISIONS 2026-06-12).** **(1)** Pool de campos candidatos de resumen como
+**`Template.gridFieldKeys String[]`** — GOBERNANZA VIVA en el contenedor mutable (keyed por `key` estable, espejo de
+`equipmentMode`/`editWindow`), guardado con **"Guardar configuración"** (`PATCH /templates/:id`, sin republicar la versión
+GxP). Corrige el plan que nombró `TemplateField.showInGrid` (poner el flag en la versión inmutable forzaría re-aprobar una
+versión controlada por un *hint* de visualización). Validación: cap **6** + sin duplicados (`gridFieldKeysSchema`) +
+`assertGridFieldKeysExist` (key debe existir en alguna versión; órfano se ignora). Audit before/after. **(2)** El listado expone
+`LogEntryListItem.summaryValues[]` (`{fieldKey,label,dataType,value,unit?,optionLabel?,thresholdBand}`) + `equipmentTag`;
+`LogbookQueryService.buildSummaries` los arma **BATCHED por página** (cero N+1): valores acotados a candidatos + meta de campo
+CONGELADA por versión + resolución code→label (inline + `referenceList`). Valor ESTRUCTURADO → el cliente formatea con
+`lib/format` (regional). **(3)** Default = **línea "Resumen"** compuesta (primeros 3, funciona en lista heterogénea); columnas
+individuales = 2.8.1b. **(4)** **Columna Equipo** `TAG · Nombre` (EAM). **(5)** **Búsqueda por contenido**: `q` extendido con
+`EXISTS` sobre `LogEntryValue` de los candidatos (`string_contains`), en OR con folio/plantilla/nodo, DENTRO del AND con ABAC;
+índice **GIN trigram** (`pg_trgm`) sobre `(value::text)`. **(6)** ABAC: valores batch-cargados solo para los `pageIds` ya
+filtrados ⇒ cero fuga. UI: checklist "Resumen en la grilla" en `TemplateBuilder` (Configuración) vía `editStateToConfigRequest`;
+columnas Equipo + Resumen en `LogbookPage` (banda de umbral resaltada). Migración aditiva `20260612190000_add_grid_field_keys`.
+**Sin permisos nuevos — catálogo 59.** Tests: contracts **154** (+3) · API **216**. **Smoke en vivo 21/21**
+(`scripts/smoke-grid-content.py`: PATCH+cap+órfano, summaryValues label/unidad/banda/code→label, equipmentTag, búsqueda
+hit/miss, 3 usuarios demo listan 200; crea+limpia por ID). Limitación MVP: la búsqueda matchea el code del SELECT, no su label
+(deuda). **Pendiente: smoke VISUAL.** Siguiente: **2.8.1b** (SavedView + gestor de columnas + multi-sort).
+
 ## Hecho en Fase 2.7.2 (Ventana de edición configurable — gobernanza temporal #6)
 
 2.º eslabón de la gobernanza temporal: plazo para CORREGIR un registro; vencido, solo se edita con privilegio explícito

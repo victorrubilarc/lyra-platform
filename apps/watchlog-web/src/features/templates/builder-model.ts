@@ -108,6 +108,9 @@ export interface EditState {
   editWindowMinutes: number | null;
   /** Modo de equipo (2.8.0.2), gobernanza del objeto de referencia EAM. */
   equipmentMode: EquipmentMode;
+  /** Campos de resumen en la grilla de Bitácoras (2.8.1a) — pool ORDENADO de `key`,
+   * gobernanza viva del contenedor. "El diseñador ofrece, el usuario dispone." */
+  gridFieldKeys: string[];
   sections: EditSection[];
 }
 
@@ -160,6 +163,7 @@ export function detailToEditState(detail: TemplateDetail): EditState {
     editWindowAnchor: detail.editWindowAnchor,
     editWindowMinutes: detail.editWindowMinutes,
     equipmentMode: detail.equipmentMode,
+    gridFieldKeys: detail.gridFieldKeys,
     sections: detail.version.sections.map((s) => ({
       uid: nextUid(),
       key: s.key,
@@ -253,6 +257,9 @@ export function editStateToConfigRequest(state: EditState): UpdateTemplateReques
     editWindowAnchor: state.editWindowAnchor,
     editWindowMinutes: state.editWindowMinutes,
     equipmentMode: state.equipmentMode,
+    // Campos de resumen de grilla (2.8.1a): solo keys que aún existen en la versión
+    // (poda de huérfanos al guardar). El backend revalida; el cap (6) lo cuida la UI.
+    gridFieldKeys: state.gridFieldKeys.filter((k) => collectFieldKeys(state).has(k)),
   };
 }
 

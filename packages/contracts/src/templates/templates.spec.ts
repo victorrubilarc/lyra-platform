@@ -6,7 +6,14 @@ import {
   optionsFieldConfigSchema,
   upgradeFieldConfig,
 } from "./field-types.js";
-import { EQUIPMENT_MODES, equipmentModeSchema, draftFieldInputSchema, saveTemplateDraftRequestSchema } from "./templates.js";
+import {
+  EQUIPMENT_MODES,
+  equipmentModeSchema,
+  draftFieldInputSchema,
+  saveTemplateDraftRequestSchema,
+  GRID_FIELD_KEYS_MAX,
+  gridFieldKeysSchema,
+} from "./templates.js";
 
 describe("config de campos por tipo", () => {
   it("acepta un NÚMERO con unidad, rango y bandas de umbral (ISA-18.2)", () => {
@@ -62,6 +69,22 @@ describe("modo de equipo por plantilla (2.8.0.2)", () => {
       sections: [{ key: "s1", title: "A", fields: [{ key: "f1", type: "TEXT", label: "Obs" }] }],
     });
     expect(r.success).toBe(true);
+  });
+});
+
+describe("campos de resumen de grilla (2.8.1a)", () => {
+  it("acepta un pool ordenado dentro del tope", () => {
+    expect(gridFieldKeysSchema.safeParse([]).success).toBe(true);
+    expect(gridFieldKeysSchema.safeParse(["temp", "presion", "estado"]).success).toBe(true);
+  });
+
+  it("rechaza superar el tope de candidatos", () => {
+    const tooMany = Array.from({ length: GRID_FIELD_KEYS_MAX + 1 }, (_, i) => `f${i}`);
+    expect(gridFieldKeysSchema.safeParse(tooMany).success).toBe(false);
+  });
+
+  it("rechaza campos repetidos (el pool es un conjunto)", () => {
+    expect(gridFieldKeysSchema.safeParse(["temp", "temp"]).success).toBe(false);
   });
 });
 

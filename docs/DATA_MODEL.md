@@ -313,6 +313,27 @@
 - **Exposición** — `eligibleNodesForTemplate` devuelve `equipmentMode` (el modal de creación lo refleja: oculta/ofrece/
   sugiere/obliga) y **omite** la consulta de equipos cuando el modo es NONE. Sin permiso nuevo (gate `template:edit`).
 
+### Bitácoras — grilla orientada a contenido (Fase 2.8.1a)
+> Migración aditiva **`20260612190000_add_grid_field_keys`**. Hace la grilla de `/bitacoras` RECONOCIBLE por su contenido
+> (síntesis SAP Fiori smart columns + j5/Maximo + Splunk + EBR; ver DECISIONS 2026-06-12).
+- **`Template.gridFieldKeys`** (`String[] @default([])`) — pool ORDENADO de `key` de campos candidatos a mostrarse como
+  **"Resumen"** en el listado. Vive en el **contenedor MUTABLE** (gobernanza VIVA, sin republicar; espejo de `equipmentMode`/
+  `editWindow*`), guardado con **"Guardar configuración"** vía `PATCH /templates/:id`. Keyed por el `key` **estable** del campo
+  (el mismo que usa `LogEntryValue.fieldKey`), no por la versión inmutable ⇒ se aplica a TODAS las versiones/entradas sin
+  republicar. Validación: cap **6** + sin duplicados (contrato `gridFieldKeysSchema`); cada key debe existir en alguna versión
+  de la plantilla (`assertGridFieldKeysExist`, tolera cross-versión; key órfano se ignora). Auditado before/after en
+  `template.updated`. **"El diseñador ofrece (showInGrid), el usuario dispone"** (la elección por usuario llega en 2.8.1b/SavedView).
+- **Exposición en el listado** — `LogEntryListItem.summaryValues[]` (`{fieldKey,label,dataType,value,unit?,optionLabel?,
+  thresholdBand}`) + `equipmentTag`. `LogbookQueryService.buildSummaries` los arma BATCHED por página (cero N+1): valores de
+  `LogEntryValue` acotados a los candidatos + meta de campo CONGELADA por versión (label/unidad/optionSource) + resolución
+  batched code→label (inline desde la config; `referenceList` desde `ReferenceItem`). El valor viaja ESTRUCTURADO; el cliente
+  formatea números/fechas con la config regional (`lib/format`). La línea Resumen muestra los primeros 3 (default; ordenable
+  por usuario en 2.8.1b). MISMO `where`/ABAC del listado ⇒ no expone contenido fuera de alcance.
+- **Búsqueda por contenido** — `q` extendido con un `EXISTS` sobre `LogEntryValue` de los candidatos (`string_contains`),
+  combinado en OR con folio/plantilla/nodo, DENTRO del AND con ABAC. Índice **GIN trigram** (`pg_trgm`) sobre `(value::text)`
+  en `LogEntryValue` para que el match no degrade a seq-scan. Limitación MVP: matchea el valor ALMACENADO (texto/number/**code**);
+  para SELECT de lista el `code` no coincide con el label (búsqueda por label = deuda, BACKLOG). Sin permisos nuevos (catálogo 59).
+
 ### Orígenes de datos
 - **DataSource** — URL base, tipo de auth, **credencial cifrada en reposo**. *1—N* **DataSourceEndpoint** (path, método, mapeo JSONPath, TTL). Caché en Redis. **Espejo ENTRANTE:** en Fase 3 un endpoint puede **alimentar/materializar** una `ReferenceList` (`source=EXTERNAL`).
 

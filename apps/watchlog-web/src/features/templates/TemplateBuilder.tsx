@@ -17,7 +17,8 @@ import {
   SlidersHorizontal,
   Trash2,
 } from "lucide-react";
-import { Button, Card, Chip, FormField, Input, Modal, Select, Textarea, useToast } from "@lyra/ui";
+import { Button, Card, Checkbox, Chip, FormField, Input, Modal, Select, Textarea, useToast } from "@lyra/ui";
+import { GRID_FIELD_KEYS_MAX } from "@lyra/contracts";
 import type { EquipmentMode, FieldType, TemplateDetail } from "@lyra/contracts";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { EditWindowDurationField } from "../settings/EditWindowDurationField.js";
@@ -610,6 +611,10 @@ function ConfigView({
               )}
             </FormField>
           </Card>
+
+          {/* Resumen en la grilla de Bitácoras (2.8.1a): pool de campos candidatos
+              que el USUARIO podrá elegir para la línea "Resumen". Gobernanza viva. */}
+          <GridSummaryFields state={state} canEdit={canEdit} patchConfig={patchConfig} />
         </div>
       ) : (
         /* Alcance y acceso (nodos de la estructura) */
@@ -632,5 +637,73 @@ function ConfigView({
         </Card>
       )}
     </div>
+  );
+}
+
+// ── Campos de resumen en la grilla (2.8.1a) ───────────────────────────────────
+// "El diseñador ofrece, el usuario dispone": aquí la plantilla marca el POOL de
+// campos candidatos (gobernanza viva del contenedor, se guarda con "Guardar
+// configuración"). En 2.8.1b el usuario elegirá cuáles ver y en qué orden.
+function GridSummaryFields({
+  state,
+  canEdit,
+  patchConfig,
+}: {
+  state: EditState;
+  canEdit: boolean;
+  patchConfig: (next: EditState) => void;
+}) {
+  const { t } = useTranslation();
+  // Campos elegibles: todos menos los de firma (no tienen un valor legible de negocio).
+  const candidates = state.sections.flatMap((s) =>
+    s.fields.filter((f) => f.type !== "SIGNATURE").map((f) => ({ key: f.key, label: f.label, section: s.title })),
+  );
+  const selected = state.gridFieldKeys;
+  const atCap = selected.length >= GRID_FIELD_KEYS_MAX;
+
+  const toggle = (key: string) => {
+    const next = selected.includes(key) ? selected.filter((k) => k !== key) : [...selected, key];
+    patchConfig({ ...state, gridFieldKeys: next });
+  };
+
+  return (
+    <Card className={styles.configGroup}>
+      <div className={styles.configGroupTitle}>{t("templates.builder.gridSummary")}</div>
+      <p className={styles.configLiveHint}>{t("templates.builder.gridSummaryHint")}</p>
+      {candidates.length === 0 ? (
+        <p className={styles.nodeScopeGlobal}>{t("templates.builder.gridSummaryEmpty")}</p>
+      ) : (
+        <>
+          <div className={styles.gridSummaryCount}>
+            {t("templates.builder.gridSummaryCount", { count: selected.length, max: GRID_FIELD_KEYS_MAX })}
+          </div>
+          <ul className={styles.gridSummaryList}>
+            {candidates.map((c) => {
+              const checked = selected.includes(c.key);
+              const blocked = !canEdit || (!checked && atCap);
+              return (
+                <li key={c.key} className={styles.gridSummaryItem}>
+                  <Checkbox
+                    checked={checked}
+                    disabled={blocked}
+                    onChange={() => toggle(c.key)}
+                    aria-label={c.label || c.key}
+                  />
+                  <button
+                    type="button"
+                    className={styles.gridSummaryLabel}
+                    disabled={blocked}
+                    onClick={() => !blocked && toggle(c.key)}
+                  >
+                    <span>{c.label || c.key}</span>
+                    <span className={styles.gridSummarySection}>{c.section}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      )}
+    </Card>
   );
 }

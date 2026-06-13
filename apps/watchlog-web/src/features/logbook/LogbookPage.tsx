@@ -17,7 +17,8 @@ import {
 } from "@lyra/ui";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { useAuth } from "../../auth/use-auth.js";
-import { formatEntryFolio, type LogEntryListItem, type OrgNodeTree } from "@lyra/contracts";
+import { formatEntryFolio, type LogEntryListItem, type LogEntrySummaryValue, type OrgNodeTree } from "@lyra/contracts";
+import { formatDateTime as fmtDateTime, formatLocalDate, formatNumber } from "../../lib/format.js";
 import { ApiError } from "../../lib/api-client.js";
 import { downloadBlob, fileStamp } from "../../lib/download.js";
 import { useOrgTree } from "../structure/structure-queries.js";
@@ -59,6 +60,65 @@ function StateChip({ row }: { row: LogEntryListItem }) {
       <span className={styles.stateDot} />
       {row.currentStateName ?? row.currentStateKey}
     </span>
+  );
+}
+
+/**
+ * Formatea UN valor de resumen según su tipo, con la configuración REGIONAL activa
+ * (lib/format). El backend manda el valor estructurado + meta; aquí se presenta.
+ */
+function formatSummaryValue(sv: LogEntrySummaryValue): string {
+  const v = sv.value;
+  if (v === null || v === undefined) return "—";
+  switch (sv.dataType) {
+    case "NUMBER": {
+      const n = typeof v === "number" ? v : Number(v);
+      const num = Number.isFinite(n) ? formatNumber(n) : String(v);
+      return sv.unit ? `${num} ${sv.unit}` : num;
+    }
+    case "CODE":
+    case "CODE_ARRAY":
+      // El valor guarda el code; el label resuelto (inline / lista) viene en optionLabel.
+      return sv.optionLabel ?? (Array.isArray(v) ? v.join(", ") : String(v));
+    case "BOOLEAN":
+      return v ? "Sí" : "No";
+    case "DATE":
+      return typeof v === "string" ? formatLocalDate(v) : String(v);
+    case "DATETIME":
+      return typeof v === "string" ? fmtDateTime(v) : String(v);
+    default:
+      return String(v);
+  }
+}
+
+/**
+ * Celda "Resumen" (2.8.1a): línea compuesta con los primeros valores de negocio que
+ * la plantilla marcó como candidatos (`showInGrid`). Hace reconocible el registro sin
+ * abrirlo. Default N=3 (el usuario podrá elegir/ordenar en 2.8.1b). Resalta la banda
+ * de umbral ISA-18.2 (WARN ámbar / CRIT rojo).
+ */
+function SummaryCell({ row }: { row: LogEntryListItem }) {
+  const values = row.summaryValues.slice(0, 3);
+  if (values.length === 0) return <span className={styles.cellSub}>—</span>;
+  return (
+    <div className={styles.summaryLine}>
+      {values.map((sv) => (
+        <span
+          key={sv.fieldKey}
+          className={
+            sv.thresholdBand === "CRIT"
+              ? `${styles.summaryItem} ${styles.summaryCrit}`
+              : sv.thresholdBand === "WARN"
+                ? `${styles.summaryItem} ${styles.summaryWarn}`
+                : styles.summaryItem
+          }
+          title={sv.label}
+        >
+          <span className={styles.summaryLabel}>{sv.label}</span>
+          <strong>{formatSummaryValue(sv)}</strong>
+        </span>
+      ))}
+    </div>
   );
 }
 
@@ -207,9 +267,28 @@ export function LogbookPage() {
       render: (r) => (
         <div title={r.orgNodePath ?? undefined}>
           <div className={styles.cellMain}>{r.orgNodeName}</div>
-          {r.equipmentName && <div className={styles.cellSub}>{r.equipmentName}</div>}
         </div>
       ),
+    },
+    {
+      // Equipo (objeto de referencia EAM): tag estable (asset num) + nombre.
+      key: "equipment",
+      header: t("logbook.list.equipment"),
+      render: (r) =>
+        r.equipmentName || r.equipmentTag ? (
+          <div title={r.equipmentName ?? undefined}>
+            {r.equipmentTag && <div className={styles.cellMain}>{r.equipmentTag}</div>}
+            {r.equipmentName && <div className={r.equipmentTag ? styles.cellSub : styles.cellMain}>{r.equipmentName}</div>}
+          </div>
+        ) : (
+          <span className={styles.cellSub}>—</span>
+        ),
+    },
+    {
+      // Resumen de contenido (2.8.1a): valores de negocio para reconocer el registro.
+      key: "summary",
+      header: t("logbook.list.summary"),
+      render: (r) => <SummaryCell row={r} />,
     },
     { key: "state", header: t("logbook.list.state"), render: (r) => <StateChip row={r} /> },
     {
