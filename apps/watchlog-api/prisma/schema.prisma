@@ -66,6 +66,7 @@ model User {
   mfaSecret       MfaSecret?
   passwordHistory PasswordHistory[]
   resetTokens     PasswordResetToken[]
+  savedViews      SavedView[]
 
   @@index([status])
 }
@@ -1371,4 +1372,32 @@ model AuditLog {
   @@index([occurredAt])
   @@index([actorId])
   @@index([entityType, entityId])
+}
+
+// Vista guardada de PLATAFORMA (Fase 2.8.1b). Entidad genérica reusable por
+// cualquier módulo de listado (Bitácoras hoy; Incidencias en Fase 4) vía el
+// discriminador `module`. Es DATO PERSONAL del usuario (no RBAC): la autorización
+// es por OWNERSHIP (userId === actor), no por permiso del catálogo. `config` es
+// JSONB validado por Zod en el contrato (no columnas por atributo: el universo de
+// presentación es abierto y heterogéneo). Las vistas de SISTEMA viven en código,
+// no aquí. Compartir por rol queda DIFERIDO (aditivo: futuros scope/sharedRoleId).
+model SavedView {
+  id        String   @id @default(cuid())
+  // Dueño. Borrado en cascada con el usuario (su preferencia muere con él).
+  userId    String
+  // Discriminador de módulo de listado. Ej. "LOGBOOK". String (no enum) para no
+  // migrar el esquema al sumar módulos; el contrato valida el conjunto vigente.
+  module    String
+  name      String
+  // Snapshot de presentación: {filters, search, sort[], columns{order,hidden,pinned,widths}, density}.
+  config    Json
+  // UNA default por (userId, module): índice único PARCIAL `WHERE isDefault`
+  // (se crea a mano en la migración; Prisma no expresa unicidad parcial).
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, module])
 }

@@ -7,6 +7,7 @@ import type {
   LogEntryListQuery,
   LogEntryListResponse,
   LogEntrySortField,
+  LogEntrySortKey,
   LogEntryStats,
   LogEntrySummaryValue,
   LogEntryTimelineEvent,
@@ -17,7 +18,7 @@ import type {
   ThresholdBand,
   TimelineQuery,
 } from "@lyra/contracts";
-import { canonicalSignaturePayload, formatEntryFolio, upgradeFieldConfig } from "@lyra/contracts";
+import { canonicalSignaturePayload, formatEntryFolio, resolveSortKeys, upgradeFieldConfig } from "@lyra/contracts";
 import { Prisma } from "@prisma/client";
 import { AuditService, type AuditContext } from "../audit/audit.service";
 import { ScopeService } from "../authz/scope.service";
@@ -36,12 +37,22 @@ const listInclude = {
 
 type ListRow = Prisma.LogEntryGetPayload<{ include: typeof listInclude }>;
 
-/** Cursor keyset del listado (opaco para el cliente). */
-interface ListCursor {
+/** Una clave del cursor: campo + dir + valor de la última fila (multi-sort). */
+interface ListCursorKey {
   s: LogEntrySortField;
   d: "asc" | "desc";
   /** Valor del campo de orden de la última fila (ISO para fechas, número para folio). */
   v: string | number;
+}
+
+/**
+ * Cursor keyset del listado (opaco para el cliente). Multi-sort: lleva la TUPLA
+ * ordenada de claves (campo, dir, valor) + id de desempate. El predicado keyset es
+ * lexicográfico sobre toda la tupla, así no se pierden filas en empates (correcto
+ * para 1..3 claves; el desempate por id usa la dir de la clave primaria).
+ */
+interface ListCursor {
+  k: ListCursorKey[];
   id: string;
 }
 
@@ -94,14 +105,13 @@ export class LogbookQueryService {
 
   async list(userId: string, query: LogEntryListQuery): Promise<LogEntryListResponse> {
     const where = await this.buildWhere(userId, query);
-    const sort: LogEntrySortField = query.sort ?? "recordedAt";
-    const dir = query.dir ?? "desc";
+    const sortKeys = resolveSortKeys(query);
     const take = query.take ?? LogbookQueryService.DEFAULT_TAKE;
 
-    const cursorWhere = this.cursorWhere(query.cursor, sort, dir);
+    const cursorWhere = this.cursorWhere(query.cursor, sortKeys);
     const rows = await this.prisma.logEntry.findMany({
       where: cursorWhere ? { AND: [where, cursorWhere] } : where,
-      orderBy: [{ [sort]: dir }, { id: dir }],
+      orderBy: this.orderBy(sortKeys),
       take: take + 1, // +1 para saber si hay página siguiente
       include: listInclude,
     });
@@ -109,10 +119,7 @@ export class LogbookQueryService {
     const page = rows.slice(0, take);
     const items = await this.enrich(page);
     const last = page[page.length - 1];
-    const nextCursor =
-      rows.length > take && last
-        ? encodeCursor({ s: sort, d: dir, v: this.sortValueOf(last, sort), id: last.id } satisfies ListCursor)
-        : null;
+    const nextCursor = rows.length > take && last ? encodeCursor(this.cursorOf(last, sortKeys)) : null;
     return { items, nextCursor };
   }
 
@@ -140,8 +147,7 @@ export class LogbookQueryService {
    */
   async exportCsv(userId: string, query: LogEntryListQuery): Promise<{ csv: string; truncated: boolean }> {
     const where = await this.buildWhere(userId, query);
-    const sort: LogEntrySortField = query.sort ?? "recordedAt";
-    const dir = query.dir ?? "desc";
+    const sortKeys = resolveSortKeys(query);
 
     const items: LogEntryListItem[] = [];
     let truncated = false;
@@ -152,7 +158,7 @@ export class LogbookQueryService {
       const cursorWhere = cursor ? this.keysetWhere(cursor) : null;
       const rows: ListRow[] = await this.prisma.logEntry.findMany({
         where: cursorWhere ? { AND: [where, cursorWhere] } : where,
-        orderBy: [{ [sort]: dir }, { id: dir }],
+        orderBy: this.orderBy(sortKeys),
         take: BATCH,
         include: listInclude,
       });
@@ -165,7 +171,7 @@ export class LogbookQueryService {
       }
       if (rows.length < BATCH) break;
       const last = rows[rows.length - 1]!;
-      cursor = { s: sort, d: dir, v: this.sortValueOf(last, sort), id: last.id };
+      cursor = this.cursorOf(last, sortKeys);
     }
 
     const csv = toCsv(
@@ -629,26 +635,49 @@ export class LogbookQueryService {
   }
 
   /** Decodifica y valida el cursor del listado contra el orden pedido. */
-  private cursorWhere(
-    raw: string | undefined,
-    sort: LogEntrySortField,
-    dir: "asc" | "desc",
-  ): Prisma.LogEntryWhereInput | null {
+  /** `ORDER BY` multi-sort: claves elegidas + desempate por id (dir de la primaria). */
+  private orderBy(keys: LogEntrySortKey[]): Prisma.LogEntryOrderByWithRelationInput[] {
+    const idDir = keys[0]?.dir ?? "desc";
+    return [...keys.map((k) => ({ [k.field]: k.dir }) as Prisma.LogEntryOrderByWithRelationInput), { id: idDir }];
+  }
+
+  /** Cursor (tupla de valores de la última fila) para el orden dado. */
+  private cursorOf(row: ListRow, keys: LogEntrySortKey[]): ListCursor {
+    return { k: keys.map((k) => ({ s: k.field, d: k.dir, v: this.sortValueOf(row, k.field) })), id: row.id };
+  }
+
+  private cursorWhere(raw: string | undefined, keys: LogEntrySortKey[]): Prisma.LogEntryWhereInput | null {
     if (!raw) return null;
     const cursor = decodeCursor<ListCursor>(raw);
-    if (!cursor || cursor.s !== sort || cursor.d !== dir) {
+    if (!cursor || !this.cursorMatchesSort(cursor, keys)) {
       throw new BadRequestException("El cursor no corresponde al orden actual");
     }
     return this.keysetWhere(cursor);
   }
 
-  /** Predicado keyset (valor, id) estrictamente posterior al cursor en el orden dado. */
+  /** El cursor solo es válido si describe EXACTAMENTE el orden activo (mismo keyset). */
+  private cursorMatchesSort(cursor: ListCursor, keys: LogEntrySortKey[]): boolean {
+    if (!Array.isArray(cursor.k) || cursor.k.length !== keys.length) return false;
+    return cursor.k.every((c, i) => c.s === keys[i]!.field && c.d === keys[i]!.dir);
+  }
+
+  /**
+   * Predicado keyset lexicográfico: la fila es estrictamente posterior a la tupla
+   * del cursor en el orden multi-columna. Rama i = igualdad en las claves previas
+   * + comparación estricta en la clave i; última rama = igualdad en todas + id.
+   */
   private keysetWhere(cursor: ListCursor): Prisma.LogEntryWhereInput {
-    const value = cursor.s === "entryNumber" ? Number(cursor.v) : new Date(String(cursor.v));
-    const op = cursor.d === "desc" ? "lt" : "gt";
-    return {
-      OR: [{ [cursor.s]: { [op]: value } }, { [cursor.s]: value, id: { [op]: cursor.id } }],
-    };
+    const eq: Record<string, number | Date> = {};
+    const or: Prisma.LogEntryWhereInput[] = [];
+    for (const key of cursor.k) {
+      const value = key.s === "entryNumber" ? Number(key.v) : new Date(String(key.v));
+      const op = key.d === "desc" ? "lt" : "gt";
+      or.push({ ...eq, [key.s]: { [op]: value } } as Prisma.LogEntryWhereInput);
+      eq[key.s] = value; // las ramas siguientes exigen igualdad en esta clave
+    }
+    const idOp = (cursor.k[0]?.d ?? "desc") === "desc" ? "lt" : "gt";
+    or.push({ ...eq, id: { [idOp]: cursor.id } } as Prisma.LogEntryWhereInput);
+    return { OR: or };
   }
 
   private sortValueOf(row: ListRow, sort: LogEntrySortField): string | number {

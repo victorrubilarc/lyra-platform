@@ -548,10 +548,50 @@ const queryBool = z
   .optional();
 
 /** Campos por los que el backend acepta ordenar (whitelist; todos NOT NULL para
- * que el cursor keyset sea correcto sin ramas de nulos). */
+ * que el cursor keyset sea correcto sin ramas de nulos). Son EXACTAMENTE los que
+ * tienen índice keyset `(col,id)`: ordenar por columnas de VALOR a escala rompería
+ * el keyset (full scan) y se difiere a Fase 7 (columnas denormalizadas/OpenSearch). */
 export const LOG_ENTRY_SORT_FIELDS = ["recordedAt", "effectiveAt", "entryNumber"] as const;
 export const logEntrySortFieldSchema = z.enum(LOG_ENTRY_SORT_FIELDS);
 export type LogEntrySortField = z.infer<typeof logEntrySortFieldSchema>;
+
+/** Una clave de orden (campo indexado + dirección). Base del multi-sort (2.8.1b). */
+export const logEntrySortKeySchema = z.object({
+  field: logEntrySortFieldSchema,
+  dir: z.enum(["asc", "desc"]),
+});
+export type LogEntrySortKey = z.infer<typeof logEntrySortKeySchema>;
+
+/** Serializa el multi-sort a/desde la query CSV `campo:dir,campo:dir` (URL-friendly). */
+export function sortKeysToParam(keys: LogEntrySortKey[]): string {
+  return keys.map((k) => `${k.field}:${k.dir}`).join(",");
+}
+export function sortKeysFromParam(raw: string): LogEntrySortKey[] {
+  const out: LogEntrySortKey[] = [];
+  const seen = new Set<string>();
+  for (const part of raw.split(",")) {
+    const [field, dir] = part.split(":");
+    const f = logEntrySortFieldSchema.safeParse(field);
+    if (!f.success || seen.has(f.data)) continue; // sin duplicados de campo
+    out.push({ field: f.data, dir: dir === "asc" ? "asc" : "desc" });
+    seen.add(f.data);
+  }
+  return out;
+}
+
+/**
+ * Normaliza el orden EFECTIVO de una query a una lista de claves (multi-sort).
+ * Precedencia: `sorts` (multi) → `sort`/`dir` (legacy single) → default. Fuente
+ * única back↔front para que el cursor keyset y el ORDER BY coincidan exactamente.
+ */
+export function resolveSortKeys(query: {
+  sorts?: LogEntrySortKey[];
+  sort?: LogEntrySortField;
+  dir?: "asc" | "desc";
+}): LogEntrySortKey[] {
+  if (query.sorts && query.sorts.length > 0) return query.sorts.slice(0, 3);
+  return [{ field: query.sort ?? "recordedAt", dir: query.dir ?? "desc" }];
+}
 
 /**
  * Query del listado de Bitácoras (Fase 2.6). TODOS los filtros se aplican en
@@ -596,8 +636,20 @@ export const logEntryListQuerySchema = z.object({
   pendingSignature: queryBool,
   /** Excepciones de umbral: CRIT / WARN exactos, o ANY (cualquier banda). */
   thresholdBand: z.enum(["WARN", "CRIT", "ANY"]).optional(),
+  /** Orden legacy single (back-compat con deep-links previos a 2.8.1b). */
   sort: logEntrySortFieldSchema.optional(),
   dir: z.enum(["asc", "desc"]).optional(),
+  /**
+   * Multi-sort (2.8.1b): lista ordenada de claves indexadas, llega como CSV
+   * `campo:dir,campo:dir`. Tiene PRECEDENCIA sobre `sort`/`dir`. Máx 3 claves; el
+   * keyset encadena la tupla completa (lexicográfico) para no perder filas en empates.
+   */
+  sorts: z
+    .preprocess(
+      (v) => (typeof v === "string" ? sortKeysFromParam(v) : v),
+      z.array(logEntrySortKeySchema).max(3),
+    )
+    .optional(),
   /** Cursor keyset opaco devuelto por la página anterior. */
   cursor: z.string().optional(),
   take: z.coerce.number().int().min(1).max(100).optional(),
@@ -605,7 +657,7 @@ export const logEntryListQuerySchema = z.object({
 export type LogEntryListQuery = z.infer<typeof logEntryListQuerySchema>;
 
 /** Filtros del listado que maneja la UI (sin paginación ni orden). */
-export type LogEntryListFilters = Omit<LogEntryListQuery, "cursor" | "take" | "sort" | "dir">;
+export type LogEntryListFilters = Omit<LogEntryListQuery, "cursor" | "take" | "sort" | "dir" | "sorts">;
 
 // === Línea de tiempo / audit trail unificado (Fase 2.6) ======================
 

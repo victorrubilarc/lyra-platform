@@ -20,6 +20,7 @@ import { FiscalCalendarModule } from "./fiscal-calendar/fiscal-calendar.module";
 import { OperationalPeriodModule } from "./operational-periods/operational-periods.module";
 import { SettingsModule } from "./settings/settings.module";
 import { LogEntriesModule } from "./log-entries/log-entries.module";
+import { SavedViewsModule } from "./saved-views/saved-views.module";
 import { SecurityModule } from "./security/security.module";
 
 @Module({
@@ -59,6 +60,7 @@ import { SecurityModule } from "./security/security.module";
     OperationalPeriodModule,
     SettingsModule,
     LogEntriesModule,
+    SavedViewsModule,
     SecurityModule,
     HealthModule,
   ],
