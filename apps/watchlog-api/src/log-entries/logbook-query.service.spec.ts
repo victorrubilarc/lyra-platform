@@ -204,7 +204,15 @@ describe("LogbookQueryService — list", () => {
     const { logbook, prisma } = makeServices();
     await logbook.list("u1", { orgNodeId: "n1", includeDescendants: true });
     const arg = (prisma.logEntry.findMany as ReturnType<typeof vi.fn>).mock.calls[0]![0];
-    expect(arg.where.AND).toContainEqual({ orgNode: { path: { startsWith: "/n1/" } } });
+    // Multi-nodo (2.8.1b-UX): el filtro de rama va como OR de prefijos de ruta.
+    expect(arg.where.AND).toContainEqual({ OR: [{ orgNode: { path: { startsWith: "/n1/" } } }] });
+  });
+
+  it("filtra por VARIOS nodos (orgNodeIds) — IN sin descendientes", async () => {
+    const { logbook, prisma } = makeServices();
+    await logbook.list("u1", { orgNodeIds: ["n1", "n2"] });
+    const arg = (prisma.logEntry.findMany as ReturnType<typeof vi.fn>).mock.calls[0]![0];
+    expect(arg.where.AND).toContainEqual({ orgNodeId: { in: ["n1", "n2"] } });
   });
 
   it("pagina por keyset: take+1 detecta página siguiente y el cursor reanuda", async () => {

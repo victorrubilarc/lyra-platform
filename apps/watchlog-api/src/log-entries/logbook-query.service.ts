@@ -540,16 +540,21 @@ export class LogbookQueryService {
     const accessibleTemplates = await this.scope.getAccessibleTemplateIds(userId);
     if (accessibleTemplates !== null) and.push({ templateId: { in: [...accessibleTemplates] } });
 
-    if (query.orgNodeId) {
+    // Filtro por nodo(s): multi-nodo (orgNodeIds) con precedencia sobre el legacy
+    // orgNodeId. includeDescendants expande la rama de CADA nodo (OR de prefijos de
+    // ruta). El ABAC (getAccessibleNodeIds arriba) se aplica en AND aparte ⇒ filtrar
+    // por un nodo fuera de alcance no amplía lo que el usuario puede ver.
+    const filterNodeIds = query.orgNodeIds?.length ? query.orgNodeIds : query.orgNodeId ? [query.orgNodeId] : [];
+    if (filterNodeIds.length > 0) {
       if (query.includeDescendants) {
-        const node = await this.prisma.orgNode.findFirst({
-          where: { id: query.orgNodeId, deletedAt: null },
+        const nodes = await this.prisma.orgNode.findMany({
+          where: { id: { in: filterNodeIds }, deletedAt: null },
           select: { path: true },
         });
-        if (!node) throw new BadRequestException("El nodo del filtro no existe");
-        and.push({ orgNode: { path: { startsWith: node.path } } });
+        if (nodes.length === 0) throw new BadRequestException("Ningún nodo del filtro existe");
+        and.push({ OR: nodes.map((n) => ({ orgNode: { path: { startsWith: n.path } } })) });
       } else {
-        and.push({ orgNodeId: query.orgNodeId });
+        and.push({ orgNodeId: { in: filterNodeIds } });
       }
     }
 

@@ -562,8 +562,19 @@ export const logEntryListQuerySchema = z.object({
   /** Búsqueda: folio (numérico) o coincidencia parcial en plantilla / nodo. */
   q: z.string().trim().min(1).max(120).optional(),
   templateId: z.string().optional(),
-  /** Nodo de la estructura; con `includeDescendants` filtra toda la rama (path). */
+  /** Nodo de la estructura (1 solo); con `includeDescendants` filtra toda la rama. @deprecated usar orgNodeIds. */
   orgNodeId: z.string().optional(),
+  /**
+   * Filtro MULTI-NODO (2.8.1b-UX): varios nodos a la vez. Llega como CSV en la query
+   * (`a,b,c`) y se normaliza a arreglo. `includeDescendants` aplica a TODOS los nodos
+   * (la rama de cada uno). Tiene precedencia sobre `orgNodeId`. ABAC se aplica aparte.
+   */
+  orgNodeIds: z
+    .preprocess(
+      (v) => (typeof v === "string" ? v.split(",").map((s) => s.trim()).filter(Boolean) : v),
+      z.array(z.string()).max(100),
+    )
+    .optional(),
   includeDescendants: queryBool,
   equipmentId: z.string().optional(),
   status: logEntryStatusSchema.optional(),
