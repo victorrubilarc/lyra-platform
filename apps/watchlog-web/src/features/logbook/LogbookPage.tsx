@@ -52,11 +52,12 @@ import {
   DEFAULT_COLUMN_STATE,
   fromViewConfig,
   loadLastView,
+  LOGBOOK_COLUMNS,
   saveLastView,
   toViewConfig,
   type LogbookDensity,
 } from "./logbook-views.js";
-import { ColumnsDrawer } from "./ColumnsDrawer.js";
+import { ColumnsDrawer, type ManagedColumnView } from "./ColumnsDrawer.js";
 import { ViewBar } from "./ViewBar.js";
 import styles from "./Logbook.module.css";
 
@@ -390,6 +391,36 @@ export function LogbookPage() {
   // Multi-sort para el Table (key = sortField de las columnas indexadas).
   const tableSorts: TableSort[] = state.sorts.map((s) => ({ key: s.field, direction: s.dir }));
 
+  // Columnas de VALOR por plantilla (2.8.1b): solo con UNA plantilla filtrada las claves
+  // son homogéneas ⇒ se ofrecen los campos candidatos como columnas individuales. Con 0 o
+  // ≥2 plantillas cae a la línea "Resumen" (patrón Fiori smart columns).
+  const singleTemplate = Boolean(state.templateId);
+  const valueFields = useMemo<{ key: string; label: string }[]>(() => {
+    if (!singleTemplate) return [];
+    const seen = new Map<string, string>();
+    for (const r of rows) for (const sv of r.summaryValues) if (!seen.has(sv.fieldKey)) seen.set(sv.fieldKey, sv.label);
+    return [...seen.entries()].map(([fieldKey, label]) => ({ key: `val:${fieldKey}`, label }));
+  }, [singleTemplate, rows]);
+
+  // Columnas gestionables que ve el panel "Columnas" (base i18n + valor de la plantilla).
+  const managedColumns = useMemo<ManagedColumnView[]>(
+    () => [
+      ...LOGBOOK_COLUMNS.map((c) => ({ key: c.key, label: t(c.labelKey), locked: c.locked, sortField: c.sortField })),
+      ...valueFields,
+    ],
+    [t, valueFields],
+  );
+
+  // Estado de columnas EFECTIVO: las columnas de valor aún no fijadas se muestran por
+  // defecto (se materializan al primer cambio en el panel). NO afecta el "dirty" (que
+  // compara el estado PERSISTIDO con la vista).
+  const effectiveColumnState = useMemo<Required<TableColumnState>>(() => {
+    if (valueFields.length === 0) return columnState;
+    const known = new Set([...columnState.order, ...columnState.hidden]);
+    const appended = valueFields.map((v) => v.key).filter((k) => !known.has(k));
+    return appended.length ? { ...columnState, order: [...columnState.order, ...appended] } : columnState;
+  }, [columnState, valueFields]);
+
   const refreshing = list.isRefetching || stats.isRefetching;
   const doRefresh = () => {
     void list.refetch();
@@ -608,6 +639,29 @@ export function LogbookPage() {
     },
   ];
 
+  // Columnas de VALOR (una por campo candidato de la plantilla filtrada). El render
+  // busca el valor de ese campo en `summaryValues` y aplica el formato regional + banda.
+  const valueColumns: TableColumn<LogEntryListItem>[] = valueFields.map((vf) => {
+    const fieldKey = vf.key.slice(4); // quita "val:"
+    return {
+      key: vf.key,
+      header: vf.label,
+      render: (r: LogEntryListItem) => {
+        const sv = r.summaryValues.find((x) => x.fieldKey === fieldKey);
+        if (!sv) return <span className={styles.cellSub}>—</span>;
+        // Reusa el resaltado de banda del Resumen (las reglas colorean el <strong> interno).
+        const cls =
+          sv.thresholdBand === "CRIT" ? styles.summaryCrit : sv.thresholdBand === "WARN" ? styles.summaryWarn : undefined;
+        return (
+          <span className={cls}>
+            <strong>{formatSummaryValue(sv)}</strong>
+          </span>
+        );
+      },
+    };
+  });
+  const allColumns = [...columns, ...valueColumns];
+
   const activeChips: { key: string; label: string; clear: () => void }[] = [];
   if (state.q) activeChips.push({ key: "q", label: `${t("logbook.filters.search")}: ${state.q}`, clear: () => { setQInput(""); patch({ q: "" }); } });
   if (state.templateId) {
@@ -684,7 +738,8 @@ export function LogbookPage() {
       <ColumnsDrawer
         open={columnsOpen}
         onClose={() => setColumnsOpen(false)}
-        columnState={columnState}
+        columns={managedColumns}
+        columnState={effectiveColumnState}
         onColumnStateChange={setColumnState}
         density={density}
         onDensityChange={setDensity}
@@ -880,12 +935,12 @@ export function LogbookPage() {
       <div className={styles.gridWrap}>
         {paginationBar}
         <Table
-          columns={columns}
+          columns={allColumns}
           data={visibleRows}
           rowKey={(r) => r.id}
           loading={list.isLoading}
           density={density}
-          columnState={columnState}
+          columnState={effectiveColumnState}
           sorts={tableSorts}
           onSort={(key, direction) => {
             // Click en la cabecera = orden ÚNICO por esa columna indexada (reemplaza).

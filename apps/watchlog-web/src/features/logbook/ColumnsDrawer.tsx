@@ -4,12 +4,22 @@ import { ArrowDown, ArrowUp, GripVertical, Pin, Plus, RotateCcw, X } from "lucid
 import { Button, Checkbox, Drawer, Select } from "@lyra/ui";
 import type { TableColumnState } from "@lyra/ui";
 import type { LogEntrySortField, LogEntrySortKey } from "@lyra/contracts";
-import { DEFAULT_COLUMN_STATE, LOGBOOK_COLUMNS, type LogbookDensity } from "./logbook-views.js";
+import { DEFAULT_COLUMN_STATE, type LogbookDensity } from "./logbook-views.js";
 import styles from "./Logbook.module.css";
+
+/** Columna gestionable con su etiqueta YA resuelta (estática i18n o de campo dinámico). */
+export interface ManagedColumnView {
+  key: string;
+  label: string;
+  locked?: boolean;
+  sortField?: LogEntrySortField;
+}
 
 interface Props {
   open: boolean;
   onClose: () => void;
+  /** Columnas gestionables (base + columnas de valor de la plantilla filtrada). */
+  columns: ManagedColumnView[];
   columnState: Required<TableColumnState>;
   onColumnStateChange: (next: Required<TableColumnState>) => void;
   density: LogbookDensity;
@@ -18,12 +28,10 @@ interface Props {
   onSortsChange: (s: LogEntrySortKey[]) => void;
 }
 
-/** Columnas que aceptan orden server-side (las indexadas). */
-const SORTABLE = LOGBOOK_COLUMNS.filter((c) => c.sortField);
-
 export function ColumnsDrawer({
   open,
   onClose,
+  columns,
   columnState,
   onColumnStateChange,
   density,
@@ -33,6 +41,8 @@ export function ColumnsDrawer({
 }: Props) {
   const { t } = useTranslation();
   const [dragKey, setDragKey] = useState<string | null>(null);
+  // Columnas que aceptan orden server-side (las indexadas).
+  const SORTABLE = columns.filter((c) => c.sortField);
 
   const hidden = new Set(columnState.hidden);
   const pinnedLeft = new Set(columnState.pinnedLeft);
@@ -69,7 +79,8 @@ export function ColumnsDrawer({
 
   function reorder(fromKey: string, toKey: string) {
     if (fromKey === toKey) return;
-    const order = [...columnState.order];
+    // Reordena sobre el orden VISIBLE (materializa columnas de valor aún no fijadas).
+    const order = [...orderedKeys];
     const from = order.indexOf(fromKey);
     const to = order.indexOf(toKey);
     if (from < 0 || to < 0) return;
@@ -77,10 +88,11 @@ export function ColumnsDrawer({
     patch({ order });
   }
 
-  // Orden de presentación de la lista del gestor (sigue el order del estado).
-  const ordered = [...columnState.order]
-    .map((k) => LOGBOOK_COLUMNS.find((c) => c.key === k))
-    .filter((c): c is (typeof LOGBOOK_COLUMNS)[number] => Boolean(c));
+  // Orden de presentación de la lista del gestor (sigue el order del estado; las
+  // columnas presentes no incluidas aún en el order se listan al final).
+  const byKey = new Map(columns.map((c) => [c.key, c]));
+  const orderedKeys = [...columnState.order.filter((k) => byKey.has(k)), ...columns.map((c) => c.key).filter((k) => !columnState.order.includes(k))];
+  const ordered = orderedKeys.map((k) => byKey.get(k)!).filter(Boolean);
 
   // --- Orden (multi-sort) ---
   function updateSort(i: number, patchKey: Partial<LogEntrySortKey>) {
@@ -153,7 +165,7 @@ export function ColumnsDrawer({
                 >
                   {SORTABLE.map((c) => (
                     <option key={c.sortField} value={c.sortField}>
-                      {t(c.labelKey)}
+                      {c.label}
                     </option>
                   ))}
                 </Select>
@@ -211,7 +223,7 @@ export function ColumnsDrawer({
                     checked={!isHidden}
                     disabled={locked}
                     onChange={() => toggleHidden(col.key)}
-                    label={t(col.labelKey)}
+                    label={col.label}
                   />
                   {!locked && (
                     <div className={styles.colPins}>
