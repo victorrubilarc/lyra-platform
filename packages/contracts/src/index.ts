@@ -46,3 +46,6 @@ export * from "./log-entries/log-entries.js";
 
 // Configuración del sistema (Fase 2.7.1.1 UX)
 export * from "./system-settings/system-settings.js";
+
+// Vistas guardadas de plataforma (Fase 2.8.1b)
+export * from "./saved-views/saved-views.js";

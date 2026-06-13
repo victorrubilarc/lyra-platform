@@ -1,4 +1,4 @@
-import type { LogEntryListQuery, LogEntrySortField } from "@lyra/contracts";
+import { sortKeysFromParam, sortKeysToParam, type LogEntryListQuery, type LogEntrySortKey } from "@lyra/contracts";
 
 /**
  * Estado de la grilla de Bitácoras que viaja en la URL (deep-link): filtros +
@@ -26,9 +26,13 @@ export interface LogbookGridState {
   thresholdBand: "" | "WARN" | "CRIT" | "ANY";
   /** Origen del registro (2.7.0): "" = todos. */
   entryOrigin: "" | "ONLINE" | "DEFERRED";
-  sort: LogEntrySortField;
-  dir: "asc" | "desc";
+  /** Multi-sort (2.8.1b): lista ordenada de claves indexadas (1..3). El header
+   *  fija una sola; el gestor de orden arma la lista. Default = recordedAt desc. */
+  sorts: LogEntrySortKey[];
 }
+
+/** Orden por defecto (fecha de captura, más reciente primero). */
+export const DEFAULT_SORTS: LogEntrySortKey[] = [{ field: "recordedAt", dir: "desc" }];
 
 export const DEFAULT_GRID_STATE: LogbookGridState = {
   q: "",
@@ -48,8 +52,7 @@ export const DEFAULT_GRID_STATE: LogbookGridState = {
   pendingSignature: false,
   thresholdBand: "",
   entryOrigin: "",
-  sort: "recordedAt",
-  dir: "desc",
+  sorts: DEFAULT_SORTS,
 };
 
 /** Día local YYYY-MM-DD (para `<input type="date">`). */
@@ -81,25 +84,31 @@ export function toListQuery(state: LogbookGridState, currentUserId: string | nul
     pendingSignature: state.pendingSignature || undefined,
     thresholdBand: state.thresholdBand || undefined,
     entryOrigin: state.entryOrigin || undefined,
-    sort: state.sort,
-    dir: state.dir,
+    sorts: state.sorts.length ? state.sorts : DEFAULT_SORTS,
     // Lote del servidor (keyset). La grilla pagina ESTE lote en el cliente con su
     // propio paginador; "Cargar más" trae el siguiente lote cuando hay más.
     take: 100,
   };
 }
 
+/** ¿El orden multi-sort es el por defecto (recordedAt desc)? */
+export function isDefaultSorts(sorts: LogEntrySortKey[]): boolean {
+  return sorts.length === 1 && sorts[0]!.field === "recordedAt" && sorts[0]!.dir === "desc";
+}
+
 /** Serializa a URLSearchParams omitiendo los valores por defecto (URL limpia). */
 export function gridStateToParams(state: LogbookGridState): URLSearchParams {
   const params = new URLSearchParams();
   for (const key of Object.keys(DEFAULT_GRID_STATE) as (keyof LogbookGridState)[]) {
-    if (key === "orgNodeIds") continue; // array → CSV, manejado aparte
+    if (key === "orgNodeIds" || key === "sorts") continue; // arrays → CSV, manejados aparte
     const value = state[key];
     const fallback = DEFAULT_GRID_STATE[key];
     if (value === fallback) continue;
     params.set(key, String(value));
   }
   if (state.orgNodeIds.length) params.set("orgNodeIds", state.orgNodeIds.join(","));
+  // El orden va en la URL (es "qué datos", compartible). Columnas/densidad NO (presentación personal).
+  if (!isDefaultSorts(state.sorts)) params.set("sorts", sortKeysToParam(state.sorts));
   return params;
 }
 
@@ -134,10 +143,18 @@ export function gridStateFromParams(params: URLSearchParams): LogbookGridState {
   if (band === "WARN" || band === "CRIT" || band === "ANY") state.thresholdBand = band;
   const origin = params.get("entryOrigin");
   if (origin === "ONLINE" || origin === "DEFERRED") state.entryOrigin = origin;
-  const sort = params.get("sort");
-  if (sort === "recordedAt" || sort === "effectiveAt" || sort === "entryNumber") state.sort = sort;
-  const dir = params.get("dir");
-  if (dir === "asc" || dir === "desc") state.dir = dir;
+  // Multi-sort (2.8.1b) desde `sorts=campo:dir,…`; back-compat con `sort`+`dir` legacy.
+  const sortsRaw = params.get("sorts");
+  if (sortsRaw) {
+    const parsed = sortKeysFromParam(sortsRaw);
+    if (parsed.length) state.sorts = parsed;
+  } else {
+    const sort = params.get("sort");
+    const dir = params.get("dir");
+    if (sort === "recordedAt" || sort === "effectiveAt" || sort === "entryNumber") {
+      state.sorts = [{ field: sort, dir: dir === "asc" ? "asc" : "desc" }];
+    }
+  }
   return state;
 }
 
@@ -145,7 +162,7 @@ export function gridStateFromParams(params: URLSearchParams): LogbookGridState {
 export function hasActiveFilters(state: LogbookGridState): boolean {
   if (state.orgNodeIds.length > 0) return true;
   for (const key of Object.keys(DEFAULT_GRID_STATE) as (keyof LogbookGridState)[]) {
-    if (key === "sort" || key === "dir" || key === "includeDescendants" || key === "orgNodeIds") continue;
+    if (key === "sorts" || key === "includeDescendants" || key === "orgNodeIds") continue;
     if (state[key] !== DEFAULT_GRID_STATE[key]) return true;
   }
   return false;
@@ -156,7 +173,7 @@ export function activeFilterCount(state: LogbookGridState): number {
   let n = 0;
   if (state.orgNodeIds.length > 0) n += 1;
   for (const key of Object.keys(DEFAULT_GRID_STATE) as (keyof LogbookGridState)[]) {
-    if (key === "sort" || key === "dir" || key === "includeDescendants" || key === "orgNodeIds") continue;
+    if (key === "sorts" || key === "includeDescendants" || key === "orgNodeIds") continue;
     if (state[key] !== DEFAULT_GRID_STATE[key]) n += 1;
   }
   return n;

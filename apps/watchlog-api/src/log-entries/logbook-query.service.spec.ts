@@ -245,6 +245,44 @@ describe("LogbookQueryService — list", () => {
     });
   });
 
+  it("multi-sort: ORDER BY encadena las claves + id; el keyset es lexicográfico", async () => {
+    const rows = [
+      listRow({ id: "e3", entryNumber: 3, effectiveAt: new Date("2026-06-10T12:00:00.000Z") }),
+      listRow({ id: "e2", entryNumber: 9, effectiveAt: new Date("2026-06-10T12:00:00.000Z") }),
+      listRow({ id: "e1", entryNumber: 1, effectiveAt: new Date("2026-06-10T11:00:00.000Z") }),
+    ];
+    const { logbook, prisma } = makeServices({
+      logEntry: {
+        findFirst: vi.fn(),
+        findMany: vi.fn().mockResolvedValue(rows),
+        count: vi.fn(),
+        groupBy: vi.fn().mockResolvedValue([]),
+      },
+    });
+    // Orden por fecha efectiva DESC y, en empate, por folio ASC.
+    const sorts = [
+      { field: "effectiveAt", dir: "desc" },
+      { field: "entryNumber", dir: "asc" },
+    ] as const;
+    const page = await logbook.list("u1", { take: 2, sorts: [...sorts] });
+
+    const firstArg = (prisma.logEntry.findMany as ReturnType<typeof vi.fn>).mock.calls[0]![0];
+    expect(firstArg.orderBy).toEqual([{ effectiveAt: "desc" }, { entryNumber: "asc" }, { id: "desc" }]);
+    expect(page.nextCursor).not.toBeNull();
+
+    // Reanuda: la última fila visible es e2 (effectiveAt 12:00, folio 9).
+    await logbook.list("u1", { take: 2, sorts: [...sorts], cursor: page.nextCursor! });
+    const arg = (prisma.logEntry.findMany as ReturnType<typeof vi.fn>).mock.calls[1]![0];
+    const keyset = (arg.where.AND as Record<string, unknown>[])[1];
+    expect(keyset).toEqual({
+      OR: [
+        { effectiveAt: { lt: new Date("2026-06-10T12:00:00.000Z") } },
+        { effectiveAt: new Date("2026-06-10T12:00:00.000Z"), entryNumber: { gt: 9 } },
+        { effectiveAt: new Date("2026-06-10T12:00:00.000Z"), entryNumber: 9, id: { lt: "e2" } },
+      ],
+    });
+  });
+
   it("rechaza un cursor que no corresponde al orden pedido", async () => {
     const { logbook } = makeServices();
     const first = await logbook.list("u1", { take: 1 });

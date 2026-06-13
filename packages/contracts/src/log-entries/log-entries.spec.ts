@@ -13,6 +13,9 @@ import {
   isFieldVisible,
   isSectionEditableInState,
   logEntryListQuerySchema,
+  resolveSortKeys,
+  sortKeysFromParam,
+  sortKeysToParam,
   logEntrySectionStateDtoSchema,
   logEntryTimelineEventSchema,
   resolveEditWindow,
@@ -438,6 +441,31 @@ describe("logEntryListQuerySchema (v2 — Bitácoras)", () => {
         dir: "asc",
       }).success,
     ).toBe(true);
+  });
+
+  it("parsea multi-sort desde CSV `campo:dir` ignorando campos inválidos/duplicados", () => {
+    const parsed = logEntryListQuerySchema.parse({ sorts: "effectiveAt:asc,entryNumber:desc,effectiveAt:desc,foo:asc" });
+    // dedup por campo (la 1.ª gana) + descarta `foo` (fuera de whitelist).
+    expect(parsed.sorts).toEqual([
+      { field: "effectiveAt", dir: "asc" },
+      { field: "entryNumber", dir: "desc" },
+    ]);
+  });
+
+  it("resolveSortKeys prioriza multi → legacy single → default", () => {
+    expect(resolveSortKeys({ sorts: [{ field: "entryNumber", dir: "asc" }], sort: "recordedAt", dir: "desc" })).toEqual([
+      { field: "entryNumber", dir: "asc" },
+    ]);
+    expect(resolveSortKeys({ sort: "effectiveAt", dir: "asc" })).toEqual([{ field: "effectiveAt", dir: "asc" }]);
+    expect(resolveSortKeys({})).toEqual([{ field: "recordedAt", dir: "desc" }]);
+  });
+
+  it("sortKeysToParam round-trip", () => {
+    const keys = [
+      { field: "recordedAt", dir: "desc" },
+      { field: "entryNumber", dir: "asc" },
+    ] as const;
+    expect(sortKeysFromParam(sortKeysToParam([...keys]))).toEqual(keys);
   });
 });
 

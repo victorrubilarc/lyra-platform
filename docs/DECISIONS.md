@@ -4,6 +4,68 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-13 · Fase 2.8.1b — Vistas guardadas + gestor de columnas + multi-sort — ✅ IMPLEMENTADO
+
+**Cierre:** entregado todo lo confirmado. `SavedView` (entidad genérica, migración `20260613130000`, índice único
+parcial), `SavedViewsModule` CRUD ownership-gated, multi-sort keyset lexicográfico (cursor multi-columna, no pierde
+filas en empates), `Table` column-aware en `@lyra/ui` (orden/ocultar/anclar sticky/anchos/densidad + badge de prioridad),
+gestor de columnas (`ColumnsDrawer`), selector de vistas (`ViewBar`: sistema en código + personales + dirty + Guardar
+como/Actualizar/Predeterminada/Eliminar), última vista en localStorage, y **columnas de VALOR individuales por plantilla**
+(con 1 plantilla filtrada). **Recortes entregados como tales:** resize de columnas ✅ (grip de arrastre) / **autosize
+diferido**; **"Mi turno" diferida a 2.8.1c** (requiere `ShiftResolver`); **orden global por columnas de valor diferido a
+Fase 7** (rompería keyset). Sin permisos nuevos (catálogo 59). Tests contracts 163 · API 224. Smoke `scripts/smoke-saved-views.py`
+**24/24** (CRUD, default único, ownership 404, validación, multi-sort + cursor reanuda/rechaza orden incongruente).
+**Pendiente: smoke VISUAL del dueño.**
+
+---
+
+### 2026-06-13 · Fase 2.8.1b — Vistas guardadas + gestor de columnas + multi-sort — 📋 FORKS RESUELTOS
+
+Segundo sub-slice del plan 2.8.1: **el usuario dispone**. Tras 2.8.1a (la plantilla *ofrece* el pool `gridFieldKeys`),
+aquí el usuario elige qué ver, en qué orden, lo guarda y lo reusa. **5 forks resueltos con el dueño (confirmados):**
+
+1. **Modelo de `SavedView` = entidad GENÉRICA de PLATAFORMA** con `module` discriminador (`"LOGBOOK"` hoy; reusable por
+   Incidencias Fase 4) + **`config jsonb`** validado por Zod (`{filters, search, sort[], columns{order,hidden[],pinned{left,right},
+   widths}, density}`) — NO columnas por atributo (universo abierto, mar de NULLs; misma razón que `TemplateField.config`).
+   **`isDefault` único por `(userId, module)` vía índice único PARCIAL** `WHERE "isDefault"` (Postgres; migración a mano).
+   **Alcance: solo personal ahora**; compartir por rol DIFERIDO pero aditivo (slots `scope`/`sharedRoleId` a futuro, sin
+   romper). **Sin permisos nuevos (catálogo sigue en 59):** una vista es DATO PERSONAL del usuario (como favoritos/ui-store,
+   pero server-side para cross-device); el backend autoriza por **ownership** (`userId === session.user.id`) + acceso al módulo
+   (`logentry:view`, ya existe); el front solo refleja. No inflar RBAC con una preferencia de UI. Refs: SAP Fiori *variants*
+   (personal+default), ServiceNow *personal list views*.
+
+2. **Vistas de SISTEMA en CÓDIGO, no BD** (no migrables). Constantes que producen un grid-state. Selector con grupo "Sistema"
+   (solo lectura; "Guardar como…" las bifurca a personal) + grupo "Mis vistas". Entrego las 3 expresables con filtros
+   existentes: **"Firmas pendientes"** (`pendingSignature`), **"Excepciones"** (`thresholdBand=ANY`), **"Últimas 24h"** (preset
+   effective 1d). **"Mi turno" DIFERIDA a 2.8.1c** (necesita resolver turno/persona actual vía `ShiftResolver` — es motor, no
+   filtro; no se entrega a medias).
+
+3. **Gestor de columnas = separar render de configuración.** El `Table` de `@lyra/ui` evoluciona a **column-aware** (props
+   controladas: orden, ocultas, ancladas izq/der, anchos; emite cambios) = reusable por Incidencias. La **UI de gestión** vive
+   en panel/Drawer aparte ("Columnas": checklist + drag reorder + toggles de anclar) que alimenta esas props. Reorder = drag
+   nativo HTML5 (sin dep). Pin = sticky. **Anchos manuales + persistencia ahora; resize-drag/autosize = stretch goal** (si el
+   contexto da; si no, 2.8.1c). **Columnas de VALOR por plantilla (nivel 2/3) solo con 1 plantilla filtrada** (claves homogéneas
+   → ofrece sus `gridFieldKeys` como columnas); con 0 o ≥2 plantillas cae a la línea "Resumen" (= Fiori smart columns,
+   coherente con 2.8.1a).
+
+4. **"Última vista" efímera en localStorage** (id de la última vista aplicada / estado ad-hoc por usuario-dispositivo); vistas
+   nombradas en BD. Espejo de `ui-store`/`workspace-store`. **Multi-sort — objeción técnica (cito *Use The Index, Luke*):** la
+   paginación keyset exige tupla INDEXADA; hoy solo `recordedAt/effectiveAt/entryNumber` tienen índice keyset `(col,id)`.
+   ⇒ **multi-sort server-side LIMITADO a esas 3 columnas indexadas** (lista ordenada, máx 2–3 claves). **Orden por columnas de
+   VALOR = solo client-side sobre el lote cargado** (≤100, etiquetado "orden del lote visible"), NUNCA global. **Orden global
+   por valores arbitrarios = Fase 7** (columnas de orden denormalizadas / OpenSearch; ya en BACKLOG §3, no se improvisa).
+
+5. **Deep-link/URL ↔ SavedView:** la URL sigue siendo el estado canónico en runtime; la vista es un snapshot nombrado. Aplicar
+   una vista ESCRIBE su config en la URL/estado y marca "vista activa = X" (efímero); deep-link sin vista = estado desde params
+   (como hoy). Tras aplicar, tocar filtros marca la vista **"modificada" (dirty)** → "Actualizar vista" / "Guardar como nueva"
+   (patrón dirty de Fiori variants). **Separación (ServiceNow/Fiori):** la URL lleva *qué datos* (filtros+búsqueda+sort) =
+   compartible; **columnas+densidad** (*cómo lo veo yo*) viven en la vista/localStorage, **NO en la URL** (verbosa, impersonal).
+
+**Recortes declarados** (para que el slice sea cerrable en una sesión): resize/autosize de columnas = stretch; "Mi turno" y
+orden global por valores = slices posteriores. Si el contexto se llena, consolido y se parte. Ver BACKLOG §2.
+
+---
+
 ### 2026-06-13 · Afinamiento UX de la grilla de Bitácoras (QA del dueño) — ✅ IMPLEMENTADO
 
 Tras el smoke visual de 2.8.1a el dueño pidió un overhaul de UX de la grilla. Es **frontend** (salvo un cambio chico de

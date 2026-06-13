@@ -142,6 +142,28 @@ inicio «‹ números ›» fin; "siguiente" en la última página trae el lote 
 con contorno premium** (glow del acento) + lista enmarcada + `<select>` discreto. Tests: contracts 154 · API **217** (+1
 multi-nodo). Smoke **25/25**. typecheck/lint(0)/build verdes. **Pendiente: re-confirmación VISUAL del dueño.**
 
+**+ Fase 2.8.1b — Bitácoras: VISTAS GUARDADAS + GESTOR DE COLUMNAS + MULTI-SORT ✅ (2026-06-13, `feat/bitacoras-vistas-guardadas`
+→ `main`).** "El usuario dispone": elige qué ver, en qué orden, lo guarda y lo reusa. **5 forks resueltos (DECISIONS 2026-06-13).**
+**(1) `SavedView`** = entidad GENÉRICA de PLATAFORMA (`module` discriminador `"LOGBOOK"`, reusable por Incidencias Fase 4) +
+**`config jsonb`** (filtros/búsqueda/orden/columnas{orden,ocultas,ancladas,anchos}/densidad). **DATO PERSONAL** → autorización por
+**OWNERSHIP** (no RBAC; sin permisos nuevos, catálogo 59). **UNA default por `(userId,module)`** vía **índice único PARCIAL**
+`WHERE isDefault` (migración `20260613130000_add_saved_view`). `SavedViewsModule` CRUD (gateado por `logentry:view` + ownership en
+service; desmarca la default previa en la misma tx). **(2) Vistas de SISTEMA en CÓDIGO** (`LOGBOOK_SYSTEM_VIEWS`: Firmas pendientes /
+Excepciones / Últimas 24h); "Mi turno" DIFERIDA a 2.8.1c (necesita `ShiftResolver`). **(3) `Table` de `@lyra/ui` column-aware**
+(retrocompatible): `columnState` controlado (orden, ocultas, ancladas izq/der sticky con offsets, anchos), `density`
+comfortable|compact, `sorts` con badge de prioridad, `onColumnResize` (grip de arrastre). UI de gestión SEPARADA (`ColumnsDrawer`).
+**(4) Multi-sort** keyset CORRECTO: contrato `sorts` (CSV `campo:dir`, máx 3 indexadas, precedencia sobre `sort`/`dir` legacy);
+cursor generalizado a **tupla lexicográfica** (no pierde filas en empates); el header fija orden ÚNICO, el panel arma el multi.
+Orden global por columnas de VALOR = Fase 7 (rompería keyset). **(5) URL ↔ vista:** la URL lleva filtros+búsqueda+orden
+(compartible); columnas+densidad+vista activa = presentación personal en localStorage (última vista), NO en la URL. Aplicar vista
+escribe su config; tocar filtros marca **dirty** → Actualizar / Guardar como. **+ Columnas de VALOR individuales por plantilla**
+(headline del objetivo): con UNA plantilla filtrada el gestor ofrece sus `gridFieldKeys` como columnas (de `summaryValues`),
+mostradas por defecto; con 0 o ≥2 plantillas cae a la línea "Resumen" (patrón Fiori smart columns). Web: `ViewBar` + `ColumnsDrawer`
++ `logbook-views` (mapeo estado↔config + localStorage). Tests: contracts **163** (+9) · API **224** (+7). Smoke en vivo **24/24**
+(`scripts/smoke-saved-views.py`: CRUD, default único, ownership 404, validación, multi-sort + cursor reanuda/rechaza orden
+incongruente; crea y LIMPIA por ID). typecheck/lint(0)/build verdes. **Pendiente: smoke VISUAL del dueño.** Siguiente: **2.8.1c**
+(peek lateral + facetas con conteo + review-by-exception + "Mi turno").
+
 ## Hecho en Fase 2.7.2 (Ventana de edición configurable — gobernanza temporal #6)
 
 2.º eslabón de la gobernanza temporal: plazo para CORREGIR un registro; vencido, solo se edita con privilegio explícito

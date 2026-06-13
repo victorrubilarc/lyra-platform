@@ -4,14 +4,22 @@ import {
   logEntryStatsSchema,
   logEntryTimelineResponseSchema,
   relatedLogEntriesSchema,
+  savedViewListResponseSchema,
+  savedViewSchema,
   signatureVerifyResultSchema,
+  sortKeysToParam,
+  type CreateSavedViewRequest,
   type LogEntryChangesResponse,
   type LogEntryListQuery,
   type LogEntryListResponse,
   type LogEntryStats,
   type LogEntryTimelineResponse,
   type RelatedLogEntries,
+  type SavedViewDto,
+  type SavedViewListResponse,
+  type SavedViewModule,
   type SignatureVerifyResult,
+  type UpdateSavedViewRequest,
 } from "@lyra/contracts";
 import { z } from "zod";
 import { apiBlob, apiJson } from "../../lib/api-client.js";
@@ -35,9 +43,11 @@ export function fetchLogbookFilterTemplates(): Promise<FilterTemplate[]> {
 export function listQueryString(query: LogEntryListQuery): string {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(query)) {
-    if (value === undefined || value === null || value === "") continue;
+    if (value === undefined || value === null || value === "" || key === "sorts") continue;
     params.set(key, String(value));
   }
+  // Multi-sort → CSV `campo:dir` (String(array de objetos) daría "[object Object]").
+  if (query.sorts && query.sorts.length) params.set("sorts", sortKeysToParam(query.sorts));
   return params.toString();
 }
 
@@ -77,4 +87,24 @@ export function verifyLogbookSignature(id: string, signatureId: string): Promise
     method: "POST",
     body: {},
   });
+}
+
+// --- Vistas guardadas (Fase 2.8.1b) — preferencia personal, ownership-gated -----
+
+// Los esquemas con `.default()` tienen input ≠ output; `apiJson` unifica ambos en su
+// genérico, así que tipamos el retorno por el OUTPUT (lo que `parse` produce en runtime).
+export function fetchSavedViews(module: SavedViewModule): Promise<SavedViewListResponse> {
+  return apiJson(`/saved-views?module=${encodeURIComponent(module)}`, savedViewListResponseSchema) as Promise<SavedViewListResponse>;
+}
+
+export function createSavedView(body: CreateSavedViewRequest): Promise<SavedViewDto> {
+  return apiJson(`/saved-views`, savedViewSchema, { method: "POST", body }) as Promise<SavedViewDto>;
+}
+
+export function updateSavedView(id: string, body: UpdateSavedViewRequest): Promise<SavedViewDto> {
+  return apiJson(`/saved-views/${id}`, savedViewSchema, { method: "PATCH", body }) as Promise<SavedViewDto>;
+}
+
+export function deleteSavedView(id: string): Promise<{ ok: true }> {
+  return apiJson(`/saved-views/${id}`, z.object({ ok: z.literal(true) }), { method: "DELETE" });
 }

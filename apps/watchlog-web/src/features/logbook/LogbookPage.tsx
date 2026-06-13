@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { BookOpenCheck, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Download, FilterX, GitBranch, History, Lock, PenLine, RefreshCw, SlidersHorizontal, TriangleAlert } from "lucide-react";
+import { BookOpenCheck, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Columns3, Download, FilterX, GitBranch, History, Lock, PenLine, RefreshCw, SlidersHorizontal, TriangleAlert } from "lucide-react";
 import {
   Button,
   Checkbox,
@@ -16,19 +16,31 @@ import {
   useToast,
   type ComboboxOption,
   type TableColumn,
+  type TableColumnState,
+  type TableSort,
 } from "@lyra/ui";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { useAuth } from "../../auth/use-auth.js";
-import { formatEntryFolio, type LogEntryListItem, type LogEntrySummaryValue, type OrgNodeTree } from "@lyra/contracts";
+import {
+  formatEntryFolio,
+  LOG_ENTRY_SORT_FIELDS,
+  type LogEntryListItem,
+  type LogEntrySortField,
+  type LogEntrySummaryValue,
+  type OrgNodeTree,
+  type SavedViewDto,
+  type SystemView,
+} from "@lyra/contracts";
 import { formatDateTime as fmtDateTime, formatLocalDate, formatNumber } from "../../lib/format.js";
 import { ApiError } from "../../lib/api-client.js";
 import { downloadBlob, fileStamp } from "../../lib/download.js";
 import { useOrgTree } from "../structure/structure-queries.js";
 import { exportLogbookCsv } from "./logbook-api.js";
-import { useLogbookFilterTemplates, useLogbookList, useLogbookStats } from "./logbook-queries.js";
+import { useLogbookFilterTemplates, useLogbookList, useLogbookStats, useSavedViewMutations, useSavedViews } from "./logbook-queries.js";
 import {
   activeFilterCount,
   DEFAULT_GRID_STATE,
+  DEFAULT_SORTS,
   gridStateFromParams,
   gridStateToParams,
   hasActiveFilters,
@@ -36,7 +48,40 @@ import {
   toListQuery,
   type LogbookGridState,
 } from "./logbook-filters.js";
+import {
+  DEFAULT_COLUMN_STATE,
+  fromViewConfig,
+  loadLastView,
+  LOGBOOK_COLUMNS,
+  saveLastView,
+  toViewConfig,
+  type LogbookDensity,
+} from "./logbook-views.js";
+import { ColumnsDrawer, type ManagedColumnView } from "./ColumnsDrawer.js";
+import { ViewBar } from "./ViewBar.js";
 import styles from "./Logbook.module.css";
+
+/** Comparación estable de configs (para el estado "modificada" de la vista). */
+function canonicalConfig(c: ReturnType<typeof toViewConfig>): string {
+  const sortObj = (o: Record<string, unknown>) =>
+    Object.fromEntries(Object.entries(o).sort(([a], [b]) => a.localeCompare(b)));
+  return JSON.stringify({
+    filters: sortObj(c.filters),
+    sort: c.sort,
+    columns: {
+      order: c.columns.order,
+      hidden: [...c.columns.hidden].sort(),
+      pinnedLeft: c.columns.pinnedLeft,
+      pinnedRight: c.columns.pinnedRight,
+      widths: sortObj(c.columns.widths),
+    },
+    density: c.density,
+  });
+}
+
+function isSortField(v: string): v is LogEntrySortField {
+  return (LOG_ENTRY_SORT_FIELDS as readonly string[]).includes(v);
+}
 
 /** Aplana el árbol de estructura para el Combobox (sangría por nivel). */
 function flattenTree(tree: OrgNodeTree[], depth = 0, out: ComboboxOption[] = []): ComboboxOption[] {
@@ -188,13 +233,27 @@ export function LogbookPage() {
   const userId = session?.user.id ?? null;
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // La URL es la fuente de verdad del estado de la grilla (deep-link).
+  // La URL es la fuente de verdad de los FILTROS/ORDEN de la grilla (deep-link).
   const [state, setState] = useState<LogbookGridState>(() => gridStateFromParams(searchParams));
   const [qInput, setQInput] = useState(state.q);
   const [exporting, setExporting] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [columnsOpen, setColumnsOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
+
+  // Presentación (columnas + densidad): personal, NO viaja en la URL. Se restaura
+  // de la última vista (localStorage) o cae a los defaults.
+  const memo = useMemo(() => (userId ? loadLastView(userId) : null), [userId]);
+  const [columnState, setColumnState] = useState<Required<TableColumnState>>(() => memo?.columnState ?? { ...DEFAULT_COLUMN_STATE });
+  const [density, setDensity] = useState<LogbookDensity>(() => memo?.density ?? "comfortable");
+  const [activeViewId, setActiveViewId] = useState<string | null>(() => memo?.viewId ?? null);
+
+  // Vistas guardadas (preferencia personal del usuario para el módulo Bitácoras).
+  const savedViews = useSavedViews("LOGBOOK");
+  const viewMutations = useSavedViewMutations("LOGBOOK");
+  const views = savedViews.data ?? [];
+  const initializedRef = useRef(false);
 
   // Debounce de la búsqueda (400 ms).
   useEffect(() => {
@@ -237,8 +296,131 @@ export function LogbookPage() {
   const patch = (partial: Partial<LogbookGridState>) => setState((s) => ({ ...s, ...partial }));
   const clearFilters = () => {
     setQInput("");
-    setState((s) => ({ ...DEFAULT_GRID_STATE, sort: s.sort, dir: s.dir }));
+    setState((s) => ({ ...DEFAULT_GRID_STATE, sorts: s.sorts }));
   };
+
+  // --- Vistas guardadas: estado activo, dirty y aplicación ---
+  const currentConfig = useMemo(() => toViewConfig(state, columnState, density), [state, columnState, density]);
+  const activeView = views.find((v) => v.id === activeViewId) ?? null;
+  // Ambos lados nacen de toViewConfig (estado completo) ⇒ comparación apples-to-apples.
+  const dirty = activeView ? canonicalConfig(currentConfig) !== canonicalConfig(activeView.config) : false;
+
+  // Persiste la "última vista" (presentación personal) por usuario-dispositivo.
+  useEffect(() => {
+    if (userId) saveLastView(userId, { viewId: activeViewId, columnState, density });
+  }, [userId, activeViewId, columnState, density]);
+
+  // Primera carga sin deep-link ni memoria: aplica la vista DEFAULT si existe.
+  useEffect(() => {
+    if (initializedRef.current || savedViews.isLoading) return;
+    initializedRef.current = true;
+    if (memo || hasActiveFilters(state)) return; // respeta deep-link / última sesión
+    const def = views.find((v) => v.isDefault);
+    if (def) applyView(def);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedViews.isLoading]);
+
+  function applyView(view: SavedViewDto) {
+    const { state: s, columnState: cs, density: d } = fromViewConfig(view.config);
+    setState(s);
+    setQInput(s.q);
+    setColumnState(cs);
+    setDensity(d);
+    setActiveViewId(view.id);
+  }
+  function applySystem(view: SystemView) {
+    // Las vistas de sistema solo fijan FILTROS; la presentación es personal (se conserva).
+    const next: LogbookGridState = { ...DEFAULT_GRID_STATE, sorts: DEFAULT_SORTS };
+    for (const [k, v] of Object.entries(view.filters)) {
+      if (k === "__preset" && v === "effective24h") {
+        const to = new Date();
+        const from = new Date();
+        from.setDate(from.getDate() - 1);
+        next.effectiveFromDay = isoDay(from);
+        next.effectiveToDay = isoDay(to);
+      } else if (k in next) {
+        // Asignación tolerante (los valores provienen del contrato de la vista de sistema).
+        (next as unknown as Record<string, unknown>)[k] = v;
+      }
+    }
+    setState(next);
+    setQInput(next.q);
+    setActiveViewId(view.id);
+  }
+  function applyDefault() {
+    setState({ ...DEFAULT_GRID_STATE });
+    setQInput("");
+    setActiveViewId(null);
+  }
+  async function handleSaveAs(name: string, isDefault: boolean) {
+    try {
+      const created = await viewMutations.create.mutateAsync({ module: "LOGBOOK", name, config: currentConfig, isDefault });
+      setActiveViewId(created.id);
+      toast.success(t("logbook.views.saved"));
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : t("common.errorGeneric"));
+    }
+  }
+  async function handleUpdateActive() {
+    if (!activeView) return;
+    try {
+      await viewMutations.update.mutateAsync({ id: activeView.id, body: { config: currentConfig } });
+      toast.success(t("logbook.views.updated"));
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : t("common.errorGeneric"));
+    }
+  }
+  async function handleToggleDefault(view: SavedViewDto) {
+    try {
+      await viewMutations.update.mutateAsync({ id: view.id, body: { isDefault: !view.isDefault } });
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : t("common.errorGeneric"));
+    }
+  }
+  async function handleDeleteView(view: SavedViewDto) {
+    try {
+      await viewMutations.remove.mutateAsync(view.id);
+      if (activeViewId === view.id) setActiveViewId(null);
+      toast.success(t("logbook.views.deleted"));
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : t("common.errorGeneric"));
+    }
+  }
+  const viewBusy = viewMutations.create.isPending || viewMutations.update.isPending || viewMutations.remove.isPending;
+
+  // Multi-sort para el Table (key = sortField de las columnas indexadas).
+  const tableSorts: TableSort[] = state.sorts.map((s) => ({ key: s.field, direction: s.dir }));
+
+  // Columnas de VALOR por plantilla (2.8.1b): solo con UNA plantilla filtrada las claves
+  // son homogéneas ⇒ se ofrecen los campos candidatos como columnas individuales. Con 0 o
+  // ≥2 plantillas cae a la línea "Resumen" (patrón Fiori smart columns).
+  const singleTemplate = Boolean(state.templateId);
+  const valueFields = useMemo<{ key: string; label: string }[]>(() => {
+    if (!singleTemplate) return [];
+    const seen = new Map<string, string>();
+    for (const r of rows) for (const sv of r.summaryValues) if (!seen.has(sv.fieldKey)) seen.set(sv.fieldKey, sv.label);
+    return [...seen.entries()].map(([fieldKey, label]) => ({ key: `val:${fieldKey}`, label }));
+  }, [singleTemplate, rows]);
+
+  // Columnas gestionables que ve el panel "Columnas" (base i18n + valor de la plantilla).
+  const managedColumns = useMemo<ManagedColumnView[]>(
+    () => [
+      ...LOGBOOK_COLUMNS.map((c) => ({ key: c.key, label: t(c.labelKey), locked: c.locked, sortField: c.sortField })),
+      ...valueFields,
+    ],
+    [t, valueFields],
+  );
+
+  // Estado de columnas EFECTIVO: las columnas de valor aún no fijadas se muestran por
+  // defecto (se materializan al primer cambio en el panel). NO afecta el "dirty" (que
+  // compara el estado PERSISTIDO con la vista).
+  const effectiveColumnState = useMemo<Required<TableColumnState>>(() => {
+    if (valueFields.length === 0) return columnState;
+    const known = new Set([...columnState.order, ...columnState.hidden]);
+    const appended = valueFields.map((v) => v.key).filter((k) => !known.has(k));
+    return appended.length ? { ...columnState, order: [...columnState.order, ...appended] } : columnState;
+  }, [columnState, valueFields]);
+
   const refreshing = list.isRefetching || stats.isRefetching;
   const doRefresh = () => {
     void list.refetch();
@@ -457,6 +639,29 @@ export function LogbookPage() {
     },
   ];
 
+  // Columnas de VALOR (una por campo candidato de la plantilla filtrada). El render
+  // busca el valor de ese campo en `summaryValues` y aplica el formato regional + banda.
+  const valueColumns: TableColumn<LogEntryListItem>[] = valueFields.map((vf) => {
+    const fieldKey = vf.key.slice(4); // quita "val:"
+    return {
+      key: vf.key,
+      header: vf.label,
+      render: (r: LogEntryListItem) => {
+        const sv = r.summaryValues.find((x) => x.fieldKey === fieldKey);
+        if (!sv) return <span className={styles.cellSub}>—</span>;
+        // Reusa el resaltado de banda del Resumen (las reglas colorean el <strong> interno).
+        const cls =
+          sv.thresholdBand === "CRIT" ? styles.summaryCrit : sv.thresholdBand === "WARN" ? styles.summaryWarn : undefined;
+        return (
+          <span className={cls}>
+            <strong>{formatSummaryValue(sv)}</strong>
+          </span>
+        );
+      },
+    };
+  });
+  const allColumns = [...columns, ...valueColumns];
+
   const activeChips: { key: string; label: string; clear: () => void }[] = [];
   if (state.q) activeChips.push({ key: "q", label: `${t("logbook.filters.search")}: ${state.q}`, clear: () => { setQInput(""); patch({ q: "" }); } });
   if (state.templateId) {
@@ -505,6 +710,22 @@ export function LogbookPage() {
           <p className={styles.subtitle}>{t("logbook.list.subtitle")}</p>
         </div>
         <div className={styles.headerActions}>
+          <ViewBar
+            views={views}
+            activeViewId={activeViewId}
+            dirty={dirty}
+            busy={viewBusy}
+            onApplyView={applyView}
+            onApplySystem={applySystem}
+            onApplyDefault={applyDefault}
+            onSaveAs={handleSaveAs}
+            onUpdateActive={handleUpdateActive}
+            onToggleDefault={handleToggleDefault}
+            onDelete={handleDeleteView}
+          />
+          <Button variant="secondary" leftIcon={<Columns3 size={16} />} onClick={() => setColumnsOpen(true)}>
+            {t("logbook.columns.button")}
+          </Button>
           <Button variant="secondary" leftIcon={<RefreshCw size={16} className={refreshing ? styles.spin : undefined} />} onClick={doRefresh}>
             {t("logbook.list.refresh")}
           </Button>
@@ -513,6 +734,18 @@ export function LogbookPage() {
           </Button>
         </div>
       </div>
+
+      <ColumnsDrawer
+        open={columnsOpen}
+        onClose={() => setColumnsOpen(false)}
+        columns={managedColumns}
+        columnState={effectiveColumnState}
+        onColumnStateChange={setColumnState}
+        density={density}
+        onDensityChange={setDensity}
+        sorts={state.sorts}
+        onSortsChange={(s) => patch({ sorts: s })}
+      />
 
       {/* KPIs del set filtrado (clic = filtro rápido, review by exception) */}
       <div className={styles.kpis}>
@@ -702,16 +935,21 @@ export function LogbookPage() {
       <div className={styles.gridWrap}>
         {paginationBar}
         <Table
-          columns={columns}
+          columns={allColumns}
           data={visibleRows}
           rowKey={(r) => r.id}
           loading={list.isLoading}
-          sort={{ key: state.sort, direction: state.dir }}
+          density={density}
+          columnState={effectiveColumnState}
+          sorts={tableSorts}
           onSort={(key, direction) => {
-            if (key === "entryNumber" || key === "effectiveAt" || key === "recordedAt") {
-              patch({ sort: key, dir: direction });
-            }
+            // Click en la cabecera = orden ÚNICO por esa columna indexada (reemplaza).
+            // El multi-sort se arma en el gestor de columnas (panel "Columnas").
+            if (isSortField(key)) patch({ sorts: [{ field: key, dir: direction }] });
           }}
+          onColumnResize={(key, width) =>
+            setColumnState((cs) => ({ ...cs, widths: { ...cs.widths, [key]: width } }))
+          }
           onRowClick={(r) => navigate(`/bitacoras/${r.id}`)}
           emptyState={
             <EmptyState
