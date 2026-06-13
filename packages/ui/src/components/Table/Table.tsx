@@ -48,6 +48,8 @@ export interface TableProps<T> {
   sorts?: TableSort[];
   onSort?: (key: string, direction: "asc" | "desc") => void;
   onRowClick?: (row: T) => void;
+  /** Clase por fila (p. ej. realce de excepción/review-by-exception). */
+  rowClassName?: (row: T) => string | undefined;
   className?: string;
   /** Densidad de filas (área táctil de terreno vs. más filas a la vista). */
   density?: "comfortable" | "compact";
@@ -162,6 +164,7 @@ export function Table<T>({
   sorts,
   onSort,
   onRowClick,
+  rowClassName,
   className,
   density = "comfortable",
   columnState,
@@ -297,7 +300,7 @@ export function Table<T>({
             visible.map((row, i) => (
               <tr
                 key={rowKey(row)}
-                className={cx(styles.dataRow, onRowClick && styles.clickable)}
+                className={cx(styles.dataRow, onRowClick && styles.clickable, rowClassName?.(row))}
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
               >
                 {displayColumns.map((dc) => (

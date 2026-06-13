@@ -124,12 +124,14 @@ export interface SystemView {
   filters: SavedViewFilters;
 }
 
-/** Vistas de sistema del módulo de Bitácoras (2.8.1b). */
+/** Vistas de sistema del módulo de Bitácoras (2.8.1b/2.8.1c). */
 export const LOGBOOK_SYSTEM_VIEWS: readonly SystemView[] = [
+  // Mi turno: lo resuelve el backend al aplicar (turno/día vigentes + autor); marca dinámica.
+  { id: "sys:my-shift", labelKey: "logbook.views.system.myShift", filters: { __preset: "myShift" } },
   // Firmas pendientes: registros con ≥1 sección que exige firma y no la tiene.
   { id: "sys:pending-signatures", labelKey: "logbook.views.system.pendingSignatures", filters: { pendingSignature: true } },
-  // Excepciones: cualquier banda de umbral fuera de rango (WARN/CRIT).
-  { id: "sys:exceptions", labelKey: "logbook.views.system.exceptions", filters: { thresholdBand: "ANY" } },
+  // Excepciones: review-by-exception = umbral WARN/CRIT OR firma pendiente.
+  { id: "sys:exceptions", labelKey: "logbook.views.system.exceptions", filters: { exceptionsOnly: true } },
   // Últimas 24h: el preset de fecha efectiva lo resuelve la UI al aplicar (marca dinámica).
   { id: "sys:last-24h", labelKey: "logbook.views.system.last24h", filters: { __preset: "effective24h" } },
 ] as const;

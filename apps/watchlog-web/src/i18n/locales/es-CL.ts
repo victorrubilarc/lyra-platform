@@ -971,6 +971,17 @@ export const esCL = {
       WARN: "Solo advertencia",
       CRIT: "Solo crítico",
     },
+    facets: {
+      button: "Facetas",
+      title: "Facetas",
+      band: "Banda de umbral",
+      empty: "Sin valores que mostrar para el set actual.",
+    },
+    peek: {
+      openFull: "Abrir ficha completa",
+      sections: "secciones",
+      pendingSig: "firmas pend.",
+    },
     origin: {
       ONLINE: "En línea",
       DEFERRED: "Diferida",
@@ -1077,6 +1088,7 @@ export const esCL = {
       updated: "Vista actualizada.",
       deleted: "Vista eliminada.",
       system: {
+        myShift: "Mi turno",
         pendingSignatures: "Firmas pendientes",
         exceptions: "Excepciones",
         last24h: "Últimas 24h",
@@ -1094,6 +1106,7 @@ export const esCL = {
       includeDescendants: "Incluir descendientes",
       onlyMine: "Mis entradas",
       pendingSignature: "Con firmas pendientes",
+      exceptionsOnly: "Solo excepciones",
       shift: "Turno",
       shiftPlaceholder: "Ej. A",
       period: "Periodo",

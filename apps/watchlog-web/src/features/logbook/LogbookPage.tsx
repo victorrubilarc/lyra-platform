@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { BookOpenCheck, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Columns3, Download, FilterX, GitBranch, History, Lock, PenLine, RefreshCw, SlidersHorizontal, TriangleAlert } from "lucide-react";
+import { BarChart3, BookOpenCheck, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Columns3, Download, FilterX, GitBranch, History, Lock, PenLine, RefreshCw, SlidersHorizontal, TriangleAlert } from "lucide-react";
 import {
   Button,
   Checkbox,
@@ -26,17 +26,19 @@ import {
   LOG_ENTRY_SORT_FIELDS,
   type LogEntryListItem,
   type LogEntrySortField,
-  type LogEntrySummaryValue,
   type OrgNodeTree,
   type SavedViewDto,
   type SystemView,
 } from "@lyra/contracts";
-import { formatDateTime as fmtDateTime, formatLocalDate, formatNumber } from "../../lib/format.js";
+import { formatDateTime } from "../../lib/format.js";
 import { ApiError } from "../../lib/api-client.js";
 import { downloadBlob, fileStamp } from "../../lib/download.js";
 import { useOrgTree } from "../structure/structure-queries.js";
-import { exportLogbookCsv } from "./logbook-api.js";
-import { useLogbookFilterTemplates, useLogbookList, useLogbookStats, useSavedViewMutations, useSavedViews } from "./logbook-queries.js";
+import { exportLogbookCsv, fetchMyShiftFilter } from "./logbook-api.js";
+import { useLogbookFacets, useLogbookFilterTemplates, useLogbookList, useLogbookStats, useSavedViewMutations, useSavedViews } from "./logbook-queries.js";
+import { formatSummaryValue } from "./logbook-cells.js";
+import { FacetsPanel } from "./FacetsPanel.js";
+import { PeekDrawer } from "./PeekDrawer.js";
 import {
   activeFilterCount,
   DEFAULT_GRID_STATE,
@@ -92,9 +94,6 @@ function flattenTree(tree: OrgNodeTree[], depth = 0, out: ComboboxOption[] = [])
   return out;
 }
 
-function formatDateTime(iso: string): string {
-  return new Intl.DateTimeFormat("es-CL", { dateStyle: "short", timeStyle: "short" }).format(new Date(iso));
-}
 
 /** Números de página compactos con elipsis (1 … 4 5 [6] 7 8 … 20). */
 function pageNumbers(current: number, total: number): (number | "…")[] {
@@ -122,34 +121,6 @@ function StateChip({ row }: { row: LogEntryListItem }) {
       {row.currentStateName ?? row.currentStateKey}
     </span>
   );
-}
-
-/**
- * Formatea UN valor de resumen según su tipo, con la configuración REGIONAL activa
- * (lib/format). El backend manda el valor estructurado + meta; aquí se presenta.
- */
-function formatSummaryValue(sv: LogEntrySummaryValue): string {
-  const v = sv.value;
-  if (v === null || v === undefined) return "—";
-  switch (sv.dataType) {
-    case "NUMBER": {
-      const n = typeof v === "number" ? v : Number(v);
-      const num = Number.isFinite(n) ? formatNumber(n) : String(v);
-      return sv.unit ? `${num} ${sv.unit}` : num;
-    }
-    case "CODE":
-    case "CODE_ARRAY":
-      // El valor guarda el code; el label resuelto (inline / lista) viene en optionLabel.
-      return sv.optionLabel ?? (Array.isArray(v) ? v.join(", ") : String(v));
-    case "BOOLEAN":
-      return v ? "Sí" : "No";
-    case "DATE":
-      return typeof v === "string" ? formatLocalDate(v) : String(v);
-    case "DATETIME":
-      return typeof v === "string" ? fmtDateTime(v) : String(v);
-    default:
-      return String(v);
-  }
 }
 
 /**
@@ -239,6 +210,8 @@ export function LogbookPage() {
   const [exporting, setExporting] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [columnsOpen, setColumnsOpen] = useState(false);
+  const [facetsOpen, setFacetsOpen] = useState(false);
+  const [peekRow, setPeekRow] = useState<LogEntryListItem | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
 
@@ -269,6 +242,7 @@ export function LogbookPage() {
   const query = useMemo(() => toListQuery(state, userId), [state, userId]);
   const list = useLogbookList(query);
   const stats = useLogbookStats(query);
+  const facets = useLogbookFacets(query, facetsOpen);
 
   // Al cambiar filtros/orden, vuelve a la página 1.
   useEffect(() => {
@@ -328,7 +302,7 @@ export function LogbookPage() {
     setDensity(d);
     setActiveViewId(view.id);
   }
-  function applySystem(view: SystemView) {
+  async function applySystem(view: SystemView) {
     // Las vistas de sistema solo fijan FILTROS; la presentación es personal (se conserva).
     const next: LogbookGridState = { ...DEFAULT_GRID_STATE, sorts: DEFAULT_SORTS };
     for (const [k, v] of Object.entries(view.filters)) {
@@ -338,6 +312,16 @@ export function LogbookPage() {
         from.setDate(from.getDate() - 1);
         next.effectiveFromDay = isoDay(from);
         next.effectiveToDay = isoDay(to);
+      } else if (k === "__preset" && v === "myShift") {
+        // "Mi turno": el backend resuelve el turno/día vigentes + autor.
+        try {
+          const f = await fetchMyShiftFilter();
+          next.onlyMine = true;
+          next.operationalDate = f.operationalDate;
+          if (f.shiftCode) next.shiftCode = f.shiftCode;
+        } catch {
+          next.onlyMine = true; // degradación: al menos "mías"
+        }
       } else if (k in next) {
         // Asignación tolerante (los valores provienen del contrato de la vista de sistema).
         (next as unknown as Record<string, unknown>)[k] = v;
@@ -346,6 +330,22 @@ export function LogbookPage() {
     setState(next);
     setQInput(next.q);
     setActiveViewId(view.id);
+  }
+
+  // Clic en un valor de faceta = toggle del filtro correspondiente (URL/SavedView).
+  function toggleFacet(dim: "status" | "state" | "template" | "equipment" | "band", value: string) {
+    switch (dim) {
+      case "status":
+        return patch({ status: state.status === value ? "" : (value as LogbookGridState["status"]) });
+      case "state":
+        return patch({ stateKey: state.stateKey === value ? "" : value });
+      case "template":
+        return patch({ templateId: state.templateId === value ? "" : value });
+      case "equipment":
+        return patch({ equipmentId: state.equipmentId === value ? "" : value });
+      case "band":
+        return patch({ thresholdBand: state.thresholdBand === value ? "" : (value as LogbookGridState["thresholdBand"]) });
+    }
   }
   function applyDefault() {
     setState({ ...DEFAULT_GRID_STATE });
@@ -695,8 +695,13 @@ export function LogbookPage() {
       clear: () => patch({ recordedFromDay: "", recordedToDay: "" }),
     });
   }
+  if (state.equipmentId) {
+    const label = facets.data?.equipment.find((b) => b.value === state.equipmentId)?.label ?? state.equipmentId;
+    activeChips.push({ key: "equipment", label: `${t("logbook.list.equipment")}: ${label}`, clear: () => patch({ equipmentId: "" }) });
+  }
   if (state.onlyMine) activeChips.push({ key: "mine", label: t("logbook.filters.onlyMine"), clear: () => patch({ onlyMine: false }) });
   if (state.pendingSignature) activeChips.push({ key: "pending", label: t("logbook.filters.pendingSignature"), clear: () => patch({ pendingSignature: false }) });
+  if (state.exceptionsOnly) activeChips.push({ key: "exceptions", label: t("logbook.filters.exceptionsOnly"), clear: () => patch({ exceptionsOnly: false }) });
   if (state.thresholdBand) activeChips.push({ key: "band", label: t(`logbook.bandFilter.${state.thresholdBand}`), clear: () => patch({ thresholdBand: "" }) });
   if (state.entryOrigin) activeChips.push({ key: "origin", label: t(`logbook.origin.${state.entryOrigin}`), clear: () => patch({ entryOrigin: "" }) });
 
@@ -723,6 +728,14 @@ export function LogbookPage() {
             onToggleDefault={handleToggleDefault}
             onDelete={handleDeleteView}
           />
+          <Button
+            variant="secondary"
+            leftIcon={<BarChart3 size={16} />}
+            onClick={() => setFacetsOpen((o) => !o)}
+            aria-pressed={facetsOpen}
+          >
+            {t("logbook.facets.button")}
+          </Button>
           <Button variant="secondary" leftIcon={<Columns3 size={16} />} onClick={() => setColumnsOpen(true)}>
             {t("logbook.columns.button")}
           </Button>
@@ -916,6 +929,11 @@ export function LogbookPage() {
               onChange={(v) => patch({ pendingSignature: v })}
               label={t("logbook.filters.pendingSignature")}
             />
+            <Checkbox
+              checked={state.exceptionsOnly}
+              onChange={(v) => patch({ exceptionsOnly: v })}
+              label={t("logbook.filters.exceptionsOnly")}
+            />
           </div>
         </div>
       </Drawer>
@@ -932,38 +950,59 @@ export function LogbookPage() {
         </div>
       )}
 
-      <div className={styles.gridWrap}>
-        {paginationBar}
-        <Table
-          columns={allColumns}
-          data={visibleRows}
-          rowKey={(r) => r.id}
-          loading={list.isLoading}
-          density={density}
-          columnState={effectiveColumnState}
-          sorts={tableSorts}
-          onSort={(key, direction) => {
-            // Click en la cabecera = orden ÚNICO por esa columna indexada (reemplaza).
-            // El multi-sort se arma en el gestor de columnas (panel "Columnas").
-            if (isSortField(key)) patch({ sorts: [{ field: key, dir: direction }] });
-          }}
-          onColumnResize={(key, width) =>
-            setColumnState((cs) => ({ ...cs, widths: { ...cs.widths, [key]: width } }))
-          }
-          onRowClick={(r) => navigate(`/bitacoras/${r.id}`)}
-          emptyState={
-            <EmptyState
-              icon={<BookOpenCheck size={32} />}
-              title={t("logbook.list.empty")}
-              description={hasActiveFilters(state) ? t("logbook.list.emptyFiltered") : t("logbook.list.emptyDesc")}
-            />
-          }
-        />
-        {rows.length > 0 && paginationBar}
-        {list.isError && (
-          <EmptyState icon={<TriangleAlert size={30} />} title={t("logbook.list.loadError")} />
+      <div className={facetsOpen ? styles.gridWithFacets : undefined}>
+        {facetsOpen && (
+          <FacetsPanel facets={facets.data} loading={facets.isLoading} state={state} onToggle={toggleFacet} />
         )}
+        <div className={styles.gridWrap}>
+          {paginationBar}
+          <Table
+            columns={allColumns}
+            data={visibleRows}
+            rowKey={(r) => r.id}
+            loading={list.isLoading}
+            density={density}
+            columnState={effectiveColumnState}
+            sorts={tableSorts}
+            onSort={(key, direction) => {
+              // Click en la cabecera = orden ÚNICO por esa columna indexada (reemplaza).
+              // El multi-sort se arma en el gestor de columnas (panel "Columnas").
+              if (isSortField(key)) patch({ sorts: [{ field: key, dir: direction }] });
+            }}
+            onColumnResize={(key, width) =>
+              setColumnState((cs) => ({ ...cs, widths: { ...cs.widths, [key]: width } }))
+            }
+            rowClassName={(r) =>
+              // Realce por excepción (review-by-exception): tinte sutil por la peor banda.
+              r.indicators.worstThresholdBand === "CRIT"
+                ? styles.rowCrit
+                : r.indicators.worstThresholdBand === "WARN"
+                  ? styles.rowWarn
+                  : undefined
+            }
+            onRowClick={(r) => setPeekRow(r)}
+            emptyState={
+              <EmptyState
+                icon={<BookOpenCheck size={32} />}
+                title={t("logbook.list.empty")}
+                description={hasActiveFilters(state) ? t("logbook.list.emptyFiltered") : t("logbook.list.emptyDesc")}
+              />
+            }
+          />
+          {rows.length > 0 && paginationBar}
+          {list.isError && (
+            <EmptyState icon={<TriangleAlert size={30} />} title={t("logbook.list.loadError")} />
+          )}
+        </div>
       </div>
+
+      <PeekDrawer
+        row={peekRow}
+        onClose={() => setPeekRow(null)}
+        onOpenFull={(id) => navigate(`/bitacoras/${id}`)}
+        onEdit={(id) => navigate(`/nueva-entrada/${id}`)}
+        canEdit={can("logentry:fill")}
+      />
     </div>
   );
 }
