@@ -20,6 +20,7 @@ import type {
   SaveTemplateDraftRequest,
   TemplateDetail,
   TemplateNodeAssignmentInput,
+  UpdateTemplateRequest,
   VisibleWhen,
 } from "@lyra/contracts";
 
@@ -203,8 +204,6 @@ export function editStateToDraftRequest(state: EditState): SaveTemplateDraftRequ
   return {
     name: state.name.trim() || "Sin título",
     description: state.description.trim() || null,
-    // Alcance de estructura (2.8.0): fuente de verdad; el backend deriva orgNodeId.
-    nodeAssignments: state.nodeAssignments,
     requireSignature: state.requireSignature,
     // Flujo: enviamos solo la DEFINICIÓN; el backend ata SIEMPRE su versión
     // publicada vigente (`resolveWorkflowBinding` exige la actual). Reenviar la
@@ -213,9 +212,10 @@ export function editStateToDraftRequest(state: EditState): SaveTemplateDraftRequ
     // vigente del flujo"). null = el binding se resuelve a la versión vigente.
     workflowDefinitionId: state.workflowDefinitionId,
     workflowDefinitionVersionId: null,
-    editWindowAnchor: state.editWindowAnchor,
-    editWindowMinutes: state.editWindowMinutes,
-    equipmentMode: state.equipmentMode,
+    // NOTA: el alcance de nodos, la ventana de edición y el modo de equipo son
+    // GOBERNANZA VIVA del contenedor y se guardan por `editStateToConfigRequest`
+    // (PATCH), NO por el borrador — así "Guardar borrador" y "Guardar configuración"
+    // no se pisan ni mezclan sus semánticas (definición versionada vs ajuste vivo).
     sections: state.sections.map((s, si) => ({
       key: s.key,
       title: s.title.trim() || `Sección ${si + 1}`,
@@ -236,6 +236,23 @@ export function editStateToDraftRequest(state: EditState): SaveTemplateDraftRequ
         roleIds: f.roleIds,
       })),
     })),
+  };
+}
+
+/**
+ * Construye el request de CONFIGURACIÓN/gobernanza (PATCH /templates/:id): identidad
+ * + alcance de nodos + ventana de edición + modo de equipo. Es config VIVA del
+ * contenedor: se aplica de inmediato a las entradas nuevas, sin crear borrador ni
+ * publicar. NO incluye el flujo (definición versionada) ni las secciones.
+ */
+export function editStateToConfigRequest(state: EditState): UpdateTemplateRequest {
+  return {
+    name: state.name.trim() || "Sin título",
+    description: state.description.trim() || null,
+    nodeAssignments: state.nodeAssignments,
+    editWindowAnchor: state.editWindowAnchor,
+    editWindowMinutes: state.editWindowMinutes,
+    equipmentMode: state.equipmentMode,
   };
 }
 
