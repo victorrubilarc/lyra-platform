@@ -98,7 +98,8 @@ const versionGraph = {
 
 function makeServices(prismaOver: Record<string, unknown> = {}, scopeOver: Partial<ScopeService> = {}) {
   const prisma = {
-    template: { findUnique: vi.fn().mockResolvedValue({ name: "Plantilla" }) },
+    template: { findUnique: vi.fn().mockResolvedValue({ name: "Plantilla" }), findMany: vi.fn().mockResolvedValue([]) },
+    templateField: { findMany: vi.fn().mockResolvedValue([]) },
     templateVersion: { findUnique: vi.fn().mockResolvedValue(versionGraph) },
     workflowDefinitionVersion: { findUnique: vi.fn() },
     workflowState: { findMany: vi.fn().mockResolvedValue([]) },

@@ -183,6 +183,7 @@ export class TemplatesService {
         editWindowAnchor: t.editWindowAnchor,
         editWindowMinutes: t.editWindowMinutes,
         equipmentMode: t.equipmentMode,
+        gridFieldKeys: t.gridFieldKeys,
         createdAt: t.createdAt.toISOString(),
         updatedAt: t.updatedAt.toISOString(),
         orgNodePath: t.orgNodeId ? (nodePaths.get(t.orgNodeId) ?? null) : null,
@@ -292,6 +293,7 @@ export class TemplatesService {
       editWindowAnchor: template.editWindowAnchor,
       editWindowMinutes: template.editWindowMinutes,
       equipmentMode: template.equipmentMode,
+      gridFieldKeys: template.gridFieldKeys,
       createdAt: template.createdAt.toISOString(),
       updatedAt: template.updatedAt.toISOString(),
       version: this.mapVersion(version),
@@ -317,6 +319,7 @@ export class TemplatesService {
         editWindowAnchor: dto.editWindowAnchor ?? null,
         editWindowMinutes: dto.editWindowMinutes ?? null,
         equipmentMode: dto.equipmentMode ?? undefined, // undefined ⇒ default OPTIONAL del schema
+        gridFieldKeys: dto.gridFieldKeys ?? undefined, // undefined ⇒ default [] del schema
         createdById: userId,
         updatedById: userId,
         nodeAssignments: {
@@ -348,6 +351,9 @@ export class TemplatesService {
     // Alcance de estructura (2.8.0): null = no tocar; si viene, reemplaza el set.
     const change = this.resolveAssignmentChange(dto);
     if (change) await this.assertAssignmentNodesExist(change.assignments);
+    // Campos de resumen de grilla (2.8.1a): si viene, valida que cada `key` exista
+    // en alguna versión de la plantilla (evita typos/órfanos; tolera cross-versión).
+    if (dto.gridFieldKeys !== undefined) await this.assertGridFieldKeysExist(id, dto.gridFieldKeys);
 
     const updated = await this.prisma.$transaction(async (tx) => {
       const t = await tx.template.update({
@@ -361,6 +367,8 @@ export class TemplatesService {
           editWindowMinutes: dto.editWindowMinutes === undefined ? undefined : dto.editWindowMinutes,
           // Modo de equipo (2.8.0.2): gobernanza viva, editable sin republicar.
           equipmentMode: dto.equipmentMode === undefined ? undefined : dto.equipmentMode,
+          // Campos de resumen de grilla (2.8.1a): gobernanza viva, editable sin republicar.
+          gridFieldKeys: dto.gridFieldKeys === undefined ? undefined : dto.gridFieldKeys,
           updatedById: userId,
         },
       });
@@ -391,6 +399,7 @@ export class TemplatesService {
         editWindowAnchor: before.editWindowAnchor,
         editWindowMinutes: before.editWindowMinutes,
         equipmentMode: before.equipmentMode,
+        gridFieldKeys: before.gridFieldKeys,
       },
       after: {
         name: updated.name,
@@ -399,6 +408,7 @@ export class TemplatesService {
         editWindowAnchor: updated.editWindowAnchor,
         editWindowMinutes: updated.editWindowMinutes,
         equipmentMode: updated.equipmentMode,
+        gridFieldKeys: updated.gridFieldKeys,
       },
     });
     return this.getDetail(userId, id);
@@ -724,6 +734,26 @@ export class TemplatesService {
     if (ids.length === 0) return;
     const found = await this.prisma.orgNode.count({ where: { id: { in: ids }, deletedAt: null } });
     if (found !== ids.length) throw new BadRequestException("Uno o más nodos de la asignación no existen");
+  }
+
+  /**
+   * Campos de resumen de grilla (2.8.1a): cada `key` del pool debe existir como
+   * campo en ALGUNA versión de la plantilla (tolera cross-versión: el pool es
+   * gobernanza viva keyed por `key` estable, no por una versión concreta). Rechaza
+   * typos / claves órfanas. El cap (6) y la unicidad los valida el contrato.
+   */
+  private async assertGridFieldKeysExist(templateId: string, keys: string[]): Promise<void> {
+    if (keys.length === 0) return;
+    const fields = await this.prisma.templateField.findMany({
+      where: { section: { version: { templateId } }, key: { in: keys } },
+      select: { key: true },
+      distinct: ["key"],
+    });
+    const valid = new Set(fields.map((f) => f.key));
+    const missing = keys.filter((k) => !valid.has(k));
+    if (missing.length > 0) {
+      throw new BadRequestException(`Campos de resumen inexistentes en la plantilla: ${missing.join(", ")}`);
+    }
   }
 
   /** Reemplaza por completo el set de asignaciones de la plantilla (dentro de una tx). */
