@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import type {
   EditWindowAnchor,
+  EquipmentMode,
   FieldSemanticRole,
   FieldType,
   OrgNodeTree,
@@ -104,6 +105,8 @@ export interface EditState {
    * minutos null = hereda global · 0 = sin ventana · >0 = propia. */
   editWindowAnchor: EditWindowAnchor | null;
   editWindowMinutes: number | null;
+  /** Modo de equipo (2.8.0.2), gobernanza del objeto de referencia EAM. */
+  equipmentMode: EquipmentMode;
   sections: EditSection[];
 }
 
@@ -155,6 +158,7 @@ export function detailToEditState(detail: TemplateDetail): EditState {
     workflowDefinitionVersionId: detail.version.workflowDefinitionVersionId,
     editWindowAnchor: detail.editWindowAnchor,
     editWindowMinutes: detail.editWindowMinutes,
+    equipmentMode: detail.equipmentMode,
     sections: detail.version.sections.map((s) => ({
       uid: nextUid(),
       key: s.key,
@@ -211,6 +215,7 @@ export function editStateToDraftRequest(state: EditState): SaveTemplateDraftRequ
     workflowDefinitionVersionId: null,
     editWindowAnchor: state.editWindowAnchor,
     editWindowMinutes: state.editWindowMinutes,
+    equipmentMode: state.equipmentMode,
     sections: state.sections.map((s, si) => ({
       key: s.key,
       title: s.title.trim() || `Sección ${si + 1}`,

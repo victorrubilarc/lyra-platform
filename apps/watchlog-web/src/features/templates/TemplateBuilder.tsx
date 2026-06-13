@@ -14,7 +14,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { Button, Card, Chip, FormField, Input, Modal, Select, Textarea, useToast } from "@lyra/ui";
-import type { FieldType, TemplateDetail } from "@lyra/contracts";
+import type { EquipmentMode, FieldType, TemplateDetail } from "@lyra/contracts";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { EditWindowDurationField } from "../settings/EditWindowDurationField.js";
 import { fetchRoles } from "../security/security-api.js";
@@ -374,6 +374,24 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
                       </>
                     )}
                   </div>
+                )}
+              </FormField>
+              {/* Modo de equipo (2.8.0.2): gobernanza del objeto de referencia EAM —
+                  el TIPO de registro decide si la entrada se tagea a un equipo
+                  (patrón notification-type SAP / WO-type Maximo). Gobernanza VIVA. */}
+              <FormField label={t("templates.builder.equipmentMode")} hint={t("templates.builder.equipmentModeHint")}>
+                {({ id }) => (
+                  <Select
+                    id={id}
+                    value={state.equipmentMode}
+                    disabled={!canEdit}
+                    onChange={(e) => patchState({ ...state, equipmentMode: e.target.value as EquipmentMode })}
+                  >
+                    <option value="NONE">{t("templates.builder.equipmentModeNone")}</option>
+                    <option value="OPTIONAL">{t("templates.builder.equipmentModeOptional")}</option>
+                    <option value="SUGGESTED">{t("templates.builder.equipmentModeSuggested")}</option>
+                    <option value="REQUIRED">{t("templates.builder.equipmentModeRequired")}</option>
+                  </Select>
                 )}
               </FormField>
             </Card>
