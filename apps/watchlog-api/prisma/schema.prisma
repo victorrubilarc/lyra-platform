@@ -1208,6 +1208,11 @@ model LogEntry {
   @@index([equipmentId])
   @@index([status])
   @@index([currentStateKey])
+  // Orden POR DEFECTO del listado (recordedAt desc) con desempate por id: índice
+  // COMPUESTO para que la paginación keyset sea un seek por índice a cualquier escala.
+  @@index([recordedAt, id])
+  // effectiveAt es el otro orden disponible; compuesto con id por el mismo motivo.
+  @@index([effectiveAt, id])
   @@index([effectiveAt])
   @@index([operationalDate])
   @@index([periodKey])

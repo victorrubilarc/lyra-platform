@@ -595,6 +595,30 @@ rate-limit global + CSP/HSTS (Caddy) · exportación CSV/PDF · notificaciones S
 terreno (PWA) · retención/borrado lógico · adjuntos/evidencias en MinIO · firma con validez
 probatoria (hash+timestamp). Ref: `DECISIONS.md` (sección de recomendaciones).
 
+#### Escalabilidad de la grilla de Bitácoras a MILLONES de registros (consulta del dueño 2026-06-13)
+Análisis hecho el 2026-06-13. **Resuelto ya (no es Fase 7):** índices COMPUESTOS para keyset
+(`LogEntry(recordedAt,id)` + `(effectiveAt,id)`, migración `20260613120000_add_logentry_keyset_indexes`)
+— el orden por defecto `recordedAt desc` no tenía índice. Lo que **sí** es Fase 7 (endurecimiento), con su
+implementación esperada:
+- [ ] **KPIs/stats sin `COUNT` exacto a escala** (el cuello de botella real). Hoy `stats()` hace 5 conteos sobre el
+      set filtrado, 2 con semi-join a `LogEntryValue`/`LogEntrySection`. Implementación: **caché corta en Redis**
+      (`CacheService` ya existe) por hash de filtros, y/o **rollups materializados** (tabla/vista materializada de
+      conteos por día×nodo×plantilla×estado refrescada por job o trigger), con *fallback* a conteo en vivo para
+      filtros ad-hoc; opción de conteos **aproximados**. KPIs bajo demanda si se prefiere.
+- [ ] **Búsqueda por contenido full-text** (hoy `ILIKE` sobre `value::text` con índice GIN trgm + cap de 5.000 ids).
+      Implementación in-Postgres: **columna `tsvector`** denormalizada de los valores `gridFieldKeys`, GIN + `@@`
+      con ranking, mantenida por trigger/al guardar; o, a gran escala, **OpenSearch** (indexa entradas → ids →
+      hidrata de Postgres) — solo si un cliente lo exige (rompe la simplicidad on-prem).
+- [ ] **Particionado por tiempo de `LogEntry`** (+ `LogEntryValue`/`LogEntryFieldChange`). Implementación:
+      `PARTITION BY RANGE (recordedAt)` mensual (PK compuesta con `recordedAt`), creación/*drop* de particiones por
+      `pg_partman` o job; **partition pruning** por filtros de fecha + archivado barato de particiones viejas.
+      Migración no trivial (raw SQL, Prisma no gestiona particiones). El modelo ya estampa `recordedAt`/
+      `operationalDate`/`periodKey` (partition-ready). Acompaña **retención/archivado**.
+- [ ] **Paginador absoluto** (saltar a "página N de millones") queda DESCARTADO con keyset (no random-access);
+      a escala el patrón es FILTRAR (ya hay filtros potentes + multi-nodo). El paginador actual es relativo a la
+      ventana cargada (lotes de 100). Solo si un cliente lo exige se evaluaría offset+count (no escala).
+- [ ] **Export CSV** capado a 100.000 filas (`EXPORT_MAX_ROWS`, marca `truncated`) — revisar a demanda.
+
 ---
 
 ## 4. Pendiente por PROBAR (gaps de verificación)
