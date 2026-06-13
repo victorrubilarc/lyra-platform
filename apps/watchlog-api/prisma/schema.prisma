@@ -576,6 +576,16 @@ enum EditWindowAnchor {
   EFFECTIVE
 }
 
+// Modo de equipo por plantilla (Fase 2.8.0.2) — gobernanza del objeto de referencia
+// EAM (patrón notification-type SAP PM / WO-type Maximo). El tipo de registro decide
+// si el equipo se oculta / ofrece / sugiere / exige al crear la entrada.
+enum EquipmentMode {
+  NONE
+  OPTIONAL
+  SUGGESTED
+  REQUIRED
+}
+
 model Template {
   id               String         @id @default(cuid())
   name             String
@@ -591,6 +601,10 @@ model Template {
   // editWindowMinutes: null = hereda global · 0 = SIN ventana (explícito) · >0 = minutos.
   editWindowAnchor  EditWindowAnchor?
   editWindowMinutes Int?
+  // --- Modo de equipo (Fase 2.8.0.2) — GOBERNANZA del objeto de referencia EAM ----
+  // Vive en el contenedor MUTABLE (gobernanza viva, sin republicar). Default OPTIONAL
+  // = preserva el comportamiento contextual de 2.8.0.1 para plantillas existentes.
+  equipmentMode     EquipmentMode  @default(OPTIONAL)
   // Autoría (referencia blanda, sin FK: el usuario pudo borrarse — igual que AuditLog).
   createdById      String?
   updatedById      String?

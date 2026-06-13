@@ -192,6 +192,13 @@ GxP: MHRA Data Integrity 2018 / FDA DI Q&A (corrección tardía justificada + at
   (huella proactiva "Editable hasta X"); quien tiene el override no queda bloqueado (la UI le pide motivo al guardar).
 - **Residual**: matriz rol×sección×tiempo (#7) llega en 2.7.3.
 
+### Gobernanza del objeto de referencia EAM — modo de equipo por plantilla (Fase 2.8.0.2)
+- **`Template.equipmentMode`** (`NONE|OPTIONAL|SUGGESTED|REQUIRED`, config de **gobernanza viva** en el contenedor, default
+  OPTIONAL) decide si la entrada se asocia a un equipo. El **backend AUTORIZA** en `create`/materialización
+  (`assertEquipmentForMode`): **REQUIRED** sin equipo ⇒ 400; **NONE** con equipo ⇒ 400 (el front solo refleja el modo que
+  `eligibleNodes` expone). Sin permiso nuevo: editar el modo va por `template:edit`; el cambio queda **auditado** before/after
+  en `template.updated`. No se re-valida al sellar (equipo estampado = histórico intacto, ALCOA+).
+
 ## Estado
 - **Fase 0:** cabeceras (Helmet) y validación de entorno activas.
 - **Fase 1 (backend, ✅):** auth local Argon2id; access JWT (15 min) + refresh rotativo httpOnly con detección de reuso por familia; CSRF de doble envío en refresh/logout; lockout por fuerza bruta (contador en BD); **MFA TOTP** completo (enrolamiento + recovery codes, secreto cifrado en reposo); `PermissionsGuard` + `@RequirePermission` (dims. 1–3) globales; `ScopeService` (dim. 4) con ruta materializada; catálogo de permisos en `@lyra/contracts`; `AuditLog` append-only con **trigger Postgres** que rechaza UPDATE/DELETE; política de contraseñas configurable + historial; seed idempotente con admin de arranque (forzado a cambiar contraseña).

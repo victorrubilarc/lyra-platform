@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { CalendarClock, ChevronRight, ClipboardList, FileStack, History, Layers, Lock, Network, TriangleAlert } from "lucide-react";
 import { Button, Card, Combobox, EmptyState, FormField, Input, Modal, Skeleton, Textarea, Toggle, useToast } from "@lyra/ui";
-import type { EligibleNode, TemplateListItem } from "@lyra/contracts";
+import type { EligibleNode, EquipmentMode, TemplateListItem } from "@lyra/contracts";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { localInputToIso } from "./datetime-local.js";
 import { fetchTemplateEligibleNodes } from "./log-entries-api.js";
@@ -40,7 +40,11 @@ export function NewEntryPage() {
   // Selección de NODO al crear (multi-nodo 2.8.0): si la plantilla resuelve a un
   // solo nodo se autoselecciona; si resuelve a varios, se obliga a elegir.
   const [resolvingId, setResolvingId] = useState<string | null>(null);
-  const [nodeChoice, setNodeChoice] = useState<{ template: TemplateListItem; nodes: EligibleNode[] } | null>(null);
+  const [nodeChoice, setNodeChoice] = useState<{
+    template: TemplateListItem;
+    nodes: EligibleNode[];
+    equipmentMode: EquipmentMode;
+  } | null>(null);
   const [chosenNode, setChosenNode] = useState("");
   const [chosenEquipment, setChosenEquipment] = useState("");
 
@@ -77,18 +81,26 @@ export function NewEntryPage() {
     }
     setResolvingId(tpl.id);
     try {
-      const { nodes } = await fetchTemplateEligibleNodes(tpl.id);
+      const { equipmentMode, nodes } = await fetchTemplateEligibleNodes(tpl.id);
       if (nodes.length === 0) {
         toast.error(t("logbook.new.noEligibleNodes"));
         return;
       }
-      if (nodes.length === 1 && nodes[0]!.equipment.length === 0) {
+      // Modo de equipo (2.8.0.2): REQUIRED exige elegir equipo ⇒ nunca atajo directo.
+      const required = equipmentMode === "REQUIRED";
+      if (nodes.length === 1 && nodes[0]!.equipment.length === 0 && !required) {
         goCompose(tpl.id, nodes[0]!.id, null);
         return;
       }
+      // Autoselección del equipo único cuando se sugiere o exige (un nodo, un equipo).
+      const single = nodes.length === 1 ? nodes[0]! : null;
+      const autoEquip =
+        single && single.equipment.length === 1 && (required || equipmentMode === "SUGGESTED")
+          ? single.equipment[0]!.id
+          : "";
       setChosenNode(nodes.length === 1 ? nodes[0]!.id : "");
-      setChosenEquipment("");
-      setNodeChoice({ template: tpl, nodes });
+      setChosenEquipment(autoEquip);
+      setNodeChoice({ template: tpl, nodes, equipmentMode });
     } catch {
       toast.error(t("logbook.new.loadError"));
     } finally {
@@ -208,7 +220,7 @@ export function NewEntryPage() {
             </Button>
             <Button
               variant="primary"
-              disabled={!chosenNode}
+              disabled={!chosenNode || (nodeChoice?.equipmentMode === "REQUIRED" && !chosenEquipment)}
               onClick={() => {
                 if (nodeChoice && chosenNode) {
                   const tplId = nodeChoice.template.id;
@@ -228,6 +240,10 @@ export function NewEntryPage() {
             const multiNode = nodeChoice.nodes.length > 1;
             const current = nodeChoice.nodes.find((n) => n.id === chosenNode) ?? null;
             const equipment = current?.equipment ?? [];
+            // Gobernanza del equipo (2.8.0.2): REQUIRED obliga (sin "(sin equipo)");
+            // SUGGESTED ofrece "(sin equipo)" pero empuja a elegir.
+            const equipRequired = nodeChoice.equipmentMode === "REQUIRED";
+            const equipSuggested = nodeChoice.equipmentMode === "SUGGESTED";
             return (
               <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
                 {multiNode ? (
@@ -253,24 +269,41 @@ export function NewEntryPage() {
                   </FormField>
                 )}
 
-                {/* Equipo OPCIONAL: solo si el nodo elegido tiene equipos activos. */}
+                {/* Equipo (2.8.0.1/2.8.0.2): se muestra si el nodo tiene equipos. El modo
+                    de la plantilla decide si es obligatorio (REQUIRED) o sugerido. */}
                 {equipment.length > 0 && (
-                  <FormField label={t("logbook.new.equipment")} hint={t("logbook.new.equipmentHint")}>
+                  <FormField
+                    label={t("logbook.new.equipment")}
+                    required={equipRequired}
+                    hint={
+                      equipRequired
+                        ? t("logbook.new.equipmentRequiredHint")
+                        : equipSuggested
+                          ? t("logbook.new.equipmentSuggestedHint")
+                          : t("logbook.new.equipmentHint")
+                    }
+                  >
                     {({ id }) => (
                       <Combobox
                         id={id}
                         value={chosenEquipment}
                         onChange={setChosenEquipment}
                         options={[
-                          { value: "", label: t("logbook.new.equipmentNone") },
+                          // REQUIRED no ofrece "(sin equipo)"; el backend también lo rechaza.
+                          ...(equipRequired ? [] : [{ value: "", label: t("logbook.new.equipmentNone") }]),
                           ...equipment.map((e) => ({ value: e.id, label: e.tag ? `${e.name} · ${e.tag}` : e.name })),
                         ]}
-                        placeholder={t("logbook.new.equipmentNone")}
+                        placeholder={equipRequired ? t("logbook.new.equipmentChoose") : t("logbook.new.equipmentNone")}
                         searchPlaceholder={t("common.search")}
                         ariaLabel={t("logbook.new.equipment")}
                       />
                     )}
                   </FormField>
+                )}
+                {/* REQUIRED pero el nodo elegido no tiene equipos activos: no se puede
+                    crear la entrada hasta dar de alta un equipo en ese nodo. */}
+                {equipRequired && equipment.length === 0 && chosenNode && (
+                  <p className={styles.equipmentBlocked}>{t("logbook.new.equipmentRequiredNoneInNode")}</p>
                 )}
               </div>
             );

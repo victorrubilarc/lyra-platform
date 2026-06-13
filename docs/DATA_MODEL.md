@@ -299,6 +299,20 @@
   (null = sin ventana). Vencida + sin override ⇒ secciones reportan **`EDIT_WINDOW_EXPIRED`** (precede a `WRONG_STATE`/
   `MISSING_ROLE`; `PERIOD_CLOSED` precede a esta). La UI muestra "Editable hasta X" antes de vencer.
 
+### Modo de equipo por plantilla (Fase 2.8.0.2)
+> Migración aditiva **`20260612180000_add_template_equipment_mode`**. Gobernanza del objeto de referencia EAM sobre la
+> mecánica de 2.8.0.1 (patrón notification-type SAP PM / WO-type Maximo).
+- **`Template.equipmentMode`** (enum **`EquipmentMode`** `NONE|OPTIONAL|SUGGESTED|REQUIRED`, `@default(OPTIONAL)`) — config
+  en el **contenedor MUTABLE** (gobernanza VIVA, sin republicar la versión, espejo de `editWindow*`). Default OPTIONAL =
+  preserva el comportamiento contextual de 2.8.0.1 en plantillas ya publicadas (cero ruptura). Auditado before/after en
+  `template.updated`. **OPTIONAL y SUGGESTED son equivalentes en el backend** (permisivos); SUGGESTED solo empuja en la UI.
+- **Enforcement (backend AUTORIZA)** — `LogEntriesService.assertEquipmentForMode(mode, equipmentId)` en **`create`**
+  (punto de materialización donde `equipmentId` se estampa, como `orgNodeId`): **REQUIRED** sin equipo ⇒ 400; **NONE** con
+  equipo ⇒ 400. `previewNew` (compose) solo valida la consistencia de NONE; REQUIRED **no** bloquea al componer (el gate
+  duro corre al materializar). NO se re-valida al sellar: el equipo queda estampado (histórico intacto).
+- **Exposición** — `eligibleNodesForTemplate` devuelve `equipmentMode` (el modal de creación lo refleja: oculta/ofrece/
+  sugiere/obliga) y **omite** la consulta de equipos cuando el modo es NONE. Sin permiso nuevo (gate `template:edit`).
+
 ### Orígenes de datos
 - **DataSource** — URL base, tipo de auth, **credencial cifrada en reposo**. *1—N* **DataSourceEndpoint** (path, método, mapeo JSONPath, TTL). Caché en Redis. **Espejo ENTRANTE:** en Fase 3 un endpoint puede **alimentar/materializar** una `ReferenceList` (`source=EXTERNAL`).
 

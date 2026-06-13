@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   editWindowAnchorSchema,
+  equipmentModeSchema,
   templateVersionSchema,
   type EditWindowAnchor,
   type TemplateFieldDto,
@@ -431,6 +432,12 @@ export type EligibleNode = z.infer<typeof eligibleNodeSchema>;
 
 export const templateEligibleNodesSchema = z.object({
   templateId: z.string(),
+  /**
+   * Modo de equipo de la plantilla (2.8.0.2): gobierna cómo el modal de creación
+   * trata el equipo (oculto/opcional/sugerido/requerido). El backend AUTORIZA REQUIRED
+   * en `create`; el front solo lo refleja. NONE ⇒ los nodos no traen equipos.
+   */
+  equipmentMode: equipmentModeSchema,
   nodes: z.array(eligibleNodeSchema),
 });
 export type TemplateEligibleNodes = z.infer<typeof templateEligibleNodesSchema>;

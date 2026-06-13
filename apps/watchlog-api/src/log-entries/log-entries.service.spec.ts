@@ -263,6 +263,51 @@ describe("LogEntriesService — create", () => {
     await expect(service.create("u1", { templateId: "t1" }, ctx)).rejects.toBeInstanceOf(ForbiddenException);
     expect(prisma.logEntry.create).not.toHaveBeenCalled();
   });
+
+  it("modo de equipo (2.8.0.2): REQUIRED rechaza crear sin equipo", async () => {
+    const { service, prisma } = makeService({
+      template: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "t1", status: "PUBLISHED", currentVersionId: "v1", orgNodeId: "n1", equipmentMode: "REQUIRED", nodeAssignments: [],
+        }),
+      },
+    });
+    await expect(service.create("u1", { templateId: "t1" }, ctx)).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.logEntry.create).not.toHaveBeenCalled();
+  });
+
+  it("modo de equipo (2.8.0.2): NONE rechaza crear con un equipo", async () => {
+    const { service, prisma } = makeService({
+      template: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "t1", status: "PUBLISHED", currentVersionId: "v1", orgNodeId: "n1", equipmentMode: "NONE", nodeAssignments: [],
+        }),
+      },
+    });
+    await expect(service.create("u1", { templateId: "t1", equipmentId: "eq1" }, ctx)).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.logEntry.create).not.toHaveBeenCalled();
+  });
+
+  it("modo de equipo (2.8.0.2): REQUIRED acepta crear con un equipo válido del nodo", async () => {
+    const { service, prisma } = makeService({
+      template: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "t1", status: "PUBLISHED", currentVersionId: "v1", orgNodeId: "n1", equipmentMode: "REQUIRED", nodeAssignments: [],
+        }),
+        findUnique: vi.fn().mockResolvedValue({ name: "Mantención" }),
+      },
+      equipment: { count: vi.fn().mockResolvedValue(1), findFirst: vi.fn().mockResolvedValue({ orgNodeId: "n1", active: true }), findUnique: vi.fn().mockResolvedValue({ name: "Bomba 1" }) },
+      templateVersion: {
+        findFirst: vi.fn().mockResolvedValue(versionGraph([section("s1", [field({ key: "obs", type: "TEXT", dataType: "STRING", label: "Obs" })])])),
+      },
+    });
+    vi.spyOn(service, "getDetail").mockResolvedValue({ id: "e1" } as never);
+
+    await service.create("u1", { templateId: "t1", equipmentId: "eq1" }, ctx);
+    expect(prisma.logEntry.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ equipmentId: "eq1" }) }),
+    );
+  });
 });
 
 describe("LogEntriesService — saveSection", () => {

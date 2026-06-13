@@ -4,6 +4,48 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-12 · Fase 2.8.0.2 — Modo de equipo por PLANTILLA (gobernanza, "opción B") — ✅ IMPLEMENTADO
+
+Capa de **gobernanza** sobre la mecánica EAM de 2.8.0.1: el TIPO de registro (la plantilla) declara cómo se trata el equipo
+y el backend lo **AUTORIZA**. Patrón **notification-type de SAP PM / WO-type de Maximo**: el tipo de registro decide si el
+objeto de referencia es obligatorio (una mantención/inspección exige equipo; un turno/área lo deja opcional u oculto). **6
+forks resueltos con el dueño** (recomendación primero, fundada):
+
+1. **Dónde vive `equipmentMode` → en `Template` (contenedor MUTABLE), NO en `TemplateVersion`.** Es **gobernanza VIVA**:
+   cambiarlo aplica de inmediato a entradas nuevas sin republicar la versión, espejo exacto de la ventana de edición 2.7.2 y
+   del notification-type de SAP (master data configurable, no parte congelada del documento). No re-validamos históricos
+   (el equipo ya quedó o no estampado), así que congelarlo no aportaría.
+2. **Enum `NONE | OPTIONAL | SUGGESTED | REQUIRED`** (el dueño pidió incluir SUGGESTED). **OPTIONAL y SUGGESTED son
+   idénticos en el BACKEND** (permisivos, sin enforcement); SUGGESTED solo cambia la UX (autoselecciona el equipo único,
+   "recomendado", pero permite "(sin equipo)"). NONE oculta; REQUIRED obliga. Extensible de forma aditiva.
+3. **Enforcement de REQUIRED en `create`/materialización** (no en submit/transición). `equipmentId` es un dato de creación
+   (se estampa una vez, como `orgNodeId`; no se edita por sección ni después). En modo compose la materialización ES un
+   create ⇒ el gate corre ahí. Hacerlo en submit dejaría borradores huérfanos sin equipo con dims/período ya estampados.
+   La **"huella"** del faltante NO es un `blockedReason` de sección (corre antes de que existan secciones): vive en el modal
+   de creación (el front fuerza la selección, gateado por el `equipmentMode` que `eligibleNodes` expone) + 400 del backend.
+4. **Default de migración = OPTIONAL** (no NONE): preserva EXACTAMENTE el comportamiento contextual de 2.8.0.1 en plantillas
+   ya publicadas (cero ruptura). NONE habría ocultado el equipo = regresión. Migración aditiva sin backfill destructivo.
+5. **UI**: control "Equipo en la entrada" en el `TemplateBuilder` (junto al alcance de nodo / ventana de edición), gate
+   `template:edit` (sin permiso nuevo, catálogo sigue en **59**). En el modal de creación: REQUIRED quita "(sin equipo)" y
+   obliga (botón Continuar deshabilitado sin equipo; aviso si el nodo no tiene equipos activos); SUGGESTED empuja; NONE no
+   muestra equipo (y `eligibleNodes` no consulta equipos).
+6. **No re-validar al sellar** si un equipo REQUIRED se da de baja luego: el equipo se estampa al crear (existe+activo+nodo);
+   el histórico queda **intacto** (igual que `shiftCode`/`periodKey`). "Bloquear sellado si el objeto de referencia se retiró"
+   queda diferido (BACKLOG) por si un cliente lo exige.
+
+**Implementación.** Contrato: `EQUIPMENT_MODES`/`equipmentModeSchema` + `equipmentMode` en `templateSchema`/list/detail y en
+create/update/saveDraft (opcional) + en `templateEligibleNodesSchema`. Prisma: enum `EquipmentMode` + `Template.equipmentMode
+@default(OPTIONAL)`, migración aditiva `20260612180000_add_template_equipment_mode`. Backend: `TemplatesService` persiste/mapea/
+audita (before/after de gobernanza); `LogEntriesService.assertEquipmentForMode` (gate duro en `create`: REQUIRED sin equipo →
+400, NONE con equipo → 400) + previewNew solo valida consistencia de NONE (REQUIRED no bloquea al componer); `eligibleNodes`
+expone `equipmentMode` y omite equipos si NONE. Web: control en builder + lógica del modal en `NewEntryPage`. Verde:
+typecheck/lint (0 err)/build · tests **contracts 151** (+2) · **API 216** (+3) · smoke en vivo **17/17**
+(`smoke-template-equipment-mode.py`, crea plantilla+equipo, recorre los 4 modos, **crea+limpia por ID** vía psql cascade;
+AuditLog inmutable conserva el rastro). Pendiente: smoke VISUAL. **NO probado en vivo con operador/supervisor/mantenedor** por
+separado: el gate corre en `create` ANTES de los chequeos de rol ⇒ es independiente del rol (cubierto por unit tests).
+
+---
+
 ### 2026-06-12 · Fase 2.8.0.1 — Equipo OPCIONAL al crear entrada (objeto de referencia EAM) — ✅ IMPLEMENTADO
 
 Tras el selector de nodo (2.8.0), el dueño observó que un nodo puede tener equipos y pidió poder **tagear la bitácora a
