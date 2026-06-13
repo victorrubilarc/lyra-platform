@@ -8,7 +8,8 @@ import type { LogEntryListQuery, LogEntrySortField } from "@lyra/contracts";
 export interface LogbookGridState {
   q: string;
   templateId: string;
-  orgNodeId: string;
+  /** Multi-nodo (2.8.1b-UX): varios nodos a la vez. Vacío = toda la estructura. */
+  orgNodeIds: string[];
   includeDescendants: boolean;
   status: "" | "DRAFT" | "SUBMITTED" | "VOID";
   stateKey: string;
@@ -32,7 +33,7 @@ export interface LogbookGridState {
 export const DEFAULT_GRID_STATE: LogbookGridState = {
   q: "",
   templateId: "",
-  orgNodeId: "",
+  orgNodeIds: [],
   includeDescendants: true,
   status: "",
   stateKey: "",
@@ -65,8 +66,8 @@ export function toListQuery(state: LogbookGridState, currentUserId: string | nul
   return {
     q: state.q.trim() || undefined,
     templateId: state.templateId || undefined,
-    orgNodeId: state.orgNodeId || undefined,
-    includeDescendants: state.orgNodeId ? state.includeDescendants : undefined,
+    orgNodeIds: state.orgNodeIds.length ? state.orgNodeIds : undefined,
+    includeDescendants: state.orgNodeIds.length ? state.includeDescendants : undefined,
     status: state.status || undefined,
     stateKey: state.stateKey || undefined,
     shiftCode: state.shiftCode.trim() || undefined,
@@ -82,6 +83,9 @@ export function toListQuery(state: LogbookGridState, currentUserId: string | nul
     entryOrigin: state.entryOrigin || undefined,
     sort: state.sort,
     dir: state.dir,
+    // Lote del servidor (keyset). La grilla pagina ESTE lote en el cliente con su
+    // propio paginador; "Cargar más" trae el siguiente lote cuando hay más.
+    take: 100,
   };
 }
 
@@ -89,21 +93,24 @@ export function toListQuery(state: LogbookGridState, currentUserId: string | nul
 export function gridStateToParams(state: LogbookGridState): URLSearchParams {
   const params = new URLSearchParams();
   for (const key of Object.keys(DEFAULT_GRID_STATE) as (keyof LogbookGridState)[]) {
+    if (key === "orgNodeIds") continue; // array → CSV, manejado aparte
     const value = state[key];
     const fallback = DEFAULT_GRID_STATE[key];
     if (value === fallback) continue;
     params.set(key, String(value));
   }
+  if (state.orgNodeIds.length) params.set("orgNodeIds", state.orgNodeIds.join(","));
   return params;
 }
 
 /** Reconstruye el estado desde la URL (valores desconocidos caen al default). */
 export function gridStateFromParams(params: URLSearchParams): LogbookGridState {
   const state: LogbookGridState = { ...DEFAULT_GRID_STATE };
+  const nodes = params.get("orgNodeIds") ?? params.get("orgNodeId"); // back-compat deep-link
+  if (nodes) state.orgNodeIds = nodes.split(",").map((s) => s.trim()).filter(Boolean);
   for (const key of [
     "q",
     "templateId",
-    "orgNodeId",
     "stateKey",
     "shiftCode",
     "periodKey",
@@ -136,9 +143,21 @@ export function gridStateFromParams(params: URLSearchParams): LogbookGridState {
 
 /** ¿Hay filtros activos (distintos del default), sin contar el orden? */
 export function hasActiveFilters(state: LogbookGridState): boolean {
+  if (state.orgNodeIds.length > 0) return true;
   for (const key of Object.keys(DEFAULT_GRID_STATE) as (keyof LogbookGridState)[]) {
-    if (key === "sort" || key === "dir" || key === "includeDescendants") continue;
+    if (key === "sort" || key === "dir" || key === "includeDescendants" || key === "orgNodeIds") continue;
     if (state[key] !== DEFAULT_GRID_STATE[key]) return true;
   }
   return false;
+}
+
+/** Nº de filtros activos (para el badge de "Más filtros"). Cuenta cada criterio aplicado. */
+export function activeFilterCount(state: LogbookGridState): number {
+  let n = 0;
+  if (state.orgNodeIds.length > 0) n += 1;
+  for (const key of Object.keys(DEFAULT_GRID_STATE) as (keyof LogbookGridState)[]) {
+    if (key === "sort" || key === "dir" || key === "includeDescendants" || key === "orgNodeIds") continue;
+    if (state[key] !== DEFAULT_GRID_STATE[key]) n += 1;
+  }
+  return n;
 }

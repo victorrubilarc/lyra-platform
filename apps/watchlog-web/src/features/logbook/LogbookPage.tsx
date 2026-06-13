@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { BookOpenCheck, Download, FilterX, GitBranch, History, Lock, PenLine, TriangleAlert } from "lucide-react";
+import { BookOpenCheck, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Download, FilterX, GitBranch, History, Lock, PenLine, RefreshCw, SlidersHorizontal, TriangleAlert } from "lucide-react";
 import {
   Button,
   Checkbox,
   Chip,
   Combobox,
+  Drawer,
   EmptyState,
   Input,
+  MultiSelect,
   Select,
   Table,
   useToast,
@@ -25,6 +27,7 @@ import { useOrgTree } from "../structure/structure-queries.js";
 import { exportLogbookCsv } from "./logbook-api.js";
 import { useLogbookFilterTemplates, useLogbookList, useLogbookStats } from "./logbook-queries.js";
 import {
+  activeFilterCount,
   DEFAULT_GRID_STATE,
   gridStateFromParams,
   gridStateToParams,
@@ -46,6 +49,19 @@ function flattenTree(tree: OrgNodeTree[], depth = 0, out: ComboboxOption[] = [])
 
 function formatDateTime(iso: string): string {
   return new Intl.DateTimeFormat("es-CL", { dateStyle: "short", timeStyle: "short" }).format(new Date(iso));
+}
+
+/** Números de página compactos con elipsis (1 … 4 5 [6] 7 8 … 20). */
+function pageNumbers(current: number, total: number): (number | "…")[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const out: (number | "…")[] = [1];
+  const from = Math.max(2, current - 1);
+  const to = Math.min(total - 1, current + 1);
+  if (from > 2) out.push("…");
+  for (let i = from; i <= to; i++) out.push(i);
+  if (to < total - 1) out.push("…");
+  out.push(total);
+  return out;
 }
 
 /** Chip del estado del flujo con el COLOR de la versión congelada. */
@@ -112,7 +128,7 @@ function SummaryCell({ row }: { row: LogEntryListItem }) {
                 ? `${styles.summaryItem} ${styles.summaryWarn}`
                 : styles.summaryItem
           }
-          title={sv.label}
+          title={`${sv.label}: ${formatSummaryValue(sv)}`}
         >
           <span className={styles.summaryLabel}>{sv.label}</span>
           <strong>{formatSummaryValue(sv)}</strong>
@@ -176,6 +192,9 @@ export function LogbookPage() {
   const [state, setState] = useState<LogbookGridState>(() => gridStateFromParams(searchParams));
   const [qInput, setQInput] = useState(state.q);
   const [exporting, setExporting] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
 
   // Debounce de la búsqueda (400 ms).
   useEffect(() => {
@@ -191,6 +210,11 @@ export function LogbookPage() {
   const query = useMemo(() => toListQuery(state, userId), [state, userId]);
   const list = useLogbookList(query);
   const stats = useLogbookStats(query);
+
+  // Al cambiar filtros/orden, vuelve a la página 1.
+  useEffect(() => {
+    setPage(1);
+  }, [query]);
   const { data: tree } = useOrgTree();
   const { data: templates } = useLogbookFilterTemplates();
 
@@ -215,6 +239,83 @@ export function LogbookPage() {
     setQInput("");
     setState((s) => ({ ...DEFAULT_GRID_STATE, sort: s.sort, dir: s.dir }));
   };
+  const refreshing = list.isRefetching || stats.isRefetching;
+  const doRefresh = () => {
+    void list.refetch();
+    void stats.refetch();
+  };
+  const filterCount = activeFilterCount(state);
+
+  // Paginador DISCRETO (arriba y abajo). Pagina en el cliente el lote keyset cargado;
+  // "siguiente" en la última página trae el lote siguiente del servidor si lo hay.
+  const serverTotal = stats.data?.total ?? rows.length;
+  const pages = Math.max(1, Math.ceil(rows.length / pageSize));
+  const safePage = Math.min(page, pages);
+  const startIndex = (safePage - 1) * pageSize;
+  const visibleRows = rows.slice(startIndex, startIndex + pageSize);
+  const rangeFrom = rows.length === 0 ? 0 : startIndex + 1;
+  const rangeTo = Math.min(startIndex + pageSize, rows.length);
+  const goNext = () => {
+    if (safePage < pages) setPage(safePage + 1);
+    else if (list.hasNextPage) {
+      void list.fetchNextPage();
+      setPage(safePage + 1);
+    }
+  };
+  const nextDisabled = safePage >= pages && !list.hasNextPage;
+
+  const paginationBar =
+    rows.length > 0 ? (
+      <div className={styles.pageBar}>
+        <span className={styles.pageInfo}>{t("logbook.list.showingRange", { from: rangeFrom, to: rangeTo, total: serverTotal })}</span>
+        <div className={styles.pager}>
+          <select
+            className={styles.pageSizeSelect}
+            value={pageSize}
+            aria-label={t("logbook.list.perPage")}
+            onChange={(e) => {
+              setPageSize(Number(e.target.value));
+              setPage(1);
+            }}
+          >
+            {[10, 25, 50].map((s) => (
+              <option key={s} value={s}>
+                {t("logbook.list.perPageN", { count: s })}
+              </option>
+            ))}
+          </select>
+          <button type="button" className={styles.pagerBtn} disabled={safePage <= 1} onClick={() => setPage(1)} aria-label={t("logbook.list.first")}>
+            <ChevronsLeft size={16} />
+          </button>
+          <button type="button" className={styles.pagerBtn} disabled={safePage <= 1} onClick={() => setPage(safePage - 1)} aria-label={t("common.previous")}>
+            <ChevronLeft size={16} />
+          </button>
+          {pageNumbers(safePage, pages).map((n, i) =>
+            n === "…" ? (
+              <span key={`e${i}`} className={styles.pagerEllipsis}>
+                …
+              </span>
+            ) : (
+              <button
+                key={n}
+                type="button"
+                className={n === safePage ? `${styles.pagerBtn} ${styles.pagerBtnActive}` : styles.pagerBtn}
+                aria-current={n === safePage ? "page" : undefined}
+                onClick={() => setPage(n)}
+              >
+                {n}
+              </button>
+            ),
+          )}
+          <button type="button" className={styles.pagerBtn} disabled={nextDisabled} onClick={goNext} aria-label={t("common.next")}>
+            {list.isFetchingNextPage ? "…" : <ChevronRight size={16} />}
+          </button>
+          <button type="button" className={styles.pagerBtn} disabled={safePage >= pages} onClick={() => setPage(pages)} aria-label={t("logbook.list.last")}>
+            <ChevronsRight size={16} />
+          </button>
+        </div>
+      </div>
+    ) : null;
 
   function presetEffectiveDays(days: number) {
     const to = new Date();
@@ -362,9 +463,10 @@ export function LogbookPage() {
     const name = templateOptions.find((o) => o.value === state.templateId)?.label ?? state.templateId;
     activeChips.push({ key: "template", label: `${t("logbook.list.template")}: ${name}`, clear: () => patch({ templateId: "" }) });
   }
-  if (state.orgNodeId) {
-    const name = nodeOptions.find((o) => o.value === state.orgNodeId)?.label.trim() ?? state.orgNodeId;
-    activeChips.push({ key: "node", label: `${t("logbook.list.node")}: ${name}`, clear: () => patch({ orgNodeId: "" }) });
+  if (state.orgNodeIds.length > 0) {
+    const names = state.orgNodeIds.map((id) => nodeOptions.find((o) => o.value === id)?.label.trim() ?? id);
+    const label = names.length === 1 ? names[0] : t("logbook.filters.nodesCount", { count: names.length });
+    activeChips.push({ key: "node", label: `${t("logbook.list.node")}: ${label}`, clear: () => patch({ orgNodeIds: [] }) });
   }
   if (state.status) activeChips.push({ key: "status", label: t(`logbook.status.${state.status}`), clear: () => patch({ status: "" }) });
   if (state.stateKey) {
@@ -403,6 +505,9 @@ export function LogbookPage() {
           <p className={styles.subtitle}>{t("logbook.list.subtitle")}</p>
         </div>
         <div className={styles.headerActions}>
+          <Button variant="secondary" leftIcon={<RefreshCw size={16} className={refreshing ? styles.spin : undefined} />} onClick={doRefresh}>
+            {t("logbook.list.refresh")}
+          </Button>
           <Button variant="primary" leftIcon={<Download size={16} />} loading={exporting} onClick={doExport}>
             {t("common.export")}
           </Button>
@@ -451,19 +556,18 @@ export function LogbookPage() {
         </button>
       </div>
 
-      {/* Barra de filtros (todos se aplican en el backend) */}
-      <div className={styles.filters}>
+      {/* Barra de filtros PRIMARIA (los de mayor uso) + acceso a "Más filtros" */}
+      <div className={styles.filterBar}>
         <label className={`${styles.filterField} ${styles.filterFieldWide}`}>
           <span className={styles.filterLabel}>{t("logbook.filters.search")}</span>
           <Input value={qInput} placeholder={t("logbook.filters.searchPlaceholder")} onChange={(e) => setQInput(e.target.value)} />
         </label>
-        <label className={styles.filterField}>
+        <label className={`${styles.filterField} ${styles.filterFieldWide}`}>
           <span className={styles.filterLabel}>{t("logbook.list.node")}</span>
-          <Combobox
+          <MultiSelect
             options={nodeOptions}
-            value={state.orgNodeId || null}
-            onChange={(v) => patch({ orgNodeId: v })}
-            clearable
+            value={state.orgNodeIds}
+            onChange={(v) => patch({ orgNodeIds: v })}
             placeholder={t("logbook.filters.allNodes")}
           />
         </label>
@@ -486,76 +590,102 @@ export function LogbookPage() {
             <option value="VOID">{t("logbook.status.VOID")}</option>
           </Select>
         </label>
-        {stateOptions.length > 0 && (
-          <label className={styles.filterField}>
-            <span className={styles.filterLabel}>{t("logbook.list.state")}</span>
-            <Select value={state.stateKey} onChange={(e) => patch({ stateKey: e.target.value })}>
-              <option value="">{t("logbook.filters.all")}</option>
-              {stateOptions.map(([key, name]) => (
-                <option key={key} value={key}>
-                  {name}
-                </option>
-              ))}
-            </Select>
-          </label>
-        )}
-        <label className={styles.filterField}>
-          <span className={styles.filterLabel}>{t("logbook.filters.shift")}</span>
-          <Input value={state.shiftCode} placeholder={t("logbook.filters.shiftPlaceholder")} onChange={(e) => patch({ shiftCode: e.target.value })} />
-        </label>
-        <label className={styles.filterField}>
-          <span className={styles.filterLabel}>{t("logbook.filters.operationalDate")}</span>
-          <Input type="date" value={state.operationalDate} onChange={(e) => patch({ operationalDate: e.target.value })} />
-        </label>
-        <label className={styles.filterField}>
-          <span className={styles.filterLabel}>{t("logbook.filters.effectiveFrom")}</span>
-          <Input type="date" value={state.effectiveFromDay} max={state.effectiveToDay || undefined} onChange={(e) => patch({ effectiveFromDay: e.target.value })} />
-        </label>
-        <label className={styles.filterField}>
-          <span className={styles.filterLabel}>{t("logbook.filters.effectiveTo")}</span>
-          <Input type="date" value={state.effectiveToDay} min={state.effectiveFromDay || undefined} onChange={(e) => patch({ effectiveToDay: e.target.value })} />
-        </label>
-        <label className={styles.filterField}>
-          <span className={styles.filterLabel}>{t("logbook.filters.band")}</span>
-          <Select value={state.thresholdBand} onChange={(e) => patch({ thresholdBand: e.target.value as LogbookGridState["thresholdBand"] })}>
-            <option value="">{t("logbook.filters.all")}</option>
-            <option value="ANY">{t("logbook.bandFilter.ANY")}</option>
-            <option value="WARN">{t("logbook.bandFilter.WARN")}</option>
-            <option value="CRIT">{t("logbook.bandFilter.CRIT")}</option>
-          </Select>
-        </label>
-        <label className={styles.filterField}>
-          <span className={styles.filterLabel}>{t("logbook.filters.origin")}</span>
-          <Select value={state.entryOrigin} onChange={(e) => patch({ entryOrigin: e.target.value as LogbookGridState["entryOrigin"] })}>
-            <option value="">{t("logbook.filters.all")}</option>
-            <option value="ONLINE">{t("logbook.origin.ONLINE")}</option>
-            <option value="DEFERRED">{t("logbook.origin.DEFERRED")}</option>
-          </Select>
-        </label>
-        <div className={styles.filterChecks}>
-          {state.orgNodeId && (
-            <Checkbox
-              checked={state.includeDescendants}
-              onChange={(v) => patch({ includeDescendants: v })}
-              label={t("logbook.filters.includeDescendants")}
-            />
-          )}
-          <Checkbox checked={state.onlyMine} onChange={(v) => patch({ onlyMine: v })} label={t("logbook.filters.onlyMine")} />
-          <Checkbox
-            checked={state.pendingSignature}
-            onChange={(v) => patch({ pendingSignature: v })}
-            label={t("logbook.filters.pendingSignature")}
-          />
-        </div>
-        <div className={styles.presets}>
-          <button type="button" className={styles.presetBtn} onClick={() => patch({ operationalDate: isoDay(new Date()), effectiveFromDay: "", effectiveToDay: "" })}>
-            {t("logbook.presets.today")}
-          </button>
-          <button type="button" className={styles.presetBtn} onClick={() => presetEffectiveDays(1)}>24h</button>
-          <button type="button" className={styles.presetBtn} onClick={() => presetEffectiveDays(7)}>7d</button>
-          <button type="button" className={styles.presetBtn} onClick={() => presetEffectiveDays(30)}>30d</button>
+        <div className={styles.filterBarActions}>
+          <Button variant="secondary" leftIcon={<SlidersHorizontal size={16} />} onClick={() => setFiltersOpen(true)}>
+            {t("logbook.filters.more")}
+            {filterCount > 0 && <span className={styles.filterBadge}>{filterCount}</span>}
+          </Button>
+          <div className={styles.presets}>
+            <button type="button" className={styles.presetBtn} onClick={() => patch({ operationalDate: isoDay(new Date()), effectiveFromDay: "", effectiveToDay: "" })}>
+              {t("logbook.presets.today")}
+            </button>
+            <button type="button" className={styles.presetBtn} onClick={() => presetEffectiveDays(1)}>24h</button>
+            <button type="button" className={styles.presetBtn} onClick={() => presetEffectiveDays(7)}>7d</button>
+            <button type="button" className={styles.presetBtn} onClick={() => presetEffectiveDays(30)}>30d</button>
+          </div>
         </div>
       </div>
+
+      {/* Filtros AVANZADOS en un panel lateral (se aplican en vivo; el backend manda) */}
+      <Drawer
+        open={filtersOpen}
+        onClose={() => setFiltersOpen(false)}
+        title={t("logbook.filters.more")}
+        footer={
+          <div className={styles.drawerFooter}>
+            <Button variant="secondary" leftIcon={<FilterX size={14} />} onClick={clearFilters}>
+              {t("logbook.filters.clear")}
+            </Button>
+            <Button variant="primary" onClick={() => setFiltersOpen(false)}>
+              {t("logbook.filters.applyClose")}
+            </Button>
+          </div>
+        }
+      >
+        <div className={styles.drawerFilters}>
+          {stateOptions.length > 0 && (
+            <label className={styles.filterField}>
+              <span className={styles.filterLabel}>{t("logbook.list.state")}</span>
+              <Select value={state.stateKey} onChange={(e) => patch({ stateKey: e.target.value })}>
+                <option value="">{t("logbook.filters.all")}</option>
+                {stateOptions.map(([key, name]) => (
+                  <option key={key} value={key}>
+                    {name}
+                  </option>
+                ))}
+              </Select>
+            </label>
+          )}
+          <label className={styles.filterField}>
+            <span className={styles.filterLabel}>{t("logbook.filters.shift")}</span>
+            <Input value={state.shiftCode} placeholder={t("logbook.filters.shiftPlaceholder")} onChange={(e) => patch({ shiftCode: e.target.value })} />
+          </label>
+          <label className={styles.filterField}>
+            <span className={styles.filterLabel}>{t("logbook.filters.operationalDate")}</span>
+            <Input type="date" value={state.operationalDate} onChange={(e) => patch({ operationalDate: e.target.value })} />
+          </label>
+          <label className={styles.filterField}>
+            <span className={styles.filterLabel}>{t("logbook.filters.effectiveFrom")}</span>
+            <Input type="date" value={state.effectiveFromDay} max={state.effectiveToDay || undefined} onChange={(e) => patch({ effectiveFromDay: e.target.value })} />
+          </label>
+          <label className={styles.filterField}>
+            <span className={styles.filterLabel}>{t("logbook.filters.effectiveTo")}</span>
+            <Input type="date" value={state.effectiveToDay} min={state.effectiveFromDay || undefined} onChange={(e) => patch({ effectiveToDay: e.target.value })} />
+          </label>
+          <label className={styles.filterField}>
+            <span className={styles.filterLabel}>{t("logbook.filters.band")}</span>
+            <Select value={state.thresholdBand} onChange={(e) => patch({ thresholdBand: e.target.value as LogbookGridState["thresholdBand"] })}>
+              <option value="">{t("logbook.filters.all")}</option>
+              <option value="ANY">{t("logbook.bandFilter.ANY")}</option>
+              <option value="WARN">{t("logbook.bandFilter.WARN")}</option>
+              <option value="CRIT">{t("logbook.bandFilter.CRIT")}</option>
+            </Select>
+          </label>
+          <label className={styles.filterField}>
+            <span className={styles.filterLabel}>{t("logbook.filters.origin")}</span>
+            <Select value={state.entryOrigin} onChange={(e) => patch({ entryOrigin: e.target.value as LogbookGridState["entryOrigin"] })}>
+              <option value="">{t("logbook.filters.all")}</option>
+              <option value="ONLINE">{t("logbook.origin.ONLINE")}</option>
+              <option value="DEFERRED">{t("logbook.origin.DEFERRED")}</option>
+            </Select>
+          </label>
+          <div className={styles.filterChecks}>
+            {state.orgNodeIds.length > 0 && (
+              <Checkbox
+                checked={state.includeDescendants}
+                onChange={(v) => patch({ includeDescendants: v })}
+                label={t("logbook.filters.includeDescendants")}
+              />
+            )}
+            <Checkbox checked={state.onlyMine} onChange={(v) => patch({ onlyMine: v })} label={t("logbook.filters.onlyMine")} />
+            <Checkbox
+              checked={state.pendingSignature}
+              onChange={(v) => patch({ pendingSignature: v })}
+              label={t("logbook.filters.pendingSignature")}
+            />
+          </div>
+        </div>
+      </Drawer>
 
       {/* Chips de filtros activos (removibles) */}
       {activeChips.length > 0 && (
@@ -570,13 +700,10 @@ export function LogbookPage() {
       )}
 
       <div className={styles.gridWrap}>
-        <div className={styles.resultInfo}>
-          {t("logbook.list.resultCount", { count: rows.length })}
-          {list.hasNextPage ? "+" : ""}
-        </div>
+        {paginationBar}
         <Table
           columns={columns}
-          data={rows}
+          data={visibleRows}
           rowKey={(r) => r.id}
           loading={list.isLoading}
           sort={{ key: state.sort, direction: state.dir }}
@@ -594,13 +721,7 @@ export function LogbookPage() {
             />
           }
         />
-        {list.hasNextPage && (
-          <div className={styles.loadMore}>
-            <Button variant="secondary" loading={list.isFetchingNextPage} onClick={() => void list.fetchNextPage()}>
-              {t("logbook.list.loadMore")}
-            </Button>
-          </div>
-        )}
+        {rows.length > 0 && paginationBar}
         {list.isError && (
           <EmptyState icon={<TriangleAlert size={30} />} title={t("logbook.list.loadError")} />
         )}

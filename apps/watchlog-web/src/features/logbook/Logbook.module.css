@@ -43,35 +43,46 @@
   gap: 10px;
 }
 .kpi {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 12px 16px;
-  border-radius: 12px;
-  background: var(--color-surface-1);
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 16px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--color-surface-1) 92%, #fff 8%), var(--color-surface-1));
   border: 1px solid var(--color-border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
   cursor: pointer;
-  text-align: left;
+  text-align: center;
   font: inherit;
   color: inherit;
-  transition: border-color 0.15s ease;
-  min-height: 44px;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+  min-height: 78px;
 }
-.kpi:hover {
+.kpi:hover:not(:disabled) {
   border-color: var(--color-border-active, rgba(99, 102, 241, 0.4));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 0 0 1px rgba(99, 102, 241, 0.18),
+    0 12px 28px -16px rgba(99, 102, 241, 0.55);
+  transform: translateY(-1px);
 }
 .kpi:disabled {
   cursor: default;
 }
 .kpiValue {
   font-family: var(--font-display, "Sora", sans-serif);
-  font-size: 22px;
+  font-size: 26px;
   font-weight: 700;
-  line-height: 1.1;
+  line-height: 1.05;
 }
 .kpiLabel {
-  font-size: 12px;
-  color: var(--color-text-secondary);
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
 }
 .kpiActive {
   border-color: var(--color-accent, #6366f1);
@@ -86,12 +97,141 @@
   color: var(--color-success, #22c55e);
 }
 
-/* --- Barra de filtros --- */
-.filters {
+/* --- Barra de filtros PRIMARIA --- */
+.filterBar {
   display: flex;
   flex-wrap: wrap;
   gap: 10px 12px;
   align-items: flex-end;
+}
+.filterBarActions {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-bottom: 1px;
+  margin-left: auto;
+}
+.filterBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 99px;
+  background: var(--color-accent, #6366f1);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+/* --- Filtros avanzados (dentro del Drawer) --- */
+.drawerFilters {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.drawerFilters .filterField {
+  min-width: 0;
+  width: 100%;
+}
+.drawerFilters .filterChecks {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding-bottom: 0;
+}
+.drawerFooter {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+}
+/* --- Paginador DISCRETO (arriba y abajo) --- */
+.pageBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.pageInfo {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.pageSizeSelect {
+  height: 28px;
+  margin-right: 8px;
+  padding: 0 26px 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239aa3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 9px center;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.pageSizeSelect:hover {
+  border-color: var(--color-border-active, rgba(99, 102, 241, 0.4));
+}
+.pageSizeSelect:focus-visible {
+  border-color: var(--color-accent, #6366f1);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent, #6366f1) 25%, transparent);
+}
+.pagerBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.pagerBtn:hover:not(:disabled) {
+  background: var(--color-hover, rgba(255, 255, 255, 0.05));
+  color: var(--color-text);
+}
+.pagerBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.pagerBtnActive {
+  border-color: var(--color-border-active, rgba(99, 102, 241, 0.4));
+  background: color-mix(in srgb, var(--color-accent, #6366f1) 14%, transparent);
+  color: var(--color-text);
+  font-weight: 600;
+}
+.pagerEllipsis {
+  padding: 0 4px;
+  color: var(--color-text-muted);
+  font-size: 12.5px;
+}
+/* Ícono de "actualizar" girando mientras refresca. */
+.spin {
+  animation: wlSpin 0.8s linear infinite;
+}
+@keyframes wlSpin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 .filterField {
   display: flex;
@@ -159,11 +299,16 @@
   color: var(--color-text-muted);
 }
 
-/* --- Grilla --- */
+/* --- Grilla (card contenida premium) --- */
 .gridWrap {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
+  padding: 10px 14px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: var(--color-surface-1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 .mono {
   font-family: ui-monospace, Menlo, monospace;
@@ -184,27 +329,35 @@
   color: var(--color-text-muted);
   margin-top: 1px;
 }
-/* Resumen de contenido (2.8.1a): línea compuesta de valores de negocio. */
+/* Resumen de contenido (2.8.1a): pares "etiqueta: valor" apilados, cada uno truncado. */
 .summaryLine {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px 10px;
-  align-items: baseline;
-  max-width: 320px;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  max-width: 360px;
 }
 .summaryItem {
-  display: inline-flex;
+  display: flex;
   align-items: baseline;
-  gap: 4px;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
   font-size: 12.5px;
   color: var(--color-text-secondary);
   white-space: nowrap;
 }
 .summaryItem strong {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-weight: 600;
   color: var(--color-text-primary);
 }
 .summaryLabel {
+  flex-shrink: 0;
   font-size: 10.5px;
   text-transform: uppercase;
   letter-spacing: 0.02em;

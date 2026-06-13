@@ -164,6 +164,19 @@ def main():
         s, items = find_row(atok, tpl_id, q="NADAQUECOINCIDA999")
         check("búsqueda por contenido sin coincidencia → 0 filas (no fuga)", all(it["id"] != entry_id for it in items), f"{s} n={len(items)}")
 
+        # === Filtro MULTI-NODO ================================================
+        other = next((n for n in flat if n["id"] != node_id and not n["children"]), None)
+        s, items = call("GET", f"/log-entries?templateId={tpl_id}&orgNodeIds={node_id}", atok)
+        items = items["items"] if isinstance(items, dict) else []
+        check("filtro orgNodeIds (1 nodo) ENCUENTRA la entrada", any(it["id"] == entry_id for it in items), f"{s} n={len(items)}")
+        if other:
+            s, items = call("GET", f"/log-entries?templateId={tpl_id}&orgNodeIds={node_id},{other['id']}", atok)
+            items = items["items"] if isinstance(items, dict) else []
+            check("filtro orgNodeIds (2 nodos, unión) ENCUENTRA la entrada", any(it["id"] == entry_id for it in items), f"{s} n={len(items)}")
+            s, items = call("GET", f"/log-entries?templateId={tpl_id}&orgNodeIds={other['id']}", atok)
+            items = items["items"] if isinstance(items, dict) else []
+            check("filtro orgNodeIds (otro nodo) NO trae la entrada", all(it["id"] != entry_id for it in items), f"{s} n={len(items)}")
+
         # === ABAC: 3 usuarios demo (si existen) ===============================
         for email in DEMO_USERS:
             s, lg = call("POST", "/auth/login", body={"email": email, "password": PASS})

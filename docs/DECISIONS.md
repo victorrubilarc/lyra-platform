@@ -4,6 +4,32 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-13 · Afinamiento UX de la grilla de Bitácoras (QA del dueño) — ✅ IMPLEMENTADO
+
+Tras el smoke visual de 2.8.1a el dueño pidió un overhaul de UX de la grilla. Es **frontend** (salvo un cambio chico de
+backend para multi-nodo); las **Vistas Guardadas** (`SavedView`, backend nuevo) quedan para **2.8.1b** (su propia sesión).
+
+1. **Defecto de 2.8.1a — párrafos del Resumen desbordados.** Un valor TEXTAREA largo se renderizaba `nowrap` sin tope y
+   rompía la fila. Fix: el Resumen apila "etiqueta: valor" y **trunca cada valor con ellipsis** (texto completo en el `title`).
+   Además se **muestran todos los candidatos con valor** (no solo 3; el pool ya está acotado a 6).
+2. **Filtros: barra PRIMARIA + "Más filtros" en `Drawer`** (acordado). 4 filtros de mayor uso visibles (Buscar, Nodo,
+   Plantilla, Estado) + presets; el resto en un panel lateral con **badge** del nº de filtros activos. Patrón SAP Fiori.
+3. **Filtro de nodo MULTI-NODO real** (acordado, toca backend): el listado acepta **`orgNodeIds`** (CSV→arreglo; `orgNodeId`
+   legacy se mantiene). `buildWhere`: con `includeDescendants` = **OR de prefijos de ruta** por nodo; sin él `orgNodeId IN`.
+   El **ABAC sigue en AND aparte** (filtrar por un nodo fuera de alcance no amplía lo visible). UI: `MultiSelect` de `@lyra/ui`.
+4. **Paginador DISCRETO numerado, ARRIBA y ABAJO** (pedido). Keyset/cursor para escala: el servidor trae lotes de **100** y la
+   grilla **pagina ese lote en el cliente** (rango "X–Y de N", selector 10/25/50, **inicio « ‹ números › » fin**); "siguiente"
+   en la última página trae el lote siguiente del servidor si lo hay. No se hizo paginación numerada server-side (incompatible
+   con keyset; offset+count se evaluará si el volumen lo exige).
+5. **Pulidos pedidos:** botón **"Actualizar"** (refetch lista+KPIs, ícono girando); **KPI cards** centradas con **contorno
+   premium** (borde + realce + glow del acento en hover, sin sombras negras); **lista enmarcada** en card contenida; `<select>`
+   "por pág." discreto (sin outline blanco nativo, flecha propia, foco con acento).
+
+Verde: typecheck/lint (0 err) · API **217** (+1 test multi-nodo) · contracts 154 · build web · **smoke 25/25**
+(`scripts/smoke-grid-content.py` + filtro multi-nodo). **Pendiente: re-confirmación VISUAL del dueño.**
+
+---
+
 ### 2026-06-12 · Fase 2.8.1a — Bitácoras: grilla orientada a contenido (MVP) — ✅ IMPLEMENTADO
 
 Primer sub-slice del plan 2.8.1 (ver entrada de plan más abajo). Resuelve la queja del dueño: la grilla es ciega
