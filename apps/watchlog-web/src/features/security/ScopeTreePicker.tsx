@@ -106,7 +106,7 @@ export function ScopeTreePicker({
 
     return (
       <Fragment key={node.id}>
-        <div className={styles.row} style={{ paddingLeft: depth * 18 }}>
+        <div className={styles.row} style={{ paddingLeft: depth * 18 + 4 }}>
           <button
             type="button"
             className={styles.twisty}
@@ -117,23 +117,25 @@ export function ScopeTreePicker({
             {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
           </button>
 
-          <Checkbox
-            checked={checked}
-            disabled={disabled}
-            onChange={(v) => setNode(node.id, v)}
-            label={node.name}
-            aria-label={node.name}
-          />
+          <span className={styles.rowName}>
+            <Checkbox
+              checked={checked}
+              disabled={disabled}
+              onChange={(v) => setNode(node.id, v)}
+              label={node.name}
+              aria-label={node.name}
+            />
+          </span>
 
           {checked && (
             <span className={styles.inherit}>
+              <span className={styles.inheritLabel}>{t("security.users.scope.includeDescendants")}</span>
               <Toggle
                 size="sm"
                 checked={entry.includeDescendants}
                 onChange={(v) => setInherit(node.id, v)}
                 aria-label={t("security.users.scope.includeDescendants")}
               />
-              <span className={styles.inheritLabel}>{t("security.users.scope.includeDescendants")}</span>
             </span>
           )}
         </div>
@@ -159,9 +161,16 @@ export function ScopeTreePicker({
       {/* Resumen de seleccionados (visible aunque el árbol sea enorme). */}
       {value.length > 0 && (
         <div className={styles.summary}>
-          <span className={styles.summaryCount}>
-            {t("security.users.scope.selectedCount", { count: value.length })}
-          </span>
+          <div className={styles.summaryHeader}>
+            <span className={styles.summaryCount}>
+              {t("security.users.scope.selectedCount", { count: value.length })}
+            </span>
+            {!disabled && (
+              <button type="button" className={styles.clearBtn} onClick={() => onChange([])}>
+                {t("security.users.scope.clear")}
+              </button>
+            )}
+          </div>
           <div className={styles.chips}>
             {value.map((e) => (
               <span key={e.orgNodeId} className={styles.chip}>
@@ -179,11 +188,6 @@ export function ScopeTreePicker({
               </span>
             ))}
           </div>
-          {!disabled && (
-            <button type="button" className={styles.clearBtn} onClick={() => onChange([])}>
-              {t("security.users.scope.clear")}
-            </button>
-          )}
         </div>
       )}
 

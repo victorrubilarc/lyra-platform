@@ -4,6 +4,39 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-12 · Afinamiento UX del TemplateBuilder (vistas + guardado de gobernanza) — ✅ IMPLEMENTADO
+
+Iteración de UX del dueño sobre el builder de plantillas (tras 2.8.0.2). Cuatro decisiones:
+
+1. **El guardado de la CONFIGURACIÓN/gobernanza se separa del borrador, con su propio botón explícito (NO autosave).**
+   El dueño observó que cambiar un ajuste (modo de equipo, ventana de edición) y volver atrás no guardaba, pero tampoco
+   quería publicar. El builder mezclaba todo en "Guardar borrador" (que crea/clona una versión). **Decisión:** la
+   gobernanza viva del contenedor (identidad, alcance de nodos, ventana de edición, modo de equipo) se guarda con
+   **"Guardar configuración"** vía `PATCH /templates/:id` (`useUpdateTemplate`), **en vivo, sin crear borrador ni
+   publicar**; la DEFINICIÓN (secciones/campos/flujo) sigue por "Guardar borrador"→"Publicar". Para que no se pisen, se
+   **quitaron** del payload del borrador (`editStateToDraftRequest`) los campos de gobernanza (nodeAssignments,
+   editWindow*, equipmentMode) y se creó `editStateToConfigRequest`. Descartado el autosave (el dueño lo rechazó): un
+   botón explícito es más predecible para un ajuste. Solo en EDICIÓN (el PATCH exige un id; la creación es un modal aparte).
+2. **El FLUJO se queda en Diseño, NO en Configuración** (honestidad técnica): el flujo es **definición versionada**
+   (`PATCH` no lo acepta; cambiarlo exige publicar). Ponerlo bajo "Guardar configuración" mentiría sobre el "se aplica
+   sin publicar".
+3. **Layout en riel vertical premium** (2 secciones: **Configuración** [por defecto] · **Diseño**) en vez de tabs
+   horizontales. Configuración tiene 2 sub-pestañas (**Identidad y gobernanza** | **Alcance y acceso**); Diseño absorbe la
+   **Vista previa** como sub-pestaña (Editor | Vista previa). La barra del builder se hace **sticky** bajo el topbar
+   global (offset `--wl-sticky-top`) para no perder las acciones al hacer scroll. Sin permisos nuevos.
+4. **`ScopeTreePicker` + `Toast` (`@lyra/ui`) más prolijos** (componentes compartidos ⇒ mejoran también Seguridad y todos
+   los avisos): el árbol deja de teñir la fila seleccionada (el check ya lo indica) y alinea el toggle "Incluye
+   descendientes" a la derecha; el resumen de seleccionados pasa a panel con cabecera (cuenta + Limpiar) y chips debajo.
+   El Toast gana barra de acento por variante + glow del color (no sombra negra) + badge del icono, para que no pase
+   desapercibido. Verde: typecheck/lint (0 err)/build/test (API 216 · contracts 151). **Smoke VISUAL ✅** (dueño).
+
+**Nota operativa (no es código):** la plantilla demo «Bitácora de Turno — Demo Completa» tenía su versión PUBLICADA (v5)
+con `config = {}` en todos los campos por una republicación antigua (código previo a los arreglos). Se verificó con
+round-trips (crear/editar/publicar) que el código ACTUAL conserva la config; se restauró el dato copiando la config de la
+v2 (que la conserva) a la versión publicada. El seeder `scripts/demo-bitacora.py` es idempotente por nombre (no re-siembra).
+
+---
+
 ### 2026-06-12 · Fase 2.8.0.2 — Modo de equipo por PLANTILLA (gobernanza, "opción B") — ✅ IMPLEMENTADO
 
 Capa de **gobernanza** sobre la mecánica EAM de 2.8.0.1: el TIPO de registro (la plantilla) declara cómo se trata el equipo

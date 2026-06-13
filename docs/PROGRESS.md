@@ -93,7 +93,19 @@ expone `equipmentMode` (el modal de creación oculta/ofrece/sugiere/obliga) y om
 entrada" en el `TemplateBuilder` (gate `template:edit`). **Sin permisos nuevos — catálogo 59.** Migración aditiva
 `20260612180000_add_template_equipment_mode`. **6 forks resueltos (DECISIONS 2026-06-12).** Tests: contracts **151** (+2) ·
 API **216** (+3). **Smoke en vivo 17/17** (`scripts/smoke-template-equipment-mode.py`: crea plantilla+equipo, recorre los 4
-modos, crea+limpia por ID vía psql cascade). **Pendiente: smoke VISUAL.**
+modos, crea+limpia por ID vía psql cascade). **Smoke VISUAL ✅** (dueño, en el afinamiento siguiente).
+
+**+ Afinamiento UX del TemplateBuilder ✅ (2026-06-12, `feat/builder-vistas-config` → `main`).** Iteración del dueño (ver
+DECISIONS 2026-06-12). **(1)** El guardado de **gobernanza** (identidad, alcance de nodos, ventana de edición, modo de
+equipo) se separa con su **propio botón "Guardar configuración"** vía `PATCH /templates/:id` (en vivo, **sin borrador ni
+publicar**); se **quitó** la gobernanza del payload del borrador (`editStateToDraftRequest`) y se creó `editStateToConfigRequest`.
+Sin autosave (rechazado por el dueño); solo en edición. **(2)** El **flujo** se queda en Diseño (definición versionada). **(3)**
+Builder reorganizado en **riel vertical** (Configuración [default] · Diseño) con sub-pestañas (Identidad y gobernanza | Alcance
+y acceso; Editor | Vista previa) y **barra del builder sticky** bajo el topbar global. **(4)** `ScopeTreePicker` (toggle a la
+derecha, filas sin tinte —el check basta—, resumen como panel con cabecera + chips) y **`Toast` (`@lyra/ui`)** más visible
+(barra de acento + glow + badge). Sin permisos nuevos, sin migración. Tests sin cambio (API 216 · contracts 151); typecheck/
+lint(0)/build verdes. **Smoke VISUAL ✅** (dueño). Saneamiento de dato demo: la v5 publicada de «Demo Completa» tenía config
+`{}` (republicación antigua); restaurada desde la v2 (código actual verificado con round-trips, conserva la config).
 
 ## Hecho en Fase 2.7.2 (Ventana de edición configurable — gobernanza temporal #6)
 

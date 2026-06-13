@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ComponentProps } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -8,9 +8,13 @@ import {
   ArrowUp,
   Eye,
   FilePlus2,
+  IdCard,
+  LayoutPanelLeft,
+  Network,
   Pencil,
   Plus,
   Save,
+  SlidersHorizontal,
   Trash2,
 } from "lucide-react";
 import { Button, Card, Chip, FormField, Input, Modal, Select, Textarea, useToast } from "@lyra/ui";
@@ -26,6 +30,7 @@ import {
   collectSectionKeys,
   defaultFieldConfig,
   detailToEditState,
+  editStateToConfigRequest,
   editStateToDraftRequest,
   fieldTypeMeta,
   nextUid,
@@ -38,7 +43,7 @@ import {
 } from "./builder-model.js";
 import { BuilderConfigPanel } from "./BuilderConfigPanel.js";
 import { PreviewForm } from "./FieldPreview.js";
-import { usePublishTemplate, useSaveTemplateDraft } from "./templates-queries.js";
+import { usePublishTemplate, useSaveTemplateDraft, useUpdateTemplate } from "./templates-queries.js";
 import { useWorkflow, useWorkflows } from "../workflows/workflows-queries.js";
 import styles from "./TemplateBuilder.module.css";
 
@@ -55,12 +60,18 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
 
   const [state, setState] = useState<EditState>(() => detailToEditState(detail));
   const [selected, setSelected] = useState<Selection | null>(null);
-  const [preview, setPreview] = useState(false);
-  const [dirty, setDirty] = useState(false);
+  // Secciones principales (riel vertical): Configuración (gobernanza viva, por defecto) ·
+  // Diseño (definición versionada). La Vista previa vive DENTRO de Diseño.
+  const [view, setView] = useState<"config" | "design">("config");
+  // Sub-pestaña de Diseño: Editor (lienzo) · Vista previa.
+  const [designTab, setDesignTab] = useState<"editor" | "preview">("editor");
+  const [dirty, setDirty] = useState(false); // cambios de DEFINICIÓN (borrador)
+  const [configDirty, setConfigDirty] = useState(false); // cambios de CONFIGURACIÓN (PATCH en vivo)
   const [publishOpen, setPublishOpen] = useState(false);
 
   const save = useSaveTemplateDraft();
   const publish = usePublishTemplate();
+  const updateConfig = useUpdateTemplate();
   const { data: tree = [] } = useOrgTree();
   const rolesQuery = useQuery({ queryKey: ["templates", "roles"], queryFn: fetchRoles, retry: false });
   const roles = rolesQuery.data ?? [];
@@ -89,9 +100,18 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
   );
 
   // ── Mutadores del estado editable ──────────────────────────────────────────
+  // patchState = cambios de DEFINICIÓN (secciones/campos/flujo) → "Guardar borrador".
   function patchState(next: EditState) {
     setState(next);
     setDirty(true);
+  }
+
+  // patchConfig = cambios de CONFIGURACIÓN/gobernanza (identidad, alcance de nodos,
+  // ventana de edición, modo de equipo) → "Guardar configuración" (PATCH en vivo, sin
+  // publicar). NO marca el borrador como sucio: las dos semánticas no se mezclan.
+  function patchConfig(next: EditState) {
+    setState(next);
+    setConfigDirty(true);
   }
 
   function setWorkflow(wfId: string) {
@@ -215,6 +235,18 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
     }
   }
 
+  // Guarda la CONFIGURACIÓN/gobernanza vía PATCH: se aplica de inmediato a las entradas
+  // nuevas, SIN crear borrador ni publicar (gobernanza viva en el contenedor mutable).
+  async function handleSaveConfig() {
+    try {
+      await updateConfig.mutateAsync({ id: detail.id, dto: editStateToConfigRequest(state) });
+      setConfigDirty(false);
+      toast.success(t("templates.builder.configSaved"));
+    } catch {
+      toast.error(t("common.errorGeneric"));
+    }
+  }
+
   const busy = save.isPending || publish.isPending;
 
   return (
@@ -236,33 +268,86 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
           )}
         </div>
         <div className={styles.topActions}>
-          <Button variant="secondary" onClick={() => setPreview((p) => !p)}>
-            {preview ? <Pencil size={15} /> : <Eye size={15} />}
-            {preview ? t("templates.builder.editor") : t("templates.builder.preview")}
-          </Button>
-          {canEdit && (
-            <Button variant="secondary" onClick={handleSave} loading={save.isPending} disabled={busy || !dirty}>
-              <Save size={15} /> {t("templates.builder.saveDraft")}
-            </Button>
-          )}
-          {perms.can("template:publish") && (
-            <Button variant="primary" onClick={() => setPublishOpen(true)} disabled={busy || state.sections.length === 0}>
-              {t("templates.builder.publish")}
-            </Button>
-          )}
+          {/* Acciones contextuales a la sección activa. */}
+          {view === "config"
+            ? canEdit && (
+                <Button variant="primary" onClick={handleSaveConfig} loading={updateConfig.isPending} disabled={updateConfig.isPending || !configDirty}>
+                  <Save size={15} /> {t("templates.builder.saveConfig")}
+                </Button>
+              )
+            : designTab === "editor" && (
+                <>
+                  {canEdit && (
+                    <Button variant="secondary" onClick={handleSave} loading={save.isPending} disabled={busy || !dirty}>
+                      <Save size={15} /> {t("templates.builder.saveDraft")}
+                    </Button>
+                  )}
+                  {perms.can("template:publish") && (
+                    <Button variant="primary" onClick={() => setPublishOpen(true)} disabled={busy || state.sections.length === 0}>
+                      {t("templates.builder.publish")}
+                    </Button>
+                  )}
+                </>
+              )}
         </div>
       </div>
 
-      {isPublishedView && <div className={styles.readOnlyBanner}>{t("templates.builder.publishedReadOnly")}</div>}
+      {/* Cuerpo: riel vertical premium (Configuración / Diseño) + contenido de la sección. */}
+      <div className={styles.builderShell}>
+        <nav className={styles.rail} aria-label={t("templates.builder.viewSwitch")}>
+          <button
+            type="button"
+            className={view === "config" ? styles.railItemActive : styles.railItem}
+            aria-current={view === "config"}
+            onClick={() => setView("config")}
+          >
+            <span className={styles.railIcon}><SlidersHorizontal size={18} /></span>
+            <span className={styles.railText}>
+              <span className={styles.railTitle}>{t("templates.builder.viewConfig")}</span>
+              <span className={styles.railDesc}>{t("templates.builder.viewConfigDesc")}</span>
+            </span>
+          </button>
+          <button
+            type="button"
+            className={view === "design" ? styles.railItemActive : styles.railItem}
+            aria-current={view === "design"}
+            onClick={() => setView("design")}
+          >
+            <span className={styles.railIcon}><LayoutPanelLeft size={18} /></span>
+            <span className={styles.railText}>
+              <span className={styles.railTitle}>{t("templates.builder.viewDesign")}</span>
+              <span className={styles.railDesc}>{t("templates.builder.viewDesignDesc")}</span>
+            </span>
+          </button>
+        </nav>
 
-      {preview ? (
-        <Card className={styles.previewCard}>
-          <div className={styles.previewTitle}>{state.name || "—"}</div>
-          {state.description && <div className={styles.previewDesc}>{state.description}</div>}
-          {totalFields(state) === 0 ? <div className={styles.configEmpty}>{t("templates.builder.emptyCanvas")}</div> : <PreviewForm state={state} />}
-        </Card>
-      ) : (
-        <div className={styles.layout}>
+        <div className={styles.builderContent}>
+          {view === "config" ? (
+            <ConfigView state={state} canEdit={canEdit} tree={tree} templateId={detail.id} patchConfig={patchConfig} />
+          ) : (
+            <>
+              {/* Sub-pestañas de Diseño: Editor (lienzo) · Vista previa. */}
+              <div className={styles.subTabs} role="tablist" aria-label={t("templates.builder.viewDesign")}>
+                <button type="button" role="tab" aria-selected={designTab === "editor"} className={designTab === "editor" ? styles.subTabActive : styles.subTab} onClick={() => setDesignTab("editor")}>
+                  <Pencil size={14} /> {t("templates.builder.designEditor")}
+                </button>
+                <button type="button" role="tab" aria-selected={designTab === "preview"} className={designTab === "preview" ? styles.subTabActive : styles.subTab} onClick={() => setDesignTab("preview")}>
+                  <Eye size={14} /> {t("templates.builder.viewPreview")}
+                </button>
+              </div>
+
+              {isPublishedView && designTab === "editor" && (
+                <div className={styles.readOnlyBanner}>{t("templates.builder.publishedReadOnly")}</div>
+              )}
+
+              {designTab === "preview" ? (
+                <Card className={styles.previewCard}>
+                  <div className={styles.previewTitle}>{state.name || "—"}</div>
+                  {state.description && <div className={styles.previewDesc}>{state.description}</div>}
+                  {totalFields(state) === 0 ? <div className={styles.configEmpty}>{t("templates.builder.emptyCanvas")}</div> : <PreviewForm state={state} />}
+                </Card>
+              ) : (
+                <div className={styles.layout}>
           {/* Paleta */}
           <Card className={styles.palette}>
             <div className={styles.paletteTitle}>{t("templates.builder.paletteTitle")}</div>
@@ -284,34 +369,10 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
 
           {/* Lienzo */}
           <div className={styles.canvas}>
-            <Card className={styles.metaCard}>
-              <FormField label={t("templates.builder.name")}>
-                {({ id }) => <Input id={id} value={state.name} onChange={(e) => patchState({ ...state, name: e.target.value })} />}
-              </FormField>
-              <FormField label={t("templates.builder.description")}>
-                {({ id }) => (
-                  <Textarea id={id} rows={2} value={state.description} onChange={(e) => patchState({ ...state, description: e.target.value })} />
-                )}
-              </FormField>
-              {/* Alcance de estructura (multi-nodo 2.8.0): nodos donde la plantilla es
-                  visible/usable. Vacío = GLOBAL (todo nodo). "Solo este nodo" por
-                  defecto; el toggle extiende a todo el subárbol (incl. nodos futuros). */}
-              <FormField label={t("templates.builder.nodeScope")} hint={t("templates.builder.nodeScopeHint")}>
-                {() => (
-                  <>
-                    {state.nodeAssignments.length === 0 && (
-                      <p className={styles.nodeScopeGlobal}>{t("templates.builder.nodeScopeGlobal")}</p>
-                    )}
-                    <ScopeTreePicker
-                      tree={tree}
-                      value={state.nodeAssignments}
-                      onChange={(next) => patchState({ ...state, nodeAssignments: next })}
-                      disabled={!canEdit}
-                      defaultIncludeDescendants={false}
-                    />
-                  </>
-                )}
-              </FormField>
+            {/* Flujo del proceso: es DEFINICIÓN versionada (gobierna estados/transiciones
+                y el mapeo sección→estado), por eso vive en Diseño y se guarda con el
+                borrador — NO en Configuración (que es gobernanza viva sin publicar). */}
+            <Card className={styles.flowCard}>
               <FormField label={t("templates.builder.workflow")} hint={t("templates.builder.workflowHint")}>
                 {({ id }) => (
                   <Select id={id} value={state.workflowDefinitionId ?? ""} disabled={!canEdit} onChange={(e) => setWorkflow(e.target.value)}>
@@ -328,69 +389,6 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
                           {assignedWorkflow.data?.name ?? state.workflowDefinitionId}
                         </option>
                       )}
-                  </Select>
-                )}
-              </FormField>
-              {/* Ventana de edición (2.7.2): gobernanza VIVA del contenedor — aplica de
-                  inmediato a todas las entradas, sin republicar la versión. */}
-              <FormField label={t("templates.builder.editWindow")} hint={t("templates.builder.editWindowHint")}>
-                {({ id }) => (
-                  <div className={styles.metaGrid}>
-                    <Select
-                      id={id}
-                      value={state.editWindowMinutes === null ? "inherit" : state.editWindowMinutes === 0 ? "none" : "custom"}
-                      disabled={!canEdit}
-                      onChange={(e) => {
-                        const mode = e.target.value;
-                        patchState({
-                          ...state,
-                          editWindowMinutes:
-                            mode === "inherit" ? null : mode === "none" ? 0 : (state.editWindowMinutes ?? 0) > 0 ? state.editWindowMinutes : 120,
-                          editWindowAnchor: mode === "custom" ? (state.editWindowAnchor ?? "RECORDED") : null,
-                        });
-                      }}
-                    >
-                      <option value="inherit">{t("templates.builder.editWindowInherit")}</option>
-                      <option value="none">{t("templates.builder.editWindowNone")}</option>
-                      <option value="custom">{t("templates.builder.editWindowCustom")}</option>
-                    </Select>
-                    {(state.editWindowMinutes ?? 0) > 0 && (
-                      <>
-                        <EditWindowDurationField
-                          key={detail.id}
-                          minutes={state.editWindowMinutes}
-                          disabled={!canEdit}
-                          onChange={(min) => patchState({ ...state, editWindowMinutes: min && min > 0 ? min : 1 })}
-                        />
-                        <Select
-                          value={state.editWindowAnchor ?? "RECORDED"}
-                          disabled={!canEdit}
-                          aria-label={t("templates.builder.editWindowAnchor")}
-                          onChange={(e) => patchState({ ...state, editWindowAnchor: e.target.value as "RECORDED" | "EFFECTIVE" })}
-                        >
-                          <option value="RECORDED">{t("templates.builder.editWindowAnchorRecorded")}</option>
-                          <option value="EFFECTIVE">{t("templates.builder.editWindowAnchorEffective")}</option>
-                        </Select>
-                      </>
-                    )}
-                  </div>
-                )}
-              </FormField>
-              {/* Modo de equipo (2.8.0.2): gobernanza del objeto de referencia EAM —
-                  el TIPO de registro decide si la entrada se tagea a un equipo
-                  (patrón notification-type SAP / WO-type Maximo). Gobernanza VIVA. */}
-              <FormField label={t("templates.builder.equipmentMode")} hint={t("templates.builder.equipmentModeHint")}>
-                {({ id }) => (
-                  <Select
-                    id={id}
-                    value={state.equipmentMode}
-                    disabled={!canEdit}
-                    onChange={(e) => patchState({ ...state, equipmentMode: e.target.value as EquipmentMode })}
-                  >
-                    <option value="NONE">{t("templates.builder.equipmentModeNone")}</option>
-                    <option value="OPTIONAL">{t("templates.builder.equipmentModeOptional")}</option>
-                    <option value="SUGGESTED">{t("templates.builder.equipmentModeSuggested")}</option>
-                    <option value="REQUIRED">{t("templates.builder.equipmentModeRequired")}</option>
                   </Select>
                 )}
               </FormField>
@@ -474,8 +472,12 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
               onUpdateField={(patch) => selectedField && selectedSection && updateField(selectedSection.uid, selectedField.uid, patch)}
             />
           </Card>
+                </div>
+              )}
+            </>
+          )}
         </div>
-      )}
+      </div>
 
       <Modal
         open={publishOpen}
@@ -494,6 +496,141 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
       >
         <p style={{ margin: 0, color: "var(--color-text-secondary)", lineHeight: 1.5 }}>{t("templates.builder.publishConfirmBody")}</p>
       </Modal>
+    </div>
+  );
+}
+
+// ── Vista CONFIGURACIÓN ───────────────────────────────────────────────────────
+// Gobernanza VIVA del contenedor (identidad, alcance de nodos, ventana de edición,
+// modo de equipo). Se guarda con "Guardar configuración" (PATCH), sin publicar. NO
+// incluye el flujo: ese es definición versionada y vive en Diseño.
+function ConfigView({
+  state,
+  canEdit,
+  tree,
+  templateId,
+  patchConfig,
+}: {
+  state: EditState;
+  canEdit: boolean;
+  tree: ComponentProps<typeof ScopeTreePicker>["tree"];
+  templateId: string;
+  patchConfig: (next: EditState) => void;
+}) {
+  const { t } = useTranslation();
+  const [tab, setTab] = useState<"general" | "scope">("general");
+  return (
+    <div className={styles.configView}>
+      {/* Sub-pestañas: (Identidad + Gobernanza) · (Alcance y acceso). */}
+      <div className={styles.subTabs} role="tablist" aria-label={t("templates.builder.viewConfig")}>
+        <button type="button" role="tab" aria-selected={tab === "general"} className={tab === "general" ? styles.subTabActive : styles.subTab} onClick={() => setTab("general")}>
+          <IdCard size={14} /> {t("templates.builder.tabIdentityGov")}
+        </button>
+        <button type="button" role="tab" aria-selected={tab === "scope"} className={tab === "scope" ? styles.subTabActive : styles.subTab} onClick={() => setTab("scope")}>
+          <Network size={14} /> {t("templates.builder.groupScope")}
+        </button>
+      </div>
+
+      <p className={styles.configLiveHint}>{t("templates.builder.configLiveHint")}</p>
+
+      {tab === "general" ? (
+        <div className={styles.configGeneralGrid}>
+          {/* Identidad */}
+          <Card className={styles.configGroup}>
+            <div className={styles.configGroupTitle}>{t("templates.builder.groupIdentity")}</div>
+            <FormField label={t("templates.builder.name")}>
+              {({ id }) => <Input id={id} value={state.name} disabled={!canEdit} onChange={(e) => patchConfig({ ...state, name: e.target.value })} />}
+            </FormField>
+            <FormField label={t("templates.builder.description")}>
+              {({ id }) => (
+                <Textarea id={id} rows={3} value={state.description} disabled={!canEdit} onChange={(e) => patchConfig({ ...state, description: e.target.value })} />
+              )}
+            </FormField>
+          </Card>
+
+          {/* Gobernanza (ventana de edición + modo de equipo) */}
+          <Card className={styles.configGroup}>
+            <div className={styles.configGroupTitle}>{t("templates.builder.groupGovernance")}</div>
+            <FormField label={t("templates.builder.editWindow")} hint={t("templates.builder.editWindowHint")}>
+              {({ id }) => (
+                <div className={styles.metaGrid}>
+                  <Select
+                    id={id}
+                    value={state.editWindowMinutes === null ? "inherit" : state.editWindowMinutes === 0 ? "none" : "custom"}
+                    disabled={!canEdit}
+                    onChange={(e) => {
+                      const mode = e.target.value;
+                      patchConfig({
+                        ...state,
+                        editWindowMinutes:
+                          mode === "inherit" ? null : mode === "none" ? 0 : (state.editWindowMinutes ?? 0) > 0 ? state.editWindowMinutes : 120,
+                        editWindowAnchor: mode === "custom" ? (state.editWindowAnchor ?? "RECORDED") : null,
+                      });
+                    }}
+                  >
+                    <option value="inherit">{t("templates.builder.editWindowInherit")}</option>
+                    <option value="none">{t("templates.builder.editWindowNone")}</option>
+                    <option value="custom">{t("templates.builder.editWindowCustom")}</option>
+                  </Select>
+                  {(state.editWindowMinutes ?? 0) > 0 && (
+                    <>
+                      <EditWindowDurationField
+                        key={templateId}
+                        minutes={state.editWindowMinutes}
+                        disabled={!canEdit}
+                        onChange={(min) => patchConfig({ ...state, editWindowMinutes: min && min > 0 ? min : 1 })}
+                      />
+                      <Select
+                        value={state.editWindowAnchor ?? "RECORDED"}
+                        disabled={!canEdit}
+                        aria-label={t("templates.builder.editWindowAnchor")}
+                        onChange={(e) => patchConfig({ ...state, editWindowAnchor: e.target.value as "RECORDED" | "EFFECTIVE" })}
+                      >
+                        <option value="RECORDED">{t("templates.builder.editWindowAnchorRecorded")}</option>
+                        <option value="EFFECTIVE">{t("templates.builder.editWindowAnchorEffective")}</option>
+                      </Select>
+                    </>
+                  )}
+                </div>
+              )}
+            </FormField>
+            <FormField label={t("templates.builder.equipmentMode")} hint={t("templates.builder.equipmentModeHint")}>
+              {({ id }) => (
+                <Select
+                  id={id}
+                  value={state.equipmentMode}
+                  disabled={!canEdit}
+                  onChange={(e) => patchConfig({ ...state, equipmentMode: e.target.value as EquipmentMode })}
+                >
+                  <option value="NONE">{t("templates.builder.equipmentModeNone")}</option>
+                  <option value="OPTIONAL">{t("templates.builder.equipmentModeOptional")}</option>
+                  <option value="SUGGESTED">{t("templates.builder.equipmentModeSuggested")}</option>
+                  <option value="REQUIRED">{t("templates.builder.equipmentModeRequired")}</option>
+                </Select>
+              )}
+            </FormField>
+          </Card>
+        </div>
+      ) : (
+        /* Alcance y acceso (nodos de la estructura) */
+        <Card className={styles.configGroup}>
+          <div className={styles.configGroupTitle}>{t("templates.builder.groupScope")}</div>
+          <FormField label={t("templates.builder.nodeScope")} hint={t("templates.builder.nodeScopeHint")}>
+            {() => (
+              <>
+                {state.nodeAssignments.length === 0 && <p className={styles.nodeScopeGlobal}>{t("templates.builder.nodeScopeGlobal")}</p>}
+                <ScopeTreePicker
+                  tree={tree}
+                  value={state.nodeAssignments}
+                  onChange={(next) => patchConfig({ ...state, nodeAssignments: next })}
+                  disabled={!canEdit}
+                  defaultIncludeDescendants={false}
+                />
+              </>
+            )}
+          </FormField>
+        </Card>
+      )}
     </div>
   );
 }
