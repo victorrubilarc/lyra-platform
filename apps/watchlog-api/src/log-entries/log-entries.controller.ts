@@ -90,6 +90,20 @@ export class LogEntriesController {
     return this.logbook.stats(user.id, query);
   }
 
+  /** Facetas con conteo del set filtrado (estilo Splunk/Kibana; conteos de hermanos). */
+  @Get("facets")
+  @RequirePermission("logentry:view")
+  facets(@Query(new ZodValidationPipe(logEntryListQuerySchema)) query: LogEntryListQuery, @CurrentUser() user: RequestUser) {
+    return this.logbook.facets(user.id, query);
+  }
+
+  /** Filtros resueltos de la vista de sistema "Mi turno" (turno/día vigentes + autor). */
+  @Get("my-shift")
+  @RequirePermission("logentry:view")
+  myShift(@CurrentUser() user: RequestUser) {
+    return this.logbook.myShiftFilter(user.id);
+  }
+
   /** Exporta el set COMPLETO filtrado a CSV (server-side, patrón de auditoría). */
   @Get("export")
   @RequirePermission("logentry:view")

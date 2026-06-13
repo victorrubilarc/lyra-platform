@@ -4,6 +4,35 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-13 · Fase 2.8.1c — Peek lateral + facetas con conteo + review-by-exception + "Mi turno" — 📋 FORKS RESUELTOS (en implementación)
+
+Tercer y último sub-slice de 2.8.1 (grilla orientada a contenido). El dueño aprobó avanzar con mi criterio, estándar
+enterprise/premium. **5 forks resueltos:**
+
+1. **Facetas = endpoint nuevo `GET /log-entries/facets`** (no extender `/stats`: responsabilidad distinta), server-side,
+   reusando `buildWhere(userId, query)` (mismo where + ABAC ⇒ cero fuga). **Conteos de HERMANOS** (Kibana/Splunk): cada
+   faceta se computa con el where SIN su propio criterio de dimensión ⇒ elegir un valor no anula las demás opciones.
+   Dimensiones: `status`, `stateKey` (estado del flujo — el `<select>` deja de poblarse solo con el lote cargado),
+   `templateId`, `equipmentId`, `band` (WARN/CRIT). COUNT exacto + tope de buckets; rollups/aproximado = Fase 7 (BACKLOG §3).
+2. **Peek lateral = Drawer que reusa `getDetail`** (mismo endpoint del visor, misma autorización), vista REDUCIDA
+   (cabecera + valores readOnly + indicadores) + "Abrir ficha completa" → `/bitacoras/:id`. **El clic en la fila abre el
+   PEEK** (antes navegaba al visor); el botón "Editar" se mantiene. Hojear rápido sin salir de la lista (ServiceNow).
+3. **"Mi turno" = backend resuelve los filtros** (`ShiftResolver.resolve(now, null)` con el calendario por defecto, porque
+   el usuario abarca varios nodos): `createdById = yo` + `operationalDate` + `shiftCode` vigentes. Degradación: sin
+   calendario ⇒ `createdById = yo` + `operationalDate = hoy` (sin shift). El cliente pide los filtros y los aplica (no
+   acopla la grilla al motor). Cierra el diferido de 2.8.1b.
+4. **Facetas ↔ URL/SavedView:** clic en un valor de faceta hace toggle del filtro correspondiente, reflejado en la URL ⇒
+   capturable en una `SavedView`. **MVP single-select por faceta** (coherente con los filtros actuales single); multi-select
+   por faceta = aditivo posterior (requiere volver multi esos filtros, como se hizo con nodos).
+5. **Review-by-exception en capas:** (a) **realce visual por FILA** (tinte/borde sutil por la peor banda — solo semántica,
+   regla de marca) reforzando los indicadores existentes; (b) **flag `exceptionsOnly`** opt-in en la query = OR de lo
+   accionable (umbral WARN/CRIT **OR** firma pendiente; ambos queryables). "Fuera de ventana/período" NO es columna
+   filtrable directa (se computa) ⇒ queda fuera del flag (se ve en el peek/visor).
+
+**Sin permisos nuevos** (todo bajo `logentry:view` + ABAC). Pendiente: implementación + smoke.
+
+---
+
 ### 2026-06-13 · Fase 2.8.1b — Vistas guardadas + gestor de columnas + multi-sort — ✅ IMPLEMENTADO
 
 **Cierre:** entregado todo lo confirmado. `SavedView` (entidad genérica, migración `20260613130000`, índice único

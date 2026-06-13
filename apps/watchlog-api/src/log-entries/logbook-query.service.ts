@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import type {
   LogEntryChangesResponse,
+  LogEntryFacets,
   LogEntryFieldChangeDto,
   LogEntryIndicators,
   LogEntryListItem,
@@ -13,6 +14,7 @@ import type {
   LogEntryTimelineEvent,
   LogEntryTimelineResponse,
   RelatedLogEntries,
+  MyShiftFilter,
   SignatureVerifyResult,
   SignatureVerifyVerdict,
   ThresholdBand,
@@ -24,6 +26,7 @@ import { AuditService, type AuditContext } from "../audit/audit.service";
 import { ScopeService } from "../authz/scope.service";
 import { toCsv } from "../common/csv";
 import { EncryptionService } from "../crypto/encryption.service";
+import { ShiftResolver } from "../operational-calendar/shift-resolver";
 import { PrismaService } from "../prisma/prisma.service";
 import { LogEntriesService } from "./log-entries.service";
 
@@ -99,6 +102,7 @@ export class LogbookQueryService {
     private readonly audit: AuditService,
     private readonly enc: EncryptionService,
     private readonly entries: LogEntriesService,
+    private readonly shiftResolver: ShiftResolver,
   ) {}
 
   // --- Listado (grilla /bitacoras) --------------------------------------------
@@ -139,6 +143,109 @@ export class LogbookQueryService {
     const statusCount = { DRAFT: 0, SUBMITTED: 0, VOID: 0 };
     for (const row of byStatus) statusCount[row.status] = row._count._all;
     return { total, byStatus: statusCount, pendingSignatures, withCrit, withWarn };
+  }
+
+  /** Tope de buckets por faceta de alta cardinalidad (top-N por conteo). */
+  static readonly FACET_TOP_N = 15;
+
+  /**
+   * Facetas con conteo (2.8.1c, estilo Splunk/Kibana). Cada dimensión cuenta con el
+   * MISMO where + ABAC del listado pero EXCLUYENDO su propio criterio (conteos de
+   * "hermanos": elegir un valor no anula las demás opciones). COUNT exacto; a gran
+   * escala migra a rollups/aproximado (Fase 7, BACKLOG §3).
+   */
+  async facets(userId: string, query: LogEntryListQuery): Promise<LogEntryFacets> {
+    const without = (omit: Partial<LogEntryListQuery>) => this.buildWhere(userId, { ...query, ...omit });
+    const [statusW, stateW, templateW, equipW, bandW] = await Promise.all([
+      without({ status: undefined }),
+      without({ stateKey: undefined }),
+      without({ templateId: undefined }),
+      without({ equipmentId: undefined }),
+      without({ thresholdBand: undefined }),
+    ]);
+
+    const [statusG, stateG, templateG, equipG, warnC, critC] = await Promise.all([
+      this.prisma.logEntry.groupBy({ by: ["status"], where: statusW, _count: { _all: true } }),
+      this.prisma.logEntry.groupBy({
+        by: ["currentStateKey"],
+        where: { AND: [stateW, { currentStateKey: { not: null } }] },
+        _count: { _all: true },
+      }),
+      this.prisma.logEntry.groupBy({ by: ["templateId"], where: templateW, _count: { _all: true } }),
+      this.prisma.logEntry.groupBy({
+        by: ["equipmentId"],
+        where: { AND: [equipW, { equipmentId: { not: null } }] },
+        _count: { _all: true },
+      }),
+      this.prisma.logEntry.count({ where: { AND: [bandW, { values: { some: { thresholdBand: "WARN" } } }] } }),
+      this.prisma.logEntry.count({ where: { AND: [bandW, { values: { some: { thresholdBand: "CRIT" } } }] } }),
+    ]);
+
+    // Enriquecimiento de etiquetas (nombres de plantilla/estado/equipo), batched.
+    const templateIds = templateG.map((g) => g.templateId);
+    const equipIds = equipG.map((g) => g.equipmentId).filter((x): x is string => Boolean(x));
+    const stateKeys = stateG.map((g) => g.currentStateKey).filter((x): x is string => Boolean(x));
+    const [templates, equipment, states] = await Promise.all([
+      templateIds.length
+        ? this.prisma.template.findMany({ where: { id: { in: templateIds } }, select: { id: true, name: true } })
+        : Promise.resolve([]),
+      equipIds.length
+        ? this.prisma.equipment.findMany({ where: { id: { in: equipIds } }, select: { id: true, tag: true, name: true } })
+        : Promise.resolve([]),
+      stateKeys.length
+        ? this.prisma.workflowState.findMany({
+            where: { key: { in: stateKeys } },
+            select: { key: true, name: true, color: true },
+          })
+        : Promise.resolve([]),
+    ]);
+    const tName = new Map(templates.map((t) => [t.id, t.name]));
+    const eq = new Map(equipment.map((e) => [e.id, e]));
+    const stName = new Map<string, { name: string; color: string | null }>();
+    for (const s of states) if (!stName.has(s.key)) stName.set(s.key, { name: s.name, color: s.color }); // 1.ª versión gana
+
+    const byCount = <T extends { count: number }>(a: T, b: T) => b.count - a.count;
+    const topN = LogbookQueryService.FACET_TOP_N;
+
+    return {
+      status: statusG.map((g) => ({ value: g.status, label: g.status, count: g._count._all })).sort(byCount),
+      state: stateG
+        .map((g) => {
+          const meta = stName.get(g.currentStateKey!);
+          return { value: g.currentStateKey!, label: meta?.name ?? g.currentStateKey!, count: g._count._all, color: meta?.color ?? null };
+        })
+        .sort(byCount)
+        .slice(0, topN),
+      template: templateG
+        .map((g) => ({ value: g.templateId, label: tName.get(g.templateId) ?? g.templateId, count: g._count._all }))
+        .sort(byCount)
+        .slice(0, topN),
+      equipment: equipG
+        .map((g) => {
+          const e = eq.get(g.equipmentId!);
+          const label = e ? (e.tag ? `${e.tag} · ${e.name}` : e.name) : g.equipmentId!;
+          return { value: g.equipmentId!, label, count: g._count._all };
+        })
+        .sort(byCount)
+        .slice(0, topN),
+      band: [
+        { value: "CRIT", label: "CRIT", count: critC },
+        { value: "WARN", label: "WARN", count: warnC },
+      ].filter((b) => b.count > 0),
+    };
+  }
+
+  /**
+   * Filtros RESUELTOS de la vista de sistema "Mi turno" (2.8.1c): el turno/día
+   * operacional vigentes (vía `ShiftResolver`, calendario por defecto, porque el
+   * usuario abarca varios nodos) + autor = el propio usuario. Sin calendario ⇒ solo
+   * autor + día de hoy (degradación elegante).
+   */
+  async myShiftFilter(userId: string): Promise<MyShiftFilter> {
+    const now = new Date();
+    const res = await this.shiftResolver.resolve(now, null);
+    if (res) return { createdById: userId, operationalDate: res.operationalDate, shiftCode: res.shiftCode };
+    return { createdById: userId, operationalDate: now.toISOString().slice(0, 10), shiftCode: null };
   }
 
   /**
@@ -597,6 +704,18 @@ export class LogbookQueryService {
     if (query.thresholdBand) {
       const bands: ThresholdBand[] = query.thresholdBand === "ANY" ? ["WARN", "CRIT"] : [query.thresholdBand];
       and.push({ values: { some: { thresholdBand: { in: bands } } } });
+    }
+
+    // Review-by-exception (2.8.1c): solo lo accionable = umbral fuera de rango OR
+    // firma pendiente. OR de dos señales YA queryables (no toca fechas/ventana, que
+    // se computan); deja la grilla en "lo que requiere mirar".
+    if (query.exceptionsOnly) {
+      and.push({
+        OR: [
+          { values: { some: { thresholdBand: { in: ["WARN", "CRIT"] } } } },
+          { sections: { some: { requiresSignature: true, signatureId: null } } },
+        ],
+      });
     }
 
     if (query.q) {

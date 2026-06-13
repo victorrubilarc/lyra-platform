@@ -160,8 +160,8 @@ function makeServices(prismaOver: Record<string, unknown> = {}, scopeOver: Parti
   } as unknown as import("../settings/settings.service").SettingsService;
 
   const entries = new LogEntriesService(prisma, audit, scope, shiftResolver, fiscalResolver, reauth, enc, periods, permissions, settings);
-  const logbook = new LogbookQueryService(prisma, scope, audit, enc, entries);
-  return { logbook, entries, prisma, audit, scope };
+  const logbook = new LogbookQueryService(prisma, scope, audit, enc, entries, shiftResolver);
+  return { logbook, entries, prisma, audit, scope, shiftResolver };
 }
 
 beforeEach(() => vi.clearAllMocks());
@@ -348,6 +348,73 @@ describe("LogbookQueryService — list", () => {
         worstThresholdBand: "CRIT",
       },
     });
+  });
+});
+
+describe("LogbookQueryService — facetas / excepciones / mi turno", () => {
+  it("exceptionsOnly añade el OR accionable (umbral OR firma pendiente) al where", async () => {
+    const { logbook, prisma } = makeServices();
+    await logbook.list("u1", { exceptionsOnly: true });
+    const arg = (prisma.logEntry.findMany as ReturnType<typeof vi.fn>).mock.calls[0]![0];
+    expect(arg.where.AND).toContainEqual({
+      OR: [
+        { values: { some: { thresholdBand: { in: ["WARN", "CRIT"] } } } },
+        { sections: { some: { requiresSignature: true, signatureId: null } } },
+      ],
+    });
+  });
+
+  it("facets cuenta por dimensión con conteos de HERMANOS (excluye el propio filtro)", async () => {
+    const groupBy = vi.fn().mockImplementation((args: { by: string[] }) => {
+      const by = args.by[0];
+      if (by === "status") return Promise.resolve([{ status: "DRAFT", _count: { _all: 3 } }]);
+      if (by === "currentStateKey") return Promise.resolve([{ currentStateKey: "review", _count: { _all: 4 } }]);
+      if (by === "templateId") return Promise.resolve([{ templateId: "t1", _count: { _all: 5 } }]);
+      if (by === "equipmentId") return Promise.resolve([{ equipmentId: "e1", _count: { _all: 1 } }]);
+      return Promise.resolve([]);
+    });
+    const { logbook, prisma } = makeServices({
+      logEntry: { findFirst: vi.fn(), findMany: vi.fn(), count: vi.fn().mockResolvedValue(2), groupBy },
+      template: { findUnique: vi.fn(), findMany: vi.fn().mockResolvedValue([{ id: "t1", name: "Plantilla X" }]) },
+      equipment: { findMany: vi.fn().mockResolvedValue([{ id: "e1", tag: "EQ-1", name: "Bomba" }]) },
+      workflowState: { findMany: vi.fn().mockResolvedValue([{ key: "review", name: "En revisión", color: "#06B6D4" }]) },
+    });
+
+    const facets = await logbook.facets("u1", { status: "DRAFT", templateId: "t1" });
+    expect(facets.status).toEqual([{ value: "DRAFT", label: "DRAFT", count: 3 }]);
+    expect(facets.state[0]).toMatchObject({ value: "review", label: "En revisión", color: "#06B6D4", count: 4 });
+    expect(facets.template[0]).toMatchObject({ value: "t1", label: "Plantilla X", count: 5 });
+    expect(facets.equipment[0]).toMatchObject({ value: "e1", label: "EQ-1 · Bomba", count: 1 });
+    expect(facets.band).toEqual([
+      { value: "CRIT", label: "CRIT", count: 2 },
+      { value: "WARN", label: "WARN", count: 2 },
+    ]);
+
+    // Conteos de hermanos: la faceta de STATUS se computa SIN el filtro de status,
+    // pero la de TEMPLATE sí conserva el status="DRAFT" del where base.
+    const callOf = (by: string) => groupBy.mock.calls.find((c) => c[0].by[0] === by)![0];
+    const flat = (w: unknown): unknown[] => (w as { AND?: unknown[] }).AND ?? [];
+    expect(flat(callOf("status").where)).not.toContainEqual({ status: "DRAFT" });
+    // El where de la faceta de template (envuelto por el {not:null} de equipment? no: template) conserva status.
+    const templateWhere = callOf("templateId").where;
+    expect(flat(templateWhere)).toContainEqual({ status: "DRAFT" });
+  });
+
+  it("myShiftFilter usa el turno vigente (ShiftResolver) o degrada a hoy sin turno", async () => {
+    const { logbook, shiftResolver } = makeServices();
+    (shiftResolver.resolve as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      operationalDate: "2026-06-13",
+      shiftCode: "A",
+      periodKey: "2026-06",
+    });
+    const withShift = await logbook.myShiftFilter("u1");
+    expect(withShift).toEqual({ createdById: "u1", operationalDate: "2026-06-13", shiftCode: "A" });
+
+    (shiftResolver.resolve as ReturnType<typeof vi.fn>).mockResolvedValueOnce(null);
+    const degraded = await logbook.myShiftFilter("u1");
+    expect(degraded.createdById).toBe("u1");
+    expect(degraded.shiftCode).toBeNull();
+    expect(degraded.operationalDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 });
 

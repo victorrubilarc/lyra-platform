@@ -391,6 +391,45 @@ export const logEntryStatsSchema = z.object({
 });
 export type LogEntryStats = z.infer<typeof logEntryStatsSchema>;
 
+/**
+ * Facetas con conteo (Fase 2.8.1c, estilo Splunk/Kibana). Cada dimensión lista sus
+ * valores presentes con el conteo de entradas, calculado con el MISMO where + ABAC
+ * del listado pero EXCLUYENDO el propio criterio de esa dimensión (conteos de
+ * "hermanos": elegir un valor no anula las demás opciones de la faceta).
+ */
+export const logEntryFacetBucketSchema = z.object({
+  value: z.string(),
+  /** Etiqueta legible ya resuelta (nombre de plantilla/estado/equipo; el valor crudo si no aplica). */
+  label: z.string(),
+  count: z.number().int(),
+  /** Color congelado del estado del flujo (solo la faceta de estado lo trae). */
+  color: z.string().nullable().optional(),
+});
+export type LogEntryFacetBucket = z.infer<typeof logEntryFacetBucketSchema>;
+
+export const logEntryFacetsSchema = z.object({
+  status: z.array(logEntryFacetBucketSchema),
+  state: z.array(logEntryFacetBucketSchema),
+  template: z.array(logEntryFacetBucketSchema),
+  equipment: z.array(logEntryFacetBucketSchema),
+  /** Banda de umbral: buckets WARN / CRIT (excepciones). */
+  band: z.array(logEntryFacetBucketSchema),
+});
+export type LogEntryFacets = z.infer<typeof logEntryFacetsSchema>;
+
+/**
+ * Filtros de la vista de sistema "Mi turno" RESUELTOS por el backend (Fase 2.8.1c):
+ * el turno/día operacional vigentes (vía `ShiftResolver`, calendario por defecto) +
+ * el autor = el usuario actual. `shiftCode` null = sin calendario resuelto
+ * (degradación elegante: solo autor + día de hoy).
+ */
+export const myShiftFilterSchema = z.object({
+  createdById: z.string(),
+  operationalDate: z.string(),
+  shiftCode: z.string().nullable(),
+});
+export type MyShiftFilter = z.infer<typeof myShiftFilterSchema>;
+
 // === Requests ================================================================
 
 /**
@@ -636,6 +675,8 @@ export const logEntryListQuerySchema = z.object({
   pendingSignature: queryBool,
   /** Excepciones de umbral: CRIT / WARN exactos, o ANY (cualquier banda). */
   thresholdBand: z.enum(["WARN", "CRIT", "ANY"]).optional(),
+  /** Review-by-exception (2.8.1c): solo lo accionable = umbral WARN/CRIT OR firma pendiente. */
+  exceptionsOnly: queryBool,
   /** Orden legacy single (back-compat con deep-links previos a 2.8.1b). */
   sort: logEntrySortFieldSchema.optional(),
   dir: z.enum(["asc", "desc"]).optional(),
