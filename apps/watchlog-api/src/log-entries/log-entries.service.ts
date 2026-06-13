@@ -10,6 +10,7 @@ import type {
   CreateLogEntryRequest,
   EditWindowAnchor,
   EditWindowInfo,
+  EquipmentMode,
   ExecuteTransitionRequest,
   FieldForValidation,
   LogEntryDetail,
@@ -223,6 +224,8 @@ export class LogEntriesService {
     await this.assertNodeAllowedForTemplate(orgNodeId, template.nodeAssignments);
     // 2.º eje ABAC (Fase 2.8): la plantilla debe estar en el alcance del usuario.
     await this.scope.assertTemplateInScope(userId, template.id);
+    // Gobernanza del equipo por plantilla (2.8.0.2): gate DURO al materializar.
+    this.assertEquipmentForMode(template.equipmentMode, dto.equipmentId);
     if (dto.equipmentId) await this.assertEquipmentInNode(dto.equipmentId, orgNodeId);
 
     const version = await this.prisma.templateVersion.findFirst({
@@ -377,6 +380,12 @@ export class LogEntriesService {
     await this.assertNodeAllowedForTemplate(orgNodeId, template.nodeAssignments);
     // 2.º eje ABAC (Fase 2.8): defensa en profundidad también en la vista previa.
     await this.scope.assertTemplateInScope(userId, template.id);
+    // Gobernanza del equipo (2.8.0.2): en la vista previa solo se valida la consistencia
+    // de NONE (no admite equipo); REQUIRED NO bloquea aquí (se está componiendo y el gate
+    // duro corre al materializar en `create`).
+    if (template.equipmentMode === "NONE" && q.equipmentId) {
+      throw new BadRequestException("Esta plantilla no admite equipo en la entrada");
+    }
     if (q.equipmentId) await this.assertEquipmentInNode(q.equipmentId, orgNodeId);
 
     const version = await this.loadVersion(template.currentVersionId);
@@ -1784,6 +1793,24 @@ export class LogEntriesService {
     if (eq.orgNodeId !== orgNodeId) throw new BadRequestException("El equipo no pertenece al nodo de la entrada");
   }
 
+  /**
+   * Gobernanza del objeto de referencia EAM (Fase 2.8.0.2): autoriza el equipo contra
+   * el MODO de la plantilla, en `create`/materialización (punto donde `equipmentId` se
+   * estampa, igual que `orgNodeId`). Patrón notification-type SAP PM / WO-type Maximo:
+   * el TIPO de registro decide si el objeto de referencia es obligatorio.
+   *  - REQUIRED ⇒ obligatorio (rechaza si falta).
+   *  - NONE     ⇒ la plantilla no usa equipo (rechaza si se manda uno).
+   *  - OPTIONAL/SUGGESTED ⇒ permisivo (idénticos en backend; SUGGESTED solo empuja en UI).
+   */
+  private assertEquipmentForMode(mode: EquipmentMode, equipmentId: string | null | undefined): void {
+    if (mode === "REQUIRED" && !equipmentId) {
+      throw new BadRequestException("Esta plantilla exige indicar un equipo para la entrada");
+    }
+    if (mode === "NONE" && equipmentId) {
+      throw new BadRequestException("Esta plantilla no admite equipo en la entrada");
+    }
+  }
+
   // --- Alcance de estructura de la plantilla (multi-nodo, Fase 2.8.0) ---------
 
   /**
@@ -1857,9 +1884,11 @@ export class LogEntriesService {
     const readable = await this.nodePaths(new Set(nodeIdList));
 
     // Equipos ACTIVOS instalados en esos nodos (objeto de referencia EAM, 2.8.0.1):
-    // el equipo en la entrada es OPCIONAL y se ofrece por nodo.
-    const equip = nodeIdList.length
-      ? await this.prisma.equipment.findMany({
+    // el equipo en la entrada es OPCIONAL y se ofrece por nodo. Si el modo es NONE
+    // (2.8.0.2) la plantilla no usa equipo ⇒ no se consulta ni se ofrece.
+    const equip =
+      nodeIdList.length && template.equipmentMode !== "NONE"
+        ? await this.prisma.equipment.findMany({
           where: { orgNodeId: { in: nodeIdList }, deletedAt: null, active: true },
           select: { id: true, name: true, tag: true, orgNodeId: true },
           orderBy: [{ reportOrder: "asc" }, { name: "asc" }],
@@ -1880,7 +1909,7 @@ export class LogEntriesService {
         equipment: equipByNode.get(r.id) ?? [],
       }))
       .sort((a, b) => a.path.localeCompare(b.path, "es"));
-    return { templateId: template.id, nodes };
+    return { templateId: template.id, equipmentMode: template.equipmentMode, nodes };
   }
 
   /** Interno: ABAC — 403 si el nodo de la entrada está fuera del alcance del usuario. */

@@ -182,6 +182,7 @@ export class TemplatesService {
         currentVersionId: t.currentVersionId,
         editWindowAnchor: t.editWindowAnchor,
         editWindowMinutes: t.editWindowMinutes,
+        equipmentMode: t.equipmentMode,
         createdAt: t.createdAt.toISOString(),
         updatedAt: t.updatedAt.toISOString(),
         orgNodePath: t.orgNodeId ? (nodePaths.get(t.orgNodeId) ?? null) : null,
@@ -290,6 +291,7 @@ export class TemplatesService {
       currentVersionId: template.currentVersionId,
       editWindowAnchor: template.editWindowAnchor,
       editWindowMinutes: template.editWindowMinutes,
+      equipmentMode: template.equipmentMode,
       createdAt: template.createdAt.toISOString(),
       updatedAt: template.updatedAt.toISOString(),
       version: this.mapVersion(version),
@@ -314,6 +316,7 @@ export class TemplatesService {
         status: "DRAFT",
         editWindowAnchor: dto.editWindowAnchor ?? null,
         editWindowMinutes: dto.editWindowMinutes ?? null,
+        equipmentMode: dto.equipmentMode ?? undefined, // undefined ⇒ default OPTIONAL del schema
         createdById: userId,
         updatedById: userId,
         nodeAssignments: {
@@ -356,6 +359,8 @@ export class TemplatesService {
           // Ventana de edición (2.7.2): gobernanza viva, editable sin republicar.
           editWindowAnchor: dto.editWindowAnchor === undefined ? undefined : dto.editWindowAnchor,
           editWindowMinutes: dto.editWindowMinutes === undefined ? undefined : dto.editWindowMinutes,
+          // Modo de equipo (2.8.0.2): gobernanza viva, editable sin republicar.
+          equipmentMode: dto.equipmentMode === undefined ? undefined : dto.equipmentMode,
           updatedById: userId,
         },
       });
@@ -385,6 +390,7 @@ export class TemplatesService {
         nodeAssignments: before.nodeAssignments,
         editWindowAnchor: before.editWindowAnchor,
         editWindowMinutes: before.editWindowMinutes,
+        equipmentMode: before.equipmentMode,
       },
       after: {
         name: updated.name,
@@ -392,6 +398,7 @@ export class TemplatesService {
         nodeAssignments: change ? change.assignments : before.nodeAssignments,
         editWindowAnchor: updated.editWindowAnchor,
         editWindowMinutes: updated.editWindowMinutes,
+        equipmentMode: updated.equipmentMode,
       },
     });
     return this.getDetail(userId, id);
@@ -426,6 +433,8 @@ export class TemplatesService {
           // Ventana de edición (2.7.2): config del contenedor, viaja con el builder.
           editWindowAnchor: dto.editWindowAnchor === undefined ? undefined : dto.editWindowAnchor,
           editWindowMinutes: dto.editWindowMinutes === undefined ? undefined : dto.editWindowMinutes,
+          // Modo de equipo (2.8.0.2): config del contenedor, viaja con el builder.
+          equipmentMode: dto.equipmentMode === undefined ? undefined : dto.equipmentMode,
           updatedById: userId,
         },
       });
