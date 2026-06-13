@@ -221,11 +221,11 @@ export function Table<T>({
     if (dc.pinned === "left") {
       style.position = "sticky";
       style.left = dc.offset ?? 0;
-      style.zIndex = 1;
+      style.zIndex = 3; // sobre la cabecera sticky (z-index 2) en la esquina
     } else if (dc.pinned === "right") {
       style.position = "sticky";
       style.right = dc.offset ?? 0;
-      style.zIndex = 1;
+      style.zIndex = 3;
     }
     return Object.keys(style).length ? style : undefined;
   }

@@ -1076,7 +1076,7 @@ export const esCL = {
       systemGroup: "Vistas del sistema",
       mine: "Mis vistas",
       modified: "Vista modificada",
-      update: "Actualizar",
+      update: "Guardar cambios",
       saveAs: "Guardar como",
       saveAsTitle: "Guardar vista",
       namePlaceholder: "Nombre de la vista (p. ej. Mi turno mañana)",

@@ -1,6 +1,9 @@
 .shell {
   display: flex;
-  min-height: 100vh;
+  /* Shell de altura fija: la región de contenido scrollea internamente (no el body),
+     para que cada pantalla pueda fijar su propio chrome y dejar scrollar solo su grilla. */
+  height: 100vh;
+  overflow: hidden;
 }
 
 /* ===================== SIDEBAR ===================== */
@@ -442,7 +445,17 @@
 .content {
   flex: 1;
   min-width: 0;
+  /* Región scrolleable del workspace. Una pantalla puede fijar su `.page` a
+     height:100% para gestionar su propio scroll interno (grilla con cabecera sticky). */
+  min-height: 0;
+  overflow-y: auto;
   padding: var(--layout-content-pad-y) var(--layout-content-pad-x);
+}
+/* Las pantallas que gestionan su propio scroll interno desactivan el padding/scroll
+   del contenedor y llenan la altura disponible. */
+.content:has(> [data-fill-height]) {
+  overflow: hidden;
+  padding: 0;
 }
 
 @media (min-width: 1920px) {

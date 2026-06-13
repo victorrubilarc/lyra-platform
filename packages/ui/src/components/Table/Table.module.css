@@ -18,7 +18,12 @@
 }
 
 .th {
-  position: relative;
+  /* Cabecera sticky: cuando el wrapper scrollea verticalmente (grilla de altura
+     acotada), la cabecera queda fija arriba. Inocuo si el wrapper no scrollea.
+     Las columnas ancladas combinan este `top:0` con su `left/right` inline (esquina). */
+  position: sticky;
+  top: 0;
+  z-index: 2;
   padding: 8px var(--space-4);
   text-align: left;
   font-size: 10px;
