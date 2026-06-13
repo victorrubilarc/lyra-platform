@@ -6,7 +6,7 @@ import {
   optionsFieldConfigSchema,
   upgradeFieldConfig,
 } from "./field-types.js";
-import { draftFieldInputSchema, saveTemplateDraftRequestSchema } from "./templates.js";
+import { EQUIPMENT_MODES, equipmentModeSchema, draftFieldInputSchema, saveTemplateDraftRequestSchema } from "./templates.js";
 
 describe("config de campos por tipo", () => {
   it("acepta un NÚMERO con unidad, rango y bandas de umbral (ISA-18.2)", () => {
@@ -46,6 +46,22 @@ describe("config de campos por tipo", () => {
       config: { options: [] }, // opciones no aplican a NÚMERO
     });
     expect(bad.success).toBe(false);
+  });
+});
+
+describe("modo de equipo por plantilla (2.8.0.2)", () => {
+  it("expone exactamente los 4 modos de gobernanza del objeto de referencia", () => {
+    expect([...EQUIPMENT_MODES]).toEqual(["NONE", "OPTIONAL", "SUGGESTED", "REQUIRED"]);
+    expect(equipmentModeSchema.safeParse("REQUIRED").success).toBe(true);
+    expect(equipmentModeSchema.safeParse("ANY").success).toBe(false);
+  });
+
+  it("el borrador acepta equipmentMode opcional (gobernanza viva del contenedor)", () => {
+    const r = saveTemplateDraftRequestSchema.safeParse({
+      equipmentMode: "REQUIRED",
+      sections: [{ key: "s1", title: "A", fields: [{ key: "f1", type: "TEXT", label: "Obs" }] }],
+    });
+    expect(r.success).toBe(true);
   });
 });
 

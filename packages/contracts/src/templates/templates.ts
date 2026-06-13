@@ -53,6 +53,26 @@ export type EditWindowAnchor = z.infer<typeof editWindowAnchorSchema>;
  */
 export const editWindowMinutesSchema = z.number().int().min(0).max(525_600);
 
+/**
+ * Modo de equipo por plantilla (Fase 2.8.0.2) — GOBERNANZA del objeto de referencia
+ * EAM sobre la mecánica de 2.8.0.1. El TIPO de registro (la plantilla) decide cómo se
+ * trata el equipo al crear una entrada, patrón notification-type de SAP PM / WO-type
+ * de Maximo (el tipo decide si el objeto de referencia es obligatorio). Vive en el
+ * CONTENEDOR mutable (`Template`), gobernanza VIVA: cambiarlo aplica de inmediato a las
+ * entradas NUEVAS, sin republicar la versión (mismo patrón que la ventana de edición).
+ *
+ *  - NONE:      la plantilla no usa equipo; el selector NO se muestra al crear.
+ *  - OPTIONAL:  el equipo se ofrece, "(sin equipo)" permitido; sin empuje (comportamiento
+ *               histórico de 2.8.0.1 ⇒ default de migración).
+ *  - SUGGESTED: igual que OPTIONAL en el BACKEND (permisivo, sin enforcement); la UI
+ *               EMPUJA a elegir equipo (autoselecciona el único, "recomendado").
+ *  - REQUIRED:  el equipo es OBLIGATORIO; el backend lo AUTORIZA en `create`/materialización
+ *               (rechaza si falta), igual que el nodo. "(sin equipo)" no se ofrece.
+ */
+export const EQUIPMENT_MODES = ["NONE", "OPTIONAL", "SUGGESTED", "REQUIRED"] as const;
+export const equipmentModeSchema = z.enum(EQUIPMENT_MODES);
+export type EquipmentMode = z.infer<typeof equipmentModeSchema>;
+
 export const templateVersionStatusSchema = z.enum(["DRAFT", "PUBLISHED"]);
 export type TemplateVersionStatus = z.infer<typeof templateVersionStatusSchema>;
 
@@ -146,6 +166,11 @@ export const templateSchema = z.object({
   editWindowAnchor: editWindowAnchorSchema.nullable(),
   /** null = hereda global · 0 = sin ventana (explícito) · >0 = minutos propios. */
   editWindowMinutes: z.number().int().nullable(),
+  /**
+   * Modo de equipo (2.8.0.2) — gobernanza del objeto de referencia EAM. No nullable:
+   * siempre tiene un valor concreto (default OPTIONAL), no hereda de un global.
+   */
+  equipmentMode: equipmentModeSchema,
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -188,6 +213,8 @@ export const createTemplateRequestSchema = z.object({
   nodeAssignments: z.array(templateNodeAssignmentInputSchema).max(200).optional(),
   editWindowAnchor: editWindowAnchorSchema.nullable().optional(),
   editWindowMinutes: editWindowMinutesSchema.nullable().optional(),
+  /** Modo de equipo (2.8.0.2). Omitido = default OPTIONAL. */
+  equipmentMode: equipmentModeSchema.optional(),
 });
 export type CreateTemplateRequest = z.infer<typeof createTemplateRequestSchema>;
 
@@ -200,6 +227,8 @@ export const updateTemplateRequestSchema = z.object({
   nodeAssignments: z.array(templateNodeAssignmentInputSchema).max(200).optional(),
   editWindowAnchor: editWindowAnchorSchema.nullable().optional(),
   editWindowMinutes: editWindowMinutesSchema.nullable().optional(),
+  /** Modo de equipo (2.8.0.2). Omitido = sin cambio. */
+  equipmentMode: equipmentModeSchema.optional(),
 });
 export type UpdateTemplateRequest = z.infer<typeof updateTemplateRequestSchema>;
 
@@ -270,6 +299,8 @@ export const saveTemplateDraftRequestSchema = z
     // builder la guarda por este mismo canal junto al resto de la metadata.
     editWindowAnchor: editWindowAnchorSchema.nullable().optional(),
     editWindowMinutes: editWindowMinutesSchema.nullable().optional(),
+    /** Modo de equipo (2.8.0.2). Gobernanza viva en el contenedor; el builder la guarda aquí. */
+    equipmentMode: equipmentModeSchema.optional(),
     requireSignature: z.boolean().optional(),
     recurrenceKind: recurrenceKindSchema.optional(),
     recurrenceConfig: recurrenceConfigSchema.nullable().optional(),
