@@ -4,7 +4,22 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
-### 2026-06-13 · Fase 2.8.1b — Vistas guardadas + gestor de columnas + multi-sort — 📋 FORKS RESUELTOS (en implementación)
+### 2026-06-13 · Fase 2.8.1b — Vistas guardadas + gestor de columnas + multi-sort — ✅ IMPLEMENTADO
+
+**Cierre:** entregado todo lo confirmado. `SavedView` (entidad genérica, migración `20260613130000`, índice único
+parcial), `SavedViewsModule` CRUD ownership-gated, multi-sort keyset lexicográfico (cursor multi-columna, no pierde
+filas en empates), `Table` column-aware en `@lyra/ui` (orden/ocultar/anclar sticky/anchos/densidad + badge de prioridad),
+gestor de columnas (`ColumnsDrawer`), selector de vistas (`ViewBar`: sistema en código + personales + dirty + Guardar
+como/Actualizar/Predeterminada/Eliminar), última vista en localStorage, y **columnas de VALOR individuales por plantilla**
+(con 1 plantilla filtrada). **Recortes entregados como tales:** resize de columnas ✅ (grip de arrastre) / **autosize
+diferido**; **"Mi turno" diferida a 2.8.1c** (requiere `ShiftResolver`); **orden global por columnas de valor diferido a
+Fase 7** (rompería keyset). Sin permisos nuevos (catálogo 59). Tests contracts 163 · API 224. Smoke `scripts/smoke-saved-views.py`
+**24/24** (CRUD, default único, ownership 404, validación, multi-sort + cursor reanuda/rechaza orden incongruente).
+**Pendiente: smoke VISUAL del dueño.**
+
+---
+
+### 2026-06-13 · Fase 2.8.1b — Vistas guardadas + gestor de columnas + multi-sort — 📋 FORKS RESUELTOS
 
 Segundo sub-slice del plan 2.8.1: **el usuario dispone**. Tras 2.8.1a (la plantilla *ofrece* el pool `gridFieldKeys`),
 aquí el usuario elige qué ver, en qué orden, lo guarda y lo reusa. **5 forks resueltos con el dueño (confirmados):**

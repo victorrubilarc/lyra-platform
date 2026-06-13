@@ -334,6 +334,21 @@
   en `LogEntryValue` para que el match no degrade a seq-scan. Limitación MVP: matchea el valor ALMACENADO (texto/number/**code**);
   para SELECT de lista el `code` no coincide con el label (búsqueda por label = deuda, BACKLOG). Sin permisos nuevos (catálogo 59).
 
+### Vistas guardadas de plataforma (Fase 2.8.1b)
+> Migración aditiva **`20260613130000_add_saved_view`**. Personalización de listados como concepto de PLATAFORMA (Bitácoras
+> hoy; Incidencias en Fase 4). Ver DECISIONS 2026-06-13.
+- **SavedView** *(implementado)* — `id`, **`userId`** (dueño, FK `onDelete: Cascade`), **`module`** (discriminador `String`,
+  `"LOGBOOK"`; `String` y no enum para sumar módulos sin migrar — el contrato valida el set vigente), `name`, **`config jsonb`**
+  (snapshot de PRESENTACIÓN: `{filters, sort[], columns{order,hidden,pinnedLeft,pinnedRight,widths}, density}`, validado por Zod
+  en el contrato), **`isDefault`**, timestamps. **Es DATO PERSONAL**: la API autoriza por **OWNERSHIP** (todo filtra por `userId`),
+  NO por RBAC (como favoritos/ui-store, pero server-side para cross-device). **UNA default por `(userId, module)`** garantizada por
+  **índice único PARCIAL** `SavedView_user_module_default_key ON ("userId","module") WHERE "isDefault"` (Prisma no lo expresa → SQL
+  a mano); al marcar una nueva default se desmarca la previa en la misma transacción. Índice `(userId, module)`. **Vistas de SISTEMA
+  NO viven aquí**: son constantes en código (`LOGBOOK_SYSTEM_VIEWS`). Compartir por rol = DIFERIDO (aditivo: futuros `scope`/`sharedRoleId`).
+- **Multi-sort** *(implementado, sin cambio de esquema)* — el listado acepta `sorts` (CSV `campo:dir`, máx 3 claves **indexadas**:
+  `recordedAt`/`effectiveAt`/`entryNumber`; precedencia sobre `sort`/`dir` legacy). El cursor keyset se generalizó a **tupla
+  lexicográfica** `(c1,c2,…,id)` para no perder filas en empates. Orden por columnas de VALOR a escala = Fase 7 (rompería keyset).
+
 ### Orígenes de datos
 - **DataSource** — URL base, tipo de auth, **credencial cifrada en reposo**. *1—N* **DataSourceEndpoint** (path, método, mapeo JSONPath, TTL). Caché en Redis. **Espejo ENTRANTE:** en Fase 3 un endpoint puede **alimentar/materializar** una `ReferenceList` (`source=EXTERNAL`).
 

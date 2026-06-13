@@ -41,6 +41,9 @@ Keycloak **descartado** para el MVP (complejidad operacional); si un cliente lo 
 - **La UI solo oculta** (mejor UX), nunca es la fuente de verdad.
 - El **catálogo de permisos** vive en `@lyra/contracts` (enum tipado), compartido por UI y backend.
 
+### Datos PERSONALES → autorización por OWNERSHIP (no RBAC)
+- Las preferencias de presentación del propio usuario **no** se gobiernan con permisos del catálogo: se autorizan por **pertenencia** (el recurso es del actor). Patrón aplicado a **`SavedView`** (vistas guardadas de Bitácoras, Fase 2.8.1b): toda consulta/mutación filtra por `userId === session.user.id` (404 si la vista es de otro); el endpoint se gatea además por acceso al módulo (`logentry:view`). No infla el catálogo (sigue en **59**). Inflar RBAC con preferencias de UI sería ruido administrativo; el límite real es la propiedad del dato.
+
 ## 3. Auditoría
 - **AuditLog append-only / inmutable**: quién, qué, cuándo, valores antes/después. Cubre entradas, incidencias y configuración de seguridad.
 - Edición de bitácoras: log de cambios con motivo obligatorio.

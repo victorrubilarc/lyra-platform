@@ -80,6 +80,7 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Afinamiento UX TemplateBuilder** ("Guardar configuración" `PATCH` separado del borrador + `editStateToConfigRequest` + riel vertical/sub-pestañas + barra sticky + `ScopeTreePicker`/`Toast` premium) | `feat/builder-vistas-config` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Fase 2.8.1a Bitácoras grilla orientada a contenido** (`Template.gridFieldKeys` gobernanza viva + `summaryValues`/`equipmentTag` en el listado batched + búsqueda por contenido `pg_trgm` + checklist en builder + columnas Equipo/Resumen) | `feat/bitacoras-grilla-contenido` → `main` | ✅ fusionado y publicado en `origin/main` (`4a3a7a9`) | ninguna |
 | **Afinamiento UX grilla de Bitácoras** (fix párrafos + filtros primarios+Drawer + filtro multi-nodo `orgNodeIds` + paginador discreto arriba/abajo + Actualizar + KPIs premium) | `feat/grilla-ux` → `main` | ✅ fusionado y publicado en `origin/main` (`6b06662`) | ninguna |
+| **Fase 2.8.1b Vistas guardadas + gestor de columnas + multi-sort** (`SavedView` ownership-gated + `SavedViewsModule` + `Table` column-aware en `@lyra/ui` + `ColumnsDrawer`/`ViewBar` + multi-sort keyset + columnas de valor por plantilla) | `feat/bitacoras-vistas-guardadas` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 
 **Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
@@ -439,12 +440,19 @@ nunca queda más de una sesión atrás.
               (`EXISTS` sobre candidatos + `pg_trgm` GIN). MISMO where/ABAC ⇒ sin fuga. UI builder (checklist) + `LogbookPage`.
               Sin permisos nuevos (59). Tests contracts 154 · API 216 · smoke 21/21. **Deuda:** búsqueda por LABEL del SELECT
               (hoy matchea el code) · smoke VISUAL.
-        - [ ] **2.8.1b — Vistas guardadas + gestor de columnas:** entidad **`SavedView`** de PLATAFORMA (`module`
-              discriminador; config {filtros, búsqueda, orden, columnas{orden,ocultas,ancladas,anchos}, densidad}; CRUD del
-              dueño; UNA default por usuario+módulo; vistas de sistema EN CÓDIGO: "Mi turno"/"Firmas pendientes"/"Excepciones"/
-              "Últimas 24h"; compartir por rol DIFERIDO) + **gestor de columnas** (mostrar/ocultar/reordenar/anclar/redimensionar
-              — evoluciona el `Table` de `@lyra/ui`, reusable por Incidencias Fase 4) + densidad + recordar última vista +
-              **multi-sort**. Incluye las columnas de campos por plantilla (nivel 2/3).
+        - [x] **2.8.1b — Vistas guardadas + gestor de columnas + multi-sort ✅ (2026-06-13, `feat/bitacoras-vistas-guardadas`
+              → `main`).** `SavedView` genérica (`module` + `config jsonb`, **ownership-gated**, default único por `(userId,module)`
+              vía índice único parcial, migración `20260613130000`) + `SavedViewsModule` CRUD + vistas de SISTEMA en código
+              (Firmas pendientes/Excepciones/Últimas 24h) + `Table` column-aware en `@lyra/ui` (orden/ocultar/anclar sticky/anchos/
+              densidad + badge prioridad + resize grip) + `ColumnsDrawer` + `ViewBar` (dirty/Guardar como/Actualizar/Predeterminada/
+              Eliminar) + última vista localStorage + **multi-sort keyset lexicográfico** (`sorts` CSV, máx 3 indexadas) +
+              **columnas de VALOR individuales por plantilla** (con 1 plantilla filtrada). Sin permisos nuevos (catálogo 59). Tests
+              contracts 163 · API 224. Smoke 24/24 (`scripts/smoke-saved-views.py`). Ver DECISIONS/PROGRESS 2026-06-13.
+          - [ ] **Diferidos de 2.8.1b (aditivos):** **(a)** compartir vistas por ROL (slots `scope`/`sharedRoleId`, aditivo);
+                **(b)** **autosize** de columnas (doble-clic mide contenido; hoy hay resize manual); **(c)** vista de sistema
+                **"Mi turno"** (requiere `ShiftResolver` para resolver turno/persona actual → 2.8.1c); **(d)** **orden global por
+                columnas de VALOR** (hoy solo client-side del lote; global = Fase 7, rompería keyset/denormalización); **(e)** smoke
+                VISUAL del dueño.
         - [ ] **2.8.1c — Peek + facetas + review-by-exception:** **vistazo** lateral (Drawer con el contenido del registro
               reusando `getDetail`, sin salir de la lista; "Abrir ficha completa") + **facetas con conteo** por valor (estado/
               turno/plantilla/equipo/banda de umbral, estilo Splunk/Kibana) + **resaltado por excepción** visual (umbral
