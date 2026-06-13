@@ -164,6 +164,25 @@ mostradas por defecto; con 0 o ≥2 plantillas cae a la línea "Resumen" (patró
 incongruente; crea y LIMPIA por ID). typecheck/lint(0)/build verdes. **Pendiente: smoke VISUAL del dueño.** Siguiente: **2.8.1c**
 (peek lateral + facetas con conteo + review-by-exception + "Mi turno").
 
+**+ Fase 2.8.1c — Bitácoras: PEEK LATERAL + FACETAS CON CONTEO + REVIEW-BY-EXCEPTION + "Mi turno" ✅ (2026-06-13,
+`feat/bitacoras-peek-facetas` → `main`).** **Cierra TODA la 2.8.1** (grilla orientada a contenido: a reconocible · b vistas/
+columnas/multi-sort · c buscar-y-encontrar). **5 forks resueltos (DECISIONS 2026-06-13).** **(1) `GET /log-entries/facets`**:
+facetas con conteo (status/estado/plantilla/equipo/banda) reusando `buildWhere`+ABAC, con **conteos de HERMANOS** (cada faceta
+se computa SIN su propio criterio ⇒ elegir un valor no anula las demás opciones; estilo Splunk/Kibana). COUNT exacto + top-N;
+rollups/aproximado = Fase 7. **(2) `PeekDrawer`**: vistazo lateral **INSTANTÁNEO** armado desde la fila (cero round-trip) +
+"Abrir ficha completa" → visor; **el clic en la fila abre el peek** (antes navegaba). Refinamiento sobre el plan (peek desde la
+fila es más rápido que reusar `getDetail`; el detalle completo se abre aparte). **(3) `GET /log-entries/my-shift`**: vista de
+sistema **"Mi turno"** resuelta por backend (`ShiftResolver.resolve(now, default)` → autor + día + turno vigentes; degrada a
+autor+hoy sin calendario). Cierra el diferido de 2.8.1b. **(4) Facetas ↔ filtro ↔ URL/SavedView**: clic en un valor hace toggle
+del filtro (single-select MVP). **(5) Review-by-exception en capas**: realce por FILA (tinte sutil por la peor banda, vía
+`rowClassName` nuevo en `@lyra/ui` Table) + flag **`exceptionsOnly`** (umbral WARN/CRIT OR firma pendiente). **+ filtro de EQUIPO
+en UI** (`equipmentId` en el estado de la grilla, togglable desde la faceta — cierra pendiente histórico de 2.6.1). **+ saneamiento:**
+`formatSummaryValue` extraído a `logbook-cells` (compartido grilla/peek) y fecha de columnas migrada a `lib/format` (regional, dejó
+de hardcodear `es-CL`). Web: `FacetsPanel` (sticky, premium) + `PeekDrawer` + chips/checkbox de `exceptionsOnly`. Sin permisos
+nuevos (catálogo 59). Tests: contracts **163** · API **227** (+3: facetas hermanos, exceptionsOnly, my-shift). Smoke en vivo
+**11/11** (`scripts/smoke-facets-peek.py`: facetas 5 dims, hermanos no se autoanulan + total acota 46→41, exceptionsOnly 1≤46,
+my-shift turno "dia", ABAC 3 usuarios). typecheck/lint(0)/build verdes. **Pendiente: smoke VISUAL del dueño.** **2.8.1 COMPLETA.**
+
 ## Hecho en Fase 2.7.2 (Ventana de edición configurable — gobernanza temporal #6)
 
 2.º eslabón de la gobernanza temporal: plazo para CORREGIR un registro; vencido, solo se edita con privilegio explícito

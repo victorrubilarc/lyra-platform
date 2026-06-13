@@ -81,6 +81,7 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Fase 2.8.1a Bitácoras grilla orientada a contenido** (`Template.gridFieldKeys` gobernanza viva + `summaryValues`/`equipmentTag` en el listado batched + búsqueda por contenido `pg_trgm` + checklist en builder + columnas Equipo/Resumen) | `feat/bitacoras-grilla-contenido` → `main` | ✅ fusionado y publicado en `origin/main` (`4a3a7a9`) | ninguna |
 | **Afinamiento UX grilla de Bitácoras** (fix párrafos + filtros primarios+Drawer + filtro multi-nodo `orgNodeIds` + paginador discreto arriba/abajo + Actualizar + KPIs premium) | `feat/grilla-ux` → `main` | ✅ fusionado y publicado en `origin/main` (`6b06662`) | ninguna |
 | **Fase 2.8.1b Vistas guardadas + gestor de columnas + multi-sort** (`SavedView` ownership-gated + `SavedViewsModule` + `Table` column-aware en `@lyra/ui` + `ColumnsDrawer`/`ViewBar` + multi-sort keyset + columnas de valor por plantilla) | `feat/bitacoras-vistas-guardadas` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
+| **Fase 2.8.1c Peek + facetas + review-by-exception + Mi turno** (`/facets` conteos de hermanos + `/my-shift` + `exceptionsOnly` + `FacetsPanel`/`PeekDrawer` + `rowClassName` en `@lyra/ui` + filtro de equipo en UI) | `feat/bitacoras-peek-facetas` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 
 **Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
@@ -453,10 +454,17 @@ nunca queda más de una sesión atrás.
                 **"Mi turno"** (requiere `ShiftResolver` para resolver turno/persona actual → 2.8.1c); **(d)** **orden global por
                 columnas de VALOR** (hoy solo client-side del lote; global = Fase 7, rompería keyset/denormalización); **(e)** smoke
                 VISUAL del dueño.
-        - [ ] **2.8.1c — Peek + facetas + review-by-exception:** **vistazo** lateral (Drawer con el contenido del registro
-              reusando `getDetail`, sin salir de la lista; "Abrir ficha completa") + **facetas con conteo** por valor (estado/
-              turno/plantilla/equipo/banda de umbral, estilo Splunk/Kibana) + **resaltado por excepción** visual (umbral
-              CRÍT/ADV, firmas pendientes, fuera de ventana/período). Absorbe parte de 2.6.2.
+        - [x] **2.8.1c — Peek + facetas + review-by-exception + "Mi turno" ✅ (2026-06-13, `feat/bitacoras-peek-facetas` →
+              `main`).** `GET /log-entries/facets` (5 dims, **conteos de HERMANOS** reusando `buildWhere`+ABAC) + `GET
+              /log-entries/my-shift` (`ShiftResolver`) + `exceptionsOnly`. Web: `FacetsPanel` (clic = toggle de filtro → URL/
+              SavedView), `PeekDrawer` (vistazo INSTANTÁNEO desde la fila + "Abrir ficha completa"; clic en fila = peek), realce
+              por excepción (`rowClassName` en `@lyra/ui` Table), vista de sistema "Mi turno", **filtro de equipo en UI**
+              (cierra pendiente de 2.6.1). Sin permisos nuevos (59). Tests contracts 163 · API 227. Smoke 11/11
+              (`scripts/smoke-facets-peek.py`). **2.8.1 COMPLETA.** Ver DECISIONS/PROGRESS 2026-06-13.
+          - [ ] **Diferidos de 2.8.1c (aditivos):** **(a)** **multi-select por faceta** (requiere volver multi esos filtros,
+                como se hizo con nodos); **(b)** facetas/COUNT **a escala** sin COUNT exacto (Redis/rollups) = Fase 7 (§3);
+                **(c)** peek con más detalle (valores por sección reusando `getDetail`, hoy muestra resumen+metadatos+indicadores);
+                **(d)** smoke VISUAL del dueño.
         - [ ] **Parte A del #9 (acceso nodo↔grilla):** selector de nodo ágil "mis nodos"/recientes/favoritos + filtros
               persistentes. Intercalable en 2.8.1a/b (presentar micro-alternativa al llegar). El backend ya guarda
               `LogEntryValue`; solo falta exponerlo acotado. Adiciones de modelo: `TemplateField.showInGrid` + `SavedView` (aditivas).

@@ -4,7 +4,21 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
-### 2026-06-13 · Fase 2.8.1c — Peek lateral + facetas con conteo + review-by-exception + "Mi turno" — 📋 FORKS RESUELTOS (en implementación)
+### 2026-06-13 · Fase 2.8.1c — Peek lateral + facetas con conteo + review-by-exception + "Mi turno" — ✅ IMPLEMENTADO
+
+**Cierre (cierra TODA la 2.8.1):** `GET /log-entries/facets` (5 dimensiones, conteos de hermanos, reusa `buildWhere`+ABAC),
+`GET /log-entries/my-shift` (resuelve turno/día + autor vía `ShiftResolver`), `exceptionsOnly` en la query. Web: `FacetsPanel`
+(panel lateral toggleable, clic = toggle de filtro → URL/SavedView), `PeekDrawer` (vistazo INSTANTÁNEO desde la fila, sin
+round-trip; "Abrir ficha completa"; el clic en la fila abre el peek), realce por excepción en la fila (`rowClassName` en
+`@lyra/ui` Table), vista de sistema "Mi turno", filtro de **equipo** en UI (cierra el pendiente 2.6.1). **Refinamiento sobre
+el fork 2:** el peek se arma desde la fila (más rápido que reusar `getDetail`); el detalle completo se abre aparte. Extraído
+`formatSummaryValue` a `logbook-cells` (compartido) y corregida la fecha de columnas a `lib/format` (regional, dejó de
+hardcodear `es-CL`). Sin permisos nuevos (59). Tests contracts 163 · API 227. Smoke `scripts/smoke-facets-peek.py` **11/11**
+(facetas, hermanos, exceptionsOnly acota, my-shift, ABAC de los 3 usuarios). **Pendiente: smoke VISUAL del dueño.**
+
+---
+
+### 2026-06-13 · Fase 2.8.1c — Peek lateral + facetas con conteo + review-by-exception + "Mi turno" — 📋 FORKS RESUELTOS
 
 Tercer y último sub-slice de 2.8.1 (grilla orientada a contenido). El dueño aprobó avanzar con mi criterio, estándar
 enterprise/premium. **5 forks resueltos:**
