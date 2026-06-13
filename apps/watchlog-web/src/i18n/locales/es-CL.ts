@@ -982,6 +982,13 @@ export const esCL = {
       sections: "secciones",
       pendingSig: "firmas pend.",
     },
+    diagram: {
+      title: "Recorrido del flujo",
+      current: "Actual",
+      pending: "Sin alcanzar",
+      noFlow: "Esta plantilla no usa flujo de estados.",
+      noTransitions: "Aún sin transiciones: el registro permanece en su estado inicial.",
+    },
     origin: {
       ONLINE: "En línea",
       DEFERRED: "Diferida",
