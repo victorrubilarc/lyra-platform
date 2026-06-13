@@ -171,10 +171,25 @@ export const templateSchema = z.object({
    * siempre tiene un valor concreto (default OPTIONAL), no hereda de un global.
    */
   equipmentMode: equipmentModeSchema,
+  /**
+   * Campos de resumen en la grilla de Bitácoras (2.8.1a) — GOBERNANZA VIVA en el
+   * contenedor mutable. Pool ORDENADO de `key` de campos candidatos a mostrarse
+   * como "Resumen" en /bitacoras ("el diseñador ofrece, el usuario dispone"). Keyed
+   * por el `key` ESTABLE del campo (no la versión inmutable): se aplica sin republicar.
+   */
+  gridFieldKeys: z.array(z.string()),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
 export type TemplateDto = z.infer<typeof templateSchema>;
+
+/** Tope del pool de campos de resumen (Fiori smart columns son acotadas; 2.8.1a). */
+export const GRID_FIELD_KEYS_MAX = 6;
+export const gridFieldKeysSchema = z
+  .array(z.string().trim().min(1).max(120))
+  .max(GRID_FIELD_KEYS_MAX)
+  // Sin duplicados: el pool es un conjunto ordenado.
+  .refine((keys) => new Set(keys).size === keys.length, { message: "No se permiten campos repetidos" });
 
 /** Ítem de listado: plantilla + conteos y números de versión para las cards. */
 export const templateListItemSchema = templateSchema.extend({
@@ -215,6 +230,8 @@ export const createTemplateRequestSchema = z.object({
   editWindowMinutes: editWindowMinutesSchema.nullable().optional(),
   /** Modo de equipo (2.8.0.2). Omitido = default OPTIONAL. */
   equipmentMode: equipmentModeSchema.optional(),
+  /** Campos de resumen de grilla (2.8.1a). Si se envía, REEMPLAZA el set. Omitido = []. */
+  gridFieldKeys: gridFieldKeysSchema.optional(),
 });
 export type CreateTemplateRequest = z.infer<typeof createTemplateRequestSchema>;
 
@@ -229,6 +246,8 @@ export const updateTemplateRequestSchema = z.object({
   editWindowMinutes: editWindowMinutesSchema.nullable().optional(),
   /** Modo de equipo (2.8.0.2). Omitido = sin cambio. */
   equipmentMode: equipmentModeSchema.optional(),
+  /** Campos de resumen de grilla (2.8.1a). Si se envía, REEMPLAZA el set. Omitido = sin cambio. */
+  gridFieldKeys: gridFieldKeysSchema.optional(),
 });
 export type UpdateTemplateRequest = z.infer<typeof updateTemplateRequestSchema>;
 

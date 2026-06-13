@@ -7,7 +7,7 @@ import {
   type TemplateFieldDto,
   type TemplateSectionDto,
 } from "../templates/templates.js";
-import type { VisibleWhen } from "../templates/field-types.js";
+import { fieldDataTypeSchema, type VisibleWhen } from "../templates/field-types.js";
 import { workflowVersionSchema } from "../workflows/workflows.js";
 
 /**
@@ -319,19 +319,48 @@ export const logEntryIndicatorsSchema = z.object({
 });
 export type LogEntryIndicators = z.infer<typeof logEntryIndicatorsSchema>;
 
+/**
+ * Valor de NEGOCIO de la entrada expuesto en la grilla (2.8.1a) — para que la
+ * bitácora sea reconocible por su contenido, no solo por metadatos. El backend
+ * manda el valor ESTRUCTURADO + su meta CONGELADA (label/unidad/tipo/banda); el
+ * CLIENTE formatea números/fechas con la configuración regional (lib/format), por
+ * eso `value` NO viene pre-formateado. `optionLabel` resuelve code→label de listas.
+ */
+export const logEntrySummaryValueSchema = z.object({
+  fieldKey: z.string(),
+  /** Label CONGELADO del campo en la versión de ESTA entrada. */
+  label: z.string(),
+  dataType: fieldDataTypeSchema,
+  /** code / número / booleano / fecha ISO / etc. null = vacío. */
+  value: z.unknown(),
+  /** Unidad de medida del campo numérico (de la config congelada). null = sin unidad. */
+  unit: z.string().nullable(),
+  /** Label resuelto para SELECT de lista de referencia (el `value` guarda el code). null = no aplica. */
+  optionLabel: z.string().nullable(),
+  /** Banda de umbral ISA-18.2 estampada (null = en rango / no aplica). */
+  thresholdBand: thresholdBandSchema.nullable(),
+});
+export type LogEntrySummaryValue = z.infer<typeof logEntrySummaryValueSchema>;
+
 /** Ítem del listado de Bitácoras: cabecera + contexto legible + indicadores. LIGERO
- * a propósito: NO incluye secciones ni valores (eso vive en el detalle). */
+ * a propósito: NO incluye secciones ni valores COMPLETOS (eso vive en el detalle). Sí
+ * lleva los `summaryValues` ACOTADOS (campos `showInGrid` de la plantilla) para la
+ * línea "Resumen" — el diseñador ofrece el pool, el usuario dispone (2.8.1b). */
 export const logEntryListItemSchema = logEntrySchema.extend({
   templateName: z.string(),
   templateVersionNumber: z.number().int(),
   orgNodeName: z.string(),
   orgNodePath: z.string().nullable(),
   equipmentName: z.string().nullable(),
+  /** Tag del equipo (EAM asset num, estable). null = sin equipo / sin tag. */
+  equipmentTag: z.string().nullable(),
   createdByName: z.string().nullable(),
   /** Nombre y color del estado del flujo (de la versión CONGELADA). null = sin flujo. */
   currentStateName: z.string().nullable(),
   currentStateColor: z.string().nullable(),
   indicators: logEntryIndicatorsSchema,
+  /** Valores de resumen (campos candidatos de la plantilla, en su orden). Vacío = sin candidatos. */
+  summaryValues: z.array(logEntrySummaryValueSchema),
 });
 export type LogEntryListItem = z.infer<typeof logEntryListItemSchema>;
 
