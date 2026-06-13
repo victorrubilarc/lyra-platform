@@ -131,6 +131,17 @@ dueño (2026-06-13):** mostrar todos los candidatos (no 3) + búsqueda case-inse
 `string_contains` sensible a mayúsculas). Limitación MVP: la búsqueda matchea el code del SELECT, no su label (deuda).
 **Pendiente: re-confirmación VISUAL del dueño tras los 2 ajustes.** Siguiente: **2.8.1b** (SavedView + gestor de columnas + multi-sort).
 
+**+ Afinamiento UX de la grilla de Bitácoras ✅ (2026-06-13, `feat/bitacoras-grilla-contenido` → `main`).** Overhaul pedido por
+el dueño tras el smoke visual (DECISIONS 2026-06-13). **Frontend** salvo un cambio chico de backend (multi-nodo); las **Vistas
+Guardadas** (`SavedView`, backend) quedan para 2.8.1b. (1) **Fix del defecto de párrafos** del Resumen (truncado ellipsis +
+tooltip; muestra todos los candidatos con valor, no 3). (2) **Filtros** a barra primaria (Buscar/Nodo/Plantilla/Estado +
+presets) + **"Más filtros" en `Drawer`** con badge de activos. (3) **Filtro de nodo MULTI-NODO** real (`orgNodeIds` CSV→arreglo
+en el contrato; `buildWhere` OR de prefijos de ruta con descendientes / `IN` sin; **ABAC en AND aparte**; UI `MultiSelect`).
+(4) **Paginador discreto numerado arriba y abajo** (lote keyset de 100 paginado en cliente; rango "X–Y de N", 10/25/50 por pág.,
+inicio «‹ números ›» fin; "siguiente" en la última página trae el lote siguiente). (5) **Botón Actualizar** + **KPIs centradas
+con contorno premium** (glow del acento) + lista enmarcada + `<select>` discreto. Tests: contracts 154 · API **217** (+1
+multi-nodo). Smoke **25/25**. typecheck/lint(0)/build verdes. **Pendiente: re-confirmación VISUAL del dueño.**
+
 ## Hecho en Fase 2.7.2 (Ventana de edición configurable — gobernanza temporal #6)
 
 2.º eslabón de la gobernanza temporal: plazo para CORREGIR un registro; vencido, solo se edita con privilegio explícito
