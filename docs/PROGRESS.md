@@ -81,6 +81,20 @@ activos por nodo; `assertEquipmentInNode` valida pertenencia en create/previewNe
 el formulario). **Opción B agendada** (2.8.0.2: modo de equipo por plantilla, gobernanza). **+ fix de re-binding de flujo**
 al guardar plantilla (bug preexistente 2.2: el builder reenviaba la versión de flujo congelada; ahora ata la vigente).
 
+**+ Fase 2.8.0.2 — Modo de equipo por PLANTILLA (gobernanza, "opción B") ✅ (2026-06-12, `feat/modo-equipo-plantilla` →
+`main`).** Capa de gobernanza sobre la mecánica de 2.8.0.1: el TIPO de registro (la plantilla) declara cómo se trata el
+equipo y el backend lo AUTORIZA (patrón notification-type SAP PM / WO-type Maximo). Nuevo enum **`EquipmentMode`**
+`NONE|OPTIONAL|SUGGESTED|REQUIRED` en **`Template`** (contenedor MUTABLE = gobernanza VIVA, sin republicar; espejo de la
+ventana de edición 2.7.2), **default OPTIONAL** = preserva el comportamiento contextual previo (cero ruptura). **OPTIONAL y
+SUGGESTED son equivalentes en el backend** (permisivos); SUGGESTED solo empuja en la UI (autoselecciona el equipo único,
+"recomendado"). **Enforcement en `create`/materialización** (`assertEquipmentForMode`): REQUIRED sin equipo → 400, NONE con
+equipo → 400; `previewNew` solo valida consistencia de NONE (REQUIRED no bloquea al componer). `eligibleNodesForTemplate`
+expone `equipmentMode` (el modal de creación oculta/ofrece/sugiere/obliga) y omite equipos si NONE. Control "Equipo en la
+entrada" en el `TemplateBuilder` (gate `template:edit`). **Sin permisos nuevos — catálogo 59.** Migración aditiva
+`20260612180000_add_template_equipment_mode`. **6 forks resueltos (DECISIONS 2026-06-12).** Tests: contracts **151** (+2) ·
+API **216** (+3). **Smoke en vivo 17/17** (`scripts/smoke-template-equipment-mode.py`: crea plantilla+equipo, recorre los 4
+modos, crea+limpia por ID vía psql cascade). **Pendiente: smoke VISUAL.**
+
 ## Hecho en Fase 2.7.2 (Ventana de edición configurable — gobernanza temporal #6)
 
 2.º eslabón de la gobernanza temporal: plazo para CORREGIR un registro; vencido, solo se edita con privilegio explícito

@@ -5,7 +5,11 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-12** (**Fase 2.8.0 Plantillas MULTI-NODO ✅** — eje de NODO de la visibilidad de plantilla:
+> actualización: **2026-06-12** (**Fase 2.8.0.2 Modo de equipo por PLANTILLA ✅** — gobernanza del objeto de referencia EAM:
+> enum `EquipmentMode` `NONE|OPTIONAL|SUGGESTED|REQUIRED` en `Template` [contenedor mutable, default OPTIONAL = cero ruptura];
+> backend AUTORIZA REQUIRED/NONE en `create`; `eligibleNodes` expone el modo; control en `TemplateBuilder`. Sin permisos
+> nuevos [catálogo 59]. Tests contracts 151 · API 216 · smoke 17/17. 6 forks en DECISIONS. Pendiente: smoke VISUAL [§4].
+> Anterior: **Fase 2.8.0 Plantillas MULTI-NODO ✅** — eje de NODO de la visibilidad de plantilla:
 > entidad `TemplateNodeAssignment` [templateId × orgNodeId + `includeDescendants`, N:M] = fuente de verdad única; 3 modos
 > [uno/varios/"todos los hijos de X"]; **0 asignaciones = GLOBAL** [permisivo]; `Template.orgNodeId` = nodo primario DERIVADO
 > [deprecado, DROP en §3]. `ScopeService.getAccessibleNodes`+`isTemplateVisibleByNode`; selector de nodo al crear acotado a
@@ -72,6 +76,7 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Fase 2.8.0 Plantillas MULTI-NODO** (`TemplateNodeAssignment` N:M + `getAccessibleNodes`/`isTemplateVisibleByNode` + selector de nodo al crear `eligibleNodesForTemplate` + `assertNodeAllowedForTemplate` + UI builder/NewEntryPage) | `feat/plantillas-multinodo` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Fix re-binding de flujo al guardar plantilla** (el builder reenviaba la versión de flujo congelada; ahora ata la vigente — bug preexistente 2.2 detectado en el smoke visual de 2.8.0) | `main` (commit directo) | ✅ publicado en `origin/main` (`2a58d9f`) | ninguna |
 | **Fase 2.8.0.1 Equipo OPCIONAL al crear entrada** (`eligibleNode.equipment` + `assertEquipmentInNode` + selector de equipo en el modal de creación) | `feat/equipo-opcional-entrada` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
+| **Fase 2.8.0.2 Modo de equipo por PLANTILLA** (`EquipmentMode` en `Template` + `assertEquipmentForMode` en `create` + `equipmentMode` en `eligibleNodes` + control en `TemplateBuilder`/`NewEntryPage`) | `feat/modo-equipo-plantilla` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 
 **Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
@@ -403,11 +408,15 @@ nunca queda más de una sesión atrás.
             devuelve los equipos activos por nodo; `assertEquipmentInNode` valida pertenencia en create/previewNew; el modal
             de creación se abre también con 1 nodo si tiene equipos. El **equipo se muestra en la cabecera del llenado**.
             `LogEntry.equipmentId` ya existía (2.4). Smoke 18/18 + **VISUAL ✅** (confirmado por el dueño). Ver DECISIONS 2026-06-12.
-      - [ ] **2.8.0.2 Modo de equipo por PLANTILLA (gobernanza, "opción B")**: `equipmentMode` en la plantilla
-            (`ninguno / opcional / requerido`) — patrón notification-type de SAP / WO-type de Maximo: el tipo de registro
-            decide si el equipo se oculta, se ofrece o es obligatorio (p. ej. mantención/inspección → requerido; turno/área
-            → opcional/oculto). Migración aditiva + control en el `TemplateBuilder` + enforcement en `create`/`submit`. Es la
-            capa de gobernanza sobre la mecánica de 2.8.0.1. **Su propia sesión.**
+      - [x] **2.8.0.2 Modo de equipo por PLANTILLA (gobernanza, "opción B") ✅ (2026-06-12, `feat/modo-equipo-plantilla` →
+            `main`).** Enum **`EquipmentMode`** `NONE|OPTIONAL|SUGGESTED|REQUIRED` en **`Template`** (contenedor MUTABLE =
+            gobernanza viva, default OPTIONAL = cero ruptura). OPTIONAL≡SUGGESTED en backend (permisivos; SUGGESTED solo
+            empuja en UI). Enforcement en **`create`/materialización** (`assertEquipmentForMode`: REQUIRED sin equipo → 400,
+            NONE con equipo → 400); `previewNew` solo valida NONE. `eligibleNodes` expone `equipmentMode` y omite equipos si
+            NONE. Control en `TemplateBuilder` (gate `template:edit`) + lógica del modal en `NewEntryPage`. Sin permisos
+            nuevos (catálogo 59). Migración `20260612180000_add_template_equipment_mode`. 6 forks en DECISIONS 2026-06-12.
+            Tests contracts **151** · API **216**. Smoke **17/17** (`scripts/smoke-template-equipment-mode.py`, crea+limpia
+            por ID). **Pendiente: smoke VISUAL** (§4). Deuda diferida: re-validar al sellar si el equipo REQUIRED se da de baja.
       - [ ] **2.8.1 (#9) UX de acceso nodo↔grilla** (+ SavedView/gestor de columnas de 2.6.1 FUSIONADOS aquí):
             presentar 2–3 alternativas con pros/contras ANTES de implementar; "mis nodos"/recientes/favoritos,
             búsqueda, filtros persistentes.
@@ -682,6 +691,13 @@ probatoria (hash+timestamp). Ref: `DECISIONS.md` (sección de recomendaciones).
       **`EditWindowOverrideModal`** pidiendo motivo (≥5) y, si el ajuste lo exige, contraseña + MFA; sin el permiso, las
       secciones quedan en solo-lectura con el motivo "la ventana de edición venció el <fecha>". Verificar fechas con
       formato regional (`lib/format.ts`); modo claro y oscuro. App en `:5173`.
+- [ ] **Modo de equipo por plantilla 2.8.0.2 — smoke VISUAL en navegador** (typecheck/lint/build + smoke por API 17/17 OK;
+      falta el clic): en el **`TemplateBuilder`** → control "Equipo en la entrada" (No usar / Opcional / Sugerido /
+      Obligatorio), guardar y publicar. En `/nueva-entrada` con esa plantilla: **Obligatorio** → el modal de creación obliga
+      a elegir equipo (sin "(sin equipo)"; Continuar deshabilitado hasta elegir; aviso si el nodo no tiene equipos activos);
+      **Sugerido** → autoselecciona el equipo único + hint "recomendado", pero permite "(sin equipo)"; **No usar** → no se
+      muestra el selector de equipo; **Opcional** → comportamiento previo. Verificar que al crear con Obligatorio sin equipo
+      el backend devuelve el aviso; modo claro y oscuro. App en `:5173`.
 - [ ] **Afinamiento #4 — smoke VISUAL en navegador** (se verificó typecheck/lint/test/build + smoke por API 22/22;
       falta el clic): en `/nueva-entrada/:id` con una plantilla cuyas secciones tengan roles asignados y un campo con
       override: chip "N de M secciones completadas" en cabecera; chip "Asignada a: <rol>" por sección; sección ajena
