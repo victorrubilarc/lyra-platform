@@ -465,6 +465,8 @@ export class TemplatesService {
           // Flujo asignado (null = sin flujo). Solo se toca si el cliente lo envía.
           workflowDefinitionId: workflowBinding === undefined ? undefined : workflowBinding.definitionId,
           workflowDefinitionVersionId: workflowBinding === undefined ? undefined : workflowBinding.versionId,
+          // Reglas de validación cruzada (Req-7): si se envía, reemplaza el set.
+          rules: dto.rules === undefined ? undefined : (dto.rules as Prisma.InputJsonValue),
         },
       });
 
@@ -506,6 +508,8 @@ export class TemplatesService {
               visibleWhen: field.visibleWhen
                 ? (field.visibleWhen as Prisma.InputJsonValue)
                 : Prisma.DbNull,
+              // Campo formulado (Req-7): AST de la fórmula. null = tecleado normal.
+              computed: field.computed ? (field.computed as Prisma.InputJsonValue) : Prisma.DbNull,
               roles: field.roleIds?.length
                 ? { create: field.roleIds.map((roleId) => ({ roleId })) }
                 : undefined,
@@ -589,6 +593,8 @@ export class TemplatesService {
         description: source?.description ?? template.description,
         requireSignature: source?.requireSignature ?? false,
         recurrenceKind: source?.recurrenceKind ?? "NONE",
+        // Preserva las reglas cruzadas al clonar (editar publicada → nuevo borrador).
+        rules: (source?.rules ?? []) as Prisma.InputJsonValue,
         // Preserva el flujo congelado al clonar (editar publicada → nuevo borrador).
         workflowDefinitionId: source?.workflowDefinitionId ?? null,
         workflowDefinitionVersionId: source?.workflowDefinitionVersionId ?? null,
@@ -624,6 +630,7 @@ export class TemplatesService {
               order: field.order,
               config: upgradeFieldConfig(field.type, (field.config ?? {}) as Record<string, unknown>) as Prisma.InputJsonValue,
               visibleWhen: field.visibleWhen === null ? Prisma.DbNull : (field.visibleWhen as Prisma.InputJsonValue),
+              computed: field.computed == null ? Prisma.DbNull : (field.computed as Prisma.InputJsonValue),
               roles: field.roles.length ? { create: field.roles.map((r) => ({ roleId: r.roleId })) } : undefined,
             },
           });
@@ -646,6 +653,7 @@ export class TemplatesService {
       requireSignature: version.requireSignature,
       recurrenceKind: version.recurrenceKind,
       recurrenceConfig: version.recurrenceConfig ?? null,
+      rules: (version.rules as TemplateVersionDto["rules"]) ?? [],
       publishedAt: version.publishedAt?.toISOString() ?? null,
       sections: version.sections.map((s) => ({
         id: s.id,
@@ -669,6 +677,7 @@ export class TemplatesService {
           // Normaliza el shape de config al vigente (options[] legacy → optionSource).
           config: upgradeFieldConfig(f.type, (f.config ?? {}) as Record<string, unknown>),
           visibleWhen: (f.visibleWhen as TemplateVersionDto["sections"][number]["fields"][number]["visibleWhen"]) ?? null,
+          computed: (f.computed as TemplateVersionDto["sections"][number]["fields"][number]["computed"]) ?? null,
           roleIds: f.roles.map((r) => r.roleId),
         })),
       })),

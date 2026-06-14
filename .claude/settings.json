@@ -17,7 +17,10 @@
       "Bash(python scripts/smoke-workflow-sla.py)",
       "Bash(echo \"api=$\\(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/health 2>/dev/null\\)\")",
       "Bash(curl -s -o /dev/null -w '%{http_code}' http://localhost:5173)",
-      "Bash(echo \"web=$\\(curl -s -o /dev/null -w '%{http_code}' http://localhost:5173 2>/dev/null\\)\")"
+      "Bash(echo \"web=$\\(curl -s -o /dev/null -w '%{http_code}' http://localhost:5173 2>/dev/null\\)\")",
+      "PowerShell(\"killed\")",
+      "Bash(cd /g/Development/BitacorasInteligentes && find apps/watchlog-api/src -path \"*templates*\" -name \"*.ts\" -o -path \"*log-entries*\" -name \"*.ts\" | grep -v spec | sort)",
+      "Read(//g/g/Development/BitacorasInteligentes/apps/watchlog-api/**)"
     ]
   }
 }
