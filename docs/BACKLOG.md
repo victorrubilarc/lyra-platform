@@ -206,6 +206,48 @@ nunca queda más de una sesión atrás.
     (modelo + UI mínima) o solo se deja diseñada y se difiere a Fase 3? Refs: PI Web API WebID, OPC UA
     NodeId, ISA-95/OPC UA companion, ISO 14224 (taxonomía de equipos para confiabilidad).
 
+### Requerimientos del dueño 2026-06-14 (registrados, sin planificar fecha) 🆕
+> Capturados el 2026-06-14. Pendientes de plan/aprobación por sesión. Análisis y referencias de industria abajo.
+
+- [ ] **2.1.2 — Layout de formulario en GRILLA responsiva.** Hoy los campos se apilan en 1 columna (mucho scroll).
+      Dar al diseñador un **ancho por campo** (completo / ½ / ⅓) y acomodarlos en una **grilla CSS responsiva**
+      (colapsa a 1 columna en tablet/celular, regla de terreno + 44px). Aditivo a la versión de plantilla (config
+      versionada); NO toca validación/umbral/condicional/permisos (solo presentación). Estándar SAP Fiori/ServiceNow.
+      Opción A recomendada (ancho por campo); B = columnas por sección; C = editor drag&drop (sobre-ingeniería). **Fase 2.**
+- [ ] **Adjuntos / evidencias en formularios (Req-2).** Subir archivos/fotos. Los grandes (Maximo, SAP DMS, ServiceNow,
+      Veeva/MasterControl, j5) lo hacen en **3 niveles** y conviene soportar: **(a) tipo de campo "archivo/foto"** (adjunto
+      como dato del formulario), **(b) adjuntos a nivel de REGISTRO** (evidencia general), **(c) adjuntos en la TRANSICIÓN**
+      (evidencia al aprobar/rechazar). MVP recomendado: (a)+(b). Storage = **MinIO** (ya está en docker). Requiere pipeline
+      de subida (límite de tamaño/tipo, antivirus opcional, URLs firmadas, retención), inmutabilidad al sellar (GxP), audit.
+      Ya estaba en §3 como Fase 7; **el dueño lo quiere en plantillas** ⇒ se puede adelantar. **Fase 2 (form builder) + MinIO.**
+- [ ] **Notificaciones / Mensajería en TRANSICIONES (Req-1) + pantalla de correo saliente súper configurable (Req-5).**
+      Al disparar una transición, **notificar** por canal (mail / SMS / WhatsApp) a roles/usuarios. Quién lo hace:
+      **ServiceNow** (notifications + Flow Designer), **Jira** (automation rules), **Camunda** (listeners/connectors),
+      **SAP/Maximo** (workflow notifications / escalations + communication templates). Requiere un **MOTOR de
+      notificaciones**: canales detrás de una interfaz abstracta (ya existe `EmailService` como molde), **plantillas de
+      mensaje**, **resolución de destinatarios** (rol→usuarios), opt-in **por transición** (config en la versión del flujo).
+      **CAVEAT on-prem (importante):** **mail** es on-prem (SMTP, ya tenemos `SmtpEmailService`+Mailpit); **SMS/WhatsApp
+      rompen el on-prem puro** → exigen pasarela externa (Twilio / Meta WhatsApp Business API) o un gateway SMS propio ⇒
+      deben ser **canales OPCIONALES enchufables**, no obligatorios. **Req-5 = pantalla dedicada** de correo saliente
+      (SMTP host/puerto/seguridad/auth a BD + perfiles de remitente + editor de plantillas + **botón "enviar prueba"** +
+      cola/reintentos), estilo WP Mail SMTP / Odoo "servidores de correo saliente" / settings de GitLab/Jira. Este motor
+      lo **reutiliza Incidencias (Fase 4: SLA/escalamiento)** ⇒ es pieza FUNDACIONAL. **Nuevo bloque transversal
+      "Notificaciones" (entre Fase 3 y 4; recomendado construirlo antes de Fase 4).**
+- [ ] **API de datos por plantilla (Req-3) — salida OUTBOUND.** Exponer las entradas de una plantilla a sistemas externos.
+      Recomendación (criterio): **NO** generar un endpoint físico por plantilla (pesadilla de mantención); sí un **único
+      motor de API** versionado, **filtrable por `templateId`**, con **API Keys** de máquina (M2M), **scoping por key** (qué
+      plantillas/nodos), **rate-limit**, paginación keyset y esquema estable (OpenAPI). Un "endpoint propio por plantilla"
+      se ofrece como **alias/URL de conveniencia** sobre ese motor. Patrón: Table API de ServiceNow / Salesforce, API por
+      base de Airtable. **Fase 3 (integración, eje OUTBOUND; el inbound SCADA/PI ya es Fase 3).** Ver memoria
+      `integration-pending` (API Keys/Webhooks).
+- [ ] **Webhooks salientes desde plantillas (Req-4).** Empujar datos a otros sistemas ante eventos (entrada creada/sellada/
+      transición). Quién y cómo: **Stripe** (diseño canónico: payload **firmado HMAC**, **reintentos con backoff**, tipos de
+      evento, **idempotencia**, log de entregas, rotación de secreto), **GitHub/Shopify** (igual), consumidos por
+      **Zapier/Make/n8n**; **ServiceNow** vía outbound REST/business rules. Requiere: **bus de eventos** (ya dejamos el gancho
+      `onTransitionExecuted` no-op), **suscripciones** (por plantilla o globales), **firma HMAC**, **cola de reintentos**,
+      **log de entregas** + reintento manual. On-prem friendly (solo HTTP POST saliente). Lo difícil = entrega confiable
+      (cola+reintentos+idempotencia). **Fase 3 (integración OUTBOUND), junto a Req-3.**
+
 ### Fases siguientes (roadmap, ver PROGRESS §tabla)
 - [ ] **Fase 2** — Plantillas / Form Builder + Bitácoras. **Arquitectura enterprise definida en DECISIONS
       2026-06-09** ("formulario = proceso/documento vivo de secciones"; captura multi-actor por fases;
