@@ -1205,6 +1205,14 @@ model LogEntry {
   // Quién y cuándo declaró el diferimiento (huella ALCOA+ / timeline).
   deferredDeclaredById        String?
   deferredDeclaredAt          DateTime?
+  // --- Anulación de borrador (Fase 2.8.2, VOID) -----------------------------
+  // Anulación LÓGICA de un borrador (status=VOID): NO hard-delete y NO usa
+  // deletedAt (ese campo oculta la fila de TODA consulta, incl. el filtro VOID);
+  // aquí la entrada queda trazable (status VOID, fuera de las superficies normales
+  // pero recuperable por filtro). Quién/cuándo/por qué; el AuditLog conserva el rastro.
+  voidedAt                    DateTime?
+  voidReason                  String?
+  voidedById                  String?
   // Autoría (referencia blanda, sin FK dura; igual que Template/AuditLog).
   createdById                 String?
   updatedById                 String?
