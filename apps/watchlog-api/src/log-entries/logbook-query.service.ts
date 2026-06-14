@@ -389,6 +389,7 @@ export class LogbookQueryService {
     const actorNames = await this.entries.namesByUserId([
       entry.createdById,
       entry.deferredDeclaredById,
+      entry.voidedById,
       ...changes.map((c) => c.changedById),
       ...transitions.map((t) => t.actorId),
     ]);
@@ -467,6 +468,16 @@ export class LogbookQueryService {
         actorName: entry.createdById ? (actorNames.get(entry.createdById) ?? null) : null,
       });
     }
+    // Anulación del borrador (2.8.2): huella ALCOA+ de quién/cuándo/por qué.
+    if (entry.status === "VOID" && entry.voidedAt && passesCursor(entry.voidedAt, `voided:${id}`)) {
+      events.push({
+        kind: "VOIDED",
+        id: `voided:${id}`,
+        at: entry.voidedAt.toISOString(),
+        actorName: entry.voidedById ? (actorNames.get(entry.voidedById) ?? null) : null,
+        reason: entry.voidReason,
+      });
+    }
 
     // Merge DESC por (at, id); ISO 8601 ordena lexicográficamente = cronológicamente.
     events.sort((a, b) => (a.at === b.at ? (a.id < b.id ? 1 : -1) : a.at < b.at ? 1 : -1));
@@ -531,7 +542,8 @@ export class LogbookQueryService {
     await this.scope.assertTemplateInScope(userId, entry.templateId);
     const accessible = await this.scope.getAccessibleNodeIds(userId);
 
-    const base: Prisma.LogEntryWhereInput = { deletedAt: null, id: { not: id } };
+    // Las relacionadas excluyen borradores anulados (no son contexto operacional vivo).
+    const base: Prisma.LogEntryWhereInput = { deletedAt: null, id: { not: id }, status: { not: "VOID" } };
     const abac: Prisma.LogEntryWhereInput = accessible !== null ? { orgNodeId: { in: [...accessible] } } : {};
 
     const [samePeriodRows, sameShiftRows] = await Promise.all([
@@ -684,7 +696,11 @@ export class LogbookQueryService {
 
     if (query.templateId) and.push({ templateId: query.templateId });
     if (query.equipmentId) and.push({ equipmentId: query.equipmentId });
+    // Estado: los borradores ANULADOS (VOID) se excluyen de las superficies normales
+    // (grilla/stats/facetas/export) salvo que el usuario filtre explícitamente por
+    // VOID. Quedan trazables (recuperables por filtro), no ocultos del todo (2.8.2).
     if (query.status) and.push({ status: query.status });
+    else and.push({ status: { not: "VOID" } });
     if (query.stateKey) and.push({ currentStateKey: query.stateKey });
     if (query.shiftCode) and.push({ shiftCode: query.shiftCode });
     if (query.periodKey) and.push({ periodKey: query.periodKey });

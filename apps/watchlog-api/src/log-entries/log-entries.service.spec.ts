@@ -867,6 +867,63 @@ describe("LogEntriesService — executeTransition", () => {
   });
 });
 
+describe("LogEntriesService — voidEntry (2.8.2)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const voidableEntry = (over: Record<string, unknown> = {}) => ({
+    id: "e1", status: "DRAFT", orgNodeId: "n1", templateId: "t1", templateVersionId: "v1",
+    createdById: "u1", sealedAt: null, ...over,
+  });
+
+  function setupVoid(over: { entry?: Record<string, unknown>; perms?: string[] } = {}) {
+    const m = makeService(
+      { logEntry: { findFirst: vi.fn().mockResolvedValue(voidableEntry(over.entry)), update: vi.fn().mockResolvedValue({}), create: vi.fn(), findMany: vi.fn() } },
+      { perms: over.perms },
+    );
+    vi.spyOn(m.service, "getDetail").mockResolvedValue({ id: "e1", status: "VOID" } as never);
+    return m;
+  }
+
+  it("el AUTOR anula su propio borrador: status VOID + huella + audita (sin permiso especial)", async () => {
+    const { service, prisma, audit } = setupVoid({ perms: [] });
+    await service.voidEntry("u1", "e1", { reason: "plantilla equivocada" }, ctx);
+
+    expect(prisma.logEntry.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "e1" },
+        data: expect.objectContaining({ status: "VOID", voidedById: "u1", voidReason: "plantilla equivocada", voidedAt: expect.any(Date) }),
+      }),
+    );
+    expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({ action: "logentry.voided" }));
+  });
+
+  it("anular el borrador AJENO sin `logentry:void` ⇒ 403", async () => {
+    const { service } = setupVoid({ entry: { createdById: "u2" }, perms: [] });
+    await expect(service.voidEntry("u1", "e1", { reason: "limpieza" }, ctx)).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it("anular el borrador AJENO CON `logentry:void` ⇒ permitido", async () => {
+    const { service, prisma } = setupVoid({ entry: { createdById: "u2" }, perms: ["logentry:void"] });
+    await service.voidEntry("u1", "e1", { reason: "borrador abandonado" }, ctx);
+    expect(prisma.logEntry.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: "VOID", voidedById: "u1" }) }),
+    );
+  });
+
+  it("rechaza anular una entrada ya enviada/sellada (solo DRAFT)", async () => {
+    const submitted = setupVoid({ entry: { status: "SUBMITTED" } });
+    await expect(submitted.service.voidEntry("u1", "e1", { reason: "no aplica" }, ctx)).rejects.toBeInstanceOf(BadRequestException);
+
+    const sealed = setupVoid({ entry: { sealedAt: new Date() } });
+    await expect(sealed.service.voidEntry("u1", "e1", { reason: "no aplica" }, ctx)).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it("rechaza re-anular una entrada ya anulada (idempotencia)", async () => {
+    const { service } = setupVoid({ entry: { status: "VOID" } });
+    await expect(service.voidEntry("u1", "e1", { reason: "otra vez" }, ctx)).rejects.toBeInstanceOf(BadRequestException);
+  });
+});
+
 describe("LogEntriesService — ventana de edición (2.7.2)", () => {
   beforeEach(() => vi.clearAllMocks());
 
