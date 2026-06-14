@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""Smoke en vivo — Fase 2.1.2: ancho por campo (layoutWidth) en la grilla.
+"""Smoke en vivo — Fase 2.1.3: ancho por campo (colSpan, grilla de 12 col).
 
 Verifica el ROUND-TRIP del hint de presentación a través del diseño de plantilla
 y de la versión CONGELADA, más el mapeo del detalle de entrada:
 
-  1. crea una plantilla y guarda un borrador con campos de ancho HALF / THIRD /
-     OMITIDO (este último debe resolver a FULL en el backend — preserva lo existente);
-  2. GET detalle (versión BORRADOR) ⇒ cada campo trae su layoutWidth (omitido = FULL);
+  1. crea una plantilla y guarda un borrador con campos de ancho colSpan 6 / 8 / 4 /
+     OMITIDO (este último debe resolver a 12 en el backend — preserva lo existente);
+  2. GET detalle (versión BORRADOR) ⇒ cada campo trae su colSpan (omitido = 12);
   3. publica ⇒ GET detalle (versión PUBLICADA/congelada) ⇒ el ancho VIAJÓ en la
      versión inmutable (clonado al publicar);
   4. crea una entrada con esa plantilla y GET /log-entries/:id ⇒ el detalle de la
-     entrada (que consumen llenado y visor) expone el mismo layoutWidth por campo.
+     entrada (que consumen llenado y visor) expone el mismo colSpan por campo.
 
 CREA su propia plantilla + 1 entrada y LIMPIA TODO al final SOLO por ID (el AuditLog
 inmutable conserva el rastro). API :3000. Admin demo: demo@watchlog.local / Demo!Pass2026.
@@ -70,11 +70,11 @@ def pg(sql):
 
 
 def widths_by_key(detail):
-    """Aplana version.sections.fields → {key: layoutWidth}."""
+    """Aplana version.sections.fields → {key: colSpan}."""
     out = {}
     for s in detail["version"]["sections"]:
         for f in s["fields"]:
-            out[f["key"]] = f.get("layoutWidth")
+            out[f["key"]] = f.get("colSpan")
     return out
 
 
@@ -94,7 +94,7 @@ def main():
     try:
         # 1) Plantilla + borrador con anchos HALF / THIRD / OMITIDO(→FULL).
         _, tpl = req("POST", "/templates", atok, {
-            "name": f"SMOKE 2.1.2 layout {ts}",
+            "name": f"SMOKE 2.1.3 layout {ts}",
             "nodeAssignments": [{"orgNodeId": node_id, "includeDescendants": False}],
         })
         tpl_id = tpl["id"]
@@ -102,28 +102,31 @@ def main():
             "sections": [{
                 "key": "s1", "title": "Operación",
                 "fields": [
-                    {"key": "ancho_medio", "type": "TEXT", "label": "A media columna", "layoutWidth": "HALF"},
-                    {"key": "ancho_tercio", "type": "NUMBER", "label": "A un tercio", "layoutWidth": "THIRD", "config": {"unit": "°C"}},
+                    {"key": "ancho_medio", "type": "TEXT", "label": "Media columna", "colSpan": 6},
+                    {"key": "ancho_dos_tercios", "type": "NUMBER", "label": "Dos tercios", "colSpan": 8, "config": {"unit": "°C"}},
+                    {"key": "ancho_tercio", "type": "TEXT", "label": "Un tercio", "colSpan": 4},
                     {"key": "ancho_default", "type": "TEXT", "label": "Sin ancho (default)"},
                 ],
             }],
         })
 
-        # 2) Detalle BORRADOR: el ancho está, omitido = FULL.
+        # 2) Detalle BORRADOR: el ancho está, omitido = 12 (completo).
         _, draft = req("GET", f"/templates/{tpl_id}", atok)
         w = widths_by_key(draft)
-        check("borrador: HALF persiste", w.get("ancho_medio") == "HALF", w.get("ancho_medio"))
-        check("borrador: THIRD persiste", w.get("ancho_tercio") == "THIRD", w.get("ancho_tercio"))
-        check("borrador: omitido ⇒ FULL (cero ruptura)", w.get("ancho_default") == "FULL", w.get("ancho_default"))
+        check("borrador: colSpan 6 persiste", w.get("ancho_medio") == 6, w.get("ancho_medio"))
+        check("borrador: colSpan 8 persiste", w.get("ancho_dos_tercios") == 8, w.get("ancho_dos_tercios"))
+        check("borrador: colSpan 4 persiste", w.get("ancho_tercio") == 4, w.get("ancho_tercio"))
+        check("borrador: omitido ⇒ 12 (cero ruptura)", w.get("ancho_default") == 12, w.get("ancho_default"))
 
         # 3) Publicar ⇒ el ancho VIAJA en la versión CONGELADA (clonado al publicar).
         req("POST", f"/templates/{tpl_id}/publish", atok, {})
         _, pub = req("GET", f"/templates/{tpl_id}", atok)
         check("publicada: ya no hay borrador", pub.get("hasDraft") is False, pub.get("hasDraft"))
         wp = widths_by_key(pub)
-        check("CONGELADA: HALF viajó", wp.get("ancho_medio") == "HALF", wp.get("ancho_medio"))
-        check("CONGELADA: THIRD viajó", wp.get("ancho_tercio") == "THIRD", wp.get("ancho_tercio"))
-        check("CONGELADA: default = FULL", wp.get("ancho_default") == "FULL", wp.get("ancho_default"))
+        check("CONGELADA: colSpan 6 viajó", wp.get("ancho_medio") == 6, wp.get("ancho_medio"))
+        check("CONGELADA: colSpan 8 viajó", wp.get("ancho_dos_tercios") == 8, wp.get("ancho_dos_tercios"))
+        check("CONGELADA: colSpan 4 viajó", wp.get("ancho_tercio") == 4, wp.get("ancho_tercio"))
+        check("CONGELADA: default = 12", wp.get("ancho_default") == 12, wp.get("ancho_default"))
 
         # 4) Detalle de ENTRADA (lo que renderizan llenado y visor) expone el ancho.
         s, nodes = call("GET", f"/log-entries/templates/{tpl_id}/nodes", atok)
@@ -136,9 +139,9 @@ def main():
                 entry_id = entry["id"]
                 _, edet = req("GET", f"/log-entries/{entry_id}", atok)
                 we = widths_by_key(edet)
-                check("entrada: HALF en el detalle", we.get("ancho_medio") == "HALF", we.get("ancho_medio"))
-                check("entrada: THIRD en el detalle", we.get("ancho_tercio") == "THIRD", we.get("ancho_tercio"))
-                check("entrada: default = FULL", we.get("ancho_default") == "FULL", we.get("ancho_default"))
+                check("entrada: colSpan 6 en el detalle", we.get("ancho_medio") == 6, we.get("ancho_medio"))
+                check("entrada: colSpan 8 en el detalle", we.get("ancho_dos_tercios") == 8, we.get("ancho_dos_tercios"))
+                check("entrada: default = 12", we.get("ancho_default") == 12, we.get("ancho_default"))
     finally:
         # Limpieza SOLO por ID (cascada borra versiones/secciones/campos de la plantilla).
         if entry_id:

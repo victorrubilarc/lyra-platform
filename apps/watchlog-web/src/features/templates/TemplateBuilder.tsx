@@ -44,6 +44,8 @@ import {
   type EditState,
 } from "./builder-model.js";
 import { BuilderConfigPanel } from "./BuilderConfigPanel.js";
+import { BuilderFieldCard } from "./BuilderFieldCard.js";
+import { FieldGrid, FieldGridCell } from "./FieldGrid.js";
 import { RulesEditor } from "./RulesEditor.js";
 import type { RuleFieldRef } from "./expression-meta.js";
 import { PreviewForm } from "./FieldPreview.js";
@@ -72,6 +74,9 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
   const [dirty, setDirty] = useState(false); // cambios de DEFINICIÓN (borrador)
   const [configDirty, setConfigDirty] = useState(false); // cambios de CONFIGURACIÓN (PATCH en vivo)
   const [publishOpen, setPublishOpen] = useState(false);
+  // Arrastre de campos en el lienzo (DnD nativo, patrón ColumnsDrawer): origen + destino-hint.
+  const [dragField, setDragField] = useState<{ sUid: string; fUid: string } | null>(null);
+  const [dropHint, setDropHint] = useState<{ sUid: string; beforeFUid: string | null } | null>(null);
 
   const save = useSaveTemplateDraft();
   const publish = usePublishTemplate();
@@ -168,7 +173,7 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
       targetUid = sec.uid;
     }
     const fkey = uniqueKey(slugifyKey(label, "campo"), collectFieldKeys({ ...state, sections }));
-    const field: EditField = { uid: nextUid(), key: fkey, type, semanticRole: null, label, help: null, required: false, config: defaultFieldConfig(type), visibleWhen: null, computed: null, layoutWidth: "FULL", roleIds: [] };
+    const field: EditField = { uid: nextUid(), key: fkey, type, semanticRole: null, label, help: null, required: false, config: defaultFieldConfig(type), visibleWhen: null, computed: null, colSpan: 12, roleIds: [] };
     sections = sections.map((s) => (s.uid === targetUid ? { ...s, fields: [...s.fields, field] } : s));
     patchState({ ...state, sections });
     setSelected({ s: targetUid, f: field.uid });
@@ -221,6 +226,36 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
         return { ...s, fields };
       }),
     });
+  }
+
+  /**
+   * Mueve un campo (reordenar dentro de la sección O mover entre secciones) por
+   * arrastre. Inserta ANTES de `beforeFUid` (o al final si es null). El índice se
+   * calcula DESPUÉS de quitar el campo, así no se desfasa al arrastrar en la misma
+   * sección. Solo presentación/orden; no toca el resto del campo.
+   */
+  function moveFieldBefore(srcSUid: string, fUid: string, dstSUid: string, beforeFUid: string | null) {
+    if (srcSUid === dstSUid && fUid === beforeFUid) return;
+    let moved: EditField | undefined;
+    let sections = state.sections.map((s) => {
+      if (s.uid !== srcSUid) return s;
+      moved = s.fields.find((f) => f.uid === fUid);
+      return { ...s, fields: s.fields.filter((f) => f.uid !== fUid) };
+    });
+    if (!moved) return;
+    sections = sections.map((s) => {
+      if (s.uid !== dstSUid) return s;
+      const fields = [...s.fields];
+      const idx = beforeFUid ? fields.findIndex((f) => f.uid === beforeFUid) : -1;
+      fields.splice(idx < 0 ? fields.length : idx, 0, moved!);
+      return { ...s, fields };
+    });
+    patchState({ ...state, sections });
+  }
+
+  function endDrag() {
+    setDragField(null);
+    setDropHint(null);
   }
 
   function deleteSection(uid: string) {
@@ -448,43 +483,63 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
                   </div>
 
                   {s.fields.length === 0 ? (
-                    <div className={styles.emptySection}>{t("templates.builder.emptySectionFields")}</div>
+                    <div
+                      className={dropHint?.sUid === s.uid && !dropHint.beforeFUid ? styles.emptySectionDrop : styles.emptySection}
+                      onDragOver={(e) => {
+                        if (dragField) {
+                          e.preventDefault();
+                          setDropHint({ sUid: s.uid, beforeFUid: null });
+                        }
+                      }}
+                      onDrop={() => {
+                        if (dragField) moveFieldBefore(dragField.sUid, dragField.fUid, s.uid, null);
+                        endDrag();
+                      }}
+                    >
+                      {t("templates.builder.emptySectionFields")}
+                    </div>
                   ) : (
-                    s.fields.map((f, fi) => {
-                      const meta = fieldTypeMeta(f.type);
-                      const Icon = meta.icon;
-                      const active = selected?.f === f.uid;
-                      const c = f.config as Record<string, unknown>;
-                      return (
-                        <div
-                          key={f.uid}
-                          className={active ? styles.fieldRowActive : styles.fieldRow}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelected({ s: s.uid, f: f.uid });
-                          }}
-                        >
-                          <Icon size={16} className={styles.fieldIcon} />
-                          <div className={styles.fieldInfo}>
-                            <div className={styles.fieldLabel}>
-                              {f.label}
-                              {f.required && <span className={styles.req}> *</span>}
-                            </div>
-                            <div className={styles.fieldSub}>
-                              {t(meta.labelKey)}
-                              {c.unit ? ` · ${c.unit as string}` : ""}
-                              {c.min !== undefined || c.max !== undefined ? ` · ${c.min ?? "—"}–${c.max ?? "—"}` : ""}
-                              {f.visibleWhen ? " · condicional" : ""}
-                            </div>
-                          </div>
-                          <div className={styles.rowActions} onClick={(e) => e.stopPropagation()}>
-                            <button type="button" className={styles.iconBtn} onClick={() => moveField(s.uid, f.uid, -1)} disabled={fi === 0}><ArrowUp size={13} /></button>
-                            <button type="button" className={styles.iconBtn} onClick={() => moveField(s.uid, f.uid, 1)} disabled={fi === s.fields.length - 1}><ArrowDown size={13} /></button>
-                            <button type="button" className={styles.iconBtnDanger} onClick={() => deleteField(s.uid, f.uid)}><Trash2 size={13} /></button>
-                          </div>
-                        </div>
-                      );
-                    })
+                    <div
+                      data-field-grid
+                      // Soltar al final de la sección (área de la grilla fuera de una card).
+                      onDragOver={(e) => {
+                        if (dragField) {
+                          e.preventDefault();
+                          setDropHint({ sUid: s.uid, beforeFUid: null });
+                        }
+                      }}
+                      onDrop={() => {
+                        if (dragField) moveFieldBefore(dragField.sUid, dragField.fUid, s.uid, dropHint?.beforeFUid ?? null);
+                        endDrag();
+                      }}
+                    >
+                      <FieldGrid>
+                        {s.fields.map((f, fi) => (
+                          <FieldGridCell key={f.uid} span={f.colSpan}>
+                            <BuilderFieldCard
+                              field={f}
+                              index={fi}
+                              count={s.fields.length}
+                              active={selected?.f === f.uid}
+                              canEdit={canEdit}
+                              dragging={dragField?.fUid === f.uid}
+                              dropTarget={dropHint?.sUid === s.uid && dropHint.beforeFUid === f.uid}
+                              onSelect={() => setSelected({ s: s.uid, f: f.uid })}
+                              onDelete={() => deleteField(s.uid, f.uid)}
+                              onMove={(dir) => moveField(s.uid, f.uid, dir)}
+                              onResize={(span) => updateField(s.uid, f.uid, { colSpan: span })}
+                              onDragStart={() => setDragField({ sUid: s.uid, fUid: f.uid })}
+                              onDragEnd={endDrag}
+                              onDragOver={() => dragField && setDropHint({ sUid: s.uid, beforeFUid: f.uid })}
+                              onDrop={() => {
+                                if (dragField) moveFieldBefore(dragField.sUid, dragField.fUid, s.uid, f.uid);
+                                endDrag();
+                              }}
+                            />
+                          </FieldGridCell>
+                        ))}
+                      </FieldGrid>
+                    </div>
                   )}
                 </Card>
               ))

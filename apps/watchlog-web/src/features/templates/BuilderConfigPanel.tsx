@@ -1,12 +1,23 @@
 import { useTranslation } from "react-i18next";
-import { Columns2, Columns3, RectangleHorizontal } from "lucide-react";
 import { Checkbox, Combobox, FormField, Input, MultiSelect, Select, Textarea, Toggle } from "@lyra/ui";
-import type { LayoutWidth, OptionInlineItem, RoleSummary, WorkflowStateDto } from "@lyra/contracts";
+import type { OptionInlineItem, RoleSummary, WorkflowStateDto } from "@lyra/contracts";
 import { useReferenceLists } from "../reference-data/reference-data-queries.js";
 import { fieldTypeMeta, slugifyKey, type EditField, type EditSection } from "./builder-model.js";
 import { ExpressionEditor } from "./ExpressionEditor.js";
 import type { RuleFieldRef } from "./expression-meta.js";
 import styles from "./TemplateBuilder.module.css";
+
+/**
+ * Presets de ancho (en columnas de 12) para el campo. Atajos comunes; el ajuste
+ * fino (cualquier span 1..12) se hace arrastrando el borde de la card en el lienzo.
+ */
+const WIDTH_PRESETS = [
+  { span: 12, glyph: "1", labelKey: "templates.builder.widthFull" },
+  { span: 8, glyph: "⅔", labelKey: "templates.builder.widthTwoThirds" },
+  { span: 6, glyph: "½", labelKey: "templates.builder.widthHalf" },
+  { span: 4, glyph: "⅓", labelKey: "templates.builder.widthThird" },
+  { span: 3, glyph: "¼", labelKey: "templates.builder.widthQuarter" },
+] as const;
 
 /** Lee los ítems inline del `optionSource` de un SELECT/MULTISELECT (vacío si no es inline). */
 function inlineItems(config: Record<string, unknown>): OptionInlineItem[] {
@@ -109,24 +120,23 @@ export function BuilderConfigPanel({
           )}
         </FormField>
 
-        {/* Ancho del campo en la grilla (Fase 2.1.2): presentación pura, aplica a todos los tipos. */}
+        {/* Ancho del campo en la grilla de 12 (Fase 2.1.3): presentación pura, aplica a todos
+            los tipos. Presets rápidos; el ajuste fino se hace arrastrando el borde en el lienzo. */}
         <FormField label={t("templates.builder.layoutWidth")} hint={t("templates.builder.layoutWidthHint")}>
           {() => (
             <div className={styles.widthSeg} role="group" aria-label={t("templates.builder.layoutWidth")}>
-              {(["FULL", "HALF", "THIRD"] as const).map((w) => {
-                const Icon = w === "FULL" ? RectangleHorizontal : w === "HALF" ? Columns2 : Columns3;
-                return (
-                  <button
-                    key={w}
-                    type="button"
-                    className={styles.widthSegBtn}
-                    data-on={field.layoutWidth === w}
-                    onClick={() => onUpdateField({ layoutWidth: w as LayoutWidth })}
-                  >
-                    <Icon size={15} /> {t(`templates.builder.layoutWidthOptions.${w}`)}
-                  </button>
-                );
-              })}
+              {WIDTH_PRESETS.map((p) => (
+                <button
+                  key={p.span}
+                  type="button"
+                  className={styles.widthSegBtn}
+                  data-on={field.colSpan === p.span}
+                  onClick={() => onUpdateField({ colSpan: p.span })}
+                  title={t(p.labelKey)}
+                >
+                  {p.glyph}
+                </button>
+              ))}
             </div>
           )}
         </FormField>

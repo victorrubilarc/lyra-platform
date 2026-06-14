@@ -323,6 +323,24 @@ i18n es-CL. Sin permisos nuevos (catálogo 60). Tests: contracts **195** (+2) ·
 `scripts/smoke-field-layout.py` 12/12** (round-trip: borrador → publicado CONGELADO → detalle de entrada; omitido ⇒
 FULL; crea+limpia por ID). typecheck/lint(0)/build verdes. **Pendiente: smoke VISUAL del dueño** (§4).
 
+**+ Fase 2.1.3 — Editor de layout WYSIWYG (grilla de 12 col + arrastre) ✅ (2026-06-14, `feat/layout-editor-wysiwyg` →
+`main`).** Iteración sobre 2.1.2 por feedback del dueño ("el panel de ancho es ciego, no enterprise"). El editor del
+builder pasa a ser **WYSIWYG por manipulación directa** (estándar ServiceNow/Power Apps/Salesforce/SAP Fiori/Retool):
+los campos se ven en su ancho real en el lienzo y se **redimensionan/reordenan arrastrando**. **2 decisiones del dueño:**
+(1) **granularidad de 12 columnas** ⇒ se **reemplaza** el enum `LayoutWidth {FULL,HALF,THIRD}` de 2.1.2 por entero
+**`TemplateField.colSpan` 1..12** (`@default(12)`, SAP Fiori/Bootstrap); migración de conversión hacia adelante
+`20260614180000_field_colspan` (FULL→12/HALF→6/THIRD→4, drop enum, CHECK 1..12). (2) manipulación directa COMPLETA.
+**Sin librería de DnD nueva:** reusa el **DnD nativo HTML5** (patrón `ColumnsDrawer`) para reordenar y **pointer-events**
+(patrón `ResizableSplit`) para redimensionar — el builder lo usa el Configurador en escritorio (44px/táctil es del
+operador, ya cubierto). **Accesible:** flechas ↑↓ (teclado) + handle `role="slider"` (← → ±1). **Fuente de render única
+intacta:** `FieldGrid`/`FieldGridCell` pasan de `width:enum` a `span:number` (vía `--col-span`, para que la media query
+de celular colapse a 1 col); el lienzo del builder los REUSA ⇒ builder/llenado/visor idénticos. Nuevo `BuilderFieldCard`
+(grip + meta + flechas + handle); `moveFieldBefore` reordena dentro Y entre secciones; presets de ancho (12/8/6/4/3) en
+`BuilderConfigPanel`. Sin permisos nuevos (catálogo 60). Tests: contracts **195** · API **234**. **Smoke en vivo
+`scripts/smoke-field-layout.py` 14/14** (round-trip colSpan 6/8/4/omitido⇒12 por borrador → publicado CONGELADO →
+detalle de entrada; crea+limpia por ID). typecheck/lint(0)/build verdes. **Pendiente: smoke VISUAL del dueño** (§4:
+arrastrar reordenar dentro/entre secciones + redimensionar 1..12 con reflow + teclado).
+
 ## Estado por fase
 
 | Fase | Módulo | Estado |

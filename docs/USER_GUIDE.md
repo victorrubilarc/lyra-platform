@@ -164,29 +164,34 @@ guardar.
 **Para qué sirve.** Acomodar los campos de una sección en **varias columnas** en vez de una
 sola lista que obliga a desplazarse. Campos cortos (una fecha, un número, un sí/no) pueden ir
 **lado a lado**; campos largos (un comentario) ocupan todo el ancho. El formulario queda más
-compacto y rápido de leer, y se ve igual al diseñarlo, al llenarlo y al revisarlo.
+compacto y rápido de leer, y se ve **igual** al diseñarlo, al llenarlo y al revisarlo. El editor
+es **WYSIWYG**: armas el formulario sobre una grilla de **12 columnas** (estilo SAP Fiori),
+arrastrando, sin adivinar.
 
 **Cómo se usa.**
-1. En el **builder de plantillas** (`/plantillas/:id`), pestaña **Diseño ▸ Editor**, selecciona
-   un campo.
-2. En el panel de configuración, usa el selector **"Ancho en la grilla"**:
-   - **Completo** — ocupa todo el ancho de la sección (opción por defecto).
-   - **Mitad** — media columna (dos campos por fila).
-   - **Tercio** — un tercio (tres campos por fila).
-3. Mira el resultado en **Vista previa**. Publica la plantilla como siempre (borrador → publicar).
+1. En el **builder de plantillas** (`/plantillas/:id`), pestaña **Diseño ▸ Editor**: los campos
+   se ven en su **ancho real** dentro de la grilla de cada sección.
+2. **Cambiar el ancho de un campo** (de 3 formas):
+   - **Arrastra el borde derecho** del campo: se ensancha/angosta y los vecinos se reacomodan en vivo.
+   - O selecciónalo y usa los **presets** del panel (Completo · Dos tercios · Mitad · Un tercio · Un cuarto).
+   - O, con el borde enfocado por teclado, usa **← / →** para ajustar columna por columna.
+3. **Reordenar campos**: **arrástralos** por el asa (⋮⋮) a otra posición — dentro de la misma
+   sección o **a otra sección**. (También sirven las flechas **↑ ↓** del campo, por teclado.)
+4. Publica la plantilla como siempre (borrador → publicar).
 
 **Quién puede.** El **Configurador** que puede editar la plantilla (`template:edit`). Es parte
 del diseño del formulario.
 
 **Importante.**
-- Es **solo presentación**: el ancho **no cambia** qué es obligatorio, los umbrales, la lógica
-  condicional ni quién puede llenar cada campo.
-- **Responsivo para terreno**: en **tablet** los campos a un tercio pasan a media columna, y en
-  **celular** todo se apila en **una sola columna** (para usar con guantes, sin apretar).
-- El ancho viaja en la **versión publicada** (es diseño controlado): cambiarlo crea un nuevo
-  borrador y se aplica a las entradas nuevas tras publicar; las ya registradas conservan su layout.
-- Las plantillas existentes no cambian: todo campo sin ancho definido se muestra **Completo**
-  (como antes).
+- Es **solo presentación**: el ancho y el orden **no cambian** qué es obligatorio, los umbrales,
+  la lógica condicional ni quién puede llenar cada campo.
+- El ancho se mide en **columnas de 12**: 12 = ancho completo (por defecto), 6 = media, 4 = un
+  tercio, 3 = un cuarto, etc. Puedes combinarlos (p. ej. 8 + 4 en una fila).
+- **Responsivo para terreno**: en **celular** todo se apila en **una sola columna** (para usar
+  con guantes, sin apretar), sin importar el ancho configurado.
+- El ancho y el orden viajan en la **versión publicada** (diseño controlado): cambiarlos crea un
+  nuevo borrador y se aplica a las entradas nuevas tras publicar; las ya registradas conservan su layout.
+- Las plantillas existentes no cambian: todo campo sin ancho definido ocupa el **ancho completo**.
 
 ---
 

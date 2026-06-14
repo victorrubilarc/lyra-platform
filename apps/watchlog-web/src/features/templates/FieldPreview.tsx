@@ -67,7 +67,7 @@ export function PreviewForm({ state }: { state: EditState }) {
           {s.description && <div className={styles.previewSectionDesc}>{s.description}</div>}
           <FieldGrid>
             {s.fields.filter(isVisible).map((f) => (
-              <FieldGridCell key={f.uid} width={f.layoutWidth}>
+              <FieldGridCell key={f.uid} span={f.colSpan}>
                 <FieldControl field={f} value={display[f.key]} onChange={(v) => setValue(f.key, v)} />
               </FieldGridCell>
             ))}

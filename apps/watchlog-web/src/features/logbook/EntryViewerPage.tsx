@@ -511,7 +511,7 @@ export function EntryViewerPage() {
               {visible.map((f) => {
                 const band = fieldBand(f);
                 return (
-                  <FieldGridCell key={f.key} width={f.layoutWidth}>
+                  <FieldGridCell key={f.key} span={f.colSpan}>
                     <FieldControl field={f} value={valuesByKey[f.key]} onChange={() => undefined} readOnly />
                     {band && (
                       <span className={styles.bandChip}>

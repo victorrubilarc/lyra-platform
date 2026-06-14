@@ -510,8 +510,8 @@ export class TemplatesService {
                 : Prisma.DbNull,
               // Campo formulado (Req-7): AST de la fórmula. null = tecleado normal.
               computed: field.computed ? (field.computed as Prisma.InputJsonValue) : Prisma.DbNull,
-              // Ancho en la grilla (2.1.2): hint de presentación. Ausente = FULL.
-              layoutWidth: field.layoutWidth ?? "FULL",
+              // Ancho en columnas de la grilla de 12 (2.1.3). Ausente = 12 (completo).
+              colSpan: field.colSpan ?? 12,
               roles: field.roleIds?.length
                 ? { create: field.roleIds.map((roleId) => ({ roleId })) }
                 : undefined,
@@ -633,8 +633,8 @@ export class TemplatesService {
               config: upgradeFieldConfig(field.type, (field.config ?? {}) as Record<string, unknown>) as Prisma.InputJsonValue,
               visibleWhen: field.visibleWhen === null ? Prisma.DbNull : (field.visibleWhen as Prisma.InputJsonValue),
               computed: field.computed == null ? Prisma.DbNull : (field.computed as Prisma.InputJsonValue),
-              // Ancho en la grilla (2.1.2): viaja en la versión CONGELADA al clonar.
-              layoutWidth: field.layoutWidth,
+              // Ancho en columnas (2.1.3): viaja en la versión CONGELADA al clonar.
+              colSpan: field.colSpan,
               roles: field.roles.length ? { create: field.roles.map((r) => ({ roleId: r.roleId })) } : undefined,
             },
           });
@@ -682,7 +682,7 @@ export class TemplatesService {
           config: upgradeFieldConfig(f.type, (f.config ?? {}) as Record<string, unknown>),
           visibleWhen: (f.visibleWhen as TemplateVersionDto["sections"][number]["fields"][number]["visibleWhen"]) ?? null,
           computed: (f.computed as TemplateVersionDto["sections"][number]["fields"][number]["computed"]) ?? null,
-          layoutWidth: f.layoutWidth,
+          colSpan: f.colSpan,
           roleIds: f.roles.map((r) => r.roleId),
         })),
       })),

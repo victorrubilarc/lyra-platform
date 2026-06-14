@@ -570,15 +570,6 @@ enum FieldSemanticRole {
   SEVERITY_DRIVER
 }
 
-// Ancho del campo en la grilla responsiva de su sección (Fase 2.1.2) — hint de
-// PRESENTACIÓN puro (SAP Fiori 12-col / ServiceNow form layout). FULL=12/12,
-// HALF=6/12, THIRD=4/12 (degrada en tablet/celular). Default FULL = cero ruptura.
-enum LayoutWidth {
-  FULL
-  HALF
-  THIRD
-}
-
 // Ancla de la ventana de edición (2.7.2): desde cuándo corre el plazo de edición.
 // RECORDED = desde la captura (recordedAt); EFFECTIVE = desde la fecha del evento.
 enum EditWindowAnchor {
@@ -737,9 +728,10 @@ model TemplateField {
   // está presente el campo es READ-ONLY y su valor se DERIVA/estampa al guardar
   // (congela al sellar, GxP). null = campo tecleado normal. Versión INMUTABLE.
   computed    Json?
-  // Ancho del campo en la grilla responsiva de su sección (Fase 2.1.2) — hint de
-  // PRESENTACIÓN puro. Default FULL = ancho completo (cero ruptura, sin backfill).
-  layoutWidth LayoutWidth @default(FULL)
+  // Ancho del campo en columnas de la grilla de 12 (Fase 2.1.3) — hint de
+  // PRESENTACIÓN puro (SAP Fiori / ServiceNow / Bootstrap). 12 = ancho completo
+  // (default, cero ruptura), 6 = media, 4 = tercio… Check 1..12 en la migración.
+  colSpan     Int       @default(12)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 

@@ -65,13 +65,15 @@
     (promueve `LogEntry.effectiveAt`, 2.4); **a lo sumo uno por versión** (validado en contrato + backend).
   - Además: `key`, `label`, `help?`, `required`, `order`, `config` (JSONB validado por unión Zod), `visibleWhen?`
     (condicional). *N—N* `Role` vía **TemplateFieldRole** (override por campo).
-  - **Ancho en la grilla (Fase 2.1.2, `layoutWidth` enum `LayoutWidth` `FULL|HALF|THIRD`, `@default(FULL)` NOT NULL,
-    migración `20260614170000_add_field_layout_width`):** hint de **PRESENTACIÓN puro** del campo en la grilla responsiva
-    de su sección (FULL=12/12, HALF=6/12, THIRD=4/12; SAP Fiori 12-col / ServiceNow). Vive en la versión INMUTABLE como
-    **columna dedicada** (paralelo a `visibleWhen`/`computed`/`semanticRole`, NO dentro de `config` —los config por tipo
-    son Zod `.strict()`). No toca validación/datos. Default FULL ⇒ las filas existentes preservan el render de 1 columna
-    (sin backfill). Se aplica desde una fuente de render ÚNICA (`FieldGrid`/`FieldGridCell`, web) compartida por
-    vista previa del builder + llenado + visor (registro idéntico en los tres).
+  - **Ancho en la grilla (Fase 2.1.2 → 2.1.3, `colSpan Int @default(12)`, CHECK 1..12, migración
+    `20260614180000_field_colspan` que reemplazó el enum `LayoutWidth` de 2.1.2):** hint de **PRESENTACIÓN puro** del
+    campo = cuántas columnas de **12** ocupa en la grilla responsiva de su sección (12=completo, 6=media, 4=tercio,
+    3=cuarto…; SAP Fiori / ServiceNow / Bootstrap). Vive en la versión INMUTABLE como **columna dedicada** (paralelo a
+    `visibleWhen`/`computed`/`semanticRole`, NO dentro de `config` —los config por tipo son Zod `.strict()`). No toca
+    validación/datos. Default 12 ⇒ las filas existentes preservan el render de 1 columna. Se aplica desde una fuente de
+    render ÚNICA (`FieldGrid`/`FieldGridCell`, web) compartida por vista previa del builder + llenado + visor (registro
+    idéntico en los tres). El **editor del builder es WYSIWYG** (2.1.3): el campo se ve en su ancho real y se
+    redimensiona/reordena arrastrando (DnD nativo + pointer-events, sin librería nueva).
   - **Campo FORMULADO (Req-7, `computed?` JSONB, migración `20260614120000`):** `{ expression }` (AST seguro de
     `@lyra/contracts/rules`). Presente ⇒ el campo es **READ-ONLY**: su valor lo **DERIVA el servidor** (autoritativo)
     desde otros campos/constantes y se **estampa** en `LogEntryValue` (recalcula en DRAFT, **congela al sellar** — GxP;

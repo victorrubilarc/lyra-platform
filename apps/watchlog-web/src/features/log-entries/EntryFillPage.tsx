@@ -672,7 +672,7 @@ export function EntryFillPage() {
                     ? validateFieldValue(fieldForValidation(f), draft[f.key], { allowedCodes: inlineCodes(f.config) }).errors
                     : [];
                 return (
-                  <FieldGridCell key={f.key} width={f.layoutWidth}>
+                  <FieldGridCell key={f.key} span={f.colSpan}>
                     <FieldControl field={f} value={display[f.key]} onChange={(v) => setValue(f.key, v)} readOnly={!fieldEditable} invalid={errs.length > 0 || ruleProblemFields.has(f.key)} />
                     {restricted && editable && (
                       <div className={styles.lockedNote}>

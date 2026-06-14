@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  colSpanSchema,
   deriveDataType,
   fieldConfigSchemaFor,
-  LAYOUT_WIDTHS,
-  layoutWidthSchema,
+  GRID_COLUMNS,
   numberFieldConfigSchema,
   optionsFieldConfigSchema,
   upgradeFieldConfig,
@@ -58,18 +58,22 @@ describe("config de campos por tipo", () => {
   });
 });
 
-describe("ancho del campo en la grilla (2.1.2)", () => {
-  it("expone exactamente el set mínimo {FULL, HALF, THIRD}", () => {
-    expect([...LAYOUT_WIDTHS]).toEqual(["FULL", "HALF", "THIRD"]);
-    expect(layoutWidthSchema.safeParse("QUARTER").success).toBe(false);
+describe("ancho del campo en la grilla de 12 columnas (2.1.3)", () => {
+  it("colSpan acepta 1..12 y rechaza fuera de rango / no entero", () => {
+    expect(GRID_COLUMNS).toBe(12);
+    expect(colSpanSchema.safeParse(1).success).toBe(true);
+    expect(colSpanSchema.safeParse(12).success).toBe(true);
+    expect(colSpanSchema.safeParse(0).success).toBe(false);
+    expect(colSpanSchema.safeParse(13).success).toBe(false);
+    expect(colSpanSchema.safeParse(6.5).success).toBe(false);
   });
 
-  it("el ancho es OPCIONAL en el input del campo (ausente = FULL en backend)", () => {
+  it("el ancho es OPCIONAL en el input del campo (ausente = 12 en backend)", () => {
     const sinAncho = draftFieldInputSchema.safeParse({ key: "obs", type: "TEXT", label: "Observación" });
     expect(sinAncho.success).toBe(true);
-    const conAncho = draftFieldInputSchema.safeParse({ key: "obs", type: "TEXT", label: "Observación", layoutWidth: "HALF" });
+    const conAncho = draftFieldInputSchema.safeParse({ key: "obs", type: "TEXT", label: "Observación", colSpan: 6 });
     expect(conAncho.success).toBe(true);
-    const invalido = draftFieldInputSchema.safeParse({ key: "obs", type: "TEXT", label: "Observación", layoutWidth: "WIDE" });
+    const invalido = draftFieldInputSchema.safeParse({ key: "obs", type: "TEXT", label: "Observación", colSpan: 99 });
     expect(invalido.success).toBe(false);
   });
 });
