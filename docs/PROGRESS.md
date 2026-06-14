@@ -300,6 +300,29 @@ motivo + huella; sale de la grilla y aparece con `?status=VOID`; timeline VOIDED
 permiso ⇒ 403, sigue DRAFT; admin con `logentry:void` ⇒ 2xx; round-trip de edición persiste; crea y LIMPIA por ID, 0
 huérfanos, AuditLog inmutable conserva el rastro). typecheck/lint(0)/build verdes. **Pendiente: smoke VISUAL del dueño.**
 
+**+ Fase 2.1.2 — Layout de formulario en GRILLA responsiva (ancho por campo) ✅ (2026-06-14, `feat/layout-grilla` →
+`main`).** Presentación PURA y ADITIVA: el diseñador da un **ancho por campo** (FULL/HALF/THIRD) y los campos se
+acomodan en una **grilla CSS responsiva por sección** que colapsa a 1 columna en tablet/celular (regla de terreno +
+44px). NO toca validación/umbral/condicional/permisos/reglas; **default = FULL ⇒ cero ruptura** (lo existente se ve
+igual). **5 forks resueltos con el dueño (DECISIONS 2026-06-14):** (1) **enum mínimo `{FULL,HALF,THIRD}`** (12/6/4 en
+grilla de 12 col); (2) **columna dedicada `TemplateField.layoutWidth`** en la versión INMUTABLE — **corrige la sospecha
+"config JSONB"**: los config por tipo son Zod `.strict()` (8 esquemas), así que `layoutWidth` calca el patrón de
+`visibleWhen`/`computed`/`semanticRole` (columna top-level, NO en config); `@default(FULL)` NOT NULL rellena las filas
+existentes en el mismo `ALTER` (sin backfill); (3) **responsive 12-col**: desktop FULL=12/HALF=6/THIRD=4, tablet
+768–1023px THIRD→½, <768px 1 columna (alineado al breakpoint 768 de `ResizableSplit`; `min-width:0` evita reventar
+columnas); (4) **hint universal** (todos los tipos, default FULL, el motor solo COLOCA); (5) **fuente de render ÚNICA**
+`FieldGrid`+`FieldGridCell` (un solo CSS module) usada por los TRES lados (vista previa del builder, llenado, visor) ⇒
+registro idéntico sin CSS copiado. **Contratos:** `layoutWidthSchema` en `field-types`, `templateFieldSchema` (no
+nullable, el backend mapea FULL por default) + `draftFieldInputSchema` (opcional). **Migración aditiva**
+`20260614170000_add_field_layout_width` (enum `LayoutWidth` + columna). **API:** persiste/clona `layoutWidth` en
+`saveDraft` y en el clonado-al-publicar de `TemplatesService`, y lo expone en AMBOS mapeadores de versión (templates
+para el builder + `log-entries.service.mapVersion` para el detalle de entrada — el contrato no-nullable obliga a ambos).
+**Web:** selector segmentado (Completo/Mitad/Tercio, 44px, Lucide) en `BuilderConfigPanel`; `EditField.layoutWidth` en
+`builder-model`; `PreviewForm`/`EntryFillPage`/`EntryViewerPage` envuelven sus campos en `FieldGrid`/`FieldGridCell`.
+i18n es-CL. Sin permisos nuevos (catálogo 60). Tests: contracts **195** (+2) · API **234**. **Smoke en vivo
+`scripts/smoke-field-layout.py` 12/12** (round-trip: borrador → publicado CONGELADO → detalle de entrada; omitido ⇒
+FULL; crea+limpia por ID). typecheck/lint(0)/build verdes. **Pendiente: smoke VISUAL del dueño** (§4).
+
 ## Estado por fase
 
 | Fase | Módulo | Estado |
