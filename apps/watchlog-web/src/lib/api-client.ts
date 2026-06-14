@@ -25,6 +25,8 @@ export class ApiError extends Error {
     readonly status: number,
     message: string,
     readonly issues?: ApiFieldIssue[],
+    /** Mensajes de validación detallados (ej. errores de regla/sección del backend). */
+    readonly details?: string[],
   ) {
     super(message);
     this.name = "ApiError";
@@ -90,18 +92,21 @@ function buildHeaders(options: RequestOptions): Headers {
 async function toApiError(res: Response): Promise<ApiError> {
   let message = `Error ${res.status}`;
   let issues: ApiFieldIssue[] | undefined;
+  let details: string[] | undefined;
   try {
     const body: unknown = await res.json();
     if (body && typeof body === "object") {
-      const b = body as { message?: unknown; issues?: ApiFieldIssue[] };
+      const b = body as { message?: unknown; issues?: ApiFieldIssue[]; errors?: unknown };
       if (typeof b.message === "string") message = b.message;
       else if (Array.isArray(b.message)) message = b.message.join(", ");
       if (Array.isArray(b.issues)) issues = b.issues;
+      // El backend de llenado devuelve `errors: string[]` (obligatorios, reglas…).
+      if (Array.isArray(b.errors)) details = b.errors.filter((e): e is string => typeof e === "string");
     }
   } catch {
     /* respuesta sin cuerpo JSON: nos quedamos con el mensaje por defecto */
   }
-  return new ApiError(res.status, message, issues);
+  return new ApiError(res.status, message, issues, details);
 }
 
 /**

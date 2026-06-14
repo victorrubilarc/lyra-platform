@@ -20,7 +20,9 @@ import { DeferralModal } from "./DeferralModal.js";
 import { EditWindowOverrideModal, type EditWindowOverrideFields } from "./EditWindowOverrideModal.js";
 import { Button, Card, Chip, EmptyState, Spinner, useToast } from "@lyra/ui";
 import {
+  collectVarRefs,
   evaluateCrossRules,
+  evaluateExpression,
   isFieldVisible,
   recomputeComputedValues,
   validateFieldValue,
@@ -62,6 +64,16 @@ function inlineCodes(config: Record<string, unknown>): string[] | undefined {
 
 function fieldForValidation(f: TemplateFieldDto) {
   return { key: f.key, type: f.type, dataType: f.dataType, label: f.label, config: f.config };
+}
+
+/** Texto de error a mostrar: prioriza los mensajes detallados del backend (reglas,
+ * obligatorios) sobre el mensaje genérico, para que el operador vea QUÉ falló. */
+function apiErrorText(e: unknown, fallback: string): string {
+  if (e instanceof ApiError) {
+    if (e.details && e.details.length > 0) return e.details.join(" · ");
+    return e.message;
+  }
+  return fallback;
 }
 
 export function EntryFillPage() {
@@ -128,6 +140,14 @@ export function EntryFillPage() {
     if (!entry) return;
     const seed: Draft = {};
     for (const v of entry.values) seed[v.fieldKey] = v.value;
+    // Un campo SÍ/NO (toggle) sin valor previo arranca en `false` (apagado = No),
+    // no en "vacío": así las reglas que comparan `= No` se evalúan desde el inicio
+    // sin tener que "moverlo". Los formulados (read-only) no se siembran.
+    for (const s of entry.version.sections) {
+      for (const f of s.fields) {
+        if (f.type === "BOOLEAN" && !f.computed && seed[f.key] === undefined) seed[f.key] = false;
+      }
+    }
     setDraft(seed);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entry?.id]);
@@ -149,6 +169,17 @@ export function EntryFillPage() {
     () => (entry ? evaluateCrossRules(entry.version.rules, display) : { errors: [], warnings: [] }),
     [entry, display],
   );
+
+  // Campos involucrados en una regla que SE DISPARA ahora (para resaltarlos).
+  const ruleProblemFields = useMemo(() => {
+    const keys = new Set<string>();
+    if (!entry) return keys;
+    for (const r of entry.version.rules) {
+      if (r.enabled === false) continue;
+      if (evaluateExpression(r.when, display) === true) collectVarRefs(r.when, keys);
+    }
+    return keys;
+  }, [entry, display]);
 
   if (isLoading) {
     return (
@@ -226,10 +257,13 @@ export function EntryFillPage() {
     }
   }
 
-  /** Valores a enviar de una sección (sin los campos reservados a otro rol). */
+  /** Valores a enviar de una sección (sin los reservados a otro rol ni los FORMULADOS:
+   * el valor de un campo formulado lo deriva el servidor y RECHAZA que el cliente lo envíe). */
   function valuesFor(section: TemplateSectionDto, st: LogEntrySectionStateDto) {
     const restricted = new Set(st.readOnlyFieldKeys);
-    const visible = section.fields.filter((f) => isFieldVisible(f.visibleWhen, draft) && !restricted.has(f.key));
+    const visible = section.fields.filter(
+      (f) => isFieldVisible(f.visibleWhen, display) && !restricted.has(f.key) && !f.computed,
+    );
     return visible.map((f) => ({ fieldKey: f.key, value: draft[f.key] ?? null }));
   }
 
@@ -277,7 +311,7 @@ export function EntryFillPage() {
     } catch (e) {
       // Si la entrada llegó a crearse, cambia a ella para que el reintento no duplique.
       if (createdIdRef.current) setMaterializedId(createdIdRef.current);
-      toast.error(e instanceof ApiError ? e.message : t("common.errorGeneric"));
+      toast.error(apiErrorText(e, t("common.errorGeneric")));
     } finally {
       setCreating(false);
       setSavingKey(null);
@@ -317,7 +351,7 @@ export function EntryFillPage() {
           if (e instanceof ApiError && e.status === 409) {
             toast.error(t("logbook.fill.conflict"));
             void qc.invalidateQueries({ queryKey: LOG_ENTRY_KEYS.detail(routeId) });
-          } else toast.error(e instanceof ApiError ? e.message : t("common.errorGeneric"));
+          } else toast.error(apiErrorText(e, t("common.errorGeneric")));
         },
         onSettled: () => setSavingKey(null),
       },
@@ -354,7 +388,7 @@ export function EntryFillPage() {
         { overrideReason: ov?.overrideReason, password: ov?.password, mfaCode: ov?.mfaCode },
         {
           onSuccess: () => toast.success(t("logbook.fill.submitted")),
-          onError: (e) => toast.error(e instanceof ApiError ? e.message : t("common.errorGeneric")),
+          onError: (e) => toast.error(apiErrorText(e, t("common.errorGeneric"))),
         },
       ),
     );
@@ -380,7 +414,7 @@ export function EntryFillPage() {
           toast.success(t("logbook.transition.done", { state: tr.toStateName }));
           setActiveTransition(null);
         },
-        onError: (e) => toast.error(e instanceof ApiError ? e.message : t("common.errorGeneric")),
+        onError: (e) => toast.error(apiErrorText(e, t("common.errorGeneric"))),
       },
     );
   }
@@ -400,7 +434,7 @@ export function EntryFillPage() {
       setMaterializedId(newId);
     } catch (e) {
       if (createdIdRef.current) setMaterializedId(createdIdRef.current);
-      toast.error(e instanceof ApiError ? e.message : t("common.errorGeneric"));
+      toast.error(apiErrorText(e, t("common.errorGeneric")));
     } finally {
       setCreating(false);
     }
@@ -575,7 +609,7 @@ export function EntryFillPage() {
                     : [];
                 return (
                   <div key={f.key}>
-                    <FieldControl field={f} value={display[f.key]} onChange={(v) => setValue(f.key, v)} readOnly={!fieldEditable} invalid={errs.length > 0} />
+                    <FieldControl field={f} value={display[f.key]} onChange={(v) => setValue(f.key, v)} readOnly={!fieldEditable} invalid={errs.length > 0 || ruleProblemFields.has(f.key)} />
                     {restricted && editable && (
                       <div className={styles.lockedNote}>
                         <Lock size={12} /> {t("logbook.fill.fieldRestricted")}
@@ -711,7 +745,7 @@ export function EntryFillPage() {
                     toast.success(t("logbook.deferral.declared"));
                     setDeferralOpen(false);
                   },
-                  onError: (e) => toast.error(e instanceof ApiError ? e.message : t("common.errorGeneric")),
+                  onError: (e) => toast.error(apiErrorText(e, t("common.errorGeneric"))),
                 },
               ),
             );
@@ -731,7 +765,7 @@ export function EntryFillPage() {
                     toast.success(t("logbook.deferral.removed"));
                     setDeferralOpen(false);
                   },
-                  onError: (e) => toast.error(e instanceof ApiError ? e.message : t("common.errorGeneric")),
+                  onError: (e) => toast.error(apiErrorText(e, t("common.errorGeneric"))),
                 },
               ),
             );
