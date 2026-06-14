@@ -9,6 +9,7 @@ import {
   setDeferralRequestSchema,
   submitLogEntryRequestSchema,
   timelineQuerySchema,
+  voidLogEntryRequestSchema,
   type CreateLogEntryRequest,
   type ExecuteTransitionRequest,
   type LogEntryListQuery,
@@ -17,6 +18,7 @@ import {
   type SetDeferralRequest,
   type SubmitLogEntryRequest,
   type TimelineQuery,
+  type VoidLogEntryRequest,
 } from "@lyra/contracts";
 import type { AuditContext } from "../audit/audit.service";
 import type { RequestUser } from "../authz/auth-user";
@@ -211,6 +213,22 @@ export class LogEntriesController {
     @Req() req: FastifyRequest,
   ) {
     return this.entries.setDeferral(user.id, id, dto, this.ctx(user, req));
+  }
+
+  /**
+   * Anula (descarta) un borrador (2.8.2). Gate GRUESO = `logentry:view` (estar en
+   * el módulo); la autorización FINA (ownership del autor, o `logentry:void` para
+   * anular ajenas, + ABAC) la decide el servicio. Motivo obligatorio (≥5), auditado.
+   */
+  @Post(":id/void")
+  @RequirePermission("logentry:view")
+  voidEntry(
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(voidLogEntryRequestSchema)) dto: VoidLogEntryRequest,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.entries.voidEntry(user.id, id, dto, this.ctx(user, req));
   }
 
   @Post(":id/submit")

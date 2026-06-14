@@ -237,6 +237,13 @@ export const logEntrySchema = z.object({
   deferredReason: z.string().nullable(),
   /** Cuándo se declaró el diferimiento (huella ALCOA+). */
   deferredDeclaredAt: z.string().nullable(),
+  /** --- Anulación de borrador (2.8.2, VOID) ---------------------------------
+   * Anulación LÓGICA de un borrador (status=VOID): no es hard-delete (el AuditLog
+   * inmutable conserva el rastro) y NO usa deletedAt (eso ocultaría hasta del filtro).
+   * Quién/cuándo/por qué de la anulación; null = entrada no anulada. */
+  voidedAt: z.string().nullable(),
+  voidReason: z.string().nullable(),
+  voidedById: z.string().nullable(),
   createdById: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -282,6 +289,8 @@ export const logEntryDetailSchema = logEntrySchema.extend({
   equipmentName: z.string().nullable(),
   /** Quién declaró el diferimiento (2.7.0). null = entrada en línea. */
   deferredDeclaredByName: z.string().nullable(),
+  /** Quién anuló el borrador (2.8.2). null = entrada no anulada. */
+  voidedByName: z.string().nullable(),
   /** Ventana de edición resuelta para el actor (2.7.2). null = sin ventana. */
   editWindow: editWindowInfoSchema.nullable(),
   sectionStates: z.array(logEntrySectionStateDtoSchema),
@@ -538,6 +547,17 @@ export const setDeferralRequestSchema = z.object({
 });
 export type SetDeferralRequest = z.infer<typeof setDeferralRequestSchema>;
 
+/**
+ * Anula (descarta) un borrador (2.8.2). El motivo es OBLIGATORIO (≥5): un borrador
+ * no es un registro firmado Part 11, pero ALCOA+ exige registrar POR QUÉ se descartó
+ * (MHRA Data Integrity 2018). No re-auth/firma para un borrador (eso se reserva a
+ * acciones sobre registros sellados, §11.200). Sin hard-delete: status pasa a VOID.
+ */
+export const voidLogEntryRequestSchema = z.object({
+  reason: z.string().trim().min(5).max(500),
+});
+export type VoidLogEntryRequest = z.infer<typeof voidLogEntryRequestSchema>;
+
 /** Un valor que el cliente envía al guardar una sección. */
 export const logEntryValueInputSchema = z.object({
   fieldKey: z.string().min(1).max(64),
@@ -783,6 +803,14 @@ export const logEntryTimelineEventSchema = z.discriminatedUnion("kind", [
     at: z.string(),
     actorName: z.string().nullable(),
     declaredEffectiveAt: z.string(),
+    reason: z.string().nullable(),
+  }),
+  z.object({
+    /** Anulación del borrador (2.8.2): quién, cuándo y por qué se descartó. */
+    kind: z.literal("VOIDED"),
+    id: z.string(),
+    at: z.string(),
+    actorName: z.string().nullable(),
     reason: z.string().nullable(),
   }),
 ]);

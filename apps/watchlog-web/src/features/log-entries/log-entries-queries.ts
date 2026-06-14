@@ -5,6 +5,7 @@ import type {
   SaveLogEntrySectionRequest,
   SetDeferralRequest,
   SubmitLogEntryRequest,
+  VoidLogEntryRequest,
 } from "@lyra/contracts";
 import {
   createLogEntry,
@@ -15,6 +16,7 @@ import {
   saveLogEntrySection,
   setLogEntryDeferral,
   submitLogEntry,
+  voidLogEntry,
 } from "./log-entries-api.js";
 
 export const LOG_ENTRY_KEYS = {
@@ -92,6 +94,18 @@ export function useSubmitLogEntry(id: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (dto: SubmitLogEntryRequest = {}) => submitLogEntry(id, dto),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: LOG_ENTRY_KEYS.all });
+      qc.setQueryData(LOG_ENTRY_KEYS.detail(id), data);
+    },
+  });
+}
+
+/** Anula (descarta) un borrador (2.8.2): status → VOID con motivo auditado. */
+export function useVoidLogEntry(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (dto: VoidLogEntryRequest) => voidLogEntry(id, dto),
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: LOG_ENTRY_KEYS.all });
       qc.setQueryData(LOG_ENTRY_KEYS.detail(id), data);

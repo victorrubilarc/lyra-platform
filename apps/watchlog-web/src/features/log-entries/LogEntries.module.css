@@ -31,6 +31,27 @@
 .backBtn {
   margin-bottom: 16px;
 }
+/* Barra superior del llenado/edición: Volver a la izquierda, acciones (Anular) a la derecha. */
+.fillTopBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.fillTopBar .backBtn {
+  margin-bottom: 0;
+}
+/* Rótulo eyebrow que distingue Editar / Nueva entrada / Llenar (2.8.2). */
+.entryEyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  margin-bottom: 2px;
+}
 
 /* --- Picker (Nueva entrada) --- */
 .grid {

@@ -42,10 +42,10 @@
 | 2.7.3 **Matriz rol×sección×tiempo** | ⬜ | Matriz administrable aplicada en servidor + `blockedReason` ampliado. |
 | 2.8 Alcance por PLANTILLA (2.º eje ABAC) | ✅ | Flag deny-by-default opt-in · agrupador de plantillas (categorías). |
 | 2.8.0 Plantillas multi-nodo + 2.8.0.1/2 Equipo (EAM) | ✅ | DROP de `Template.orgNodeId` (deprecado). |
-| **2.8.2 VOID de borradores + ruta de edición propia** | ⬜ **← SIGUIENTE** | Anular/descartar entrada en DRAFT (motivo, auditado) + ruta de edición dedicada. |
+| **2.8.2 VOID de borradores + ruta de edición propia** | ✅ | Anular DRAFT (`status=VOID`, motivo ≥5, auditado, `logentry:void` para ajenas) + ruta `/bitacoras/:id/editar`. **Falta:** VOID GxP de entradas SELLADAS (firma §11.200 + transición inversa, junto a la reversa de 2.5). |
 | Adjuntos / evidencias en formularios (Req-2, MinIO) | ⬜ | Campo archivo/foto + adjuntos a nivel de registro; el dueño lo quiere en Fase 2. |
 | 2.9.1 **Motor de reglas de negocio (Req-7)** | 🔄 | **Primer corte ✅** (expresión segura + formulados + validación cruzada). **2.º corte:** límites dinámicos · acciones (incidencia→F4 / notificación) · lookups a listas · **DMN** · `visibleWhen` rico. |
 
 ## Pendiente transversal
-- **Smokes VISUALES del dueño** (BACKLOG §4): grilla 2.8.1, diagrama de flujo, SLA/atrasos, **motor de reglas**.
+- **Smokes VISUALES del dueño** (BACKLOG §4): grilla 2.8.1, diagrama de flujo, SLA/atrasos, **motor de reglas**, **VOID + ruta de edición (2.8.2)**.
 - Mantener este documento al cerrar cada sesión.

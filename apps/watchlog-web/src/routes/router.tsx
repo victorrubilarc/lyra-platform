@@ -57,6 +57,9 @@ export const router = createBrowserRouter([
           { path: "/nueva-entrada/:id", element: <EntryFillPage /> },
           { path: "/bitacoras", element: <LogbookPage /> },
           { path: "/bitacoras/:id", element: <EntryViewerPage /> },
+          // Ruta de EDICIÓN dedicada de una entrada existente (2.8.2), separada del
+          // flujo de creación/compose de /nueva-entrada. Reusa EntryFillPage.
+          { path: "/bitacoras/:id/editar", element: <EntryFillPage /> },
           { path: "/flujos", element: <WorkflowsPage /> },
           { path: "/flujos/:id", element: <WorkflowBuilderPage /> },
           { path: "/datos-referencia", element: <ReferenceDataPage /> },

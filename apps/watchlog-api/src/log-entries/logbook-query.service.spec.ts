@@ -194,6 +194,19 @@ describe("LogbookQueryService — list", () => {
     expect(orClause.OR).toContainEqual({ entryNumber: 7 });
   });
 
+  it("excluye los borradores ANULADOS (VOID) por defecto, salvo filtro explícito (2.8.2)", async () => {
+    const { logbook, prisma } = makeServices();
+    await logbook.list("u1", {});
+    const noFilter = (prisma.logEntry.findMany as ReturnType<typeof vi.fn>).mock.calls[0]![0];
+    expect(noFilter.where.AND).toContainEqual({ status: { not: "VOID" } });
+
+    vi.clearAllMocks();
+    await logbook.list("u1", { status: "VOID" });
+    const withFilter = (prisma.logEntry.findMany as ReturnType<typeof vi.fn>).mock.calls[0]![0];
+    expect(withFilter.where.AND).toContainEqual({ status: "VOID" });
+    expect(withFilter.where.AND).not.toContainEqual({ status: { not: "VOID" } });
+  });
+
   it("filtra por entryOrigin (registro diferido 2.7.0) en el where", async () => {
     const { logbook, prisma } = makeServices();
     await logbook.list("u1", { entryOrigin: "DEFERRED" });

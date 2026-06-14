@@ -83,6 +83,12 @@
   `Restrict`), `equipmentId?` (FK `SetNull`), `templateId`/`templateVersionId` (FK `Restrict`, integridad histórica),
   `currentStateKey?` (estado del flujo; null = sin flujo), `status` (`DRAFT`/`SUBMITTED`/`VOID`), `sealedAt?`,
   `deletedAt?`. La trazabilidad temporal es **estructural**, no un campo que se agrega.
+  - **`voidedAt?`/`voidReason?`/`voidedById?`** *(Fase 2.8.2, migración `20260614150000_add_logentry_void`)* — huella de
+    la **anulación de un borrador**: `status` pasa a `VOID` (anulación LÓGICA, NO hard-delete y **NO** usa `deletedAt`,
+    que ocultaría la fila de TODA consulta incl. el filtro VOID). La entrada queda **trazable** (recuperable con
+    `?status=VOID`), fuera de las superficies normales (la grilla excluye VOID salvo filtro explícito). Quién/cuándo/por
+    qué; el `AuditLog` inmutable (`logentry.voided`) conserva el rastro. Solo aplica a un `DRAFT` no sellado (la
+    anulación GxP de un registro SELLADO = transición inversa + firma §11.200, corte posterior junto a la reversa de 2.5).
   - **`currentStateSince?`** *(Workflow SLA, migración `20260613140000_add_workflow_sla`)* — momento de ENTRADA al
     estado actual: seteado al crear (= `recordedAt`) y en cada transición (= `occurredAt`). Base de cómputo del ATRASO
     (`now − currentStateSince > maxStayMinutes` del estado actual). Estampado aditivo que evita la subconsulta

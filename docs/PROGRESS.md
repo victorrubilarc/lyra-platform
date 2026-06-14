@@ -278,6 +278,28 @@ latente corregido**: `valuesFor` enviaba los campos formulados (read-only) → 4
 se quitó el `sticky` de la barra/columnas (se peleaba con las pestañas de trabajo y flotaba sobre el contenido). Contracts **193** ·
 smoke **20/20** sin regresión. **Verificado en vivo por el dueño** ("ok funciona"); hará más pruebas.
 
+**+ Fase 2.8.2 — VOID de borradores + ruta de edición propia ✅ (2026-06-14, `feat/void-edicion` → `main`).** Cierra la
+deuda (b)(c) de 2.8.2 (la parte "no crear borradores huérfanos" ya estaba ✅). **4 forks resueltos con el dueño
+(recomendación aceptada en los 4; DECISIONS 2026-06-14):** (1) **alcance = solo DRAFT** ahora (la anulación GxP de
+entradas SELLADAS = transición inversa + firma §11.200, corte posterior junto a la reversa de 2.5); (2) **anulación
+LÓGICA vía `status=VOID`, NO `deletedAt`** (estrena el enum, andamiaje muerto hasta hoy; `deletedAt` ocultaría hasta del
+filtro VOID); (3) **autorización HÍBRIDA**: el AUTOR anula su PROPIO borrador por **ownership** (precedente SavedView) +
+ABAC, y anular el AJENO exige el **permiso nuevo `logentry:void`** (catálogo **59→60**); (4) **solo MOTIVO ≥5 auditado**
+para un borrador (sin re-auth/firma; eso se reserva a registros sellados). **(criterio)** ruta de edición **dedicada
+`/bitacoras/:id/editar`** separada de creación/compose, reusando `EntryFillPage`. **Backend:** migración aditiva
+`20260614150000_add_logentry_void` (`voidedAt/voidReason/voidedById`, sin backfill); `POST /log-entries/:id/void` (gate
+grueso `logentry:view`; authz fina en servicio: ownership o `logentry:void`, + ABAC nodo×plantilla; solo DRAFT no sellado;
+no re-anula; el período/ventana NO bloquean descartar); `buildWhere` **excluye VOID por defecto** (grilla/stats/facetas/
+export/related) y lo muestra solo con `?status=VOID` (patrón ServiceNow "Cancelled"); evento **`VOIDED`** en el timeline;
+auditoría `logentry.voided`. **Huella** `voidedByName/voidReason/voidedAt` en el detalle. **Web:** `VoidEntryModal`
+(motivo ≥5) + `useVoidLogEntry`; botón "Anular borrador" en `EntryFillPage` (gateado por ownership/`logentry:void`) +
+banner VOID; ruta `/bitacoras/:id/editar` (los botones "Editar" de grilla/peek/visor apuntan ahí, ya no a `/nueva-entrada`)
++ rótulo *eyebrow* (Editar/Nueva entrada/Llenado) + "Volver" al visor; banner VOID + evento VOIDED en `EntryViewerPage`;
+i18n es-CL. Tests: contracts **193** · API **234** (+6). **Smoke en vivo `scripts/smoke-void-edit.py` 17/17** (anula con
+motivo + huella; sale de la grilla y aparece con `?status=VOID`; timeline VOIDED; re-anular/motivo<5 ⇒ 400; ajeno sin
+permiso ⇒ 403, sigue DRAFT; admin con `logentry:void` ⇒ 2xx; round-trip de edición persiste; crea y LIMPIA por ID, 0
+huérfanos, AuditLog inmutable conserva el rastro). typecheck/lint(0)/build verdes. **Pendiente: smoke VISUAL del dueño.**
+
 ## Estado por fase
 
 | Fase | Módulo | Estado |

@@ -31,6 +31,7 @@ import type {
   SubmitLogEntryRequest,
   TemplateEligibleNodes,
   TemplateVersionDto,
+  VoidLogEntryRequest,
   WorkflowVersionDto,
 } from "@lyra/contracts";
 import {
@@ -125,6 +126,9 @@ export type EntrySource = Pick<
   | "deferredReason"
   | "deferredDeclaredById"
   | "deferredDeclaredAt"
+  | "voidedAt"
+  | "voidReason"
+  | "voidedById"
   | "createdById"
   | "createdAt"
   | "updatedAt"
@@ -432,6 +436,9 @@ export class LogEntriesService {
       deferredReason: null,
       deferredDeclaredById: null,
       deferredDeclaredAt: null,
+      voidedAt: null,
+      voidReason: null,
+      voidedById: null,
       createdById: userId,
       createdAt: now,
       updatedAt: now,
@@ -463,6 +470,7 @@ export class LogEntriesService {
     const actorNames = await this.namesByUserId([
       entry.createdById,
       entry.deferredDeclaredById,
+      entry.voidedById,
       ...sectionRows.map((s) => s.filledById),
       ...transitionRows.map((t) => t.actorId),
     ]);
@@ -608,6 +616,7 @@ export class LogEntriesService {
       deferredDeclaredByName: entry.deferredDeclaredById
         ? (actorNames.get(entry.deferredDeclaredById) ?? null)
         : null,
+      voidedByName: entry.voidedById ? (actorNames.get(entry.voidedById) ?? null) : null,
       editWindow,
       version: this.mapVersion(version),
       workflowVersion: wfVersion ? this.mapWorkflowVersion(wfVersion) : null,
@@ -1052,6 +1061,65 @@ export class LogEntriesService {
       after: dto.deferred
         ? { entryOrigin: "DEFERRED", declaredEffectiveAt: declaredAt!.toISOString(), deferredReason: dto.deferred.reason }
         : { entryOrigin: "ONLINE", declaredEffectiveAt: null, deferredReason: null },
+    });
+    return this.getDetail(userId, id);
+  }
+
+  // --- Anular (descartar) un borrador (Fase 2.8.2) ---------------------------
+
+  /**
+   * Anula LÓGICAMENTE un borrador (status → VOID): lo saca de las superficies
+   * operacionales normales (la grilla excluye VOID por defecto) pero lo deja
+   * TRAZABLE (recuperable por filtro status=VOID, con huella quién/cuándo/por qué).
+   * NO es hard-delete ni borrado lógico (`deletedAt`): el AuditLog inmutable conserva
+   * el rastro. Solo aplica a un DRAFT no sellado (la anulación GxP de un registro
+   * SELLADO es otro control: transición inversa + firma §11.200, corte posterior).
+   *
+   * Autorización (decidida SIEMPRE en backend): el AUTOR puede anular su PROPIO
+   * borrador (ownership, precedente SavedView 2.8.1b); anular el borrador AJENO
+   * exige el permiso `logentry:void` (limpieza supervisora). En ambos casos rige el
+   * ABAC (nodo × plantilla). El motivo (≥5) es OBLIGATORIO y queda auditado (ALCOA+).
+   * Discrepar de un período cerrado / ventana vencida NO bloquea descartar (no es
+   * corrección de dato; es retirar un borrador erróneo).
+   */
+  async voidEntry(userId: string, id: string, dto: VoidLogEntryRequest, ctx: AuditContext): Promise<LogEntryDetail> {
+    const entry = await this.loadEntry(id);
+    if (entry.status === "VOID") {
+      throw new BadRequestException("La entrada ya está anulada");
+    }
+    if (entry.status !== "DRAFT" || entry.sealedAt) {
+      throw new BadRequestException("Solo se puede anular un borrador no sellado");
+    }
+    await this.assertNodeInScope(userId, entry.orgNodeId);
+    await this.scope.assertTemplateInScope(userId, entry.templateId);
+
+    // Ownership o permiso para anular ajenas. El autor de un borrador siempre puede
+    // descartarlo; anular el de otro es una acción privilegiada (configurable).
+    if (entry.createdById !== userId) {
+      const perms = await this.permissions.getEffectivePermissions(userId);
+      if (!perms.has("logentry:void")) {
+        throw new ForbiddenException("No puede anular el borrador de otro usuario");
+      }
+    }
+
+    const now = new Date();
+    await this.prisma.logEntry.update({
+      where: { id },
+      data: {
+        status: "VOID",
+        voidedAt: now,
+        voidReason: dto.reason,
+        voidedById: userId,
+        updatedById: userId,
+      },
+    });
+    await this.audit.record({
+      ...ctx,
+      action: "logentry.voided",
+      entityType: "LogEntry",
+      entityId: id,
+      before: { status: entry.status },
+      after: { status: "VOID", voidReason: dto.reason },
     });
     return this.getDetail(userId, id);
   }
@@ -1834,6 +1902,9 @@ export class LogEntriesService {
       declaredEffectiveAt: e.declaredEffectiveAt?.toISOString() ?? null,
       deferredReason: e.deferredReason,
       deferredDeclaredAt: e.deferredDeclaredAt?.toISOString() ?? null,
+      voidedAt: e.voidedAt?.toISOString() ?? null,
+      voidReason: e.voidReason,
+      voidedById: e.voidedById,
       createdById: e.createdById,
       createdAt: e.createdAt.toISOString(),
       updatedAt: e.updatedAt.toISOString(),

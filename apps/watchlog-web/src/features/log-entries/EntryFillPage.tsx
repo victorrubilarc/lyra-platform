@@ -4,6 +4,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   AlertTriangle,
   ArrowLeft,
+  Ban,
   CalendarClock,
   CheckCircle2,
   ChevronRight,
@@ -17,6 +18,9 @@ import {
   Wrench,
 } from "lucide-react";
 import { DeferralModal } from "./DeferralModal.js";
+import { VoidEntryModal } from "./VoidEntryModal.js";
+import { useAuth } from "../../auth/use-auth.js";
+import { usePermissions } from "../../auth/use-permissions.js";
 import { EditWindowOverrideModal, type EditWindowOverrideFields } from "./EditWindowOverrideModal.js";
 import { Button, Card, Chip, EmptyState, Spinner, useToast } from "@lyra/ui";
 import {
@@ -48,6 +52,7 @@ import {
   useSaveLogEntrySection,
   useSetDeferral,
   useSubmitLogEntry,
+  useVoidLogEntry,
 } from "./log-entries-queries.js";
 import { SectionSignModal } from "./SectionSignModal.js";
 import { TransitionModal } from "./TransitionModal.js";
@@ -122,10 +127,14 @@ export function EntryFillPage() {
   const submit = useSubmitLogEntry(activeId);
   const transition = useExecuteTransition(activeId);
   const setDeferral = useSetDeferral(activeId);
+  const voidEntry = useVoidLogEntry(activeId);
+  const { user } = useAuth();
+  const perms = usePermissions();
 
   const [draft, setDraft] = useState<Draft>({});
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [deferralOpen, setDeferralOpen] = useState(false);
+  const [voidOpen, setVoidOpen] = useState(false);
   const [activeTransition, setActiveTransition] = useState<AvailableTransitionDto | null>(null);
   const [signingSection, setSigningSection] = useState<{ section: TemplateSectionDto; st: LogEntrySectionStateDto } | null>(null);
   // Override de ventana de edición pendiente (2.7.2): el modal recolecta motivo
@@ -198,6 +207,30 @@ export function EntryFillPage() {
 
   const isDraft = entry.status === "DRAFT";
   const stateBySection = new Map(entry.sectionStates.map((s) => [s.sectionKey, s]));
+
+  // Esta pantalla se abre como EDICIÓN de una entrada existente (desde Bitácoras vía
+  // /bitacoras/:id/editar) o como creación/compose (/nueva-entrada). El backend
+  // decide siempre; aquí solo cambia el rótulo, el "Volver" y la acción de anular.
+  const editingExisting = location.pathname.endsWith("/editar");
+  // Anular borrador (2.8.2): solo un DRAFT ya materializado; el AUTOR puede el
+  // propio (ownership) o quien tenga `logentry:void` puede el ajeno. El backend
+  // re-autoriza; esto solo oculta el control cuando no aplica.
+  const canVoid =
+    isDraft && !composeActive && (entry.createdById === user?.id || perms.can("logentry:void"));
+
+  function handleVoid(reason: string) {
+    voidEntry.mutate(
+      { reason },
+      {
+        onSuccess: () => {
+          setVoidOpen(false);
+          toast.success(t("logbook.void.done"));
+          navigate("/bitacoras");
+        },
+        onError: (e) => toast.error(apiErrorText(e, t("logbook.void.error"))),
+      },
+    );
+  }
 
   // Ventana de edición (2.7.2): vencida + permiso de override ⇒ toda escritura
   // pasa por el modal de motivo (el backend exige el motivo igual; la UI anticipa).
@@ -442,16 +475,32 @@ export function EntryFillPage() {
 
   return (
     <div className={styles.page}>
-      {/* "Volver": una entrada NUEVA aún sin crear vuelve al picker; una entrada ya
-          existente (se llegó desde Bitácoras) vuelve a Bitácoras. */}
-      <Button variant="secondary" className={styles.backBtn} onClick={() => navigate(composeActive ? "/nueva-entrada" : "/bitacoras")}>
-        <ArrowLeft size={15} /> {t("logbook.fill.back")}
-      </Button>
+      {/* "Volver": una entrada NUEVA aún sin crear vuelve al picker; editar desde
+          Bitácoras vuelve al visor de esa entrada; el resto, a la grilla. */}
+      <div className={styles.fillTopBar}>
+        <Button
+          variant="secondary"
+          className={styles.backBtn}
+          onClick={() =>
+            navigate(composeActive ? "/nueva-entrada" : editingExisting ? `/bitacoras/${routeId}` : "/bitacoras")
+          }
+        >
+          <ArrowLeft size={15} /> {t("logbook.fill.back")}
+        </Button>
+        {canVoid && (
+          <Button variant="danger" onClick={() => setVoidOpen(true)}>
+            <Ban size={15} /> {t("logbook.void.action")}
+          </Button>
+        )}
+      </div>
 
       {/* Cabecera: plantilla + nodo + estado + dimensiones estampadas */}
       <Card className={styles.entryHeader}>
         <div className={styles.entryHeadTop}>
           <div>
+            <div className={styles.entryEyebrow}>
+              {composeActive ? t("logbook.fill.eyebrowNew") : editingExisting ? t("logbook.fill.eyebrowEdit") : t("logbook.fill.eyebrowFill")}
+            </div>
             <div className={styles.entryName}>{entry.templateName}</div>
             <div className={styles.entryNode}>{entry.orgNodePath ?? "—"}</div>
             {entry.equipmentName && (
@@ -548,6 +597,20 @@ export function EntryFillPage() {
       {entry.status === "SUBMITTED" && (
         <div className={styles.sealedBanner}>
           <CheckCircle2 size={16} /> {t("logbook.fill.sealedBanner", { at: entry.sealedAt ? formatDateTime(entry.sealedAt) : "" })}
+        </div>
+      )}
+
+      {/* Borrador ANULADO (2.8.2): la edición es terminal; queda solo la huella. */}
+      {entry.status === "VOID" && (
+        <div className={`${styles.editWindowBanner} ${styles.editWindowExpired}`}>
+          <Ban size={18} />
+          <span>
+            {t("logbook.void.banner", {
+              who: entry.voidedByName ?? "—",
+              at: entry.voidedAt ? formatDateTime(entry.voidedAt) : "—",
+            })}
+            {entry.voidReason ? ` — “${entry.voidReason}”` : ""}
+          </span>
         </div>
       )}
 
@@ -784,6 +847,9 @@ export function EntryFillPage() {
           onClose={() => setOverrideRequest(null)}
         />
       )}
+
+      {/* Anular (descartar) el borrador (2.8.2): motivo obligatorio, auditado. */}
+      {voidOpen && <VoidEntryModal loading={voidEntry.isPending} onConfirm={handleVoid} onClose={() => setVoidOpen(false)} />}
     </div>
   );
 }

@@ -439,6 +439,15 @@ export const PERMISSION_CATALOG = [
     description:
       "Excepción: editar una entrada con la ventana de edición vencida (exige motivo auditado en cada escritura).",
   },
+  // El AUTOR siempre puede anular su PROPIO borrador (ownership + ABAC); este
+  // permiso habilita anular borradores AJENOS (limpieza supervisora de un borrador
+  // abandonado). No aplica a entradas selladas (su anulación GxP es otro control).
+  {
+    key: "logentry:void",
+    dimension: "ACTION",
+    group: "logbook",
+    description: "Anular (descartar) el borrador de OTRO usuario, con motivo auditado.",
+  },
 ] as const satisfies readonly PermissionDef[];
 
 /** Unión literal de todas las claves de permiso conocidas. */
