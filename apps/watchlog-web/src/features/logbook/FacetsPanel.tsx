@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Filter } from "lucide-react";
+import { AlarmClock, Filter } from "lucide-react";
 import { Skeleton } from "@lyra/ui";
 import type { LogEntryFacetBucket, LogEntryFacets } from "@lyra/contracts";
 import { formatNumber } from "../../lib/format.js";
@@ -13,6 +13,8 @@ interface Props {
   loading: boolean;
   state: LogbookGridState;
   onToggle: (dim: FacetDim, value: string) => void;
+  /** Toggle de la faceta "Retrasadas" (Workflow SLA): es un flag, no una dimensión por valor. */
+  onToggleDelayed: () => void;
 }
 
 /** ¿El valor está activo en el filtro actual (para resaltar el bucket)? */
@@ -36,7 +38,7 @@ function isActive(dim: FacetDim, value: string, s: LogbookGridState): boolean {
  * "hermanos" (el backend excluye el propio criterio de cada faceta). Clic en un
  * valor hace toggle del filtro correspondiente (se refleja en la URL/SavedView).
  */
-export function FacetsPanel({ facets, loading, state, onToggle }: Props) {
+export function FacetsPanel({ facets, loading, state, onToggle, onToggleDelayed }: Props) {
   const { t } = useTranslation();
 
   const sections: { dim: FacetDim; title: string; buckets: LogEntryFacetBucket[] }[] = facets
@@ -62,7 +64,31 @@ export function FacetsPanel({ facets, loading, state, onToggle }: Props) {
           ))}
         </div>
       ) : (
-        sections
+        <>
+        {/* Retrasadas (Workflow SLA): faceta de flag, no por valor. Se muestra si hay
+            atrasadas o si el filtro ya está activo (para poder desactivarlo). */}
+        {facets && (facets.delayed > 0 || state.delayedOnly) && (
+          <section className={styles.facetGroup}>
+            <h4 className={styles.facetTitle}>{t("logbook.facets.review")}</h4>
+            <ul className={styles.facetList}>
+              <li>
+                <button
+                  type="button"
+                  className={state.delayedOnly ? `${styles.facetItem} ${styles.facetItemActive}` : styles.facetItem}
+                  aria-pressed={state.delayedOnly}
+                  onClick={onToggleDelayed}
+                >
+                  <AlarmClock size={13} className={styles.facetDelayedIcon} />
+                  <span className={styles.facetLabel} title={t("logbook.facets.delayed")}>
+                    {t("logbook.facets.delayed")}
+                  </span>
+                  <span className={styles.facetCount}>{formatNumber(facets.delayed)}</span>
+                </button>
+              </li>
+            </ul>
+          </section>
+        )}
+        {sections
           .filter((sec) => sec.buckets.length > 0)
           .map((sec) => (
             <section key={sec.dim} className={styles.facetGroup}>
@@ -98,9 +124,10 @@ export function FacetsPanel({ facets, loading, state, onToggle }: Props) {
                 })}
               </ul>
             </section>
-          ))
+          ))}
+        </>
       )}
-      {facets && sections.every((s) => s.buckets.length === 0) && (
+      {facets && facets.delayed === 0 && !state.delayedOnly && sections.every((s) => s.buckets.length === 0) && (
         <p className={styles.facetsEmpty}>{t("logbook.facets.empty")}</p>
       )}
     </aside>

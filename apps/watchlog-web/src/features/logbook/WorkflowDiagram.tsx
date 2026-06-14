@@ -1,7 +1,8 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Clock, Flag, Lock, Play, Timer, User, Users } from "lucide-react";
+import { AlarmClock, Clock, Flag, Lock, Play, Timer, TriangleAlert, User, Users } from "lucide-react";
 import type { LogEntryDetail, LogEntryTransitionDto, WorkflowStateDto, WorkflowTransitionDto } from "@lyra/contracts";
+import { evaluateSla } from "@lyra/contracts";
 import { formatDateTime } from "../../lib/format.js";
 import styles from "./WorkflowDiagram.module.css";
 
@@ -192,6 +193,20 @@ export function WorkflowDiagram(props: WorkflowDiagramProps) {
     const prevMs = i === 0 ? startMs : new Date(executed[i - 1]!.occurredAt).getTime();
     legMs.set(tr.id, new Date(tr.occurredAt).getTime() - prevMs);
   });
+  // --- SLA de permanencia (Workflow SLA) ------------------------------------
+  // SLA del estado (minutos) desde la versión CONGELADA. Veredicto del estado ACTUAL
+  // (solo si el registro sigue en curso): ok / en riesgo (≥80%) / atrasado (>SLA).
+  const slaMinutesOf = (key: string | null): number | null =>
+    key ? (states.find((s) => s.key === key)?.maxStayMinutes ?? null) : null;
+  const currentSla =
+    record && isActive && currentStateKey ? evaluateSla(inCurrentSinceMs, slaMinutesOf(currentStateKey), Date.now()) : null;
+  /** ¿El tramo (tiempo en el estado origen) excedió el SLA de ese estado? (ámbar). */
+  const legOverSla = (tr: WorkflowTransitionDto, ms: number): boolean => {
+    const sla = slaMinutesOf(tr.fromStateKey);
+    return sla !== null && sla > 0 && ms > sla * 60_000;
+  };
+  const slaText = (minutes: number | null): string => (minutes ? formatDuration(minutes * 60_000) : "");
+
   // Siguiente paso = transiciones salientes del estado actual (si sigue en curso).
   const nextTransitionKeys = new Set(
     isActive && currentStateKey ? transitions.filter((tr) => tr.fromStateKey === currentStateKey).map((tr) => tr.key) : [],
@@ -209,13 +224,14 @@ export function WorkflowDiagram(props: WorkflowDiagramProps) {
 
   // RESPONSABLE por elemento: nombres de rol que pueden EJECUTAR una transición; el de
   // un ESTADO = unión de los de sus transiciones salientes (quién actúa estando ahí).
+  // Responsable por elemento: con `roleNameOf` (builder) se resuelve por id; sin él
+  // (visor) se usan los `roleNames` que el backend ya resolvió en la versión congelada.
   const roleNameOf = props.roleNameOf;
   const rolesOfTransition = (tr: WorkflowTransitionDto): string[] =>
-    roleNameOf ? tr.roleIds.map(roleNameOf).filter(Boolean) : [];
+    (roleNameOf ? tr.roleIds.map(roleNameOf) : tr.roleNames).filter(Boolean);
   const responsibleOfState = (key: string): string[] => {
-    if (!roleNameOf) return [];
     const names = new Set<string>();
-    for (const tr of transitions) if (tr.fromStateKey === key) for (const id of tr.roleIds) names.add(roleNameOf(id));
+    for (const tr of transitions) if (tr.fromStateKey === key) for (const n of rolesOfTransition(tr)) names.add(n);
     return [...names].filter(Boolean);
   };
 
@@ -241,6 +257,14 @@ export function WorkflowDiagram(props: WorkflowDiagramProps) {
         {resp.length > 0 && (
           <div className={styles.tipResp}>
             <Users size={11} /> {t("logbook.diagram.responsible")}: <strong>{resp.join(", ")}</strong>
+          </div>
+        )}
+        {s.maxStayMinutes != null && (
+          <div className={styles.tipResp}>
+            <AlarmClock size={11} /> {t("logbook.diagram.slaTip")}: <strong>{slaText(s.maxStayMinutes)}</strong>
+            {isCurrent && currentSla && currentSla.status === "breached" && (
+              <span className={styles.tipSlaBreached}> · {t("logbook.diagram.slaBreached", { d: formatDuration(currentSla.overdueMs), sla: slaText(s.maxStayMinutes) })}</span>
+            )}
           </div>
         )}
         {s.description && <div className={styles.tipDesc}>{s.description}</div>}
@@ -385,6 +409,14 @@ export function WorkflowDiagram(props: WorkflowDiagramProps) {
             <span className={styles.statusElapsed}>
               <Clock size={12} /> {isActive ? t("logbook.diagram.hereFor", { d: formatDuration(currentElapsedMs) }) : t("logbook.diagram.finished")}
             </span>
+            {currentSla && currentSla.status !== "ok" && (
+              <span className={`${styles.slaBanner} ${currentSla.status === "breached" ? styles.slaBreached : styles.slaAtRisk}`}>
+                {currentSla.status === "breached" ? <TriangleAlert size={12} /> : <AlarmClock size={12} />}
+                {currentSla.status === "breached"
+                  ? t("logbook.diagram.slaBreached", { d: formatDuration(currentSla.overdueMs), sla: slaText(slaMinutesOf(currentStateKey)) })
+                  : t("logbook.diagram.slaAtRisk", { sla: slaText(slaMinutesOf(currentStateKey)) })}
+              </span>
+            )}
           </div>
           <div className={styles.statusNext}>
             <span className={styles.statusKicker}>{t("logbook.diagram.nextStep")}</span>
@@ -458,12 +490,15 @@ export function WorkflowDiagram(props: WorkflowDiagramProps) {
               const lastExec = execs[execs.length - 1];
               if (!lastExec) return null;
               const g = edgeGeometry(tr);
-              const dur = formatDuration(legMs.get(lastExec.id) ?? 0);
+              const legDurationMs = legMs.get(lastExec.id) ?? 0;
+              const dur = formatDuration(legDurationMs);
+              const overSla = legOverSla(tr, legDurationMs);
               return (
                 <span
                   key={`b-${tr.key}`}
-                  className={`${styles.edgeBadge} ${hovered === tr.key ? styles.edgeBadgeHot : ""}`}
-                  style={{ left: g.mx, top: g.my, background: `color-mix(in srgb, ${stateColorOf(tr.toStateKey)} 88%, #000)` }}
+                  className={`${styles.edgeBadge} ${overSla ? styles.edgeBadgeOverSla : ""} ${hovered === tr.key ? styles.edgeBadgeHot : ""}`}
+                  style={overSla ? { left: g.mx, top: g.my } : { left: g.mx, top: g.my, background: `color-mix(in srgb, ${stateColorOf(tr.toStateKey)} 88%, #000)` }}
+                  title={overSla ? t("logbook.diagram.slaLegOver", { sla: slaText(slaMinutesOf(tr.fromStateKey)) }) : undefined}
                   onMouseEnter={(e) => {
                     setHovered(tr.key);
                     showTip(e, transitionTip(tr));
@@ -488,10 +523,12 @@ export function WorkflowDiagram(props: WorkflowDiagramProps) {
             const color = stateColorOf(s.key);
             // En modo DEFINICIÓN el bottom está libre ⇒ mostramos ahí el responsable.
             const respNames = !record ? responsibleOfState(s.key) : [];
+            const nodeSla = isCurrent ? currentSla : null;
             const cls = [
               styles.node,
               !record ? styles.nodeDefined : step ? styles.nodeVisited : isNext ? styles.nodeNext : styles.nodePending,
               isCurrent ? styles.nodeCurrent : "",
+              nodeSla?.status === "breached" ? styles.nodeBreached : nodeSla?.status === "at-risk" ? styles.nodeAtRisk : "",
             ].join(" ");
             return (
               <div
@@ -520,6 +557,12 @@ export function WorkflowDiagram(props: WorkflowDiagramProps) {
                   {isCurrent && isActive && (
                     <span className={styles.nodeElapsed}>
                       <Clock size={11} /> {formatDuration(currentElapsedMs)}
+                    </span>
+                  )}
+                  {nodeSla && nodeSla.status !== "ok" && (
+                    <span className={`${styles.nodeSla} ${nodeSla.status === "breached" ? styles.nodeSlaBreached : styles.nodeSlaAtRisk}`}>
+                      {nodeSla.status === "breached" ? <TriangleAlert size={11} /> : <AlarmClock size={11} />}
+                      {nodeSla.status === "breached" ? t("logbook.diagram.slaOverdue") : t("logbook.diagram.slaRisk")}
                     </span>
                   )}
                   {isNext && <span className={styles.nextPill}>{t("logbook.diagram.next")}</span>}

@@ -42,3 +42,17 @@ export function formatNumber(value: number, opts?: Intl.NumberFormatOptions): st
 export function formatCurrency(value: number, currency = "CLP", opts?: Intl.NumberFormatOptions): string {
   return new Intl.NumberFormat(locale(), { style: "currency", currency, ...opts }).format(value);
 }
+
+/**
+ * Duración COMPACTA en la UNIDAD dominante (días / horas / minutos), formateada con la
+ * configuración regional activa (`Intl.NumberFormat` style:unit). Para señales como el
+ * SLA/atraso: "3 d", "2 h", "5 min". <1 min ⇒ "0 min". Fuente única de duraciones.
+ */
+export function formatDuration(ms: number): string {
+  const totalMin = Math.max(0, Math.floor(ms / 60000));
+  const fmt = (value: number, unit: "day" | "hour" | "minute") =>
+    new Intl.NumberFormat(locale(), { style: "unit", unit, unitDisplay: "narrow" }).format(value);
+  if (totalMin >= 1440) return fmt(Math.floor(totalMin / 1440), "day");
+  if (totalMin >= 60) return fmt(Math.floor(totalMin / 60), "hour");
+  return fmt(totalMin, "minute");
+}

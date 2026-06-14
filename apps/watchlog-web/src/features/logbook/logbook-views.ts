@@ -29,6 +29,7 @@ export const LOGBOOK_COLUMNS: ManagedColumn[] = [
   { key: "equipment", labelKey: "logbook.list.equipment" },
   { key: "summary", labelKey: "logbook.list.summary" },
   { key: "state", labelKey: "logbook.list.state" },
+  { key: "delay", labelKey: "logbook.list.delay" },
   { key: "status", labelKey: "logbook.list.status" },
   { key: "shift", labelKey: "logbook.list.shift" },
   { key: "effectiveAt", labelKey: "logbook.list.effectiveAt", sortField: "effectiveAt" },
@@ -41,7 +42,7 @@ export const LOGBOOK_COLUMNS: ManagedColumn[] = [
 export const LOGBOOK_COLUMN_KEYS = LOGBOOK_COLUMNS.map((c) => c.key);
 
 /** Columnas ocultas por defecto (densidad de info sin saturar; el usuario las activa). */
-const DEFAULT_HIDDEN = ["shift", "author", "indicators"];
+const DEFAULT_HIDDEN = ["shift", "author", "indicators", "delay"];
 
 export const DEFAULT_COLUMN_STATE: Required<TableColumnState> = {
   order: LOGBOOK_COLUMN_KEYS,

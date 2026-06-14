@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { BarChart3, BookOpenCheck, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Columns3, Download, FilterX, GitBranch, History, Lock, PenLine, RefreshCw, SlidersHorizontal, TriangleAlert } from "lucide-react";
+import { AlarmClock, BarChart3, BookOpenCheck, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Columns3, Download, FilterX, GitBranch, History, Lock, PenLine, RefreshCw, SlidersHorizontal, TriangleAlert } from "lucide-react";
 import {
   Button,
   Checkbox,
@@ -22,6 +22,7 @@ import {
 import { usePermissions } from "../../auth/use-permissions.js";
 import { useAuth } from "../../auth/use-auth.js";
 import {
+  evaluateSla,
   formatEntryFolio,
   LOG_ENTRY_SORT_FIELDS,
   type LogEntryListItem,
@@ -30,7 +31,7 @@ import {
   type SavedViewDto,
   type SystemView,
 } from "@lyra/contracts";
-import { formatDateTime } from "../../lib/format.js";
+import { formatDateTime, formatDuration } from "../../lib/format.js";
 import { ApiError } from "../../lib/api-client.js";
 import { downloadBlob, fileStamp } from "../../lib/download.js";
 import { useOrgTree } from "../structure/structure-queries.js";
@@ -120,6 +121,33 @@ function StateChip({ row }: { row: LogEntryListItem }) {
     >
       <span className={styles.stateDot} />
       {row.currentStateName ?? row.currentStateKey}
+    </span>
+  );
+}
+
+/**
+ * Indicador de ATRASO (Workflow SLA): si el registro está en curso (DRAFT) y el tiempo en
+ * su estado actual superó (rojo) o se acerca (ámbar) al SLA de permanencia. Mismo veredicto
+ * que el diagrama (`evaluateSla`). Duraciones con lib/format (regional). `compact` = solo el
+ * ícono + antigüedad (celda de estado); completo = "En {estado} hace {X} · SLA {Y}" (columna).
+ */
+function DelayBadge({ row, compact }: { row: LogEntryListItem; compact?: boolean }) {
+  const { t } = useTranslation();
+  if (row.status !== "DRAFT" || !row.currentStateSince) return compact ? null : <span className={styles.cellSub}>—</span>;
+  const sla = evaluateSla(new Date(row.currentStateSince).getTime(), row.currentStateMaxStayMinutes, Date.now());
+  if (sla.status === "ok") return compact ? null : <span className={styles.cellSub}>—</span>;
+  const breached = sla.status === "breached";
+  const slaText = row.currentStateMaxStayMinutes ? formatDuration(row.currentStateMaxStayMinutes * 60000) : "";
+  const full = breached
+    ? t("logbook.delay.breached", { state: row.currentStateName ?? "", d: formatDuration(sla.elapsedMs), sla: slaText })
+    : t("logbook.delay.atRisk", { state: row.currentStateName ?? "", d: formatDuration(sla.elapsedMs), sla: slaText });
+  return (
+    <span
+      className={`${styles.delayBadge} ${breached ? styles.delayBreached : styles.delayAtRisk}`}
+      title={full}
+    >
+      {breached ? <TriangleAlert size={12} /> : <AlarmClock size={12} />}
+      {compact ? formatDuration(sla.elapsedMs) : full}
     </span>
   );
 }
@@ -576,7 +604,24 @@ export function LogbookPage() {
       width: 340, // ancho por defecto; redimensionable (el contenido sigue el ancho)
       render: (r) => <SummaryCell row={r} />,
     },
-    { key: "state", header: t("logbook.list.state"), render: (r) => <StateChip row={r} /> },
+    {
+      key: "state",
+      header: t("logbook.list.state"),
+      render: (r) => (
+        <div className={styles.stateCell}>
+          <StateChip row={r} />
+          <DelayBadge row={r} compact />
+        </div>
+      ),
+    },
+    {
+      // Atraso (Workflow SLA): texto completo "En {estado} hace {X} · SLA {Y}". Oculta por
+      // defecto (el badge compacto en la celda de estado ya da la señal); el usuario la activa.
+      key: "delay",
+      header: t("logbook.list.delay"),
+      width: 220,
+      render: (r) => <DelayBadge row={r} />,
+    },
     {
       key: "status",
       header: t("logbook.list.status"),
@@ -725,6 +770,7 @@ export function LogbookPage() {
   if (state.onlyMine) activeChips.push({ key: "mine", label: t("logbook.filters.onlyMine"), clear: () => patch({ onlyMine: false }) });
   if (state.pendingSignature) activeChips.push({ key: "pending", label: t("logbook.filters.pendingSignature"), clear: () => patch({ pendingSignature: false }) });
   if (state.exceptionsOnly) activeChips.push({ key: "exceptions", label: t("logbook.filters.exceptionsOnly"), clear: () => patch({ exceptionsOnly: false }) });
+  if (state.delayedOnly) activeChips.push({ key: "delayed", label: t("logbook.filters.delayedOnly"), clear: () => patch({ delayedOnly: false }) });
   if (state.thresholdBand) activeChips.push({ key: "band", label: t(`logbook.bandFilter.${state.thresholdBand}`), clear: () => patch({ thresholdBand: "" }) });
   if (state.entryOrigin) activeChips.push({ key: "origin", label: t(`logbook.origin.${state.entryOrigin}`), clear: () => patch({ entryOrigin: "" }) });
 
@@ -827,6 +873,14 @@ export function LogbookPage() {
             {stats.data ? stats.data.withCrit + stats.data.withWarn : "—"}
           </span>
           <span className={styles.kpiLabel}>{t("logbook.kpi.exceptions")}</span>
+        </button>
+        <button
+          type="button"
+          className={`${styles.kpi} ${styles.kpiCrit} ${state.delayedOnly ? styles.kpiActive : ""}`}
+          onClick={() => patch({ delayedOnly: !state.delayedOnly })}
+        >
+          <span className={styles.kpiValue}>{stats.data?.delayed ?? "—"}</span>
+          <span className={styles.kpiLabel}>{t("logbook.kpi.delayed")}</span>
         </button>
       </div>
 
@@ -962,6 +1016,11 @@ export function LogbookPage() {
               onChange={(v) => patch({ exceptionsOnly: v })}
               label={t("logbook.filters.exceptionsOnly")}
             />
+            <Checkbox
+              checked={state.delayedOnly}
+              onChange={(v) => patch({ delayedOnly: v })}
+              label={t("logbook.filters.delayedOnly")}
+            />
           </div>
         </div>
       </Drawer>
@@ -980,7 +1039,13 @@ export function LogbookPage() {
 
       <div className={facetsOpen ? `${styles.gridShell} ${styles.gridWithFacets}` : styles.gridShell}>
         {facetsOpen && (
-          <FacetsPanel facets={facets.data} loading={facets.isLoading} state={state} onToggle={toggleFacet} />
+          <FacetsPanel
+            facets={facets.data}
+            loading={facets.isLoading}
+            state={state}
+            onToggle={toggleFacet}
+            onToggleDelayed={() => patch({ delayedOnly: !state.delayedOnly })}
+          />
         )}
         <div className={styles.gridWrap}>
           {paginationBar}

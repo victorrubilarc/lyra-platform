@@ -439,6 +439,40 @@
   border-radius: 99px;
   background: currentColor;
 }
+/* Celda de estado: chip del estado + badge de atraso debajo (Workflow SLA). */
+.stateCell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+/* Indicador de atraso (Workflow SLA): rojo = vencido, ámbar = en riesgo. */
+.delayBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 99px;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.delayBadge svg {
+  flex-shrink: 0;
+}
+.delayBreached {
+  color: var(--color-error, #ef4444);
+  background: color-mix(in srgb, var(--color-error, #ef4444) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-error, #ef4444) 40%, transparent);
+}
+.delayAtRisk {
+  color: var(--color-warning, #f59e0b);
+  background: color-mix(in srgb, var(--color-warning, #f59e0b) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-warning, #f59e0b) 40%, transparent);
+}
 .indicators {
   display: inline-flex;
   align-items: center;
@@ -1064,6 +1098,10 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
+}
+.facetDelayedIcon {
+  flex-shrink: 0;
+  color: var(--color-error, #ef4444);
 }
 .facetLabel {
   flex: 1;
