@@ -1,0 +1,50 @@
+/*
+ * Grilla responsiva de campos por sección (Fase 2.1.2). FUENTE ÚNICA del layout:
+ * la usan la vista previa del builder, el llenado y el visor de lectura, así el
+ * registro se ve idéntico en los tres lados. Estándar SAP Fiori 12-col / ServiceNow.
+ *
+ * Anchos: FULL = 12/12, HALF = 6/12, THIRD = 4/12. El span vive en la celda
+ * (data-span); el contenedor mantiene 12 columnas. Responsive (regla de terreno):
+ *   - Tablet (<=1023px): THIRD degrada a 1/2 (6/12).
+ *   - Celular (<=767px): la grilla pasa a 1 columna (todas las celdas a `auto`).
+ * Las áreas táctiles 44px las garantizan los controles (no la grilla); `min-width:0`
+ * evita que contenido largo (textarea, números con unidad) reviente las columnas.
+ */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: var(--space-4) var(--space-5);
+  align-items: start;
+}
+
+.cell {
+  grid-column: span 12; /* FULL + default */
+  min-width: 0;
+}
+
+.cell[data-span="HALF"] {
+  grid-column: span 6;
+}
+
+.cell[data-span="THIRD"] {
+  grid-column: span 4;
+}
+
+/* Tablet portrait: ⅓ → ½ (la grilla no se aprieta de más en terreno). */
+@media (max-width: 1023px) {
+  .cell[data-span="THIRD"] {
+    grid-column: span 6;
+  }
+}
+
+/* Celular: una sola columna (todo apilado, fiel a la regla de terreno + 44px). */
+@media (max-width: 767px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cell {
+    grid-column: auto;
+  }
+}

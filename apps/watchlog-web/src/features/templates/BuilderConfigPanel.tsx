@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
+import { Columns2, Columns3, RectangleHorizontal } from "lucide-react";
 import { Checkbox, Combobox, FormField, Input, MultiSelect, Select, Textarea, Toggle } from "@lyra/ui";
-import type { OptionInlineItem, RoleSummary, WorkflowStateDto } from "@lyra/contracts";
+import type { LayoutWidth, OptionInlineItem, RoleSummary, WorkflowStateDto } from "@lyra/contracts";
 import { useReferenceLists } from "../reference-data/reference-data-queries.js";
 import { fieldTypeMeta, slugifyKey, type EditField, type EditSection } from "./builder-model.js";
 import { ExpressionEditor } from "./ExpressionEditor.js";
@@ -105,6 +106,28 @@ export function BuilderConfigPanel({
         <FormField label={t("templates.builder.fieldHelp")}>
           {({ id }) => (
             <Input id={id} value={field.help ?? ""} onChange={(e) => onUpdateField({ help: e.target.value || null })} />
+          )}
+        </FormField>
+
+        {/* Ancho del campo en la grilla (Fase 2.1.2): presentación pura, aplica a todos los tipos. */}
+        <FormField label={t("templates.builder.layoutWidth")} hint={t("templates.builder.layoutWidthHint")}>
+          {() => (
+            <div className={styles.widthSeg} role="group" aria-label={t("templates.builder.layoutWidth")}>
+              {(["FULL", "HALF", "THIRD"] as const).map((w) => {
+                const Icon = w === "FULL" ? RectangleHorizontal : w === "HALF" ? Columns2 : Columns3;
+                return (
+                  <button
+                    key={w}
+                    type="button"
+                    className={styles.widthSegBtn}
+                    data-on={field.layoutWidth === w}
+                    onClick={() => onUpdateField({ layoutWidth: w as LayoutWidth })}
+                  >
+                    <Icon size={15} /> {t(`templates.builder.layoutWidthOptions.${w}`)}
+                  </button>
+                );
+              })}
+            </div>
           )}
         </FormField>
 

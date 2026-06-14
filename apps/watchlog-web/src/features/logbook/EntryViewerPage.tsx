@@ -34,6 +34,7 @@ import {
 import { ApiError } from "../../lib/api-client.js";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { FieldControl } from "../templates/FieldControl.js";
+import { FieldGrid, FieldGridCell } from "../templates/FieldGrid.js";
 import { useLogEntry } from "../log-entries/log-entries-queries.js";
 import {
   useLogbookChanges,
@@ -506,22 +507,22 @@ export function EntryViewerPage() {
                 {st?.filledByName && <span className={fillStyles.filledBy}>{t("logbook.fill.filledBy", { name: st.filledByName })}</span>}
               </div>
             </div>
-            <div>
+            <FieldGrid>
               {visible.map((f) => {
                 const band = fieldBand(f);
                 return (
-                  <div key={f.key}>
+                  <FieldGridCell key={f.key} width={f.layoutWidth}>
                     <FieldControl field={f} value={valuesByKey[f.key]} onChange={() => undefined} readOnly />
                     {band && (
                       <span className={styles.bandChip}>
                         <Chip variant={band === "CRIT" ? "error" : "warning"} label={t(`logbook.band.${band}`)} />
                       </span>
                     )}
-                  </div>
+                  </FieldGridCell>
                 );
               })}
               {visible.length === 0 && <div className={fillStyles.filledBy}>—</div>}
-            </div>
+            </FieldGrid>
           </Card>
         );
       })}

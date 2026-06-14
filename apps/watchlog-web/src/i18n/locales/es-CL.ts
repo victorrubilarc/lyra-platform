@@ -325,6 +325,14 @@ export const esCL = {
       computedFieldHint:
         "El valor se DERIVA de esta fórmula (solo lectura). Se recalcula al editar y se estampa al guardar; se congela al sellar el registro.",
       computedTag: "Calculado",
+      layoutWidth: "Ancho en la grilla",
+      layoutWidthHint:
+        "Cuánto ocupa el campo dentro de su sección. En tablet/celular la grilla se adapta y termina en una sola columna.",
+      layoutWidthOptions: {
+        FULL: "Completo",
+        HALF: "Mitad",
+        THIRD: "Tercio",
+      },
       tabIdentityGov: "Identidad y gobernanza",
       saveDraft: "Guardar borrador",
       saveConfig: "Guardar configuración",
