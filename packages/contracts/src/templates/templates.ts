@@ -3,9 +3,9 @@ import {
   deriveDataType,
   fieldConfigSchemaFor,
   fieldDataTypeSchema,
+  colSpanSchema,
   fieldSemanticRoleSchema,
   fieldTypeSchema,
-  layoutWidthSchema,
   recurrenceConfigSchema,
   recurrenceKindSchema,
   visibleWhenSchema,
@@ -130,11 +130,11 @@ export const templateFieldSchema = z.object({
    */
   computed: computedFieldConfigSchema.nullable(),
   /**
-   * Ancho del campo en la grilla responsiva de su sección (Fase 2.1.2). Hint de
+   * Ancho del campo en columnas de la grilla de 12 (Fase 2.1.3). Hint de
    * PRESENTACIÓN puro; vive en la versión INMUTABLE. NO nullable: el backend mapea
-   * FULL por default, así el render nunca ramifica sobre null.
+   * 12 (ancho completo) por default, así el render nunca ramifica sobre null.
    */
-  layoutWidth: layoutWidthSchema,
+  colSpan: colSpanSchema,
   /** Override por campo del permiso de la sección (vacío = hereda la sección). */
   roleIds: z.array(z.string()),
 });
@@ -295,8 +295,8 @@ export const draftFieldInputSchema = z
     visibleWhen: visibleWhenSchema.nullable().optional(),
     /** Campo FORMULADO (Req-7): expresión que deriva el valor (read-only). null = tecleado. */
     computed: computedFieldConfigSchema.nullable().optional(),
-    /** Ancho en la grilla (Fase 2.1.2). Ausente = FULL (ancho completo). */
-    layoutWidth: layoutWidthSchema.optional(),
+    /** Ancho en columnas de la grilla de 12 (Fase 2.1.3). Ausente = 12 (ancho completo). */
+    colSpan: colSpanSchema.optional(),
     roleIds: z.array(z.string()).max(50).optional(),
   })
   .superRefine((field, ctx) => {
