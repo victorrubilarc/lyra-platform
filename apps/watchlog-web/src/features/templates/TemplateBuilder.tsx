@@ -452,24 +452,26 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
                 <div className={styles.workspace}>
                   {/* Barra del lienzo: flujo (definición versionada) + agregar sección. */}
                   <div className={styles.canvasBar}>
-                    <FormField label={t("templates.builder.workflow")} hint={t("templates.builder.workflowHint")}>
-                      {({ id }) => (
-                        <Select id={id} value={state.workflowDefinitionId ?? ""} disabled={!canEdit} onChange={(e) => setWorkflow(e.target.value)}>
-                          <option value="">{t("templates.builder.workflowNone")}</option>
-                          {publishedWorkflows.map((w) => (
-                            <option key={w.id} value={w.id}>
-                              {w.name}
-                            </option>
-                          ))}
-                          {state.workflowDefinitionId &&
-                            !publishedWorkflows.some((w) => w.id === state.workflowDefinitionId) && (
-                              <option value={state.workflowDefinitionId}>
-                                {assignedWorkflow.data?.name ?? state.workflowDefinitionId}
+                    <div className={styles.canvasBarFlow}>
+                      <FormField label={t("templates.builder.workflow")} hint={t("templates.builder.workflowHint")}>
+                        {({ id }) => (
+                          <Select id={id} value={state.workflowDefinitionId ?? ""} disabled={!canEdit} onChange={(e) => setWorkflow(e.target.value)}>
+                            <option value="">{t("templates.builder.workflowNone")}</option>
+                            {publishedWorkflows.map((w) => (
+                              <option key={w.id} value={w.id}>
+                                {w.name}
                               </option>
-                            )}
-                        </Select>
-                      )}
-                    </FormField>
+                            ))}
+                            {state.workflowDefinitionId &&
+                              !publishedWorkflows.some((w) => w.id === state.workflowDefinitionId) && (
+                                <option value={state.workflowDefinitionId}>
+                                  {assignedWorkflow.data?.name ?? state.workflowDefinitionId}
+                                </option>
+                              )}
+                          </Select>
+                        )}
+                      </FormField>
+                    </div>
                     <button type="button" className={styles.addSectionBtn} onClick={addSection} disabled={!canEdit}>
                       <FilePlus2 size={15} /> {t("templates.builder.addSection")}
                     </button>

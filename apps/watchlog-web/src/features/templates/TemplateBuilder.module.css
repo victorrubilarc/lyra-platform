@@ -506,10 +506,16 @@
   display: flex;
   align-items: flex-end;
   gap: var(--space-3);
+  width: 100%;
+  flex-wrap: wrap;
 }
-.canvasBar > :first-child {
-  flex: 1;
-  min-width: 0;
+.canvasBarFlow {
+  flex: 1 1 280px;
+  min-width: 240px;
+  max-width: 440px;
+}
+.canvasBar .addSectionBtn {
+  margin-left: auto;
 }
 .addFieldRow {
   margin-top: var(--space-3);
