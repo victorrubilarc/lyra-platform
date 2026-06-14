@@ -83,6 +83,7 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Fase 2.8.1b Vistas guardadas + gestor de columnas + multi-sort** (`SavedView` ownership-gated + `SavedViewsModule` + `Table` column-aware en `@lyra/ui` + `ColumnsDrawer`/`ViewBar` + multi-sort keyset + columnas de valor por plantilla) | `feat/bitacoras-vistas-guardadas` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Fase 2.8.1c Peek + facetas + review-by-exception + Mi turno** (`/facets` conteos de hermanos + `/my-shift` + `exceptionsOnly` + `FacetsPanel`/`PeekDrawer` + `rowClassName` en `@lyra/ui` + filtro de equipo en UI) | `feat/bitacoras-peek-facetas` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Workflow SLA + atrasos** (`WorkflowState.maxStayMinutes` + `LogEntry.currentStateSince` + `evaluateSla` + `roleNames` en versión congelada + `delayedOnly`/`stats.delayed`/`facets.delayed` + vista sistema "Retrasadas" + `SlaDurationField` builder + alertas diagrama/grilla) | `feat/workflow-sla-atrasos` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
+| **Motor de reglas — primer corte (Req-7)** (`@lyra/contracts/rules` AST seguro + formulados + cruzadas + `TemplateField.computed`/`TemplateVersion.rules` + recálculo autoritativo/estampado en API + `ExpressionEditor`/`RulesEditor`/preview en vivo) | `feat/motor-reglas` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 
 **Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
@@ -270,7 +271,22 @@ nunca queda más de una sesión atrás.
       Quién: mantenimiento predictivo de IBM Maximo (MAS/Predict), GE/AVEVA Predictive Analytics, SAP PdMS.
       **Fase 6 (insights) + fase posterior (ML real).**
 
-- [ ] **Motor de REGLAS DE NEGOCIO y validaciones por plantilla (Req-7, dueño 2026-06-14).** Que la plantilla deje de ser
+- [~] **Motor de REGLAS DE NEGOCIO y validaciones por plantilla (Req-7, dueño 2026-06-14).**
+      **PRIMER CORTE ✅ (2026-06-14, `feat/motor-reglas` → `main`):** expresión SEGURA (AST tipo JSONLogic, evaluador puro,
+      sin `eval`) en `@lyra/contracts/rules` = fuente única back↔front; **campos FORMULADOS** (`TemplateField.computed`,
+      read-only, valor estampado al guardar / congela al sellar, ÷0 e inputs nulos ⇒ vacío, umbral ISA-18.2 sobre el
+      calculado, recálculo autoritativo en servidor); **validación CRUZADA** (`TemplateVersion.rules`, ERROR bloquea /
+      WARN informa); ciclos/refs detectados al guardar el diseño; UI builder (ExpressionEditor + sub-pestaña Reglas) +
+      preview/llenado en vivo. Smoke 20/20. **PENDIENTE 2.º corte:** **(1)** límites dinámicos (min/max según otro campo o
+      lista); **(2)** acciones que disparan otros módulos (abrir incidencia → Fase 4, notificar → bloque Notificaciones,
+      exigir firma, marcar para revisión, autocompletar); **(3)** lookups a metadata de listas de referencia (exige
+      resolución server-side; rompe pureza del evaluador — pasar pre-resuelto); **(4)** tablas **DMN** para matrices de
+      decisión (clase equipo × lectura → severidad); **(5)** obligatoriedad/visibilidad condicional con el motor completo
+      (hoy `visibleWhen` es el struct simple); **(6) deuda fina:** un formulado en una sección ya firmada se recomputa
+      mientras la entrada no esté sellada (puede invalidar la firma de esa sección → §11.70 lo marca CHANGED_AFTER);
+      evaluar "congelar formulados al completar/firmar la sección" o `LogEntryValue.computed Boolean` para filtrar por SQL.
+      **Texto original del requerimiento abajo (referencia):**
+- [ ] ~~Motor de REGLAS DE NEGOCIO (texto original, conservado como referencia).~~ Que la plantilla deje de ser
       "formulario tonto": reglas configurables declarativas `cuando (condición) → entonces (acción)`. **Ya hay base**
       (obligatorios, rangos min/max, **umbral ISA-18.2**, formato, **`visibleWhen`** condicional, validación 100% en backend
       con fuente única `validateFieldValue` reusada en cliente). Falta el **motor** que agregue: **(1)** validación

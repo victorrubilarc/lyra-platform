@@ -22,7 +22,11 @@
       "Bash(cd /g/Development/BitacorasInteligentes && find apps/watchlog-api/src -path \"*templates*\" -name \"*.ts\" -o -path \"*log-entries*\" -name \"*.ts\" | grep -v spec | sort)",
       "Read(//g/g/Development/BitacorasInteligentes/apps/watchlog-api/**)",
       "Bash(grep -n \"    builder: {\\\\|    fieldTypes: {\\\\|^    },\\\\|^  },\" apps/watchlog-web/src/i18n/locales/es-CL.ts)",
-      "Bash(grep -n 'makeService\\\\|$transaction\\\\|const tx\\\\|tx =\\\\|function versionGraph\\\\|buildTx' apps/watchlog-api/src/log-entries/log-entries.service.spec.ts)"
+      "Bash(grep -n 'makeService\\\\|$transaction\\\\|const tx\\\\|tx =\\\\|function versionGraph\\\\|buildTx' apps/watchlog-api/src/log-entries/log-entries.service.spec.ts)",
+      "Bash(pnpm --filter @lyra/watchlog-api dev)",
+      "Bash(echo \"started api pid $!\")",
+      "Bash(python scripts/smoke-business-rules.py)",
+      "PowerShell(\"api detenida\")"
     ]
   }
 }

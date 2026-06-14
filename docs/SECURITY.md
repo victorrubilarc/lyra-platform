@@ -203,6 +203,20 @@ GxP: MHRA Data Integrity 2018 / FDA DI Q&A (corrección tardía justificada + at
   `eligibleNodes` expone). Sin permiso nuevo: editar el modo va por `template:edit`; el cambio queda **auditado** before/after
   en `template.updated`. No se re-valida al sellar (equipo estampado = histórico intacto, ALCOA+).
 
+### Motor de reglas de negocio — expresión SEGURA (Req-7, primer corte)
+- **Sin `eval` ni scripting libre.** Las fórmulas (campos formulados) y las reglas cruzadas se expresan como un **AST
+  con LISTA BLANCA de operadores** (tipo JSONLogic) evaluado por un intérprete **PURO** y SÍNCRONO en `@lyra/contracts/
+  rules` — **cero superficie de parser / inyección de código**, serializable y auditable (diffea por versión). Decisión
+  on-prem/auditabilidad (DECISIONS 2026-06-14). Cotas duras de tamaño/profundidad del AST; referencias circulares y a
+  campos inexistentes se **rechazan al guardar el diseño** (fallar en diseño, nunca en llenado).
+- **El servidor MANDA.** Los campos formulados son **read-only**: el backend **ignora** cualquier valor que el cliente
+  envíe para ellos y **recomputa** autoritativamente desde los valores persistidos antes de validar/sellar/firmar
+  (`recomputeComputedValues`); la **validación CRUZADA** (`evaluateCrossRules`) corre 100% en backend (ERROR bloquea
+  completar/enviar/avanzar). El cliente reusa las mismas funciones puras solo para feedback inmediato.
+- **GxP / integridad.** Los valores formulados se estampan en `LogEntryValue` con su `LogEntryFieldChange` (reason
+  `COMPUTED`) y se **congelan al sellar**; el estampado va **antes** de la firma para que el snapshot canónico (§11.70)
+  coincida con lo persistido. **Sin permisos nuevos** (catálogo 59): editar reglas usa `template:edit`/draft/publish.
+
 ## Estado
 - **Fase 0:** cabeceras (Helmet) y validación de entorno activas.
 - **Fase 1 (backend, ✅):** auth local Argon2id; access JWT (15 min) + refresh rotativo httpOnly con detección de reuso por familia; CSRF de doble envío en refresh/logout; lockout por fuerza bruta (contador en BD); **MFA TOTP** completo (enrolamiento + recovery codes, secreto cifrado en reposo); `PermissionsGuard` + `@RequirePermission` (dims. 1–3) globales; `ScopeService` (dim. 4) con ruta materializada; catálogo de permisos en `@lyra/contracts`; `AuditLog` append-only con **trigger Postgres** que rechaza UPDATE/DELETE; política de contraseñas configurable + historial; seed idempotente con admin de arranque (forzado a cambiar contraseña).

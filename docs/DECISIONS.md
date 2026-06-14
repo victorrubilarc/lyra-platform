@@ -4,7 +4,7 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
-### 2026-06-14 · Motor de reglas de negocio — PRIMER CORTE (Req-7) — forks resueltos (a implementar)
+### 2026-06-14 · Motor de reglas de negocio — PRIMER CORTE (Req-7) — ✅ IMPLEMENTADO (`feat/motor-reglas` → `main`)
 
 Núcleo del motor: expresión segura + campos FORMULADOS + validación CRUZADA. **NO** incluye acciones que disparan
 otros módulos (incidencia/notificación = Fase 4/Notificaciones), ni límites dinámicos, ni DMN. 5 forks resueltos con
