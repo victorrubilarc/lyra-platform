@@ -4,6 +4,25 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-14 · Fase 2.1.6 — Motor de arrastre del builder con **dnd-kit** (Canva-grade) — ✅ IMPLEMENTADO (`feat/builder-dnd-kit` → `main`)
+
+Tras probar 2.1.5 el dueño reportó que **seguía sin poder mover un campo al lado de otro** ("no veo cambios… en Canva lo hace por píxeles… quiero meterme entre dos objetos y que ambos se auto-dimensionen… algo enterprise y profesional"). Diagnóstico honesto:
+
+1. **Bug real del DnD nativo:** el arrastre solo arrancaba si `e.target.dataset.dragHandle` era verdadero, pero el grip era un `<span>` con un **SVG** dentro ⇒ al presionar sobre el ícono el target era el SVG (sin el dataset) ⇒ `preventDefault()` ⇒ **el drag casi nunca iniciaba**.
+2. **Techo del DnD nativo:** aunque se arregle el bug, HTML5 DnD nativo nunca da la sensación Canva/Notion (fantasma gris del navegador, `dragover` tosco, **sin reflow en vivo**). Canva/Notion/Typeform/Webflow usan **pointer events** con drag overlay, reflow animado y detección por píxeles.
+
+**Decisión (confirmada con el dueño):** adoptar **dnd-kit** (`@dnd-kit/core` 6 + `@dnd-kit/sortable` 10 + `@dnd-kit/utilities` 3) y **reescribir** la interacción del lienzo. Es el estándar de la industria para builders en React: ~10 kB, MIT, **cero servicios externos** (100% on-prem, cumple la regla del proyecto), y soporta **pointer + teclado + touch** ⇒ además deja el builder accesible y usable en tablet. **Frontend puro** — NO se toca modelo/contratos/API/migraciones: sigue `colSpan` 1..12 y `FieldGrid` sigue siendo la **fuente única** de render (llenado/visor idénticos).
+
+- **Nodo sortable = la CELDA de la grilla** (no la tarjeta interna) ⇒ el reflow de los vecinos se anima con `rectSortingStrategy`. El **área activadora** (`setActivatorNodeRef`) es la **tarjeta completa** ⇒ se agarra en casi cualquier parte; el **rótulo** (textarea) y el **borde-divisor** quedan exentos vía `stopPropagation` en `pointerdown` (para escribir / redimensionar). Adiós al bug del grip.
+- **`DragOverlay`** dibuja la copia que **sigue al cursor** (`BuilderFieldOverlay`, no interactiva) — sin fantasma gris; el original queda atenuado (placeholder).
+- **Intención de soltado por píxeles:** en `onDragMove` se compara el **centro del campo arrastrado** (`active.rect.current.translated`) contra el rect del destino (`over.rect`): arriba/abajo ⇒ fila propia (ancho completo), mitad izq/der ⇒ **al lado** (comparten fila, `splitRow` reparte el ancho). Se reusa **íntegro** el auto-layout de 2.1.5 (`applyDrop`/`splitRow`/`rowRangeOf`) — solo cambió el MOTOR que dispara el drop. La intención se guarda en un **ref** (`dropIntentRef`) leído síncronamente en `onDragEnd` (no depende de estado asíncrono).
+- **Colisiones `closestCenter`** + el **droppable de sección se desactiva cuando tiene campos** ⇒ con campos siempre gana un CAMPO (intención al-lado/fila); el contenedor solo actúa en sección vacía / soltar al final. Sensor pointer con umbral 5px (no roba los clics de selección); sensor de teclado con `sortableKeyboardCoordinates` (recoger/mover/soltar accesible).
+- **Se conserva:** el **divisor** del borde (pointer-events) para el ajuste fino 70/30, los indicadores de soltado (barra azul beside/row), y el responsive de terreno 1/2/12 de `FieldGrid`.
+
+**Motivo:** parchar drag nativo por 5.ª vez era invertir en un piso que no da el nivel pedido; el estándar enterprise es un motor pointer-based (dnd-kit). typecheck/lint(0)/build verdes; contracts 195 · API 234 (sin cambios, frontend puro). **Smoke VISUAL pendiente** (BACKLOG §4).
+
+---
+
 ### 2026-06-14 · Fase 2.1.5 — Builder: ancho completo + auto-layout por arrastre (Notion) + responsive de terreno — ✅ IMPLEMENTADO (`feat/builder-autolayout` → `main`)
 
 Feedback del dueño tras 2.1.4 (4 puntos, "pensar en el usuario final, simpleza"): (1) el editor no usaba todo el ancho; (2) arrastrar entre líneas no era natural; (3) el usuario NO entiende "dividir en columnas", solo quiere arrastrar y que quede bien; (4) el formulario debe verse bien en móvil/tablet (terreno). **Frontend puro** (se mantiene `colSpan`; el ancho se DERIVA del arrastre).
