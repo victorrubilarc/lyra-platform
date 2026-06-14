@@ -3,6 +3,7 @@ import { Checkbox, Combobox, FormField, Input, MultiSelect, Select, Textarea, To
 import type { OptionInlineItem, RoleSummary, WorkflowStateDto } from "@lyra/contracts";
 import { useReferenceLists } from "../reference-data/reference-data-queries.js";
 import { fieldTypeMeta, slugifyKey, type EditField, type EditSection } from "./builder-model.js";
+import { ExpressionEditor } from "./ExpressionEditor.js";
 import styles from "./TemplateBuilder.module.css";
 
 /** Lee los ítems inline del `optionSource` de un SELECT/MULTISELECT (vacío si no es inline). */
@@ -33,6 +34,8 @@ interface BuilderConfigPanelProps {
   field: EditField | null;
   roles: RoleSummary[];
   booleanFields: BooleanFieldRef[];
+  /** Todos los campos de la plantilla (key + label) para fórmulas (motor de reglas). */
+  allFields: BooleanFieldRef[];
   /** Estados del flujo asignado (para mapear sección → estado editable). */
   workflowStates: WorkflowStateDto[];
   /** Hay un flujo asignado a la versión. */
@@ -67,6 +70,7 @@ export function BuilderConfigPanel({
   field,
   roles,
   booleanFields,
+  allFields,
   workflowStates,
   hasWorkflow,
   onUpdateSection,
@@ -103,13 +107,44 @@ export function BuilderConfigPanel({
           )}
         </FormField>
 
-        <div className={styles.inlineCheck}>
-          <Checkbox
-            checked={field.required}
-            onChange={(checked) => onUpdateField({ required: checked })}
-            label={t("templates.builder.required")}
-          />
-        </div>
+        {!field.computed && (
+          <div className={styles.inlineCheck}>
+            <Checkbox
+              checked={field.required}
+              onChange={(checked) => onUpdateField({ required: checked })}
+              label={t("templates.builder.required")}
+            />
+          </div>
+        )}
+
+        {/* Campo FORMULADO (Req-7): valor derivado de una fórmula (read-only). */}
+        {field.type !== "SIGNATURE" && (
+          <div className={styles.computedBox}>
+            <div className={styles.inlineCheck}>
+              <Toggle
+                checked={!!field.computed}
+                onChange={(checked) =>
+                  onUpdateField({
+                    computed: checked ? { expression: { kind: "lit", value: 0 } } : null,
+                    required: checked ? false : field.required,
+                  })
+                }
+                aria-label={t("templates.builder.computedField")}
+              />
+              <span>{t("templates.builder.computedField")}</span>
+            </div>
+            {field.computed && (
+              <>
+                <p className={styles.thresholdHint}>{t("templates.builder.computedFieldHint")}</p>
+                <ExpressionEditor
+                  value={field.computed.expression}
+                  fields={allFields.filter((f) => f.key !== field.key)}
+                  onChange={(expr) => onUpdateField({ computed: { expression: expr } })}
+                />
+              </>
+            )}
+          </div>
+        )}
 
         {field.type === "NUMBER" && (
           <>

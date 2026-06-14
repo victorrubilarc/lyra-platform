@@ -1,8 +1,8 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, FunctionSquare } from "lucide-react";
 import { Combobox, Input, LookupPicker, MultiSelect, Textarea, Toggle } from "@lyra/ui";
-import type { FieldType, OptionInlineItem } from "@lyra/contracts";
+import type { ComputedFieldConfig, FieldType, OptionInlineItem } from "@lyra/contracts";
 import { useResolvedReferenceList } from "../reference-data/reference-data-queries.js";
 import styles from "./TemplateBuilder.module.css";
 
@@ -14,6 +14,8 @@ export interface FieldControlField {
   required?: boolean;
   help?: string | null;
   config: Record<string, unknown>;
+  /** Campo FORMULADO (Req-7): si está presente, se muestra READ-ONLY (valor derivado). */
+  computed?: ComputedFieldConfig | null;
 }
 
 /** Ítems inline del `optionSource` (cuando la fuente no es una Lista de Referencia). */
@@ -75,10 +77,16 @@ export function FieldControl({
     return m;
   }, [resolved.data]);
 
+  const isComputed = !!field.computed;
   const labelEl = (
     <label className={styles.previewLabel}>
       {field.label}
-      {field.required && <span className={styles.req}> *</span>}
+      {field.required && !isComputed && <span className={styles.req}> *</span>}
+      {isComputed && (
+        <span className={styles.computedBadge} title={t("templates.builder.computedField")}>
+          <FunctionSquare size={11} /> {t("templates.builder.computedTag")}
+        </span>
+      )}
     </label>
   );
 
@@ -90,8 +98,10 @@ export function FieldControl({
     </div>
   );
 
-  // --- Modo solo-lectura: valor formateado --------------------------------
-  if (readOnly) {
+  // --- Campo FORMULADO o modo solo-lectura: valor formateado (read-only) ----
+  // Un formulado es read-only SIEMPRE (su valor lo deriva el servidor); se muestra
+  // el valor calculado que el llamador recomputó.
+  if (isComputed || readOnly) {
     return wrap(<div className={styles.previewReadonly}>{formatReadonly(field, value, labelByCode, t)}</div>);
   }
 

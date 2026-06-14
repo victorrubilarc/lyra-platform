@@ -45,7 +45,10 @@
   **Flujo congelado (Fase 2.2):** `workflowDefinitionId?` → `WorkflowDefinition` y `workflowDefinitionVersionId?`
   → `WorkflowDefinitionVersion`, ambos **FK `onDelete: Restrict`** (la versión publicada congela qué versión de
   flujo usa; integridad histórica). Además `requireSignature` (Part 11 opt-in) y `recurrenceKind`/`recurrenceConfig`
-  (rondas/turnos, editor 2.3).
+  (rondas/turnos, editor 2.3). **Reglas de negocio (Req-7, migración `20260614120000_add_business_rules`):**
+  `rules` (JSONB, default `[]`) = array de reglas de **validación CRUZADA** `{key, when (AST seguro), severity
+  ERROR|WARN, message}`, parte de la versión INMUTABLE (cambiar una regla = nueva versión auditada). Validadas por
+  `@lyra/contracts/rules` (refs a campos existentes, cotas, sin ciclos entre formulados) al guardar el borrador.
 - **TemplateSection** *(implementado)* — unidad atómica de permiso/llenado/firma: `key` (estable), `title`,
   `description?`, `order`, `requireSignature` (opt-in), `editableInStateKey?` (estado del flujo que la
   habilita; null = siempre). *N—N* `Role` vía **TemplateSectionRole** (permiso de llenado por sección).
@@ -62,6 +65,12 @@
     (promueve `LogEntry.effectiveAt`, 2.4); **a lo sumo uno por versión** (validado en contrato + backend).
   - Además: `key`, `label`, `help?`, `required`, `order`, `config` (JSONB validado por unión Zod), `visibleWhen?`
     (condicional). *N—N* `Role` vía **TemplateFieldRole** (override por campo).
+  - **Campo FORMULADO (Req-7, `computed?` JSONB, migración `20260614120000`):** `{ expression }` (AST seguro de
+    `@lyra/contracts/rules`). Presente ⇒ el campo es **READ-ONLY**: su valor lo **DERIVA el servidor** (autoritativo)
+    desde otros campos/constantes y se **estampa** en `LogEntryValue` (recalcula en DRAFT, **congela al sellar** — GxP;
+    ÷0/input nulo ⇒ vacío). Conserva su `type`/`dataType` real ⇒ el **umbral ISA-18.2 aplica al valor calculado** y la
+    grilla/búsqueda/reporte funcionan igual. "¿Es derivado?" se sabe desde la versión (sin columna en el valor); el
+    `LogEntryFieldChange` del recálculo lleva `reason: COMPUTED` (ALCOA+: el humano teclea insumos, el sistema deriva).
   - **`config` de SELECT/MULTISELECT = `optionSource` discriminado** (desde 2.1.1, reemplaza `options[]`):
     `inline` (`items:[{code,label}]`) · `referenceList` (`listKey` → **Lista de Referencia gobernada**, REAL desde
     2.x: validado en `saveDraft`, resuelto en el preview) · `external` (`sourceKey` → Orígenes de Datos, Fase 3). El

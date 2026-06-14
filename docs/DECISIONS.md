@@ -4,6 +4,57 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-14 · Motor de reglas de negocio — PRIMER CORTE (Req-7) — ✅ IMPLEMENTADO (`feat/motor-reglas` → `main`)
+
+Núcleo del motor: expresión segura + campos FORMULADOS + validación CRUZADA. **NO** incluye acciones que disparan
+otros módulos (incidencia/notificación = Fase 4/Notificaciones), ni límites dinámicos, ni DMN. 5 forks resueltos con
+el dueño (recomendación aceptada en los 5):
+
+1. **Lenguaje = AST tipo JSONLogic con evaluador PROPIO** (~150 líneas, sin dependencia externa), helper PURO en
+   `@lyra/contracts` evaluado **idéntico cliente/servidor** (extiende el patrón `validateFieldValue`/`visibleWhen`).
+   Motivo: **cero superficie de parser** (vs CEL/string), serializa nativo a JSONB de la versión inmutable, **diffea
+   para auditoría GxP**, sin cadena de suministro (on-prem). La legibilidad infija es asunto de UI: el builder
+   **renderiza** `salida > entrada` y **almacena** el árbol. DMN/CEL para tablas de decisión complejas → BACKLOG.
+
+2. **Ubicación HÍBRIDA, todo en la versión INMUTABLE como JSON** (clonado al publicar):
+   - **Fórmula → en el campo:** nueva columna `TemplateField.computed Json?` (paralela a `visibleWhen`, NO dentro de
+     `config`). Un campo calculado *es* su fórmula; dependencias y recálculo son per-campo.
+   - **Validación cruzada → en la versión:** nueva columna `TemplateVersion.rules Json` (array de
+     `{key, when, severity ERROR|WARN, message}`). Una regla cruzada referencia varios campos y no la posee ninguno
+     (patrón Validation Rules de Salesforce / Data Policies de ServiceNow = a nivel de objeto).
+   - **JSON, no entidad relacional** en el primer corte (las reglas se leen como un todo, nunca por SQL individual;
+     una tabla `TemplateRule` no aporta y suma migración/clonado → BACKLOG si hay analítica por regla).
+   - **Clave GxP:** va a la versión **inmutable** (cambiar regla/fórmula = re-versión auditada), a diferencia de
+     `editWindow`/`equipmentMode`/`gridFieldKeys` (gobernanza *mutable* del contenedor): la lógica de cálculo/
+     validación es parte del documento controlado; un *hint* de visualización no.
+
+3. **Campo formulado = flag `computed` + expresión sobre el TIPO EXISTENTE**, NO un dataType nuevo. Conserva
+   `type`/`dataType` real (NUMBER/DATE…) ⇒ **el umbral ISA-18.2 aplica al valor calculado gratis**, y grilla/búsqueda/
+   facetas/reporte funcionan sin caminos especiales. `computed` presente ⇒ campo **read-only**, valor derivado.
+   **Estampado:** el valor se persiste en `LogEntryValue` (recalcula en DRAFT, **congela al sellar** — GxP). "¿Es
+   derivado?" se sabe **desde la versión** (sin columna nueva); el `LogEntryFieldChange` del recálculo se marca con
+   `reason: "COMPUTED"` y actor = quien cambió el input (ALCOA+: el humano teclea insumos, el sistema deriva). Filtrar
+   computados por SQL (`LogEntryValue.computed Boolean`) → BACKLOG si se necesita.
+
+4. **Set de funciones del primer corte (mínimo útil, todo SÍNCRONO y PURO):** referencias (`var(fieldKey)`) +
+   literales; aritmética (`+ − × ÷`, abs/round/ceil/floor/min/max; **÷0 ⇒ vacío**); comparación (`== != > >= < <=`);
+   lógica (and/or/not); condicional (`if`); nulos (`coalesce`, `isEmpty`; **operando nulo ⇒ resultado vacío**); fecha
+   (`dateDiff(unidad,a,b)`, `now()`); agregación intra-entrada sobre lista explícita (`sum/avg/count/min/max`).
+   **Diferido (BACKLOG):** lookups a metadata de listas de referencia (rompe pureza → exige I/O), tablas DMN, límites
+   dinámicos. Si una regla necesita datos resueltos, el llamador los pre-resuelve y los pasa (patrón `allowedCodes`).
+
+5. **Recálculo/dependencias/ciclos (diseño fijo):** dependencias extraídas estáticamente del AST (hojas `var`);
+   grafo entre formulados. **Cliente** recomputa en cada cambio en orden topológico (feedback); **servidor
+   AUTORITATIVO** recomputa todos los formulados desde los valores persistidos al guardar y los **estampa**,
+   ignorando lo que el cliente envíe para campos computados. **Ciclos** se detectan en **guardar/publicar el diseño**
+   (topo-sort) → rechazo con error de qué campos forman el ciclo (fallar en diseño, nunca en llenado); también se
+   valida que los `fieldKey` referenciados existan. **Cruzada:** se evalúa tras recomputar; si falta un campo
+   referenciado (vacío) la regla se **omite**; con todos presentes, **ERROR bloquea** completar/enviar/transicionar
+   (canal de errores existente), **WARN informa** (como bandas de umbral). **Sin permisos nuevos** (catálogo 59):
+   edición usa los gates de plantilla; la evaluación corre dentro de fill/submit/transition ya gateados.
+
+---
+
 ### 2026-06-13 · Workflow SLA + atrasos — ✅ IMPLEMENTADO (forks resueltos)
 
 Implementación del plan aprobado abajo. **SLA por ESTADO** (`WorkflowState.maxStayMinutes` nullable, minutos canónicos,

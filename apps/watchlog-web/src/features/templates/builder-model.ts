@@ -12,6 +12,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type {
+  ComputedFieldConfig,
+  CrossRule,
   EditWindowAnchor,
   EquipmentMode,
   FieldSemanticRole,
@@ -78,6 +80,8 @@ export interface EditField {
   required: boolean;
   config: Record<string, unknown>;
   visibleWhen: VisibleWhen | null;
+  /** Campo FORMULADO (Req-7): fórmula que deriva el valor (read-only). null = tecleado. */
+  computed: ComputedFieldConfig | null;
   roleIds: string[];
 }
 
@@ -111,6 +115,8 @@ export interface EditState {
   /** Campos de resumen en la grilla de Bitácoras (2.8.1a) — pool ORDENADO de `key`,
    * gobernanza viva del contenedor. "El diseñador ofrece, el usuario dispone." */
   gridFieldKeys: string[];
+  /** Reglas de validación CRUZADA (Req-7), parte de la versión INMUTABLE. */
+  rules: CrossRule[];
   sections: EditSection[];
 }
 
@@ -164,6 +170,7 @@ export function detailToEditState(detail: TemplateDetail): EditState {
     editWindowMinutes: detail.editWindowMinutes,
     equipmentMode: detail.equipmentMode,
     gridFieldKeys: detail.gridFieldKeys,
+    rules: detail.version.rules.map((r) => ({ ...r })),
     sections: detail.version.sections.map((s) => ({
       uid: nextUid(),
       key: s.key,
@@ -182,6 +189,7 @@ export function detailToEditState(detail: TemplateDetail): EditState {
         required: f.required,
         config: f.config,
         visibleWhen: f.visibleWhen,
+        computed: f.computed,
         roleIds: f.roleIds,
       })),
     })),
@@ -220,6 +228,8 @@ export function editStateToDraftRequest(state: EditState): SaveTemplateDraftRequ
     // GOBERNANZA VIVA del contenedor y se guardan por `editStateToConfigRequest`
     // (PATCH), NO por el borrador — así "Guardar borrador" y "Guardar configuración"
     // no se pisan ni mezclan sus semánticas (definición versionada vs ajuste vivo).
+    // Reglas cruzadas (Req-7): viajan en la versión inmutable junto a las secciones.
+    rules: state.rules,
     sections: state.sections.map((s, si) => ({
       key: s.key,
       title: s.title.trim() || `Sección ${si + 1}`,
@@ -237,6 +247,7 @@ export function editStateToDraftRequest(state: EditState): SaveTemplateDraftRequ
         required: f.required,
         config: f.config,
         visibleWhen: f.visibleWhen,
+        computed: f.computed,
         roleIds: f.roleIds,
       })),
     })),

@@ -536,7 +536,7 @@ describe("LogEntriesService — submit", () => {
 
   it("sella effectiveAt + dimensiones y marca SUBMITTED (todas las secciones COMPLETED)", async () => {
     const update = vi.fn().mockResolvedValue({});
-    const { service, audit } = makeService({
+    const { service, audit, tx } = makeService({
       logEntry: { findFirst: vi.fn().mockResolvedValue(entry), update, create: vi.fn(), findMany: vi.fn() },
       templateVersion: { findUnique: vi.fn().mockResolvedValue(versionGraph([section("s1", [field({ key: "obs", type: "TEXT", dataType: "STRING", label: "Obs" })])])) },
       logEntryValue: { findMany: vi.fn().mockResolvedValue([{ fieldKey: "obs", value: "ok" }]) },
@@ -546,7 +546,8 @@ describe("LogEntriesService — submit", () => {
 
     await service.submit("u1", "e1", {}, ctx);
 
-    expect(update).toHaveBeenCalledWith(
+    // El sellado del submit ahora corre dentro de $transaction (estampa formulados + sella).
+    expect(tx.logEntry.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ status: "SUBMITTED", sealedAt: expect.any(Date), shiftCode: "A" }) }),
     );
     expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({ action: "logentry.submitted" }));

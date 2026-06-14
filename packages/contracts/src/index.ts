@@ -26,6 +26,10 @@ export * from "./templates/templates.js";
 // Flujos reutilizables (Fase 2.2)
 export * from "./workflows/workflows.js";
 
+// Motor de reglas de negocio: expresión segura + formulados + validación cruzada (Req-7)
+export * from "./rules/expression.js";
+export * from "./rules/rules.js";
+
 // Datos de referencia / Listas (Fase 2.x)
 export * from "./reference-data/reference-data.js";
 

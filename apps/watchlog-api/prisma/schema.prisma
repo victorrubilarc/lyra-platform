@@ -652,6 +652,10 @@ model TemplateVersion {
   // Recurrencia (rondas/turnos). Config libre validada por contrato (editor 2.3).
   recurrenceKind              RecurrenceKind @default(NONE)
   recurrenceConfig            Json?
+  // Reglas de validación CRUZADA entre campos (Req-7): array de {key,when,severity,
+  // message} validado por @lyra/contracts. Vive en la versión INMUTABLE (cambiar
+  // una regla = nueva versión auditada, GxP). Default [] = sin reglas cruzadas.
+  rules                       Json           @default("[]")
 
   publishedAt   DateTime?
   publishedById String?
@@ -720,6 +724,10 @@ model TemplateField {
   config      Json      @default("{}")
   // Visibilidad condicional (estilo `showIf` del prototipo): { fieldKey, equals }.
   visibleWhen Json?
+  // Campo FORMULADO (Req-7): { expression } (AST seguro de @lyra/contracts). Cuando
+  // está presente el campo es READ-ONLY y su valor se DERIVA/estampa al guardar
+  // (congela al sellar, GxP). null = campo tecleado normal. Versión INMUTABLE.
+  computed    Json?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 

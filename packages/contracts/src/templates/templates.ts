@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  deriveDataType,
   fieldConfigSchemaFor,
   fieldDataTypeSchema,
   fieldSemanticRoleSchema,
@@ -8,6 +9,13 @@ import {
   recurrenceKindSchema,
   visibleWhenSchema,
 } from "./field-types.js";
+import {
+  computedFieldConfigSchema,
+  crossRuleSchema,
+  templateVersionRulesSchema,
+  validateRulesDesign,
+  type FieldForRules,
+} from "../rules/rules.js";
 
 /**
  * Plantillas / Form Builder (Fase 2.1) — contratos compartidos.
@@ -114,6 +122,12 @@ export const templateFieldSchema = z.object({
   /** Config por tipo (validada contra `fieldConfigSchemaFor` al escribir). */
   config: z.record(z.unknown()),
   visibleWhen: visibleWhenSchema.nullable(),
+  /**
+   * Campo FORMULADO (Req-7): expresión que DERIVA el valor (read-only). Vive en
+   * la versión INMUTABLE (paralelo a `visibleWhen`, NO dentro de `config`).
+   * null = campo tecleado normal. El valor se estampa al guardar y congela al sellar.
+   */
+  computed: computedFieldConfigSchema.nullable(),
   /** Override por campo del permiso de la sección (vacío = hereda la sección). */
   roleIds: z.array(z.string()),
 });
@@ -146,6 +160,12 @@ export const templateVersionSchema = z.object({
   requireSignature: z.boolean(),
   recurrenceKind: recurrenceKindSchema,
   recurrenceConfig: z.unknown().nullable(),
+  /**
+   * Reglas de validación CRUZADA entre campos (Req-7) — viven en la versión
+   * INMUTABLE (cambiar una regla = nueva versión auditada, GxP). Cada regla =
+   * `{key, when, severity, message}`. Vacío = sin reglas cruzadas.
+   */
+  rules: templateVersionRulesSchema,
   publishedAt: z.string().nullable(),
   sections: z.array(templateSectionSchema),
 });
@@ -266,6 +286,8 @@ export const draftFieldInputSchema = z
     required: z.boolean().optional(),
     config: z.record(z.unknown()).optional(),
     visibleWhen: visibleWhenSchema.nullable().optional(),
+    /** Campo FORMULADO (Req-7): expresión que deriva el valor (read-only). null = tecleado. */
+    computed: computedFieldConfigSchema.nullable().optional(),
     roleIds: z.array(z.string()).max(50).optional(),
   })
   .superRefine((field, ctx) => {
@@ -275,6 +297,15 @@ export const draftFieldInputSchema = z
         code: z.ZodIssueCode.custom,
         message: `Configuración inválida para el tipo ${field.type}`,
         path: ["config"],
+      });
+    }
+    // Un campo formulado es read-only ⇒ no tiene sentido marcarlo obligatorio (el
+    // valor lo deriva el motor, no lo teclea nadie). SIGNATURE no admite fórmula.
+    if (field.computed && field.type === "SIGNATURE") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Un campo de firma no puede ser formulado",
+        path: ["computed"],
       });
     }
   });
@@ -329,6 +360,8 @@ export const saveTemplateDraftRequestSchema = z
     // coincida con su versión publicada actual.
     workflowDefinitionId: z.string().nullable().optional(),
     workflowDefinitionVersionId: z.string().nullable().optional(),
+    /** Reglas de validación CRUZADA de la versión (Req-7). Si se envía, REEMPLAZA el set. */
+    rules: z.array(crossRuleSchema).max(100).optional(),
     sections: z.array(draftSectionInputSchema).max(100),
   })
   .superRefine((body, ctx) => {
@@ -343,6 +376,34 @@ export const saveTemplateDraftRequestSchema = z
       }
       seen.add(s.key);
     });
+
+    // Motor de reglas (Req-7): valida fórmulas + reglas cruzadas de toda la versión
+    // (refs a campos existentes, cotas de expresión, sin ciclos entre formulados).
+    // Fallar en DISEÑO, nunca en llenado. La clave de campo debe ser ÚNICA en la
+    // versión para que las `var(key)` no sean ambiguas entre secciones.
+    const fieldsForRules: FieldForRules[] = [];
+    const fieldKeySeen = new Set<string>();
+    let dupKey = false;
+    body.sections.forEach((s) => {
+      s.fields.forEach((f) => {
+        if (fieldKeySeen.has(f.key)) dupKey = true;
+        fieldKeySeen.add(f.key);
+        fieldsForRules.push({ key: f.key, dataType: deriveDataType(f.type), computed: f.computed ?? null });
+      });
+    });
+    // Si hay claves de campo duplicadas a través de secciones, el análisis de
+    // referencias sería ambiguo; se exige unicidad global SOLO si hay reglas/fórmulas.
+    const hasRuleLogic = fieldsForRules.some((f) => f.computed) || (body.rules?.length ?? 0) > 0;
+    if (hasRuleLogic && dupKey) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Con campos formulados o reglas, las claves de campo deben ser únicas en toda la plantilla",
+        path: ["sections"],
+      });
+    }
+    for (const err of validateRulesDesign(fieldsForRules, body.rules ?? [])) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: err.message, path: ["rules"] });
+    }
 
     // A lo sumo un campo puede ser la "fecha efectiva del registro" por versión
     // (promueve LogEntry.effectiveAt en 2.4).

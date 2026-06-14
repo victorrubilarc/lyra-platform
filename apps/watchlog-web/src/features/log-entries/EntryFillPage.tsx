@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
@@ -20,11 +20,14 @@ import { DeferralModal } from "./DeferralModal.js";
 import { EditWindowOverrideModal, type EditWindowOverrideFields } from "./EditWindowOverrideModal.js";
 import { Button, Card, Chip, EmptyState, Spinner, useToast } from "@lyra/ui";
 import {
+  evaluateCrossRules,
   isFieldVisible,
+  recomputeComputedValues,
   validateFieldValue,
   type AvailableTransitionDto,
   type DeferralInput,
   type ExecuteTransitionRequest,
+  type FieldForRules,
   type LogEntryDetail,
   type LogEntrySectionStateDto,
   type TemplateFieldDto,
@@ -130,6 +133,22 @@ export function EntryFillPage() {
   }, [entry?.id]);
 
   const setValue = (key: string, value: unknown) => setDraft((p) => ({ ...p, [key]: value }));
+
+  // Foto con los campos FORMULADOS recomputados EN VIVO (Req-7), con la misma
+  // función pura del backend (el servidor manda al guardar; esto da feedback).
+  const display = useMemo(() => {
+    if (!entry) return draft;
+    const fields: FieldForRules[] = entry.version.sections.flatMap((s) =>
+      s.fields.map((f) => ({ key: f.key, dataType: f.dataType, computed: f.computed })),
+    );
+    return recomputeComputedValues(fields, draft);
+  }, [entry, draft]);
+
+  // Reglas cruzadas que dispararían con la foto actual (ERROR bloquea / WARN informa).
+  const ruleHits = useMemo(
+    () => (entry ? evaluateCrossRules(entry.version.rules, display) : { errors: [], warnings: [] }),
+    [entry, display],
+  );
 
   if (isLoading) {
     return (
@@ -498,11 +517,27 @@ export function EntryFillPage() {
         </div>
       )}
 
+      {/* Reglas de negocio (Req-7): disparos cruzados con la foto actual. */}
+      {(ruleHits.errors.length > 0 || ruleHits.warnings.length > 0) && (
+        <div className={styles.ruleHits}>
+          {ruleHits.errors.map((e) => (
+            <div key={`e-${e.ruleKey}`} className={styles.ruleHitError}>
+              <TriangleAlert size={14} /> {e.message}
+            </div>
+          ))}
+          {ruleHits.warnings.map((w) => (
+            <div key={`w-${w.ruleKey}`} className={styles.ruleHitWarn}>
+              <AlertTriangle size={14} /> {w.message}
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Secciones */}
       {entry.version.sections.map((section) => {
         const st = stateBySection.get(section.key);
         const editable = Boolean(st?.editable) && isDraft;
-        const visible = section.fields.filter((f) => isFieldVisible(f.visibleWhen, draft));
+        const visible = section.fields.filter((f) => isFieldVisible(f.visibleWhen, display));
         const restrictedKeys = new Set(st?.readOnlyFieldKeys ?? []);
         return (
           <Card key={section.key} className={styles.section}>
@@ -532,11 +567,15 @@ export function EntryFillPage() {
             <div>
               {visible.map((f) => {
                 const restricted = restrictedKeys.has(f.key);
-                const fieldEditable = editable && !restricted;
-                const errs = fieldEditable ? validateFieldValue(fieldForValidation(f), draft[f.key], { allowedCodes: inlineCodes(f.config) }).errors : [];
+                // Un campo formulado es read-only SIEMPRE (valor derivado por el servidor).
+                const fieldEditable = editable && !restricted && !f.computed;
+                const errs =
+                  fieldEditable && !f.computed
+                    ? validateFieldValue(fieldForValidation(f), draft[f.key], { allowedCodes: inlineCodes(f.config) }).errors
+                    : [];
                 return (
                   <div key={f.key}>
-                    <FieldControl field={f} value={draft[f.key]} onChange={(v) => setValue(f.key, v)} readOnly={!fieldEditable} invalid={errs.length > 0} />
+                    <FieldControl field={f} value={display[f.key]} onChange={(v) => setValue(f.key, v)} readOnly={!fieldEditable} invalid={errs.length > 0} />
                     {restricted && editable && (
                       <div className={styles.lockedNote}>
                         <Lock size={12} /> {t("logbook.fill.fieldRestricted")}

@@ -234,6 +234,38 @@ forks resueltos con la opción recomendada (DECISIONS 2026-06-12). Rama `feat/ve
   EDIT_WINDOW_EXPIRED; MFA exigido sin enrolar ⇒ rechazo; entrada vigente ⇒ huella + canal normal intacto). Datos de
   prueba creados y LIMPIADOS (conteos en 0; AuditLog inmutable conserva el rastro). **Pendiente: smoke VISUAL** (§4).
 
+## Hecho en Motor de reglas de negocio (Req-7 — primer corte)
+
+**Motor de reglas — PRIMER CORTE ✅ (2026-06-14, `feat/motor-reglas` → `main`).** Núcleo declarativo + expresión segura
+(NO acciones a otros módulos, NO límites dinámicos, NO DMN). 5 forks resueltos con el dueño (DECISIONS 2026-06-14).
+
+- **Contracts (`@lyra/contracts/rules`)**: **AST tipo JSONLogic** con lista blanca de operadores + evaluador **PURO** (sin
+  `eval`, sin dependencia) en `rules/expression.ts` — aritmética (÷0⇒vacío), agregación (ignora vacíos), comparación/lógica
+  (propagan null), `if/coalesce/isEmpty`, `dateDiff/now`; cotas de nodos/profundidad; `collectVarRefs`. En `rules/rules.ts`:
+  `computedFieldConfigSchema` (campo formulado) + `crossRuleSchema {key,when,severity,message}`; `topoSortComputed` (Kahn +
+  detección de ciclo), `validateRulesDesign` (refs/ciclos/cotas), `recomputeComputedValues` (orden topológico, coerce por
+  dataType, servidor autoritativo), `evaluateCrossRules` (ERROR bloquea / WARN informa / omite si falta campo). **Fuente única
+  back↔front** (extiende `validateFieldValue`). `TemplateField.computed` + `TemplateVersion.rules` en la versión INMUTABLE;
+  validación de diseño en el `superRefine` del borrador. **+24 tests (contracts 168→192).**
+- **Migración aditiva** `20260614120000_add_business_rules`: `TemplateField.computed` (JSONB?) + `TemplateVersion.rules`
+  (JSONB default `[]`). Sin backfill (cero ruptura).
+- **API**: `TemplatesService` persiste/clona `computed`+`rules` (saveDraft/ensureDraft) y los expone (mapVersion).
+  `LogEntriesService` recomputa los formulados (autoritativo) en saveSection/submit/executeTransition y los **estampa**
+  (`stampComputedValues`: banda de umbral + `LogEntryFieldChange` reason=COMPUTED) mientras la entrada no esté sellada
+  (congela al sellar). **Rechaza** escritura de cliente a formulados (read-only). **Validación CRUZADA**: ERROR bloquea
+  completar/enviar/avanzar, WARN informa; el estampado va ANTES de la firma (snapshot §11.70 coincide con BD). **Sin permisos
+  nuevos — catálogo 59.** Tests API **228** (ajustado el test de submit: sella dentro de `$transaction`).
+- **Web**: `ExpressionEditor` recursivo (AST seguro + render infijo); toggle "campo formulado" + editor en `BuilderConfigPanel`;
+  sub-pestaña **Reglas** en Diseño (`RulesEditor`); `FieldControl` muestra formulados **read-only** con badge "Calculado";
+  `PreviewForm` y `EntryFillPage` **recomputan EN VIVO** con la misma fn pura del backend + banner de disparos de reglas.
+  i18n es-CL + CSS premium. typecheck/lint(0)/build verdes.
+- **Smoke en vivo `scripts/smoke-business-rules.py` 20/20**: diseño rechaza ciclo/ref inexistente (400×3); publicada expone
+  regla+computed; **÷0 ⇒ eficiencia vacía**; consumo derivado por el servidor = 15; **formulado read-only ⇒ 400**; el cálculo
+  del **servidor manda** (eficiencia=0.4); **umbral ISA-18.2 sobre el valor CALCULADO** (worstThresholdBand WARN); **regla
+  cruzada salida>entrada BLOQUEA completar** (400 con su mensaje); con valores válidos completa 200; limpieza por ID = 0.
+  **Pendiente: smoke VISUAL del dueño** (§4). **Siguiente corte:** límites dinámicos · acciones (incidencia→Fase 4 /
+  notificación) · lookups de listas · DMN.
+
 ## Estado por fase
 
 | Fase | Módulo | Estado |

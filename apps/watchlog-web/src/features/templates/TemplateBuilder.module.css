@@ -727,3 +727,154 @@
 .previewEmpty {
   color: var(--color-text-muted);
 }
+
+/* === Motor de reglas (Req-7): campo formulado + editor de expresión + reglas === */
+
+.computedBox {
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--color-surface-2);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.computedBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-accent, #6366f1);
+  background: color-mix(in srgb, var(--color-accent, #6366f1) 14%, transparent);
+  border-radius: 999px;
+  padding: 2px 7px;
+  vertical-align: middle;
+}
+
+/* Editor recursivo de expresión */
+.exprEditor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.exprOperand {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.exprRow {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.exprKindSel {
+  max-width: 130px;
+}
+.exprArgs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-left: 12px;
+  border-left: 2px solid var(--color-border);
+  margin-left: 4px;
+}
+.exprArgRow {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+}
+.exprAddArg {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  font-size: 12px;
+  color: var(--color-accent, #6366f1);
+  background: transparent;
+  border: 1px dashed var(--color-border-active, rgba(99, 102, 241, 0.4));
+  border-radius: 8px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.exprAddArg:hover {
+  background: color-mix(in srgb, var(--color-accent, #6366f1) 8%, transparent);
+}
+.exprPreview {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 7px 10px;
+  word-break: break-word;
+}
+
+/* Panel de reglas cruzadas */
+.rulesPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 880px;
+}
+.rulesIntro {
+  padding: 16px 18px;
+}
+.rulesIntroTitle {
+  font-family: "Sora", sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  margin-bottom: 4px;
+}
+.ruleCard {
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ruleHeader {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.ruleSeverityIcon {
+  display: inline-flex;
+}
+.ruleKeyInput {
+  max-width: 220px;
+  font-family: ui-monospace, Menlo, monospace;
+}
+
+/* Disparos de reglas en la vista previa del builder */
+.previewRuleHits {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.previewRuleError,
+.previewRuleWarn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 10px;
+  padding: 9px 13px;
+  border: 1px solid;
+}
+.previewRuleError {
+  color: var(--color-error, #ef4444);
+  background: color-mix(in srgb, var(--color-error, #ef4444) 12%, transparent);
+  border-color: color-mix(in srgb, var(--color-error, #ef4444) 40%, transparent);
+}
+.previewRuleWarn {
+  color: var(--color-warning, #f59e0b);
+  background: color-mix(in srgb, var(--color-warning, #f59e0b) 12%, transparent);
+  border-color: color-mix(in srgb, var(--color-warning, #f59e0b) 40%, transparent);
+}

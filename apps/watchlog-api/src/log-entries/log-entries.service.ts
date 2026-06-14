@@ -7,11 +7,14 @@ import {
 } from "@nestjs/common";
 import type {
   AvailableTransitionDto,
+  ComputedFieldConfig,
   CreateLogEntryRequest,
+  CrossRule,
   EditWindowAnchor,
   EditWindowInfo,
   EquipmentMode,
   ExecuteTransitionRequest,
+  FieldForRules,
   FieldForValidation,
   LogEntryDetail,
   LogEntrySectionState,
@@ -34,10 +37,12 @@ import {
   availableTransitionsFor,
   canonicalSignaturePayload,
   editWindowDeadline,
+  evaluateCrossRules,
   isEditWindowExpired,
   isEmptyValue,
   isFieldVisible,
   isSectionEditableInState,
+  recomputeComputedValues,
   resolveEditWindow,
   resolveEffectiveAt,
   thresholdBandFor,
@@ -154,6 +159,8 @@ interface FieldDef {
   required: boolean;
   config: Record<string, unknown>;
   visibleWhen: { fieldKey: string; equals: string | number | boolean } | null;
+  /** Campo FORMULADO (Req-7): fórmula que deriva el valor (read-only). null = tecleado. */
+  computed: ComputedFieldConfig | null;
   /** Override de roles por campo (vacío = hereda la sección). */
   roleIds: string[];
 }
@@ -656,10 +663,15 @@ export class LogEntriesService {
 
     const fieldsByKey = new Map(sectionDef.fields.map((f) => [f.key, this.toFieldDef(f, sectionKey)]));
 
-    // Solo se aceptan campos de ESTA sección.
+    // Solo se aceptan campos de ESTA sección. Un campo FORMULADO es de SOLO LECTURA:
+    // su valor lo deriva el servidor (no se confía en el cliente), nunca se teclea.
     for (const input of dto.values) {
-      if (!fieldsByKey.has(input.fieldKey)) {
+      const def = fieldsByKey.get(input.fieldKey);
+      if (!def) {
         throw new BadRequestException(`El campo "${input.fieldKey}" no pertenece a la sección`);
+      }
+      if (def.computed) {
+        throw new BadRequestException(`El campo "${def.label}" es formulado (solo lectura): no admite valor`);
       }
     }
 
@@ -681,6 +693,13 @@ export class LogEntriesService {
     const valuesByKey: Record<string, unknown> = {};
     for (const v of existing) valuesByKey[v.fieldKey] = (v.value ?? null) as unknown;
     for (const input of dto.values) valuesByKey[input.fieldKey] = input.value ?? null;
+
+    // Motor de reglas (Req-7): el servidor recomputa los campos FORMULADOS desde
+    // los valores persistidos (autoritativo) y los refleja en la foto antes de
+    // validar/sellar/firmar — para que la validación cruzada, el umbral y la fecha
+    // efectiva vean el valor calculado. Persistirlos ocurre dentro de la tx.
+    const evalNow = new Date();
+    Object.assign(valuesByKey, recomputeComputedValues(this.toFieldsForRules(version), valuesByKey, { now: evalNow }));
 
     // Guarda de período (2.7.1): la effectiveAt que ESTE guardado dejaría (la
     // congelada si ya está sellada; la recalculada de los valores si sigue en
@@ -719,11 +738,20 @@ export class LogEntriesService {
 
     if (dto.markComplete) {
       for (const def of fieldsByKey.values()) {
-        if (!def.required) continue;
+        // Un campo formulado no se teclea (read-only) ⇒ "obligatorio" no aplica.
+        if (!def.required || def.computed) continue;
         if (!isFieldVisible(def.visibleWhen, valuesByKey)) continue;
         if (isEmptyValue(valuesByKey[def.key])) errors.push(`${def.label}: obligatorio`);
       }
     }
+
+    // Validación CRUZADA entre campos (Req-7): ERROR bloquea (como los obligatorios,
+    // solo al COMPLETAR la sección); WARN informa. Una regla con un campo
+    // referenciado vacío se OMITE (no se puede evaluar todavía). Evaluada sobre la
+    // foto recomputada (puede referenciar valores formulados).
+    const cross = evaluateCrossRules(this.versionRules(version), valuesByKey, { now: evalNow });
+    if (dto.markComplete) errors.push(...cross.errors.map((e) => e.message));
+    warnings.push(...cross.warnings.map((w) => w.message));
     if (errors.length > 0) {
       throw new BadRequestException({ message: "La sección tiene errores de validación", errors });
     }
@@ -780,6 +808,13 @@ export class LogEntriesService {
             changedAt: now,
           },
         });
+      }
+
+      // Estampa los campos FORMULADOS recomputados (Req-7) mientras la entrada NO
+      // esté sellada (recalcula en DRAFT, congela al sellar — GxP). Va ANTES de la
+      // firma para que el snapshot firmado coincida con lo persistido (§11.70 verify).
+      if (!entry.sealedAt) {
+        await this.stampComputedValues(tx, id, version, valuesByKey, userId, now);
       }
 
       // Snapshot canónico de TODOS los valores actuales (incluye los recién guardados).
@@ -870,6 +905,9 @@ export class LogEntriesService {
 
     const version = await this.loadVersion(entry.templateVersionId);
     const valuesByKey = await this.loadValuesByKey(id);
+    // Recompute autoritativo de los formulados antes de validar/sellar (Req-7).
+    const evalNow = new Date();
+    Object.assign(valuesByKey, recomputeComputedValues(this.toFieldsForRules(version), valuesByKey, { now: evalNow }));
 
     // Enviar SELLA el registro completo (commit GxP): la validación es OBJETIVA
     // (todas las secciones, no solo las del que envía) y exige cada sección con
@@ -879,6 +917,8 @@ export class LogEntriesService {
     const inCurrentState = (section: VersionWithGraph["sections"][number]): boolean =>
       isSectionEditableInState(section.editableInStateKey, entry.currentStateKey);
     const errors = await this.collectCompletionErrors(version, valuesByKey, inCurrentState);
+    // Validación CRUZADA (Req-7): los ERROR bloquean el sellado del registro completo.
+    errors.push(...evaluateCrossRules(this.versionRules(version), valuesByKey, { now: evalNow }).errors.map((e) => e.message));
     const sectionRows = await this.prisma.logEntrySection.findMany({ where: { logEntryId: id } });
     for (const section of version.sections) {
       if (!inCurrentState(section) || section.fields.length === 0) continue;
@@ -897,9 +937,14 @@ export class LogEntriesService {
     // Guarda de ventana (2.7.2): sellar tarde un borrador abandonado es exactamente
     // la finalización tardía que GxP exige flaguear (override con motivo).
     const windowOverride = await this.assertEditWindowWritable(entry, userId, dto);
-    await this.prisma.logEntry.update({
-      where: { id },
-      data: { status: "SUBMITTED", sealedAt, ...seal, updatedById: userId },
+    await this.prisma.$transaction(async (tx) => {
+      // Estampa los formulados (última vez) ANTES de congelar: la entrada aún no
+      // está sellada en este punto, así DB == valores validados al sellar.
+      await this.stampComputedValues(tx, id, version, valuesByKey, userId, sealedAt);
+      await tx.logEntry.update({
+        where: { id },
+        data: { status: "SUBMITTED", sealedAt, ...seal, updatedById: userId },
+      });
     });
     if (windowOverride) {
       await this.auditEditWindowOverride(ctx, id, "submitted", windowOverride);
@@ -1151,6 +1196,9 @@ export class LogEntriesService {
 
     const version = await this.loadVersion(entry.templateVersionId);
     const valuesByKey = await this.loadValuesByKey(id);
+    // Recompute autoritativo de los formulados antes de validar/sellar (Req-7).
+    const evalNow = new Date();
+    Object.assign(valuesByKey, recomputeComputedValues(this.toFieldsForRules(version), valuesByKey, { now: evalNow }));
     const sectionRows = await this.prisma.logEntrySection.findMany({ where: { logEntryId: id } });
     const fromStateKey = entry.currentStateKey;
     const editableInFrom = (section: VersionWithGraph["sections"][number]): boolean =>
@@ -1180,6 +1228,8 @@ export class LogEntriesService {
     // (d) completitud: las secciones editables en el estado de ORIGEN deben estar
     // marcadas COMPLETED y sin errores de validación (defensa en profundidad).
     const errors = await this.collectCompletionErrors(version, valuesByKey, editableInFrom);
+    // Validación CRUZADA (Req-7): los ERROR bloquean el avance del flujo.
+    errors.push(...evaluateCrossRules(this.versionRules(version), valuesByKey, { now: evalNow }).errors.map((e) => e.message));
     for (const section of version.sections) {
       if (!editableInFrom(section) || section.fields.length === 0) continue;
       const row = sectionRows.find((r) => r.sectionKey === section.key);
@@ -1208,6 +1258,11 @@ export class LogEntriesService {
     const nextStatus = toState.isFinal ? "SUBMITTED" : "DRAFT";
 
     await this.prisma.$transaction(async (tx) => {
+      // Estampa los formulados recomputados ANTES de la firma/sellado (Req-7): el
+      // snapshot firmado debe coincidir con lo persistido (§11.70). Solo en DRAFT.
+      if (!entry.sealedAt) {
+        await this.stampComputedValues(tx, id, version, valuesByKey, userId, now);
+      }
       let signatureId: string | null = null;
       if (transition.requireSignature && reauth) {
         const sig = await this.createSignature(tx, {
@@ -1499,8 +1554,90 @@ export class LogEntriesService {
       required: f.required,
       config: upgradeFieldConfig(f.type, (f.config ?? {}) as Record<string, unknown>),
       visibleWhen: (f.visibleWhen as FieldDef["visibleWhen"]) ?? null,
+      computed: (f.computed as ComputedFieldConfig | null) ?? null,
       roleIds: f.roles.map((r) => r.roleId),
     };
+  }
+
+  /** Lista plana de campos de la versión para el motor de reglas (key/dataType/computed). */
+  private toFieldsForRules(version: VersionWithGraph): FieldForRules[] {
+    const out: FieldForRules[] = [];
+    for (const s of version.sections) {
+      for (const f of s.fields) {
+        out.push({ key: f.key, dataType: f.dataType, computed: (f.computed as ComputedFieldConfig | null) ?? null });
+      }
+    }
+    return out;
+  }
+
+  /** Reglas de validación cruzada de la versión congelada (Req-7). [] = sin reglas. */
+  private versionRules(version: VersionWithGraph): CrossRule[] {
+    return (version.rules as CrossRule[] | null) ?? [];
+  }
+
+  /**
+   * Recomputa los campos FORMULADOS desde `valuesByKey` (servidor AUTORITATIVO) y
+   * PERSISTE los que cambiaron en `LogEntryValue` (banda de umbral estampada) con
+   * su huella en `LogEntryFieldChange` (reason COMPUTED, actor = quien gatilló el
+   * cambio — ALCOA+: el humano teclea insumos, el sistema deriva). Devuelve el
+   * mapa recomputado. Solo se llama mientras la entrada NO esté sellada (congela al sellar).
+   */
+  private async stampComputedValues(
+    tx: Prisma.TransactionClient,
+    id: string,
+    version: VersionWithGraph,
+    valuesByKey: Record<string, unknown>,
+    userId: string,
+    now: Date,
+  ): Promise<void> {
+    const fieldByKey = new Map<string, { def: FieldDef }>();
+    for (const s of version.sections) {
+      for (const f of s.fields) {
+        if (f.computed) fieldByKey.set(f.key, { def: this.toFieldDef(f, s.key) });
+      }
+    }
+    if (fieldByKey.size === 0) return;
+
+    const recomputed = recomputeComputedValues(this.toFieldsForRules(version), valuesByKey, { now });
+    const computedKeys = [...fieldByKey.keys()];
+    const currentRows = await tx.logEntryValue.findMany({
+      where: { logEntryId: id, fieldKey: { in: computedKeys } },
+    });
+    const currentByKey = new Map(currentRows.map((r) => [r.fieldKey, (r.value ?? null) as unknown]));
+
+    for (const key of computedKeys) {
+      const { def } = fieldByKey.get(key)!;
+      const after = recomputed[key] ?? null;
+      const before = currentByKey.get(key) ?? null;
+      // Refleja el valor recomputado también en el mapa en memoria (snapshot de firma).
+      valuesByKey[key] = after;
+      if (JSON.stringify(before) === JSON.stringify(after)) continue;
+      const band = thresholdBandFor(def, after);
+      await tx.logEntryValue.upsert({
+        where: { logEntryId_fieldKey: { logEntryId: id, fieldKey: key } },
+        create: {
+          logEntryId: id,
+          sectionKey: def.sectionKey,
+          fieldKey: key,
+          dataType: def.dataType,
+          value: this.toJson(after),
+          thresholdBand: band,
+          updatedById: userId,
+        },
+        update: { value: this.toJson(after), thresholdBand: band, updatedById: userId },
+      });
+      await tx.logEntryFieldChange.create({
+        data: {
+          logEntryId: id,
+          fieldKey: key,
+          before: this.toJson(before),
+          after: this.toJson(after),
+          reason: "COMPUTED",
+          changedById: userId,
+          changedAt: now,
+        },
+      });
+    }
   }
 
   private toFieldDtoLite(f: VersionWithGraph["sections"][number]["fields"][number]) {
@@ -1717,6 +1854,7 @@ export class LogEntriesService {
       requireSignature: version.requireSignature,
       recurrenceKind: version.recurrenceKind,
       recurrenceConfig: version.recurrenceConfig ?? null,
+      rules: (version.rules as TemplateVersionDto["rules"]) ?? [],
       publishedAt: version.publishedAt?.toISOString() ?? null,
       sections: version.sections.map((s) => ({
         id: s.id,
@@ -1739,6 +1877,7 @@ export class LogEntriesService {
           order: f.order,
           config: upgradeFieldConfig(f.type, (f.config ?? {}) as Record<string, unknown>),
           visibleWhen: (f.visibleWhen as TemplateVersionDto["sections"][number]["fields"][number]["visibleWhen"]) ?? null,
+          computed: (f.computed as TemplateVersionDto["sections"][number]["fields"][number]["computed"]) ?? null,
           roleIds: f.roles.map((r) => r.roleId),
         })),
       })),
