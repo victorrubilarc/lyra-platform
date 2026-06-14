@@ -9,7 +9,12 @@ import styles from "./FieldGrid.module.css";
  * (`span` 1..12). Presentación pura: no toca validación ni datos.
  */
 export function FieldGrid({ children }: { children: ReactNode }) {
-  return <div className={styles.grid}>{children}</div>;
+  // `data-field-grid`: ancla para el divisor del builder (mide las 12 columnas).
+  return (
+    <div className={styles.grid} data-field-grid>
+      {children}
+    </div>
+  );
 }
 
 /** Celda de la grilla: ocupa `span` columnas de 12 (default 12 = ancho completo). */

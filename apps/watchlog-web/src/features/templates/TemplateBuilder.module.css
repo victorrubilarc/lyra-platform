@@ -603,8 +603,17 @@
   border-color: var(--color-accent-primary);
   box-shadow: 0 0 0 1px var(--color-accent-primary);
 }
+/* Placeholder: el campo arrastrado queda atenuado en su sitio; la copia "viva"
+   la dibuja el DragOverlay (cardOverlay). */
 .builderCardDragging {
-  opacity: 0.4;
+  opacity: 0.35;
+}
+/* Copia que sigue al cursor (DragOverlay de dnd-kit): elevada, sin fantasma gris. */
+.cardOverlay {
+  cursor: grabbing;
+  box-shadow: 0 18px 40px -12px rgba(6, 6, 26, 0.55), 0 0 0 1px var(--color-accent-primary);
+  background: var(--color-surface-2, #111827);
+  transform: scale(1.01);
 }
 /* Indicadores de soltado (auto-layout): barra vertical = compartir fila (al lado),
    horizontal = fila nueva (arriba/abajo). El color del acento marca dónde caerá. */

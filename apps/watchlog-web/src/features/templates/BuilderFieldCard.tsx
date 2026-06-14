@@ -1,22 +1,26 @@
-import { useEffect, useRef, type DragEvent as ReactDragEvent, type PointerEvent as ReactPointerEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useEffect, useRef, type CSSProperties, type PointerEvent as ReactPointerEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { GripVertical } from "lucide-react";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { GRID_COLUMNS } from "@lyra/contracts";
 import { FieldControl } from "./FieldControl.js";
 import { FieldToolbar } from "./FieldToolbar.js";
 import { type EditField } from "./builder-model.js";
+import gridStyles from "./FieldGrid.module.css";
 import styles from "./TemplateBuilder.module.css";
 
 const clampSpan = (n: number) => Math.min(Math.max(Math.round(n), 1), GRID_COLUMNS);
 
-/** Zona de soltado derivada de la posición del puntero sobre la card. */
+/** Zona de soltado derivada de la posición del campo arrastrado sobre el destino. */
 export type DropMode = "beside-left" | "beside-right" | "row-before" | "row-after";
 
 interface BuilderFieldCardProps {
   field: EditField;
+  /** Sección a la que pertenece (para el contexto de arrastre dnd-kit). */
+  sUid: string;
   active: boolean;
   canEdit: boolean;
-  dragging: boolean;
   /** Zona de soltado activa para ESTA card (indicador), o null. */
   dropMode: DropMode | null;
   /** Tiene vecino a la derecha en su fila ⇒ el borde funciona como divisor. */
@@ -31,33 +35,23 @@ interface BuilderFieldCardProps {
   onMoreOptions: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
-  onDragStart: () => void;
-  onDragEnd: () => void;
-  onDropHint: (mode: DropMode) => void;
-  onDrop: (mode: DropMode) => void;
-}
-
-/** Deriva la zona de soltado de la posición del puntero dentro de la card. */
-function zoneFromPointer(e: ReactDragEvent<HTMLDivElement>): DropMode {
-  const r = e.currentTarget.getBoundingClientRect();
-  const y = (e.clientY - r.top) / r.height;
-  if (y < 0.28) return "row-before";
-  if (y > 0.72) return "row-after";
-  return (e.clientX - r.left) / r.width < 0.5 ? "beside-left" : "beside-right";
 }
 
 /**
- * Card de un campo en el LIENZO WYSIWYG (Fase 2.1.5). Muestra el control REAL y se
- * acomoda por ARRASTRE (auto-layout estilo Notion): soltar al lado ⇒ comparte fila
- * (ancho repartido solo), soltar arriba/abajo ⇒ fila propia. El borde derecho es un
- * DIVISOR (transfiere ancho al vecino, manteniendo la fila). El usuario nunca elige
- * "columnas". Builder de escritorio (DnD nativo + pointer-events, sin librería).
+ * Card de un campo en el LIENZO WYSIWYG (Fase 2.1.6). El arrastre usa **dnd-kit**
+ * (pointer/teclado) en vez del DnD nativo: el nodo SORTABLE es la celda de la grilla
+ * (para que el reflow de los vecinos se anime), y el área activadora es la tarjeta
+ * completa — se agarra en casi cualquier parte (el rótulo y el borde-divisor quedan
+ * exentos para poder escribir y redimensionar). El ancho se DERIVA del arrastre
+ * (auto-layout estilo Notion/Canva): soltar al lado ⇒ comparte fila (ancho repartido
+ * solo), soltar arriba/abajo ⇒ fila propia. El borde derecho es un DIVISOR (transfiere
+ * ancho al vecino). El usuario nunca elige "columnas".
  */
 export function BuilderFieldCard({
   field,
+  sUid,
   active,
   canEdit,
-  dragging,
   dropMode,
   resizable,
   onSelect,
@@ -70,13 +64,15 @@ export function BuilderFieldCard({
   onMoreOptions,
   onMoveUp,
   onMoveDown,
-  onDragStart,
-  onDragEnd,
-  onDropHint,
-  onDrop,
 }: BuilderFieldCardProps) {
   const { t } = useTranslation();
   const labelRef = useRef<HTMLTextAreaElement>(null);
+
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
+    id: field.uid,
+    data: { type: "field", sUid, fUid: field.uid },
+    disabled: !canEdit,
+  });
 
   useEffect(() => {
     const el = labelRef.current;
@@ -97,7 +93,7 @@ export function BuilderFieldCard({
   const onHandleDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (!canEdit || !resizable) return;
     e.preventDefault();
-    e.stopPropagation();
+    e.stopPropagation(); // no inicia arrastre de la card
     const handle = e.currentTarget;
     handle.setPointerCapture(e.pointerId);
     const move = (ev: PointerEvent) => {
@@ -124,83 +120,107 @@ export function BuilderFieldCard({
     }
   };
 
+  const cols = clampSpan(field.colSpan);
+  const cellStyle: CSSProperties = {
+    "--col-span": cols,
+    transform: CSS.Translate.toString(transform),
+    transition,
+    zIndex: isDragging ? 2 : undefined,
+  } as CSSProperties;
+
+  const cardCls =
+    `${active ? styles.builderCardActive : styles.builderCard}` +
+    `${isDragging ? " " + styles.builderCardDragging : ""}` +
+    `${dropMode ? " " + styles[`drop_${dropMode}`] : ""}`;
+
   return (
-    <div
-      className={`${active ? styles.builderCardActive : styles.builderCard}${dragging ? " " + styles.builderCardDragging : ""}${dropMode ? " " + styles[`drop_${dropMode}`] : ""}`}
-      draggable={canEdit}
-      onClick={(e) => {
-        e.stopPropagation();
-        onSelect();
-      }}
-      onDragStart={(e) => {
-        const tgt = e.target as HTMLElement;
-        if (!tgt.dataset.dragHandle) {
-          e.preventDefault();
-          return;
-        }
-        onDragStart();
-      }}
-      onDragEnd={onDragEnd}
-      onDragOver={(e) => {
-        if (!canEdit) return;
-        e.preventDefault();
-        onDropHint(zoneFromPointer(e));
-      }}
-      onDrop={(e) => {
-        e.preventDefault();
-        onDrop(zoneFromPointer(e));
-      }}
-    >
-      <span className={styles.cardGrip} data-drag-handle="1" aria-hidden title={t("templates.builder.dragToReorder")}>
+    // El nodo SORTABLE es la celda de la grilla (posición + reflow animado).
+    <div ref={setNodeRef} className={gridStyles.cell} style={cellStyle}>
+      {/* La tarjeta completa es el área activadora del arrastre (se agarra donde sea). */}
+      <div
+        ref={setActivatorNodeRef}
+        className={cardCls}
+        {...attributes}
+        {...listeners}
+        onClick={(e) => {
+          e.stopPropagation();
+          onSelect();
+        }}
+      >
+        <span className={styles.cardGrip} aria-hidden title={t("templates.builder.dragToReorder")}>
+          <GripVertical size={15} />
+        </span>
+
+        {active && (
+          <FieldToolbar
+            required={field.required}
+            computed={!!field.computed}
+            canEdit={canEdit}
+            onToggleRequired={onToggleRequired}
+            onDuplicate={onDuplicate}
+            onDelete={onDelete}
+            onMoreOptions={onMoreOptions}
+            onMoveUp={onMoveUp}
+            onMoveDown={onMoveDown}
+          />
+        )}
+
+        <div className={styles.cardBody}>
+          <textarea
+            ref={labelRef}
+            className={styles.inlineLabel}
+            value={field.label}
+            rows={1}
+            disabled={!canEdit}
+            aria-label={t("templates.builder.fieldLabel")}
+            onPointerDown={(e) => e.stopPropagation()} // editar el rótulo, no arrastrar
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => onLabel(e.target.value)}
+          />
+          <div className={styles.cardControl} aria-hidden>
+            <FieldControl field={field} value={undefined} onChange={() => undefined} />
+          </div>
+        </div>
+
+        {/* Divisor (borde derecho): solo si comparte fila con un vecino a la derecha. */}
+        {resizable && (
+          <div
+            data-resize-handle="1"
+            className={styles.cardResize}
+            role="slider"
+            tabIndex={canEdit ? 0 : -1}
+            aria-label={t("templates.builder.resizeField", { cols: field.colSpan })}
+            aria-valuemin={1}
+            aria-valuemax={GRID_COLUMNS}
+            aria-valuenow={field.colSpan}
+            onPointerDown={onHandleDown}
+            onKeyDown={onHandleKey}
+            onClick={(e) => e.stopPropagation()}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Vista NO interactiva de la tarjeta para el `DragOverlay` de dnd-kit: es la copia
+ * que "sigue al cursor" mientras arrastras (sin fantasma gris del navegador).
+ */
+export function BuilderFieldOverlay({ field }: { field: EditField }) {
+  return (
+    <div className={`${styles.builderCardActive} ${styles.cardOverlay}`}>
+      <span className={styles.cardGrip} aria-hidden>
         <GripVertical size={15} />
       </span>
-
-      {active && (
-        <FieldToolbar
-          required={field.required}
-          computed={!!field.computed}
-          canEdit={canEdit}
-          onToggleRequired={onToggleRequired}
-          onDuplicate={onDuplicate}
-          onDelete={onDelete}
-          onMoreOptions={onMoreOptions}
-          onMoveUp={onMoveUp}
-          onMoveDown={onMoveDown}
-        />
-      )}
-
       <div className={styles.cardBody}>
-        <textarea
-          ref={labelRef}
-          className={styles.inlineLabel}
-          value={field.label}
-          rows={1}
-          disabled={!canEdit}
-          aria-label={t("templates.builder.fieldLabel")}
-          onClick={(e) => e.stopPropagation()}
-          onChange={(e) => onLabel(e.target.value)}
-        />
+        <div className={styles.inlineLabel} style={{ whiteSpace: "pre-wrap" }}>
+          {field.label}
+        </div>
         <div className={styles.cardControl} aria-hidden>
           <FieldControl field={field} value={undefined} onChange={() => undefined} />
         </div>
       </div>
-
-      {/* Divisor (borde derecho): solo si comparte fila con un vecino a la derecha. */}
-      {resizable && (
-        <div
-          data-resize-handle="1"
-          className={styles.cardResize}
-          role="slider"
-          tabIndex={canEdit ? 0 : -1}
-          aria-label={t("templates.builder.resizeField", { cols: field.colSpan })}
-          aria-valuemin={1}
-          aria-valuemax={GRID_COLUMNS}
-          aria-valuenow={field.colSpan}
-          onPointerDown={onHandleDown}
-          onKeyDown={onHandleKey}
-          onClick={(e) => e.stopPropagation()}
-        />
-      )}
     </div>
   );
 }
