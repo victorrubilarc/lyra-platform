@@ -5,7 +5,12 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-12** (**Fase 2.8.0.2 Modo de equipo por PLANTILLA ✅** — gobernanza del objeto de referencia EAM:
+> actualización: **2026-06-14** (**Fase 2.8.2 VOID de borradores + ruta de edición ✅** — `feat/void-edicion`: `status=VOID`
+> con motivo ≥5 auditado [NO `deletedAt`], autorización ownership + permiso nuevo `logentry:void` para ajenas [catálogo
+> **59→60**], `buildWhere` excluye VOID por defecto [recuperable con `?status=VOID`], evento timeline VOIDED, banner en
+> visor/llenado, **ruta de edición dedicada `/bitacoras/:id/editar`**. Cierra la deuda (b)(c) de 2.8.2 [la (a) ya estaba].
+> Contracts 193 · API 234 · smoke 17/17. **Falta:** VOID GxP de entradas SELLADAS [firma §11.200 + transición inversa,
+> con 2.5(a)]. Anterior: **Fase 2.8.0.2 Modo de equipo por PLANTILLA ✅** — gobernanza del objeto de referencia EAM:
 > enum `EquipmentMode` `NONE|OPTIONAL|SUGGESTED|REQUIRED` en `Template` [contenedor mutable, default OPTIONAL = cero ruptura];
 > backend AUTORIZA REQUIRED/NONE en `create`; `eligibleNodes` expone el modo; control en `TemplateBuilder`. Sin permisos
 > nuevos [catálogo 59]. Tests contracts 151 · API 216 · smoke 17/17. 6 forks en DECISIONS. Pendiente: smoke VISUAL [§4].
@@ -84,8 +89,9 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Fase 2.8.1c Peek + facetas + review-by-exception + Mi turno** (`/facets` conteos de hermanos + `/my-shift` + `exceptionsOnly` + `FacetsPanel`/`PeekDrawer` + `rowClassName` en `@lyra/ui` + filtro de equipo en UI) | `feat/bitacoras-peek-facetas` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Workflow SLA + atrasos** (`WorkflowState.maxStayMinutes` + `LogEntry.currentStateSince` + `evaluateSla` + `roleNames` en versión congelada + `delayedOnly`/`stats.delayed`/`facets.delayed` + vista sistema "Retrasadas" + `SlaDurationField` builder + alertas diagrama/grilla) | `feat/workflow-sla-atrasos` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Motor de reglas — primer corte (Req-7)** (`@lyra/contracts/rules` AST seguro + formulados + cruzadas + `TemplateField.computed`/`TemplateVersion.rules` + recálculo autoritativo/estampado en API + `ExpressionEditor`/`RulesEditor`/preview en vivo) | `feat/motor-reglas` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
+| **Fase 2.8.2 VOID de borradores + ruta de edición** (`status=VOID` + `voidedAt/voidReason/voidedById` + `POST /void` ownership/`logentry:void` + `buildWhere` excluye VOID + evento timeline VOIDED + `VoidEntryModal`/banner + ruta `/bitacoras/:id/editar`) | `feat/void-edicion` → `main` | ⏳ **pendiente de merge+push en esta sesión** | merge a `main` + push |
 
-**Estado:** **nada vive solo en local.** `main` = `origin/main`.
+**Estado:** **nada vive solo en local.** `main` = `origin/main` (salvo `feat/void-edicion`, en publicación al cierre).
 
 **Convención propuesta (a confirmar):** trabajar cada módulo en rama `feat/<modulo>`;
 al cerrar la sesión → push de la rama + merge a `main` + push de `main`. Así `origin/main`
@@ -421,7 +427,9 @@ nunca queda más de una sesión atrás.
           inversa con motivo obligatorio + su propia firma; el modelo append-only ya la soporta (fork 5 diferido).
           **(b)** guarda de completitud **configurable por transición** (hoy exige COMPLETED todas las secciones del
           estado de origen con campos). **(c)** re-seed del editor al transicionar desde otra pestaña (concurrencia de
-          estado, espejo del 409 de sección). **(d)** anulación de entrada (`VOID`) con motivo y firma.
+          estado, espejo del 409 de sección). **(d)** anulación de entrada (`VOID`): **borradores ✅ en 2.8.2** (motivo
+          auditado, `status=VOID`, sin firma); **falta la anulación de una entrada SELLADA** (firma §11.200 + transición
+          inversa) — va junto con (a).
   - [x] **2.6.0 Módulo de Bitácoras — núcleo de lectura** ✅ (2026-06-10). Diseño COMPLETO del módulo + slicing en
         DECISIONS 2026-06-10 (9 forks + 3 adiciones de modelo confirmados). Migración aditiva
         `…_add_logbook_review_columns` (folio `entryNumber` con backfill ordenado, `requiresSignature` estampado,
@@ -584,17 +592,15 @@ nunca queda más de una sesión atrás.
         - [ ] **Parte A del #9 (acceso nodo↔grilla):** selector de nodo ágil "mis nodos"/recientes/favoritos + filtros
               persistentes. Intercalable en 2.8.1a/b (presentar micro-alternativa al llegar). El backend ya guarda
               `LogEntryValue`; solo falta exponerlo acotado. Adiciones de modelo: `TemplateField.showInGrid` + `SavedView` (aditivas).
-      - [ ] **2.8.2 Creación de entrada SIN borradores huérfanos + descarte de borrador** (deuda de UX/integridad
-            detectada 2026-06-11). HOY elegir una plantilla en `/nueva-entrada` hace `POST /log-entries` de
-            inmediato: persiste un `LogEntry` DRAFT en BD (incluido el diferimiento si se declaró) y la grilla lo
-            muestra (no filtra DRAFT por defecto). Un clic accidental o una prueba dejan **borradores vacíos
-            huérfanos imposibles de retirar** (no existe `DELETE` ni transición a `VOID` en el controller). Dos
-            frentes: **(a)** diferir la persistencia — elegir plantilla NO crea nada; la entrada se materializa en
-            el **primer guardado real** (1ª sección guardada / confirmación); mientras tanto el llenado trabaja
-            contra un borrador en memoria; **(b)** **anulación de borrador** (`VOID` con motivo + permiso +
-            auditoría — nunca borrado físico, por ALCOA+) para los que sí persistan. Cambia el modelo de creación
-            y toca el flujo de llenado ⇒ proponer enfoque y esperar visto bueno antes de codear. Ref: conversación
-            2026-06-11.
+      - [x] **2.8.2 Creación de entrada SIN borradores huérfanos + descarte de borrador** ✅ (deuda de UX/integridad
+            detectada 2026-06-11, CERRADA en 2 cortes). **(a) ✅ 2026-06-12** (`feat/ventana-edicion-ux`): persistencia
+            diferida — elegir plantilla NO crea nada (`GET /log-entries/new` arma el detalle sin persistir); la entrada
+            se materializa en el **primer guardado real** (modo compose). **(b)(c) ✅ 2026-06-14** (`feat/void-edicion`):
+            **anulación de borrador** (`POST /log-entries/:id/void`, `status=VOID`, motivo ≥5 auditado, ownership o
+            `logentry:void` para ajenas, ABAC; NUNCA borrado físico — ALCOA+; `buildWhere` excluye VOID por defecto,
+            recuperable con `?status=VOID`) + **ruta de edición dedicada** `/bitacoras/:id/editar`. Ver DECISIONS/PROGRESS
+            2026-06-14. **Falta (corte posterior):** VOID GxP de entradas **SELLADAS** (firma §11.200 + transición
+            inversa, junto a la reversa de transición de 2.5(a)).
     - [ ] **Fase 2.9 — Plantillas inteligentes**:
       - [ ] **2.9.0 (#3) Layouts modernos**: modo por versión (clásico/pestañas/wizard/colapsable) + grilla
             responsiva de campos (1/1, 1/2, 1/3) + separadores/ayudas, como DATO de la versión.

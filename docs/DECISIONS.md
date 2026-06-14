@@ -4,6 +4,49 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-14 · Fase 2.8.2 — VOID de borradores + ruta de edición propia — ✅ IMPLEMENTADO (`feat/void-edicion` → `main`)
+
+Cierra la deuda (b)(c) de 2.8.2. 4 forks resueltos con el dueño (recomendación aceptada en los 4):
+
+1. **Alcance = solo DRAFT en este corte.** Anular/descartar un borrador no sellado. La anulación GxP de una entrada
+   **SELLADA** (transición inversa + firma §11.200) es un control DISTINTO y va en el corte posterior, junto a la reversa
+   de transición diferida de 2.5 (diferido (a)/(d)). Motivo: no mezclar "descartar borrador" (bajo riesgo) con "anular
+   registro controlado" (alto riesgo, exige firma); ServiceNow/Jira distinguen "Cancelled" (borrador) de "Reversed/Voided"
+   (documento publicado).
+
+2. **Anulación LÓGICA vía `status = VOID`, NO `deletedAt`.** El enum `LogEntryStatus.VOID` ya existía (andamiaje muerto):
+   se ESTRENA. **No** se usa `deletedAt` porque `buildWhere` lo filtra siempre ⇒ ocultaría la entrada hasta del filtro
+   `status=VOID` (contradice "trazable"). En cambio `buildWhere` **excluye VOID por defecto** y lo muestra solo con filtro
+   explícito (patrón ServiceNow "Cancelled" / SAP documento anulado): fuera de las superficies operacionales normales
+   (grilla/stats/facetas/export/related) pero recuperable. Huella `voidedAt/voidReason/voidedById` + `AuditLog`
+   inmutable (`logentry.voided`). El período cerrado / la ventana vencida **NO** bloquean descartar (no es corrección de
+   dato; es retirar un borrador erróneo).
+
+3. **Autorización HÍBRIDA = ownership + permiso nuevo para ajenas.** El AUTOR (`createdById === userId`) anula su PROPIO
+   borrador como autoservicio con `logentry:create` + ABAC (precedente del repo: `SavedView` autoriza por ownership,
+   2.8.1b; análogo a descartar tu borrador no enviado en ServiceNow/Jira/Docs). Anular el borrador AJENO (limpieza
+   supervisora de un borrador abandonado) exige el **permiso nuevo `logentry:void`** — configurable, NO hardcodeado.
+   **Catálogo 59→60.** El gate del controller es GRUESO (`logentry:view` = estar en el módulo) y la autorización FINA
+   (ownership o `logentry:void`, + ABAC nodo×plantilla) la decide el SERVICIO — mismo patrón que saveSection/transition.
+
+4. **Para un borrador basta MOTIVO obligatorio (≥5), auditado; sin re-auth/firma.** El borrador no es un registro firmado
+   Part 11; ALCOA+/MHRA exigen registrar POR QUÉ se descartó, y eso basta. La re-autenticación/firma (§11.200) se reserva
+   a acciones sobre registros SELLADOS (será parte del corte de void GxP).
+
+5. **(criterio) Ruta de edición DEDICADA `/bitacoras/:id/editar`**, separada del flujo de creación/compose de
+   `/nueva-entrada`, reusando el componente `EntryFillPage`. La URL refleja "editar registro existente" (no "crear"); los
+   botones "Editar" de grilla/peek/visor apuntan ahí; el rótulo *eyebrow* (Editar/Nueva entrada/Llenado) y el "Volver"
+   contextual (al visor) distinguen editar de crear. Respeta ventana (2.7.2) + período (2.7.1) + rol-sección×ABAC vía el
+   `saveSection` ya gateado (el backend AUTORIZA siempre). Una entrada VOID es terminal en edición (banner + secciones
+   bloqueadas `ENTRY_CLOSED`).
+
+**Verificación:** contracts 193 · API 234 (+6: void ownership/permiso/guardas + default-exclude VOID). typecheck/lint(0)/
+build verdes. **Smoke en vivo `scripts/smoke-void-edit.py` 17/17** (anula con motivo + huella; sale de la grilla y aparece
+con `?status=VOID`; timeline VOIDED; re-anular/motivo<5 ⇒ 400; ajeno sin permiso ⇒ 403; admin con `logentry:void` ⇒ 2xx;
+round-trip de edición persiste; crea y LIMPIA por ID, AuditLog conserva el rastro). **Pendiente: smoke VISUAL del dueño.**
+
+---
+
 ### 2026-06-14 · Motor de reglas de negocio — PRIMER CORTE (Req-7) — ✅ IMPLEMENTADO (`feat/motor-reglas` → `main`)
 
 Núcleo del motor: expresión segura + campos FORMULADOS + validación CRUZADA. **NO** incluye acciones que disparan

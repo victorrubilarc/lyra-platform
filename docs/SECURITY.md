@@ -203,6 +203,21 @@ GxP: MHRA Data Integrity 2018 / FDA DI Q&A (corrección tardía justificada + at
   `eligibleNodes` expone). Sin permiso nuevo: editar el modo va por `template:edit`; el cambio queda **auditado** before/after
   en `template.updated`. No se re-valida al sellar (equipo estampado = histórico intacto, ALCOA+).
 
+### Anulación (VOID) de borradores (Fase 2.8.2)
+- **`POST /log-entries/:id/void`** descarta un borrador (status → `VOID`): anulación LÓGICA, **no** hard-delete ni
+  `deletedAt`. Solo `DRAFT` no sellado; **motivo `reason` ≥5 OBLIGATORIO** y auditado (`logentry.voided`; ALCOA+/MHRA: la
+  baja excepcional se justifica). No re-anula (400) y el período cerrado / la ventana vencida NO bloquean (es retiro de un
+  borrador, no corrección de dato).
+- **Autorización HÍBRIDA (decidida en el SERVICIO, no por decorador).** El gate del controller es GRUESO
+  (`logentry:view`); el servicio AUTORIZA fino: el **AUTOR** (`createdById === userId`) anula su propio borrador por
+  **ownership** (precedente `SavedView`), y anular el AJENO exige el **permiso nuevo `logentry:void`** (catálogo **59→60**;
+  limpieza supervisora). En AMBOS casos rige el ABAC (nodo × plantilla). El front solo oculta el control cuando no aplica;
+  el backend re-autoriza siempre.
+- **Trazable, fuera de las superficies normales.** `buildWhere` **excluye `VOID` por defecto** (grilla/stats/facetas/
+  export/related) y lo muestra solo con `?status=VOID` (patrón ServiceNow "Cancelled"). Huella en visor (banner) y timeline
+  (evento `VOIDED`: quién/cuándo/por qué). La anulación GxP de un registro **SELLADO** (firma §11.200 + transición inversa)
+  es un corte posterior.
+
 ### Motor de reglas de negocio — expresión SEGURA (Req-7, primer corte)
 - **Sin `eval` ni scripting libre.** Las fórmulas (campos formulados) y las reglas cruzadas se expresan como un **AST
   con LISTA BLANCA de operadores** (tipo JSONLogic) evaluado por un intérprete **PURO** y SÍNCRONO en `@lyra/contracts/
