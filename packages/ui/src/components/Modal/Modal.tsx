@@ -10,7 +10,7 @@ export interface ModalProps {
   title?: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "xl";
 }
 
 /** Diálogo modal con overlay, cierre por Escape/click-fuera y scroll lock. */
