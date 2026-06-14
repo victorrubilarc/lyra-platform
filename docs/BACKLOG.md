@@ -270,6 +270,26 @@ nunca queda más de una sesión atrás.
       Quién: mantenimiento predictivo de IBM Maximo (MAS/Predict), GE/AVEVA Predictive Analytics, SAP PdMS.
       **Fase 6 (insights) + fase posterior (ML real).**
 
+- [ ] **Motor de REGLAS DE NEGOCIO y validaciones por plantilla (Req-7, dueño 2026-06-14).** Que la plantilla deje de ser
+      "formulario tonto": reglas configurables declarativas `cuando (condición) → entonces (acción)`. **Ya hay base**
+      (obligatorios, rangos min/max, **umbral ISA-18.2**, formato, **`visibleWhen`** condicional, validación 100% en backend
+      con fuente única `validateFieldValue` reusada en cliente). Falta el **motor** que agregue: **(1)** validación
+      **cruzada** entre campos (si A>B ⇒ error), **(2)** **obligatoriedad/visibilidad condicional** (extiende visibleWhen),
+      **(3)** **campos calculados** (fórmula), **(4)** **límites dinámicos** (min/max según otro campo o lista de
+      referencia), **(5)** **acciones**: mensaje error/advertencia/info, exigir firma, **abrir incidencia** (→Fase 4),
+      **notificar** (→bloque Notificaciones), bloquear envío/transición, marcar para revisión, autocompletar.
+      **Cómo lo hacen los grandes:** ServiceNow (Business Rules + UI/Data Policies declarativas + Flow Designer);
+      Salesforce (Validation Rules por fórmula + Flows + campos fórmula); SAP **BRFplus**; **Camunda/DMN decision tables**
+      (estándar OMG, lógica de decisión declarativa = ideal para matrices "clase de equipo × lectura → severidad");
+      Maximo (conditional expressions + automation scripts); Power Apps (business rules declarativas). **Decisión de
+      arquitectura clave (criterio):** reglas **DECLARATIVAS first** + **lenguaje de expresión SEGURO y sandboxeado**
+      (whitelist tipo JSONLogic/CEL, **NUNCA `eval`/JS arbitrario** — seguridad + on-prem + auditable), evaluado **idéntico
+      en cliente y servidor** (extiende la fuente única actual); **NO** scripting libre (sobre-ingeniería + riesgo). Las
+      reglas viajan en la **versión INMUTABLE** de la plantilla (cambiar una regla = nueva versión auditada, GxP). Evaluar
+      **DMN** para las tablas de decisión complejas. **Encaje por capas:** el NÚCLEO (condiciones + cálculo + validación
+      cruzada + fuente única) es **Fase 2** (expande el form engine); las **acciones que disparan** incidencia/
+      notificación se cablean cuando existan esos módulos (Fase 4 / Notificaciones).
+
 ### Fases siguientes (roadmap, ver PROGRESS §tabla)
 - [ ] **Fase 2** — Plantillas / Form Builder + Bitácoras. **Arquitectura enterprise definida en DECISIONS
       2026-06-09** ("formulario = proceso/documento vivo de secciones"; captura multi-actor por fases;
