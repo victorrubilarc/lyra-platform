@@ -4,6 +4,30 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-13 · Diagrama de flujo premium + plan SLA/atrasos — ✅ (visual) / 📋 (SLA aprobado, pendiente)
+
+**Hecho (visual, sin modelo):** `WorkflowDiagram` reusable en visor/grilla (modo REGISTRO) y mantenedor de flujos (modo
+DEFINICIÓN). Layout HORIZONTAL izq→der (estándar BPMN/Jira) con **puertos distribuidos** (anclajes repartidos por el borde
+según el nodo opuesto) y **aristas de retorno ORTOGONALES por canal inferior** (no cruzan el flujo; estilo Sugiyama). Color
+por estado (paleta por defecto si el estado no tiene color). "Dónde estás ahora" (glow pulsante + banner), "siguiente paso"
+(aristas/nodos animados), **tiempos reales del registro** (duración por tramo + en estado actual). Tooltips premium. Modal
+expandible (tamaño `xl` en `@lyra/ui`). **Responsable por elemento** (rol que ejecuta cada transición; el del estado = unión de
+sus salientes) en nodo (definición) + tooltips; el builder pasa el resolver de nombres de rol (sin migración).
+
+**Aprobado por el dueño (a implementar en sesión propia "Workflow SLA + atrasos"):**
+- **SLA por ESTADO** (decisión del dueño): `WorkflowState.maxStayMinutes` nullable (migración aditiva) + campo en el
+  `WorkflowBuilder` (minutos/horas, espejo de la ventana de edición) + contrato. Tiempo CALENDARIO en el MVP (horas hábiles =
+  futuro, requiere el calendario operacional).
+- **Diagrama (registro):** si el estado actual excede su SLA ⇒ **alerta roja** en el nodo (anillo pulsante + "Atrasado hace X ·
+  SLA Y"); tramos pasados sobre SLA ⇒ badge ámbar.
+- **Grilla:** indicador/columna "Atraso" ("⚠ En *Estado* hace 3 d · SLA 1 d") + filtro/faceta/KPI "Retrasadas"
+  (`delayedOnly`). Backend computa: `status=DRAFT AND (now − inicio_en_estado_actual) > SLA_del_estado_actual` (inicio = última
+  transición o `recordedAt`; SLA = estado actual de la versión congelada). A escala = endurecimiento Fase 7.
+- **Responsable en el VISOR (registro):** exponer `roleNames` en la transición de la versión congelada (resolución backend, sin
+  migración) para mostrar el responsable también fuera del builder.
+
+---
+
 ### 2026-06-13 · Fase 2.8.1c — Peek lateral + facetas con conteo + review-by-exception + "Mi turno" — ✅ IMPLEMENTADO
 
 **Cierre (cierra TODA la 2.8.1):** `GET /log-entries/facets` (5 dimensiones, conteos de hermanos, reusa `buildWhere`+ABAC),

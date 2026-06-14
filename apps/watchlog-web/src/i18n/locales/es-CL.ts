@@ -1007,6 +1007,8 @@ export const esCL = {
       legNote: "Tiempo en el estado anterior antes de esta transición.",
       expand: "Expandir",
       collapse: "Reducir",
+      responsible: "Responsable",
+      canExecute: "Puede ejecutar",
     },
     origin: {
       ONLINE: "En línea",

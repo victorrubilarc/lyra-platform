@@ -465,6 +465,13 @@ nunca queda más de una sesión atrás.
                 como se hizo con nodos); **(b)** facetas/COUNT **a escala** sin COUNT exacto (Redis/rollups) = Fase 7 (§3);
                 **(c)** peek con más detalle (valores por sección reusando `getDetail`, hoy muestra resumen+metadatos+indicadores);
                 **(d)** smoke VISUAL del dueño.
+      - [ ] **Workflow SLA + atrasos (APROBADO por el dueño 2026-06-13, su propia sesión).** Diagrama de flujo premium ya
+            entregado (visor/grilla + builder, horizontal+puertos+canal de retorno, dónde-estás/siguiente-paso, tiempos reales,
+            responsable por elemento). **Falta (requiere modelo):** **SLA por ESTADO** `WorkflowState.maxStayMinutes` (migración
+            aditiva) + campo en `WorkflowBuilder` (min/horas) + contrato → **alerta de atraso** en el diagrama (estado actual
+            sobre SLA = anillo rojo; tramos pasados sobre SLA = ámbar) + **grilla**: indicador/columna "Atraso" + filtro/faceta/
+            KPI "Retrasadas" (`delayedOnly`, backend: `status=DRAFT AND now−inicio_estado_actual > SLA_estado_actual`). +
+            exponer `roleNames` en la transición de la versión congelada para el responsable en el VISOR. Ver DECISIONS 2026-06-13.
         - [ ] **Parte A del #9 (acceso nodo↔grilla):** selector de nodo ágil "mis nodos"/recientes/favoritos + filtros
               persistentes. Intercalable en 2.8.1a/b (presentar micro-alternativa al llegar). El backend ya guarda
               `LogEntryValue`; solo falta exponerlo acotado. Adiciones de modelo: `TemplateField.showInGrid` + `SavedView` (aditivas).

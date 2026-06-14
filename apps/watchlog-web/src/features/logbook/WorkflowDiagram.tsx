@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Clock, Flag, Lock, Play, Timer, User } from "lucide-react";
+import { Clock, Flag, Lock, Play, Timer, User, Users } from "lucide-react";
 import type { LogEntryDetail, LogEntryTransitionDto, WorkflowStateDto, WorkflowTransitionDto } from "@lyra/contracts";
 import { formatDateTime } from "../../lib/format.js";
 import styles from "./WorkflowDiagram.module.css";
@@ -124,9 +124,10 @@ export interface WorkflowDiagramRecord {
   status: string;
 }
 
-type WorkflowDiagramProps =
-  | { entry: LogEntryDetail }
-  | { states: WorkflowStateDto[]; transitions: WorkflowTransitionDto[]; record?: WorkflowDiagramRecord };
+type WorkflowDiagramProps = ({ entry: LogEntryDetail } | { states: WorkflowStateDto[]; transitions: WorkflowTransitionDto[]; record?: WorkflowDiagramRecord }) & {
+  /** Resuelve un id de rol a su nombre (para mostrar el RESPONSABLE por elemento). */
+  roleNameOf?: (id: string) => string;
+};
 
 /**
  * Diagrama del flujo (máquina de estados). DOS MODOS:
@@ -206,12 +207,25 @@ export function WorkflowDiagram(props: WorkflowDiagramProps) {
   const colorByKey = new Map(states.map((s, i) => [s.key, s.color ?? STATE_PALETTE[i % STATE_PALETTE.length]!]));
   const stateColorOf = (key: string) => colorByKey.get(key) ?? FALLBACK_COLOR;
 
+  // RESPONSABLE por elemento: nombres de rol que pueden EJECUTAR una transición; el de
+  // un ESTADO = unión de los de sus transiciones salientes (quién actúa estando ahí).
+  const roleNameOf = props.roleNameOf;
+  const rolesOfTransition = (tr: WorkflowTransitionDto): string[] =>
+    roleNameOf ? tr.roleIds.map(roleNameOf).filter(Boolean) : [];
+  const responsibleOfState = (key: string): string[] => {
+    if (!roleNameOf) return [];
+    const names = new Set<string>();
+    for (const tr of transitions) if (tr.fromStateKey === key) for (const id of tr.roleIds) names.add(roleNameOf(id));
+    return [...names].filter(Boolean);
+  };
+
   /** Contenido del tooltip de un ESTADO: identidad + situación + cómo se ingresó. */
   function nodeTip(s: WorkflowStateDto): ReactNode {
     const step = visitStep.get(s.key);
     const isCurrent = s.key === currentStateKey;
     const enter = [...executed].reverse().find((tr) => tr.toStateKey === s.key);
-    const color = s.color ?? FALLBACK_COLOR;
+    const color = stateColorOf(s.key);
+    const resp = responsibleOfState(s.key);
     return (
       <>
         <div className={styles.tipTitle}>
@@ -224,6 +238,11 @@ export function WorkflowDiagram(props: WorkflowDiagramProps) {
           {isCurrent && <span className={`${styles.tipTag} ${styles.tipTagOn}`}>{t("logbook.diagram.current")}</span>}
           <span className={styles.tipTag}>{step ? t("logbook.diagram.tipStep", { n: step }) : t("logbook.diagram.pending")}</span>
         </div>
+        {resp.length > 0 && (
+          <div className={styles.tipResp}>
+            <Users size={11} /> {t("logbook.diagram.responsible")}: <strong>{resp.join(", ")}</strong>
+          </div>
+        )}
         {s.description && <div className={styles.tipDesc}>{s.description}</div>}
         {enter ? (
           <div className={styles.tipMeta}>
@@ -246,12 +265,18 @@ export function WorkflowDiagram(props: WorkflowDiagramProps) {
   function transitionTip(tr: WorkflowTransitionDto): ReactNode {
     const execs = executed.filter((e) => e.transitionKey === tr.key);
     const last = execs[execs.length - 1];
+    const roles = rolesOfTransition(tr);
     return (
       <>
         <div className={styles.tipTitle}>{tr.label}</div>
         <div className={styles.tipFlow}>
           {stateName(tr.fromStateKey)} <span className={styles.tipArrow}>→</span> {stateName(tr.toStateKey)}
         </div>
+        {roles.length > 0 && (
+          <div className={styles.tipResp}>
+            <Users size={11} /> {t("logbook.diagram.canExecute")}: <strong>{roles.join(", ")}</strong>
+          </div>
+        )}
         {last ? (
           <div className={styles.tipMeta}>
             <div>
@@ -461,6 +486,8 @@ export function WorkflowDiagram(props: WorkflowDiagramProps) {
             const isCurrent = s.key === currentStateKey;
             const isNext = Boolean(record) && nextStateKeys.has(s.key) && !isCurrent;
             const color = stateColorOf(s.key);
+            // En modo DEFINICIÓN el bottom está libre ⇒ mostramos ahí el responsable.
+            const respNames = !record ? responsibleOfState(s.key) : [];
             const cls = [
               styles.node,
               !record ? styles.nodeDefined : step ? styles.nodeVisited : isNext ? styles.nodeNext : styles.nodePending,
@@ -497,6 +524,11 @@ export function WorkflowDiagram(props: WorkflowDiagramProps) {
                   )}
                   {isNext && <span className={styles.nextPill}>{t("logbook.diagram.next")}</span>}
                   {record && !step && !isCurrent && !isNext && <span className={styles.pendingText}>{t("logbook.diagram.pending")}</span>}
+                  {respNames.length > 0 && (
+                    <span className={styles.nodeRoles} title={respNames.join(", ")}>
+                      <Users size={11} /> {respNames.join(", ")}
+                    </span>
+                  )}
                 </div>
               </div>
             );

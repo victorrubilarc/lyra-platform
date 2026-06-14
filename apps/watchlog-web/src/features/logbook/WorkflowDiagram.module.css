@@ -514,3 +514,31 @@
   color: var(--color-text-secondary);
   font-variant-numeric: tabular-nums;
 }
+
+/* Responsable por elemento (roles). En el nodo (modo definición) y en tooltips. */
+.nodeRoles {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nodeRoles svg {
+  flex-shrink: 0;
+}
+.tipResp {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.tipResp strong {
+  color: var(--color-text-primary);
+  font-weight: 600;
+}

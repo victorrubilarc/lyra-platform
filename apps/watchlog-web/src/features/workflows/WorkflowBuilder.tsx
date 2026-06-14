@@ -392,7 +392,11 @@ export function WorkflowBuilder({ detail }: { detail: WorkflowDetail }) {
           </button>
           {diagramOpen && (
             <div className={styles.diagramWrap}>
-              <WorkflowDiagram states={diagramStates} transitions={diagramTransitions} />
+              <WorkflowDiagram
+                states={diagramStates}
+                transitions={diagramTransitions}
+                roleNameOf={(id) => roles.find((r) => r.id === id)?.name ?? id}
+              />
             </div>
           )}
         </Card>
