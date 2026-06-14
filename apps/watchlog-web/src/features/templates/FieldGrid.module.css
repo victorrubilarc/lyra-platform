@@ -3,12 +3,13 @@
  * la usan la vista previa del builder, el llenado y el visor de lectura, así el
  * registro se ve idéntico en los tres lados. Estándar SAP Fiori 12-col / ServiceNow.
  *
- * Anchos: FULL = 12/12, HALF = 6/12, THIRD = 4/12. El span vive en la celda
- * (data-span); el contenedor mantiene 12 columnas. Responsive (regla de terreno):
- *   - Tablet (<=1023px): THIRD degrada a 1/2 (6/12).
- *   - Celular (<=767px): la grilla pasa a 1 columna (todas las celdas a `auto`).
- * Las áreas táctiles 44px las garantizan los controles (no la grilla); `min-width:0`
- * evita que contenido largo (textarea, números con unidad) reviente las columnas.
+ * Ancho por celda en columnas de 12 (`--col-span`, 1..12): 12 = completo, 6 =
+ * media, 4 = tercio, 3 = cuarto… (estilo SAP Fiori / Bootstrap). El contenedor
+ * mantiene 12 columnas; el span vive en la celda como custom property. Responsive
+ * (regla de terreno): en celular (<=767px) la grilla pasa a 1 columna (las celdas
+ * a `auto`, ignorando el span). Las áreas táctiles 44px las garantizan los
+ * controles (no la grilla); `min-width:0` evita que contenido largo (textarea,
+ * números con unidad) reviente las columnas.
  */
 
 .grid {
@@ -19,23 +20,8 @@
 }
 
 .cell {
-  grid-column: span 12; /* FULL + default */
+  grid-column: span var(--col-span, 12);
   min-width: 0;
-}
-
-.cell[data-span="HALF"] {
-  grid-column: span 6;
-}
-
-.cell[data-span="THIRD"] {
-  grid-column: span 4;
-}
-
-/* Tablet portrait: ⅓ → ½ (la grilla no se aprieta de más en terreno). */
-@media (max-width: 1023px) {
-  .cell[data-span="THIRD"] {
-    grid-column: span 6;
-  }
 }
 
 /* Celular: una sola columna (todo apilado, fiel a la regla de terreno + 44px). */

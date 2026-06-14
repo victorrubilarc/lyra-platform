@@ -18,7 +18,6 @@ import type {
   EquipmentMode,
   FieldSemanticRole,
   FieldType,
-  LayoutWidth,
   OrgNodeTree,
   SaveTemplateDraftRequest,
   TemplateDetail,
@@ -83,8 +82,8 @@ export interface EditField {
   visibleWhen: VisibleWhen | null;
   /** Campo FORMULADO (Req-7): fórmula que deriva el valor (read-only). null = tecleado. */
   computed: ComputedFieldConfig | null;
-  /** Ancho del campo en la grilla responsiva (Fase 2.1.2). Default FULL. */
-  layoutWidth: LayoutWidth;
+  /** Ancho del campo en columnas de la grilla de 12 (Fase 2.1.3). Default 12. */
+  colSpan: number;
   roleIds: string[];
 }
 
@@ -193,7 +192,7 @@ export function detailToEditState(detail: TemplateDetail): EditState {
         config: f.config,
         visibleWhen: f.visibleWhen,
         computed: f.computed,
-        layoutWidth: f.layoutWidth,
+        colSpan: f.colSpan,
         roleIds: f.roleIds,
       })),
     })),
@@ -252,7 +251,7 @@ export function editStateToDraftRequest(state: EditState): SaveTemplateDraftRequ
         config: f.config,
         visibleWhen: f.visibleWhen,
         computed: f.computed,
-        layoutWidth: f.layoutWidth,
+        colSpan: f.colSpan,
         roleIds: f.roleIds,
       })),
     })),
