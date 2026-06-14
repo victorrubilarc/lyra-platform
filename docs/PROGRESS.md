@@ -266,6 +266,18 @@ forks resueltos con la opción recomendada (DECISIONS 2026-06-12). Rama `feat/ve
   **Pendiente: smoke VISUAL del dueño** (§4). **Siguiente corte:** límites dinámicos · acciones (incidencia→Fase 4 /
   notificación) · lookups de listas · DMN.
 
+**+ Afinamiento UX del motor de reglas ✅ (2026-06-14, QA en vivo del dueño, en `main`).** Tras probarlo en navegador:
+(1) **Pestaña Reglas enterprise**: TABLA de reglas (severidad/mensaje/condición legible) con **activar/desactivar** (`CrossRule.enabled?`
++ `name?`, evaluateCrossRules salta las desactivadas) + **modal crear/editar con AYUDA y ejemplo** + botones Guardar borrador/Publicar
+también en Reglas + aviso "publicada → editar crea borrador". (2) **Selector de VALORES**: al comparar contra un campo de lista/sí-no, el
+operando "Valor" se elige de un desplegable (evita escribir códigos errados — causa del caso real "la regla no dispara": se comparó
+`conformidad="ok"` en vez de `estado_mecanico`). Metadata/infix compartidos en `expression-meta.ts`. (3) **Llenado**: el toggle SÍ/NO
+arranca en `false` (apagado = No) — antes quedaba "vacío" y la regla `=No` no se evaluaba sin moverlo; **mensaje de regla específico**
+(ApiError capta el arreglo `errors` del backend → `details`); **resalte de los campos** que la regla dispara (collectVarRefs). (4) **Bug
+latente corregido**: `valuesFor` enviaba los campos formulados (read-only) → 400; ahora se excluyen. (5) **Fix de layout del builder**:
+se quitó el `sticky` de la barra/columnas (se peleaba con las pestañas de trabajo y flotaba sobre el contenido). Contracts **193** ·
+smoke **20/20** sin regresión. **Verificado en vivo por el dueño** ("ok funciona"); hará más pruebas.
+
 ## Estado por fase
 
 | Fase | Módulo | Estado |
