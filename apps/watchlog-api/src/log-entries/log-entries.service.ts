@@ -1949,7 +1949,7 @@ export class LogEntriesService {
           config: upgradeFieldConfig(f.type, (f.config ?? {}) as Record<string, unknown>),
           visibleWhen: (f.visibleWhen as TemplateVersionDto["sections"][number]["fields"][number]["visibleWhen"]) ?? null,
           computed: (f.computed as TemplateVersionDto["sections"][number]["fields"][number]["computed"]) ?? null,
-          layoutWidth: f.layoutWidth,
+          colSpan: f.colSpan,
           roleIds: f.roles.map((r) => r.roleId),
         })),
       })),
