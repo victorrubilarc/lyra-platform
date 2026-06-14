@@ -264,6 +264,7 @@ export class WorkflowsService {
             isInitial: state.isInitial ?? false,
             isFinal: state.isFinal ?? false,
             color: state.color ?? null,
+            maxStayMinutes: state.maxStayMinutes ?? null,
           },
         });
         stateIdByKey.set(state.key, created.id);
@@ -392,6 +393,7 @@ export class WorkflowsService {
             isInitial: s.isInitial,
             isFinal: s.isFinal,
             color: s.color,
+            maxStayMinutes: s.maxStayMinutes,
           },
         });
         stateIdByKey.set(s.key, created.id);
@@ -434,6 +436,7 @@ export class WorkflowsService {
         isInitial: s.isInitial,
         isFinal: s.isFinal,
         color: s.color,
+        maxStayMinutes: s.maxStayMinutes,
       })),
       transitions: version.transitions.map((t) => ({
         id: t.id,
@@ -446,6 +449,9 @@ export class WorkflowsService {
         signatureMeaning: t.signatureMeaning,
         requireMfa: t.requireMfa,
         roleIds: t.roles.map((r) => r.roleId),
+        // El builder resuelve los nombres con su propia lista de roles (roleNameOf);
+        // aquí no hace falta resolverlos (el visor sí los recibe, ver log-entries).
+        roleNames: [],
       })),
     };
   }
