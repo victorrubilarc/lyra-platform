@@ -694,7 +694,7 @@ export function LogbookPage() {
               title={t("logbook.list.editEntry")}
               onClick={(e) => {
                 e.stopPropagation();
-                navigate(`/nueva-entrada/${r.id}`);
+                navigate(`/bitacoras/${r.id}/editar`);
               }}
             >
               <PenLine size={15} />
@@ -1094,7 +1094,7 @@ export function LogbookPage() {
         row={peekRow}
         onClose={() => setPeekRow(null)}
         onOpenFull={(id) => navigate(`/bitacoras/${id}`)}
-        onEdit={(id) => navigate(`/nueva-entrada/${id}`)}
+        onEdit={(id) => navigate(`/bitacoras/${id}/editar`)}
         onViewFlow={(id) => setFlowEntryId(id)}
         canEdit={can("logentry:fill")}
       />

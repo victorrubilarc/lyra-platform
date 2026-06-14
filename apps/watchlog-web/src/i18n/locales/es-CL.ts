@@ -1002,6 +1002,19 @@ export const esCL = {
       SUBMITTED: "Registrada",
       VOID: "Anulada",
     },
+    void: {
+      action: "Anular borrador",
+      modalTitle: "Anular borrador",
+      explain:
+        "Descarta este borrador. No se elimina: queda anulado y trazable (con quién, cuándo y por qué), fuera de las superficies normales. Solo aplica a borradores no sellados.",
+      reason: "Motivo de la anulación",
+      reasonHint: "Mínimo 5 caracteres. Quedará auditado (ALCOA+).",
+      reasonPlaceholder: "Ej.: borrador duplicado / plantilla equivocada / abierto por error",
+      confirm: "Anular borrador",
+      done: "Borrador anulado.",
+      error: "No se pudo anular el borrador.",
+      banner: "Borrador anulado por {{who}} el {{at}}.",
+    },
     sectionState: {
       PENDING: "Pendiente",
       IN_PROGRESS: "En progreso",
@@ -1251,6 +1264,7 @@ export const esCL = {
         sealed: "Dimensiones selladas",
         sectionSigned: "Sección «{{section}}» firmada",
         deferredDeclared: "Registro diferido declarado",
+        voided: "Borrador anulado",
       },
     },
     new: {
@@ -1276,6 +1290,9 @@ export const esCL = {
     },
     fill: {
       back: "Volver",
+      eyebrowNew: "Nueva entrada",
+      eyebrowEdit: "Editar registro",
+      eyebrowFill: "Llenado",
       loadError: "No se pudo cargar la entrada.",
       effectiveAt: "Fecha efectiva",
       recordedAt: "Capturada",

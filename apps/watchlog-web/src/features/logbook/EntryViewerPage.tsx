@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   ArrowRight,
+  Ban,
   CalendarClock,
   CheckCircle2,
   Clock,
@@ -242,6 +243,21 @@ function TimelineEvent({ event }: { event: LogEntryTimelineEvent }) {
           {event.reason && <div className={styles.eventReason}>“{event.reason}”</div>}
         </div>
       );
+    case "VOIDED":
+      return (
+        <div className={`${styles.eventItem} ${styles.eventChange}`}>
+          <div className={styles.eventHead}>
+            <span className={styles.eventTitle}>
+              <Ban size={14} /> {t("logbook.viewer.event.voided")}
+            </span>
+            <span className={styles.eventWhen}>
+              {event.actorName ? `${event.actorName} · ` : ""}
+              {formatDateTime(event.at)}
+            </span>
+          </div>
+          {event.reason && <div className={styles.eventReason}>“{event.reason}”</div>}
+        </div>
+      );
     case "SECTION_SIGNED":
       return (
         <div className={`${styles.eventItem} ${styles.eventSignature}`}>
@@ -333,7 +349,7 @@ export function EntryViewerPage() {
           {/* Abrir para EDITAR: solo si el registro sigue en curso (DRAFT) y el
               usuario puede llenar. El backend reaplica la autorización por sección. */}
           {can("logentry:fill") && entry.status === "DRAFT" && (
-            <Button variant="primary" leftIcon={<PenLine size={15} />} onClick={() => navigate(`/nueva-entrada/${entry.id}`)}>
+            <Button variant="primary" leftIcon={<PenLine size={15} />} onClick={() => navigate(`/bitacoras/${entry.id}/editar`)}>
               {t("logbook.viewer.edit")}
             </Button>
           )}
@@ -342,6 +358,20 @@ export function EntryViewerPage() {
           </Button>
         </div>
       </div>
+
+      {/* Borrador ANULADO (2.8.2): huella prominente quién/cuándo/por qué. */}
+      {entry.status === "VOID" && (
+        <div className={styles.voidBanner}>
+          <Ban size={18} />
+          <span>
+            {t("logbook.void.banner", {
+              who: entry.voidedByName ?? "—",
+              at: entry.voidedAt ? formatDateTime(entry.voidedAt) : "—",
+            })}
+            {entry.voidReason ? ` — “${entry.voidReason}”` : ""}
+          </span>
+        </div>
+      )}
 
       {/* Cabecera de identidad (record review) */}
       <Card className={styles.viewerHeader}>

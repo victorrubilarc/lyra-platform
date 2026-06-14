@@ -8,6 +8,7 @@ import {
   submitLogEntryRequestSchema,
   templateEligibleNodesSchema,
   templateListItemSchema,
+  voidLogEntryRequestSchema,
   type CreateLogEntryRequest,
   type ExecuteTransitionRequest,
   type LogEntryDetail,
@@ -16,6 +17,7 @@ import {
   type SubmitLogEntryRequest,
   type TemplateEligibleNodes,
   type TemplateListItem,
+  type VoidLogEntryRequest,
 } from "@lyra/contracts";
 import { apiJson } from "../../lib/api-client.js";
 
@@ -92,4 +94,10 @@ export function submitLogEntry(id: string, dto: SubmitLogEntryRequest = {}): Pro
 export function executeTransition(id: string, dto: ExecuteTransitionRequest): Promise<LogEntryDetail> {
   executeTransitionRequestSchema.parse(dto);
   return apiJson(`/log-entries/${id}/transitions`, logEntryDetailSchema, { method: "POST", body: dto });
+}
+
+/** Anula (descarta) un borrador con motivo obligatorio (≥5). Status → VOID (2.8.2). */
+export function voidLogEntry(id: string, dto: VoidLogEntryRequest): Promise<LogEntryDetail> {
+  voidLogEntryRequestSchema.parse(dto);
+  return apiJson(`/log-entries/${id}/void`, logEntryDetailSchema, { method: "POST", body: dto });
 }
