@@ -27,7 +27,8 @@
 | 2.1 Form Builder (secciones/campos/umbral ISA-18.2/borrador-publicar) | ✅ | — |
 | 2.1.1 Modelo de campo en 3 capas (type/dataType/semanticRole) | ✅ | — |
 | 2.1.2 **Layout de formulario en GRILLA** (ancho por campo) | ✅ | `feat/layout-grilla`: columna de ancho + grilla responsiva (`FieldGrid` compartido). Superado por 2.1.3. |
-| 2.1.3 **Editor de layout WYSIWYG** (12 col + arrastre) | ✅ | `feat/layout-editor-wysiwyg`: `TemplateField.colSpan` 1..12 (reemplaza el enum); lienzo del builder con reordenar/redimensionar arrastrando (DnD nativo + pointer-events, sin lib nueva). Smoke 14/14. Falta smoke visual. |
+| 2.1.3 **Editor de layout WYSIWYG** (12 col + arrastre) | ✅ | `feat/layout-editor-wysiwyg`: `TemplateField.colSpan` 1..12 (reemplaza el enum); lienzo del builder con reordenar/redimensionar arrastrando (DnD nativo + pointer-events, sin lib nueva). Smoke 14/14. |
+| 2.1.4 **Builder canvas-first** (config en el lienzo) | ✅ (Fase 1) | `feat/builder-canvas`: lienzo full-width, paleta→popover "＋", config avanzada→`Drawer`, control REAL WYSIWYG, rótulo/sección inline, barra flotante contextual. Frontend puro. Fase 2 (drag-desde-paleta, inline placeholder/opciones, colapsar, atajos) diferida. Falta smoke visual. |
 | 2.2 Flujos reutilizables (`WorkflowDefinition`) | ✅ | — |
 | 2.x Datos de referencia / Listas | ✅ | Roadmap industrial: jerarquía, cascada, metadata tipada, vigencia, crosswalk (con Fase 3). |
 | 2.3.0 Calendario operacional (turnos + día operacional) | ✅ | 4-4-5, rotación de cuadrillas, vigencia de turnos (diferidos). |

@@ -341,6 +341,22 @@ de celular colapse a 1 col); el lienzo del builder los REUSA ⇒ builder/llenado
 detalle de entrada; crea+limpia por ID). typecheck/lint(0)/build verdes. **Pendiente: smoke VISUAL del dueño** (§4:
 arrastrar reordenar dentro/entre secciones + redimensionar 1..12 con reflow + teclado).
 
+**+ Fase 2.1.4 — Builder CANVAS-FIRST con configuración en el lienzo ✅ (2026-06-14, `feat/builder-canvas` → `main`).**
+Feedback del dueño tras 2.1.3 ("estrecho y poco intuitivo vs Canva; no podemos darle menos"). **Frontend puro** (no
+toca modelo/contratos/API). El editor pasa a **canvas-first**: se elimina la grilla de 3 columnas; el **lienzo ocupa
+todo el ancho** (artboard centrado ~1040px). La **paleta deja de ser columna** → popover **"＋ Agregar campo"**
+(`AddFieldMenu`, reusa `Menu`) en la barra del lienzo y al final de cada sección (inserta en posición vía
+`addFieldAt`). El **panel de config pasa a `Drawer`** que se abre con "Más opciones" (solo lo AVANZADO: umbral/opciones/
+condicional/fórmula/roles). **Configuración EN EL LIENZO:** cada campo se ve como el **control REAL** (`FieldControl` no
+interactivo) ⇒ WYSIWYG; **rótulo editable en el lugar**, **título/descr. de sección inline**, y **barra flotante**
+(`FieldToolbar`) sobre el campo activo (ancho/obligatorio/mover ↑↓/duplicar/eliminar/más opciones). Se conserva arrastrar
+para reordenar/redimensionar, la fuente de render ÚNICA (`FieldGrid` ⇒ builder ≈ llenado ≈ visor) y la accesibilidad.
+Nuevos `AddFieldMenu`/`FieldToolbar`, `BuilderFieldCard` reescrito, `duplicateField`. **Entregado como Fase 1; Fase 2
+diferida** (drag-desde-paleta-a-posición, edición inline de placeholder/ayuda/opciones, colapsar secciones, atajos,
+multi-selección). Sin permisos nuevos (catálogo 60). Tests sin cambio (contracts 195 · API 234). typecheck/lint(0)/build
+verdes. **Pendiente: smoke VISUAL del dueño** (§4: lienzo ancho, agregar con ＋ en posición, editar rótulo en el lienzo,
+barra flotante, drawer de avanzado, arrastrar reordenar/redimensionar).
+
 ## Estado por fase
 
 | Fase | Módulo | Estado |
