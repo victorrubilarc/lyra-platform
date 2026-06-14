@@ -502,6 +502,11 @@
   padding: var(--space-3) var(--space-4) var(--space-4);
   position: sticky;
   top: var(--wl-sticky-top);
+  /* Sticky más alto que el viewport (p. ej. con el editor de fórmula abierto):
+     acota la altura al espacio bajo la barra del builder y deja scroll INTERNO,
+     así su cabecera nunca queda atrapada detrás de la barra sticky. */
+  max-height: calc(100vh - var(--wl-sticky-top) - var(--space-4, 16px));
+  overflow-y: auto;
 }
 .configHeader {
   font-size: 10px;
