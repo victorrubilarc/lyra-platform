@@ -5,7 +5,11 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-14** (**Fase 2.1.4 Builder canvas-first ✅** — `feat/builder-canvas`: por feedback del dueño
+> actualización: **2026-06-14** (**Fase 2.1.5 Builder auto-layout por arrastre ✅** — `feat/builder-autolayout`: por
+> feedback del dueño (4 puntos): lienzo a **todo el ancho**; **auto-layout estilo Notion** (soltar al lado ⇒ comparten
+> fila con ancho repartido solo; a su línea ⇒ ancho completo; el usuario NO piensa en columnas); se quita el menú "12/12"
+> y el ajuste fino es un **divisor** del borde; **responsive 1/2/12** (móvil/tablet/escritorio). Frontend puro. Contracts
+> 195 · API 234 (sin cambio). Pendiente: smoke VISUAL [§4]. Anterior: **Fase 2.1.4 Builder canvas-first ✅** — `feat/builder-canvas`: por feedback del dueño
 > ("estrecho y poco intuitivo vs Canva"), el editor pasa a **canvas-first** (lienzo a todo el ancho), la paleta es un
 > popover "＋ Agregar", la config avanzada vive en un `Drawer`, y **se configura SOBRE el lienzo**: control REAL
 > (WYSIWYG), rótulo/sección editables en el lugar, barra flotante contextual (ancho/obligatorio/mover/duplicar/eliminar).
@@ -109,9 +113,10 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Fase 2.8.2 VOID de borradores + ruta de edición** (`status=VOID` + `voidedAt/voidReason/voidedById` + `POST /void` ownership/`logentry:void` + `buildWhere` excluye VOID + evento timeline VOIDED + `VoidEntryModal`/banner + ruta `/bitacoras/:id/editar`) | `feat/void-edicion` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Fase 2.1.2 Layout de formulario en grilla responsiva** (enum `LayoutWidth` + columna `TemplateField.layoutWidth` + migración `…_add_field_layout_width` + `FieldGrid`/`FieldGridCell` compartido + selector en `BuilderConfigPanel` + cableo de PreviewForm/EntryFillPage/EntryViewerPage) | `feat/layout-grilla` → `main` | ✅ fusionado y publicado en `origin/main` (`a74a320`) | ninguna |
 | **Fase 2.1.3 Editor de layout WYSIWYG (12 col + arrastre)** (reemplaza enum `LayoutWidth` por `TemplateField.colSpan` 1..12 + migración `…_field_colspan` + `FieldGrid` numérico + `BuilderFieldCard` con DnD nativo reorder y resize pointer/teclado + presets en `BuilderConfigPanel` + `moveFieldBefore`) | `feat/layout-editor-wysiwyg` → `main` | ✅ fusionado y publicado en `origin/main` (`d84240d`) | ninguna |
-| **Fase 2.1.4 Builder canvas-first (config en el lienzo)** (lienzo full-width + `AddFieldMenu` popover + config en `Drawer` + control real WYSIWYG + rótulo/sección inline + `FieldToolbar` flotante + `addFieldAt`/`duplicateField`; frontend puro) | `feat/builder-canvas` → `main` | ⏳ **pendiente de merge+push en esta sesión** | merge a `main` + push |
+| **Fase 2.1.4 Builder canvas-first (config en el lienzo)** (lienzo full-width + `AddFieldMenu` popover + config en `Drawer` + control real WYSIWYG + rótulo/sección inline + `FieldToolbar` flotante + `addFieldAt`/`duplicateField`; frontend puro) | `feat/builder-canvas` → `main` | ✅ fusionado y publicado en `origin/main` (`3f3ccbc`/`a654646`) | ninguna |
+| **Fase 2.1.5 Builder auto-layout por arrastre (Notion)** (ancho completo + soltar-al-lado/a-su-línea con ancho auto `splitRow`/`rowRangeOf`/`applyDrop` + divisor de borde `resizeDivider` + quitar menú "12/12" + responsive 1/2/12 + indicadores de soltado; frontend puro) | `feat/builder-autolayout` → `main` | ⏳ **pendiente de merge+push en esta sesión** | merge a `main` + push |
 
-**Estado:** **nada vive solo en local.** `main` = `origin/main` (salvo `feat/builder-canvas`, en publicación al cierre).
+**Estado:** **nada vive solo en local.** `main` = `origin/main` (salvo `feat/builder-autolayout`, en publicación al cierre).
 
 **Convención propuesta (a confirmar):** trabajar cada módulo en rama `feat/<modulo>`;
 al cerrar la sesión → push de la rama + merge a `main` + push de `main`. Así `origin/main`
@@ -259,7 +264,12 @@ nunca queda más de una sesión atrás.
       "＋ Agregar campo", config avanzada → `Drawer`; **se configura sobre el lienzo** (control REAL WYSIWYG, rótulo/
       sección inline, barra flotante contextual con ancho/obligatorio/mover/duplicar/eliminar/más opciones). Frontend
       puro. Nuevos `AddFieldMenu`/`FieldToolbar`; `BuilderFieldCard` reescrito; `addFieldAt`/`duplicateField`.
-  - [ ] **2.1.4 Fase 2 (diferida):** arrastrar DESDE la paleta a una posición (drag-to-add); edición inline de
+- [x] **2.1.5 — Builder auto-layout por arrastre (Notion) + ancho completo + responsive ✅ (2026-06-14,
+      `feat/builder-autolayout` → `main`).** El usuario ya NO piensa en "columnas": arrastra un campo al lado de otro ⇒
+      comparten fila (ancho repartido solo); a su propia línea ⇒ ancho completo (`splitRow`/`rowRangeOf`/`applyDrop`).
+      Lienzo a todo el ancho; ajuste fino = divisor del borde (`resizeDivider`); se quitó el menú "12/12"; responsive
+      móvil 1 / tablet 2 / escritorio 12 col (terreno). Frontend puro.
+  - [ ] **2.1.4/2.1.5 Fase 2 (diferida):** arrastrar DESDE la paleta a una posición (drag-to-add); edición inline de
         placeholder/ayuda/opciones; **colapsar secciones**; atajos de teclado + copiar/pegar; multi-selección de campos.
   - [ ] **Deuda 2.1.x (aditiva, si surge caso real):** el editor de layout AVANZADO (posicionamiento absoluto, plantillas
         de layout wizard/pestañas/colapsable) es **2.9.0** (otra sesión), NO aquí. Eventual DnD táctil del builder en
@@ -857,16 +867,16 @@ implementación esperada:
       **Guardar borrador** y **Publicar** (congela versión), editar publicada (clona borrador), borrar (bloqueado si
       en uso); en el **Form Builder**: asignar un flujo publicado, mapear secciones→estados editables, editar el
       **override de rol por campo**; modo claro. App en `:5173`.
-- [ ] **Fase 2.1.2 / 2.1.3 / 2.1.4 Builder canvas-first WYSIWYG — smoke VISUAL en navegador** (typecheck/lint/build/test
-      + smoke API 14/14 OK; falta el clic): en el **builder** (`/plantillas/:id`, Diseño ▸ Editor) el **lienzo ocupa todo
-      el ancho** (artboard) y cada campo se ve con su **control REAL** (WYSIWYG); **agregar campo** con **"＋ Agregar
-      campo"** (barra del lienzo y al final de cada sección) eligiendo el tipo en el popover; **editar el rótulo EN EL
-      LIENZO** (clic en el texto) y el **título/descripción de la sección** inline; al seleccionar un campo aparece la
-      **barra flotante** (ancho con presets, obligatorio, mover ↑↓, duplicar, eliminar, **Más opciones** → abre el
-      **Drawer** con umbral/opciones/condicional/fórmula/roles); **arrastrar** por el asa para **reordenar** dentro y
-      **entre secciones**; **arrastrar el borde derecho** para **redimensionar** 1..12 con reflow; **teclado** (← → en el
-      borde, ↑↓ en la barra). Verificar que **lienzo ≈ llenado (`/nueva-entrada/:id`) ≈ visor (`/bitacoras/:id`)**;
-      **1 columna** en celular; modo claro y oscuro. App en `:5173`.
+- [ ] **Fase 2.1.x Builder canvas-first + auto-layout (2.1.2→2.1.5) — smoke VISUAL en navegador** (typecheck/lint/build
+      OK; smoke API 14/14; falta el clic): en el **builder** (`/plantillas/:id`, Diseño ▸ Editor) el **lienzo ocupa TODO
+      el ancho** y cada campo se ve con su **control REAL** (WYSIWYG). **Agregar** con **"＋ Agregar campo"** (barra y fin
+      de sección). **Editar el rótulo EN EL LIENZO** y el **título/descripción de la sección** inline. **AUTO-LAYOUT por
+      arrastre** (lo nuevo de 2.1.5): arrastra un campo **AL LADO** de otro ⇒ comparten fila con **ancho repartido solo**
+      (indicador vertical azul); arrastra **arriba/abajo** ⇒ **fila propia** ancho completo (indicador horizontal); **NO**
+      hay menú de "12 columnas". **Divisor:** arrastra el borde derecho de un campo que comparte fila ⇒ transfiere ancho
+      al vecino (← → por teclado). Barra flotante (obligatorio/mover/duplicar/eliminar/**Más opciones**→Drawer). Verificar
+      **lienzo ≈ llenado (`/nueva-entrada/:id`) ≈ visor (`/bitacoras/:id`)**; **responsive: tablet 2 col, móvil 1 col**
+      (táctil 44px, terreno); modo claro y oscuro. App en `:5173`.
 - [ ] **Workflow SLA + atrasos — smoke VISUAL en navegador** (se verificó typecheck/lint/build/test + smoke por API
       20/20; falta el clic): en el **builder de flujos** (`/flujos/:id`), por estado el campo **"Tiempo máximo de
       estadía"** (Min/Horas/**Días**, vacío = sin SLA), guardar borrador y publicar (el SLA persiste). En el **diagrama

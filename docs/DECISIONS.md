@@ -4,6 +4,19 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-14 · Fase 2.1.5 — Builder: ancho completo + auto-layout por arrastre (Notion) + responsive de terreno — ✅ IMPLEMENTADO (`feat/builder-autolayout` → `main`)
+
+Feedback del dueño tras 2.1.4 (4 puntos, "pensar en el usuario final, simpleza"): (1) el editor no usaba todo el ancho; (2) arrastrar entre líneas no era natural; (3) el usuario NO entiende "dividir en columnas", solo quiere arrastrar y que quede bien; (4) el formulario debe verse bien en móvil/tablet (terreno). **Frontend puro** (se mantiene `colSpan`; el ancho se DERIVA del arrastre).
+
+- **(#1) Ancho completo:** se quita el `max-width:1040px` del lienzo (`.workspace`) ⇒ llena el ancho disponible.
+- **(#2/#3) Auto-layout por arrastre (Notion/Coda), confirmado por el dueño:** soltar un campo **AL LADO** de otro ⇒ comparten fila y el ancho **se reparte solo** (`splitRow`: 2→6/6, 3→4/4/4, 4→3/3/3/3; tope 4 por fila); soltar en **su propia línea** (zona arriba/abajo) ⇒ **ancho completo** (`colSpan=12`). El usuario nunca elige columnas. **`onDragOver` deriva la zona** del puntero sobre la card (tercios: arriba=row-before, abajo=row-after, izq/der=beside) con **indicadores** (barra vertical=compartir fila, horizontal=fila nueva). Helpers puros nuevos en `builder-model`: `splitRow` + `rowRangeOf` (una "fila" = corrida cuyos colSpan suman ≤12). `applyDrop` reemplaza a `moveFieldBefore`.
+- **(#3) Se quita la jerga de "12 columnas":** se elimina el menú "12/12" de `FieldToolbar`. El **ajuste fino** queda como **DIVISOR** (estilo Notion): arrastrar el borde transfiere columnas entre el campo y su vecino de la MISMA fila (suma constante, cada uno mín. 3; `resizeDivider`); el handle solo aparece si hay vecino a la derecha. El control de ancho explícito sobrevive solo en el Drawer avanzado (baja visibilidad).
+- **(#4) Responsive de terreno** en `FieldGrid` (fuente de render única ⇒ aplica a llenado y visor): móvil <768px = 1 col; **tablet 768–1023px = 2 col fijas** (fluyen de a 2, táctil 44px); escritorio ≥1024px = grilla de 12 con `colSpan`.
+
+**Motivo:** estándar de editores modernos = arrastrar-para-acomodar con ancho automático; el usuario no debe pensar en grillas. Sin librería nueva (DnD nativo + pointer-events; builder de escritorio). typecheck/lint(0)/build verdes; contracts 195 · API 234 (sin cambios). **Smoke VISUAL pendiente** (BACKLOG §4).
+
+---
+
 ### 2026-06-14 · Fase 2.1.4 — Builder CANVAS-FIRST con configuración en el lienzo — ✅ IMPLEMENTADO (`feat/builder-canvas` → `main`)
 
 Feedback del dueño tras probar 2.1.3: el editor se sentía **estrecho y poco intuitivo** vs Canva/Webflow/Google Forms ("el usuario está acostumbrado a otros softwares, no podemos darle menos"). Causa: lienzo espachurrado entre paleta (220px) y config (320px) ⇒ ~280px; y toda la config en un panel lateral abstracto. **Frontend puro** (no toca modelo/contratos/API — `colSpan` ya estaba).

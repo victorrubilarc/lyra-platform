@@ -357,6 +357,20 @@ multi-selección). Sin permisos nuevos (catálogo 60). Tests sin cambio (contrac
 verdes. **Pendiente: smoke VISUAL del dueño** (§4: lienzo ancho, agregar con ＋ en posición, editar rótulo en el lienzo,
 barra flotante, drawer de avanzado, arrastrar reordenar/redimensionar).
 
+**+ Fase 2.1.5 — Builder: ancho completo + auto-layout por arrastre (Notion) + responsive de terreno ✅ (2026-06-14,
+`feat/builder-autolayout` → `main`).** Feedback del dueño (4 puntos, "pensar en el usuario final"). **Frontend puro**
+(se mantiene `colSpan`; el ancho se DERIVA del arrastre). **(#1)** lienzo a **todo el ancho** (se quita `max-width`).
+**(#2/#3)** **auto-layout estilo Notion** (confirmado): soltar un campo **al lado** de otro ⇒ comparten fila con ancho
+repartido solo (`splitRow` 2→6/6, 3→4/4/4, 4→3/3/3/3; tope 4); soltar **a su línea** (zona arriba/abajo) ⇒ ancho
+completo; `onDragOver` deriva la zona del puntero (tercios) con **indicadores** (barra vertical=compartir fila /
+horizontal=fila nueva). Helpers puros `splitRow`+`rowRangeOf`; `applyDrop` reemplaza `moveFieldBefore`. **El usuario ya
+no elige "columnas":** se quita el menú "12/12" de la barra; el ajuste fino es un **DIVISOR** del borde (transfiere ancho
+al vecino de la fila, suma constante, `resizeDivider`; solo si hay vecino a la derecha). **(#4)** responsive en
+`FieldGrid` (fuente única ⇒ llenado+visor): móvil 1 col / **tablet 2 col** / escritorio 12. Sin librería nueva (DnD
+nativo + pointer-events). Sin permisos nuevos (catálogo 60). Tests sin cambio (contracts 195 · API 234).
+typecheck/lint(0)/build verdes. **Pendiente: smoke VISUAL del dueño** (§4: ancho completo, arrastrar al lado/a su línea,
+divisor, tablet 2col/móvil 1col).
+
 ## Estado por fase
 
 | Fase | Módulo | Estado |
