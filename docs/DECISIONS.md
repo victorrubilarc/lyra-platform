@@ -4,7 +4,23 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
-### 2026-06-14 · Fase 2.1.2 — Layout de formulario en grilla responsiva (ancho por campo) — ✅ IMPLEMENTADO (`feat/layout-grilla` → `main`)
+### 2026-06-14 · Fase 2.1.3 — Editor de layout WYSIWYG (grilla de 12 col + arrastre) — ✅ IMPLEMENTADO (`feat/layout-editor-wysiwyg` → `main`)
+
+Iteración sobre 2.1.2 por feedback del dueño: el panel lateral de ancho era **ciego** (editas en abstracto, verificas en otra pestaña). Los líderes (ServiceNow, Power Apps, Salesforce, SAP Fiori, Retool) editan el layout **WYSIWYG por manipulación directa sobre el formulario**. El dueño eligió manipulación directa COMPLETA (arrastrar para redimensionar y reordenar) y granularidad de **12 columnas**.
+
+1. **Granularidad → grilla de 12 col.** Se **reemplaza** el enum `LayoutWidth {FULL,HALF,THIRD}` de 2.1.2 por un entero **`TemplateField.colSpan` 1..12** (`@default(12)`), estilo SAP Fiori/Bootstrap. Permite el redimensionado fino por arrastre (3 topes era pobre para "arrastrar"). Migración de conversión NUEVA hacia adelante (FULL→12/HALF→6/THIRD→4; los migrations publicados son inmutables, no se edita el de 2.1.2): `20260614180000_field_colspan` agrega `colSpan`, convierte, dropea `layoutWidth` y el enum, y agrega CHECK 1..12.
+
+2. **Sin librería de DnD nueva.** El repo ya tiene **arrastre nativo HTML5** (`ColumnsDrawer`) y **pointer-events** (`ResizableSplit`). El builder lo usa el **Configurador en ESCRITORIO** (la regla 44px/guantes/tablet es del OPERADOR llenando, ya cubierta por la grilla responsiva), así que NO se necesita DnD táctil ⇒ reordenar = DnD nativo, redimensionar = handle con pointer-events. Cero dependencias nuevas (coherente con la cultura del repo: `ResizableSplit`/`useAnchoredPanel` son propios).
+
+3. **Accesibilidad.** Se MANTIENEN las flechas ↑↓ (reordenar por teclado) y el handle de redimensionar es **`role="slider"`** (aria-valuemin/max/now; ← → ajustan ±1) ⇒ todo operable sin mouse.
+
+4. **Fuente de render única intacta.** `FieldGrid`/`FieldGridCell` siguen siendo la única grilla; el **lienzo del builder los REUSA** (los campos del editor se ven con el mismo layout que llenado/visor). `FieldGridCell` pasó de `width:enum` a `span:number` (vía `--col-span` custom property, para que la media query de celular pueda sobreescribir a 1 col).
+
+**Cambios:** contratos (`colSpanSchema` 1..12 reemplaza `layoutWidthSchema`), Prisma (`colSpan Int`, drop enum), API (`colSpan` en ambos services), web (`FieldGrid` numérico, nuevo `BuilderFieldCard` con grip+resize, lienzo WYSIWYG en `TemplateBuilder` con `moveFieldBefore` para reordenar dentro/entre secciones, presets de ancho en `BuilderConfigPanel`). **Motivo:** llevar el editor al estándar enterprise sin sobre-ingeniería (sin posicionamiento absoluto ni plantillas de layout = sigue siendo 2.9.0). Tests contracts 195 · API 234 · smoke `scripts/smoke-field-layout.py` 14/14. **Smoke VISUAL pendiente** (BACKLOG §4): arrastrar para reordenar (dentro/entre secciones) y redimensionar 1..12 con reflow en vivo; teclado; los tres lados idénticos.
+
+---
+
+### 2026-06-14 · Fase 2.1.2 — Layout de formulario en grilla responsiva (ancho por campo) — ✅ IMPLEMENTADO (`feat/layout-grilla` → `main`) — (granularidad reemplazada por 2.1.3: enum→colSpan 12)
 
 Presentación PURA y ADITIVA: el diseñador da un **ancho por campo** y los campos se acomodan en una **grilla CSS responsiva por sección** que colapsa a 1 columna en tablet/celular. NO toca validación/umbral/condicional/permisos/reglas. Default = ancho completo ⇒ cero ruptura. 5 forks resueltos con el dueño:
 
