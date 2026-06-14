@@ -1,4 +1,4 @@
-import { useMemo, useState, type ComponentProps } from "react";
+import { useLayoutEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -263,10 +263,26 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
 
   const busy = save.isPending || publish.isPending;
 
+  // Offset sticky DINÁMICO: la barra del builder es sticky bajo el topbar global
+  // (58px) y puede ENVOLVERSE a 2 líneas (con "Publicar" abajo). En vez de un número
+  // mágico, medimos su alto real y fijamos `--wl-sticky-top`, así el riel/paleta/
+  // inspector y el contenido nunca quedan atrapados detrás de la barra.
+  const topbarRef = useRef<HTMLDivElement>(null);
+  const [stickyTop, setStickyTop] = useState(132);
+  useLayoutEffect(() => {
+    const el = topbarRef.current;
+    if (!el) return;
+    const update = () => setStickyTop(58 + el.offsetHeight + 12);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   return (
-    <div className={styles.page}>
+    <div className={styles.page} style={{ ["--wl-sticky-top" as string]: `${stickyTop}px` }}>
       {/* Barra superior */}
-      <div className={styles.topbar}>
+      <div ref={topbarRef} className={styles.topbar}>
         <div className={styles.topLeft}>
           <Button variant="secondary" onClick={() => navigate("/plantillas")}>
             <ArrowLeft size={16} /> {t("templates.builder.back")}
