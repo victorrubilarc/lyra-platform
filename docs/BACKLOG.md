@@ -275,7 +275,15 @@ nunca queda más de una sesión atrás.
       (obligatorios, rangos min/max, **umbral ISA-18.2**, formato, **`visibleWhen`** condicional, validación 100% en backend
       con fuente única `validateFieldValue` reusada en cliente). Falta el **motor** que agregue: **(1)** validación
       **cruzada** entre campos (si A>B ⇒ error), **(2)** **obligatoriedad/visibilidad condicional** (extiende visibleWhen),
-      **(3)** **campos calculados** (fórmula), **(4)** **límites dinámicos** (min/max según otro campo o lista de
+      **(3)** **campos calculados / FORMULADOS** (valor derivado de otros campos + constantes + listas; read-only; auto-actualiza;
+      ej. `horas = fin − inicio`, `consumo = lect_final − lect_inicial`, `eficiencia = salida/entrada`, promedios/totales,
+      "días desde última mantención"). Detalles: **mismo** motor de expresión seguro; **se ESTAMPA el valor al guardar**
+      (registro histórico fijo y reportable, marcado como derivado; recalcula en DRAFT, congela al sellar — GxP);
+      **dependencias** (saber qué campos lo alimentan para recalcular); **el umbral ISA-18.2 puede aplicar al valor
+      calculado** (ej. eficiencia calculada dispara WARN); manejar **división por cero / inputs nulos** (⇒ vacío) y
+      **referencias circulares** (detectar y bloquear); formato regional vía `lib/format`. Cómo lo hacen: Salesforce
+      formula fields, Airtable/Notion formulas, ServiceNow calculated fields, hojas de cálculo. **(4)** **límites
+      dinámicos** (min/max según otro campo o lista de
       referencia), **(5)** **acciones**: mensaje error/advertencia/info, exigir firma, **abrir incidencia** (→Fase 4),
       **notificar** (→bloque Notificaciones), bloquear envío/transición, marcar para revisión, autocompletar.
       **Cómo lo hacen los grandes:** ServiceNow (Business Rules + UI/Data Policies declarativas + Flow Designer);
