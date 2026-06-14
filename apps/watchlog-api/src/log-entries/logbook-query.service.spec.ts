@@ -98,6 +98,7 @@ const versionGraph = {
 
 function makeServices(prismaOver: Record<string, unknown> = {}, scopeOver: Partial<ScopeService> = {}) {
   const prisma = {
+    $queryRaw: vi.fn().mockResolvedValue([]),
     template: { findUnique: vi.fn().mockResolvedValue({ name: "Plantilla" }), findMany: vi.fn().mockResolvedValue([]) },
     templateField: { findMany: vi.fn().mockResolvedValue([]) },
     templateVersion: { findUnique: vi.fn().mockResolvedValue(versionGraph) },
@@ -213,6 +214,22 @@ describe("LogbookQueryService — list", () => {
     await logbook.list("u1", { orgNodeIds: ["n1", "n2"] });
     const arg = (prisma.logEntry.findMany as ReturnType<typeof vi.fn>).mock.calls[0]![0];
     expect(arg.where.AND).toContainEqual({ orgNodeId: { in: ["n1", "n2"] } });
+  });
+
+  it("delayedOnly intersecta los ids atrasados (JOIN raw) en AND con el ABAC del where", async () => {
+    const { logbook, prisma } = makeServices({
+      $queryRaw: vi.fn().mockResolvedValue([{ id: "late-1" }, { id: "late-2" }]),
+      logEntry: {
+        findFirst: vi.fn(),
+        findMany: vi.fn().mockResolvedValue([]),
+        count: vi.fn(),
+        groupBy: vi.fn().mockResolvedValue([]),
+      },
+    });
+    await logbook.list("u1", { delayedOnly: true });
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+    const arg = (prisma.logEntry.findMany as ReturnType<typeof vi.fn>).mock.calls[0]![0];
+    expect(arg.where.AND).toContainEqual({ id: { in: ["late-1", "late-2"] } });
   });
 
   it("pagina por keyset: take+1 detecta página siguiente y el cursor reanuda", async () => {
@@ -373,7 +390,7 @@ describe("LogbookQueryService — facetas / excepciones / mi turno", () => {
       if (by === "equipmentId") return Promise.resolve([{ equipmentId: "e1", _count: { _all: 1 } }]);
       return Promise.resolve([]);
     });
-    const { logbook, prisma } = makeServices({
+    const { logbook } = makeServices({
       logEntry: { findFirst: vi.fn(), findMany: vi.fn(), count: vi.fn().mockResolvedValue(2), groupBy },
       template: { findUnique: vi.fn(), findMany: vi.fn().mockResolvedValue([{ id: "t1", name: "Plantilla X" }]) },
       equipment: { findMany: vi.fn().mockResolvedValue([{ id: "e1", tag: "EQ-1", name: "Bomba" }]) },
@@ -429,7 +446,8 @@ describe("LogbookQueryService — stats", () => {
           .mockResolvedValueOnce(10) // total
           .mockResolvedValueOnce(3) // firmas pendientes
           .mockResolvedValueOnce(2) // CRIT
-          .mockResolvedValueOnce(4), // WARN
+          .mockResolvedValueOnce(4) // WARN
+          .mockResolvedValueOnce(1), // atrasadas (Workflow SLA)
         groupBy: vi.fn().mockResolvedValue([
           { status: "DRAFT", _count: { _all: 6 } },
           { status: "SUBMITTED", _count: { _all: 4 } },
@@ -443,8 +461,9 @@ describe("LogbookQueryService — stats", () => {
       pendingSignatures: 3,
       withCrit: 2,
       withWarn: 4,
+      delayed: 1,
     });
-    expect(prisma.logEntry.count).toHaveBeenCalledTimes(4);
+    expect(prisma.logEntry.count).toHaveBeenCalledTimes(5);
   });
 });
 

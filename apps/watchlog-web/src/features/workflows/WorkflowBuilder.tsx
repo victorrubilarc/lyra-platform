@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, ChevronDown, ChevronRight, GitBranch, Info, ListChecks, PlayCircle, Plus, Save, Trash2, TriangleAlert } from "lucide-react";
+import { AlarmClock, ArrowLeft, ArrowRight, ChevronDown, ChevronRight, GitBranch, Info, ListChecks, PlayCircle, Plus, Save, Trash2, TriangleAlert } from "lucide-react";
 import { Button, Card, Checkbox, Chip, cx, FormField, Input, Modal, MultiSelect, Select, Textarea, Toggle, useToast } from "@lyra/ui";
 import { validateWorkflowMachine, type WorkflowDetail, type WorkflowStateDto, type WorkflowTransitionDto } from "@lyra/contracts";
 import { usePermissions } from "../../auth/use-permissions.js";
@@ -20,6 +20,7 @@ import {
   type EditWorkflowState,
   type EditWorkflowTransition,
 } from "./workflow-builder-model.js";
+import { SlaDurationField } from "./SlaDurationField.js";
 import { usePublishWorkflow, useSaveWorkflowDraft } from "./workflows-queries.js";
 import styles from "./WorkflowBuilder.module.css";
 
@@ -101,7 +102,7 @@ export function WorkflowBuilder({ detail }: { detail: WorkflowDetail }) {
     const name = t("workflows.builder.stateDefault", { n: wf.states.length + 1 });
     const key = uniqueKey(slugifyKey(name, `estado_${wf.states.length + 1}`), collectStateKeys(wf));
     const isInitial = wf.states.length === 0; // el primero es inicial por defecto
-    const state: EditWorkflowState = { uid: nextUid(), key, name, description: null, isInitial, isFinal: false, color: null, keyLocked: false };
+    const state: EditWorkflowState = { uid: nextUid(), key, name, description: null, isInitial, isFinal: false, color: null, maxStayMinutes: null, keyLocked: false };
     patch({ ...wf, states: [...wf.states, state] });
   }
 
@@ -238,6 +239,7 @@ export function WorkflowBuilder({ detail }: { detail: WorkflowDetail }) {
         isInitial: s.isInitial,
         isFinal: s.isFinal,
         color: s.color,
+        maxStayMinutes: s.maxStayMinutes,
       })),
     [wf.states],
   );
@@ -256,6 +258,8 @@ export function WorkflowBuilder({ detail }: { detail: WorkflowDetail }) {
         signatureMeaning: tr.signatureMeaning,
         requireMfa: tr.requireMfa,
         roleIds: tr.roleIds,
+        // El builder resuelve los nombres con la prop roleNameOf del diagrama.
+        roleNames: [],
       }));
   }, [wf.states, wf.transitions]);
 
@@ -489,6 +493,15 @@ export function WorkflowBuilder({ detail }: { detail: WorkflowDetail }) {
                         aria-label={t("workflows.builder.colorCustom")}
                       />
                     )}
+                  </div>
+                  <div className={styles.slaRow} title={t("workflows.builder.slaHint")}>
+                    <AlarmClock size={13} className={styles.slaIcon} aria-hidden />
+                    <span className={styles.slaLabel}>{t("workflows.builder.slaLabel")}</span>
+                    <SlaDurationField
+                      minutes={s.maxStayMinutes}
+                      disabled={!canEdit}
+                      onChange={(m) => updateState(s.uid, { maxStayMinutes: m })}
+                    />
                   </div>
                 </div>
               </div>

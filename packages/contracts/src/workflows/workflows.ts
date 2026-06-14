@@ -55,6 +55,9 @@ export const workflowStateSchema = z.object({
   isFinal: z.boolean(),
   /** Token de color del DS para el chip (opcional). */
   color: z.string().nullable(),
+  /** SLA de PERMANENCIA: tiempo máximo de estadía en el estado, en MINUTOS canónicos
+   *  (null = sin SLA). Tiempo calendario. Viaja en la versión congelada ⇒ histórico fiel. */
+  maxStayMinutes: z.number().int().nullable(),
 });
 export type WorkflowStateDto = z.infer<typeof workflowStateSchema>;
 
@@ -75,6 +78,11 @@ export const workflowTransitionSchema = z.object({
   requireMfa: z.boolean(),
   /** Roles autorizados a ejecutar la transición (autorización = dato). */
   roleIds: z.array(z.string()),
+  /** Nombres de esos roles, resueltos en backend (RESPONSABLE por elemento). El
+   *  builder los resuelve con su propia lista de roles (`roleNameOf`); el visor los
+   *  recibe ya resueltos aquí para mostrar el responsable fuera del builder. []
+   *  cuando el productor no resuelve nombres (p. ej. el mantenedor de flujos). */
+  roleNames: z.array(z.string()),
 });
 export type WorkflowTransitionDto = z.infer<typeof workflowTransitionSchema>;
 
@@ -289,6 +297,48 @@ export function hasBlockingMachineErrors(issues: readonly MachineIssue[]): boole
   return issues.some((i) => i.severity === "error");
 }
 
+// === SLA de permanencia (Workflow SLA, 2026-06-13) ============================
+
+/**
+ * Veredicto de SLA de un estado:
+ *  - `ok`: dentro del SLA (o sin SLA configurado).
+ *  - `at-risk`: alcanzó el umbral de riesgo (≥ 80% del SLA) sin superarlo aún.
+ *  - `breached`: superó el SLA (ATRASADO).
+ * Dos niveles = estándar de monitoreo (at-risk vs breach). El filtro/KPI "Retrasadas"
+ * cuenta solo `breached`; `at-risk` es señal proactiva de UI.
+ */
+export type SlaStatus = "ok" | "at-risk" | "breached";
+
+/** Fracción del SLA a partir de la cual el estado se marca "en riesgo" (ámbar). */
+export const SLA_AT_RISK_RATIO = 0.8;
+
+export interface SlaEvaluation {
+  status: SlaStatus;
+  /** Tiempo transcurrido en el estado, en ms (≥ 0). */
+  elapsedMs: number;
+  /** Duración del SLA en ms; null = sin SLA. */
+  slaMs: number | null;
+  /** ms por encima del SLA cuando `breached`; 0 en otros casos. */
+  overdueMs: number;
+}
+
+/**
+ * Evalúa el SLA de permanencia: fuente ÚNICA back↔front del veredicto de atraso.
+ * `sinceMs` = instante de entrada al estado; `slaMinutes` = SLA del estado (null =
+ * sin SLA); `nowMs` = ahora. El cliente formatea las duraciones con lib/format
+ * (regional); el backend lo usa para el cómputo de la grilla/diagrama.
+ */
+export function evaluateSla(sinceMs: number, slaMinutes: number | null, nowMs: number): SlaEvaluation {
+  const elapsedMs = Math.max(0, nowMs - sinceMs);
+  if (slaMinutes === null || slaMinutes <= 0) {
+    return { status: "ok", elapsedMs, slaMs: null, overdueMs: 0 };
+  }
+  const slaMs = slaMinutes * 60_000;
+  if (elapsedMs > slaMs) return { status: "breached", elapsedMs, slaMs, overdueMs: elapsedMs - slaMs };
+  if (elapsedMs >= slaMs * SLA_AT_RISK_RATIO) return { status: "at-risk", elapsedMs, slaMs, overdueMs: 0 };
+  return { status: "ok", elapsedMs, slaMs, overdueMs: 0 };
+}
+
 // === Requests ================================================================
 
 export const createWorkflowRequestSchema = z.object({
@@ -314,6 +364,8 @@ export const draftStateInputSchema = z.object({
   isInitial: z.boolean().optional(),
   isFinal: z.boolean().optional(),
   color: z.string().trim().max(32).nullable().optional(),
+  /** SLA de permanencia en MINUTOS canónicos (null/omitido = sin SLA). 1..525600 (365 d). */
+  maxStayMinutes: z.number().int().min(1).max(525_600).nullable().optional(),
 });
 export type DraftStateInput = z.infer<typeof draftStateInputSchema>;
 

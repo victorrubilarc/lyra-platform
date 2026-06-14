@@ -38,6 +38,7 @@ Keycloak **descartado** para el MVP (complejidad operacional); si un cliente lo 
 
 ### Aplicación (regla de oro)
 - **El backend SIEMPRE decide.** `PermissionsGuard` (NestJS) + decorador `@RequirePermission(...)` cubren dimensiones 1–3; el `ScopeService` aplica la dimensión 4 filtrando filas por `OrgNode` **y** `Template` (AND de los dos ejes).
+- **Cómputos derivados sobre el listado reusan el MISMO `where`+ABAC.** Tanto la búsqueda por contenido (`pg_trgm`) como el filtro/KPI/faceta **"Retrasadas"** (Workflow SLA) resuelven un set de ids candidatos con SQL crudo y lo **intersectan en AND** con el `where` del listado (que ya incluye los dos ejes ABAC) — nunca se confía en el set crudo ⇒ filtrar por atraso/contenido jamás amplía lo que el usuario puede ver. **Sin permisos nuevos** (catálogo **59**): el SLA es config del flujo, el atraso es una propiedad calculada del dato ya autorizado.
 - **La UI solo oculta** (mejor UX), nunca es la fuente de verdad.
 - El **catálogo de permisos** vive en `@lyra/contracts` (enum tipado), compartido por UI y backend.
 

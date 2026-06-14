@@ -542,3 +542,67 @@
   color: var(--color-text-primary);
   font-weight: 600;
 }
+.tipSlaBreached {
+  color: var(--color-error, #ef4444);
+  font-weight: 600;
+}
+
+/* ── SLA de permanencia (Workflow SLA) ── */
+/* Señal en el banner "Estás aquí". */
+.slaBanner {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+.slaBreached {
+  color: var(--color-error, #ef4444);
+  background: color-mix(in srgb, var(--color-error, #ef4444) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-error, #ef4444) 45%, transparent);
+}
+.slaAtRisk {
+  color: var(--color-warning, #f59e0b);
+  background: color-mix(in srgb, var(--color-warning, #f59e0b) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-warning, #f59e0b) 45%, transparent);
+}
+
+/* Nodo actual atrasado / en riesgo: anillo de color sobre el pulso del estado. */
+.nodeBreached {
+  border-color: var(--color-error, #ef4444) !important;
+  animation: wfSlaBreach 1.6s ease-in-out infinite;
+}
+@keyframes wfSlaBreach {
+  0%, 100% { box-shadow: 0 0 0 1px var(--color-error, #ef4444), 0 0 14px color-mix(in srgb, var(--color-error, #ef4444) 40%, transparent); }
+  50% { box-shadow: 0 0 0 2px var(--color-error, #ef4444), 0 0 26px color-mix(in srgb, var(--color-error, #ef4444) 66%, transparent); }
+}
+.nodeAtRisk {
+  border-color: var(--color-warning, #f59e0b) !important;
+  box-shadow: 0 0 0 1px var(--color-warning, #f59e0b), 0 0 14px color-mix(in srgb, var(--color-warning, #f59e0b) 40%, transparent);
+}
+/* Píldora de estado de SLA dentro del nodo. */
+.nodeSla {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+.nodeSlaBreached {
+  color: #fff;
+  background: var(--color-error, #ef4444);
+}
+.nodeSlaAtRisk {
+  color: var(--color-warning, #f59e0b);
+  background: color-mix(in srgb, var(--color-warning, #f59e0b) 16%, transparent);
+}
+/* Badge de tramo que excedió su SLA: ámbar (en vez del color del estado destino). */
+.edgeBadgeOverSla {
+  background: var(--color-warning, #f59e0b);
+  color: #1a1205;
+  border-color: color-mix(in srgb, #fff 30%, transparent);
+}

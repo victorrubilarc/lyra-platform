@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  evaluateSla,
   hasBlockingMachineErrors,
   saveWorkflowDraftRequestSchema,
+  SLA_AT_RISK_RATIO,
   validateWorkflowMachine,
   workflowKeySchema,
 } from "./workflows.js";
@@ -16,6 +18,39 @@ const validTransitions = [
   { key: "send", fromStateKey: "draft", toStateKey: "review" },
   { key: "approve", fromStateKey: "review", toStateKey: "closed" },
 ];
+
+describe("evaluateSla", () => {
+  const now = Date.UTC(2026, 5, 13, 12, 0, 0);
+  const min = (m: number) => now - m * 60_000;
+
+  it("sin SLA configurado ⇒ ok y slaMs null", () => {
+    const r = evaluateSla(min(10_000), null, now);
+    expect(r.status).toBe("ok");
+    expect(r.slaMs).toBeNull();
+    expect(r.overdueMs).toBe(0);
+  });
+
+  it("dentro del SLA y bajo el umbral de riesgo ⇒ ok", () => {
+    // 30 min de 60 = 50% < 80% ⇒ ok.
+    expect(evaluateSla(min(30), 60, now).status).toBe("ok");
+  });
+
+  it("alcanza el umbral de riesgo (≥80%) sin vencer ⇒ at-risk", () => {
+    expect(evaluateSla(min(60 * SLA_AT_RISK_RATIO), 60, now).status).toBe("at-risk");
+    expect(evaluateSla(min(59), 60, now).status).toBe("at-risk");
+  });
+
+  it("supera el SLA ⇒ breached con overdueMs positivo", () => {
+    const r = evaluateSla(min(90), 60, now);
+    expect(r.status).toBe("breached");
+    expect(r.overdueMs).toBe(30 * 60_000);
+    expect(r.slaMs).toBe(60 * 60_000);
+  });
+
+  it("nunca produce elapsedMs negativo (since en el futuro)", () => {
+    expect(evaluateSla(now + 5_000, 60, now).elapsedMs).toBe(0);
+  });
+});
 
 describe("validateWorkflowMachine", () => {
   it("acepta una máquina lineal válida", () => {

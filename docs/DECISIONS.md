@@ -4,6 +4,31 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-13 · Workflow SLA + atrasos — ✅ IMPLEMENTADO (forks resueltos)
+
+Implementación del plan aprobado abajo. **SLA por ESTADO** (`WorkflowState.maxStayMinutes` nullable, minutos canónicos,
+migración aditiva). 4 forks resueltos con el dueño (recomendación aceptada en los 4):
+
+1. **Unidad del SLA = Min / Horas / Días** (UI), almacenado en **minutos canónicos** (espejo de la ventana de edición 2.7.2,
+   con "Días" añadido porque los SLA operacionales suelen medirse en días). `slaDurationField` propio.
+2. **Tiempo CALENDARIO** en el MVP (horas hábiles = futuro, requiere el calendario operacional/turnos → BACKLOG §3).
+3. **Estampar `LogEntry.currentStateSince`** (columna aditiva, seteada al crear = `recordedAt` y en cada transición =
+   `occurredAt`): evita la subconsulta `MAX(transición)` y es semántica de primera clase. El filtro/KPI **"Retrasadas"** se
+   computa con un **JOIN raw** `LogEntry→WorkflowState` (`currentStateSince + maxStayMinutes < now()`), intersectado con el
+   `where`+ABAC del listado (mismo patrón que la búsqueda por contenido 2.8.1a ⇒ cero fuga). A escala = endurecimiento Fase 7.
+4. **Dos niveles de alerta** (estándar de monitoreo at-risk vs breach): estado actual **`at-risk` (ámbar)** al alcanzar el
+   **80%** del SLA (`SLA_AT_RISK_RATIO`), **`breached` (rojo)** al superarlo; tramos pasados sobre su SLA = ámbar. El **filtro
+   `delayedOnly`/KPI** cuenta solo **breached** (vencido, no en riesgo) para mantenerlo crítico.
+5. **Superficie completa de "Retrasadas"** (espejo de `exceptionsOnly`): flag `delayedOnly`, KPI en `stats`, bucket en
+   `/facets`, indicador "Atraso" por fila + columna, y **vista de SISTEMA** "Retrasadas".
+6. **Responsable en el VISOR** (sin migración): la versión de flujo CONGELADA expuesta en el detalle resuelve `roleNames` por
+   transición (backend); el `WorkflowDiagram` usa `roleNameOf` (builder) o cae a `tr.roleNames` (visor).
+
+Helper puro **`evaluateSla`** en `@lyra/contracts` (workflows) = fuente única back↔front del veredicto de SLA; el cliente
+formatea duraciones con `lib/format` (regional). El SLA viaja en la versión congelada ⇒ los registros históricos conservan su SLA.
+
+---
+
 ### 2026-06-13 · Diagrama de flujo premium + plan SLA/atrasos — ✅ (visual) / 📋 (SLA aprobado, pendiente)
 
 **Hecho (visual, sin modelo):** `WorkflowDiagram` reusable en visor/grilla (modo REGISTRO) y mantenedor de flujos (modo

@@ -129,8 +129,9 @@ export class LogbookQueryService {
 
   /** KPIs del set filtrado (mismo `where` que el listado). */
   async stats(userId: string, query: LogEntryListQuery): Promise<LogEntryStats> {
-    const where = await this.buildWhere(userId, query);
-    const [total, byStatus, pendingSignatures, withCrit, withWarn] = await Promise.all([
+    const delayedIds = await this.delayedEntryIds();
+    const where = await this.buildWhere(userId, query, { delayedIds });
+    const [total, byStatus, pendingSignatures, withCrit, withWarn, delayed] = await Promise.all([
       this.prisma.logEntry.count({ where }),
       this.prisma.logEntry.groupBy({ by: ["status"], where, _count: { _all: true } }),
       this.prisma.logEntry.count({
@@ -138,11 +139,12 @@ export class LogbookQueryService {
       }),
       this.prisma.logEntry.count({ where: { AND: [where, { values: { some: { thresholdBand: "CRIT" } } }] } }),
       this.prisma.logEntry.count({ where: { AND: [where, { values: { some: { thresholdBand: "WARN" } } }] } }),
+      this.prisma.logEntry.count({ where: { AND: [where, { id: { in: delayedIds } }] } }),
     ]);
 
     const statusCount = { DRAFT: 0, SUBMITTED: 0, VOID: 0 };
     for (const row of byStatus) statusCount[row.status] = row._count._all;
-    return { total, byStatus: statusCount, pendingSignatures, withCrit, withWarn };
+    return { total, byStatus: statusCount, pendingSignatures, withCrit, withWarn, delayed };
   }
 
   /** Tope de buckets por faceta de alta cardinalidad (top-N por conteo). */
@@ -155,13 +157,15 @@ export class LogbookQueryService {
    * escala migra a rollups/aproximado (Fase 7, BACKLOG §3).
    */
   async facets(userId: string, query: LogEntryListQuery): Promise<LogEntryFacets> {
-    const without = (omit: Partial<LogEntryListQuery>) => this.buildWhere(userId, { ...query, ...omit });
-    const [statusW, stateW, templateW, equipW, bandW] = await Promise.all([
+    const delayedIds = await this.delayedEntryIds();
+    const without = (omit: Partial<LogEntryListQuery>) => this.buildWhere(userId, { ...query, ...omit }, { delayedIds });
+    const [statusW, stateW, templateW, equipW, bandW, delayedW] = await Promise.all([
       without({ status: undefined }),
       without({ stateKey: undefined }),
       without({ templateId: undefined }),
       without({ equipmentId: undefined }),
       without({ thresholdBand: undefined }),
+      without({ delayedOnly: undefined }),
     ]);
 
     const [statusG, stateG, templateG, equipG, warnC, critC] = await Promise.all([
@@ -180,6 +184,8 @@ export class LogbookQueryService {
       this.prisma.logEntry.count({ where: { AND: [bandW, { values: { some: { thresholdBand: "WARN" } } }] } }),
       this.prisma.logEntry.count({ where: { AND: [bandW, { values: { some: { thresholdBand: "CRIT" } } }] } }),
     ]);
+
+    const delayedCount = await this.prisma.logEntry.count({ where: { AND: [delayedW, { id: { in: delayedIds } }] } });
 
     // Enriquecimiento de etiquetas (nombres de plantilla/estado/equipo), batched.
     const templateIds = templateG.map((g) => g.templateId);
@@ -232,6 +238,7 @@ export class LogbookQueryService {
         { value: "CRIT", label: "CRIT", count: critC },
         { value: "WARN", label: "WARN", count: warnC },
       ].filter((b) => b.count > 0),
+      delayed: delayedCount,
     };
   }
 
@@ -642,7 +649,11 @@ export class LogbookQueryService {
    * `where` compartido por listado / stats / export: ABAC SIEMPRE + todos los
    * filtros del contrato aplicados en SQL.
    */
-  private async buildWhere(userId: string, query: LogEntryListQuery): Promise<Prisma.LogEntryWhereInput> {
+  private async buildWhere(
+    userId: string,
+    query: LogEntryListQuery,
+    opts?: { delayedIds?: string[] },
+  ): Promise<Prisma.LogEntryWhereInput> {
     const and: Prisma.LogEntryWhereInput[] = [{ deletedAt: null }];
 
     const accessible = await this.scope.getAccessibleNodeIds(userId);
@@ -716,6 +727,15 @@ export class LogbookQueryService {
           { sections: { some: { requiresSignature: true, signatureId: null } } },
         ],
       });
+    }
+
+    // Atrasadas (Workflow SLA): el conjunto de ids vencidos se computa con un JOIN raw
+    // (LogEntry→WorkflowState del estado actual de la versión CONGELADA) y se intersecta
+    // aquí en AND con el ABAC ⇒ filtrar por atraso jamás amplía el alcance. Mismo patrón
+    // que la búsqueda por contenido. A escala (Fase 7) = materializar el atraso (BACKLOG §3).
+    if (query.delayedOnly) {
+      const ids = opts?.delayedIds ?? (await this.delayedEntryIds());
+      and.push({ id: { in: ids } });
     }
 
     if (query.q) {
@@ -820,7 +840,7 @@ export class LogbookQueryService {
       wfVersionIds.length
         ? this.prisma.workflowState.findMany({
             where: { workflowDefinitionVersionId: { in: wfVersionIds } },
-            select: { workflowDefinitionVersionId: true, key: true, name: true, color: true },
+            select: { workflowDefinitionVersionId: true, key: true, name: true, color: true, maxStayMinutes: true },
           })
         : Promise.resolve([]),
       this.prisma.logEntrySection.findMany({
@@ -835,8 +855,13 @@ export class LogbookQueryService {
       }),
     ]);
 
-    const stateByVersionAndKey = new Map<string, { name: string; color: string | null }>();
-    for (const s of states) stateByVersionAndKey.set(`${s.workflowDefinitionVersionId}:${s.key}`, { name: s.name, color: s.color });
+    const stateByVersionAndKey = new Map<string, { name: string; color: string | null; maxStayMinutes: number | null }>();
+    for (const s of states)
+      stateByVersionAndKey.set(`${s.workflowDefinitionVersionId}:${s.key}`, {
+        name: s.name,
+        color: s.color,
+        maxStayMinutes: s.maxStayMinutes,
+      });
 
     const indicatorsById = new Map<string, LogEntryIndicators>();
     const blank = (): LogEntryIndicators => ({
@@ -895,10 +920,38 @@ export class LogbookQueryService {
         createdByName: row.createdById ? (names.get(row.createdById) ?? null) : null,
         currentStateName: state?.name ?? null,
         currentStateColor: state?.color ?? null,
+        currentStateSince: row.currentStateSince?.toISOString() ?? null,
+        currentStateMaxStayMinutes: state?.maxStayMinutes ?? null,
         indicators: indicatorsById.get(row.id) ?? blank(),
         summaryValues: summariesById.get(row.id) ?? [],
       };
     });
+  }
+
+  /** Tope de ids de entradas atrasadas resueltos por el JOIN raw (deuda de escala Fase 7). */
+  static readonly DELAYED_IDS_LIMIT = 5000;
+
+  /**
+   * Ids de entradas ATRASADAS (Workflow SLA): DRAFT cuyo estado ACTUAL excede su SLA
+   * de permanencia (`now − currentStateSince > maxStayMinutes`). JOIN a `WorkflowState`
+   * de la versión CONGELADA del flujo (el SLA viaja en la versión). Sin ABAC: el llamador
+   * lo intersecta en AND con el `where`+ABAC del listado (cero fuga). Calendario, no horas
+   * hábiles (MVP). Tope `DELAYED_IDS_LIMIT` (materialización a escala = BACKLOG §3).
+   */
+  private async delayedEntryIds(): Promise<string[]> {
+    const rows = await this.prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT le."id"
+      FROM "LogEntry" le
+      JOIN "WorkflowState" ws
+        ON ws."workflowDefinitionVersionId" = le."workflowDefinitionVersionId"
+       AND ws."key" = le."currentStateKey"
+      WHERE le."status" = 'DRAFT'
+        AND le."deletedAt" IS NULL
+        AND le."currentStateSince" IS NOT NULL
+        AND ws."maxStayMinutes" IS NOT NULL
+        AND le."currentStateSince" + (ws."maxStayMinutes" * interval '1 minute') < now()
+      LIMIT ${LogbookQueryService.DELAYED_IDS_LIMIT}`;
+    return rows.map((r) => r.id);
   }
 
   /** Unión de los `gridFieldKeys` de TODAS las plantillas (set chico, para la

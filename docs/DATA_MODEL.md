@@ -74,6 +74,10 @@
   `Restrict`), `equipmentId?` (FK `SetNull`), `templateId`/`templateVersionId` (FK `Restrict`, integridad histórica),
   `currentStateKey?` (estado del flujo; null = sin flujo), `status` (`DRAFT`/`SUBMITTED`/`VOID`), `sealedAt?`,
   `deletedAt?`. La trazabilidad temporal es **estructural**, no un campo que se agrega.
+  - **`currentStateSince?`** *(Workflow SLA, migración `20260613140000_add_workflow_sla`)* — momento de ENTRADA al
+    estado actual: seteado al crear (= `recordedAt`) y en cada transición (= `occurredAt`). Base de cómputo del ATRASO
+    (`now − currentStateSince > maxStayMinutes` del estado actual). Estampado aditivo que evita la subconsulta
+    `MAX(transición)`. Backfill desde la última transición o `recordedAt`. Índice `currentStateSince`.
   - **`entryNumber`** *(Fase 2.6, migración `20260610051359_add_logbook_review_columns`)* — **folio humano
     correlativo** único (secuencia BD; backfill ordenado por `recordedAt`). Referencia estable de auditoría/terreno
     (`BIT-000123` vía `formatEntryFolio`). Índices 2.6 añadidos: `createdById`, `currentStateKey`.
@@ -165,7 +169,9 @@
   `versionNumber`, `status`, `name/description` (snapshot), `publishedAt/By`. Referenciada/congelada por
   `TemplateVersion`. Editar publicada **clona** un borrador nuevo.
 - **WorkflowState** *(implementado)* — estado de la máquina: `key` (estable en la versión), `name`, `description?`,
-  `order`, `isInitial` (exactamente uno), `isFinal` (≥1), `color?` (token DS). `TemplateSection.editableInStateKey`
+  `order`, `isInitial` (exactamente uno), `isFinal` (≥1), `color?` (token DS), **`maxStayMinutes?`** *(Workflow SLA,
+  migración `20260613140000_add_workflow_sla`)* = SLA de PERMANENCIA en minutos canónicos (null = sin SLA; check
+  1..525600). Viaja en la versión CONGELADA ⇒ histórico fiel. `TemplateSection.editableInStateKey`
   referencia un estado por **clave** dentro de la versión de flujo congelada (no FK; ver DECISIONS 2026-06-09).
 - **WorkflowTransition** *(implementado)* — transición dirigida: `key`, `label`, `fromStateId`/`toStateId` (FK a
   `WorkflowState` de la misma versión), `order`, `requireSignature`+`signatureMeaning?` (Part 11 opt-in),

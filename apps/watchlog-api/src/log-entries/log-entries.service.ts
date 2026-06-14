@@ -133,7 +133,9 @@ export const workflowVersionInclude = {
     include: {
       fromState: { select: { key: true } },
       toState: { select: { key: true } },
-      roles: { select: { roleId: true } },
+      // Nombre del rol resuelto: el visor muestra el RESPONSABLE por elemento sin
+      // depender del builder (que tiene su propia lista de roles).
+      roles: { select: { roleId: true, role: { select: { name: true } } } },
     },
   },
 } satisfies Prisma.WorkflowDefinitionVersionInclude;
@@ -273,6 +275,8 @@ export class LogEntriesService {
       orgNodeId,
       equipmentId: dto.equipmentId ?? null,
       currentStateKey,
+      // Entra al estado inicial al crearse: base de cómputo del SLA (Workflow SLA).
+      currentStateSince: recordedAt,
       status: "DRAFT" as const,
       recordedAt,
       effectiveAt,
@@ -1252,6 +1256,8 @@ export class LogEntriesService {
         where: { id },
         data: {
           currentStateKey: toState.key,
+          // Reinicia el reloj de SLA: ahora se entra al estado destino (Workflow SLA).
+          currentStateSince: now,
           status: nextStatus,
           updatedById: userId,
           ...(seal ? { sealedAt: now, ...seal } : {}),
@@ -1757,6 +1763,7 @@ export class LogEntriesService {
         isInitial: s.isInitial,
         isFinal: s.isFinal,
         color: s.color,
+        maxStayMinutes: s.maxStayMinutes,
       })),
       transitions: version.transitions.map((t) => ({
         id: t.id,
@@ -1769,6 +1776,7 @@ export class LogEntriesService {
         signatureMeaning: t.signatureMeaning,
         requireMfa: t.requireMfa,
         roleIds: t.roles.map((r) => r.roleId),
+        roleNames: t.roles.map((r) => r.role.name),
       })),
     };
   }

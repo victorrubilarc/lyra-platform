@@ -27,6 +27,8 @@ export interface LogbookGridState {
   pendingSignature: boolean;
   /** Review-by-exception (2.8.1c): solo lo accionable (umbral WARN/CRIT OR firma pendiente). */
   exceptionsOnly: boolean;
+  /** Workflow SLA: solo entradas ATRASADAS (estado actual sobre su SLA). */
+  delayedOnly: boolean;
   thresholdBand: "" | "WARN" | "CRIT" | "ANY";
   /** Origen del registro (2.7.0): "" = todos. */
   entryOrigin: "" | "ONLINE" | "DEFERRED";
@@ -56,6 +58,7 @@ export const DEFAULT_GRID_STATE: LogbookGridState = {
   onlyMine: false,
   pendingSignature: false,
   exceptionsOnly: false,
+  delayedOnly: false,
   thresholdBand: "",
   entryOrigin: "",
   sorts: DEFAULT_SORTS,
@@ -90,6 +93,7 @@ export function toListQuery(state: LogbookGridState, currentUserId: string | nul
     createdById: state.onlyMine && currentUserId ? currentUserId : undefined,
     pendingSignature: state.pendingSignature || undefined,
     exceptionsOnly: state.exceptionsOnly || undefined,
+    delayedOnly: state.delayedOnly || undefined,
     thresholdBand: state.thresholdBand || undefined,
     entryOrigin: state.entryOrigin || undefined,
     sorts: state.sorts.length ? state.sorts : DEFAULT_SORTS,
@@ -141,7 +145,7 @@ export function gridStateFromParams(params: URLSearchParams): LogbookGridState {
     const raw = params.get(key);
     if (raw !== null) state[key] = raw;
   }
-  for (const key of ["includeDescendants", "onlyMine", "pendingSignature", "exceptionsOnly"] as const) {
+  for (const key of ["includeDescendants", "onlyMine", "pendingSignature", "exceptionsOnly", "delayedOnly"] as const) {
     const raw = params.get(key);
     if (raw !== null) state[key] = raw === "true";
   }

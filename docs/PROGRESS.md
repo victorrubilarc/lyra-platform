@@ -183,6 +183,25 @@ nuevos (catálogo 59). Tests: contracts **163** · API **227** (+3: facetas herm
 **11/11** (`scripts/smoke-facets-peek.py`: facetas 5 dims, hermanos no se autoanulan + total acota 46→41, exceptionsOnly 1≤46,
 my-shift turno "dia", ABAC 3 usuarios). typecheck/lint(0)/build verdes. **Pendiente: smoke VISUAL del dueño.** **2.8.1 COMPLETA.**
 
+**+ Workflow SLA + atrasos ✅ (2026-06-13, `feat/workflow-sla-atrasos` → `main`).** SLA de PERMANENCIA por ESTADO
+(decisión del dueño). 4 forks resueltos (DECISIONS 2026-06-13). **Modelo:** `WorkflowState.maxStayMinutes Int?` (minutos
+canónicos, check 1..525600) + `LogEntry.currentStateSince DateTime?` (estampado al crear = `recordedAt` y en cada
+transición = `occurredAt`; backfill desde MAX(transición)|recordedAt). Migración aditiva `20260613140000_add_workflow_sla`.
+**Contrato:** `workflowStateSchema.maxStayMinutes` + `draftStateInputSchema` + helper puro **`evaluateSla`** (fuente única:
+`ok`/`at-risk` ≥80%/`breached`; `SLA_AT_RISK_RATIO`) + `roleNames` en la transición (responsable en el visor) + ítem de lista
+(`currentStateSince`/`currentStateMaxStayMinutes`) + `delayedOnly` en la query + `stats.delayed` + `facets.delayed` + vista de
+sistema "Retrasadas". **Persistencia:** el SLA viaja en la versión congelada (`saveDraft`/`ensureDraft`/`mapVersion`); el visor
+resuelve `roleNames` (include de rol con nombre, sin migración). **Grilla:** `delayedEntryIds()` = JOIN raw
+`LogEntry→WorkflowState` (`currentStateSince + maxStayMinutes < now()`) intersectado en AND con el `where`+ABAC (mismo patrón
+que la búsqueda por contenido ⇒ cero fuga); KPI "Retrasadas", faceta toggle, columna/badge "Atraso" por fila (rojo vencido /
+ámbar en riesgo). **Diagrama (registro):** nodo actual con anillo rojo "Atrasado hace X · SLA Y" / ámbar "En riesgo"; tramos
+pasados sobre su SLA = badge ámbar; SLA + responsable en tooltips. **Builder:** `SlaDurationField` (Min/Horas/**Días** →
+minutos, espejo de la ventana de edición 2.7.2) por estado. Tiempo CALENDARIO (horas hábiles = Fase 7). Duraciones vía
+`lib/format.formatDuration` (regional). **Sin permisos nuevos — catálogo 59.** Tests: contracts **168** (+5 `evaluateSla`) ·
+API **228** (+1 delayedOnly). Smoke en vivo **20/20** (`scripts/smoke-workflow-sla.py`: round-trip SLA builder/publish,
+roleNames en versión congelada, delayedOnly/stats/facets, `currentStateSince` gobierna el atraso, ABAC 3 usuarios; muta por
+psql y RESTAURA). typecheck/lint(0)/build verdes. **Pendiente: smoke VISUAL del dueño** (§4).
+
 ## Hecho en Fase 2.7.2 (Ventana de edición configurable — gobernanza temporal #6)
 
 2.º eslabón de la gobernanza temporal: plazo para CORREGIR un registro; vencido, solo se edita con privilegio explícito

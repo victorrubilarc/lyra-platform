@@ -14,6 +14,8 @@ export interface EditWorkflowState {
   isInitial: boolean;
   isFinal: boolean;
   color: string | null;
+  /** SLA de permanencia en MINUTOS canónicos (null = sin SLA). Tiempo calendario. */
+  maxStayMinutes: number | null;
   /** La clave fue fijada por el usuario (deja de seguir al nombre). Solo local. */
   keyLocked: boolean;
 }
@@ -73,6 +75,7 @@ export function detailToEditWorkflow(detail: WorkflowDetail): EditWorkflow {
       isInitial: s.isInitial,
       isFinal: s.isFinal,
       color: s.color,
+      maxStayMinutes: s.maxStayMinutes,
       // Estados ya existentes: preservar su clave (no auto-renombrar al editar el nombre).
       keyLocked: true,
     })),
@@ -109,6 +112,7 @@ export function editWorkflowToDraftRequest(wf: EditWorkflow): SaveWorkflowDraftR
       isInitial: s.isInitial,
       isFinal: s.isFinal,
       color: s.color,
+      maxStayMinutes: s.maxStayMinutes,
     })),
     transitions: wf.transitions.map((t, i) => ({
       key: t.key,

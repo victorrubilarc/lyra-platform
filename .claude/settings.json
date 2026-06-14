@@ -9,7 +9,12 @@
       "Bash(:)",
       "Bash(wait)",
       "Bash(pnpm --filter @lyra/ui run lint)",
-      "Bash(grep -n \"GitBranch\\\\|import.*from \\\\\"./\\\\|Workflow\" apps/watchlog-web/src/features/logbook/EntryViewerPage.tsx)"
+      "Bash(grep -n \"GitBranch\\\\|import.*from \\\\\"./\\\\|Workflow\" apps/watchlog-web/src/features/logbook/EntryViewerPage.tsx)",
+      "Bash(grep \"\\\\.ts$\")",
+      "PowerShell(\"node detenido\")",
+      "Bash(nohup pnpm dev)",
+      "Bash(echo \"dev lanzado, pid $!\")",
+      "Bash(python scripts/smoke-workflow-sla.py)"
     ]
   }
 }
