@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Clock, Flag, Lock, Play, User } from "lucide-react";
-import type { LogEntryDetail, WorkflowStateDto } from "@lyra/contracts";
+import type { LogEntryDetail, WorkflowStateDto, WorkflowTransitionDto } from "@lyra/contracts";
 import { formatDateTime } from "../../lib/format.js";
 import styles from "./WorkflowDiagram.module.css";
 
@@ -103,6 +103,7 @@ const FALLBACK_COLOR = "var(--color-accent-primary, #6366f1)";
 export function WorkflowDiagram({ entry }: { entry: LogEntryDetail }) {
   const { t } = useTranslation();
   const [hovered, setHovered] = useState<string | null>(null); // transitionKey resaltado
+  const [tip, setTip] = useState<{ x: number; y: number; content: ReactNode } | null>(null);
 
   const wf = entry.workflowVersion;
   const executed = useMemo(
@@ -131,6 +132,88 @@ export function WorkflowDiagram({ entry }: { entry: LogEntryDetail }) {
   });
 
   const anchor = (key: string) => layout.nodes.get(key)!;
+  const stateName = (key: string) => wf.states.find((s) => s.key === key)?.name ?? key;
+  // Color de la transición = color de su estado DESTINO (hacia dónde lleva).
+  const stateColorOf = (key: string) => wf.states.find((s) => s.key === key)?.color ?? FALLBACK_COLOR;
+
+  /** Contenido del tooltip de un ESTADO: identidad + situación + cómo se ingresó. */
+  function nodeTip(s: WorkflowStateDto): ReactNode {
+    const step = visitStep.get(s.key);
+    const isCurrent = s.key === entry.currentStateKey;
+    const enter = [...executed].reverse().find((tr) => tr.toStateKey === s.key);
+    const color = s.color ?? FALLBACK_COLOR;
+    return (
+      <>
+        <div className={styles.tipTitle}>
+          <span className={styles.tipDot} style={{ background: color }} />
+          {s.name}
+        </div>
+        <div className={styles.tipTags}>
+          {s.isInitial && <span className={styles.tipTag}>{t("logbook.diagram.tipInitial")}</span>}
+          {s.isFinal && <span className={styles.tipTag}>{t("logbook.diagram.tipFinal")}</span>}
+          {isCurrent && <span className={`${styles.tipTag} ${styles.tipTagOn}`}>{t("logbook.diagram.current")}</span>}
+          <span className={styles.tipTag}>{step ? t("logbook.diagram.tipStep", { n: step }) : t("logbook.diagram.pending")}</span>
+        </div>
+        {s.description && <div className={styles.tipDesc}>{s.description}</div>}
+        {enter ? (
+          <div className={styles.tipMeta}>
+            <div className={styles.tipMetaStrong}>{enter.label ?? enter.transitionKey}</div>
+            <div>
+              <User size={11} /> {enter.actorName ?? "—"}
+            </div>
+            <div>
+              <Clock size={11} /> {formatDateTime(enter.occurredAt)}
+            </div>
+          </div>
+        ) : s.isInitial ? (
+          <div className={styles.tipMeta}>{t("logbook.diagram.tipInitialNote")}</div>
+        ) : null}
+      </>
+    );
+  }
+
+  /** Contenido del tooltip de una TRANSICIÓN: acción + recorrido + ejecución/posible. */
+  function transitionTip(tr: WorkflowTransitionDto): ReactNode {
+    const execs = executed.filter((e) => e.transitionKey === tr.key);
+    const last = execs[execs.length - 1];
+    return (
+      <>
+        <div className={styles.tipTitle}>{tr.label}</div>
+        <div className={styles.tipFlow}>
+          {stateName(tr.fromStateKey)} <span className={styles.tipArrow}>→</span> {stateName(tr.toStateKey)}
+        </div>
+        {last ? (
+          <div className={styles.tipMeta}>
+            <div>
+              <User size={11} /> {last.actorName ?? "—"}
+            </div>
+            <div>
+              <Clock size={11} /> {formatDateTime(last.occurredAt)}
+            </div>
+            {last.reason && <div className={styles.tipReason}>“{last.reason}”</div>}
+            {last.signature && (
+              <div className={styles.tipSig}>
+                <Lock size={11} /> {last.signature.meaning}
+              </div>
+            )}
+            {execs.length > 1 && <div>{t("logbook.diagram.tipTimes", { n: execs.length })}</div>}
+          </div>
+        ) : (
+          <div className={styles.tipMeta}>
+            <div>{t("logbook.diagram.tipPossible")}</div>
+            {tr.requireSignature && (
+              <div className={styles.tipSig}>
+                <Lock size={11} /> {tr.signatureMeaning ?? t("logbook.diagram.tipNeedsSign")}
+              </div>
+            )}
+          </div>
+        )}
+      </>
+    );
+  }
+
+  const showTip = (e: { clientX: number; clientY: number }, content: ReactNode) =>
+    setTip({ x: e.clientX, y: e.clientY, content });
 
   function edgeGeometry(t0: { fromStateKey: string; toStateKey: string }) {
     const a = anchor(t0.fromStateKey);
@@ -167,11 +250,10 @@ export function WorkflowDiagram({ entry }: { entry: LogEntryDetail }) {
         <div className={styles.canvas} style={{ width: layout.width, height: layout.height }}>
           <svg className={styles.edges} width={layout.width} height={layout.height} aria-hidden>
             <defs>
+              {/* La punta de flecha hereda el color del trazo (context-stroke) ⇒ cada
+                  transición lleva el color de su estado destino sin marcadores por color. */}
               <marker id="wf-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-                <path d="M0,0 L10,5 L0,10 z" className={styles.arrowHead} />
-              </marker>
-              <marker id="wf-arrow-on" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-                <path d="M0,0 L10,5 L0,10 z" className={styles.arrowHeadOn} />
+                <path d="M0,0 L10,5 L0,10 z" fill="context-stroke" />
               </marker>
             </defs>
             {wf.transitions.map((tr) => {
@@ -179,14 +261,32 @@ export function WorkflowDiagram({ entry }: { entry: LogEntryDetail }) {
               const orders = traversed.get(tr.key);
               const on = Boolean(orders);
               const hot = hovered === tr.key;
+              const toColor = stateColorOf(tr.toStateKey);
               return (
-                <path
-                  key={tr.key}
-                  d={g.path}
-                  fill="none"
-                  className={`${styles.edge} ${on ? styles.edgeOn : ""} ${hot ? styles.edgeHot : ""}`}
-                  markerEnd={on ? "url(#wf-arrow-on)" : "url(#wf-arrow)"}
-                />
+                <g key={tr.key}>
+                  <path
+                    d={g.path}
+                    fill="none"
+                    className={`${styles.edge} ${on ? styles.edgeOn : ""} ${hot ? styles.edgeHot : ""}`}
+                    style={on ? { stroke: toColor } : undefined}
+                    markerEnd="url(#wf-arrow)"
+                  />
+                  {/* Hit-path invisible y ancho: hace fácil pasar el cursor por la arista. */}
+                  <path
+                    d={g.path}
+                    fill="none"
+                    className={styles.edgeHit}
+                    onMouseEnter={(e) => {
+                      setHovered(tr.key);
+                      showTip(e, transitionTip(tr));
+                    }}
+                    onMouseMove={(e) => showTip(e, transitionTip(tr))}
+                    onMouseLeave={() => {
+                      setHovered(null);
+                      setTip(null);
+                    }}
+                  />
+                </g>
               );
             })}
           </svg>
@@ -200,8 +300,16 @@ export function WorkflowDiagram({ entry }: { entry: LogEntryDetail }) {
               <span
                 key={`b-${tr.key}`}
                 className={`${styles.edgeBadge} ${hovered === tr.key ? styles.edgeBadgeHot : ""}`}
-                style={{ left: g.mx, top: g.my }}
-                title={tr.label}
+                style={{ left: g.mx, top: g.my, background: `color-mix(in srgb, ${stateColorOf(tr.toStateKey)} 88%, #000)` }}
+                onMouseEnter={(e) => {
+                  setHovered(tr.key);
+                  showTip(e, transitionTip(tr));
+                }}
+                onMouseMove={(e) => showTip(e, transitionTip(tr))}
+                onMouseLeave={() => {
+                  setHovered(null);
+                  setTip(null);
+                }}
               >
                 {orders.length > 1 ? `${orders[0]}…` : orders[0]}
               </span>
@@ -230,6 +338,9 @@ export function WorkflowDiagram({ entry }: { entry: LogEntryDetail }) {
                   height: NODE_H,
                   ["--state-color" as string]: color,
                 }}
+                onMouseEnter={(e) => showTip(e, nodeTip(s))}
+                onMouseMove={(e) => showTip(e, nodeTip(s))}
+                onMouseLeave={() => setTip(null)}
               >
                 <div className={styles.nodeTop}>
                   {s.isInitial && <Play size={12} className={styles.nodeMark} />}
@@ -246,6 +357,13 @@ export function WorkflowDiagram({ entry }: { entry: LogEntryDetail }) {
           })}
         </div>
       </div>
+
+      {/* Tooltip flotante (sigue el cursor; position:fixed ⇒ sin recortes por el scroll). */}
+      {tip && (
+        <div className={styles.tooltip} style={{ left: tip.x + 14, top: tip.y + 16 }} role="tooltip">
+          {tip.content}
+        </div>
+      )}
 
       {/* Historial de transiciones — cada tarjeta enlaza con su arista (hover) */}
       {executed.length > 0 ? (

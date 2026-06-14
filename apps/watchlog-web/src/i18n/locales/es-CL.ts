@@ -989,6 +989,13 @@ export const esCL = {
       pending: "Sin alcanzar",
       noFlow: "Esta plantilla no usa flujo de estados.",
       noTransitions: "Aún sin transiciones: el registro permanece en su estado inicial.",
+      tipInitial: "Inicial",
+      tipFinal: "Final",
+      tipStep: "Paso {{n}}",
+      tipInitialNote: "Estado inicial del registro.",
+      tipPossible: "Transición posible (aún no ejecutada).",
+      tipNeedsSign: "Requiere firma electrónica.",
+      tipTimes: "Ejecutada {{n}} veces.",
     },
     origin: {
       ONLINE: "En línea",

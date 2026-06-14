@@ -20,10 +20,12 @@
 .th {
   /* Cabecera sticky: cuando el wrapper scrollea verticalmente (grilla de altura
      acotada), la cabecera queda fija arriba. Inocuo si el wrapper no scrollea.
-     Las columnas ancladas combinan este `top:0` con su `left/right` inline (esquina). */
+     Las columnas ancladas combinan este `top:0` con su `left/right` inline (esquina).
+     Fondo OPACO propio: si no, el cuerpo se ve a través de la cabecera al scrollear. */
   position: sticky;
   top: 0;
   z-index: 2;
+  background: var(--color-bg-surface-2);
   padding: 8px var(--space-4);
   text-align: left;
   font-size: 10px;
@@ -110,9 +112,12 @@
 .pinnedRight {
   box-shadow: -1px 0 0 var(--color-border-subtle);
 }
-/* La fila pinned hereda el hover para no romper el fondo al pasar el cursor. */
+/* La fila pinned hereda el hover SIN romper la opacidad: la tinta de hover (que es
+   semitransparente) se pinta SOBRE la superficie opaca, no la reemplaza ⇒ no se ve el
+   contenido scrolleado por detrás. */
 .dataRow:hover .pinned {
-  background: var(--color-hover);
+  background-color: var(--color-bg-surface-1);
+  background-image: linear-gradient(var(--color-hover), var(--color-hover));
 }
 
 /* ── Filas ── */
