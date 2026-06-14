@@ -8,11 +8,11 @@
   --wl-sticky-top: 132px;
 }
 
-/* ── Barra superior (sticky bajo el topbar global del shell de 58px) ───────── */
+/* ── Barra superior (header del builder, en flujo normal — NO sticky) ──────────
+   Se quitó el sticky: con la fila de pestañas de trabajo del shell, el offset
+   sticky se peleaba y la barra terminaba flotando sobre el contenido. Header
+   normal = sin solapamientos. */
 .topbar {
-  position: sticky;
-  top: 58px;
-  z-index: 25;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -71,8 +71,6 @@
 
 /* ── Riel vertical premium (Configuración / Diseño) ───────────────────────── */
 .rail {
-  position: sticky;
-  top: var(--wl-sticky-top);
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
@@ -235,8 +233,6 @@
 /* ── Paleta ───────────────────────────────────────────────────────────────── */
 .palette {
   padding: var(--space-3);
-  position: sticky;
-  top: var(--wl-sticky-top);
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -500,13 +496,6 @@
 /* ── Panel de configuración ───────────────────────────────────────────────── */
 .configCard {
   padding: var(--space-3) var(--space-4) var(--space-4);
-  position: sticky;
-  top: var(--wl-sticky-top);
-  /* Sticky más alto que el viewport (p. ej. con el editor de fórmula abierto):
-     acota la altura al espacio bajo la barra del builder y deja scroll INTERNO,
-     así su cabecera nunca queda atrapada detrás de la barra sticky. */
-  max-height: calc(100vh - var(--wl-sticky-top) - var(--space-4, 16px));
-  overflow-y: auto;
 }
 .configHeader {
   font-size: 10px;
