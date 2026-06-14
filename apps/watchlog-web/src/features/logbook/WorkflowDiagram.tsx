@@ -454,13 +454,19 @@ export function WorkflowDiagram(props: WorkflowDiagramProps) {
               // Coloreada (con el color del destino) si: recorrida, es el siguiente paso,
               // o estamos en modo DEFINICIÓN (todas las transiciones son "reales").
               const colored = on || isNext || !record;
+              // Nº de PASADAS por esta arista (reprocesos). Engrosa la línea con cada
+              // pasada extra (tope +3) ⇒ las transiciones más transitadas pesan más.
+              const passes = traversed.get(tr.key)?.length ?? 0;
+              let strokeWidth: number | undefined;
+              if (passes > 0) strokeWidth = 2.5 + Math.min(passes - 1, 3) * 1.1;
+              if (hot) strokeWidth = (strokeWidth ?? 3.5) + 1;
               return (
                 <g key={tr.key}>
                   <path
                     d={g.path}
                     fill="none"
                     className={`${styles.edge} ${colored ? styles.edgeOn : ""} ${isNext ? styles.edgeNext : ""} ${hot ? styles.edgeHot : ""}`}
-                    style={colored ? { stroke: toColor } : undefined}
+                    style={colored ? { stroke: toColor, ...(strokeWidth ? { strokeWidth } : {}) } : undefined}
                     markerEnd="url(#wf-arrow)"
                   />
                   {/* Hit-path invisible y ancho: hace fácil pasar el cursor por la arista. */}
@@ -493,12 +499,19 @@ export function WorkflowDiagram(props: WorkflowDiagramProps) {
               const legDurationMs = legMs.get(lastExec.id) ?? 0;
               const dur = formatDuration(legDurationMs);
               const overSla = legOverSla(tr, legDurationMs);
+              const passes = execs.length; // nº de veces que se recorrió esta arista
               return (
                 <span
                   key={`b-${tr.key}`}
                   className={`${styles.edgeBadge} ${overSla ? styles.edgeBadgeOverSla : ""} ${hovered === tr.key ? styles.edgeBadgeHot : ""}`}
                   style={overSla ? { left: g.mx, top: g.my } : { left: g.mx, top: g.my, background: `color-mix(in srgb, ${stateColorOf(tr.toStateKey)} 88%, #000)` }}
-                  title={overSla ? t("logbook.diagram.slaLegOver", { sla: slaText(slaMinutesOf(tr.fromStateKey)) }) : undefined}
+                  title={
+                    passes > 1
+                      ? t("logbook.diagram.passesTip", { n: passes })
+                      : overSla
+                        ? t("logbook.diagram.slaLegOver", { sla: slaText(slaMinutesOf(tr.fromStateKey)) })
+                        : undefined
+                  }
                   onMouseEnter={(e) => {
                     setHovered(tr.key);
                     showTip(e, transitionTip(tr));
@@ -510,6 +523,7 @@ export function WorkflowDiagram(props: WorkflowDiagramProps) {
                   }}
                 >
                   {dur}
+                  {passes > 1 && <span className={styles.edgeBadgeMult}>×{passes}</span>}
                 </span>
               );
             })}
@@ -554,17 +568,25 @@ export function WorkflowDiagram(props: WorkflowDiagramProps) {
                 <div className={styles.nodeBottom}>
                   {record && step && <span className={styles.stepBadge}>{step}</span>}
                   {isCurrent && <span className={styles.currentPill}>{t("logbook.diagram.current")}</span>}
-                  {isCurrent && isActive && (
+                  {isCurrent && isActive && nodeSla && nodeSla.status !== "ok" ? (
+                    // Atrasado/en riesgo: UNA píldora que funde estado + tiempo (evita amontonar
+                    // "ACTUAL · 🕐 1 d · ⚠ Atrasado"). El tiempo transcurrido va dentro del aviso.
+                    <span
+                      className={`${styles.nodeSla} ${nodeSla.status === "breached" ? styles.nodeSlaBreached : styles.nodeSlaAtRisk}`}
+                      title={
+                        nodeSla.status === "breached"
+                          ? t("logbook.diagram.slaBreached", { d: formatDuration(nodeSla.overdueMs), sla: slaText(slaMinutesOf(s.key)) })
+                          : t("logbook.diagram.slaAtRisk", { sla: slaText(slaMinutesOf(s.key)) })
+                      }
+                    >
+                      {nodeSla.status === "breached" ? <TriangleAlert size={11} /> : <AlarmClock size={11} />}
+                      {formatDuration(currentElapsedMs)}
+                    </span>
+                  ) : isCurrent && isActive ? (
                     <span className={styles.nodeElapsed}>
                       <Clock size={11} /> {formatDuration(currentElapsedMs)}
                     </span>
-                  )}
-                  {nodeSla && nodeSla.status !== "ok" && (
-                    <span className={`${styles.nodeSla} ${nodeSla.status === "breached" ? styles.nodeSlaBreached : styles.nodeSlaAtRisk}`}>
-                      {nodeSla.status === "breached" ? <TriangleAlert size={11} /> : <AlarmClock size={11} />}
-                      {nodeSla.status === "breached" ? t("logbook.diagram.slaOverdue") : t("logbook.diagram.slaRisk")}
-                    </span>
-                  )}
+                  ) : null}
                   {isNext && <span className={styles.nextPill}>{t("logbook.diagram.next")}</span>}
                   {record && !step && !isCurrent && !isNext && <span className={styles.pendingText}>{t("logbook.diagram.pending")}</span>}
                   {respNames.length > 0 && (

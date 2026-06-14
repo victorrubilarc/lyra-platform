@@ -1026,6 +1026,7 @@ export const esCL = {
       slaRisk: "En riesgo",
       slaTip: "SLA de estadía",
       slaLegOver: "Excedió el SLA de estadía ({{sla}})",
+      passesTip: "Recorrida {{n}} veces · se muestra el último tramo",
     },
     origin: {
       ONLINE: "En línea",
