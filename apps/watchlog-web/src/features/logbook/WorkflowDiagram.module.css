@@ -30,7 +30,6 @@
 .edges {
   position: absolute;
   inset: 0;
-  pointer-events: none;
 }
 
 /* Aristas: posibles (tenues, punteadas) vs. recorridas (sólidas, con acento). */
@@ -39,23 +38,25 @@
   stroke-width: 1.5;
   stroke-dasharray: 4 4;
   opacity: 0.55;
+  pointer-events: none;
 }
+/* Zona de impacto invisible y ancha para pasar el cursor por la arista con facilidad. */
+.edgeHit {
+  stroke: transparent;
+  stroke-width: 18;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+/* Transición RECORRIDA: el color lo da el estado destino (inline `stroke`). */
 .edgeOn {
-  stroke: color-mix(in srgb, var(--color-accent-primary) 70%, var(--color-text-secondary));
   stroke-width: 2.5;
   stroke-dasharray: none;
   opacity: 1;
 }
+/* Hover: engrosa y agrega glow conservando el color de la transición. */
 .edgeHot {
-  stroke: var(--color-accent-secondary, #06b6d4);
-  stroke-width: 3;
-  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--color-accent-secondary, #06b6d4) 60%, transparent));
-}
-.arrowHead {
-  fill: var(--color-border-default);
-}
-.arrowHeadOn {
-  fill: color-mix(in srgb, var(--color-accent-primary) 70%, var(--color-text-secondary));
+  stroke-width: 3.5;
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--color-accent-secondary, #06b6d4) 55%, transparent));
 }
 
 .edgeBadge {
@@ -275,4 +276,97 @@
   border-left: 2px solid var(--color-border-active);
   background: var(--color-bg-surface-2);
   border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+/* ── Tooltip flotante (sigue el cursor) ── */
+.tooltip {
+  position: fixed;
+  z-index: 1200;
+  max-width: 280px;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-bg-surface-1) 92%, #000);
+  border: 1px solid var(--color-border-active);
+  box-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(8px);
+}
+.tipTitle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-display, "Sora", sans-serif);
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+.tipDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.tipTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.tipTag {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-secondary);
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--color-bg-surface-2);
+  border: 1px solid var(--color-border-subtle);
+}
+.tipTagOn {
+  color: var(--color-accent-primary);
+  border-color: var(--color-border-active);
+  background: color-mix(in srgb, var(--color-accent-primary) 14%, transparent);
+}
+.tipFlow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.tipArrow {
+  color: var(--color-text-muted);
+}
+.tipDesc {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.tipMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-top: 6px;
+  border-top: 1px solid var(--color-border-subtle);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.tipMeta > div {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.tipMetaStrong {
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+.tipReason {
+  font-style: italic;
+  color: var(--color-text-secondary);
+}
+.tipSig {
+  color: var(--color-success, #22c55e);
+  font-weight: 600;
 }

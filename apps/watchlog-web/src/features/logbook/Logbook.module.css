@@ -41,6 +41,9 @@
   gap: 10px;
   align-items: center;
   flex-wrap: wrap;
+  /* Pegada a la derecha (también al envolverse en pantallas angostas). */
+  margin-left: auto;
+  justify-content: flex-end;
 }
 
 /* --- KPIs (digeribles de un vistazo; respetan los filtros) --- */

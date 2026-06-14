@@ -625,7 +625,8 @@ export function LogbookPage() {
       // abriendo el visor de lectura. El backend reaplica la autorización por sección.
       key: "actions",
       header: "",
-      width: 150,
+      width: 104,
+      align: "right",
       render: (r) => (
         <div className={styles.rowActions}>
           {r.currentStateName && (
@@ -643,14 +644,15 @@ export function LogbookPage() {
           )}
           {can("logentry:fill") && r.status === "DRAFT" && (
             <Button
-              variant="secondary"
-              leftIcon={<PenLine size={14} />}
+              variant="icon"
+              aria-label={t("logbook.list.editEntry")}
+              title={t("logbook.list.editEntry")}
               onClick={(e) => {
                 e.stopPropagation();
                 navigate(`/nueva-entrada/${r.id}`);
               }}
             >
-              {t("logbook.list.editEntry")}
+              <PenLine size={15} />
             </Button>
           )}
         </div>
