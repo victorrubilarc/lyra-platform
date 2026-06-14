@@ -14,7 +14,10 @@
       "PowerShell(\"node detenido\")",
       "Bash(nohup pnpm dev)",
       "Bash(echo \"dev lanzado, pid $!\")",
-      "Bash(python scripts/smoke-workflow-sla.py)"
+      "Bash(python scripts/smoke-workflow-sla.py)",
+      "Bash(echo \"api=$\\(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/health 2>/dev/null\\)\")",
+      "Bash(curl -s -o /dev/null -w '%{http_code}' http://localhost:5173)",
+      "Bash(echo \"web=$\\(curl -s -o /dev/null -w '%{http_code}' http://localhost:5173 2>/dev/null\\)\")"
     ]
   }
 }
