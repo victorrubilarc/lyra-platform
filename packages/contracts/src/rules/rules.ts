@@ -67,8 +67,10 @@ export const crossRuleSchema = z
   .strict();
 export type CrossRule = z.infer<typeof crossRuleSchema>;
 
-/** Conjunto de reglas cruzadas de una versión (default `[]`). Tope acotado. */
-export const templateVersionRulesSchema = z.array(crossRuleSchema).max(100).default([]);
+/** Conjunto de reglas cruzadas de una versión (vacío = sin reglas). Tope acotado.
+ * Sin `.default` a propósito: el servidor SIEMPRE envía el array, y un default
+ * divergiría el tipo input/output del DTO. */
+export const templateVersionRulesSchema = z.array(crossRuleSchema).max(100);
 export type TemplateVersionRules = z.infer<typeof templateVersionRulesSchema>;
 
 // === Forma mínima de campo para el motor =====================================

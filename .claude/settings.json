@@ -20,7 +20,9 @@
       "Bash(echo \"web=$\\(curl -s -o /dev/null -w '%{http_code}' http://localhost:5173 2>/dev/null\\)\")",
       "PowerShell(\"killed\")",
       "Bash(cd /g/Development/BitacorasInteligentes && find apps/watchlog-api/src -path \"*templates*\" -name \"*.ts\" -o -path \"*log-entries*\" -name \"*.ts\" | grep -v spec | sort)",
-      "Read(//g/g/Development/BitacorasInteligentes/apps/watchlog-api/**)"
+      "Read(//g/g/Development/BitacorasInteligentes/apps/watchlog-api/**)",
+      "Bash(grep -n \"    builder: {\\\\|    fieldTypes: {\\\\|^    },\\\\|^  },\" apps/watchlog-web/src/i18n/locales/es-CL.ts)",
+      "Bash(grep -n 'makeService\\\\|$transaction\\\\|const tx\\\\|tx =\\\\|function versionGraph\\\\|buildTx' apps/watchlog-api/src/log-entries/log-entries.service.spec.ts)"
     ]
   }
 }

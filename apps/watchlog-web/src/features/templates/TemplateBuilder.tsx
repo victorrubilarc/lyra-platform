@@ -8,6 +8,7 @@ import {
   ArrowUp,
   Eye,
   FilePlus2,
+  FunctionSquare,
   IdCard,
   LayoutPanelLeft,
   Network,
@@ -43,6 +44,7 @@ import {
   type EditState,
 } from "./builder-model.js";
 import { BuilderConfigPanel } from "./BuilderConfigPanel.js";
+import { RulesEditor } from "./RulesEditor.js";
 import { PreviewForm } from "./FieldPreview.js";
 import { usePublishTemplate, useSaveTemplateDraft, useUpdateTemplate } from "./templates-queries.js";
 import { useWorkflow, useWorkflows } from "../workflows/workflows-queries.js";
@@ -64,8 +66,8 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
   // Secciones principales (riel vertical): Configuración (gobernanza viva, por defecto) ·
   // Diseño (definición versionada). La Vista previa vive DENTRO de Diseño.
   const [view, setView] = useState<"config" | "design">("config");
-  // Sub-pestaña de Diseño: Editor (lienzo) · Vista previa.
-  const [designTab, setDesignTab] = useState<"editor" | "preview">("editor");
+  // Sub-pestaña de Diseño: Editor (lienzo) · Reglas (motor de reglas) · Vista previa.
+  const [designTab, setDesignTab] = useState<"editor" | "rules" | "preview">("editor");
   const [dirty, setDirty] = useState(false); // cambios de DEFINICIÓN (borrador)
   const [configDirty, setConfigDirty] = useState(false); // cambios de CONFIGURACIÓN (PATCH en vivo)
   const [publishOpen, setPublishOpen] = useState(false);
@@ -99,6 +101,17 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
       ),
     [state],
   );
+
+  // Todos los campos (key + label) para fórmulas y reglas del motor (Req-7).
+  const allFields = useMemo(
+    () => state.sections.flatMap((s) => s.fields.map((f) => ({ key: f.key, label: f.label }))),
+    [state],
+  );
+
+  // Mutador de las reglas cruzadas (DEFINICIÓN versionada → "Guardar borrador").
+  function setRules(rules: EditState["rules"]) {
+    patchState({ ...state, rules });
+  }
 
   // ── Mutadores del estado editable ──────────────────────────────────────────
   // patchState = cambios de DEFINICIÓN (secciones/campos/flujo) → "Guardar borrador".
@@ -146,7 +159,7 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
       targetUid = sec.uid;
     }
     const fkey = uniqueKey(slugifyKey(label, "campo"), collectFieldKeys({ ...state, sections }));
-    const field: EditField = { uid: nextUid(), key: fkey, type, semanticRole: null, label, help: null, required: false, config: defaultFieldConfig(type), visibleWhen: null, roleIds: [] };
+    const field: EditField = { uid: nextUid(), key: fkey, type, semanticRole: null, label, help: null, required: false, config: defaultFieldConfig(type), visibleWhen: null, computed: null, roleIds: [] };
     sections = sections.map((s) => (s.uid === targetUid ? { ...s, fields: [...s.fields, field] } : s));
     patchState({ ...state, sections });
     setSelected({ s: targetUid, f: field.uid });
@@ -332,6 +345,9 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
                 <button type="button" role="tab" aria-selected={designTab === "editor"} className={designTab === "editor" ? styles.subTabActive : styles.subTab} onClick={() => setDesignTab("editor")}>
                   <Pencil size={14} /> {t("templates.builder.designEditor")}
                 </button>
+                <button type="button" role="tab" aria-selected={designTab === "rules"} className={designTab === "rules" ? styles.subTabActive : styles.subTab} onClick={() => setDesignTab("rules")}>
+                  <FunctionSquare size={14} /> {t("templates.builder.designRules")}
+                </button>
                 <button type="button" role="tab" aria-selected={designTab === "preview"} className={designTab === "preview" ? styles.subTabActive : styles.subTab} onClick={() => setDesignTab("preview")}>
                   <Eye size={14} /> {t("templates.builder.viewPreview")}
                 </button>
@@ -347,6 +363,13 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
                   {state.description && <div className={styles.previewDesc}>{state.description}</div>}
                   {totalFields(state) === 0 ? <div className={styles.configEmpty}>{t("templates.builder.emptyCanvas")}</div> : <PreviewForm state={state} />}
                 </Card>
+              ) : designTab === "rules" ? (
+                <RulesEditor
+                  rules={state.rules}
+                  fields={allFields}
+                  canEdit={canEdit && !isPublishedView}
+                  onChange={setRules}
+                />
               ) : (
                 <div className={styles.layout}>
           {/* Paleta */}
@@ -467,6 +490,7 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
               field={selectedField}
               roles={roles}
               booleanFields={booleanFields}
+              allFields={allFields}
               workflowStates={workflowStates}
               hasWorkflow={Boolean(state.workflowDefinitionId)}
               onUpdateSection={(patch) => selectedSection && updateSection(selectedSection.uid, patch)}
