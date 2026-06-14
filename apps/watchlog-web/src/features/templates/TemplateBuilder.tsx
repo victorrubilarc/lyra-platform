@@ -45,6 +45,7 @@ import {
 } from "./builder-model.js";
 import { BuilderConfigPanel } from "./BuilderConfigPanel.js";
 import { RulesEditor } from "./RulesEditor.js";
+import type { RuleFieldRef } from "./expression-meta.js";
 import { PreviewForm } from "./FieldPreview.js";
 import { usePublishTemplate, useSaveTemplateDraft, useUpdateTemplate } from "./templates-queries.js";
 import { useWorkflow, useWorkflows } from "../workflows/workflows-queries.js";
@@ -102,9 +103,17 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
     [state],
   );
 
-  // Todos los campos (key + label) para fórmulas y reglas del motor (Req-7).
-  const allFields = useMemo(
-    () => state.sections.flatMap((s) => s.fields.map((f) => ({ key: f.key, label: f.label }))),
+  // Todos los campos (key + label + tipo + opciones) para fórmulas y reglas del
+  // motor (Req-7). Las opciones inline alimentan el selector de valores del editor.
+  const allFields = useMemo<RuleFieldRef[]>(
+    () =>
+      state.sections.flatMap((s) =>
+        s.fields.map((f) => {
+          const src = (f.config as { optionSource?: { kind?: string; items?: { code: string; label: string }[] } }).optionSource;
+          const options = src?.kind === "inline" && Array.isArray(src.items) ? src.items : undefined;
+          return { key: f.key, label: f.label, type: f.type, options };
+        }),
+      ),
     [state],
   );
 

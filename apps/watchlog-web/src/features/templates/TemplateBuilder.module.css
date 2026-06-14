@@ -819,29 +819,131 @@
 .rulesIntro {
   padding: 16px 18px;
 }
+.rulesIntroHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
 .rulesIntroTitle {
   font-family: "Sora", sans-serif;
   font-weight: 700;
   font-size: 15px;
   margin-bottom: 4px;
 }
-.ruleCard {
-  padding: 16px 18px;
+.rulesSaveHint {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  border-top: 1px solid var(--color-border-subtle);
+  padding-top: 10px;
+}
+.rulesEmpty {
+  padding: 28px 18px;
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+/* Tabla de reglas */
+.rulesTableCard {
+  padding: 0;
+  overflow: hidden;
+}
+.rulesTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.rulesTable thead th {
+  text-align: left;
+  padding: 10px 14px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  border-bottom: 1px solid var(--color-border-default);
+  background: var(--color-surface-2);
+}
+.rulesThState {
+  width: 64px;
+}
+.rulesThSev {
+  width: 130px;
+}
+.rulesThActions {
+  width: 84px;
+}
+.rulesTable tbody td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  vertical-align: middle;
+}
+.rulesTable tbody tr:last-child td {
+  border-bottom: none;
+}
+.rulesTable tbody tr:hover {
+  background: var(--color-hover, rgba(255, 255, 255, 0.03));
+}
+.ruleRowOff {
+  opacity: 0.5;
+}
+.ruleMsg {
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+.ruleNoMsg {
+  color: var(--color-text-muted);
+  font-weight: 400;
+  font-style: italic;
+}
+.ruleCond {
+  margin-top: 3px;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 11.5px;
+  color: var(--color-text-secondary);
+}
+
+/* Modal de creación/edición de regla */
+.ruleForm {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
 }
-.ruleHeader {
+.ruleFormRow {
+  display: grid;
+  grid-template-columns: 1fr 240px;
+  gap: 14px;
+}
+@media (max-width: 620px) {
+  .ruleFormRow {
+    grid-template-columns: 1fr;
+  }
+}
+.ruleHelp {
+  border: 1px solid var(--color-border-active, rgba(99, 102, 241, 0.4));
+  background: color-mix(in srgb, var(--color-accent, #6366f1) 8%, transparent);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+}
+.ruleHelp p {
+  margin: 6px 0 0;
+}
+.ruleHelpTitle {
   display: flex;
-  gap: 8px;
   align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  color: var(--color-text-primary);
 }
-.ruleSeverityIcon {
-  display: inline-flex;
-}
-.ruleKeyInput {
-  max-width: 220px;
-  font-family: ui-monospace, Menlo, monospace;
+.ruleHelpExample {
+  border-top: 1px solid var(--color-border-subtle);
+  padding-top: 8px;
+  color: var(--color-text-muted);
 }
 
 /* Disparos de reglas en la vista previa del builder */

@@ -58,11 +58,15 @@ export const crossRuleSchema = z
       .min(1)
       .max(64)
       .regex(/^[a-zA-Z][a-zA-Z0-9_]*$/, "Use letras, números y guión bajo; debe iniciar con letra"),
+    /** Nombre legible de la regla (para la grilla; opcional, cae a `key`). */
+    name: z.string().trim().max(120).optional(),
     /** Condición de disparo (true ⇒ la regla aplica). */
     when: expressionSchema,
     severity: ruleSeveritySchema,
     /** Mensaje mostrado cuando la regla dispara (lo redacta el diseñador). */
     message: z.string().trim().min(1).max(300),
+    /** ¿Está activa? Ausente/true = activa; false = desactivada (no se evalúa). */
+    enabled: z.boolean().optional(),
   })
   .strict();
 export type CrossRule = z.infer<typeof crossRuleSchema>;
@@ -285,6 +289,7 @@ export function evaluateCrossRules(
   const errors: CrossRuleHit[] = [];
   const warnings: CrossRuleHit[] = [];
   for (const rule of rules) {
+    if (rule.enabled === false) continue; // regla desactivada: no se evalúa
     const triggered = evaluateExpression(rule.when, valuesByKey, opts) === true;
     if (!triggered) continue;
     const hit: CrossRuleHit = { ruleKey: rule.key, severity: rule.severity, message: rule.message };

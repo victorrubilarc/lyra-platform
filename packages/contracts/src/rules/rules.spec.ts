@@ -202,4 +202,10 @@ describe("evaluateCrossRules — disparo, omisión, severidad", () => {
     expect(r.errors).toEqual([]);
     expect(r.warnings).toEqual([]);
   });
+
+  it("NO evalúa una regla DESACTIVADA (enabled: false)", () => {
+    const off: CrossRule[] = [{ ...rules[0]!, enabled: false }];
+    const r = evaluateCrossRules(off, { salida: 10, entrada: 5 });
+    expect(r.errors).toEqual([]); // dispararía si estuviera activa
+  });
 });

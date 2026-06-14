@@ -4,6 +4,7 @@ import type { OptionInlineItem, RoleSummary, WorkflowStateDto } from "@lyra/cont
 import { useReferenceLists } from "../reference-data/reference-data-queries.js";
 import { fieldTypeMeta, slugifyKey, type EditField, type EditSection } from "./builder-model.js";
 import { ExpressionEditor } from "./ExpressionEditor.js";
+import type { RuleFieldRef } from "./expression-meta.js";
 import styles from "./TemplateBuilder.module.css";
 
 /** Lee los ítems inline del `optionSource` de un SELECT/MULTISELECT (vacío si no es inline). */
@@ -34,8 +35,8 @@ interface BuilderConfigPanelProps {
   field: EditField | null;
   roles: RoleSummary[];
   booleanFields: BooleanFieldRef[];
-  /** Todos los campos de la plantilla (key + label) para fórmulas (motor de reglas). */
-  allFields: BooleanFieldRef[];
+  /** Todos los campos de la plantilla (key + label + tipo + opciones) para fórmulas. */
+  allFields: RuleFieldRef[];
   /** Estados del flujo asignado (para mapear sección → estado editable). */
   workflowStates: WorkflowStateDto[];
   /** Hay un flujo asignado a la versión. */
