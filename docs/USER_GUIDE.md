@@ -169,20 +169,24 @@ es **WYSIWYG**: armas el formulario sobre una grilla de **12 columnas** (estilo 
 arrastrando, sin adivinar.
 
 **Cómo se usa.** El editor es **canvas-first** (el lienzo a todo el ancho) y se configura **sobre
-el lienzo**, como en Canva / Google Forms:
+el lienzo**, como en Canva / Notion / Google Forms. **No tienes que pensar en columnas ni anchos:**
+arrastras los campos y el editor los acomoda solo.
 1. En el **builder de plantillas** (`/plantillas/:id`), pestaña **Diseño ▸ Editor**: cada campo se
    ve con su **control real** (lo que ves es lo que será el formulario).
 2. **Agregar un campo**: botón **"＋ Agregar campo"** (en la barra del lienzo o al final de una
-   sección) → elige el tipo. Se inserta donde lo pediste.
-3. **Editar el rótulo**: haz clic en el texto del campo y escríbelo **en el lienzo** (igual el
+   sección) → elige el tipo.
+3. **Acomodar (arrastrando, ancho automático):** arrastra un campo (por el asa ⋮⋮)…
+   - …**al lado** de otro ⇒ **comparten fila** y el ancho se reparte solo (2 = mitad y mitad, 3 =
+     tercios, hasta 4 por fila).
+   - …**arriba o abajo** (a su propia línea) ⇒ queda a **ancho completo**.
+   - Una **guía azul** te muestra dónde va a caer (vertical = al lado; horizontal = nueva fila).
+4. **Editar el rótulo**: haz clic en el texto del campo y escríbelo **en el lienzo** (igual el
    **título/descripción** de la sección).
-4. **Barra flotante** (al seleccionar un campo): **ancho** (presets), **obligatorio**, **mover ↑↓**,
-   **duplicar**, **eliminar**, y **"Más opciones"** (abre un panel lateral con lo avanzado: umbrales,
-   opciones de lista, condicional, fórmula, permisos por campo).
-5. **Cambiar el ancho**: **arrastra el borde derecho** del campo (se ensancha/angosta y los vecinos
-   se reacomodan), o usa los **presets** de la barra, o **← / →** con el borde enfocado.
-6. **Reordenar**: **arrastra** el campo por el asa (⋮⋮) a otra posición — dentro de la sección o **a
-   otra sección** (también con **↑ ↓** de la barra, por teclado).
+5. **Barra flotante** (al seleccionar un campo): **obligatorio**, **mover ↑↓**, **duplicar**,
+   **eliminar**, y **"Más opciones"** (panel lateral con lo avanzado: umbrales, opciones de lista,
+   condicional, fórmula, permisos por campo).
+6. **Ajuste fino del ancho** (opcional): si dos campos comparten fila, **arrastra el borde** entre
+   ellos para dejarlos, por ejemplo, 70/30 (o **← / →** con el borde enfocado).
 7. Publica la plantilla como siempre (borrador → publicar).
 
 **Quién puede.** El **Configurador** que puede editar la plantilla (`template:edit`). Es parte
@@ -191,13 +195,11 @@ del diseño del formulario.
 **Importante.**
 - Es **solo presentación**: el ancho y el orden **no cambian** qué es obligatorio, los umbrales,
   la lógica condicional ni quién puede llenar cada campo.
-- El ancho se mide en **columnas de 12**: 12 = ancho completo (por defecto), 6 = media, 4 = un
-  tercio, 3 = un cuarto, etc. Puedes combinarlos (p. ej. 8 + 4 en una fila).
-- **Responsivo para terreno**: en **celular** todo se apila en **una sola columna** (para usar
-  con guantes, sin apretar), sin importar el ancho configurado.
-- El ancho y el orden viajan en la **versión publicada** (diseño controlado): cambiarlos crea un
-  nuevo borrador y se aplica a las entradas nuevas tras publicar; las ya registradas conservan su layout.
-- Las plantillas existentes no cambian: todo campo sin ancho definido ocupa el **ancho completo**.
+- **Responsivo para terreno** (la bitácora se llena en tablet/celular): en **celular** todo se apila
+  en **una sola columna** y en **tablet** se ven **2 por fila** (áreas táctiles amplias, para guantes),
+  sin importar cómo lo acomodaste en el escritorio.
+- El layout viaja en la **versión publicada** (diseño controlado): cambiarlo crea un nuevo borrador y
+  se aplica a las entradas nuevas tras publicar; las ya registradas conservan su layout.
 
 ---
 

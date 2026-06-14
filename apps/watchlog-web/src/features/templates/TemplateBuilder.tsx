@@ -35,7 +35,10 @@ import {
   editStateToDraftRequest,
   fieldTypeMeta,
   nextUid,
+  rowRangeOf,
+  ROW_MAX_FIELDS,
   slugifyKey,
+  splitRow,
   totalFields,
   uniqueKey,
   type EditField,
@@ -58,6 +61,9 @@ interface Selection {
   f?: string;
 }
 
+/** Zona de soltado del auto-layout (Fase 2.1.5). */
+type DropMode = "beside-left" | "beside-right" | "row-before" | "row-after";
+
 export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -76,7 +82,7 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
   const [publishOpen, setPublishOpen] = useState(false);
   // Arrastre de campos en el lienzo (DnD nativo, patrón ColumnsDrawer): origen + destino-hint.
   const [dragField, setDragField] = useState<{ sUid: string; fUid: string } | null>(null);
-  const [dropHint, setDropHint] = useState<{ sUid: string; beforeFUid: string | null } | null>(null);
+  const [dropHint, setDropHint] = useState<{ sUid: string; anchorFUid: string; mode: DropMode } | null>(null);
   // Drawer de configuración AVANZADA (umbral/opciones/condicional/fórmula/roles): se abre
   // con "Más opciones" del campo o de la sección. Lo común se edita en el lienzo.
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -261,28 +267,79 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
   }
 
   /**
-   * Mueve un campo (reordenar dentro de la sección O mover entre secciones) por
-   * arrastre. Inserta ANTES de `beforeFUid` (o al final si es null). El índice se
-   * calcula DESPUÉS de quitar el campo, así no se desfasa al arrastrar en la misma
-   * sección. Solo presentación/orden; no toca el resto del campo.
+   * AUTO-LAYOUT por arrastre (Fase 2.1.5): suelta un campo AL LADO de otro
+   * (`beside-left`/`beside-right`) ⇒ comparten fila y el ancho se reparte solo; o
+   * en su propia línea (`row-before`/`row-after`, o sin anchor = al final) ⇒ ancho
+   * completo. El usuario nunca elige "columnas": el ancho se DERIVA del arrastre.
    */
-  function moveFieldBefore(srcSUid: string, fUid: string, dstSUid: string, beforeFUid: string | null) {
-    if (srcSUid === dstSUid && fUid === beforeFUid) return;
+  function applyDrop(dstSUid: string, anchorFUid: string, mode: DropMode) {
+    if (!dragField) return;
+    const { sUid: srcSUid, fUid } = dragField;
     let moved: EditField | undefined;
     let sections = state.sections.map((s) => {
       if (s.uid !== srcSUid) return s;
       moved = s.fields.find((f) => f.uid === fUid);
       return { ...s, fields: s.fields.filter((f) => f.uid !== fUid) };
     });
-    if (!moved) return;
+    if (!moved) return endDrag();
     sections = sections.map((s) => {
       if (s.uid !== dstSUid) return s;
       const fields = [...s.fields];
-      const idx = beforeFUid ? fields.findIndex((f) => f.uid === beforeFUid) : -1;
-      fields.splice(idx < 0 ? fields.length : idx, 0, moved!);
+      const anchorIdx = fields.findIndex((f) => f.uid === anchorFUid);
+      if (anchorIdx < 0) {
+        // Sin anchor (sección vacía / soltar al final) ⇒ fila nueva completa.
+        fields.push({ ...moved!, colSpan: 12 });
+        return { ...s, fields };
+      }
+      const [rs, re] = rowRangeOf(fields, anchorIdx);
+      if (mode === "row-before" || mode === "row-after") {
+        fields.splice(mode === "row-before" ? rs : re, 0, { ...moved!, colSpan: 12 });
+        return { ...s, fields };
+      }
+      // beside-*: compartir la fila del anchor (si cabe), repartiendo el ancho.
+      const rowCount = re - rs;
+      if (rowCount >= ROW_MAX_FIELDS) {
+        fields.splice(re, 0, { ...moved!, colSpan: 12 }); // fila llena ⇒ nueva fila
+        return { ...s, fields };
+      }
+      const insertAt = mode === "beside-left" ? anchorIdx : anchorIdx + 1;
+      fields.splice(insertAt, 0, { ...moved! });
+      const widths = splitRow(rowCount + 1);
+      for (let i = 0; i < rowCount + 1; i += 1) fields[rs + i] = { ...fields[rs + i]!, colSpan: widths[i]! };
       return { ...s, fields };
     });
     patchState({ ...state, sections });
+    endDrag();
+  }
+
+  /**
+   * Ajuste fino tipo DIVISOR (Notion): mover el borde de un campo transfiere
+   * columnas a su vecino de la misma fila (la suma de la fila no cambia; cada uno
+   * mín. 3). `absCol` = columna 1..12 bajo el puntero. `delta` = nudge por teclado.
+   */
+  function resizeDivider(sUid: string, fUid: string, opts: { absCol?: number; delta?: number }) {
+    const MIN = 3;
+    patchState({
+      ...state,
+      sections: state.sections.map((s) => {
+        if (s.uid !== sUid) return s;
+        const fields = [...s.fields];
+        const idx = fields.findIndex((f) => f.uid === fUid);
+        if (idx < 0) return s;
+        const [rs, re] = rowRangeOf(fields, idx);
+        if (idx + 1 >= re) return s; // sin vecino a la derecha (último de la fila)
+        const f = fields[idx]!;
+        const nb = fields[idx + 1]!;
+        const pairTotal = f.colSpan + nb.colSpan;
+        const precedingCols = fields.slice(rs, idx).reduce((a, x) => a + x.colSpan, 0);
+        const desired = opts.absCol !== undefined ? opts.absCol - precedingCols : f.colSpan + (opts.delta ?? 0);
+        const fSpan = Math.min(Math.max(desired, MIN), pairTotal - MIN);
+        if (fSpan === f.colSpan) return s;
+        fields[idx] = { ...f, colSpan: fSpan };
+        fields[idx + 1] = { ...nb, colSpan: pairTotal - fSpan };
+        return { ...s, fields };
+      }),
+    });
   }
 
   function endDrag() {
@@ -528,49 +585,57 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
 
                         <div
                           data-field-grid
-                          className={dropHint?.sUid === s.uid && !dropHint.beforeFUid && s.fields.length === 0 ? styles.emptySectionDrop : undefined}
+                          className={dropHint?.sUid === s.uid && s.fields.length === 0 ? styles.emptySectionDrop : undefined}
                           onDragOver={(e) => {
-                            if (dragField) {
+                            // Soltar en el área vacía de la sección ⇒ al final, fila nueva.
+                            if (dragField && s.fields.length === 0) {
                               e.preventDefault();
-                              setDropHint({ sUid: s.uid, beforeFUid: null });
+                              setDropHint({ sUid: s.uid, anchorFUid: "", mode: "row-after" });
                             }
                           }}
                           onDrop={() => {
-                            if (dragField) moveFieldBefore(dragField.sUid, dragField.fUid, s.uid, dropHint?.beforeFUid ?? null);
-                            endDrag();
+                            if (dragField && s.fields.length === 0) applyDrop(s.uid, "", "row-after");
+                            else endDrag();
                           }}
                         >
                           {s.fields.length === 0 ? (
                             <div className={styles.emptySection}>{t("templates.builder.emptySectionFields")}</div>
                           ) : (
                             <FieldGrid>
-                              {s.fields.map((f) => (
-                                <FieldGridCell key={f.uid} span={f.colSpan}>
-                                  <BuilderFieldCard
-                                    field={f}
-                                    active={selected?.f === f.uid}
-                                    canEdit={canEdit}
-                                    dragging={dragField?.fUid === f.uid}
-                                    dropTarget={dropHint?.sUid === s.uid && dropHint.beforeFUid === f.uid}
-                                    onSelect={() => setSelected({ s: s.uid, f: f.uid })}
-                                    onLabel={(label) => updateField(s.uid, f.uid, { label })}
-                                    onResize={(span) => updateField(s.uid, f.uid, { colSpan: span })}
-                                    onToggleRequired={() => updateField(s.uid, f.uid, { required: !f.required })}
-                                    onDuplicate={() => duplicateField(s.uid, f.uid)}
-                                    onDelete={() => deleteField(s.uid, f.uid)}
-                                    onMoreOptions={() => { setSelected({ s: s.uid, f: f.uid }); setDrawerOpen(true); }}
-                                    onMoveUp={() => moveField(s.uid, f.uid, -1)}
-                                    onMoveDown={() => moveField(s.uid, f.uid, 1)}
-                                    onDragStart={() => setDragField({ sUid: s.uid, fUid: f.uid })}
-                                    onDragEnd={endDrag}
-                                    onDragOver={() => dragField && setDropHint({ sUid: s.uid, beforeFUid: f.uid })}
-                                    onDrop={() => {
-                                      if (dragField) moveFieldBefore(dragField.sUid, dragField.fUid, s.uid, f.uid);
-                                      endDrag();
-                                    }}
-                                  />
-                                </FieldGridCell>
-                              ))}
+                              {s.fields.map((f, fi) => {
+                                const [, re] = rowRangeOf(s.fields, fi);
+                                const resizable = fi + 1 < re; // tiene vecino a la derecha en la fila
+                                const dm = dropHint?.sUid === s.uid && dropHint.anchorFUid === f.uid ? dropHint.mode : null;
+                                return (
+                                  <FieldGridCell key={f.uid} span={f.colSpan}>
+                                    <BuilderFieldCard
+                                      field={f}
+                                      active={selected?.f === f.uid}
+                                      canEdit={canEdit}
+                                      dragging={dragField?.fUid === f.uid}
+                                      dropMode={dm}
+                                      resizable={resizable}
+                                      onSelect={() => setSelected({ s: s.uid, f: f.uid })}
+                                      onLabel={(label) => updateField(s.uid, f.uid, { label })}
+                                      onResizeAbs={(absCol) => resizeDivider(s.uid, f.uid, { absCol })}
+                                      onNudge={(delta) => resizeDivider(s.uid, f.uid, { delta })}
+                                      onToggleRequired={() => updateField(s.uid, f.uid, { required: !f.required })}
+                                      onDuplicate={() => duplicateField(s.uid, f.uid)}
+                                      onDelete={() => deleteField(s.uid, f.uid)}
+                                      onMoreOptions={() => { setSelected({ s: s.uid, f: f.uid }); setDrawerOpen(true); }}
+                                      onMoveUp={() => moveField(s.uid, f.uid, -1)}
+                                      onMoveDown={() => moveField(s.uid, f.uid, 1)}
+                                      onDragStart={() => setDragField({ sUid: s.uid, fUid: f.uid })}
+                                      onDragEnd={endDrag}
+                                      onDropHint={(mode) => dragField && dragField.fUid !== f.uid && setDropHint({ sUid: s.uid, anchorFUid: f.uid, mode })}
+                                      onDrop={(mode) => {
+                                        if (dragField && dragField.fUid !== f.uid) applyDrop(s.uid, f.uid, mode);
+                                        else endDrag();
+                                      }}
+                                    />
+                                  </FieldGridCell>
+                                );
+                              })}
                             </FieldGrid>
                           )}
 

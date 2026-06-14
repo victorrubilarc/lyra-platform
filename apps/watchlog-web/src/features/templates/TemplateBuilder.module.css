@@ -499,8 +499,6 @@
   flex-direction: column;
   gap: var(--space-4);
   width: 100%;
-  max-width: 1040px;
-  margin: 0 auto;
 }
 .canvasBar {
   display: flex;
@@ -608,8 +606,19 @@
 .builderCardDragging {
   opacity: 0.4;
 }
-.builderCardDrop {
+/* Indicadores de soltado (auto-layout): barra vertical = compartir fila (al lado),
+   horizontal = fila nueva (arriba/abajo). El color del acento marca dónde caerá. */
+.drop_beside-left {
   box-shadow: inset 3px 0 0 0 var(--color-accent-primary);
+}
+.drop_beside-right {
+  box-shadow: inset -3px 0 0 0 var(--color-accent-primary);
+}
+.drop_row-before {
+  box-shadow: inset 0 3px 0 0 var(--color-accent-primary);
+}
+.drop_row-after {
+  box-shadow: inset 0 -3px 0 0 var(--color-accent-primary);
 }
 .cardBody {
   display: flex;

@@ -79,6 +79,42 @@ export const WIDTH_PRESETS = [
   { span: 3, glyph: "¼", labelKey: "templates.builder.widthQuarter" },
 ] as const;
 
+// === Auto-layout por arrastre (Fase 2.1.5) ===================================
+// El usuario no piensa en "12 columnas": arrastra un campo AL LADO de otro y
+// comparten fila (ancho repartido solo), o a su propia línea (ancho completo). El
+// ancho se DERIVA del arrastre; `colSpan` sigue siendo el almacenamiento. Una
+// "fila" = corrida de campos consecutivos cuyos colSpan suman ≤12 (lo que la grilla
+// CSS ya empaqueta). Tope de 4 por fila (mín. colSpan 3) para que sigan legibles.
+
+export const GRID_TOTAL = 12;
+export const ROW_MAX_FIELDS = 4;
+
+/** Reparte 12 columnas en n partes iguales (2→6,6; 3→4,4,4; 4→3,3,3,3). */
+export function splitRow(n: number): number[] {
+  if (n <= 1) return [GRID_TOTAL];
+  const base = Math.floor(GRID_TOTAL / n);
+  const rem = GRID_TOTAL - base * n;
+  return Array.from({ length: n }, (_, i) => base + (i < rem ? 1 : 0));
+}
+
+/** Rango `[start, end)` de la fila (corrida que suma ≤12) que contiene `index`. */
+export function rowRangeOf(fields: EditField[], index: number): [number, number] {
+  let start = 0;
+  while (start < fields.length) {
+    let sum = 0;
+    let end = start;
+    while (end < fields.length) {
+      const next = sum + (fields[end]!.colSpan || GRID_TOTAL);
+      if (end > start && next > GRID_TOTAL) break;
+      sum = next;
+      end += 1;
+    }
+    if (index >= start && index < end) return [start, end];
+    start = end;
+  }
+  return [index, index + 1];
+}
+
 // === Modelo editable local ===================================================
 
 export interface EditField {
