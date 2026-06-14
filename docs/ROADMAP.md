@@ -26,7 +26,7 @@
 |---|---|---|
 | 2.1 Form Builder (secciones/campos/umbral ISA-18.2/borrador-publicar) | ✅ | — |
 | 2.1.1 Modelo de campo en 3 capas (type/dataType/semanticRole) | ✅ | — |
-| 2.1.2 **Layout de formulario en GRILLA** (ancho por campo) | ⬜ | Req del dueño; presentación versionada, aditivo. |
+| 2.1.2 **Layout de formulario en GRILLA** (ancho por campo) | ✅ | `feat/layout-grilla`: `{FULL,HALF,THIRD}` en columna `TemplateField.layoutWidth` + grilla 12-col responsiva (`FieldGrid` compartido). Smoke 12/12. Falta smoke visual. |
 | 2.2 Flujos reutilizables (`WorkflowDefinition`) | ✅ | — |
 | 2.x Datos de referencia / Listas | ✅ | Roadmap industrial: jerarquía, cascada, metadata tipada, vigencia, crosswalk (con Fase 3). |
 | 2.3.0 Calendario operacional (turnos + día operacional) | ✅ | 4-4-5, rotación de cuadrillas, vigencia de turnos (diferidos). |

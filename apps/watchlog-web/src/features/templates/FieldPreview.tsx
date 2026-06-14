@@ -4,6 +4,7 @@ import { TriangleAlert, Info } from "lucide-react";
 import { deriveDataType, evaluateCrossRules, recomputeComputedValues, type FieldForRules } from "@lyra/contracts";
 import type { EditField, EditState } from "./builder-model.js";
 import { FieldControl } from "./FieldControl.js";
+import { FieldGrid, FieldGridCell } from "./FieldGrid.js";
 import styles from "./TemplateBuilder.module.css";
 
 type Values = Record<string, unknown>;
@@ -64,14 +65,13 @@ export function PreviewForm({ state }: { state: EditState }) {
         <div key={s.uid} className={styles.previewSection}>
           <div className={styles.previewSectionTitle}>{s.title}</div>
           {s.description && <div className={styles.previewSectionDesc}>{s.description}</div>}
-          {s.fields.filter(isVisible).map((f) => (
-            <FieldControl
-              key={f.uid}
-              field={f}
-              value={display[f.key]}
-              onChange={(v) => setValue(f.key, v)}
-            />
-          ))}
+          <FieldGrid>
+            {s.fields.filter(isVisible).map((f) => (
+              <FieldGridCell key={f.uid} width={f.layoutWidth}>
+                <FieldControl field={f} value={display[f.key]} onChange={(v) => setValue(f.key, v)} />
+              </FieldGridCell>
+            ))}
+          </FieldGrid>
           {s.fields.length === 0 && <div className={styles.previewEmpty}>—</div>}
         </div>
       ))}

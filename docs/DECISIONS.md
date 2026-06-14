@@ -4,6 +4,24 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-14 · Fase 2.1.2 — Layout de formulario en grilla responsiva (ancho por campo) — ✅ IMPLEMENTADO (`feat/layout-grilla` → `main`)
+
+Presentación PURA y ADITIVA: el diseñador da un **ancho por campo** y los campos se acomodan en una **grilla CSS responsiva por sección** que colapsa a 1 columna en tablet/celular. NO toca validación/umbral/condicional/permisos/reglas. Default = ancho completo ⇒ cero ruptura. 5 forks resueltos con el dueño:
+
+1. **Set de anchos = enum mínimo `{FULL, HALF, THIRD}`** (recomendación aceptada). Mapea limpio a una grilla de 12 col (12/6/4), sin spans sueltos = sin error de fila. TWO_THIRDS/QUARTER/spans numéricos 1–12 → BACKLOG si surge un caso real (sobre-ingeniería para terreno hoy).
+
+2. **Persistencia = columna dedicada `TemplateField.layoutWidth`** en la versión INMUTABLE (es diseño controlado MMR/Part 11). **Corrige la sospecha inicial del dueño (config JSONB para evitar migración)**: los config por tipo son Zod `.strict()` (8 esquemas) ⇒ meterlo en `config` obliga a tocar los 8 o romper el strict; en cambio `visibleWhen`/`computed`/`semanticRole` YA son columnas top-level separadas (NO en config). La columna calca ese patrón, es consultable, y `@default(FULL)` NOT NULL rellena las filas existentes en el mismo `ALTER` ⇒ **sin backfill, cero ruptura**. Costo: 1 migración aditiva trivial (`20260614170000_add_field_layout_width`).
+
+3. **Responsive (recomendación)**: grilla de 12 col. Desktop ≥1024px → FULL=12 / HALF=6 / THIRD=4. Tablet 768–1023px → THIRD degrada a ½ (span 6). <768px → grilla a 1 columna (celdas a `auto`). Alineado al breakpoint 768 ya usado por `ResizableSplit`. 44px se conservan (los controles ya tienen `min-height:44px`); `min-width:0` evita que contenido largo reviente columnas.
+
+4. **Tipos de campo (recomendación)**: hint UNIVERSAL, default FULL, el motor solo COLOCA, nada se fuerza. TEXTAREA/SEVERITY/SIGNATURE quedan FULL por default pero el diseñador puede cambiarlos.
+
+5. **Fuente de render ÚNICA (recomendación)**: componente compartido nuevo `FieldGrid` + `FieldGridCell` (un solo CSS module `FieldGrid.module.css`), usado por los TRES lados (vista previa del builder, llenado, visor). El **contenedor de grilla vive a nivel de sección**; el **span vive en la celda** desde `field.layoutWidth`. Sin CSS copiado ⇒ el registro se ve idéntico en los tres.
+
+**Motivo:** terreno/tablet sufre el scroll de una sola columna; SAP Fiori (12-col responsive grid) y ServiceNow (form layout por anchos) son el estándar. Mantenerlo mínimo (ancho + grilla, nada de drag&drop/posicionamiento absoluto/plantillas de layout = eso es 2.9.0) evita la sobre-ingeniería. Round-trip verificado (`scripts/smoke-field-layout.py` 12/12: el ancho viaja en la versión CONGELADA y vuelve en el detalle de entrada; omitido = FULL). **Smoke VISUAL pendiente** (BACKLOG §4): builder-preview + llenado + visor idénticos, colapso a 1 col en tablet, ⅓→½ intermedio, 44px.
+
+---
+
 ### 2026-06-14 · Fase 2.8.2 — VOID de borradores + ruta de edición propia — ✅ IMPLEMENTADO (`feat/void-edicion` → `main`)
 
 Cierra la deuda (b)(c) de 2.8.2. 4 forks resueltos con el dueño (recomendación aceptada en los 4):

@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   deriveDataType,
   fieldConfigSchemaFor,
+  LAYOUT_WIDTHS,
+  layoutWidthSchema,
   numberFieldConfigSchema,
   optionsFieldConfigSchema,
   upgradeFieldConfig,
@@ -53,6 +55,22 @@ describe("config de campos por tipo", () => {
       config: { options: [] }, // opciones no aplican a NÚMERO
     });
     expect(bad.success).toBe(false);
+  });
+});
+
+describe("ancho del campo en la grilla (2.1.2)", () => {
+  it("expone exactamente el set mínimo {FULL, HALF, THIRD}", () => {
+    expect([...LAYOUT_WIDTHS]).toEqual(["FULL", "HALF", "THIRD"]);
+    expect(layoutWidthSchema.safeParse("QUARTER").success).toBe(false);
+  });
+
+  it("el ancho es OPCIONAL en el input del campo (ausente = FULL en backend)", () => {
+    const sinAncho = draftFieldInputSchema.safeParse({ key: "obs", type: "TEXT", label: "Observación" });
+    expect(sinAncho.success).toBe(true);
+    const conAncho = draftFieldInputSchema.safeParse({ key: "obs", type: "TEXT", label: "Observación", layoutWidth: "HALF" });
+    expect(conAncho.success).toBe(true);
+    const invalido = draftFieldInputSchema.safeParse({ key: "obs", type: "TEXT", label: "Observación", layoutWidth: "WIDE" });
+    expect(invalido.success).toBe(false);
   });
 });
 

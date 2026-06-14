@@ -55,7 +55,8 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 
 ### 6. Plantillas / Form Builder  [Configurador]
 - ✍️ Secciones y campos (tipos, obligatorios, ayuda)
-- ✍️ Umbrales de alerta (rangos warn/crit, ISA-18.2)
+- ✅ Ancho de campo / layout en grilla (completo / mitad / tercio)
+- ✅ Umbrales de alerta (rangos warn/crit, ISA-18.2)
 - ✍️ Lógica condicional (mostrar campo según otro)
 - ✍️ Borrador / publicar (versión inmutable)
 - ✍️ Alcance de estructura (en qué nodos vive la plantilla)
@@ -155,3 +156,60 @@ guardar.
 - Solo se editan entradas **en borrador**. Una entrada **sellada** se abre en **solo lectura**.
 - La edición respeta la **ventana de edición** (si venció, se pide motivo para corregir) y el
   **período contable** (si está cerrado, se requiere permiso de excepción).
+
+---
+
+## Plantillas ▸ Ancho de campo / layout en grilla  [Configurador]
+
+**Para qué sirve.** Acomodar los campos de una sección en **varias columnas** en vez de una
+sola lista que obliga a desplazarse. Campos cortos (una fecha, un número, un sí/no) pueden ir
+**lado a lado**; campos largos (un comentario) ocupan todo el ancho. El formulario queda más
+compacto y rápido de leer, y se ve igual al diseñarlo, al llenarlo y al revisarlo.
+
+**Cómo se usa.**
+1. En el **builder de plantillas** (`/plantillas/:id`), pestaña **Diseño ▸ Editor**, selecciona
+   un campo.
+2. En el panel de configuración, usa el selector **"Ancho en la grilla"**:
+   - **Completo** — ocupa todo el ancho de la sección (opción por defecto).
+   - **Mitad** — media columna (dos campos por fila).
+   - **Tercio** — un tercio (tres campos por fila).
+3. Mira el resultado en **Vista previa**. Publica la plantilla como siempre (borrador → publicar).
+
+**Quién puede.** El **Configurador** que puede editar la plantilla (`template:edit`). Es parte
+del diseño del formulario.
+
+**Importante.**
+- Es **solo presentación**: el ancho **no cambia** qué es obligatorio, los umbrales, la lógica
+  condicional ni quién puede llenar cada campo.
+- **Responsivo para terreno**: en **tablet** los campos a un tercio pasan a media columna, y en
+  **celular** todo se apila en **una sola columna** (para usar con guantes, sin apretar).
+- El ancho viaja en la **versión publicada** (es diseño controlado): cambiarlo crea un nuevo
+  borrador y se aplica a las entradas nuevas tras publicar; las ya registradas conservan su layout.
+- Las plantillas existentes no cambian: todo campo sin ancho definido se muestra **Completo**
+  (como antes).
+
+---
+
+## Plantillas ▸ Umbrales de alerta (rangos warn/crit)  [Configurador]
+
+**Para qué sirve.** Avisar cuando un valor numérico se sale de lo normal sin tener que recordarlo
+de memoria: el campo "pinta" una **advertencia** (ámbar) o una situación **crítica** (rojo) según
+los límites que defina el diseñador. Sigue el estándar industrial **ISA-18.2** de gestión de
+alarmas (niveles bajo-bajo / bajo / alto / alto-alto).
+
+**Cómo se usa.**
+1. En el builder, agrega o selecciona un campo de tipo **Número**.
+2. Define el **rango válido** (mínimo / máximo): fuera de él el valor se rechaza.
+3. Dentro de ese rango, define las **bandas de umbral**: *warn bajo / warn alto* (advertencia) y
+   *crit bajo / crit alto* (crítico).
+4. Al llenar, el campo muestra el aviso correspondiente; en Bitácoras la banda se resalta en la
+   celda y en el resumen.
+
+**Quién puede.** El **Configurador** que edita la plantilla (`template:edit`).
+
+**Importante.**
+- El **mínimo/máximo** es el límite **duro** (valor inválido); las **bandas** son señales dentro
+  del rango válido (el valor se acepta pero queda marcado).
+- La banda se **estampa al guardar** y queda en el registro: alimenta el "review-by-exception" de
+  Bitácoras (filtrar solo lo que requiere atención) y, más adelante, las incidencias automáticas.
+- Si el campo es **calculado** (motor de reglas), el umbral aplica sobre el **valor calculado**.

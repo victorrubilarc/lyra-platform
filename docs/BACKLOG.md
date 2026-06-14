@@ -5,7 +5,12 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-14** (**Fase 2.8.2 VOID de borradores + ruta de edición ✅** — `feat/void-edicion`: `status=VOID`
+> actualización: **2026-06-14** (**Fase 2.1.2 Layout de formulario en grilla responsiva ✅** — `feat/layout-grilla`:
+> ancho por campo `{FULL,HALF,THIRD}` en **columna `TemplateField.layoutWidth`** [versión inmutable, NO en `config`
+> JSONB porque los config por tipo son Zod `.strict()`] + grilla CSS 12-col responsiva [THIRD→½ tablet, 1 col <768px]
+> desde fuente de render ÚNICA `FieldGrid`/`FieldGridCell` [builder-preview + llenado + visor idénticos]. Presentación
+> PURA y aditiva, default FULL = cero ruptura. Migración `…_add_field_layout_width`. Contracts 195 · API 234 · smoke
+> 12/12. Pendiente: smoke VISUAL [§4]. Anterior: **Fase 2.8.2 VOID de borradores + ruta de edición ✅** — `feat/void-edicion`: `status=VOID`
 > con motivo ≥5 auditado [NO `deletedAt`], autorización ownership + permiso nuevo `logentry:void` para ajenas [catálogo
 > **59→60**], `buildWhere` excluye VOID por defecto [recuperable con `?status=VOID`], evento timeline VOIDED, banner en
 > visor/llenado, **ruta de edición dedicada `/bitacoras/:id/editar`**. Cierra la deuda (b)(c) de 2.8.2 [la (a) ya estaba].
@@ -91,9 +96,10 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Fase 2.8.1c Peek + facetas + review-by-exception + Mi turno** (`/facets` conteos de hermanos + `/my-shift` + `exceptionsOnly` + `FacetsPanel`/`PeekDrawer` + `rowClassName` en `@lyra/ui` + filtro de equipo en UI) | `feat/bitacoras-peek-facetas` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Workflow SLA + atrasos** (`WorkflowState.maxStayMinutes` + `LogEntry.currentStateSince` + `evaluateSla` + `roleNames` en versión congelada + `delayedOnly`/`stats.delayed`/`facets.delayed` + vista sistema "Retrasadas" + `SlaDurationField` builder + alertas diagrama/grilla) | `feat/workflow-sla-atrasos` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Motor de reglas — primer corte (Req-7)** (`@lyra/contracts/rules` AST seguro + formulados + cruzadas + `TemplateField.computed`/`TemplateVersion.rules` + recálculo autoritativo/estampado en API + `ExpressionEditor`/`RulesEditor`/preview en vivo) | `feat/motor-reglas` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
-| **Fase 2.8.2 VOID de borradores + ruta de edición** (`status=VOID` + `voidedAt/voidReason/voidedById` + `POST /void` ownership/`logentry:void` + `buildWhere` excluye VOID + evento timeline VOIDED + `VoidEntryModal`/banner + ruta `/bitacoras/:id/editar`) | `feat/void-edicion` → `main` | ⏳ **pendiente de merge+push en esta sesión** | merge a `main` + push |
+| **Fase 2.8.2 VOID de borradores + ruta de edición** (`status=VOID` + `voidedAt/voidReason/voidedById` + `POST /void` ownership/`logentry:void` + `buildWhere` excluye VOID + evento timeline VOIDED + `VoidEntryModal`/banner + ruta `/bitacoras/:id/editar`) | `feat/void-edicion` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
+| **Fase 2.1.2 Layout de formulario en grilla responsiva** (enum `LayoutWidth` + columna `TemplateField.layoutWidth` + migración `…_add_field_layout_width` + persistir/clonar/mapear en ambos services + `FieldGrid`/`FieldGridCell` compartido + selector en `BuilderConfigPanel` + cableo de PreviewForm/EntryFillPage/EntryViewerPage) | `feat/layout-grilla` → `main` | ⏳ **pendiente de merge+push en esta sesión** | merge a `main` + push |
 
-**Estado:** **nada vive solo en local.** `main` = `origin/main` (salvo `feat/void-edicion`, en publicación al cierre).
+**Estado:** **nada vive solo en local.** `main` = `origin/main` (salvo `feat/layout-grilla`, en publicación al cierre).
 
 **Convención propuesta (a confirmar):** trabajar cada módulo en rama `feat/<modulo>`;
 al cerrar la sesión → push de la rama + merge a `main` + push de `main`. Así `origin/main`
@@ -226,11 +232,14 @@ nunca queda más de una sesión atrás.
 ### Requerimientos del dueño 2026-06-14 (registrados, sin planificar fecha) 🆕
 > Capturados el 2026-06-14. Pendientes de plan/aprobación por sesión. Análisis y referencias de industria abajo.
 
-- [ ] **2.1.2 — Layout de formulario en GRILLA responsiva.** Hoy los campos se apilan en 1 columna (mucho scroll).
-      Dar al diseñador un **ancho por campo** (completo / ½ / ⅓) y acomodarlos en una **grilla CSS responsiva**
-      (colapsa a 1 columna en tablet/celular, regla de terreno + 44px). Aditivo a la versión de plantilla (config
-      versionada); NO toca validación/umbral/condicional/permisos (solo presentación). Estándar SAP Fiori/ServiceNow.
-      Opción A recomendada (ancho por campo); B = columnas por sección; C = editor drag&drop (sobre-ingeniería). **Fase 2.**
+- [x] **2.1.2 — Layout de formulario en GRILLA responsiva ✅ (2026-06-14, `feat/layout-grilla` → `main`).** Ancho por
+      campo `{FULL,HALF,THIRD}` (columna dedicada `TemplateField.layoutWidth` en la versión inmutable; NO en `config`
+      JSONB porque los config por tipo son Zod `.strict()`) + grilla CSS de 12 col responsiva (THIRD→½ en tablet, 1 col
+      <768px) desde una fuente de render ÚNICA `FieldGrid`/`FieldGridCell` (builder-preview + llenado + visor idénticos).
+      Aditivo, default FULL = cero ruptura; NO toca validación/umbral/condicional/permisos. Migración
+      `20260614170000_add_field_layout_width`. Smoke API 12/12. Ver DECISIONS/PROGRESS 2026-06-14.
+  - [ ] **Deuda 2.1.2 (aditiva, si surge caso real):** anchos extra `TWO_THIRDS`/`QUARTER` o spans numéricos 1–12; el
+        editor de layout avanzado (drag&drop, plantillas wizard/pestañas/colapsable) es **2.9.0** (otra sesión), NO aquí.
 - [ ] **Adjuntos / evidencias en formularios (Req-2).** Subir archivos/fotos. Los grandes (Maximo, SAP DMS, ServiceNow,
       Veeva/MasterControl, j5) lo hacen en **3 niveles** y conviene soportar: **(a) tipo de campo "archivo/foto"** (adjunto
       como dato del formulario), **(b) adjuntos a nivel de REGISTRO** (evidencia general), **(c) adjuntos en la TRANSICIÓN**
@@ -824,6 +833,12 @@ implementación esperada:
       **Guardar borrador** y **Publicar** (congela versión), editar publicada (clona borrador), borrar (bloqueado si
       en uso); en el **Form Builder**: asignar un flujo publicado, mapear secciones→estados editables, editar el
       **override de rol por campo**; modo claro. App en `:5173`.
+- [ ] **Fase 2.1.2 Layout en grilla — smoke VISUAL en navegador** (se verificó typecheck/lint/build/test + smoke por
+      API 12/12; falta el clic): en el **builder** (`/plantillas/:id`, Diseño ▸ Editor), seleccionar un campo y usar el
+      **selector de ancho** (Completo / Mitad / Tercio); en la **Vista previa** ver los campos acomodados en la grilla;
+      verificar que **builder-preview + llenado (`/nueva-entrada/:id`) + visor (`/bitacoras/:id`)** se ven **IDÉNTICOS**;
+      **colapso a 1 columna** en tablet-portrait (≤768px) y **⅓→½** en ancho intermedio (768–1023px); áreas táctiles
+      **44px** con guantes; modo claro y oscuro. Para verlo: poner 2–3 campos en ½ o ⅓ en una sección. App en `:5173`.
 - [ ] **Workflow SLA + atrasos — smoke VISUAL en navegador** (se verificó typecheck/lint/build/test + smoke por API
       20/20; falta el clic): en el **builder de flujos** (`/flujos/:id`), por estado el campo **"Tiempo máximo de
       estadía"** (Min/Horas/**Días**, vacío = sin SLA), guardar borrador y publicar (el SLA persiste). En el **diagrama

@@ -710,6 +710,41 @@
   background: var(--color-accent-soft, rgba(99, 102, 241, 0.2));
   color: var(--color-text-primary);
 }
+
+/* Selector segmentado de ancho del campo en la grilla (Fase 2.1.2). */
+.widthSeg {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.widthSegBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px; /* área táctil (terreno / tablet) */
+  padding: 0 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-default);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s,
+    color 0.15s;
+}
+.widthSegBtn:hover {
+  border-color: var(--color-border-active);
+  color: var(--color-text-primary);
+}
+.widthSegBtn[data-on="true"] {
+  border-color: var(--color-accent-primary);
+  background: var(--color-accent-soft, rgba(99, 102, 241, 0.2));
+  color: var(--color-text-primary);
+}
 .previewSignature {
   padding: 18px;
   border: 1px dashed var(--color-border-active);

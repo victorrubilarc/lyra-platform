@@ -109,6 +109,21 @@ export function deriveDataType(type: FieldType): FieldDataType {
   return FIELD_TYPE_TO_DATA_TYPE[type];
 }
 
+// === Ancho del campo en la grilla (Fase 2.1.2) ===============================
+//
+// Hint de PRESENTACIÓN del campo: cuánto ocupa dentro de la grilla responsiva de
+// su sección (estándar SAP Fiori 12-col / ServiceNow form layout). Vive en la
+// versión INMUTABLE (es diseño controlado MMR/Part 11), como columna dedicada
+// `TemplateField.layoutWidth` (paralelo a `visibleWhen`/`computed`/`semanticRole`,
+// NO dentro de `config`). El motor de render solo COLOCA: no fuerza, no valida.
+//   - FULL  (default): ancho completo de la sección (12/12).
+//   - HALF:  media columna (6/12).
+//   - THIRD: un tercio (4/12); degrada a ½ en tablet y a 1 col en celular.
+// El set se mantiene mínimo a propósito (sin spans sueltos = sin error de fila).
+export const LAYOUT_WIDTHS = ["FULL", "HALF", "THIRD"] as const;
+export const layoutWidthSchema = z.enum(LAYOUT_WIDTHS);
+export type LayoutWidth = z.infer<typeof layoutWidthSchema>;
+
 // === Config por tipo =========================================================
 
 /** Opción de un selector (valor estable + etiqueta visible). @deprecated 2.1.1 → usar inline `optionSource`. */
