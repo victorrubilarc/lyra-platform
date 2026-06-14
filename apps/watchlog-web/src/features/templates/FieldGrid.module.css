@@ -24,7 +24,19 @@
   min-width: 0;
 }
 
-/* Celular: una sola columna (todo apilado, fiel a la regla de terreno + 44px). */
+/* Tablet (768–1023px): 2 columnas fijas; los campos fluyen de a 2 sin importar su
+   colSpan (legible y táctil en terreno). El operador suele llenar en tablet. */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cell {
+    grid-column: auto;
+  }
+}
+
+/* Móvil (<768px): una sola columna (todo apilado, regla de terreno + 44px). */
 @media (max-width: 767px) {
   .grid {
     grid-template-columns: 1fr;
