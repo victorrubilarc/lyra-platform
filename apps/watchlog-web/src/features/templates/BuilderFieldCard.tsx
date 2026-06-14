@@ -1,24 +1,29 @@
-import type { PointerEvent as ReactPointerEvent, KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useEffect, useRef, type PointerEvent as ReactPointerEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { ArrowUp, ArrowDown, FunctionSquare, GripVertical, Trash2 } from "lucide-react";
+import { GripVertical } from "lucide-react";
 import { GRID_COLUMNS } from "@lyra/contracts";
-import { fieldTypeMeta, type EditField } from "./builder-model.js";
+import { FieldControl } from "./FieldControl.js";
+import { FieldToolbar } from "./FieldToolbar.js";
+import { type EditField } from "./builder-model.js";
 import styles from "./TemplateBuilder.module.css";
 
 const clampSpan = (n: number) => Math.min(Math.max(Math.round(n), 1), GRID_COLUMNS);
 
 interface BuilderFieldCardProps {
   field: EditField;
-  index: number;
-  count: number;
   active: boolean;
   canEdit: boolean;
   dragging: boolean;
   dropTarget: boolean;
   onSelect: () => void;
-  onDelete: () => void;
-  onMove: (dir: -1 | 1) => void;
+  onLabel: (label: string) => void;
   onResize: (span: number) => void;
+  onToggleRequired: () => void;
+  onDuplicate: () => void;
+  onDelete: () => void;
+  onMoreOptions: () => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
   onDragStart: () => void;
   onDragEnd: () => void;
   onDragOver: () => void;
@@ -26,33 +31,43 @@ interface BuilderFieldCardProps {
 }
 
 /**
- * Card de un campo en el LIENZO WYSIWYG del builder (Fase 2.1.3). Se ve en su ancho
- * real dentro de la grilla de la sección. Se REORDENA arrastrando (DnD nativo, patrón
- * `ColumnsDrawer`; las flechas ↑↓ quedan como vía de teclado) y se REDIMENSIONA
- * arrastrando el borde derecho (pointer-events, patrón `ResizableSplit`) — el handle
- * es `role="slider"`, operable con ← →. El builder lo usa el Configurador en escritorio.
+ * Card de un campo en el LIENZO WYSIWYG del builder (Fase 2.1.4). Muestra el
+ * **control REAL** (no interactivo) tal cual saldrá en el formulario, con el rótulo
+ * editable EN EL LUGAR y una **barra flotante** de configuración (estilo Canva/
+ * Google Forms). Se reordena arrastrando (DnD nativo) y se redimensiona arrastrando
+ * el borde derecho (pointer-events; `role="slider"` con ← →). El builder lo usa el
+ * Configurador en escritorio.
  */
 export function BuilderFieldCard({
   field,
-  index,
-  count,
   active,
   canEdit,
   dragging,
   dropTarget,
   onSelect,
-  onDelete,
-  onMove,
+  onLabel,
   onResize,
+  onToggleRequired,
+  onDuplicate,
+  onDelete,
+  onMoreOptions,
+  onMoveUp,
+  onMoveDown,
   onDragStart,
   onDragEnd,
   onDragOver,
   onDrop,
 }: BuilderFieldCardProps) {
   const { t } = useTranslation();
-  const meta = fieldTypeMeta(field.type);
-  const Icon = meta.icon;
-  const c = field.config as Record<string, unknown>;
+  const labelRef = useRef<HTMLTextAreaElement>(null);
+
+  // El rótulo inline se auto-ajusta a su contenido (sin scroll).
+  useEffect(() => {
+    const el = labelRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [field.label]);
 
   // Redimensionar: deriva el span de la posición del puntero respecto de la grilla
   // de la sección (`[data-field-grid]`). Snap por columna (ancho de la grilla / 12).
@@ -61,8 +76,7 @@ export function BuilderFieldCard({
     if (!grid) return null;
     const rect = grid.getBoundingClientRect();
     if (rect.width <= 0) return null;
-    const col = rect.width / GRID_COLUMNS;
-    return clampSpan((clientX - rect.left) / col);
+    return clampSpan((clientX - rect.left) / (rect.width / GRID_COLUMNS));
   };
 
   const onHandleDown = (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -71,17 +85,17 @@ export function BuilderFieldCard({
     e.stopPropagation();
     const handle = e.currentTarget;
     handle.setPointerCapture(e.pointerId);
-    const onMoveEv = (ev: PointerEvent) => {
+    const move = (ev: PointerEvent) => {
       const next = spanFromPointer(handle, ev.clientX);
       if (next !== null && next !== field.colSpan) onResize(next);
     };
-    const onUp = (ev: PointerEvent) => {
+    const up = (ev: PointerEvent) => {
       handle.releasePointerCapture(ev.pointerId);
-      handle.removeEventListener("pointermove", onMoveEv);
-      handle.removeEventListener("pointerup", onUp);
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", up);
     };
-    handle.addEventListener("pointermove", onMoveEv);
-    handle.addEventListener("pointerup", onUp);
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", up);
   };
 
   const onHandleKey = (e: ReactKeyboardEvent<HTMLDivElement>) => {
@@ -104,8 +118,9 @@ export function BuilderFieldCard({
         onSelect();
       }}
       onDragStart={(e) => {
-        // Evita que el arrastre se inicie desde el handle de redimensionar.
-        if ((e.target as HTMLElement).dataset.resizeHandle) {
+        const tgt = e.target as HTMLElement;
+        // El arrastre solo inicia desde el asa; no desde el rótulo, el handle ni la barra.
+        if (!tgt.dataset.dragHandle) {
           e.preventDefault();
           return;
         }
@@ -123,39 +138,47 @@ export function BuilderFieldCard({
         onDrop();
       }}
     >
-      <span className={styles.cardGrip} aria-hidden>
+      {/* Asa de arrastre (única zona "draggable" de la card). */}
+      <span className={styles.cardGrip} data-drag-handle="1" aria-hidden title={t("templates.builder.dragToReorder")}>
         <GripVertical size={15} />
       </span>
-      <Icon size={16} className={styles.fieldIcon} />
-      <div className={styles.fieldInfo}>
-        <div className={styles.fieldLabel}>
-          {field.label}
-          {field.required && !field.computed && <span className={styles.req}> *</span>}
-          {field.computed && (
-            <span className={styles.computedBadge}>
-              <FunctionSquare size={11} /> {t("templates.builder.computedTag")}
-            </span>
-          )}
-        </div>
-        <div className={styles.fieldSub}>
-          {t(meta.labelKey)}
-          {c.unit ? ` · ${c.unit as string}` : ""}
-          {c.min !== undefined || c.max !== undefined ? ` · ${c.min ?? "—"}–${c.max ?? "—"}` : ""}
-          {field.visibleWhen ? ` · ${t("templates.builder.conditionalTag")}` : ""}
-          {` · ${field.colSpan}/${GRID_COLUMNS}`}
+
+      {/* Barra flotante contextual (solo cuando la card está activa). */}
+      {active && (
+        <FieldToolbar
+          colSpan={field.colSpan}
+          required={field.required}
+          computed={!!field.computed}
+          canEdit={canEdit}
+          onWidth={onResize}
+          onToggleRequired={onToggleRequired}
+          onDuplicate={onDuplicate}
+          onDelete={onDelete}
+          onMoreOptions={onMoreOptions}
+          onMoveUp={onMoveUp}
+          onMoveDown={onMoveDown}
+        />
+      )}
+
+      <div className={styles.cardBody}>
+        {/* Rótulo editable EN EL LUGAR. */}
+        <textarea
+          ref={labelRef}
+          className={styles.inlineLabel}
+          value={field.label}
+          rows={1}
+          disabled={!canEdit}
+          aria-label={t("templates.builder.fieldLabel")}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => onLabel(e.target.value)}
+        />
+        {/* Control REAL (widgets vacíos, no interactivos vía CSS): lo que se ve es lo
+            que es. Se oculta el rótulo interno del control (el inline de arriba manda). */}
+        <div className={styles.cardControl} aria-hidden>
+          <FieldControl field={field} value={undefined} onChange={() => undefined} />
         </div>
       </div>
-      <div className={styles.rowActions} onClick={(e) => e.stopPropagation()}>
-        <button type="button" className={styles.iconBtn} onClick={() => onMove(-1)} disabled={!canEdit || index === 0} aria-label={t("common.moveUp")}>
-          <ArrowUp size={13} />
-        </button>
-        <button type="button" className={styles.iconBtn} onClick={() => onMove(1)} disabled={!canEdit || index === count - 1} aria-label={t("common.moveDown")}>
-          <ArrowDown size={13} />
-        </button>
-        <button type="button" className={styles.iconBtnDanger} onClick={onDelete} disabled={!canEdit} aria-label={t("common.delete")}>
-          <Trash2 size={13} />
-        </button>
-      </div>
+
       {/* Handle de redimensionar (borde derecho). Pointer = arrastrar; teclado = ← →. */}
       <div
         data-resize-handle="1"

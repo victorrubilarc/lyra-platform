@@ -66,6 +66,19 @@ export function fieldTypeMeta(type: FieldType): FieldTypeMeta {
   return FIELD_TYPE_META.find((m) => m.type === type) ?? FIELD_TYPE_META[0]!;
 }
 
+/**
+ * Presets de ancho (en columnas de 12) para el campo. Atajos comunes; el ajuste
+ * fino (cualquier span 1..12) se hace arrastrando el borde de la card en el lienzo.
+ * Compartido por la barra flotante del campo y el panel de configuración avanzada.
+ */
+export const WIDTH_PRESETS = [
+  { span: 12, glyph: "1", labelKey: "templates.builder.widthFull" },
+  { span: 8, glyph: "⅔", labelKey: "templates.builder.widthTwoThirds" },
+  { span: 6, glyph: "½", labelKey: "templates.builder.widthHalf" },
+  { span: 4, glyph: "⅓", labelKey: "templates.builder.widthThird" },
+  { span: 3, glyph: "¼", labelKey: "templates.builder.widthQuarter" },
+] as const;
+
 // === Modelo editable local ===================================================
 
 export interface EditField {
