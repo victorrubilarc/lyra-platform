@@ -289,7 +289,7 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
                   <Save size={15} /> {t("templates.builder.saveConfig")}
                 </Button>
               )
-            : designTab === "editor" && (
+            : (designTab === "editor" || designTab === "rules") && (
                 <>
                   {canEdit && (
                     <Button variant="secondary" onClick={handleSave} loading={save.isPending} disabled={busy || !dirty}>
@@ -353,7 +353,7 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
                 </button>
               </div>
 
-              {isPublishedView && designTab === "editor" && (
+              {isPublishedView && (designTab === "editor" || designTab === "rules") && (
                 <div className={styles.readOnlyBanner}>{t("templates.builder.publishedReadOnly")}</div>
               )}
 
@@ -367,7 +367,7 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
                 <RulesEditor
                   rules={state.rules}
                   fields={allFields}
-                  canEdit={canEdit && !isPublishedView}
+                  canEdit={canEdit}
                   onChange={setRules}
                 />
               ) : (
