@@ -226,9 +226,10 @@ nunca queda más de una sesión atrás.
       **SAP/Maximo** (workflow notifications / escalations + communication templates). Requiere un **MOTOR de
       notificaciones**: canales detrás de una interfaz abstracta (ya existe `EmailService` como molde), **plantillas de
       mensaje**, **resolución de destinatarios** (rol→usuarios), opt-in **por transición** (config en la versión del flujo).
-      **CAVEAT on-prem (importante):** **mail** es on-prem (SMTP, ya tenemos `SmtpEmailService`+Mailpit); **SMS/WhatsApp
-      rompen el on-prem puro** → exigen pasarela externa (Twilio / Meta WhatsApp Business API) o un gateway SMS propio ⇒
-      deben ser **canales OPCIONALES enchufables**, no obligatorios. **Req-5 = pantalla dedicada** de correo saliente
+      **Alcance del canal (decisión dueño 2026-06-14): SOLO MAIL.** **SMS y WhatsApp quedan FUERA DE ALCANCE**
+      (rompían el on-prem puro: exigían pasarela externa Twilio / Meta WhatsApp Business API). El motor se diseña con
+      canales detrás de interfaz abstracta por si en el futuro se reabren, pero **no se construyen** SMS/WhatsApp.
+      **Req-5 = pantalla dedicada** de correo saliente
       (SMTP host/puerto/seguridad/auth a BD + perfiles de remitente + editor de plantillas + **botón "enviar prueba"** +
       cola/reintentos), estilo WP Mail SMTP / Odoo "servidores de correo saliente" / settings de GitLab/Jira. Este motor
       lo **reutiliza Incidencias (Fase 4: SLA/escalamiento)** ⇒ es pieza FUNDACIONAL. **Nuevo bloque transversal
@@ -247,6 +248,27 @@ nunca queda más de una sesión atrás.
       `onTransitionExecuted` no-op), **suscripciones** (por plantilla o globales), **firma HMAC**, **cola de reintentos**,
       **log de entregas** + reintento manual. On-prem friendly (solo HTTP POST saliente). Lo difícil = entrega confiable
       (cola+reintentos+idempotencia). **Fase 3 (integración OUTBOUND), junto a Req-3.**
+- [ ] **Asistente IA: consulta de bitácoras en LENGUAJE NATURAL (RAG) (Req-6, dueño 2026-06-14).** Preguntar en lenguaje
+      natural ("¿qué fallas tuvo la bomba 2 este mes?") y que el asistente responda **citando los folios** de respaldo.
+      Técnica = **RAG** (Retrieval-Augmented Generation): (1) **indexar** entradas + base de conocimiento como
+      **embeddings**; (2) ante la pregunta, **recuperar** los fragmentos relevantes; (3) el **LLM** redacta la respuesta
+      SOLO con eso (con citas), reduciendo alucinación. Piezas: pipeline de ingest/re-index (entradas son inmutables GxP),
+      **vector store = `pgvector`** (extensión de Postgres ⇒ **on-prem**, sin servicio nuevo), `LlmProvider` **abstracto**
+      (modelo local tipo Ollama/llama.cpp **o** API; CLAUDE.md ya exige la interfaz abstracta), prompt+citas.
+      **CRÍTICO de seguridad:** el recuperador DEBE aplicar el **MISMO ABAC** que la grilla — el asistente solo "ve" lo
+      que el usuario puede ver (nada de fuga vía IA). Quién lo hace así: Glean, Danswer/Onyx, Azure AI Search + RAG.
+      **Fase 6 (Asistente IA), sobre la base de conocimiento; apoyado en la interfaz LLM de Fase 5.**
+- [ ] **Inteligencia PREDICTIVA de fallos (Req-6b, dueño 2026-06-14).** Que el sistema **discierna patrones y prediga
+      posibles fallos** desde el histórico de bitácoras. Dos niveles, NO confundir:
+      **(A) "Insights" asistidos por IA (alcanzable antes):** el LLM razona sobre el histórico recuperado (RAG) y sugiere
+      causas probables / patrones / recomendaciones, **con citas**. Extiende el asistente Req-6. **Fase 6.**
+      **(B) Predicción ML real (anomalías / predicción de falla):** modelos sobre series de tiempo + datos estructurados
+      (los campos numéricos con umbral + equipo + **modos de falla ISO 14224** que YA capturamos son el sustrato; FMEA).
+      **Objeción honesta (criterio):** la predicción ML seria **necesita VOLUMEN e historial** (no se predice con semanas
+      de datos) + etiquetado + entrenamiento/validación + MLOps ⇒ es un esfuerzo **grande y posterior**. Recomendación:
+      capturar datos ya (en curso), entregar (A) en Fase 6, y (B) como **fase posterior/piloto** cuando haya historial.
+      Quién: mantenimiento predictivo de IBM Maximo (MAS/Predict), GE/AVEVA Predictive Analytics, SAP PdMS.
+      **Fase 6 (insights) + fase posterior (ML real).**
 
 ### Fases siguientes (roadmap, ver PROGRESS §tabla)
 - [ ] **Fase 2** — Plantillas / Form Builder + Bitácoras. **Arquitectura enterprise definida en DECISIONS
