@@ -4,6 +4,18 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-14 · Fase 2.1.4 — Builder CANVAS-FIRST con configuración en el lienzo — ✅ IMPLEMENTADO (`feat/builder-canvas` → `main`)
+
+Feedback del dueño tras probar 2.1.3: el editor se sentía **estrecho y poco intuitivo** vs Canva/Webflow/Google Forms ("el usuario está acostumbrado a otros softwares, no podemos darle menos"). Causa: lienzo espachurrado entre paleta (220px) y config (320px) ⇒ ~280px; y toda la config en un panel lateral abstracto. **Frontend puro** (no toca modelo/contratos/API — `colSpan` ya estaba).
+
+- **Shell canvas-first:** se elimina la grilla de 3 columnas; el **lienzo ocupa todo el ancho** (artboard centrado, max-width ~1040px). La **paleta deja de ser columna**: agregar campo es un **popover "＋ Agregar campo"** (`AddFieldMenu`, reusa `Menu` de @lyra/ui) en la barra del lienzo y **al final de cada sección** (inserta donde se invoca, vía `addFieldAt(type, sectionUid, index)`). El **panel de config pasa a `Drawer` lateral** (@lyra/ui) que se abre con "Más opciones" — solo para lo AVANZADO (umbral, opciones/lista, condicional, fórmula, roles).
+- **Configuración EN EL LIENZO (lo potente):** cada campo se ve como el **control REAL** (`FieldControl` no interactivo, `pointer-events:none`, se oculta su rótulo interno) ⇒ lo que ves es lo que es. **Rótulo editable en el lugar** (textarea auto-grow), **título/descripción de sección inline**, y **barra flotante contextual** (`FieldToolbar`) sobre el campo activo: ancho (presets + el handle fino), obligatorio, mover ↑↓, duplicar, eliminar, "Más opciones". Patrón Canva/Notion/Google Forms.
+- **Se conserva:** arrastrar para reordenar (DnD nativo) y redimensionar (handle pointer/teclado), la fuente de render ÚNICA (`FieldGrid`/`FieldGridCell`) ⇒ builder ≈ llenado ≈ visor, y la accesibilidad (flechas ↑↓ en la barra, handle `role=slider`).
+- **Nuevos componentes:** `AddFieldMenu`, `FieldToolbar`; `BuilderFieldCard` reescrito a WYSIWYG. `WIDTH_PRESETS` movido a `builder-model` (compartido barra+panel). `duplicateField` nuevo.
+- **Entregado en 2 fases (honestidad de alcance).** Fase 1 (esto): canvas-first + WYSIWYG + config en el lienzo. **Fase 2 (BACKLOG):** drag-desde-paleta-a-posición, edición inline de placeholder/ayuda/opciones, colapsar secciones, atajos/copiar-pegar, multi-selección. **NO** se hace posicionamiento absoluto ni plantillas de layout (sigue siendo 2.9.0). **Motivo:** estándar enterprise de editores de formulario = el lienzo ES el formulario y se configura encima. typecheck/lint(0)/build verdes; contracts 195 · API 234 (sin cambios). **Smoke VISUAL pendiente** (BACKLOG §4).
+
+---
+
 ### 2026-06-14 · Fase 2.1.3 — Editor de layout WYSIWYG (grilla de 12 col + arrastre) — ✅ IMPLEMENTADO (`feat/layout-editor-wysiwyg` → `main`)
 
 Iteración sobre 2.1.2 por feedback del dueño: el panel lateral de ancho era **ciego** (editas en abstracto, verificas en otra pestaña). Los líderes (ServiceNow, Power Apps, Salesforce, SAP Fiori, Retool) editan el layout **WYSIWYG por manipulación directa sobre el formulario**. El dueño eligió manipulación directa COMPLETA (arrastrar para redimensionar y reordenar) y granularidad de **12 columnas**.

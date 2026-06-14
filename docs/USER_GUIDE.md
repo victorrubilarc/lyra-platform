@@ -168,16 +168,22 @@ compacto y rápido de leer, y se ve **igual** al diseñarlo, al llenarlo y al re
 es **WYSIWYG**: armas el formulario sobre una grilla de **12 columnas** (estilo SAP Fiori),
 arrastrando, sin adivinar.
 
-**Cómo se usa.**
-1. En el **builder de plantillas** (`/plantillas/:id`), pestaña **Diseño ▸ Editor**: los campos
-   se ven en su **ancho real** dentro de la grilla de cada sección.
-2. **Cambiar el ancho de un campo** (de 3 formas):
-   - **Arrastra el borde derecho** del campo: se ensancha/angosta y los vecinos se reacomodan en vivo.
-   - O selecciónalo y usa los **presets** del panel (Completo · Dos tercios · Mitad · Un tercio · Un cuarto).
-   - O, con el borde enfocado por teclado, usa **← / →** para ajustar columna por columna.
-3. **Reordenar campos**: **arrástralos** por el asa (⋮⋮) a otra posición — dentro de la misma
-   sección o **a otra sección**. (También sirven las flechas **↑ ↓** del campo, por teclado.)
-4. Publica la plantilla como siempre (borrador → publicar).
+**Cómo se usa.** El editor es **canvas-first** (el lienzo a todo el ancho) y se configura **sobre
+el lienzo**, como en Canva / Google Forms:
+1. En el **builder de plantillas** (`/plantillas/:id`), pestaña **Diseño ▸ Editor**: cada campo se
+   ve con su **control real** (lo que ves es lo que será el formulario).
+2. **Agregar un campo**: botón **"＋ Agregar campo"** (en la barra del lienzo o al final de una
+   sección) → elige el tipo. Se inserta donde lo pediste.
+3. **Editar el rótulo**: haz clic en el texto del campo y escríbelo **en el lienzo** (igual el
+   **título/descripción** de la sección).
+4. **Barra flotante** (al seleccionar un campo): **ancho** (presets), **obligatorio**, **mover ↑↓**,
+   **duplicar**, **eliminar**, y **"Más opciones"** (abre un panel lateral con lo avanzado: umbrales,
+   opciones de lista, condicional, fórmula, permisos por campo).
+5. **Cambiar el ancho**: **arrastra el borde derecho** del campo (se ensancha/angosta y los vecinos
+   se reacomodan), o usa los **presets** de la barra, o **← / →** con el borde enfocado.
+6. **Reordenar**: **arrastra** el campo por el asa (⋮⋮) a otra posición — dentro de la sección o **a
+   otra sección** (también con **↑ ↓** de la barra, por teclado).
+7. Publica la plantilla como siempre (borrador → publicar).
 
 **Quién puede.** El **Configurador** que puede editar la plantilla (`template:edit`). Es parte
 del diseño del formulario.

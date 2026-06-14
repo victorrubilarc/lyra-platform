@@ -18,7 +18,7 @@ import {
   SlidersHorizontal,
   Trash2,
 } from "lucide-react";
-import { Button, Card, Checkbox, Chip, FormField, Input, Modal, Select, Textarea, useToast } from "@lyra/ui";
+import { Button, Card, Checkbox, Chip, Drawer, FormField, Input, Modal, Select, Textarea, useToast } from "@lyra/ui";
 import { GRID_FIELD_KEYS_MAX } from "@lyra/contracts";
 import type { EquipmentMode, FieldType, TemplateDetail } from "@lyra/contracts";
 import { usePermissions } from "../../auth/use-permissions.js";
@@ -27,7 +27,6 @@ import { fetchRoles } from "../security/security-api.js";
 import { ScopeTreePicker } from "../security/ScopeTreePicker.js";
 import { useOrgTree } from "../structure/structure-queries.js";
 import {
-  FIELD_TYPE_META,
   collectFieldKeys,
   collectSectionKeys,
   defaultFieldConfig,
@@ -43,6 +42,7 @@ import {
   type EditSection,
   type EditState,
 } from "./builder-model.js";
+import { AddFieldMenu } from "./AddFieldMenu.js";
 import { BuilderConfigPanel } from "./BuilderConfigPanel.js";
 import { BuilderFieldCard } from "./BuilderFieldCard.js";
 import { FieldGrid, FieldGridCell } from "./FieldGrid.js";
@@ -77,6 +77,9 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
   // Arrastre de campos en el lienzo (DnD nativo, patrón ColumnsDrawer): origen + destino-hint.
   const [dragField, setDragField] = useState<{ sUid: string; fUid: string } | null>(null);
   const [dropHint, setDropHint] = useState<{ sUid: string; beforeFUid: string | null } | null>(null);
+  // Drawer de configuración AVANZADA (umbral/opciones/condicional/fórmula/roles): se abre
+  // con "Más opciones" del campo o de la sección. Lo común se edita en el lienzo.
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const save = useSaveTemplateDraft();
   const publish = usePublishTemplate();
@@ -161,22 +164,51 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
     setSelected({ s: sec.uid });
   }
 
-  function addField(type: FieldType) {
+  /**
+   * Inserta un campo nuevo. `targetSUid`/`index` definen DÓNDE (estilo Canva/Google
+   * Forms: agregar desde el lienzo en una posición). Si no hay sección, crea una.
+   * `index` undefined = al final de la sección.
+   */
+  function addFieldAt(type: FieldType, targetSUid?: string, index?: number) {
     const label = t(fieldTypeMeta(type).labelKey);
     let sections = state.sections;
-    let targetUid = selected?.s ?? sections[sections.length - 1]?.uid ?? null;
-    if (!targetUid) {
+    let sUid = targetSUid ?? selected?.s ?? sections[sections.length - 1]?.uid ?? null;
+    if (!sUid) {
       const stitle = t("templates.builder.sectionDefault");
       const skey = uniqueKey(slugifyKey(stitle, "seccion_1"), collectSectionKeys(state));
       const sec: EditSection = { uid: nextUid(), key: skey, title: stitle, description: null, requireSignature: false, editableInStateKey: null, roleIds: [], fields: [] };
       sections = [...sections, sec];
-      targetUid = sec.uid;
+      sUid = sec.uid;
     }
     const fkey = uniqueKey(slugifyKey(label, "campo"), collectFieldKeys({ ...state, sections }));
     const field: EditField = { uid: nextUid(), key: fkey, type, semanticRole: null, label, help: null, required: false, config: defaultFieldConfig(type), visibleWhen: null, computed: null, colSpan: 12, roleIds: [] };
-    sections = sections.map((s) => (s.uid === targetUid ? { ...s, fields: [...s.fields, field] } : s));
+    sections = sections.map((s) => {
+      if (s.uid !== sUid) return s;
+      const fields = [...s.fields];
+      fields.splice(index === undefined ? fields.length : Math.max(0, Math.min(index, fields.length)), 0, field);
+      return { ...s, fields };
+    });
     patchState({ ...state, sections });
-    setSelected({ s: targetUid, f: field.uid });
+    setSelected({ s: sUid, f: field.uid });
+  }
+
+  /** Duplica un campo (clon con uid + key únicos), insertado justo después del original. */
+  function duplicateField(sUid: string, fUid: string) {
+    const src = state.sections.find((s) => s.uid === sUid)?.fields.find((f) => f.uid === fUid);
+    if (!src) return;
+    const fkey = uniqueKey(`${src.key}_copia`, collectFieldKeys(state));
+    const clone: EditField = { ...src, uid: nextUid(), key: fkey, config: { ...src.config } };
+    patchState({
+      ...state,
+      sections: state.sections.map((s) => {
+        if (s.uid !== sUid) return s;
+        const i = s.fields.findIndex((f) => f.uid === fUid);
+        const fields = [...s.fields];
+        fields.splice(i + 1, 0, clone);
+        return { ...s, fields };
+      }),
+    });
+    setSelected({ s: sUid, f: clone.uid });
   }
 
   function updateSection(uid: string, patch: Partial<EditSection>) {
@@ -415,158 +447,171 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
                   onChange={setRules}
                 />
               ) : (
-                <div className={styles.layout}>
-          {/* Paleta */}
-          <Card className={styles.palette}>
-            <div className={styles.paletteTitle}>{t("templates.builder.paletteTitle")}</div>
-            <button type="button" className={styles.addSectionBtn} onClick={addSection} disabled={!canEdit}>
-              <FilePlus2 size={15} /> {t("templates.builder.addSection")}
-            </button>
-            <div className={styles.paletteDivider} />
-            {FIELD_TYPE_META.map((m) => {
-              const Icon = m.icon;
-              return (
-                <button key={m.type} type="button" className={styles.paletteItem} onClick={() => addField(m.type)} disabled={!canEdit}>
-                  <Icon size={15} />
-                  <span>{t(m.labelKey)}</span>
-                  <Plus size={13} className={styles.paletteAdd} />
-                </button>
-              );
-            })}
-          </Card>
-
-          {/* Lienzo */}
-          <div className={styles.canvas}>
-            {/* Flujo del proceso: es DEFINICIÓN versionada (gobierna estados/transiciones
-                y el mapeo sección→estado), por eso vive en Diseño y se guarda con el
-                borrador — NO en Configuración (que es gobernanza viva sin publicar). */}
-            <Card className={styles.flowCard}>
-              <FormField label={t("templates.builder.workflow")} hint={t("templates.builder.workflowHint")}>
-                {({ id }) => (
-                  <Select id={id} value={state.workflowDefinitionId ?? ""} disabled={!canEdit} onChange={(e) => setWorkflow(e.target.value)}>
-                    <option value="">{t("templates.builder.workflowNone")}</option>
-                    {publishedWorkflows.map((w) => (
-                      <option key={w.id} value={w.id}>
-                        {w.name}
-                      </option>
-                    ))}
-                    {/* Mantiene visible el flujo asignado aunque ya no esté en la lista. */}
-                    {state.workflowDefinitionId &&
-                      !publishedWorkflows.some((w) => w.id === state.workflowDefinitionId) && (
-                        <option value={state.workflowDefinitionId}>
-                          {assignedWorkflow.data?.name ?? state.workflowDefinitionId}
-                        </option>
+                /* Lienzo CANVAS-FIRST a todo el ancho (artboard centrado). La paleta es un
+                   popover "＋ Agregar", la configuración avanzada vive en un Drawer. */
+                <div className={styles.workspace}>
+                  {/* Barra del lienzo: flujo (definición versionada) + agregar sección. */}
+                  <div className={styles.canvasBar}>
+                    <FormField label={t("templates.builder.workflow")} hint={t("templates.builder.workflowHint")}>
+                      {({ id }) => (
+                        <Select id={id} value={state.workflowDefinitionId ?? ""} disabled={!canEdit} onChange={(e) => setWorkflow(e.target.value)}>
+                          <option value="">{t("templates.builder.workflowNone")}</option>
+                          {publishedWorkflows.map((w) => (
+                            <option key={w.id} value={w.id}>
+                              {w.name}
+                            </option>
+                          ))}
+                          {state.workflowDefinitionId &&
+                            !publishedWorkflows.some((w) => w.id === state.workflowDefinitionId) && (
+                              <option value={state.workflowDefinitionId}>
+                                {assignedWorkflow.data?.name ?? state.workflowDefinitionId}
+                              </option>
+                            )}
+                        </Select>
                       )}
-                  </Select>
-                )}
-              </FormField>
-            </Card>
-
-            {state.sections.length === 0 ? (
-              <div className={styles.emptyCanvas}>{t("templates.builder.emptyCanvas")}</div>
-            ) : (
-              state.sections.map((s, si) => (
-                <Card
-                  key={s.uid}
-                  className={selected?.s === s.uid && !selected.f ? styles.sectionCardActive : styles.sectionCard}
-                  onClick={() => setSelected({ s: s.uid })}
-                >
-                  <div className={styles.sectionHeader}>
-                    <span className={styles.sectionTitle}>{s.title}</span>
-                    <span className={styles.sectionCount}>{t("templates.builder.sectionCount", { count: s.fields.length })}</span>
-                    {s.requireSignature && <Chip variant="info" label="Part 11" />}
-                    <div className={styles.rowActions} onClick={(e) => e.stopPropagation()}>
-                      <button type="button" className={styles.iconBtn} onClick={() => moveSection(s.uid, -1)} disabled={si === 0}><ArrowUp size={13} /></button>
-                      <button type="button" className={styles.iconBtn} onClick={() => moveSection(s.uid, 1)} disabled={si === state.sections.length - 1}><ArrowDown size={13} /></button>
-                      <button type="button" className={styles.iconBtnDanger} onClick={() => deleteSection(s.uid)}><Trash2 size={13} /></button>
-                    </div>
+                    </FormField>
+                    <button type="button" className={styles.addSectionBtn} onClick={addSection} disabled={!canEdit}>
+                      <FilePlus2 size={15} /> {t("templates.builder.addSection")}
+                    </button>
                   </div>
 
-                  {s.fields.length === 0 ? (
-                    <div
-                      className={dropHint?.sUid === s.uid && !dropHint.beforeFUid ? styles.emptySectionDrop : styles.emptySection}
-                      onDragOver={(e) => {
-                        if (dragField) {
-                          e.preventDefault();
-                          setDropHint({ sUid: s.uid, beforeFUid: null });
-                        }
-                      }}
-                      onDrop={() => {
-                        if (dragField) moveFieldBefore(dragField.sUid, dragField.fUid, s.uid, null);
-                        endDrag();
-                      }}
-                    >
-                      {t("templates.builder.emptySectionFields")}
+                  {state.sections.length === 0 ? (
+                    <div className={styles.emptyCanvas}>
+                      {t("templates.builder.emptyCanvas")}
+                      {canEdit && (
+                        <div className={styles.emptyCanvasAdd}>
+                          <AddFieldMenu
+                            onPick={(type) => addFieldAt(type)}
+                            trigger={<button type="button" className={styles.addFieldBtn}><Plus size={15} /> {t("templates.builder.addField")}</button>}
+                          />
+                        </div>
+                      )}
                     </div>
                   ) : (
-                    <div
-                      data-field-grid
-                      // Soltar al final de la sección (área de la grilla fuera de una card).
-                      onDragOver={(e) => {
-                        if (dragField) {
-                          e.preventDefault();
-                          setDropHint({ sUid: s.uid, beforeFUid: null });
-                        }
-                      }}
-                      onDrop={() => {
-                        if (dragField) moveFieldBefore(dragField.sUid, dragField.fUid, s.uid, dropHint?.beforeFUid ?? null);
-                        endDrag();
-                      }}
-                    >
-                      <FieldGrid>
-                        {s.fields.map((f, fi) => (
-                          <FieldGridCell key={f.uid} span={f.colSpan}>
-                            <BuilderFieldCard
-                              field={f}
-                              index={fi}
-                              count={s.fields.length}
-                              active={selected?.f === f.uid}
-                              canEdit={canEdit}
-                              dragging={dragField?.fUid === f.uid}
-                              dropTarget={dropHint?.sUid === s.uid && dropHint.beforeFUid === f.uid}
-                              onSelect={() => setSelected({ s: s.uid, f: f.uid })}
-                              onDelete={() => deleteField(s.uid, f.uid)}
-                              onMove={(dir) => moveField(s.uid, f.uid, dir)}
-                              onResize={(span) => updateField(s.uid, f.uid, { colSpan: span })}
-                              onDragStart={() => setDragField({ sUid: s.uid, fUid: f.uid })}
-                              onDragEnd={endDrag}
-                              onDragOver={() => dragField && setDropHint({ sUid: s.uid, beforeFUid: f.uid })}
-                              onDrop={() => {
-                                if (dragField) moveFieldBefore(dragField.sUid, dragField.fUid, s.uid, f.uid);
-                                endDrag();
-                              }}
+                    state.sections.map((s, si) => (
+                      <Card
+                        key={s.uid}
+                        className={selected?.s === s.uid && !selected.f ? styles.sectionCardActive : styles.sectionCard}
+                        onClick={() => setSelected({ s: s.uid })}
+                      >
+                        <div className={styles.sectionHeader}>
+                          {/* Título + descripción de sección editables EN EL LUGAR. */}
+                          <div className={styles.sectionTitleWrap}>
+                            <input
+                              className={styles.inlineSectionTitle}
+                              value={s.title}
+                              disabled={!canEdit}
+                              aria-label={t("templates.builder.sectionTitle")}
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={(e) => updateSection(s.uid, { title: e.target.value })}
                             />
-                          </FieldGridCell>
-                        ))}
-                      </FieldGrid>
-                    </div>
-                  )}
-                </Card>
-              ))
-            )}
-          </div>
+                            <input
+                              className={styles.inlineSectionDesc}
+                              value={s.description ?? ""}
+                              disabled={!canEdit}
+                              placeholder={t("templates.builder.sectionDescription")}
+                              aria-label={t("templates.builder.sectionDescription")}
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={(e) => updateSection(s.uid, { description: e.target.value || null })}
+                            />
+                          </div>
+                          {s.requireSignature && <Chip variant="info" label="Part 11" />}
+                          <div className={styles.rowActions} onClick={(e) => e.stopPropagation()}>
+                            <button type="button" className={styles.iconBtn} onClick={() => { setSelected({ s: s.uid }); setDrawerOpen(true); }} title={t("templates.builder.moreOptions")}><SlidersHorizontal size={14} /></button>
+                            <button type="button" className={styles.iconBtn} onClick={() => moveSection(s.uid, -1)} disabled={si === 0} aria-label={t("common.moveUp")}><ArrowUp size={13} /></button>
+                            <button type="button" className={styles.iconBtn} onClick={() => moveSection(s.uid, 1)} disabled={si === state.sections.length - 1} aria-label={t("common.moveDown")}><ArrowDown size={13} /></button>
+                            <button type="button" className={styles.iconBtnDanger} onClick={() => deleteSection(s.uid)} aria-label={t("common.delete")}><Trash2 size={13} /></button>
+                          </div>
+                        </div>
 
-          {/* Config */}
-          <Card className={styles.configCard}>
-            <div className={styles.configHeader}>{t("templates.builder.configTitle")}</div>
-            <BuilderConfigPanel
-              section={selectedSection}
-              field={selectedField}
-              roles={roles}
-              booleanFields={booleanFields}
-              allFields={allFields}
-              workflowStates={workflowStates}
-              hasWorkflow={Boolean(state.workflowDefinitionId)}
-              onUpdateSection={(patch) => selectedSection && updateSection(selectedSection.uid, patch)}
-              onUpdateField={(patch) => selectedField && selectedSection && updateField(selectedSection.uid, selectedField.uid, patch)}
-            />
-          </Card>
+                        <div
+                          data-field-grid
+                          className={dropHint?.sUid === s.uid && !dropHint.beforeFUid && s.fields.length === 0 ? styles.emptySectionDrop : undefined}
+                          onDragOver={(e) => {
+                            if (dragField) {
+                              e.preventDefault();
+                              setDropHint({ sUid: s.uid, beforeFUid: null });
+                            }
+                          }}
+                          onDrop={() => {
+                            if (dragField) moveFieldBefore(dragField.sUid, dragField.fUid, s.uid, dropHint?.beforeFUid ?? null);
+                            endDrag();
+                          }}
+                        >
+                          {s.fields.length === 0 ? (
+                            <div className={styles.emptySection}>{t("templates.builder.emptySectionFields")}</div>
+                          ) : (
+                            <FieldGrid>
+                              {s.fields.map((f) => (
+                                <FieldGridCell key={f.uid} span={f.colSpan}>
+                                  <BuilderFieldCard
+                                    field={f}
+                                    active={selected?.f === f.uid}
+                                    canEdit={canEdit}
+                                    dragging={dragField?.fUid === f.uid}
+                                    dropTarget={dropHint?.sUid === s.uid && dropHint.beforeFUid === f.uid}
+                                    onSelect={() => setSelected({ s: s.uid, f: f.uid })}
+                                    onLabel={(label) => updateField(s.uid, f.uid, { label })}
+                                    onResize={(span) => updateField(s.uid, f.uid, { colSpan: span })}
+                                    onToggleRequired={() => updateField(s.uid, f.uid, { required: !f.required })}
+                                    onDuplicate={() => duplicateField(s.uid, f.uid)}
+                                    onDelete={() => deleteField(s.uid, f.uid)}
+                                    onMoreOptions={() => { setSelected({ s: s.uid, f: f.uid }); setDrawerOpen(true); }}
+                                    onMoveUp={() => moveField(s.uid, f.uid, -1)}
+                                    onMoveDown={() => moveField(s.uid, f.uid, 1)}
+                                    onDragStart={() => setDragField({ sUid: s.uid, fUid: f.uid })}
+                                    onDragEnd={endDrag}
+                                    onDragOver={() => dragField && setDropHint({ sUid: s.uid, beforeFUid: f.uid })}
+                                    onDrop={() => {
+                                      if (dragField) moveFieldBefore(dragField.sUid, dragField.fUid, s.uid, f.uid);
+                                      endDrag();
+                                    }}
+                                  />
+                                </FieldGridCell>
+                              ))}
+                            </FieldGrid>
+                          )}
+
+                          {/* Agregar campo AL FINAL de esta sección (estilo Canva/Google Forms). */}
+                          {canEdit && (
+                            <div className={styles.addFieldRow} onClick={(e) => e.stopPropagation()}>
+                              <AddFieldMenu
+                                onPick={(type) => addFieldAt(type, s.uid)}
+                                trigger={<button type="button" className={styles.addFieldBtn}><Plus size={15} /> {t("templates.builder.addField")}</button>}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </Card>
+                    ))
+                  )}
                 </div>
               )}
             </>
           )}
         </div>
       </div>
+
+      {/* Configuración AVANZADA del campo/sección seleccionado (lo común se edita en
+          el lienzo). Se abre con "Más opciones"; en escritorio convive con el lienzo. */}
+      <Drawer
+        open={drawerOpen && view === "design" && designTab === "editor" && Boolean(selectedField || selectedSection)}
+        onClose={() => setDrawerOpen(false)}
+        title={selectedField ? t("templates.builder.fieldOptions") : t("templates.builder.sectionOptions")}
+        width={420}
+      >
+        <BuilderConfigPanel
+          section={selectedSection}
+          field={selectedField}
+          roles={roles}
+          booleanFields={booleanFields}
+          allFields={allFields}
+          workflowStates={workflowStates}
+          hasWorkflow={Boolean(state.workflowDefinitionId)}
+          onUpdateSection={(patch) => selectedSection && updateSection(selectedSection.uid, patch)}
+          onUpdateField={(patch) => selectedField && selectedSection && updateField(selectedSection.uid, selectedField.uid, patch)}
+        />
+      </Drawer>
 
       <Modal
         open={publishOpen}
