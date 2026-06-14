@@ -358,6 +358,12 @@ export const logEntryListItemSchema = logEntrySchema.extend({
   /** Nombre y color del estado del flujo (de la versión CONGELADA). null = sin flujo. */
   currentStateName: z.string().nullable(),
   currentStateColor: z.string().nullable(),
+  /** Momento de entrada al estado actual (Workflow SLA). Base del cómputo de atraso.
+   *  null = sin flujo / pre-migración. El cliente formatea la antigüedad con lib/format. */
+  currentStateSince: z.string().nullable(),
+  /** SLA de permanencia del estado actual, en MINUTOS (de la versión congelada).
+   *  null = el estado actual no tiene SLA. */
+  currentStateMaxStayMinutes: z.number().int().nullable(),
   indicators: logEntryIndicatorsSchema,
   /** Valores de resumen (campos candidatos de la plantilla, en su orden). Vacío = sin candidatos. */
   summaryValues: z.array(logEntrySummaryValueSchema),
@@ -388,6 +394,8 @@ export const logEntryStatsSchema = z.object({
   /** Entradas con ≥1 valor en banda crítica / de advertencia (excepciones). */
   withCrit: z.number().int(),
   withWarn: z.number().int(),
+  /** Entradas ATRASADAS (Workflow SLA): DRAFT con el estado actual sobre su SLA. */
+  delayed: z.number().int(),
 });
 export type LogEntryStats = z.infer<typeof logEntryStatsSchema>;
 
@@ -414,6 +422,8 @@ export const logEntryFacetsSchema = z.object({
   equipment: z.array(logEntryFacetBucketSchema),
   /** Banda de umbral: buckets WARN / CRIT (excepciones). */
   band: z.array(logEntryFacetBucketSchema),
+  /** Conteo de entradas ATRASADAS (Workflow SLA) en el set filtrado (faceta toggle). */
+  delayed: z.number().int(),
 });
 export type LogEntryFacets = z.infer<typeof logEntryFacetsSchema>;
 
@@ -677,6 +687,9 @@ export const logEntryListQuerySchema = z.object({
   thresholdBand: z.enum(["WARN", "CRIT", "ANY"]).optional(),
   /** Review-by-exception (2.8.1c): solo lo accionable = umbral WARN/CRIT OR firma pendiente. */
   exceptionsOnly: queryBool,
+  /** Workflow SLA (2026-06-13): solo entradas ATRASADAS = DRAFT con el estado actual
+   *  por encima de su SLA de permanencia (now − currentStateSince > maxStayMinutes). */
+  delayedOnly: queryBool,
   /** Orden legacy single (back-compat con deep-links previos a 2.8.1b). */
   sort: logEntrySortFieldSchema.optional(),
   dir: z.enum(["asc", "desc"]).optional(),

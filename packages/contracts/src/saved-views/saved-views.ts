@@ -132,6 +132,8 @@ export const LOGBOOK_SYSTEM_VIEWS: readonly SystemView[] = [
   { id: "sys:pending-signatures", labelKey: "logbook.views.system.pendingSignatures", filters: { pendingSignature: true } },
   // Excepciones: review-by-exception = umbral WARN/CRIT OR firma pendiente.
   { id: "sys:exceptions", labelKey: "logbook.views.system.exceptions", filters: { exceptionsOnly: true } },
+  // Retrasadas: DRAFT con el estado actual por encima de su SLA de permanencia (Workflow SLA).
+  { id: "sys:delayed", labelKey: "logbook.views.system.delayed", filters: { delayedOnly: true } },
   // Últimas 24h: el preset de fecha efectiva lo resuelve la UI al aplicar (marca dinámica).
   { id: "sys:last-24h", labelKey: "logbook.views.system.last24h", filters: { __preset: "effective24h" } },
 ] as const;

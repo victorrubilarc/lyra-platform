@@ -840,6 +840,11 @@ model WorkflowState {
   isFinal                     Boolean @default(false)
   // Token de color del DS para el chip (opcional).
   color                       String?
+  // SLA de PERMANENCIA (Workflow SLA, 2026-06-13): tiempo máximo de estadía en este
+  // estado, en MINUTOS canónicos. null = sin SLA. Viaja en la versión congelada ⇒ los
+  // registros históricos conservan el SLA vigente cuando se crearon. Tiempo calendario
+  // (horas hábiles = futuro). Check 1..525600 (365 d) en la migración.
+  maxStayMinutes              Int?
 
   version          WorkflowDefinitionVersion @relation(fields: [workflowDefinitionVersionId], references: [id], onDelete: Cascade)
   outgoing         WorkflowTransition[]       @relation("TransitionFrom")
@@ -1173,6 +1178,12 @@ model LogEntry {
   periodKey                   String?
   // Instante en que se congelaron effectiveAt + dimensiones (al enviar). null = DRAFT.
   sealedAt                    DateTime?
+  // Momento de ENTRADA al estado actual (Workflow SLA, 2026-06-13): seteado al crear
+  // (= recordedAt) y en cada transición (= occurredAt). Es la base de cómputo del
+  // ATRASO (now − currentStateSince > maxStayMinutes del estado actual). Estampado
+  // aditivo que evita la subconsulta MAX(transición). null solo en filas pre-migración
+  // sin backfill (el backfill lo derivó de la última transición o recordedAt).
+  currentStateSince           DateTime?
   // --- Registro diferido (Fase 2.7.0) ---------------------------------------
   // Origen DECLARADO del registro (default ONLINE; ver enum LogEntryOrigin).
   entryOrigin                 LogEntryOrigin @default(ONLINE)
