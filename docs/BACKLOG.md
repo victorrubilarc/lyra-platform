@@ -82,6 +82,7 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Afinamiento UX grilla de Bitácoras** (fix párrafos + filtros primarios+Drawer + filtro multi-nodo `orgNodeIds` + paginador discreto arriba/abajo + Actualizar + KPIs premium) | `feat/grilla-ux` → `main` | ✅ fusionado y publicado en `origin/main` (`6b06662`) | ninguna |
 | **Fase 2.8.1b Vistas guardadas + gestor de columnas + multi-sort** (`SavedView` ownership-gated + `SavedViewsModule` + `Table` column-aware en `@lyra/ui` + `ColumnsDrawer`/`ViewBar` + multi-sort keyset + columnas de valor por plantilla) | `feat/bitacoras-vistas-guardadas` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Fase 2.8.1c Peek + facetas + review-by-exception + Mi turno** (`/facets` conteos de hermanos + `/my-shift` + `exceptionsOnly` + `FacetsPanel`/`PeekDrawer` + `rowClassName` en `@lyra/ui` + filtro de equipo en UI) | `feat/bitacoras-peek-facetas` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
+| **Workflow SLA + atrasos** (`WorkflowState.maxStayMinutes` + `LogEntry.currentStateSince` + `evaluateSla` + `roleNames` en versión congelada + `delayedOnly`/`stats.delayed`/`facets.delayed` + vista sistema "Retrasadas" + `SlaDurationField` builder + alertas diagrama/grilla) | `feat/workflow-sla-atrasos` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 
 **Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
@@ -641,6 +642,14 @@ implementación esperada:
       a escala el patrón es FILTRAR (ya hay filtros potentes + multi-nodo). El paginador actual es relativo a la
       ventana cargada (lotes de 100). Solo si un cliente lo exige se evaluaría offset+count (no escala).
 - [ ] **Export CSV** capado a 100.000 filas (`EXPORT_MAX_ROWS`, marca `truncated`) — revisar a demanda.
+- [ ] **"Retrasadas" (Workflow SLA) a escala** (2026-06-13). Hoy `delayedEntryIds()` resuelve los ids vencidos con un
+      JOIN raw `LogEntry→WorkflowState` (cap **5.000**) intersectado con el `where`+ABAC del listado (cero fuga, MVP
+      correcto). A escala: **materializar el atraso** (columna/flag `isDelayed` denormalizado o vista materializada
+      refrescada por job, ya que el vencimiento depende de `now()`), o un índice parcial sobre DRAFT; integrar con la
+      caché de KPIs de arriba. El `currentStateSince` ya está estampado (partition/index-ready).
+- [ ] **SLA en HORAS HÁBILES** (Workflow SLA, futuro). Hoy el atraso es tiempo CALENDARIO. Las horas hábiles requieren
+      acoplar el calendario operacional/turnos (`OperationalCalendar`/`ShiftResolver`) al cómputo de `evaluateSla`
+      (descontar no-laborables). Solo si un cliente lo pide.
 
 ---
 
@@ -691,6 +700,15 @@ implementación esperada:
       **Guardar borrador** y **Publicar** (congela versión), editar publicada (clona borrador), borrar (bloqueado si
       en uso); en el **Form Builder**: asignar un flujo publicado, mapear secciones→estados editables, editar el
       **override de rol por campo**; modo claro. App en `:5173`.
+- [ ] **Workflow SLA + atrasos — smoke VISUAL en navegador** (se verificó typecheck/lint/build/test + smoke por API
+      20/20; falta el clic): en el **builder de flujos** (`/flujos/:id`), por estado el campo **"Tiempo máximo de
+      estadía"** (Min/Horas/**Días**, vacío = sin SLA), guardar borrador y publicar (el SLA persiste). En el **diagrama
+      del registro** (visor `/bitacoras/:id` + peek ⎇): un estado actual vencido muestra **anillo rojo + "Atrasado hace
+      X · SLA Y"**, uno cerca del SLA **ámbar "En riesgo"**, y un tramo pasado sobre su SLA un **badge ámbar**; tooltips
+      con SLA + **responsable** (que ahora aparece también en el visor, no solo en el builder). En la **grilla
+      `/bitacoras`**: KPI **"Retrasadas"**, faceta **"Retrasadas"** (toggle), badge **"Atraso"** en la celda de estado +
+      columna "Atraso" (activable en el gestor de columnas), y la **vista de sistema "Retrasadas"**; modo claro. Para
+      verlo en vivo: poner un SLA corto a un estado con registros DRAFT antiguos. App en `:5173`.
 - [ ] **Datos de referencia 2.x — smoke VISUAL en navegador** (se verificó typecheck/lint/build/test + smoke por
       API; falta el clic): `/datos-referencia` (lista de Listas + buscador), crear lista (drawer: key/nombre/descr/
       activo/orden), seleccionar lista → grilla de ítems; agregar ítem (code/label/orden + **metadata key-value**),
