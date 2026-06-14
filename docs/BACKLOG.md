@@ -5,7 +5,14 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-14** (**Fase 2.1.5 Builder auto-layout por arrastre ✅** — `feat/builder-autolayout`: por
+> actualización: **2026-06-14** (**Fase 2.1.6 Builder motor de arrastre con dnd-kit ✅** — `feat/builder-dnd-kit`: el
+> dueño reportó que tras 2.1.5 seguía sin poder mover un campo al lado de otro. Causa: (1) **bug** del DnD nativo (el drag
+> solo arrancaba desde el grip, pero el ícono SVG dejaba el target sin `data-drag-handle` ⇒ casi nunca iniciaba); (2)
+> **techo** del DnD nativo (sin reflow en vivo, fantasma gris). Se adoptó **dnd-kit** (core 6 + sortable 10 + utilities 3;
+> MIT, on-prem, pointer/teclado/touch) y se reescribió el lienzo: nodo sortable = **celda** (reflow animado), tarjeta =
+> **activador** (se agarra donde sea; rótulo/borde exentos), **`DragOverlay`** sigue al cursor, intención al-lado/fila **por
+> píxeles** reusando el auto-layout de 2.1.5 (`applyDrop`/`splitRow`). Frontend puro (sigue `colSpan`; `FieldGrid` fuente
+> única). Contracts 195 · API 234 (sin cambio). Pendiente: smoke VISUAL [§4]. Anterior: **Fase 2.1.5 Builder auto-layout por arrastre ✅** — `feat/builder-autolayout`: por
 > feedback del dueño (4 puntos): lienzo a **todo el ancho**; **auto-layout estilo Notion** (soltar al lado ⇒ comparten
 > fila con ancho repartido solo; a su línea ⇒ ancho completo; el usuario NO piensa en columnas); se quita el menú "12/12"
 > y el ajuste fino es un **divisor** del borde; **responsive 1/2/12** (móvil/tablet/escritorio). Frontend puro. Contracts
@@ -114,9 +121,10 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Fase 2.1.2 Layout de formulario en grilla responsiva** (enum `LayoutWidth` + columna `TemplateField.layoutWidth` + migración `…_add_field_layout_width` + `FieldGrid`/`FieldGridCell` compartido + selector en `BuilderConfigPanel` + cableo de PreviewForm/EntryFillPage/EntryViewerPage) | `feat/layout-grilla` → `main` | ✅ fusionado y publicado en `origin/main` (`a74a320`) | ninguna |
 | **Fase 2.1.3 Editor de layout WYSIWYG (12 col + arrastre)** (reemplaza enum `LayoutWidth` por `TemplateField.colSpan` 1..12 + migración `…_field_colspan` + `FieldGrid` numérico + `BuilderFieldCard` con DnD nativo reorder y resize pointer/teclado + presets en `BuilderConfigPanel` + `moveFieldBefore`) | `feat/layout-editor-wysiwyg` → `main` | ✅ fusionado y publicado en `origin/main` (`d84240d`) | ninguna |
 | **Fase 2.1.4 Builder canvas-first (config en el lienzo)** (lienzo full-width + `AddFieldMenu` popover + config en `Drawer` + control real WYSIWYG + rótulo/sección inline + `FieldToolbar` flotante + `addFieldAt`/`duplicateField`; frontend puro) | `feat/builder-canvas` → `main` | ✅ fusionado y publicado en `origin/main` (`3f3ccbc`/`a654646`) | ninguna |
-| **Fase 2.1.5 Builder auto-layout por arrastre (Notion)** (ancho completo + soltar-al-lado/a-su-línea con ancho auto `splitRow`/`rowRangeOf`/`applyDrop` + divisor de borde `resizeDivider` + quitar menú "12/12" + responsive 1/2/12 + indicadores de soltado; frontend puro) | `feat/builder-autolayout` → `main` | ⏳ **pendiente de merge+push en esta sesión** | merge a `main` + push |
+| **Fase 2.1.5 Builder auto-layout por arrastre (Notion)** (ancho completo + soltar-al-lado/a-su-línea con ancho auto `splitRow`/`rowRangeOf`/`applyDrop` + divisor de borde `resizeDivider` + quitar menú "12/12" + responsive 1/2/12 + indicadores de soltado; frontend puro) | `feat/builder-autolayout` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
+| **Fase 2.1.6 Builder motor de arrastre con dnd-kit (Canva-grade)** (adopta `@dnd-kit/core`6+`sortable`10+`utilities`3; nodo sortable = celda con reflow animado; tarjeta = activador; `DragOverlay` sigue al cursor; intención al-lado/fila por píxeles reusando `applyDrop`/`splitRow`; `SectionDropArea` droppable de sección; arregla el bug del grip-SVG; frontend puro) | `feat/builder-dnd-kit` → `main` | ⏳ **pendiente de merge+push en esta sesión** | merge a `main` + push |
 
-**Estado:** **nada vive solo en local.** `main` = `origin/main` (salvo `feat/builder-autolayout`, en publicación al cierre).
+**Estado:** **nada vive solo en local.** `main` = `origin/main` (salvo `feat/builder-dnd-kit`, en publicación al cierre).
 
 **Convención propuesta (a confirmar):** trabajar cada módulo en rama `feat/<modulo>`;
 al cerrar la sesión → push de la rama + merge a `main` + push de `main`. Así `origin/main`
@@ -867,16 +875,19 @@ implementación esperada:
       **Guardar borrador** y **Publicar** (congela versión), editar publicada (clona borrador), borrar (bloqueado si
       en uso); en el **Form Builder**: asignar un flujo publicado, mapear secciones→estados editables, editar el
       **override de rol por campo**; modo claro. App en `:5173`.
-- [ ] **Fase 2.1.x Builder canvas-first + auto-layout (2.1.2→2.1.5) — smoke VISUAL en navegador** (typecheck/lint/build
-      OK; smoke API 14/14; falta el clic): en el **builder** (`/plantillas/:id`, Diseño ▸ Editor) el **lienzo ocupa TODO
-      el ancho** y cada campo se ve con su **control REAL** (WYSIWYG). **Agregar** con **"＋ Agregar campo"** (barra y fin
-      de sección). **Editar el rótulo EN EL LIENZO** y el **título/descripción de la sección** inline. **AUTO-LAYOUT por
-      arrastre** (lo nuevo de 2.1.5): arrastra un campo **AL LADO** de otro ⇒ comparten fila con **ancho repartido solo**
-      (indicador vertical azul); arrastra **arriba/abajo** ⇒ **fila propia** ancho completo (indicador horizontal); **NO**
-      hay menú de "12 columnas". **Divisor:** arrastra el borde derecho de un campo que comparte fila ⇒ transfiere ancho
-      al vecino (← → por teclado). Barra flotante (obligatorio/mover/duplicar/eliminar/**Más opciones**→Drawer). Verificar
-      **lienzo ≈ llenado (`/nueva-entrada/:id`) ≈ visor (`/bitacoras/:id`)**; **responsive: tablet 2 col, móvil 1 col**
-      (táctil 44px, terreno); modo claro y oscuro. App en `:5173`.
+- [ ] **Fase 2.1.x Builder canvas-first + auto-layout + dnd-kit (2.1.2→2.1.6) — smoke VISUAL en navegador** (typecheck/
+      lint/build OK; smoke API 14/14; falta el clic): en el **builder** (`/plantillas/:id`, Diseño ▸ Editor) el **lienzo
+      ocupa TODO el ancho** y cada campo se ve con su **control REAL** (WYSIWYG). **Agregar** con **"＋ Agregar campo"**
+      (barra y fin de sección). **Editar el rótulo EN EL LIENZO** y el **título/descripción de la sección** inline.
+      **ARRASTRE dnd-kit (lo nuevo de 2.1.6):** se agarra el campo en **casi cualquier parte** (no solo el grip); la copia
+      **sigue al cursor** (sin fantasma gris) y los **vecinos se corren con animación**. **Soltar AL LADO** de otro ⇒
+      comparten fila con **ancho repartido solo** (indicador vertical azul); **arriba/abajo** ⇒ **fila propia** ancho
+      completo (indicador horizontal). Probar **arrastrar entre dos campos de la misma fila** (que ambos se redimensionen).
+      Arrastrar **entre secciones**. Verificar que **escribir el rótulo** y el **divisor** del borde NO inician arrastre.
+      **NO** hay menú de "12 columnas". **Divisor:** arrastra el borde derecho de un campo que comparte fila ⇒ transfiere
+      ancho al vecino (← → por teclado). Barra flotante (obligatorio/mover/duplicar/eliminar/**Más opciones**→Drawer).
+      Verificar **lienzo ≈ llenado (`/nueva-entrada/:id`) ≈ visor (`/bitacoras/:id`)**; **responsive: tablet 2 col, móvil
+      1 col** (táctil 44px, terreno); modo claro y oscuro. App en `:5173`.
 - [ ] **Workflow SLA + atrasos — smoke VISUAL en navegador** (se verificó typecheck/lint/build/test + smoke por API
       20/20; falta el clic): en el **builder de flujos** (`/flujos/:id`), por estado el campo **"Tiempo máximo de
       estadía"** (Min/Horas/**Días**, vacío = sin SLA), guardar borrador y publicar (el SLA persiste). En el **diagrama

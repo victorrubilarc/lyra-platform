@@ -1,5 +1,16 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-14 — Fase 2.1.6 Builder: motor de arrastre con dnd-kit (Canva-grade) ✅** (`feat/builder-dnd-kit` → `main`).
+El dueño reportó que tras 2.1.5 seguía sin poder mover un campo al lado de otro. Causa doble: (1) **bug** del DnD nativo
+(el drag solo arrancaba desde el grip, pero el ícono SVG hacía que el target no tuviera `data-drag-handle` ⇒ casi nunca
+iniciaba); (2) **techo** del DnD nativo (no da la sensación Canva: fantasma gris, sin reflow en vivo). Se adoptó
+**dnd-kit** (core 6 + sortable 10 + utilities 3; MIT, on-prem, pointer/teclado/touch) y se reescribió la interacción:
+el **nodo sortable es la celda** (reflow animado de vecinos), la **tarjeta completa es el activador** (se agarra donde sea;
+rótulo y borde exentos), **`DragOverlay`** dibuja la copia que sigue al cursor, y la **intención al-lado/fila se deriva
+por píxeles** (centro del arrastrado vs rect del destino) reusando íntegro el auto-layout de 2.1.5 (`applyDrop`/`splitRow`).
+**Frontend puro** (no toca modelo/API; sigue `colSpan`; `FieldGrid` = fuente única). typecheck/lint(0)/build verdes;
+contracts 195 · API 234 (sin cambios). Pendiente: smoke VISUAL del dueño (BACKLOG §4).
+
 Última actualización: 2026-06-12 (**Fase 1 completa**; **Fase 2.1/2.1.1/2.2/2.x/2.3.0/2.4/2.5/2.6.0 ✅** +
 **Afinamiento #4 ✅** + **Fase 2.7.0 — Registro diferido ✅** + **Fase 2.7.1 — Período contable gobernado ✅** +
 **Fase 2.7.1.1 — Calendario FISCAL transversal ✅**: el período se DESACOPLÓ de los turnos a la entidad transversal

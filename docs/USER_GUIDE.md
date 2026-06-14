@@ -175,11 +175,15 @@ arrastras los campos y el editor los acomoda solo.
    ve con su **control real** (lo que ves es lo que será el formulario).
 2. **Agregar un campo**: botón **"＋ Agregar campo"** (en la barra del lienzo o al final de una
    sección) → elige el tipo.
-3. **Acomodar (arrastrando, ancho automático):** arrastra un campo (por el asa ⋮⋮)…
-   - …**al lado** de otro ⇒ **comparten fila** y el ancho se reparte solo (2 = mitad y mitad, 3 =
-     tercios, hasta 4 por fila).
-   - …**arriba o abajo** (a su propia línea) ⇒ queda a **ancho completo**.
+3. **Acomodar (arrastrando, ancho automático):** **agarra el campo en casi cualquier parte** (no solo
+   en el asa ⋮⋮) y arrástralo. La copia **sigue a tu cursor** y los demás campos **se corren solos**…
+   - …suéltalo **al lado** de otro ⇒ **comparten fila** y el ancho se reparte solo (2 = mitad y mitad,
+     3 = tercios, hasta 4 por fila).
+   - …suéltalo **arriba o abajo** (a su propia línea) ⇒ queda a **ancho completo**.
+   - Puedes arrastrar un campo **entre dos** de la misma fila o **a otra sección**.
    - Una **guía azul** te muestra dónde va a caer (vertical = al lado; horizontal = nueva fila).
+   - (También funciona con **teclado**: enfoca el campo, **Espacio** para tomarlo, **flechas** para
+     moverlo, **Espacio** para soltar.)
 4. **Editar el rótulo**: haz clic en el texto del campo y escríbelo **en el lienzo** (igual el
    **título/descripción** de la sección).
 5. **Barra flotante** (al seleccionar un campo): **obligatorio**, **mover ↑↓**, **duplicar**,

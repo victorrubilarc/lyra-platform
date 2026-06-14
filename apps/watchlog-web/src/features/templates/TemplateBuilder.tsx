@@ -1,7 +1,21 @@
-import { useMemo, useState, type ComponentProps } from "react";
+import { useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import {
+  closestCenter,
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragMoveEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
+import { SortableContext, rectSortingStrategy, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import {
   ArrowDown,
   ArrowLeft,
@@ -47,8 +61,8 @@ import {
 } from "./builder-model.js";
 import { AddFieldMenu } from "./AddFieldMenu.js";
 import { BuilderConfigPanel } from "./BuilderConfigPanel.js";
-import { BuilderFieldCard } from "./BuilderFieldCard.js";
-import { FieldGrid, FieldGridCell } from "./FieldGrid.js";
+import { BuilderFieldCard, BuilderFieldOverlay } from "./BuilderFieldCard.js";
+import { FieldGrid } from "./FieldGrid.js";
 import { RulesEditor } from "./RulesEditor.js";
 import type { RuleFieldRef } from "./expression-meta.js";
 import { PreviewForm } from "./FieldPreview.js";
@@ -80,9 +94,13 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
   const [dirty, setDirty] = useState(false); // cambios de DEFINICIÓN (borrador)
   const [configDirty, setConfigDirty] = useState(false); // cambios de CONFIGURACIÓN (PATCH en vivo)
   const [publishOpen, setPublishOpen] = useState(false);
-  // Arrastre de campos en el lienzo (DnD nativo, patrón ColumnsDrawer): origen + destino-hint.
-  const [dragField, setDragField] = useState<{ sUid: string; fUid: string } | null>(null);
+  // Arrastre de campos en el lienzo (dnd-kit, pointer/teclado): campo activo + destino-hint.
+  // El destino se refleja en `dropHint` (indicador) y en `dropIntentRef` (lectura síncrona
+  // en onDragEnd, sin depender del estado asíncrono). `dragSrcRef` = origen del arrastre.
+  const [dragField, setDragField] = useState<EditField | null>(null);
   const [dropHint, setDropHint] = useState<{ sUid: string; anchorFUid: string; mode: DropMode } | null>(null);
+  const dragSrcRef = useRef<{ sUid: string; fUid: string } | null>(null);
+  const dropIntentRef = useRef<{ sUid: string; anchorFUid: string; mode: DropMode } | null>(null);
   // Drawer de configuración AVANZADA (umbral/opciones/condicional/fórmula/roles): se abre
   // con "Más opciones" del campo o de la sección. Lo común se edita en el lienzo.
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -267,14 +285,13 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
   }
 
   /**
-   * AUTO-LAYOUT por arrastre (Fase 2.1.5): suelta un campo AL LADO de otro
+   * AUTO-LAYOUT por arrastre (Fase 2.1.5/2.1.6): suelta un campo AL LADO de otro
    * (`beside-left`/`beside-right`) ⇒ comparten fila y el ancho se reparte solo; o
    * en su propia línea (`row-before`/`row-after`, o sin anchor = al final) ⇒ ancho
    * completo. El usuario nunca elige "columnas": el ancho se DERIVA del arrastre.
    */
-  function applyDrop(dstSUid: string, anchorFUid: string, mode: DropMode) {
-    if (!dragField) return;
-    const { sUid: srcSUid, fUid } = dragField;
+  function applyDrop(src: { sUid: string; fUid: string }, dstSUid: string, anchorFUid: string, mode: DropMode) {
+    const { sUid: srcSUid, fUid } = src;
     let moved: EditField | undefined;
     let sections = state.sections.map((s) => {
       if (s.uid !== srcSUid) return s;
@@ -345,6 +362,80 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
   function endDrag() {
     setDragField(null);
     setDropHint(null);
+    dragSrcRef.current = null;
+    dropIntentRef.current = null;
+  }
+
+  // ── Arrastre del lienzo con dnd-kit ─────────────────────────────────────────
+  // Pointer (con umbral de 5px para no robar los clics) + teclado (accesible y
+  // usable en tablet). El nodo sortable es la celda; el reflow de vecinos lo anima
+  // dnd-kit. La intención (al-lado / fila) se deriva de la posición del campo
+  // arrastrado sobre el destino; el ancho final se aplica al soltar.
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  function findField(uid: string): { sUid: string; field: EditField } | null {
+    for (const s of state.sections) {
+      const field = s.fields.find((f) => f.uid === uid);
+      if (field) return { sUid: s.uid, field };
+    }
+    return null;
+  }
+
+  function onDragStart(e: DragStartEvent) {
+    const data = e.active.data.current as { sUid?: string; fUid?: string } | undefined;
+    if (!data?.sUid || !data.fUid) return;
+    dragSrcRef.current = { sUid: data.sUid, fUid: data.fUid };
+    dropIntentRef.current = null;
+    setDragField(findField(data.fUid)?.field ?? null);
+  }
+
+  function onDragMove(e: DragMoveEvent) {
+    const over = e.over;
+    const dragRect = e.active.rect.current.translated;
+    if (!over || !dragRect) {
+      dropIntentRef.current = null;
+      setDropHint(null);
+      return;
+    }
+    // Soltar sobre el área de una sección (vacía o al final) ⇒ fila nueva al final.
+    const overData = over.data.current as { type?: string; sUid?: string } | undefined;
+    if (overData?.type === "section" && overData.sUid) {
+      const hint = { sUid: overData.sUid, anchorFUid: "", mode: "row-after" as DropMode };
+      dropIntentRef.current = hint;
+      setDropHint(hint);
+      return;
+    }
+    if (over.id === e.active.id) {
+      dropIntentRef.current = null;
+      setDropHint(null);
+      return;
+    }
+    const target = findField(String(over.id));
+    if (!target) return;
+    // Centro del campo arrastrado respecto del destino: arriba/abajo ⇒ fila propia,
+    // mitad izq/der ⇒ al lado (comparten fila). Mismo espacio de coordenadas dnd-kit.
+    const r = over.rect;
+    const cx = dragRect.left + dragRect.width / 2;
+    const cy = dragRect.top + dragRect.height / 2;
+    const relY = (cy - r.top) / r.height;
+    const relX = (cx - r.left) / r.width;
+    const mode: DropMode =
+      relY < 0.3 ? "row-before" : relY > 0.7 ? "row-after" : relX < 0.5 ? "beside-left" : "beside-right";
+    const hint = { sUid: target.sUid, anchorFUid: target.field.uid, mode };
+    dropIntentRef.current = hint;
+    setDropHint(hint);
+  }
+
+  function onDragEnd(_e: DragEndEvent) {
+    const src = dragSrcRef.current;
+    const intent = dropIntentRef.current;
+    if (src && intent && !(intent.anchorFUid === src.fUid)) {
+      applyDrop(src, intent.sUid, intent.anchorFUid, intent.mode);
+    }
+    endDrag();
   }
 
   function deleteSection(uid: string) {
@@ -534,6 +625,14 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
                     </button>
                   </div>
 
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragStart={onDragStart}
+                    onDragMove={onDragMove}
+                    onDragEnd={onDragEnd}
+                    onDragCancel={endDrag}
+                  >
                   {state.sections.length === 0 ? (
                     <div className={styles.emptyCanvas}>
                       {t("templates.builder.emptyCanvas")}
@@ -583,36 +682,23 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
                           </div>
                         </div>
 
-                        <div
-                          data-field-grid
-                          className={dropHint?.sUid === s.uid && s.fields.length === 0 ? styles.emptySectionDrop : undefined}
-                          onDragOver={(e) => {
-                            // Soltar en el área vacía de la sección ⇒ al final, fila nueva.
-                            if (dragField && s.fields.length === 0) {
-                              e.preventDefault();
-                              setDropHint({ sUid: s.uid, anchorFUid: "", mode: "row-after" });
-                            }
-                          }}
-                          onDrop={() => {
-                            if (dragField && s.fields.length === 0) applyDrop(s.uid, "", "row-after");
-                            else endDrag();
-                          }}
-                        >
+                        <SectionDropArea sUid={s.uid} highlight={dropHint?.sUid === s.uid && s.fields.length === 0} disabled={s.fields.length > 0}>
                           {s.fields.length === 0 ? (
                             <div className={styles.emptySection}>{t("templates.builder.emptySectionFields")}</div>
                           ) : (
-                            <FieldGrid>
-                              {s.fields.map((f, fi) => {
-                                const [, re] = rowRangeOf(s.fields, fi);
-                                const resizable = fi + 1 < re; // tiene vecino a la derecha en la fila
-                                const dm = dropHint?.sUid === s.uid && dropHint.anchorFUid === f.uid ? dropHint.mode : null;
-                                return (
-                                  <FieldGridCell key={f.uid} span={f.colSpan}>
+                            <SortableContext items={s.fields.map((f) => f.uid)} strategy={rectSortingStrategy}>
+                              <FieldGrid>
+                                {s.fields.map((f, fi) => {
+                                  const [, re] = rowRangeOf(s.fields, fi);
+                                  const resizable = fi + 1 < re; // tiene vecino a la derecha en la fila
+                                  const dm = dropHint?.sUid === s.uid && dropHint.anchorFUid === f.uid ? dropHint.mode : null;
+                                  return (
                                     <BuilderFieldCard
+                                      key={f.uid}
                                       field={f}
+                                      sUid={s.uid}
                                       active={selected?.f === f.uid}
                                       canEdit={canEdit}
-                                      dragging={dragField?.fUid === f.uid}
                                       dropMode={dm}
                                       resizable={resizable}
                                       onSelect={() => setSelected({ s: s.uid, f: f.uid })}
@@ -625,18 +711,11 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
                                       onMoreOptions={() => { setSelected({ s: s.uid, f: f.uid }); setDrawerOpen(true); }}
                                       onMoveUp={() => moveField(s.uid, f.uid, -1)}
                                       onMoveDown={() => moveField(s.uid, f.uid, 1)}
-                                      onDragStart={() => setDragField({ sUid: s.uid, fUid: f.uid })}
-                                      onDragEnd={endDrag}
-                                      onDropHint={(mode) => dragField && dragField.fUid !== f.uid && setDropHint({ sUid: s.uid, anchorFUid: f.uid, mode })}
-                                      onDrop={(mode) => {
-                                        if (dragField && dragField.fUid !== f.uid) applyDrop(s.uid, f.uid, mode);
-                                        else endDrag();
-                                      }}
                                     />
-                                  </FieldGridCell>
-                                );
-                              })}
-                            </FieldGrid>
+                                  );
+                                })}
+                              </FieldGrid>
+                            </SortableContext>
                           )}
 
                           {/* Agregar campo AL FINAL de esta sección (estilo Canva/Google Forms). */}
@@ -648,10 +727,14 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
                               />
                             </div>
                           )}
-                        </div>
+                        </SectionDropArea>
                       </Card>
                     ))
                   )}
+                  <DragOverlay dropAnimation={null}>
+                    {dragField ? <BuilderFieldOverlay field={dragField} /> : null}
+                  </DragOverlay>
+                  </DndContext>
                 </div>
               )}
             </>
@@ -697,6 +780,32 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
       >
         <p style={{ margin: 0, color: "var(--color-text-secondary)", lineHeight: 1.5 }}>{t("templates.builder.publishConfirmBody")}</p>
       </Modal>
+    </div>
+  );
+}
+
+/**
+ * Área droppable de una sección: destino de arrastre para soltar AL FINAL o en una
+ * sección vacía (fila nueva). Los campos con contenido son droppables propios
+ * (sortables); este contenedor cubre el resto.
+ */
+function SectionDropArea({
+  sUid,
+  highlight,
+  disabled,
+  children,
+}: {
+  sUid: string;
+  highlight: boolean;
+  /** Con campos, el contenedor se desactiva: así `closestCenter` elige un CAMPO
+   *  (intención al-lado/fila) y no el contenedor (que solo sirve para sección vacía). */
+  disabled: boolean;
+  children: ReactNode;
+}) {
+  const { setNodeRef } = useDroppable({ id: `sec:${sUid}`, data: { type: "section", sUid }, disabled });
+  return (
+    <div ref={setNodeRef} className={highlight ? styles.emptySectionDrop : undefined}>
+      {children}
     </div>
   );
 }
