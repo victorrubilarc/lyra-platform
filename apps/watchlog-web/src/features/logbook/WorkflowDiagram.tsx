@@ -96,6 +96,10 @@ function computeLayout(states: WorkflowStateDto[], transitions: { fromStateKey: 
 
 const FALLBACK_COLOR = "var(--color-accent-primary, #6366f1)";
 
+/** Paleta por defecto: los estados sin color asignado toman uno por su posición ⇒ el
+ *  diagrama siempre tiene color (el diseñador puede sobreescribir por estado). */
+const STATE_PALETTE = ["#6366F1", "#06B6D4", "#22C55E", "#F59E0B", "#8B5CF6", "#EC4899", "#14B8A6", "#F97316"];
+
 /** Duración compacta (d / h / min) — tiempos reales de ESTE registro. */
 function formatDuration(ms: number): string {
   const m = Math.max(0, Math.floor(ms / 60000));
@@ -198,8 +202,9 @@ export function WorkflowDiagram(props: WorkflowDiagramProps) {
 
   const anchor = (key: string) => layout.nodes.get(key)!;
   const stateName = (key: string) => states.find((s) => s.key === key)?.name ?? key;
-  // Color de la transición = color de su estado DESTINO (hacia dónde lleva).
-  const stateColorOf = (key: string) => states.find((s) => s.key === key)?.color ?? FALLBACK_COLOR;
+  // Color por estado: el asignado, o uno de la paleta por su posición (nunca gris).
+  const colorByKey = new Map(states.map((s, i) => [s.key, s.color ?? STATE_PALETTE[i % STATE_PALETTE.length]!]));
+  const stateColorOf = (key: string) => colorByKey.get(key) ?? FALLBACK_COLOR;
 
   /** Contenido del tooltip de un ESTADO: identidad + situación + cómo se ingresó. */
   function nodeTip(s: WorkflowStateDto): ReactNode {
@@ -324,14 +329,21 @@ export function WorkflowDiagram(props: WorkflowDiagramProps) {
       const dx = Math.max(34, (x2 - x1) * 0.5);
       return { path: `M${x1},${y1} C${x1 + dx},${y1} ${x2 - dx},${y2} ${x2},${y2}`, mx: (x1 + x2) / 2, my: (y1 + y2) / 2 };
     }
-    // Retorno/lateral (reabrir/observar): baja al CANAL inferior, corre por debajo de
-    // todos los nodos y sube al destino ⇒ no cruza las aristas del avance.
+    // Retorno/lateral (reabrir/observar): ORTOGONAL por el CANAL inferior (baja recto,
+    // corre por debajo de todos los nodos, sube recto) ⇒ no cruza las aristas del avance.
     const x1 = a.x + NODE_W / 2;
     const y1 = a.y + NODE_H;
     const x2 = b.x + NODE_W / 2;
     const y2 = b.y + NODE_H;
     const chY = nodesBottom + 18 + (backIndex.get(t0.key) ?? 0) * 16;
-    return { path: `M${x1},${y1} C${x1},${chY} ${x2},${chY} ${x2},${y2}`, mx: (x1 + x2) / 2, my: chY - 7 };
+    const r = 9;
+    const left = x2 < x1;
+    const hx1 = left ? x1 - r : x1 + r;
+    const hx2 = left ? x2 + r : x2 - r;
+    const path =
+      `M${x1},${y1} L${x1},${chY - r} Q${x1},${chY} ${hx1},${chY} ` +
+      `L${hx2},${chY} Q${x2},${chY} ${x2},${chY - r} L${x2},${y2}`;
+    return { path, mx: (x1 + x2) / 2, my: chY - 7 };
   }
 
   return (
@@ -448,7 +460,7 @@ export function WorkflowDiagram(props: WorkflowDiagramProps) {
             const step = visitStep.get(s.key);
             const isCurrent = s.key === currentStateKey;
             const isNext = Boolean(record) && nextStateKeys.has(s.key) && !isCurrent;
-            const color = s.color ?? FALLBACK_COLOR;
+            const color = stateColorOf(s.key);
             const cls = [
               styles.node,
               !record ? styles.nodeDefined : step ? styles.nodeVisited : isNext ? styles.nodeNext : styles.nodePending,
