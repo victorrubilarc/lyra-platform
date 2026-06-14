@@ -35,6 +35,8 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 - [ ] `pnpm typecheck && pnpm lint && pnpm build && pnpm test` en verde.
 - [ ] Smoke en vivo de lo construido (y registrado qué se probó y qué **no**, en §4).
 - [ ] Docs actualizados: `PROGRESS.md`, los docs afectados y **este `BACKLOG.md`**.
+- [ ] Si se completó una funcionalidad de cara al usuario: **`docs/USER_GUIDE.md`** actualizado
+      (sección redactada + índice marcado ✅) y, de paso, 1–2 secciones antiguas (✍️) rellenadas.
 - [ ] Commit(s) descriptivos.
 - [ ] **Publicación decidida y ejecutada** (§1): push de la rama y/o merge a `main` y
       push de `main`. Un commit que solo vive en este disco **es trabajo en riesgo**.
@@ -100,6 +102,14 @@ nunca queda más de una sesión atrás.
 ---
 
 ## 2. Pendiente por HACER (módulos / submódulos)
+
+### Transversal — Manual de uso (`docs/USER_GUIDE.md`)
+- [ ] **Backfill INCREMENTAL del manual de uso** (decidido 2026-06-14 con el dueño). Existe
+      `docs/USER_GUIDE.md` (documento VIVO) con el **índice completo de funcionalidades** (las pendientes
+      marcadas ✍️) y la 1.ª sección redactada (Bitácoras ▸ Anular / Editar, 2.8.2). **Pendiente:** redactar
+      las secciones ✍️ de lo ya construido (Fases 1 y 2) a razón de **1–2 por sesión**, además de documentar
+      cada funcionalidad NUEVA al cerrar su sesión (ya es regla en `CLAUDE.md` y en §0). NO requiere su propia
+      sesión: avanza pegado al trabajo normal.
 
 ### Fase 1 — Seguridad + Estructura (en curso)
 - [x] **App Shell / Workspace premium** ✅ (2026-06-06). Sidebar colapsable, top bar (breadcrumbs/
