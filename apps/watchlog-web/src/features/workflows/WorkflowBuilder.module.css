@@ -542,3 +542,8 @@
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+/* Contenedor del diagrama de flujo dentro del builder. */
+.diagramWrap {
+  padding: 14px 16px 16px;
+}

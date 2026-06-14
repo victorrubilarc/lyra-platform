@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Maximize2, Minimize2 } from "lucide-react";
 import { Button, Modal, Spinner } from "@lyra/ui";
 import { formatEntryFolio } from "@lyra/contracts";
 import { useLogEntry } from "../log-entries/log-entries-queries.js";
@@ -19,6 +20,7 @@ interface Props {
  */
 export function FlowModal({ entryId, onClose, onOpenFull }: Props) {
   const { t } = useTranslation();
+  const [expanded, setExpanded] = useState(false);
   const detail = useLogEntry(entryId);
   const entry = detail.data;
 
@@ -26,14 +28,23 @@ export function FlowModal({ entryId, onClose, onOpenFull }: Props) {
     <Modal
       open={entryId !== null}
       onClose={onClose}
-      size="lg"
+      size={expanded ? "xl" : "lg"}
       title={entry ? `${t("logbook.diagram.title")} · ${formatEntryFolio(entry.entryNumber)}` : t("logbook.diagram.title")}
       footer={
-        entry ? (
-          <Button variant="primary" leftIcon={<ExternalLink size={14} />} onClick={() => onOpenFull(entry.id)}>
-            {t("logbook.peek.openFull")}
+        <div className={styles.flowModalFooter}>
+          <Button
+            variant="secondary"
+            leftIcon={expanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+            onClick={() => setExpanded((e) => !e)}
+          >
+            {expanded ? t("logbook.diagram.collapse") : t("logbook.diagram.expand")}
           </Button>
-        ) : null
+          {entry && (
+            <Button variant="primary" leftIcon={<ExternalLink size={14} />} onClick={() => onOpenFull(entry.id)}>
+              {t("logbook.peek.openFull")}
+            </Button>
+          )}
+        </div>
       }
     >
       {detail.isLoading && (

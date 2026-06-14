@@ -2,10 +2,11 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, ChevronDown, ChevronRight, Info, ListChecks, PlayCircle, Plus, Save, Trash2, TriangleAlert } from "lucide-react";
+import { ArrowLeft, ArrowRight, ChevronDown, ChevronRight, GitBranch, Info, ListChecks, PlayCircle, Plus, Save, Trash2, TriangleAlert } from "lucide-react";
 import { Button, Card, Checkbox, Chip, cx, FormField, Input, Modal, MultiSelect, Select, Textarea, Toggle, useToast } from "@lyra/ui";
-import { validateWorkflowMachine, type WorkflowDetail } from "@lyra/contracts";
+import { validateWorkflowMachine, type WorkflowDetail, type WorkflowStateDto, type WorkflowTransitionDto } from "@lyra/contracts";
 import { usePermissions } from "../../auth/use-permissions.js";
+import { WorkflowDiagram } from "../logbook/WorkflowDiagram.js";
 import { fetchRoles } from "../security/security-api.js";
 import {
   collectStateKeys,
@@ -50,6 +51,7 @@ export function WorkflowBuilder({ detail }: { detail: WorkflowDetail }) {
   const [dirty, setDirty] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
+  const [diagramOpen, setDiagramOpen] = useState(true);
   // Las transiciones ya existentes arrancan PLEGADAS (vista compacta al abrir);
   // las que se agreguen en la sesión quedan expandidas (uid nuevo ∉ del set).
   const [collapsedTransitions, setCollapsedTransitions] = useState<Set<string>>(
@@ -223,6 +225,40 @@ export function WorkflowBuilder({ detail }: { detail: WorkflowDetail }) {
   const roleNames = (ids: string[]) =>
     ids.map((id) => roles.find((r) => r.id === id)?.name ?? "—").join(", ");
 
+  // Mapea el modelo EDITABLE a los DTOs del diagrama (modo DEFINICIÓN, sin registro).
+  // Solo transiciones con origen/destino válidos (mientras se edita pueden estar a medias).
+  const diagramStates: WorkflowStateDto[] = useMemo(
+    () =>
+      wf.states.map((s, i) => ({
+        id: s.uid,
+        key: s.key,
+        name: s.name || s.key,
+        description: s.description,
+        order: i,
+        isInitial: s.isInitial,
+        isFinal: s.isFinal,
+        color: s.color,
+      })),
+    [wf.states],
+  );
+  const diagramTransitions: WorkflowTransitionDto[] = useMemo(() => {
+    const keys = new Set(wf.states.map((s) => s.key));
+    return wf.transitions
+      .filter((tr) => keys.has(tr.fromStateKey) && keys.has(tr.toStateKey))
+      .map((tr, i) => ({
+        id: tr.uid,
+        key: tr.key,
+        label: tr.label || tr.key,
+        fromStateKey: tr.fromStateKey,
+        toStateKey: tr.toStateKey,
+        order: i,
+        requireSignature: tr.requireSignature,
+        signatureMeaning: tr.signatureMeaning,
+        requireMfa: tr.requireMfa,
+        roleIds: tr.roleIds,
+      }));
+  }, [wf.states, wf.transitions]);
+
   return (
     <div className={styles.page}>
       <div className={styles.topbar}>
@@ -337,6 +373,27 @@ export function WorkflowBuilder({ detail }: { detail: WorkflowDetail }) {
               </tbody>
             </table>
           </div>
+          )}
+        </Card>
+      )}
+
+      {/* Diagrama del flujo (vista de definición) — para ver cómo es el flujo. */}
+      {wf.states.length > 0 && (
+        <Card className={styles.summaryCard}>
+          <button
+            type="button"
+            className={styles.summaryHeader}
+            onClick={() => setDiagramOpen((o) => !o)}
+            aria-expanded={diagramOpen}
+          >
+            {diagramOpen ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+            <GitBranch size={15} />
+            <span>{t("workflows.builder.diagramTitle")}</span>
+          </button>
+          {diagramOpen && (
+            <div className={styles.diagramWrap}>
+              <WorkflowDiagram states={diagramStates} transitions={diagramTransitions} />
+            </div>
           )}
         </Card>
       )}

@@ -10,22 +10,22 @@
   color: var(--color-text-muted);
 }
 
-/* ── Lienzo del diagrama (vertical: centrado horizontal, scroll vertical natural) ── */
+/* ── Lienzo del diagrama (horizontal izq→der; centrado, scroll si excede) ── */
 .canvasScroll {
-  display: flex;
-  justify-content: center;
   overflow: auto;
-  max-height: 56vh;
-  padding: 8px;
+  max-height: 62vh;
+  padding: 10px;
   border-radius: var(--radius-lg);
   background:
-    radial-gradient(120% 80% at 50% 0%, color-mix(in srgb, var(--color-accent-primary) 7%, transparent), transparent 60%),
+    radial-gradient(120% 90% at 0% 50%, color-mix(in srgb, var(--color-accent-primary) 7%, transparent), transparent 60%),
     var(--color-bg-surface-2);
   border: 1px solid var(--color-border-subtle);
 }
+/* `margin:auto` centra cuando cabe y, si excede, deja scrollear sin recortar la izquierda
+   (a diferencia de flex + justify-content:center). */
 .canvas {
   position: relative;
-  flex-shrink: 0;
+  margin: 0 auto;
 }
 .edges {
   position: absolute;
@@ -88,27 +88,74 @@
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 9px 11px;
+  padding: 9px 11px 9px 16px;
   border-radius: 12px;
   background: var(--color-bg-surface-1);
   border: 1px solid var(--color-border-subtle);
   box-sizing: border-box;
+  overflow: hidden;
   transition: box-shadow 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
 }
+/* Barra de acento con el COLOR DEL ESTADO (identidad de color del diagrama). */
+.nodeBar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  background: var(--state-color);
+}
 .nodePending {
-  opacity: 0.5;
+  opacity: 0.45;
   border-style: dashed;
 }
-.nodeVisited {
-  border-color: color-mix(in srgb, var(--state-color) 50%, transparent);
+.nodePending .nodeBar {
+  opacity: 0.5;
+}
+.nodeVisited,
+.nodeDefined {
+  border-color: color-mix(in srgb, var(--state-color) 45%, transparent);
   background: linear-gradient(180deg, color-mix(in srgb, var(--state-color) 12%, var(--color-bg-surface-1)), var(--color-bg-surface-1));
 }
+/* Siguiente paso posible: borde discontinuo del color del destino + leve respiración. */
+.nodeNext {
+  border-color: var(--state-color);
+  border-style: dashed;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--state-color) 8%, var(--color-bg-surface-1)), var(--color-bg-surface-1));
+  animation: wfBreathe 2.6s ease-in-out infinite;
+}
+/* Estado ACTUAL: glow del color del estado + pulso (dónde estás AHORA). */
 .nodeCurrent {
   border-color: var(--state-color);
-  box-shadow:
-    0 0 0 1px var(--state-color),
-    0 0 18px color-mix(in srgb, var(--state-color) 45%, transparent);
   transform: translateY(-1px);
+  animation: wfPulse 2.4s ease-in-out infinite;
+}
+@keyframes wfPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 1px var(--state-color), 0 0 16px color-mix(in srgb, var(--state-color) 38%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 1px var(--state-color), 0 0 28px color-mix(in srgb, var(--state-color) 62%, transparent);
+  }
+}
+@keyframes wfBreathe {
+  0%, 100% { border-color: color-mix(in srgb, var(--state-color) 55%, transparent); }
+  50% { border-color: var(--state-color); }
+}
+@keyframes wfFlow {
+  to { stroke-dashoffset: -22; }
+}
+/* Arista del SIGUIENTE paso: línea fluyendo ("marching ants") en el color del destino. */
+.edgeNext {
+  stroke-width: 2.5;
+  stroke-dasharray: 7 5;
+  opacity: 1;
+  animation: wfFlow 0.9s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .nodeCurrent, .nodeNext, .edgeNext {
+    animation: none;
+  }
 }
 
 .nodeTop {
@@ -369,4 +416,101 @@
 .tipSig {
   color: var(--color-success, #22c55e);
   font-weight: 600;
+}
+
+/* Píldora "Siguiente" + tiempo en el estado actual (en el nodo). */
+.nextPill {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--state-color);
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px dashed color-mix(in srgb, var(--state-color) 60%, transparent);
+}
+.nodeElapsed {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-secondary);
+}
+
+/* ── Banner: dónde estás + siguiente paso ── */
+.statusBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 18px;
+  padding: 12px 14px;
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--state-color) 12%, transparent), transparent 55%),
+    var(--color-bg-surface-2);
+  border: 1px solid var(--color-border-subtle);
+}
+.statusNow,
+.statusNext {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+.statusKicker {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+.statusState {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-display, "Sora", sans-serif);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+.statusElapsed {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--color-bg-surface-1);
+  border: 1px solid var(--color-border-subtle);
+}
+.nextChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--state-color) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--state-color) 45%, transparent);
+}
+.nextChipArrow {
+  color: var(--state-color);
+  font-weight: 700;
+}
+.statusDone {
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+}
+
+/* Duración del tramo en la tarjeta de historial. */
+.histDur {
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
 }
