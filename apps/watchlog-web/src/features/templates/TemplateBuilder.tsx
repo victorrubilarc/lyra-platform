@@ -48,10 +48,10 @@ import {
   type EditSection,
   type EditState,
 } from "./builder-model.js";
+import { AddFieldPopover } from "./AddFieldPopover.js";
 import { BuilderConfigPanel } from "./BuilderConfigPanel.js";
 import { FieldControl } from "./FieldControl.js";
 import { FieldGrid } from "./FieldGrid.js";
-import { FieldPalette } from "./FieldPalette.js";
 import { FieldPropertiesPanel } from "./FieldPropertiesPanel.js";
 import { SectionCanvas, type CanvasGeometry } from "./SectionCanvas.js";
 import { RulesEditor } from "./RulesEditor.js";
@@ -479,12 +479,10 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
                   onChange={setRules}
                 />
               ) : (
-                /* DISEÑADOR VISUAL (Fase 2.1.7): paleta (izq) · lienzo de posicionamiento
-                   LIBRE (centro, react-grid-layout) · propiedades (der). Se arrastra desde
-                   la paleta a una posición, y se mueve/redimensiona cualquier campo. */
-                <div className={styles.designer}>
-                  <FieldPalette canEdit={canEdit && !isPublishedView} onAdd={(type) => addFieldAt(type)} />
-
+                /* DISEÑADOR VISUAL (Fase 2.1.7): LIENZO protagonista a ancho completo.
+                   Agregar campo = botón "＋" con buscador (popover). Las propiedades
+                   aparecen (panel flotante) solo al seleccionar un campo. */
+                <div className={styles.editorWrap}>
                   <div className={styles.designerCenter}>
                     {/* Barra superior del lienzo: flujo + dispositivo + cuadrícula + sección. */}
                     <div className={styles.canvasBar}>
@@ -515,6 +513,7 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
                           <button type="button" className={device === "mobile" ? styles.deviceOn : styles.deviceBtn} onClick={() => setDevice("mobile")} title={t("templates.builder.deviceMobile")}><Smartphone size={15} /></button>
                         </div>
                         <button type="button" className={showGrid ? styles.toolOn : styles.toolBtn} onClick={() => setShowGrid((v) => !v)} title={t("templates.builder.toggleGrid")} aria-pressed={showGrid}><Grid3x3 size={15} /></button>
+                        {state.sections.length > 0 && <AddFieldPopover canEdit={canEdit && !isPublishedView} variant="bar" onPick={(type) => addFieldAt(type)} />}
                         <button type="button" className={styles.addSectionBtn} onClick={addSection} disabled={!canEdit}>
                           <FilePlus2 size={15} /> {t("templates.builder.addSection")}
                         </button>
@@ -587,6 +586,12 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
                                   renderCell={(f) => <FieldControl field={f} value={undefined} onChange={() => undefined} readOnly />}
                                 />
                               )}
+
+                              {device === "desktop" && (
+                                <div className={styles.sectionAddRow} onClick={(e) => e.stopPropagation()}>
+                                  <AddFieldPopover canEdit={canEdit && !isPublishedView} variant="section" onPick={(type) => addFieldAt(type, s.uid)} />
+                                </div>
+                              )}
                             </Card>
                           ))}
                         </div>
@@ -594,21 +599,24 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
                     </div>
                   </div>
 
-                  <FieldPropertiesPanel
-                    field={selectedField}
-                    canEdit={canEdit && !isPublishedView}
-                    onLabel={(label) => selectedSection && selectedField && updateField(selectedSection.uid, selectedField.uid, { label })}
-                    onRequired={(required) => selectedSection && selectedField && updateField(selectedSection.uid, selectedField.uid, { required })}
-                    onWidth={(w) => {
-                      if (!selectedSection || !selectedField) return;
-                      const gridX = Math.max(0, Math.min(selectedField.gridX, 12 - w));
-                      updateField(selectedSection.uid, selectedField.uid, { colSpan: w, gridX });
-                    }}
-                    onHeight={(h) => selectedSection && selectedField && updateField(selectedSection.uid, selectedField.uid, { gridH: h })}
-                    onAdvanced={() => setDrawerOpen(true)}
-                    onDuplicate={() => selectedSection && selectedField && duplicateField(selectedSection.uid, selectedField.uid)}
-                    onDelete={() => selectedSection && selectedField && deleteField(selectedSection.uid, selectedField.uid)}
-                  />
+                  {/* Propiedades: panel FLOTANTE, aparece solo al seleccionar un campo. */}
+                  {selectedField && selectedSection && (
+                    <FieldPropertiesPanel
+                      field={selectedField}
+                      canEdit={canEdit && !isPublishedView}
+                      onClose={() => setSelected({ s: selectedSection.uid })}
+                      onLabel={(label) => updateField(selectedSection.uid, selectedField.uid, { label })}
+                      onRequired={(required) => updateField(selectedSection.uid, selectedField.uid, { required })}
+                      onWidth={(w) => {
+                        const gridX = Math.max(0, Math.min(selectedField.gridX, 12 - w));
+                        updateField(selectedSection.uid, selectedField.uid, { colSpan: w, gridX });
+                      }}
+                      onHeight={(h) => updateField(selectedSection.uid, selectedField.uid, { gridH: h })}
+                      onAdvanced={() => setDrawerOpen(true)}
+                      onDuplicate={() => duplicateField(selectedSection.uid, selectedField.uid)}
+                      onDelete={() => deleteField(selectedSection.uid, selectedField.uid)}
+                    />
+                  )}
                 </div>
               )}
             </>

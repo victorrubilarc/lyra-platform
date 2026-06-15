@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Copy, SlidersHorizontal, Trash2 } from "lucide-react";
+import { Copy, SlidersHorizontal, Trash2, X } from "lucide-react";
 import { Button, Checkbox, Input } from "@lyra/ui";
 import { GRID_COLUMNS } from "@lyra/contracts";
 import { WIDTH_PRESETS, type EditField } from "./builder-model.js";
@@ -15,6 +15,7 @@ import styles from "./TemplateBuilder.module.css";
 export function FieldPropertiesPanel({
   field,
   canEdit,
+  onClose,
   onLabel,
   onRequired,
   onWidth,
@@ -25,6 +26,7 @@ export function FieldPropertiesPanel({
 }: {
   field: EditField | null;
   canEdit: boolean;
+  onClose: () => void;
   onLabel: (label: string) => void;
   onRequired: (required: boolean) => void;
   onWidth: (w: number) => void;
@@ -52,6 +54,9 @@ export function FieldPropertiesPanel({
         <span className={styles.propsType}>
           <Icon size={15} /> {t(meta.labelKey)}
         </span>
+        <button type="button" className={styles.propsClose} onClick={onClose} aria-label={t("common.close")}>
+          <X size={15} />
+        </button>
       </div>
 
       <label className={styles.propRow}>
