@@ -1304,10 +1304,8 @@
   z-index: 40;
 }
 .addPopover {
-  position: absolute;
+  position: fixed;
   z-index: 41;
-  top: calc(100% + 6px);
-  left: 0;
   width: 280px;
   max-height: 360px;
   overflow: auto;

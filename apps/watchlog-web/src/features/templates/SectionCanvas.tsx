@@ -214,6 +214,9 @@ export function SectionCanvas({
             className={`${styles.canvasCell}${dragging ? " " + styles.canvasCellDragging : ""}${sel ? " " + styles.canvasCellSelected : ""}`}
             style={cellStyle(g)}
             onPointerDown={(e) => begin(e, f.uid, "move")}
+            // No dejar que el clic burbujee a la sección (que selecciona la sección y
+            // borraría la selección del campo) ni al lienzo (que deselecciona).
+            onClick={(e) => e.stopPropagation()}
           >
             <div className={`${styles.canvasItem}${sel ? " " + styles.canvasItemActive : ""}`}>
               {/* Título EDITABLE dentro del objeto (no arrastra: stopPropagation). */}
