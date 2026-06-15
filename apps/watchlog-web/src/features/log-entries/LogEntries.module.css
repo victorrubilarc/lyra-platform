@@ -1,6 +1,9 @@
 .page {
   padding: var(--layout-content-pad-y, 28px) var(--layout-content-pad-x, 32px);
-  max-width: 920px;
+  /* Ancho ADAPTATIVO: el llenado usa todo el ancho del workspace (como la grilla de
+     Bitácoras y la Vista previa del builder), aprovechando los monitores grandes. La
+     grilla de campos (12 columnas, container-queries) reacomoda los campos al ancho
+     disponible; en pantallas chicas colapsa a 1 columna (regla de terreno). */
 }
 
 .header {

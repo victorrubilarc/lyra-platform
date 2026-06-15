@@ -881,12 +881,11 @@
 /* ── Vista previa ─────────────────────────────────────────────────────────── */
 .previewCard {
   padding: var(--space-5, 26px) var(--space-5, 30px);
-  /* WYSIWYG: la Vista previa replica el ANCHO de la pantalla de llenado (Nueva
-     entrada usa max-width 920px), para que la grilla de campos se acomode IGUAL
-     que lo que verá el operador. El responsive de terreno (tablet/móvil) se prueba
-     con el selector de dispositivo del Editor. */
+  /* Ancho COMPLETO: la Vista previa refleja el DISEÑO del lienzo a ancho de
+     escritorio (geometría side-by-side), igual que la pantalla de llenado, que
+     también adapta al ancho del workspace. El responsive de terreno se prueba con
+     el selector escritorio/tablet/móvil del Editor. */
   width: 100%;
-  max-width: 920px;
 }
 .previewTitle {
   font-family: var(--font-brand);
