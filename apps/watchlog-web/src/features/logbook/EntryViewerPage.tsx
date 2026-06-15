@@ -516,7 +516,7 @@ export function EntryViewerPage() {
                   const band = fieldBand(f);
                   return (
                     <>
-                      <FieldControl field={f} value={valuesByKey[f.key]} onChange={() => undefined} readOnly />
+                      <FieldControl field={f} value={valuesByKey[f.key]} onChange={() => undefined} readOnly nodeId={entry.orgNodeId} />
                       {band && (
                         <span className={styles.bandChip}>
                           <Chip variant={band === "CRIT" ? "error" : "warning"} label={t(`logbook.band.${band}`)} />

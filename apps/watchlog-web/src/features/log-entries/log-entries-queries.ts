@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   CreateLogEntryRequest,
   ExecuteTransitionRequest,
+  ReferenceEntity,
   SaveLogEntrySectionRequest,
   SetDeferralRequest,
   SubmitLogEntryRequest,
@@ -13,6 +14,7 @@ import {
   fetchAvailableTemplates,
   fetchLogEntry,
   fetchNewLogEntryPreview,
+  fetchReferenceOptions,
   saveLogEntrySection,
   setLogEntryDeferral,
   submitLogEntry,
@@ -39,6 +41,22 @@ export function useLogEntry(id: string | null) {
     queryKey: LOG_ENTRY_KEYS.detail(id ?? ""),
     queryFn: () => fetchLogEntry(id!),
     enabled: !!id,
+  });
+}
+
+/**
+ * Opciones de un selector de REFERENCIA (Ola 2): equipo/usuario/nodo/turno con
+ * ABAC server-side. Para FieldControl (fill y visor resuelven label idéntico). Se
+ * cachea por (kind, nodo); deshabilitada si falta el contexto que la entidad exige
+ * (equipo/turno requieren nodo).
+ */
+export function useReferenceOptions(kind: ReferenceEntity | null, nodeId: string | null, enabled = true) {
+  const needsNode = kind === "equipment" || kind === "shift";
+  return useQuery({
+    queryKey: ["log-entries", "references", kind ?? "", nodeId ?? ""] as const,
+    queryFn: () => fetchReferenceOptions(kind!, { nodeId }),
+    enabled: enabled && !!kind && (!needsNode || !!nodeId),
+    staleTime: 60_000,
   });
 }
 

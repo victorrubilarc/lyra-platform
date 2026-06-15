@@ -682,7 +682,15 @@ export function EntryFillPage() {
                       : [];
                   return (
                     <>
-                      <FieldControl field={f} value={display[f.key]} onChange={(v) => setValue(f.key, v)} readOnly={!fieldEditable} invalid={errs.length > 0 || ruleProblemFields.has(f.key)} />
+                      <FieldControl
+                        field={f}
+                        value={display[f.key]}
+                        onChange={(v) => setValue(f.key, v)}
+                        readOnly={!fieldEditable}
+                        invalid={errs.length > 0 || ruleProblemFields.has(f.key)}
+                        nodeId={entry.orgNodeId}
+                        counterPrevious={entry.counterPreviousValues?.[f.key]}
+                      />
                       {restricted && editable && (
                         <div className={styles.lockedNote}>
                           <Lock size={12} /> {t("logbook.fill.fieldRestricted")}

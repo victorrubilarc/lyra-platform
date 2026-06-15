@@ -312,7 +312,7 @@ export const logEntryDetailSchema = logEntrySchema.extend({
    * valor sellado del mismo equipo+campo. La UI muestra el delta (actual − previa).
    * Es PRESENTACIÓN (no se persiste). Ausente = sin lectura previa.
    */
-  counterPreviousValues: z.record(z.number()).default({}),
+  counterPreviousValues: z.record(z.number()).optional(),
   /** Transiciones que ESTE usuario puede ejecutar ahora (gateado en backend). */
   availableTransitions: z.array(availableTransitionSchema),
   /** Historial de transiciones ejecutadas (append-only, orden cronológico). */

@@ -3,6 +3,7 @@ import {
   createLogEntryRequestSchema,
   executeTransitionRequestSchema,
   logEntryDetailSchema,
+  referenceOptionsResultSchema,
   saveLogEntrySectionRequestSchema,
   setDeferralRequestSchema,
   submitLogEntryRequestSchema,
@@ -12,6 +13,8 @@ import {
   type CreateLogEntryRequest,
   type ExecuteTransitionRequest,
   type LogEntryDetail,
+  type ReferenceEntity,
+  type ReferenceOptionsResult,
   type SaveLogEntrySectionRequest,
   type SetDeferralRequest,
   type SubmitLogEntryRequest,
@@ -20,6 +23,21 @@ import {
   type VoidLogEntryRequest,
 } from "@lyra/contracts";
 import { apiJson } from "../../lib/api-client.js";
+
+/**
+ * Opciones de un selector de REFERENCIA (Ola 2) con ABAC server-side. `nodeId` =
+ * nodo de la entrada (acota equipo/turno); `q` filtra. El backend decide el alcance.
+ */
+export function fetchReferenceOptions(
+  kind: ReferenceEntity,
+  params: { nodeId?: string | null; q?: string } = {},
+): Promise<ReferenceOptionsResult> {
+  const qs = new URLSearchParams();
+  if (params.nodeId) qs.set("nodeId", params.nodeId);
+  if (params.q) qs.set("q", params.q);
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return apiJson(`/log-entries/references/${kind}/options${suffix}`, referenceOptionsResultSchema);
+}
 
 /**
  * Plantillas publicadas que el usuario puede usar para CREAR una entrada (picker de

@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { useTranslation } from "react-i18next";
 import { Checkbox, Combobox, FormField, Input, MultiSelect, Select, Textarea, Toggle } from "@lyra/ui";
 import { isPresentationalType, type OptionInlineItem, type RoleSummary, type WorkflowStateDto } from "@lyra/contracts";
@@ -63,6 +64,105 @@ function numberConfigField(
         />
       )}
     </FormField>
+  );
+}
+
+/**
+ * Editor de la MATRIZ DE RIESGO (Ola 2, ISO 31000): rótulos de ejes editables +
+ * cuadrícula "pintable" donde cada celda cicla su severidad 1..5. Ejes de 2..7.
+ */
+function RiskMatrixEditor({
+  config,
+  setConfig,
+  t,
+}: {
+  config: Record<string, unknown>;
+  setConfig: (key: string, value: unknown) => void;
+  t: (k: string, o?: Record<string, unknown>) => string;
+}) {
+  const pLabels = (config.probabilityLabels as string[]) ?? [];
+  const cLabels = (config.consequenceLabels as string[]) ?? [];
+  const cells = (config.cells as number[][]) ?? [];
+
+  const setLabel = (axis: "p" | "c", i: number, val: string) => {
+    if (axis === "p") setConfig("probabilityLabels", pLabels.map((l, j) => (j === i ? val : l)));
+    else setConfig("consequenceLabels", cLabels.map((l, j) => (j === i ? val : l)));
+  };
+  const cycleCell = (p: number, c: number) => {
+    const next = cells.map((row, ri) => row.map((s, ci) => (ri === p && ci === c ? (s >= 5 ? 1 : s + 1) : s)));
+    setConfig("cells", next);
+  };
+  const addRow = () => {
+    if (pLabels.length >= 7) return;
+    setConfig("probabilityLabels", [...pLabels, t("templates.builder.riskNewRow", { n: pLabels.length + 1 })]);
+    setConfig("cells", [...cells, cLabels.map(() => 1)]);
+  };
+  const removeRow = () => {
+    if (pLabels.length <= 2) return;
+    setConfig("probabilityLabels", pLabels.slice(0, -1));
+    setConfig("cells", cells.slice(0, -1));
+  };
+  const addCol = () => {
+    if (cLabels.length >= 7) return;
+    setConfig("consequenceLabels", [...cLabels, t("templates.builder.riskNewCol", { n: cLabels.length + 1 })]);
+    setConfig("cells", cells.map((row) => [...row, 1]));
+  };
+  const removeCol = () => {
+    if (cLabels.length <= 2) return;
+    setConfig("consequenceLabels", cLabels.slice(0, -1));
+    setConfig("cells", cells.map((row) => row.slice(0, -1)));
+  };
+
+  return (
+    <div className={styles.riskEditor}>
+      <p className={styles.thresholdHint}>{t("templates.builder.riskEditorHint")}</p>
+      <div className={styles.riskEditorGrid} style={{ gridTemplateColumns: `minmax(90px,1fr) repeat(${cLabels.length}, minmax(54px,1fr))` }}>
+        <div className={styles.riskCorner} aria-hidden>
+          <span>{t("templates.builder.riskProbability")}</span>
+          <span>{t("templates.builder.riskConsequence")}</span>
+        </div>
+        {cLabels.map((cl, c) => (
+          <input
+            key={`c${c}`}
+            className={styles.riskAxisInput}
+            value={cl}
+            onChange={(e) => setLabel("c", c, e.target.value)}
+            aria-label={t("templates.builder.riskConsequence")}
+          />
+        ))}
+        {pLabels.map((pl, p) => (
+          <Fragment key={`p${p}`}>
+            <input
+              className={styles.riskAxisInput}
+              value={pl}
+              onChange={(e) => setLabel("p", p, e.target.value)}
+              aria-label={t("templates.builder.riskProbability")}
+            />
+            {cLabels.map((_, c) => {
+              const sev = cells[p]?.[c] ?? 1;
+              return (
+                <button
+                  key={`${p}-${c}`}
+                  type="button"
+                  className={styles.riskCell}
+                  data-sev={sev}
+                  onClick={() => cycleCell(p, c)}
+                  title={t(`templates.builder.riskLevel.${sev}`)}
+                >
+                  {sev}
+                </button>
+              );
+            })}
+          </Fragment>
+        ))}
+      </div>
+      <div className={styles.riskEditorActions}>
+        <button type="button" onClick={addRow} disabled={pLabels.length >= 7}>＋ {t("templates.builder.riskProbability")}</button>
+        <button type="button" onClick={removeRow} disabled={pLabels.length <= 2}>－ {t("templates.builder.riskProbability")}</button>
+        <button type="button" onClick={addCol} disabled={cLabels.length >= 7}>＋ {t("templates.builder.riskConsequence")}</button>
+        <button type="button" onClick={removeCol} disabled={cLabels.length <= 2}>－ {t("templates.builder.riskConsequence")}</button>
+      </div>
+    </div>
   );
 }
 
@@ -237,18 +337,45 @@ export function BuilderConfigPanel({
               {numberConfigField(field.config, "min", t("templates.builder.min"), setConfig)}
               {numberConfigField(field.config, "max", t("templates.builder.max"), setConfig)}
             </div>
-            <div className={styles.thresholdBox}>
-              <div className={styles.thresholdTitle}>{t("templates.builder.thresholds")}</div>
-              <p className={styles.thresholdHint}>{t("templates.builder.thresholdsHint")}</p>
-              <div className={styles.twoCol}>
-                {numberConfigField(field.config, "warnLow", t("templates.builder.warnLow"), setConfig)}
-                {numberConfigField(field.config, "warnHigh", t("templates.builder.warnHigh"), setConfig)}
+            {/* Lectura con tolerancia (Ola 2): las bandas warn/crit se DERIVAN de expected ± tolerance. */}
+            {field.config.expected !== undefined && field.config.counter !== true ? (
+              <div className={styles.thresholdBox}>
+                <div className={styles.thresholdTitle}>{t("templates.builder.toleranceTitle")}</div>
+                <p className={styles.thresholdHint}>{t("templates.builder.toleranceHint")}</p>
+                <div className={styles.twoCol}>
+                  {numberConfigField(field.config, "expected", t("templates.builder.toleranceExpected"), setConfig)}
+                  {numberConfigField(field.config, "tolerance", t("templates.builder.toleranceWarn"), setConfig)}
+                </div>
+                {numberConfigField(field.config, "critTolerance", t("templates.builder.toleranceCrit"), setConfig)}
               </div>
-              <div className={styles.twoCol}>
-                {numberConfigField(field.config, "critLow", t("templates.builder.critLow"), setConfig)}
-                {numberConfigField(field.config, "critHigh", t("templates.builder.critHigh"), setConfig)}
+            ) : field.config.counter === true ? (
+              /* Contador/acumulado (Ola 2): lectura incremental; delta vs la previa del mismo equipo. */
+              <div className={styles.thresholdBox}>
+                <div className={styles.thresholdTitle}>{t("templates.builder.counterTitle")}</div>
+                <p className={styles.thresholdHint}>{t("templates.builder.counterHint")}</p>
+                <FormField label={t("templates.builder.counterNonDecreasing")}>
+                  {() => (
+                    <Toggle
+                      checked={field.config.counterNonDecreasing === true}
+                      onChange={(checked) => setConfig("counterNonDecreasing", checked ? true : undefined)}
+                    />
+                  )}
+                </FormField>
               </div>
-            </div>
+            ) : (
+              <div className={styles.thresholdBox}>
+                <div className={styles.thresholdTitle}>{t("templates.builder.thresholds")}</div>
+                <p className={styles.thresholdHint}>{t("templates.builder.thresholdsHint")}</p>
+                <div className={styles.twoCol}>
+                  {numberConfigField(field.config, "warnLow", t("templates.builder.warnLow"), setConfig)}
+                  {numberConfigField(field.config, "warnHigh", t("templates.builder.warnHigh"), setConfig)}
+                </div>
+                <div className={styles.twoCol}>
+                  {numberConfigField(field.config, "critLow", t("templates.builder.critLow"), setConfig)}
+                  {numberConfigField(field.config, "critHigh", t("templates.builder.critHigh"), setConfig)}
+                </div>
+              </div>
+            )}
           </>
         )}
 
@@ -492,6 +619,28 @@ export function BuilderConfigPanel({
             </FormField>
           </>
         )}
+
+        {field.type === "REFERENCE" && (
+          <>
+            <p className={styles.modeledNote}>
+              {t(`templates.builder.referenceEntity.${(field.config.entity as string) ?? "equipment"}`)}
+            </p>
+            <FormField label={t("templates.builder.referenceDisplay")}>
+              {({ id }) => (
+                <Select
+                  id={id}
+                  value={(field.config.display as string) ?? "dropdown"}
+                  onChange={(e) => setConfig("display", e.target.value)}
+                >
+                  <option value="dropdown">{t("templates.builder.referenceDisplayDropdown")}</option>
+                  <option value="modal">{t("templates.builder.referenceDisplayModal")}</option>
+                </Select>
+              )}
+            </FormField>
+          </>
+        )}
+
+        {field.type === "RISK_MATRIX" && <RiskMatrixEditor config={field.config} setConfig={setConfig} t={t} />}
 
         {(field.type === "SEVERITY" || field.type === "SIGNATURE") && (
           <p className={styles.modeledNote}>{t("templates.builder.modeledLater")}</p>

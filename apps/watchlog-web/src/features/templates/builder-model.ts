@@ -10,6 +10,8 @@ import {
   CircleDollarSign,
   ExternalLink,
   Fingerprint,
+  Gauge,
+  Grid3x3,
   Hash,
   Heading,
   Image,
@@ -19,17 +21,22 @@ import {
   ListPlus,
   Mail,
   Minus,
+  Network,
   PenLine,
   Percent,
   Phone,
   Rows3,
   SearchCheck,
   Star,
+  Target,
   Text as TextIcon,
   Timer,
   TriangleAlert,
   Type,
   ToggleRight,
+  User,
+  Users,
+  Wrench,
   type LucideIcon,
 } from "lucide-react";
 import type {
@@ -69,7 +76,7 @@ export function flattenNodeOptions(nodes: OrgNodeTree[], depth = 0): NodeOption[
 // FIELD_TYPES queda chica y la paleta se ve rica. Cada preset declara su categoría
 // para agruparse en el popover "＋ Agregar campo".
 
-export const PALETTE_CATEGORIES = ["basics", "selection", "evaluation", "presentation"] as const;
+export const PALETTE_CATEGORIES = ["basics", "selection", "evaluation", "reference", "presentation"] as const;
 export type PaletteCategory = (typeof PALETTE_CATEGORIES)[number];
 
 /** Un objeto ofrecido en la paleta (tipo + config inicial + presentación). */
@@ -86,6 +93,20 @@ export interface FieldPreset {
 
 /** Opciones inline de arranque para los objetos de selección. */
 const starterOptions = () => ({ optionSource: { kind: "inline", items: [{ code: "opcion_1", label: "Opción 1" }] } });
+
+/**
+ * Matriz de riesgo 5×5 de arranque (ISO 31000): ejes con rótulos estándar y un
+ * heatmap derivado del producto probabilidad×consecuencia (severidad 1..5). El
+ * diseñador puede repintar cada celda en el editor.
+ */
+const starterRiskMatrix = () => {
+  const probabilityLabels = ["Muy baja", "Baja", "Media", "Alta", "Muy alta"];
+  const consequenceLabels = ["Insignificante", "Menor", "Moderada", "Mayor", "Catastrófica"];
+  const cells = probabilityLabels.map((_, p) =>
+    consequenceLabels.map((_, c) => Math.min(5, Math.max(1, Math.ceil(((p + 1) * (c + 1)) / 5)))),
+  );
+  return { probabilityLabels, consequenceLabels, cells };
+};
 
 export const FIELD_PALETTE: readonly FieldPreset[] = [
   // --- Básicos ---
@@ -104,6 +125,8 @@ export const FIELD_PALETTE: readonly FieldPreset[] = [
   { id: "time", type: "TIME", category: "basics", labelKey: "templates.fieldTypes.time", icon: Clock, config: () => ({}) },
   { id: "duration", type: "DURATION", category: "basics", labelKey: "templates.fieldTypes.duration", icon: Timer, config: () => ({}) },
   { id: "range", type: "RANGE", category: "basics", labelKey: "templates.fieldTypes.range", icon: ArrowLeftRight, config: () => ({}) },
+  { id: "tolerance", type: "NUMBER", category: "basics", labelKey: "templates.fieldTypes.tolerance", icon: Target, config: () => ({ expected: 0, tolerance: 0 }) },
+  { id: "counter", type: "NUMBER", category: "basics", labelKey: "templates.fieldTypes.counter", icon: Gauge, config: () => ({ counter: true, counterNonDecreasing: true }) },
   // --- Selección ---
   { id: "select", type: "SELECT", category: "selection", labelKey: "templates.fieldTypes.select", icon: ChevronDownSquare, config: () => ({ displayAs: "dropdown", ...starterOptions() }) },
   { id: "radio", type: "SELECT", category: "selection", labelKey: "templates.fieldTypes.radio", icon: CircleDot, config: () => ({ displayAs: "radio", ...starterOptions() }) },
@@ -115,7 +138,13 @@ export const FIELD_PALETTE: readonly FieldPreset[] = [
   { id: "conformity", type: "CONFORMITY", category: "evaluation", labelKey: "templates.fieldTypes.conformity", icon: CheckCheck, config: () => ({}) },
   { id: "severity", type: "SEVERITY", category: "evaluation", labelKey: "templates.fieldTypes.severity", icon: TriangleAlert, config: () => ({}) },
   { id: "rating", type: "RATING", category: "evaluation", labelKey: "templates.fieldTypes.rating", icon: Star, config: () => ({ style: "stars", max: 5 }) },
+  { id: "riskMatrix", type: "RISK_MATRIX", category: "evaluation", labelKey: "templates.fieldTypes.riskMatrix", icon: Grid3x3, config: () => starterRiskMatrix() },
   { id: "signature", type: "SIGNATURE", category: "evaluation", labelKey: "templates.fieldTypes.signature", icon: PenLine, config: () => ({}) },
+  // --- Referencia (apuntan a una entidad de la plataforma) ---
+  { id: "refEquipment", type: "REFERENCE", category: "reference", labelKey: "templates.fieldTypes.refEquipment", icon: Wrench, config: () => ({ entity: "equipment", display: "dropdown" }) },
+  { id: "refUser", type: "REFERENCE", category: "reference", labelKey: "templates.fieldTypes.refUser", icon: User, config: () => ({ entity: "user", display: "dropdown" }) },
+  { id: "refNode", type: "REFERENCE", category: "reference", labelKey: "templates.fieldTypes.refNode", icon: Network, config: () => ({ entity: "orgNode", display: "dropdown" }) },
+  { id: "refShift", type: "REFERENCE", category: "reference", labelKey: "templates.fieldTypes.refShift", icon: Users, config: () => ({ entity: "shift", display: "dropdown" }) },
   // --- Presentación (no-dato) ---
   { id: "heading", type: "HEADING", category: "presentation", labelKey: "templates.fieldTypes.heading", icon: Heading, config: () => ({ level: 2 }) },
   { id: "staticText", type: "STATIC_TEXT", category: "presentation", labelKey: "templates.fieldTypes.staticText", icon: TextIcon, config: () => ({}) },
@@ -137,17 +166,31 @@ export function fieldDisplayMeta(field: { type: FieldType; config?: Record<strin
 } {
   const cfg = field.config ?? {};
   const byType = FIELD_PALETTE.filter((p) => p.type === field.type);
-  // Distinguir variantes por `format` (TEXT/NUMBER) o `displayAs` (SELECT/MULTISELECT).
+  // Distinguir variantes por `entity` (REFERENCE), `format` (TEXT/NUMBER),
+  // `displayAs` (SELECT/MULTISELECT) o flags numéricos (contador/tolerancia).
   const match =
     byType.find((p) => {
-      const pc = p.config();
+      const pc = p.config() as Record<string, unknown>;
+      if ("entity" in pc) return pc.entity === cfg.entity;
+      if ("counter" in pc) return cfg.counter === true;
+      if ("expected" in pc) return cfg.expected !== undefined && cfg.counter !== true;
       if ("format" in pc) return pc.format === cfg.format;
       if ("displayAs" in pc) return pc.displayAs === (cfg.displayAs ?? "dropdown");
       return false;
     }) ??
     byType.find((p) => {
-      const pc = p.config();
-      return !("format" in pc) && !("displayAs" in pc);
+      const pc = p.config() as Record<string, unknown>;
+      // El preset base (NÚMERO/TEXTO simple) gana solo si el campo no es variante.
+      return (
+        !("entity" in pc) &&
+        !("counter" in pc) &&
+        !("expected" in pc) &&
+        !("format" in pc) &&
+        !("displayAs" in pc) &&
+        cfg.counter !== true &&
+        cfg.expected === undefined &&
+        cfg.format === undefined
+      );
     }) ??
     byType[0];
   return match ?? { labelKey: "templates.fieldTypes.text", icon: Type };
