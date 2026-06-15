@@ -5,7 +5,16 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-14** (**Fase 2.1.6 Builder motor de arrastre con dnd-kit ✅** — `feat/builder-dnd-kit`: el
+> actualización: **2026-06-14** (**Fase 2.1.7 Diseñador visual de formularios ✅ FASE 1** — `feat/builder-visual-designer`:
+> el modelo auto-fila era rígido (no se podía colocar/redimensionar libre). Se contradijo el píxel-absoluto puro (rompe el
+> responsive de terreno) y el dueño aceptó **grilla responsiva de posicionamiento libre** (`react-grid-layout`): geometría
+> EXPLÍCITA `{x,y,w,h}` por campo (columnas `TemplateField.gridX/gridY/gridH` NULLABLE, migración aditiva; `null`=legacy ⇒
+> el editor la deriva del orden+colSpan), arrastrar/redimensionar cualquier campo, snapping, arrastrar desde la paleta.
+> Editor 3 zonas (paleta · lienzo RGL · propiedades) + escritorio/tablet/móvil (preview con el MISMO `FieldGrid` data-driven
+> + container-queries) + cuadrícula. Render único intacto; compat con plantillas viejas. Contracts 195 · API 234 · smoke
+> `smoke-field-geometry.py` 14/14. **Diferido Fase 2/3** (historial, multi-sel, alinear/distribuir, capas, copiar/pegar,
+> atajos, edición por breakpoint, zoom) + limpieza de huérfanos (BuilderFieldCard/FieldToolbar/AddFieldMenu/dnd-kit).
+> Pendiente: smoke VISUAL [§4]. Anterior: **Fase 2.1.6 Builder motor de arrastre con dnd-kit ✅** — `feat/builder-dnd-kit`: el
 > dueño reportó que tras 2.1.5 seguía sin poder mover un campo al lado de otro. Causa: (1) **bug** del DnD nativo (el drag
 > solo arrancaba desde el grip, pero el ícono SVG dejaba el target sin `data-drag-handle` ⇒ casi nunca iniciaba); (2)
 > **techo** del DnD nativo (sin reflow en vivo, fantasma gris). Se adoptó **dnd-kit** (core 6 + sortable 10 + utilities 3;
@@ -123,8 +132,9 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Fase 2.1.4 Builder canvas-first (config en el lienzo)** (lienzo full-width + `AddFieldMenu` popover + config en `Drawer` + control real WYSIWYG + rótulo/sección inline + `FieldToolbar` flotante + `addFieldAt`/`duplicateField`; frontend puro) | `feat/builder-canvas` → `main` | ✅ fusionado y publicado en `origin/main` (`3f3ccbc`/`a654646`) | ninguna |
 | **Fase 2.1.5 Builder auto-layout por arrastre (Notion)** (ancho completo + soltar-al-lado/a-su-línea con ancho auto `splitRow`/`rowRangeOf`/`applyDrop` + divisor de borde `resizeDivider` + quitar menú "12/12" + responsive 1/2/12 + indicadores de soltado; frontend puro) | `feat/builder-autolayout` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Fase 2.1.6 Builder motor de arrastre con dnd-kit (Canva-grade)** (adopta `@dnd-kit/core`6+`sortable`10+`utilities`3; nodo sortable = celda con reflow animado; tarjeta = activador; `DragOverlay` sigue al cursor; intención al-lado/fila por píxeles reusando `applyDrop`/`splitRow`; `SectionDropArea` droppable de sección; arregla el bug del grip-SVG; frontend puro) | `feat/builder-dnd-kit` → `main` | ✅ fusionado y publicado en `origin/main` (`20e236b`) | ninguna |
+| **Fase 2.1.7 Diseñador visual de formularios (lienzo libre)** (geometría `TemplateField.gridX/gridY/gridH` nullable + migración `…_add_field_grid_geometry` + contratos + 3 map sites API; `react-grid-layout` en `SectionCanvas` + `FieldPalette` + `FieldPropertiesPanel`; `FieldGrid` data-driven + container-queries; deriva legacy del orden+colSpan; smoke geometría 14/14) | `feat/builder-visual-designer` → `main` | ⏳ **pendiente de merge+push en esta sesión** | merge a `main` + push |
 
-**Estado:** **nada vive solo en local.** `main` = `origin/main`.
+**Estado:** **nada vive solo en local.** `main` = `origin/main` (salvo `feat/builder-visual-designer`, en publicación al cierre).
 
 **Convención propuesta (a confirmar):** trabajar cada módulo en rama `feat/<modulo>`;
 al cerrar la sesión → push de la rama + merge a `main` + push de `main`. Así `origin/main`
@@ -875,19 +885,18 @@ implementación esperada:
       **Guardar borrador** y **Publicar** (congela versión), editar publicada (clona borrador), borrar (bloqueado si
       en uso); en el **Form Builder**: asignar un flujo publicado, mapear secciones→estados editables, editar el
       **override de rol por campo**; modo claro. App en `:5173`.
-- [ ] **Fase 2.1.x Builder canvas-first + auto-layout + dnd-kit (2.1.2→2.1.6) — smoke VISUAL en navegador** (typecheck/
-      lint/build OK; smoke API 14/14; falta el clic): en el **builder** (`/plantillas/:id`, Diseño ▸ Editor) el **lienzo
-      ocupa TODO el ancho** y cada campo se ve con su **control REAL** (WYSIWYG). **Agregar** con **"＋ Agregar campo"**
-      (barra y fin de sección). **Editar el rótulo EN EL LIENZO** y el **título/descripción de la sección** inline.
-      **ARRASTRE dnd-kit (lo nuevo de 2.1.6):** se agarra el campo en **casi cualquier parte** (no solo el grip); la copia
-      **sigue al cursor** (sin fantasma gris) y los **vecinos se corren con animación**. **Soltar AL LADO** de otro ⇒
-      comparten fila con **ancho repartido solo** (indicador vertical azul); **arriba/abajo** ⇒ **fila propia** ancho
-      completo (indicador horizontal). Probar **arrastrar entre dos campos de la misma fila** (que ambos se redimensionen).
-      Arrastrar **entre secciones**. Verificar que **escribir el rótulo** y el **divisor** del borde NO inician arrastre.
-      **NO** hay menú de "12 columnas". **Divisor:** arrastra el borde derecho de un campo que comparte fila ⇒ transfiere
-      ancho al vecino (← → por teclado). Barra flotante (obligatorio/mover/duplicar/eliminar/**Más opciones**→Drawer).
-      Verificar **lienzo ≈ llenado (`/nueva-entrada/:id`) ≈ visor (`/bitacoras/:id`)**; **responsive: tablet 2 col, móvil
-      1 col** (táctil 44px, terreno); modo claro y oscuro. App en `:5173`.
+- [ ] **Fase 2.1.7 Diseñador visual de formularios (lienzo libre, react-grid-layout) — smoke VISUAL en navegador**
+      (typecheck/lint/build OK; smoke geometría 14/14; falta el clic): en el **builder** (`/plantillas/:id`, Diseño ▸
+      Editor) hay **3 zonas**: PALETA (izq, buscador + categorías), LIENZO (centro), PROPIEDADES (der). **(1)** Arrastra un
+      objeto de la paleta a una **posición** del lienzo (o clic = al final). **(2)** Mueve un campo existente **libremente**.
+      **(3)** Redimensiónalo desde los **handles** (lados/esquina): ancho Y alto, CUALQUIER campo (incluido uno solo en su
+      fila). **(4)** Guarda borrador, **recarga** ⇒ la posición/tamaño se mantienen. Selecciona un campo ⇒ el panel derecho
+      edita rótulo/obligatorio/ancho/alto/posición y **"Opciones avanzadas"** abre el Drawer (umbral/opciones/condicional/
+      fórmula/roles). **Cuadrícula** on/off. **Dispositivo escritorio/tablet/móvil**: en tablet/móvil se ve el **preview
+      responsivo** (sin cortes; móvil 1 col, tablet 2). Verifica **lienzo ≈ llenado (`/nueva-entrada/:id`) ≈ visor
+      (`/bitacoras/:id`)** y que una **plantilla antigua** abre igual que antes (geometría derivada). Modo claro y oscuro.
+      App en `:5173`. **NOTA Fase 2/3 (no esperar aún):** deshacer/rehacer, multi-selección/marquee, alinear/distribuir,
+      capas, copiar/pegar, atajos de teclado, edición por breakpoint.
 - [ ] **Workflow SLA + atrasos — smoke VISUAL en navegador** (se verificó typecheck/lint/build/test + smoke por API
       20/20; falta el clic): en el **builder de flujos** (`/flujos/:id`), por estado el campo **"Tiempo máximo de
       estadía"** (Min/Horas/**Días**, vacío = sin SLA), guardar borrador y publicar (el SLA persiste). En el **diagrama

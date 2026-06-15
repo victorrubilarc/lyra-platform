@@ -1,5 +1,17 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-14 — Fase 2.1.7 Diseñador visual de formularios (lienzo de posicionamiento libre) ✅ FASE 1**
+(`feat/builder-visual-designer` → `main`). El modelo auto-fila (orden + colSpan, ancho derivado) era rígido: no se
+podía colocar un campo donde uno quería ni redimensionar uno libremente. Contradije el píxel-absoluto puro (Figma/Canva)
+porque rompe el responsive de terreno (tablet/celular) — y el dueño aceptó **grilla responsiva de posicionamiento libre**
+(`react-grid-layout`): geometría EXPLÍCITA `{x,y,w,h}` por campo (columnas `TemplateField.gridX/gridY/gridH` NULLABLE,
+migración aditiva; `null`=legacy ⇒ el editor la deriva del orden+colSpan), arrastrar/redimensionar CUALQUIER campo,
+snapping, arrastrar desde la paleta a una posición. Editor a **3 zonas** (paleta · lienzo RGL · propiedades) + selector
+escritorio/tablet/móvil (preview responsivo con el MISMO `FieldGrid`, ahora data-driven + container-queries) + toggle de
+cuadrícula. **Fuente única de render** intacta (editor=llenado=visor). Compat con plantillas viejas. typecheck/lint(0)/
+build verdes; contracts 195 · API 234; **smoke `smoke-field-geometry.py` 14/14**. Diferido Fase 2/3 (historial, multi-sel,
+alinear/distribuir, capas, copiar/pegar, atajos, edición por breakpoint, zoom). Pendiente: smoke VISUAL del dueño.
+
 **2026-06-14 — Fase 2.1.6 Builder: motor de arrastre con dnd-kit (Canva-grade) ✅** (`feat/builder-dnd-kit` → `main`).
 El dueño reportó que tras 2.1.5 seguía sin poder mover un campo al lado de otro. Causa doble: (1) **bug** del DnD nativo
 (el drag solo arrancaba desde el grip, pero el ícono SVG hacía que el target no tuviera `data-drag-handle` ⇒ casi nunca
