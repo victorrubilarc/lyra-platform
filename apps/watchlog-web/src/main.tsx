@@ -1,3 +1,4 @@
+import "./process-shim"; // DEBE ir primero: define `process` para react-grid-layout (ver archivo).
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
