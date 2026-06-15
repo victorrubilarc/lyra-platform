@@ -535,6 +535,12 @@ enum FieldType {
   // discriminado por config.kind → dataType FILE_ARRAY (descriptor[]). El
   // escaneo QR/código NO agrega tipo (es config.scan sobre TEXT). Ver field-types.ts.
   ATTACHMENT
+  // Catálogo de objetos premium — Ola 4 (2026-06-15). Objetos ESTRUCTURADOS /
+  // repetibles: TABLE (tabla/grupo repetible, filas dinámicas → dataType TABLE) y
+  // MATRIX (parámetro×turno, filas/columnas fijas → dataType MATRIX). Las columnas/
+  // ejes son sub-campos escalares en config. Ver field-types.ts.
+  TABLE
+  MATRIX
 }
 
 // Recurrencia (rondas/lecturas programadas). Modelada para no re-migrar; su
@@ -586,6 +592,8 @@ enum FieldDataType {
   LAYOUT // objeto de PRESENTACIÓN: no es dato, el llenado lo ignora (Ola 1)
   RISK // matriz de riesgo: valor estructurado {probability,consequence} (Ola 2)
   FILE_ARRAY // varios objetos almacenados (descriptor[]) — adjuntos (Ola 3)
+  TABLE // tabla/grupo repetible: valor = array de filas Record<colKey, escalar> (Ola 4)
+  MATRIX // matriz parámetro×turno: valor = Record<rowKey, Record<colKey, escalar>> (Ola 4)
 }
 
 // Capa 3 del campo: rol semántico opcional (qué significa para la plataforma).

@@ -51,6 +51,10 @@ export const FIELD_TYPES = [
   "ATTACHMENT", // foto/archivo/nota de voz/croquis, discriminado por config.kind
   // El escaneo QR/código de barras NO es archivo: es config.scan sobre TEXT
   // (decode client-side que rellena el valor), sin storage ni dataType nuevo.
+  // --- Catálogo de objetos premium · Ola 4 (2026-06-15) -------------------
+  // Objetos ESTRUCTURADOS / repetibles (valor = colección de celdas):
+  "TABLE", // tabla/grilla repetible (filas dinámicas) o grupo repetible (layout cards)
+  "MATRIX", // matriz parámetro×turno (filas y columnas fijas, celda uniforme)
 ] as const;
 
 export const fieldTypeSchema = z.enum(FIELD_TYPES);
@@ -119,6 +123,8 @@ export const FIELD_DATA_TYPES = [
   "RANGE", // rango estructurado {from,to} de dos números (Ola 1)
   "LAYOUT", // objeto de PRESENTACIÓN: no es dato, el llenado lo ignora (Ola 1)
   "RISK", // matriz de riesgo: valor estructurado {probability,consequence} (Ola 2)
+  "TABLE", // tabla/grupo repetible: valor = array de filas Record<colKey, escalar> (Ola 4)
+  "MATRIX", // matriz parámetro×turno: valor = Record<rowKey, Record<colKey, escalar>> (Ola 4)
 ] as const;
 export const fieldDataTypeSchema = z.enum(FIELD_DATA_TYPES);
 export type FieldDataType = z.infer<typeof fieldDataTypeSchema>;
@@ -166,6 +172,9 @@ export const FIELD_TYPE_TO_DATA_TYPE: Record<FieldType, FieldDataType> = {
   RISK_MATRIX: "RISK", // {probability, consequence}
   // --- Ola 3 ---
   ATTACHMENT: "FILE_ARRAY", // descriptor[] (multiple=false solo limita a 1)
+  // --- Ola 4 ---
+  TABLE: "TABLE", // Array<Record<colKey, escalar>>
+  MATRIX: "MATRIX", // Record<rowKey, Record<colKey, escalar>>
 };
 
 /** Deriva el `dataType` de un `type` (la presentación define el almacenamiento). */
@@ -796,6 +805,173 @@ export function maxAttachmentCount(config: { multiple?: boolean; maxCount?: numb
   return config.maxCount ?? ATTACHMENT_DEFAULT_MAX_COUNT;
 }
 
+// === Objetos ESTRUCTURADOS / repetibles (Ola 4) =============================
+//
+// TABLE y MATRIX capturan una COLECCIÓN de celdas escalares en un solo campo,
+// reusando la validación por tipo de cada celda (`fieldConfigSchemaFor` /
+// `validateFieldValue`). Las columnas/ejes se definen en `config` (sub-campos
+// escalares) y viajan en la versión INMUTABLE (config jsonb, clonado al publicar,
+// igual que `RISK_MATRIX.cells`). El valor se persiste en `LogEntryValue.value`:
+//   - TABLE  → `Array<Record<colKey, escalar>>` (filas dinámicas que el operador
+//              agrega/quita/reordena; layout `table` = grilla, `cards` = bloque
+//              repetible "agregar otro hallazgo").
+//   - MATRIX → `Record<rowKey, Record<colKey, escalar>>` (filas=parámetros y
+//              columnas=turnos/intervalos FIJAS y configuradas; celda uniforme).
+// MVP (forks 2026-06-15): sub-tipos de celda = SOLO escalares; columnas de matriz
+// configuradas (sin ShiftResolver); SELECT de celda = opciones INLINE (sin ABAC
+// por celda); sin agregados (total/promedio diferidos). Patrón de industria: SAP
+// measurement documents/characteristics, IBM Maximo Multi-record/Asset Meter,
+// ServiceNow MultiRow Variable Set, j5 tabular logs, EBR repeating sections.
+
+/** Sub-tipos ESCALARES permitidos dentro de una celda/columna (MVP Ola 4). */
+export const STRUCTURED_CELL_TYPES = [
+  "TEXT",
+  "TEXTAREA",
+  "NUMBER",
+  "SELECT",
+  "BOOLEAN",
+  "DATE",
+  "TIME",
+  "DURATION",
+  "CONFORMITY",
+  "RATING",
+] as const satisfies readonly FieldType[];
+export type StructuredCellType = (typeof STRUCTURED_CELL_TYPES)[number];
+export const structuredCellTypeSchema = z.enum(STRUCTURED_CELL_TYPES);
+
+/** Layout de un TABLE: `table` = grilla de filas; `cards` = bloque repetible vertical. */
+export const TABLE_LAYOUTS = ["table", "cards"] as const;
+export type TableLayout = (typeof TABLE_LAYOUTS)[number];
+
+export const TABLE_MAX_COLUMNS = 12;
+export const TABLE_ROWS_CAP = 200; // tope duro de filas (anti-abuso); el operador no llega aquí
+export const MATRIX_MAX_ROWS = 50; // parámetros
+export const MATRIX_MAX_COLUMNS = 24; // turnos/intervalos
+
+/** Clave estable de columna/eje (identificador, no se muestra). */
+const cellKeySchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(64)
+  .regex(/^[a-zA-Z][a-zA-Z0-9_]*$/, "clave inválida (letra inicial, alfanumérico/_)");
+
+/**
+ * Una COLUMNA de TABLE = sub-campo escalar. `config` se valida contra el esquema
+ * del tipo de la columna (`fieldConfigSchemaFor`), igual que un campo normal; así
+ * un NUMBER de columna trae unidad/min/max/umbral y un SELECT su `optionSource`.
+ */
+export const tableColumnSchema = z
+  .object({
+    key: cellKeySchema,
+    label: z.string().trim().min(1).max(120),
+    type: structuredCellTypeSchema,
+    required: z.boolean().optional(),
+    config: z.record(z.unknown()).optional(),
+  })
+  .strict()
+  .superRefine((col, ctx) => {
+    const r = fieldConfigSchemaFor(col.type).safeParse(col.config ?? {});
+    if (!r.success) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Configuración inválida para la columna "${col.key}"`,
+        path: ["config"],
+      });
+    }
+  });
+export type TableColumn = z.infer<typeof tableColumnSchema>;
+
+/** TABLE — tabla/grupo repetible. Columnas = sub-campos escalares; filas dinámicas. */
+export const tableFieldConfigSchema = z
+  .object({
+    layout: z.enum(TABLE_LAYOUTS).optional(), // default "table"
+    columns: z.array(tableColumnSchema).min(1).max(TABLE_MAX_COLUMNS),
+    /** Mínimo de filas COMPLETAS exigidas cuando el campo es obligatorio (default 1). */
+    minRows: z.number().int().min(0).max(TABLE_ROWS_CAP).optional(),
+    /** Máximo de filas permitidas. */
+    maxRows: z.number().int().min(1).max(TABLE_ROWS_CAP).optional(),
+    /** Rótulo del botón "agregar fila" (default "Agregar fila"). */
+    addRowLabel: z.string().trim().max(60).optional(),
+  })
+  .strict()
+  .superRefine((c, ctx) => {
+    const seen = new Set<string>();
+    c.columns.forEach((col, i) => {
+      if (seen.has(col.key)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: `Clave de columna duplicada: ${col.key}`, path: ["columns", i, "key"] });
+      }
+      seen.add(col.key);
+    });
+    if (c.minRows !== undefined && c.maxRows !== undefined && c.minRows > c.maxRows) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "minRows no puede superar maxRows", path: ["minRows"] });
+    }
+  });
+export type TableFieldConfig = z.infer<typeof tableFieldConfigSchema>;
+
+/** Un eje (fila o columna) de MATRIX: clave estable + rótulo visible. */
+export const matrixAxisItemSchema = z
+  .object({
+    key: cellKeySchema,
+    label: z.string().trim().min(1).max(120),
+  })
+  .strict();
+export type MatrixAxisItem = z.infer<typeof matrixAxisItemSchema>;
+
+/**
+ * MATRIX — parámetro×turno. Filas (parámetros) y columnas (turnos/intervalos) son
+ * FIJAS y configuradas; cada celda es del MISMO sub-tipo escalar (`cell`). El valor
+ * es `Record<rowKey, Record<colKey, escalar>>`. Cabeceras read-only.
+ */
+export const matrixFieldConfigSchema = z
+  .object({
+    rows: z.array(matrixAxisItemSchema).min(1).max(MATRIX_MAX_ROWS),
+    columns: z.array(matrixAxisItemSchema).min(1).max(MATRIX_MAX_COLUMNS),
+    cell: z
+      .object({
+        type: structuredCellTypeSchema,
+        config: z.record(z.unknown()).optional(),
+      })
+      .strict(),
+    /** Rótulo de la cabecera de la columna de parámetros (default "Parámetro"). */
+    rowHeaderLabel: z.string().trim().max(60).optional(),
+  })
+  .strict()
+  .superRefine((c, ctx) => {
+    const seenR = new Set<string>();
+    c.rows.forEach((r, i) => {
+      if (seenR.has(r.key)) ctx.addIssue({ code: z.ZodIssueCode.custom, message: `Clave de fila duplicada: ${r.key}`, path: ["rows", i, "key"] });
+      seenR.add(r.key);
+    });
+    const seenC = new Set<string>();
+    c.columns.forEach((col, i) => {
+      if (seenC.has(col.key)) ctx.addIssue({ code: z.ZodIssueCode.custom, message: `Clave de columna duplicada: ${col.key}`, path: ["columns", i, "key"] });
+      seenC.add(col.key);
+    });
+    const r = fieldConfigSchemaFor(c.cell.type).safeParse(c.cell.config ?? {});
+    if (!r.success) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Configuración de celda inválida", path: ["cell", "config"] });
+  });
+export type MatrixFieldConfig = z.infer<typeof matrixFieldConfigSchema>;
+
+/** Layout EFECTIVO de un TABLE (default `table`). */
+export function tableLayoutOf(config: Record<string, unknown>): TableLayout {
+  return (config as { layout?: TableLayout }).layout === "cards" ? "cards" : "table";
+}
+
+/** Codes inline de una columna/celda SELECT (única fuente de catálogo permitida en celda, MVP). */
+export function inlineCellCodes(config: Record<string, unknown> | undefined): Set<string> | undefined {
+  const src = (config ?? {}) as { optionSource?: { kind?: string; items?: { code?: unknown }[] } };
+  if (src.optionSource?.kind === "inline" && Array.isArray(src.optionSource.items)) {
+    return new Set(src.optionSource.items.map((i) => String(i.code)));
+  }
+  return undefined;
+}
+
+/** Vista de una columna como campo para reusar `validateFieldValue` por celda. */
+export function columnAsField(col: { key: string; label: string; type: StructuredCellType; config?: Record<string, unknown> }) {
+  return { key: col.key, type: col.type as FieldType, dataType: deriveDataType(col.type), label: col.label, config: col.config ?? {} };
+}
+
 // --- Objetos de PRESENTACIÓN (dataType LAYOUT; el llenado los ignora) --------
 
 /** HEADING — nivel jerárquico del encabezado (1..3). El texto va en `label`. */
@@ -920,6 +1096,11 @@ export function fieldConfigSchemaFor(type: FieldType): z.ZodTypeAny {
     // --- Ola 3 ---
     case "ATTACHMENT":
       return attachmentFieldConfigSchema;
+    // --- Ola 4 ---
+    case "TABLE":
+      return tableFieldConfigSchema;
+    case "MATRIX":
+      return matrixFieldConfigSchema;
   }
 }
 

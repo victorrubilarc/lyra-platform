@@ -26,10 +26,14 @@ import {
   submitLogEntryRequestSchema,
   thresholdBandFor,
   validateFieldValue,
+  countCompleteTableRows,
+  isEmptyMatrixValue,
+  requiredFieldError,
+  tableRowIsEmpty,
   type FieldForValidation,
   type TransitionForAvailability,
 } from "./log-entries.js";
-import { deriveToleranceBands, riskLevelFor } from "../templates/field-types.js";
+import { deriveToleranceBands, riskLevelFor, fieldConfigSchemaFor } from "../templates/field-types.js";
 
 const numberField = (config: Record<string, unknown> = {}): FieldForValidation => ({
   key: "temp",
@@ -789,5 +793,96 @@ describe("ventana de edición (2.7.2)", () => {
     expect(setDeferralRequestSchema.safeParse({ deferred: null, overrideReason: "Ajuste tardío" }).success).toBe(true);
     expect(submitLogEntryRequestSchema.safeParse({ overrideReason: "Cierre tardío del turno" }).success).toBe(true);
     expect(submitLogEntryRequestSchema.safeParse({ overrideReason: "no" }).success).toBe(false);
+  });
+});
+
+describe("validateFieldValue — objetos Ola 4 (estructurados)", () => {
+  const tableField = (config: Record<string, unknown>, value: unknown) =>
+    validateFieldValue({ key: "t", type: "TABLE", dataType: "TABLE", label: "Lecturas", config }, value);
+
+  const tableConfig = {
+    columns: [
+      { key: "hora", label: "Hora", type: "TIME", required: true },
+      { key: "temp", label: "Temp", type: "NUMBER", required: true, config: { min: 0, max: 100, warnHigh: 80 } },
+      {
+        key: "estado",
+        label: "Estado",
+        type: "SELECT",
+        config: { optionSource: { kind: "inline", items: [{ code: "OK", label: "OK" }, { code: "MAL", label: "Mal" }] } },
+      },
+    ],
+    maxRows: 3,
+  };
+
+  it("acepta la config de TABLE/MATRIX en fieldConfigSchemaFor", () => {
+    expect(fieldConfigSchemaFor("TABLE").safeParse(tableConfig).success).toBe(true);
+    expect(fieldConfigSchemaFor("TABLE").safeParse({ columns: [] }).success).toBe(false); // ≥1 columna
+    expect(
+      fieldConfigSchemaFor("TABLE").safeParse({ columns: [{ key: "a", label: "A", type: "ATTACHMENT" }] }).success,
+    ).toBe(false); // tipo de celda no escalar
+    expect(
+      fieldConfigSchemaFor("TABLE").safeParse({
+        columns: [{ key: "n", label: "N", type: "NUMBER", config: { min: 5, max: 1 } }],
+      }).success,
+    ).toBe(false); // config de columna inválida (min>max)
+  });
+
+  it("TABLE: valida por celda y rechaza tipo/rango/catálogo", () => {
+    expect(tableField(tableConfig, [{ hora: "08:00", temp: 50, estado: "OK" }]).errors).toHaveLength(0);
+    expect(tableField(tableConfig, "no-array").errors).toHaveLength(1);
+    expect(tableField(tableConfig, [{ hora: "25:00", temp: 50 }]).errors.length).toBeGreaterThan(0); // hora inválida
+    expect(tableField(tableConfig, [{ hora: "08:00", temp: 250 }]).errors.length).toBeGreaterThan(0); // fuera de rango
+    expect(tableField(tableConfig, [{ hora: "08:00", temp: 50, estado: "XX" }]).errors.length).toBeGreaterThan(0); // fuera de catálogo
+  });
+
+  it("TABLE: fila vacía se ignora; advertencia de umbral por celda; maxRows", () => {
+    expect(tableField(tableConfig, [{ hora: "", temp: "", estado: "" }]).errors).toHaveLength(0); // placeholder
+    expect(tableField(tableConfig, [{ hora: "08:00", temp: 90 }]).warnings.length).toBeGreaterThan(0); // 90 > warnHigh 80
+    expect(tableField(tableConfig, [{ hora: "1:00" }, {}, {}, {}]).errors.some((e) => e.includes("máximo"))).toBe(true);
+  });
+
+  it("TABLE: columna required vacía en fila NO vacía es error", () => {
+    expect(tableField(tableConfig, [{ temp: 50 }]).errors.some((e) => e.includes("Hora"))).toBe(true);
+  });
+
+  it("countCompleteTableRows + requiredFieldError(TABLE)", () => {
+    const f: FieldForValidation = { key: "t", type: "TABLE", dataType: "TABLE", label: "Lecturas", config: tableConfig };
+    expect(countCompleteTableRows(tableConfig, [{ hora: "08:00", temp: 50 }, {}])).toBe(1);
+    expect(countCompleteTableRows(tableConfig, [{ temp: 50 }])).toBe(0); // falta hora (required)
+    expect(requiredFieldError(f, [])).not.toBeNull();
+    expect(requiredFieldError(f, [{ hora: "08:00", temp: 50 }])).toBeNull();
+    const f2: FieldForValidation = { ...f, config: { ...tableConfig, minRows: 2 } };
+    expect(requiredFieldError(f2, [{ hora: "08:00", temp: 50 }])).not.toBeNull(); // exige 2
+  });
+
+  it("tableRowIsEmpty", () => {
+    const cols = [{ key: "a" }, { key: "b" }];
+    expect(tableRowIsEmpty({ a: "", b: null }, cols)).toBe(true);
+    expect(tableRowIsEmpty({ a: 0, b: null }, cols)).toBe(false); // 0 cuenta
+  });
+
+  const matrixConfig = {
+    rows: [{ key: "p1", label: "Presión" }, { key: "p2", label: "Caudal" }],
+    columns: [{ key: "t1", label: "Turno A" }, { key: "t2", label: "Turno B" }],
+    cell: { type: "NUMBER", config: { min: 0, max: 10 } },
+  };
+  const matrixField = (value: unknown) =>
+    validateFieldValue({ key: "m", type: "MATRIX", dataType: "MATRIX", label: "Lecturas", config: matrixConfig }, value);
+
+  it("MATRIX: valida por celda; celda vacía permitida; fuera de rango falla", () => {
+    expect(fieldConfigSchemaFor("MATRIX").safeParse(matrixConfig).success).toBe(true);
+    expect(matrixField({ p1: { t1: 5, t2: 6 }, p2: { t1: 1 } }).errors).toHaveLength(0);
+    expect(matrixField({ p1: { t1: 99 } }).errors.length).toBeGreaterThan(0); // > max
+    expect(matrixField("no-obj").errors).toHaveLength(1);
+    expect(matrixField({ p1: {} }).errors).toHaveLength(0); // parcial
+  });
+
+  it("isEmptyMatrixValue + requiredFieldError(MATRIX)", () => {
+    const f: FieldForValidation = { key: "m", type: "MATRIX", dataType: "MATRIX", label: "Lecturas", config: matrixConfig };
+    expect(isEmptyMatrixValue({})).toBe(true);
+    expect(isEmptyMatrixValue({ p1: { t1: null } })).toBe(true);
+    expect(isEmptyMatrixValue({ p1: { t1: 5 } })).toBe(false);
+    expect(requiredFieldError(f, {})).not.toBeNull();
+    expect(requiredFieldError(f, { p1: { t1: 5 } })).toBeNull();
   });
 });
