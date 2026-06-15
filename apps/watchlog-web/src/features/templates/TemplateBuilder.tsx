@@ -572,6 +572,7 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
                                   showGrid={showGrid}
                                   selectedFUid={selected?.s === s.uid ? selected.f ?? null : null}
                                   onSelectField={(fUid) => setSelected({ s: s.uid, f: fUid })}
+                                  onLabel={(fUid, label) => updateField(s.uid, fUid, { label })}
                                   onGeometryChange={(geom) => updateFieldGeometry(s.uid, geom)}
                                   onDropNew={(type, x, y) => addFieldAtGeom(type, s.uid, x, y)}
                                 />
