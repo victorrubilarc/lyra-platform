@@ -67,6 +67,42 @@ function numberState(config: Record<string, unknown>, value: unknown): "ok" | "w
 }
 
 /**
+ * Contador de caracteres + pista de mín/máx para TEXT/TEXTAREA. Discreto (no invade
+ * el formulario): una línea pequeña y atenuada bajo el control, alineada a la
+ * derecha. Solo aparece si el campo define `minLength` y/o `maxLength`. Vira a ámbar
+ * cuando aún no llega al mínimo (con texto ya escrito) y a rojo cuando excede el máximo.
+ */
+function CharCounter({
+  config,
+  value,
+  t,
+}: {
+  config: Record<string, unknown>;
+  value: unknown;
+  t: (k: string, opts?: Record<string, unknown>) => string;
+}) {
+  const c = config as { minLength?: number; maxLength?: number };
+  const min = typeof c.minLength === "number" ? c.minLength : undefined;
+  const max = typeof c.maxLength === "number" ? c.maxLength : undefined;
+  if (min === undefined && max === undefined) return null;
+  const len = typeof value === "string" ? value.length : 0;
+  const over = max !== undefined && len > max;
+  const under = min !== undefined && len > 0 && len < min;
+  return (
+    <div className={styles.charCounter} data-over={over || undefined} data-under={under || undefined}>
+      <span>{min !== undefined && len < min ? t("templates.builder.charMin", { n: min }) : null}</span>
+      <span>
+        {max !== undefined
+          ? over
+            ? t("templates.builder.charOver", { n: len - max })
+            : t("templates.builder.charRemaining", { n: max - len })
+          : null}
+      </span>
+    </div>
+  );
+}
+
+/**
  * Control de un campo, FUENTE ÚNICA de render del Form Builder (vista previa) y
  * del llenado de bitácoras (Fase 2.4). En modo `readOnly` muestra el valor
  * formateado (resolviendo code→label para selectores); de lo contrario, el
@@ -201,16 +237,29 @@ export function FieldControl({
       // usuario siempre puede teclear el valor manualmente (degradación elegante).
       if (scan) {
         return wrap(
-          <div className={styles.scanRow}>
-            {input}
-            <QrScanButton onResult={(text) => onChange(text)} />
-          </div>,
+          <>
+            <div className={styles.scanRow}>
+              {input}
+              <QrScanButton onResult={(text) => onChange(text)} />
+            </div>
+            {!bare && <CharCounter config={field.config} value={value} t={t} />}
+          </>,
         );
       }
-      return wrap(input);
+      return wrap(
+        <>
+          {input}
+          {!bare && <CharCounter config={field.config} value={value} t={t} />}
+        </>,
+      );
     }
     case "TEXTAREA":
-      return wrap(<Textarea value={(value as string) ?? ""} onChange={(e) => onChange(e.target.value)} invalid={invalid} />);
+      return wrap(
+        <>
+          <Textarea value={(value as string) ?? ""} onChange={(e) => onChange(e.target.value)} invalid={invalid} />
+          {!bare && <CharCounter config={field.config} value={value} t={t} />}
+        </>,
+      );
     case "NUMBER": {
       const st = numberState(field.config, value);
       const c = field.config as Record<string, string | number | boolean | undefined>;

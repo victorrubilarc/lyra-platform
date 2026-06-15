@@ -1,3 +1,10 @@
+/* Footer del drawer de configuración avanzada: acciones Cancelar/Aceptar a la derecha. */
+.drawerFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .page {
   display: flex;
   flex-direction: column;
@@ -706,6 +713,56 @@
 .cardGrip:active {
   cursor: grabbing;
 }
+
+/* Panel de HOVER del lienzo: tipo de objeto + datos configurados. Se revela al pasar
+   por encima de una card NO seleccionada (la seleccionada muestra todo en Propiedades).
+   pointer-events:none ⇒ el clic/arrastre atraviesa al de la card. */
+.cardInfo {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  z-index: 6;
+  display: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 9px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-active);
+  background: var(--color-surface-2, #111827);
+  box-shadow: 0 10px 24px -14px rgba(6, 6, 26, 0.7);
+  pointer-events: none;
+}
+/* En el lienzo: se revela al pasar el cursor sobre una card NO seleccionada
+   (la seleccionada ya muestra todo en el panel de Propiedades). */
+.canvasCell:not(.canvasCellSelected):hover .cardInfo {
+  display: flex;
+}
+.cardInfoType {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+.cardInfoChips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.cardInfoChip {
+  font-size: 10.5px;
+  line-height: 1.5;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--color-surface-1, rgba(255, 255, 255, 0.05));
+  border: 1px solid var(--color-border-subtle);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
 /* Barra flotante contextual (arriba a la derecha de la card activa). */
 .fieldToolbar {
   position: absolute;
@@ -2191,6 +2248,28 @@
   color: var(--color-success, #22c55e);
 }
 .counterDelta strong[data-neg="true"] {
+  color: var(--color-error, #ef4444);
+}
+
+/* Contador de caracteres (TEXT/TEXTAREA): discreto, una línea bajo el control.
+   Izquierda = pista de mínimo; derecha = caracteres restantes. No invade el form. */
+.charCounter {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 4px;
+  font-size: 11.5px;
+  line-height: 1.3;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.charCounter > span:last-child {
+  margin-left: auto;
+}
+.charCounter[data-under="true"] {
+  color: var(--color-warning, #f59e0b);
+}
+.charCounter[data-over="true"] {
   color: var(--color-error, #ef4444);
 }
 

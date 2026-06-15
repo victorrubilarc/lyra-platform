@@ -84,26 +84,35 @@ previa es exactamente lo que verá el operador**. No hay tres pantallas que se d
 ### Texto  *(paleta: «Texto»)*
 - **• Qué es.** Una línea de texto corto.
 - **• Para qué sirve.** *Planta:* anotar el N.º de OT (orden de trabajo) o un código de lote.
-- **• Cómo se ve / se usa.** Casilla de una línea; el operador escribe.
-- **• Cómo se configura.** Texto de ayuda (placeholder), largo mínimo/máximo, **patrón** (una
-  expresión regular para exigir un formato), y opcionalmente un **formato semántico** (RUT,
-  correo, teléfono, URL — esos tienen ficha propia más abajo).
+- **• Cómo se ve / se usa.** Casilla de una línea; el operador escribe. Si el diseñador puso
+  mín./máx. de caracteres, aparece un **contador discreto** bajo la casilla ("Quedan 188"), que
+  vira a **ámbar** si aún no llega al mínimo y a **rojo** si se pasa del máximo. Es una línea
+  pequeña y atenuada, alineada a la derecha: **no invade** el formulario.
+- **• Cómo se configura.** Texto de ayuda (placeholder), **Mín. caracteres** y **Máx.
+  caracteres** (ambos en el panel del builder), **patrón** (una expresión regular para exigir un
+  formato), y opcionalmente un **formato semántico** (RUT, correo, teléfono, URL — esos tienen
+  ficha propia más abajo). El diseño rechaza poner un mínimo mayor que el máximo.
 - **• Qué valida.** Con `minLength=3, maxLength=10`: ✅ `OT-7788` · ❌ `AB` ("mínimo 3
   caracteres") · ❌ 11+ caracteres ("máximo 10 caracteres"). Si hay patrón y no calza →
   "formato inválido".
-- **• Ejemplo.** Campo "N.º OT", min 3 / max 12 → operador escribe `OT-2026-014` → válido.
+- **• Ejemplo.** Campo "N.º OT", min 3 / max 12 → el operador escribe `OT-` y ve "Quedan 9";
+  al escribir `OT-2026-014` el contador llega a "Quedan 1" y el dato es válido.
 - **• A futuro.** (1) Máscaras de entrada visuales; (2) autocompletar desde catálogos;
   (3) sugerencia/normalización a mayúsculas.
 
 ### Área de texto  *(paleta: «Área de texto»)*
 - **• Qué es.** Texto largo de varias líneas.
 - **• Para qué sirve.** *Planta:* describir una observación de ronda o un evento del turno.
-- **• Cómo se ve / se usa.** Caja multilínea; el operador redacta.
-- **• Cómo se configura.** Placeholder, **alto** (filas 2–20), largo máximo (hasta 20.000).
-- **• Qué valida.** ✅ texto dentro del máximo · ❌ pasar el máximo ("máximo N caracteres").
-- **• Ejemplo.** "Observaciones del turno", 5 filas, máx 2.000 → relato del operador.
-- **• A futuro.** (1) Conteo de caracteres en vivo; (2) plantillas de texto;
-  (3) resumen con IA del relato.
+- **• Cómo se ve / se usa.** Caja multilínea; el operador redacta. Igual que el Texto corto,
+  muestra el **contador discreto** de caracteres ("Quedan N", ámbar bajo el mínimo, rojo sobre
+  el máximo) cuando hay mín./máx. configurados.
+- **• Cómo se configura.** Placeholder, **alto** (filas 2–20), **Mín. caracteres** y **Máx.
+  caracteres** (hasta 20.000). El diseño rechaza un mínimo mayor que el máximo.
+- **• Qué valida.** Con `minLength=20, maxLength=2000`: ✅ texto entre 20 y 2.000 · ❌ menos de
+  20 ("mínimo 20 caracteres") · ❌ pasar el máximo ("máximo 2000 caracteres").
+- **• Ejemplo.** "Observaciones del turno", 5 filas, mín 20 / máx 2.000 → relato del operador
+  con el contador guiándolo.
+- **• A futuro.** (1) Plantillas de texto; (2) formato enriquecido; (3) resumen con IA del relato.
 
 ### Número  *(paleta: «Número»)*  — objeto bandera
 - **• Qué es.** Una casilla para un número, con unidad y "luces de alerta" opcionales.
@@ -584,6 +593,11 @@ previa es exactamente lo que verá el operador**. No hay tres pantallas que se d
   al lado de otro, etc. Hay vista previa de **escritorio/tablet/móvil**.
 - **Importante (terreno).** En **celular la grilla colapsa a 1 columna** (legibilidad con
   guantes). Lo viejo sin geometría se deriva del orden y se conserva.
+- **Ayuda al diseñar.** Al **pasar el cursor** por encima de un campo del lienzo (sin
+  seleccionarlo) aparece un panel con **qué objeto es** (ícono + nombre del preset, p. ej.
+  "RUT", "Lista desplegable") y **chips con los datos configurados** más útiles (obligatorio,
+  calculado, condicional, unidad, rango mín/máx, umbrales, formato, límite de caracteres,
+  n.º de opciones/columnas, etc.) — así se reconoce un campo sin tener que pincharlo.
 - **A futuro.** Edición por breakpoint, alinear/distribuir, copiar/pegar, deshacer/rehacer.
 
 ### 3.2 Obligatoriedad — qué cuenta como "vacío"

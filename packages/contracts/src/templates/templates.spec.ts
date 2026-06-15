@@ -39,6 +39,13 @@ describe("config de campos por tipo", () => {
     expect(r.success).toBe(false);
   });
 
+  it("acepta min/max de caracteres en TEXT y TEXTAREA, y rechaza min > max", () => {
+    expect(fieldConfigSchemaFor("TEXT").safeParse({ minLength: 3, maxLength: 10 }).success).toBe(true);
+    expect(fieldConfigSchemaFor("TEXTAREA").safeParse({ minLength: 20, maxLength: 2000 }).success).toBe(true);
+    expect(fieldConfigSchemaFor("TEXT").safeParse({ minLength: 10, maxLength: 5 }).success).toBe(false);
+    expect(fieldConfigSchemaFor("TEXTAREA").safeParse({ minLength: 10, maxLength: 5 }).success).toBe(false);
+  });
+
   it("valida la config contra el tipo en el input del campo", () => {
     const ok = draftFieldInputSchema.safeParse({
       key: "temp",

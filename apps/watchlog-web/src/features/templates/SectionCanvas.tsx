@@ -1,7 +1,88 @@
 import { useEffect, useRef, useState, type CSSProperties, type DragEvent as RDE, type PointerEvent as RPE } from "react";
+import { useTranslation } from "react-i18next";
 import { FieldControl } from "./FieldControl.js";
-import { type EditField } from "./builder-model.js";
+import { type EditField, fieldDisplayMeta } from "./builder-model.js";
 import styles from "./TemplateBuilder.module.css";
+
+/** Claves i18n del rótulo de formato de un TEXT (para los chips del panel de hover). */
+const TEXT_FORMAT_LABEL_KEY: Record<string, string> = {
+  rut: "templates.builder.textFormatRut",
+  email: "templates.builder.textFormatEmail",
+  phone: "templates.builder.textFormatPhone",
+  url: "templates.builder.textFormatUrl",
+};
+
+/**
+ * "Datos interesantes" CONFIGURADOS en el campo, como chips cortos para el panel de
+ * hover del lienzo (ver qué es y cómo está configurado sin pincharlo). El TIPO ya lo
+ * muestra la cabecera (`fieldDisplayMeta`), así que aquí NO se repite lo que el nombre
+ * del preset implica (entidad/kind/displayAs): solo lo que cambia el comportamiento.
+ */
+function fieldInfoChips(field: EditField, t: (k: string, opts?: Record<string, unknown>) => string): string[] {
+  const c = (field.config ?? {}) as Record<string, unknown>;
+  const num = (v: unknown) => (typeof v === "number" ? v : undefined);
+  const chips: string[] = [];
+  if (field.required && !field.computed) chips.push(t("templates.builder.fieldInfo.required"));
+  if (field.computed) chips.push(t("templates.builder.fieldInfo.computed"));
+  if (field.visibleWhen) chips.push(t("templates.builder.fieldInfo.conditional"));
+
+  switch (field.type) {
+    case "NUMBER": {
+      if (c.format === "percent") chips.push("%");
+      else if (c.format === "currency") chips.push(String(c.currency ?? "CLP"));
+      else if (typeof c.unit === "string" && c.unit) chips.push(c.unit);
+      if (typeof c.expected === "number") {
+        chips.push(`${t("templates.builder.fieldInfo.target")} ${c.expected}${typeof c.tolerance === "number" ? ` ± ${c.tolerance}` : ""}`);
+      }
+      if (c.counter === true) chips.push(t("templates.builder.fieldInfo.counter"));
+      const lo = num(c.min);
+      const hi = num(c.max);
+      if (lo !== undefined || hi !== undefined) chips.push(`${lo ?? "−∞"}…${hi ?? "∞"}`);
+      if (typeof c.decimals === "number") chips.push(t("templates.builder.fieldInfo.decimals", { n: c.decimals }));
+      if (["warnLow", "warnHigh", "critLow", "critHigh"].some((k) => typeof c[k] === "number")) {
+        chips.push(t("templates.builder.fieldInfo.thresholds"));
+      }
+      break;
+    }
+    case "TEXT":
+    case "TEXTAREA": {
+      if (typeof c.format === "string" && TEXT_FORMAT_LABEL_KEY[c.format]) chips.push(t(TEXT_FORMAT_LABEL_KEY[c.format]!));
+      const lo = num(c.minLength);
+      const hi = num(c.maxLength);
+      if (lo !== undefined || hi !== undefined) chips.push(t("templates.builder.fieldInfo.chars", { range: `${lo ?? 0}–${hi ?? "∞"}` }));
+      if (c.scan === true) chips.push(t("templates.builder.fieldInfo.scan"));
+      break;
+    }
+    case "SELECT":
+    case "MULTISELECT": {
+      const src = c.optionSource as { kind?: string; items?: unknown[] } | undefined;
+      if (src?.kind === "inline" && Array.isArray(src.items)) chips.push(t("templates.builder.fieldInfo.options", { n: src.items.length }));
+      else if (src?.kind === "referenceList") chips.push(t("templates.builder.fieldInfo.refList"));
+      break;
+    }
+    case "RATING": {
+      chips.push(`1–${num(c.max) ?? 5}`);
+      break;
+    }
+    case "ATTACHMENT": {
+      if (c.multiple === true) chips.push(t("templates.builder.fieldInfo.multiple"));
+      break;
+    }
+    case "TABLE": {
+      chips.push(t("templates.builder.fieldInfo.columns", { n: Array.isArray(c.columns) ? c.columns.length : 0 }));
+      break;
+    }
+    case "MATRIX": {
+      chips.push(`${Array.isArray(c.rows) ? c.rows.length : 0}×${Array.isArray(c.columns) ? c.columns.length : 0}`);
+      break;
+    }
+    case "RISK_MATRIX": {
+      chips.push(`${Array.isArray(c.probabilityLabels) ? c.probabilityLabels.length : 0}×${Array.isArray(c.consequenceLabels) ? c.consequenceLabels.length : 0}`);
+      break;
+    }
+  }
+  return chips;
+}
 
 /**
  * Lienzo de POSICIONAMIENTO LIBRE de una sección (Fase 2.1.7) — motor PROPIO con
@@ -74,6 +155,7 @@ export function SectionCanvas({
   onGeometryChange,
   onDropNew,
 }: SectionCanvasProps) {
+  const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
   const fieldsRef = useRef(fields);
   fieldsRef.current = fields;
@@ -207,6 +289,9 @@ export function SectionCanvas({
         const g = geomOf(f);
         const sel = selectedFUid === f.uid;
         const dragging = active?.uid === f.uid;
+        const meta = fieldDisplayMeta(f);
+        const MetaIcon = meta.icon;
+        const infoChips = fieldInfoChips(f, t);
         return (
           <div
             key={f.uid}
@@ -232,6 +317,22 @@ export function SectionCanvas({
               <div className={styles.canvasItemControl} aria-hidden>
                 <FieldControl field={f} value={undefined} onChange={() => undefined} />
               </div>
+            </div>
+
+            {/* Hover: qué objeto es + datos configurados (se revela en cards NO seleccionadas, vía CSS). */}
+            <div className={styles.cardInfo} aria-hidden>
+              <span className={styles.cardInfoType}>
+                <MetaIcon size={12} /> {t(meta.labelKey)}
+              </span>
+              {infoChips.length > 0 && (
+                <span className={styles.cardInfoChips}>
+                  {infoChips.map((ch, i) => (
+                    <span key={i} className={styles.cardInfoChip}>
+                      {ch}
+                    </span>
+                  ))}
+                </span>
+              )}
             </div>
 
             {canEdit && (

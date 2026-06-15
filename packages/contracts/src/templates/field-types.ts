@@ -487,16 +487,28 @@ export const textFieldConfigSchema = z
      */
     scan: z.boolean().optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((c, ctx) => {
+    if (c.minLength !== undefined && c.maxLength !== undefined && c.minLength > c.maxLength) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El mínimo de caracteres no puede superar al máximo", path: ["minLength"] });
+    }
+  });
 export type TextFieldConfig = z.infer<typeof textFieldConfigSchema>;
 
 export const textareaFieldConfigSchema = z
   .object({
     placeholder: z.string().trim().max(160).optional(),
     rows: z.number().int().min(2).max(20).optional(),
+    /** Mínimo de caracteres (validado por `validateFieldValue`, igual que TEXT). */
+    minLength: z.number().int().min(0).max(20000).optional(),
     maxLength: z.number().int().min(1).max(20000).optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((c, ctx) => {
+    if (c.minLength !== undefined && c.maxLength !== undefined && c.minLength > c.maxLength) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El mínimo de caracteres no puede superar al máximo", path: ["minLength"] });
+    }
+  });
 export type TextareaFieldConfig = z.infer<typeof textareaFieldConfigSchema>;
 
 /**

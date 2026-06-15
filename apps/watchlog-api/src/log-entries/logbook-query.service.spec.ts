@@ -159,8 +159,15 @@ function makeServices(prismaOver: Record<string, unknown> = {}, scopeOver: Parti
       .fn()
       .mockResolvedValue({ editWindowAnchor: "RECORDED", editWindowMinutes: null, requireMfaEditWindowOverride: false }),
   } as unknown as import("../settings/settings.service").SettingsService;
+  const storage = {
+    putObject: vi.fn().mockResolvedValue(undefined),
+    statObject: vi.fn().mockResolvedValue(null),
+    removeObject: vi.fn().mockResolvedValue(undefined),
+    removePrefix: vi.fn().mockResolvedValue(undefined),
+    presignedGetUrl: vi.fn().mockResolvedValue("https://minio.local/x"),
+  } as unknown as import("../storage/storage.service").StorageService;
 
-  const entries = new LogEntriesService(prisma, audit, scope, shiftResolver, fiscalResolver, reauth, enc, periods, permissions, settings);
+  const entries = new LogEntriesService(prisma, audit, scope, shiftResolver, fiscalResolver, reauth, enc, periods, permissions, settings, storage);
   const logbook = new LogbookQueryService(prisma, scope, audit, enc, entries, shiftResolver);
   return { logbook, entries, prisma, audit, scope, shiftResolver };
 }
