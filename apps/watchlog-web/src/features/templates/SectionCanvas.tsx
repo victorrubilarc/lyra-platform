@@ -63,14 +63,17 @@ export function SectionCanvas({
     [fields],
   );
 
-  // Commit solo si la geometría realmente cambió (RGL también dispara al montar).
+  // Commit solo si la geometría de un campo EXISTENTE cambió (RGL dispara también al
+  // montar y al compactar). Se ignora el placeholder transitorio de drop.
   const commit = (next: Layout[]) => {
     let changed = false;
-    const geom = next.map((l) => {
+    const geom: CanvasGeometry[] = [];
+    for (const l of next) {
       const cur = fields.find((f) => f.uid === l.i);
-      if (!cur || cur.gridX !== l.x || cur.gridY !== l.y || cur.colSpan !== l.w || cur.gridH !== l.h) changed = true;
-      return { uid: l.i, x: l.x, y: l.y, w: l.w, h: l.h };
-    });
+      if (!cur) continue; // placeholder "__dropping__" u otro: lo agrega onDrop
+      if (cur.gridX !== l.x || cur.gridY !== l.y || cur.colSpan !== l.w || cur.gridH !== l.h) changed = true;
+      geom.push({ uid: l.i, x: l.x, y: l.y, w: l.w, h: l.h });
+    }
     if (changed) onGeometryChange(geom);
   };
 
@@ -87,7 +90,6 @@ export function SectionCanvas({
       margin={[12, 12]}
       containerPadding={[0, 0]}
       measureBeforeMount
-      useCSSTransforms={false}
       layout={layout}
       compactType="vertical"
       isBounded
@@ -98,8 +100,7 @@ export function SectionCanvas({
       isDroppable={canEdit}
       droppingItem={{ i: "__dropping__", w: 6, h: 1 }}
       onDrop={handleDrop}
-      onDragStop={(l) => commit(l)}
-      onResizeStop={(l) => commit(l)}
+      onLayoutChange={(l) => commit(l)}
     >
       {fields.map((f) => (
         <div

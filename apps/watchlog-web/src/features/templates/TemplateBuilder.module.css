@@ -1631,14 +1631,79 @@
   opacity: 0.18;
   border-radius: var(--radius-md);
 }
+/* Handles de redimensionar: visibles (atenuados) y resaltados al hover/seleccionar.
+   Se quita el icono diagonal por defecto y se dibuja una marca por lado con el acento. */
 .rgl :global(.react-resizable-handle) {
-  opacity: 0;
+  background-image: none;
+  opacity: 0.45;
   transition: opacity 0.12s;
 }
-.rgl :global(.react-grid-item:hover .react-resizable-handle),
-.rgl :global(.react-grid-item.react-draggable-dragging .react-resizable-handle) {
+.rgl :global(.react-grid-item:hover .react-resizable-handle) {
   opacity: 1;
 }
 .rgl :global(.react-resizable-handle::after) {
-  border-color: var(--color-accent-primary) !important;
+  content: "";
+  position: absolute;
+  border: none;
+  background: var(--color-accent-primary);
+}
+/* Lados E/O: barra vertical centrada (zona de agarre ancha). */
+.rgl :global(.react-resizable-handle-e),
+.rgl :global(.react-resizable-handle-w) {
+  top: 0;
+  bottom: 0;
+  width: 14px;
+  height: auto;
+  margin: 0;
+  cursor: ew-resize;
+}
+.rgl :global(.react-resizable-handle-e) {
+  right: -7px;
+}
+.rgl :global(.react-resizable-handle-w) {
+  left: -7px;
+}
+.rgl :global(.react-resizable-handle-e::after),
+.rgl :global(.react-resizable-handle-w::after) {
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 28px;
+  border-radius: 99px;
+  transform: translate(-50%, -50%);
+}
+/* Lado S: barra horizontal centrada abajo. */
+.rgl :global(.react-resizable-handle-s) {
+  left: 0;
+  right: 0;
+  width: auto;
+  height: 14px;
+  bottom: -7px;
+  margin: 0;
+  cursor: ns-resize;
+}
+.rgl :global(.react-resizable-handle-s::after) {
+  left: 50%;
+  top: 50%;
+  width: 28px;
+  height: 4px;
+  border-radius: 99px;
+  transform: translate(-50%, -50%);
+}
+/* Esquina SE: cuadrito de agarre. */
+.rgl :global(.react-resizable-handle-se) {
+  right: 0;
+  bottom: 0;
+  width: 18px;
+  height: 18px;
+  cursor: nwse-resize;
+}
+.rgl :global(.react-resizable-handle-se::after) {
+  right: 3px;
+  bottom: 3px;
+  width: 9px;
+  height: 9px;
+  background: transparent;
+  border-right: 2px solid var(--color-accent-primary);
+  border-bottom: 2px solid var(--color-accent-primary);
 }
