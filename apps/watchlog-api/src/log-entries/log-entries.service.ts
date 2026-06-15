@@ -52,6 +52,7 @@ import {
   isPresentationalType,
   isSectionEditableInState,
   maxAttachmentBytes,
+  pruneEmptyTableRows,
   recomputeComputedValues,
   requiredFieldError,
   resolveEditWindow,
@@ -720,6 +721,13 @@ export class LogEntriesService {
       if (JSON.stringify(beforeVal) !== JSON.stringify(input.value ?? null)) {
         throw new ForbiddenException(`El campo "${def.label}" está reservado a otro rol: no puede modificarlo`);
       }
+    }
+
+    // Higiene de TABLE: poda las filas COMPLETAMENTE vacías (placeholders) antes de
+    // validar y persistir, para que no cuenten en `maxRows` ni ensucien el jsonb.
+    for (const input of dto.values) {
+      const def = fieldsByKey.get(input.fieldKey)!;
+      if (def.type === "TABLE") input.value = pruneEmptyTableRows(def.config, input.value ?? null);
     }
 
     const valuesByKey: Record<string, unknown> = {};
