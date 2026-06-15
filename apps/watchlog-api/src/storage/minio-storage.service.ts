@@ -66,7 +66,7 @@ export class MinioStorageService extends StorageService implements OnModuleInit 
     await this.client.removeObject(this.bucket, key);
   }
 
-  async removePrefix(prefix: string): Promise<void> {
+  async listObjects(prefix: string): Promise<string[]> {
     const keys: string[] = [];
     await new Promise<void>((resolve, reject) => {
       const stream = this.client.listObjectsV2(this.bucket, prefix, true);
@@ -76,13 +76,23 @@ export class MinioStorageService extends StorageService implements OnModuleInit 
       stream.on("end", () => resolve());
       stream.on("error", reject);
     });
+    return keys;
+  }
+
+  async removePrefix(prefix: string): Promise<void> {
+    const keys = await this.listObjects(prefix);
     if (keys.length > 0) await this.client.removeObjects(this.bucket, keys);
   }
 
-  async presignedGetUrl(key: string, downloadName: string): Promise<{ url: string; expiresAt: string }> {
+  async presignedGetUrl(
+    key: string,
+    downloadName: string,
+    opts?: { inline?: boolean },
+  ): Promise<{ url: string; expiresAt: string }> {
     const safe = downloadName.replace(/["\\\r\n]/g, "_");
+    const disposition = opts?.inline ? "inline" : "attachment";
     const url = await this.client.presignedGetObject(this.bucket, key, this.presignTtl, {
-      "response-content-disposition": `attachment; filename="${safe}"`,
+      "response-content-disposition": `${disposition}; filename="${safe}"`,
     });
     return { url, expiresAt: new Date(Date.now() + this.presignTtl * 1000).toISOString() };
   }

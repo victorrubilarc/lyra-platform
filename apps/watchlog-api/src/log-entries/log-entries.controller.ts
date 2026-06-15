@@ -295,8 +295,9 @@ export class LogEntriesController {
     @Param("descriptorId") descriptorId: string,
     @CurrentUser() user: RequestUser,
     @Req() req: FastifyRequest,
+    @Query("inline") inline?: string,
   ) {
-    return this.entries.getAttachmentDownloadUrl(user.id, id, descriptorId, this.ctx(user, req));
+    return this.entries.getAttachmentDownloadUrl(user.id, id, descriptorId, this.ctx(user, req), inline === "1" || inline === "true");
   }
 
   @Post(":id/submit")

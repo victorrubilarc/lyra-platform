@@ -27,10 +27,18 @@ export abstract class StorageService {
   /** Elimina todos los objetos bajo un prefijo (limpieza de una entrada/campo). */
   abstract removePrefix(prefix: string): Promise<void>;
 
+  /** Lista las keys de los objetos bajo un prefijo (recursivo). */
+  abstract listObjects(prefix: string): Promise<string[]>;
+
   /**
    * URL prefirmada de descarga (GET) de vida corta (TTL configurado). `downloadName`
-   * fuerza el nombre de archivo en el navegador (Content-Disposition: attachment).
-   * Devuelve también el instante de expiración (ISO) para informarlo al cliente.
+   * fuerza el nombre de archivo en el navegador. Por defecto la disposición es
+   * `attachment` (descarga); con `opts.inline` se sirve `inline` para previsualizar
+   * el objeto en el navegador (imagen/audio/video/PDF). Devuelve la expiración (ISO).
    */
-  abstract presignedGetUrl(key: string, downloadName: string): Promise<{ url: string; expiresAt: string }>;
+  abstract presignedGetUrl(
+    key: string,
+    downloadName: string,
+    opts?: { inline?: boolean },
+  ): Promise<{ url: string; expiresAt: string }>;
 }

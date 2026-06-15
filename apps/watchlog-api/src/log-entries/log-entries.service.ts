@@ -1327,6 +1327,7 @@ export class LogEntriesService {
     entryId: string,
     descriptorId: string,
     ctx: AuditContext,
+    inline = false,
   ): Promise<{ url: string; filename: string; expiresAt: string }> {
     const entry = await this.loadEntry(entryId);
     await this.assertNodeInScope(userId, entry.orgNodeId);
@@ -1335,21 +1336,35 @@ export class LogEntriesService {
     const rows = await this.prisma.logEntryValue.findMany({
       where: { logEntryId: entryId, dataType: "FILE_ARRAY" },
     });
-    let found: FileDescriptor | null = null;
+    let found: { key: string; filename: string } | null = null;
     for (const row of rows) {
       const arr = Array.isArray(row.value) ? (row.value as unknown[]) : [];
       for (const item of arr) {
         const parsed = fileDescriptorSchema.safeParse(item);
         if (parsed.success && parsed.data.id === descriptorId) {
-          found = parsed.data;
+          found = { key: parsed.data.key, filename: parsed.data.filename };
           break;
         }
       }
       if (found) break;
     }
+
+    // Fallback: el adjunto puede estar SUBIDO (objeto en storage bajo el prefijo de
+    // la entrada) pero la sección AÚN no guardada ⇒ el descriptor no está en los
+    // valores persistidos. Se resuelve por la `key` (que embebe el id) bajo el
+    // prefijo de ESTA entrada — la pertenencia y la ABAC ya están aseguradas por el
+    // prefijo + el acceso a la entrada; permite previsualizar antes de guardar.
+    if (!found) {
+      const keys = await this.storage.listObjects(`entries/${entryId}/`);
+      const matchKey = keys.find((k) => (k.split("/").pop() ?? "").startsWith(`${descriptorId}-`));
+      if (matchKey) {
+        const base = matchKey.split("/").pop() ?? "";
+        found = { key: matchKey, filename: base.slice(descriptorId.length + 1) || base };
+      }
+    }
     if (!found) throw new NotFoundException("Adjunto no encontrado en la entrada");
 
-    const { url, expiresAt } = await this.storage.presignedGetUrl(found.key, found.filename);
+    const { url, expiresAt } = await this.storage.presignedGetUrl(found.key, found.filename, { inline });
     await this.audit.record({
       ...ctx,
       action: "logentry.attachment.downloaded",
