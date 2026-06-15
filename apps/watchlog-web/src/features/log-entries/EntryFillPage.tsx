@@ -43,7 +43,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ApiError } from "../../lib/api-client.js";
 import { formatDateTime } from "../../lib/format.js";
 import { FieldControl } from "../templates/FieldControl.js";
-import { FieldGrid, FieldGridCell } from "../templates/FieldGrid.js";
+import { FieldGrid } from "../templates/FieldGrid.js";
 import { createLogEntry, executeTransition as executeTransitionApi, saveLogEntrySection, submitLogEntry } from "./log-entries-api.js";
 import {
   LOG_ENTRY_KEYS,
@@ -662,33 +662,37 @@ export function EntryFillPage() {
               </div>
             )}
 
-            <FieldGrid>
-              {visible.map((f) => {
-                const restricted = restrictedKeys.has(f.key);
-                // Un campo formulado es read-only SIEMPRE (valor derivado por el servidor).
-                const fieldEditable = editable && !restricted && !f.computed;
-                const errs =
-                  fieldEditable && !f.computed
-                    ? validateFieldValue(fieldForValidation(f), draft[f.key], { allowedCodes: inlineCodes(f.config) }).errors
-                    : [];
-                return (
-                  <FieldGridCell key={f.key} span={f.colSpan}>
-                    <FieldControl field={f} value={display[f.key]} onChange={(v) => setValue(f.key, v)} readOnly={!fieldEditable} invalid={errs.length > 0 || ruleProblemFields.has(f.key)} />
-                    {restricted && editable && (
-                      <div className={styles.lockedNote}>
-                        <Lock size={12} /> {t("logbook.fill.fieldRestricted")}
-                      </div>
-                    )}
-                    {errs.map((msg, i) => (
-                      <div key={i} className={styles.fieldError}>
-                        <AlertTriangle size={12} /> {msg}
-                      </div>
-                    ))}
-                  </FieldGridCell>
-                );
-              })}
-              {visible.length === 0 && <div className={styles.filledBy}>—</div>}
-            </FieldGrid>
+            {visible.length === 0 ? (
+              <div className={styles.filledBy}>—</div>
+            ) : (
+              <FieldGrid
+                fields={visible}
+                renderCell={(f) => {
+                  const restricted = restrictedKeys.has(f.key);
+                  // Un campo formulado es read-only SIEMPRE (valor derivado por el servidor).
+                  const fieldEditable = editable && !restricted && !f.computed;
+                  const errs =
+                    fieldEditable && !f.computed
+                      ? validateFieldValue(fieldForValidation(f), draft[f.key], { allowedCodes: inlineCodes(f.config) }).errors
+                      : [];
+                  return (
+                    <>
+                      <FieldControl field={f} value={display[f.key]} onChange={(v) => setValue(f.key, v)} readOnly={!fieldEditable} invalid={errs.length > 0 || ruleProblemFields.has(f.key)} />
+                      {restricted && editable && (
+                        <div className={styles.lockedNote}>
+                          <Lock size={12} /> {t("logbook.fill.fieldRestricted")}
+                        </div>
+                      )}
+                      {errs.map((msg, i) => (
+                        <div key={i} className={styles.fieldError}>
+                          <AlertTriangle size={12} /> {msg}
+                        </div>
+                      ))}
+                    </>
+                  );
+                }}
+              />
+            )}
 
             {editable && st && (
               <div className={styles.sectionFooter}>

@@ -1,48 +1,53 @@
 /*
- * Grilla responsiva de campos por sección (Fase 2.1.2). FUENTE ÚNICA del layout:
- * la usan la vista previa del builder, el llenado y el visor de lectura, así el
- * registro se ve idéntico en los tres lados. Estándar SAP Fiori 12-col / ServiceNow.
- *
- * Ancho por celda en columnas de 12 (`--col-span`, 1..12): 12 = completo, 6 =
- * media, 4 = tercio, 3 = cuarto… (estilo SAP Fiori / Bootstrap). El contenedor
- * mantiene 12 columnas; el span vive en la celda como custom property. Responsive
- * (regla de terreno): en celular (<=767px) la grilla pasa a 1 columna (las celdas
- * a `auto`, ignorando el span). Las áreas táctiles 44px las garantizan los
- * controles (no la grilla); `min-width:0` evita que contenido largo (textarea,
- * números con unidad) reviente las columnas.
+ * Grilla de campos por sección (Fase 2.1.7). FUENTE ÚNICA del layout: la usan el
+ * llenado, el visor y la vista previa; el editor (lienzo react-grid-layout) escribe
+ * la misma geometría. Cada celda se coloca por columna/fila/ancho que viajan como
+ * custom properties (--gx columna inicial 1-based, --gw ancho en columnas, --grow
+ * fila 1-based). Se hacen custom properties (no `grid-*` en duro) para que las media
+ * queries puedan colapsar a `auto` en tablet/celular (regla de terreno).
  */
+
+.gridContainer {
+  container-type: inline-size;
+}
 
 .grid {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-auto-rows: min-content;
   gap: var(--space-4) var(--space-5);
   align-items: start;
 }
 
 .cell {
-  grid-column: span var(--col-span, 12);
+  grid-column: var(--gx, auto) / span var(--gw, 12);
+  grid-row: var(--grow, auto);
   min-width: 0;
 }
 
-/* Tablet (768–1023px): 2 columnas fijas; los campos fluyen de a 2 sin importar su
-   colSpan (legible y táctil en terreno). El operador suele llenar en tablet. */
-@media (min-width: 768px) and (max-width: 1023px) {
+/* Tablet (768–1023px del CONTENEDOR): 2 columnas fluidas; los campos fluyen de a 2
+   sin importar su geometría (legible y táctil en terreno). */
+@container (min-width: 768px) and (max-width: 1023px) {
   .grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: auto;
   }
 
   .cell {
     grid-column: auto;
+    grid-row: auto;
   }
 }
 
-/* Móvil (<768px): una sola columna (todo apilado, regla de terreno + 44px). */
-@media (max-width: 767px) {
+/* Móvil (<768px del CONTENEDOR): una sola columna (apilado, terreno + 44px). */
+@container (max-width: 767px) {
   .grid {
     grid-template-columns: 1fr;
+    grid-auto-rows: auto;
   }
 
   .cell {
     grid-column: auto;
+    grid-row: auto;
   }
 }
