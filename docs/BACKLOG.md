@@ -230,11 +230,16 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
       celda solo escalares · sin agregados. `requiredFieldError` generaliza la obligatoriedad (TABLE ≥ filas completas /
       MATRIX ≥1 celda). Opacos a resumen/reglas. Render `RepeatableControl`/`MatrixControl` recursivos sobre `FieldControl`
       (modo `bare`); paleta categoría "Estructurados". Migración ALTER enum. **Sin permisos nuevos (catálogo 60).** Contracts
-      230 · API 234 · smoke 22/22. **Pendiente: smoke VISUAL** (§4). **Deuda:** agregados (total/promedio por columna) ·
-      refs del motor de reglas a celdas/agregados (AST sobre arrays) · resumen "N filas" en la grilla (hoy opaco) · export
-      CSV de tablas (hoy JSON/conteo) · REFERENCE/ATTACHMENT/RANGE/RISK en celda · tabla ANIDADA · columnas de la matriz
-      desde el calendario operacional en vivo (ShiftResolver) · stripping de filas vacías al persistir (hoy se ignoran en
-      validación pero se guardan) · pulido fino del sticky/scroll/táctil en tablet.
+      230 · API 234 · smoke 22/22. **Pendiente: smoke VISUAL** (§4). **+ Pulido (`fix/objetos-pulido`, 2026-06-15):** ✅ poda
+      de filas vacías al guardar (`pruneEmptyTableRows`; maxRows ya no cuenta vacías + jsonb limpio) · ✅ catálogo de celda
+      SELECT por lista de referencia RECHAZADO en el diseño (cierra el hueco de validación). **Deuda mayor (de la evaluación
+      del dueño):** **banda de umbral por celda numérica → review-by-exception / grilla** (hoy una lectura CRÍTICA dentro de
+      una tabla/matriz NO marca la entrada como excepción — la brecha funcional más relevante) · refs del motor de reglas a
+      celdas/agregados (AST sobre arrays: `sum(col)`, "si alguna fila estado=fuera ⇒ alerta") · agregados (total/promedio por
+      columna) · resumen "N filas" en la grilla · export CSV de tablas · obligatoriedad fina de MATRIZ (completa / por
+      fila-columna; hoy solo ≥1 celda) · `minRows` cuando la tabla NO es obligatoria · REFERENCE/ATTACHMENT/RANGE/RISK en
+      celda · tabla ANIDADA · columnas de la matriz desde el calendario operacional en vivo (ShiftResolver) · pulido fino
+      sticky/scroll/táctil en tablet.
 - [ ] **Ola 5 — origen de datos (Fase 3).** Lectura autocompletada desde tag SCADA/PI/OPC (modelar + stub).
 
 ### Transversal — Manual de uso (`docs/USER_GUIDE.md`)
@@ -948,8 +953,10 @@ implementación esperada:
       en el lienzo (marcador "se sube al llenar"), configurarlo (multiple/maxCount/maxSizeMb/accept/cámara), y en una
       entrada: **Foto** (capturar con cámara en tablet / subir de galería; miniatura/descarga), **Archivo** (PDF), **Nota
       de voz** (grabar con `MediaRecorder` + detener + reproducir/descargar), **Croquis** (dibujar en el lienzo→guardar
-      PNG), **Escáner QR** (apuntar la cámara, decodifica y rellena el TAG). Verificar: descarga (presigned), quitar un
-      adjunto, estados (busy/error/inválido/vacío/readOnly), claro+oscuro, 44px, responsive. App en `:5173`.
+      PNG), **Escáner QR** (apuntar la cámara, decodifica y rellena el TAG). Verificar: **VISTA PREVIA al hacer clic** (botón
+      "Ver" / ítem clicable abre el modal: imagen en lightbox, audio/video reproducibles, PDF en iframe, otros → abrir en
+      pestaña), descarga (presigned), quitar un adjunto, estados (busy/error/inválido/vacío/readOnly), claro+oscuro, 44px,
+      responsive. App en `:5173`.
 - [ ] **Catálogo de objetos · Ola 2 — smoke VISUAL en navegador** (selectores de referencia equipo/usuario/nodo/turno con
       dropdown/modal, tolerancia objetivo±tol, contador con delta, matriz de riesgo clicable + heatmap del editor).
 - [ ] **Catálogo de objetos · Ola 1 — smoke VISUAL en navegador** (se verificó typecheck/lint/build + smoke API
