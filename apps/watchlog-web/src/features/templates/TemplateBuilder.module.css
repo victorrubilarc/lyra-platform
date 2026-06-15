@@ -851,11 +851,10 @@
 /* ── Vista previa ─────────────────────────────────────────────────────────── */
 .previewCard {
   padding: var(--space-5, 26px) var(--space-5, 30px);
-  /* Ancho de escritorio: la Vista previa refleja el DISEÑO del lienzo (geometría
-     side-by-side). El contenedor debe superar 1024px para no caer en las
-     container-queries de tablet/móvil de FieldGrid. El responsive de terreno se
-     prueba con el selector escritorio/tablet/móvil del Editor. */
-  max-width: 1200px;
+  /* Ancho COMPLETO: la Vista previa refleja el DISEÑO del lienzo a ancho de
+     escritorio (geometría side-by-side), sin quedar centrada/angosta. El responsive
+     de terreno se prueba con el selector escritorio/tablet/móvil del Editor. */
+  width: 100%;
 }
 .previewTitle {
   font-family: var(--font-brand);
