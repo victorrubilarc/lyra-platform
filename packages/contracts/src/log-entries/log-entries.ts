@@ -7,7 +7,17 @@ import {
   type TemplateFieldDto,
   type TemplateSectionDto,
 } from "../templates/templates.js";
-import { fieldDataTypeSchema, type VisibleWhen } from "../templates/field-types.js";
+import {
+  fieldDataTypeSchema,
+  CONFORMITY_CODES,
+  RATING_DEFAULT_MAX,
+  isPresentationalType,
+  isValidTextFormat,
+  isValidTimeOfDay,
+  type NumberFormat,
+  type TextFormat,
+  type VisibleWhen,
+} from "../templates/field-types.js";
 import { workflowVersionSchema } from "../workflows/workflows.js";
 
 /**
@@ -886,6 +896,12 @@ export function isEmptyValue(value: unknown): boolean {
   if (value === null || value === undefined) return true;
   if (typeof value === "string") return value.trim() === "";
   if (Array.isArray(value)) return value.length === 0;
+  // Valor ESTRUCTURADO (p. ej. RANGE {from,to}): vacío si TODOS sus campos lo están.
+  // (0/false NO son vacíos; un objeto sin claves se considera vacío.)
+  if (typeof value === "object") {
+    const vals = Object.values(value as Record<string, unknown>);
+    return vals.every((v) => v === null || v === undefined || (typeof v === "string" && v.trim() === ""));
+  }
   return false;
 }
 
@@ -944,6 +960,8 @@ export function validateFieldValue(
 ): FieldValueValidation {
   const errors: string[] = [];
   const warnings: string[] = [];
+  // Objetos de PRESENTACIÓN (HEADING/NOTICE/…): no son dato, nunca se validan.
+  if (isPresentationalType(field.type)) return { errors, warnings };
   if (isEmptyValue(value)) return { errors, warnings };
 
   const allowed =
@@ -968,7 +986,12 @@ export function validateFieldValue(
         critLow?: number;
         critHigh?: number;
         decimals?: number;
+        format?: NumberFormat;
       };
+      // Porcentaje: el valor está acotado a 0..100 (la unidad es el % implícito).
+      if (c.format === "percent") {
+        if (n < 0 || n > 100) errors.push(`${field.label}: el porcentaje debe estar entre 0 y 100`);
+      }
       if (typeof c.min === "number" && n < c.min) errors.push(`${field.label}: por debajo del mínimo (${c.min})`);
       if (typeof c.max === "number" && n > c.max) errors.push(`${field.label}: por encima del máximo (${c.max})`);
       if (typeof c.decimals === "number") {
@@ -990,7 +1013,7 @@ export function validateFieldValue(
         errors.push(`${field.label}: debe ser texto`);
         break;
       }
-      const c = field.config as { minLength?: number; maxLength?: number; pattern?: string };
+      const c = field.config as { minLength?: number; maxLength?: number; pattern?: string; format?: TextFormat };
       if (typeof c.minLength === "number" && value.length < c.minLength)
         errors.push(`${field.label}: mínimo ${c.minLength} caracteres`);
       if (typeof c.maxLength === "number" && value.length > c.maxLength)
@@ -1001,6 +1024,16 @@ export function validateFieldValue(
         } catch {
           /* patrón inválido en la plantilla: ignora la validación de formato */
         }
+      }
+      // Formato semántico (Ola 1): RUT (dígito verificador) / correo / teléfono / URL.
+      if (c.format && !isValidTextFormat(c.format, value)) {
+        const msg: Record<TextFormat, string> = {
+          rut: "RUT inválido (verifique el dígito verificador)",
+          email: "correo electrónico inválido",
+          phone: "teléfono inválido",
+          url: "URL inválida",
+        };
+        errors.push(`${field.label}: ${msg[c.format]}`);
       }
       break;
     }
@@ -1050,6 +1083,53 @@ export function validateFieldValue(
     case "SIGNATURE": {
       // La firma electrónica (Part 11) se captura en la ejecución de flujo (2.5).
       errors.push(`${field.label}: la firma se realiza al ejecutar el flujo`);
+      break;
+    }
+    // --- Ola 1 ---------------------------------------------------------------
+    case "CONFORMITY": {
+      if (typeof value !== "string") {
+        errors.push(`${field.label}: selección inválida`);
+        break;
+      }
+      const allowNa = (field.config as { allowNa?: boolean }).allowNa !== false;
+      const valid = CONFORMITY_CODES.filter((c) => allowNa || c !== "NA");
+      if (!(valid as readonly string[]).includes(value)) errors.push(`${field.label}: opción fuera del catálogo`);
+      break;
+    }
+    case "RATING": {
+      const n = typeof value === "number" ? value : Number(value);
+      const max = (field.config as { max?: number }).max ?? RATING_DEFAULT_MAX;
+      if (!Number.isInteger(n) || n < 1 || n > max) errors.push(`${field.label}: valoración fuera de rango (1–${max})`);
+      break;
+    }
+    case "TIME": {
+      if (typeof value !== "string" || !isValidTimeOfDay(value)) errors.push(`${field.label}: hora inválida (HH:MM)`);
+      break;
+    }
+    case "DURATION": {
+      const n = typeof value === "number" ? value : Number(value);
+      if (!Number.isInteger(n) || n < 0) errors.push(`${field.label}: duración inválida`);
+      break;
+    }
+    case "RANGE": {
+      if (typeof value !== "object" || value === null || Array.isArray(value)) {
+        errors.push(`${field.label}: rango inválido`);
+        break;
+      }
+      const r = value as { from?: unknown; to?: unknown };
+      const from = r.from === null || r.from === undefined || r.from === "" ? null : Number(r.from);
+      const to = r.to === null || r.to === undefined || r.to === "" ? null : Number(r.to);
+      if ((from !== null && !Number.isFinite(from)) || (to !== null && !Number.isFinite(to))) {
+        errors.push(`${field.label}: el rango debe contener números`);
+        break;
+      }
+      if (from !== null && to !== null && from > to) errors.push(`${field.label}: el mínimo no puede superar al máximo`);
+      const rc = field.config as { min?: number; max?: number };
+      for (const v of [from, to]) {
+        if (v === null) continue;
+        if (typeof rc.min === "number" && v < rc.min) errors.push(`${field.label}: por debajo del mínimo (${rc.min})`);
+        if (typeof rc.max === "number" && v > rc.max) errors.push(`${field.label}: por encima del máximo (${rc.max})`);
+      }
       break;
     }
   }

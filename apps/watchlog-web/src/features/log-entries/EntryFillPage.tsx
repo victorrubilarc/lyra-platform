@@ -28,6 +28,7 @@ import {
   evaluateCrossRules,
   evaluateExpression,
   isFieldVisible,
+  isPresentationalType,
   recomputeComputedValues,
   validateFieldValue,
   type AvailableTransitionDto,
@@ -296,7 +297,11 @@ export function EntryFillPage() {
   function valuesFor(section: TemplateSectionDto, st: LogEntrySectionStateDto) {
     const restricted = new Set(st.readOnlyFieldKeys);
     const visible = section.fields.filter(
-      (f) => isFieldVisible(f.visibleWhen, display) && !restricted.has(f.key) && !f.computed,
+      (f) =>
+        isFieldVisible(f.visibleWhen, display) &&
+        !restricted.has(f.key) &&
+        !f.computed &&
+        !isPresentationalType(f.type), // objetos de presentación: no producen valor
     );
     return visible.map((f) => ({ fieldKey: f.key, value: draft[f.key] ?? null }));
   }

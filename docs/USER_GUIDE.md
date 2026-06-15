@@ -54,10 +54,11 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 - ✍️ Lectura de auditoría (quién hizo qué, antes/después)
 
 ### 6. Plantillas / Form Builder  [Configurador]
-- ✍️ Secciones y campos (tipos, obligatorios, ayuda)
+- ✅ **Catálogo de objetos del formulario** (Ola 1) (§ Plantillas ▸ Objetos del formulario)
+- ✅ Secciones y campos (tipos, obligatorios, ayuda) (§ Plantillas ▸ Secciones y campos)
 - ✅ Ancho de campo / layout en grilla (completo / mitad / tercio)
 - ✅ Umbrales de alerta (rangos warn/crit, ISA-18.2)
-- ✍️ Lógica condicional (mostrar campo según otro)
+- ✅ Lógica condicional (mostrar campo según otro) (§ Plantillas ▸ Lógica condicional)
 - ✍️ Borrador / publicar (versión inmutable)
 - ✍️ Alcance de estructura (en qué nodos vive la plantilla)
 - ✍️ Alcance por plantilla (quién ve qué plantillas) y acceso por rol
@@ -221,3 +222,80 @@ alarmas (niveles bajo-bajo / bajo / alto / alto-alto).
 - La banda se **estampa al guardar** y queda en el registro: alimenta el "review-by-exception" de
   Bitácoras (filtrar solo lo que requiere atención) y, más adelante, las incidencias automáticas.
 - Si el campo es **calculado** (motor de reglas), el umbral aplica sobre el **valor calculado**.
+
+---
+
+## Plantillas ▸ Objetos del formulario  [Configurador]
+
+**Para qué sirve.** Construir una bitácora con el objeto correcto para cada dato, igual que en los
+grandes sistemas de inspección y mantenimiento. Además de los básicos (texto, número, sí/no, fecha),
+hay objetos especializados que capturan mejor la información de terreno y la dejan **reportable**.
+
+**Cómo se usa.** En el builder, abre **＋ Agregar campo**: la paleta agrupa los objetos por categoría.
+Elige uno (clic o arrástralo al lienzo) y ajústalo en el panel de propiedades.
+
+- **Básicos.** Texto, Párrafo, Número (con unidad y umbrales), **Porcentaje**, **Moneda (CLP)**,
+  **RUT** (valida el dígito verificador), **Correo / Teléfono / Enlace (URL)** (validan el formato),
+  Sí/No, Fecha, Fecha y hora, **Hora**, **Duración (HH:MM)** y **Rango (mín–máx)**.
+- **Selección.** Una opción: **Lista desplegable**, **Opción única visible** (radio) o **Segmentos**
+  (chips de 1 toque). Varias opciones: **Casillas**, **Selección múltiple** o **Multiselección con
+  modal** (ventana de búsqueda para listas largas). Todas pueden alimentarse de una **Lista de
+  referencia** gobernada.
+- **Evaluación.** **Conforme / No conforme / N.A.** (tri-estado de inspección, con N.A. opcional),
+  **Severidad 1–5**, **Valoración** (estrellas, numérica o Likert con rótulos) y **Firma electrónica**.
+- **Presentación** (no piden dato): **Encabezado**, **Texto / instrucción**, **Separador**, **Aviso**
+  (información/advertencia/éxito/peligro), **Enlace a procedimiento** e **Imagen de referencia** (por URL).
+
+**Quién puede.** El **Configurador** que edita la plantilla (`template:edit`).
+
+**Importante.**
+- Un objeto se ve **igual** en el diseñador, al llenar y en el visor (un solo motor de render).
+- Los objetos de **Presentación** son solo guía visual: **no se llenan, no se validan** y no aparecen
+  en reglas ni en el resumen de la grilla.
+- **RUT, correo, %, hora, duración y rango** validan su formato al guardar (en el servidor, no solo en
+  pantalla). La duración se guarda en minutos y los montos/porcentajes se muestran con el formato regional.
+- Cambiar un objeto crea un nuevo **borrador**; aplica a las entradas nuevas al **publicar** (la versión
+  publicada queda inmutable).
+
+---
+
+## Plantillas ▸ Lógica condicional (mostrar un campo según otro)  [Configurador]
+
+**Para qué sirve.** Mantener el formulario corto y relevante: un campo aparece **solo cuando hace
+falta** (p. ej. "¿Hubo falla?" → si la respuesta es *Sí*, se muestra "Descripción de la falla").
+
+**Cómo se usa.**
+1. Agrega un campo **Sí/No** que actúe de interruptor.
+2. Selecciona el campo que quieres condicionar y, en sus propiedades, usa **"Mostrar solo si"**.
+3. Elige el campo Sí/No: el campo quedará oculto hasta que aquel esté en *Sí*.
+
+**Quién puede.** El **Configurador** que edita la plantilla (`template:edit`).
+
+**Importante.**
+- La condición se evalúa **también en el servidor**: un campo oculto no se exige ni se valida (no
+  bloquea completar la sección) y no guarda valor mientras esté oculto.
+- Es una regla simple (un campo = un valor). Las validaciones **cruzadas** entre campos y los campos
+  **calculados** viven en el **motor de reglas** (sub-pestaña *Reglas* del diseñador).
+
+---
+
+## Plantillas ▸ Secciones y campos  [Configurador]
+
+**Para qué sirve.** Organizar la bitácora en **secciones** (bloques con título) que se llenan y, si
+aplica, se firman por separado — la sección es la unidad de permiso, llenado y firma.
+
+**Cómo se usa.**
+1. En el diseñador, agrega una **sección** y dale título y descripción.
+2. Agrega **campos** desde **＋ Agregar campo** (ver *Objetos del formulario*); marca los **obligatorios**
+   y añade un **texto de ayuda** cuando convenga.
+3. Acomoda los campos en el **lienzo** (ancho y posición) y, si la plantilla tiene flujo, define en qué
+   **estado** es editable cada sección y qué **roles** pueden llenarla.
+
+**Quién puede.** El **Configurador** que edita la plantilla (`template:edit`).
+
+**Importante.**
+- Cada campo tiene una **clave estable** que lo identifica entre versiones (no la cambies a la ligera:
+  es la referencia para reglas, resumen y reportes).
+- Los **obligatorios** se exigen al **completar** la sección, respetando la lógica condicional.
+- El diseño viaja en una **versión inmutable** al publicar; las entradas en curso siguen con la versión
+  con que nacieron.

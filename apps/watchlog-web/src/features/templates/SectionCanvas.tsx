@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, type CSSProperties, type DragEvent as RDE, type PointerEvent as RPE } from "react";
-import type { FieldType } from "@lyra/contracts";
 import { FieldControl } from "./FieldControl.js";
 import { type EditField } from "./builder-model.js";
 import styles from "./TemplateBuilder.module.css";
@@ -62,7 +61,7 @@ interface SectionCanvasProps {
   onSelectField: (fUid: string) => void;
   onLabel: (fUid: string, label: string) => void;
   onGeometryChange: (geom: CanvasGeometry[]) => void;
-  onDropNew: (type: FieldType, x: number, y: number) => void;
+  onDropNew: (presetId: string, x: number, y: number) => void;
 }
 
 export function SectionCanvas({
@@ -180,10 +179,10 @@ export function SectionCanvas({
   function onDrop(e: RDE<HTMLDivElement>) {
     if (!canEdit || !ref.current) return;
     e.preventDefault();
-    const type = e.dataTransfer.getData("text/plain");
+    const presetId = e.dataTransfer.getData("text/plain");
     const cell = cellFromEvent(e, 6);
     setDropAt(null);
-    if (type) onDropNew(type as FieldType, cell.x, cell.y);
+    if (presetId) onDropNew(presetId, cell.x, cell.y);
   }
 
   const cellStyle = (g: CanvasGeometry): CSSProperties => ({

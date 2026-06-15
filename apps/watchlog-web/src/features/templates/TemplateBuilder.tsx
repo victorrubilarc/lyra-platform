@@ -38,7 +38,7 @@ import {
   detailToEditState,
   editStateToConfigRequest,
   editStateToDraftRequest,
-  fieldTypeMeta,
+  fieldPresetById,
   nextFreeRow,
   nextUid,
   slugifyKey,
@@ -183,8 +183,11 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
    * (clic en la paleta). Si no hay sección, crea una. Para soltar en una posición
    * concreta del lienzo se usa `addFieldAtGeom`.
    */
-  function addFieldAt(type: FieldType, targetSUid?: string) {
-    const label = t(fieldTypeMeta(type).labelKey);
+  function addFieldAt(presetId: string, targetSUid?: string) {
+    const preset = fieldPresetById(presetId);
+    const type: FieldType = preset?.type ?? "TEXT";
+    const label = t(preset?.labelKey ?? "templates.fieldTypes.text");
+    const presetConfig = preset?.config() ?? defaultFieldConfig(type);
     let sections = state.sections;
     let sUid = targetSUid ?? selected?.s ?? sections[sections.length - 1]?.uid ?? null;
     if (!sUid) {
@@ -205,7 +208,7 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
       label,
       help: null,
       required: false,
-      config: defaultFieldConfig(type),
+      config: presetConfig,
       visibleWhen: null,
       computed: null,
       colSpan: 12,
@@ -223,8 +226,10 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
    * Inserta un campo NUEVO en una POSICIÓN del lienzo (arrastre desde la paleta).
    * El ancho por defecto es 6 columnas (medio); el operador lo redimensiona luego.
    */
-  function addFieldAtGeom(type: FieldType, sUid: string, x: number, y: number) {
-    const label = t(fieldTypeMeta(type).labelKey);
+  function addFieldAtGeom(presetId: string, sUid: string, x: number, y: number) {
+    const preset = fieldPresetById(presetId);
+    const type: FieldType = preset?.type ?? "TEXT";
+    const label = t(preset?.labelKey ?? "templates.fieldTypes.text");
     const fkey = uniqueKey(slugifyKey(label, "campo"), collectFieldKeys(state));
     const w = 6;
     const field: EditField = {
@@ -235,7 +240,7 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
       label,
       help: null,
       required: false,
-      config: defaultFieldConfig(type),
+      config: preset?.config() ?? defaultFieldConfig(type),
       visibleWhen: null,
       computed: null,
       colSpan: w,

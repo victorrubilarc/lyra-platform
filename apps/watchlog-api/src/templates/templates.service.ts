@@ -772,13 +772,19 @@ export class TemplatesService {
     if (keys.length === 0) return;
     const fields = await this.prisma.templateField.findMany({
       where: { section: { version: { templateId } }, key: { in: keys } },
-      select: { key: true },
+      select: { key: true, dataType: true },
       distinct: ["key"],
     });
     const valid = new Set(fields.map((f) => f.key));
     const missing = keys.filter((k) => !valid.has(k));
     if (missing.length > 0) {
       throw new BadRequestException(`Campos de resumen inexistentes en la plantilla: ${missing.join(", ")}`);
+    }
+    // Los objetos de PRESENTACIÓN (dataType LAYOUT) no son dato ⇒ no pueden ser
+    // candidatos de la línea "Resumen" de la grilla (no tienen valor que mostrar).
+    const presentational = fields.filter((f) => f.dataType === "LAYOUT").map((f) => f.key);
+    if (presentational.length > 0) {
+      throw new BadRequestException(`Los objetos de presentación no pueden ser campos de resumen: ${presentational.join(", ")}`);
     }
   }
 

@@ -54,12 +54,20 @@
   habilita; null = siempre). *N—N* `Role` vía **TemplateSectionRole** (permiso de llenado por sección).
 - **TemplateField** *(implementado — modelo de 3 capas desde 2.1.1, migración `20260609155007_add_field_layers`)* —
   un campo son **3 capas separadas** (ver DECISIONS 2026-06-09):
-  - **Capa 1 — presentación/widget:** `type` (enum `FieldType`: 8 núcleo + SEVERITY/SIGNATURE). Cómo se ve.
+  - **Capa 1 — presentación/widget:** `type` (enum `FieldType`: 10 base + **Ola 1** `CONFORMITY`/`RATING`/`TIME`/
+    `DURATION`/`RANGE` + presentación `HEADING`/`STATIC_TEXT`/`DIVIDER`/`NOTICE`/`PROCEDURE_LINK`/`REFERENCE_IMAGE`;
+    migración `20260615120000_add_ola1_field_types`). Cómo se ve.
   - **Capa 2 — tipo de dato:** `dataType` (enum `FieldDataType`: STRING/NUMBER/BOOLEAN/DATE/DATETIME/TIME/
-    **CODE**/**CODE_ARRAY**/**REFERENCE**/FILE/GEO/COMPUTED). Cómo se almacena/valida/reporta. Es **derivado del
-    `type`** en backend (fuente única `deriveDataType` en `@lyra/contracts`); la UI no lo edita. Mapeo: NUMBER→NUMBER,
-    TEXT/TEXTAREA→STRING, SELECT→CODE, MULTISELECT→CODE_ARRAY, BOOLEAN→BOOLEAN, DATE→DATE, DATETIME→DATETIME,
-    SEVERITY→CODE (escala cerrada {1..5}), SIGNATURE→REFERENCE.
+    **CODE**/**CODE_ARRAY**/**REFERENCE**/FILE/GEO/COMPUTED/**RANGE**/**LAYOUT**). Cómo se almacena/valida/reporta. Es
+    **derivado del `type`** en backend (fuente única `deriveDataType` en `@lyra/contracts`); la UI no lo edita. Mapeo:
+    NUMBER→NUMBER, TEXT/TEXTAREA→STRING, SELECT→CODE, MULTISELECT→CODE_ARRAY, BOOLEAN→BOOLEAN, DATE→DATE,
+    DATETIME→DATETIME, SEVERITY→CODE (escala cerrada {1..5}), SIGNATURE→REFERENCE. **Ola 1:** CONFORMITY→CODE
+    (catálogo cerrado {CONFORME,NO_CONFORME,NA}), RATING→NUMBER (ordinal), TIME→TIME, DURATION→NUMBER (minutos
+    canónicos), RANGE→RANGE (valor estructurado `{from,to}`), y los 6 objetos de PRESENTACIÓN→**LAYOUT** (no-dato: el
+    llenado los ignora — no `LogEntryValue`, no valida, fuera de reglas/resumen/obligatorios; fuente única
+    `isPresentationalType`). **Variantes por config (no tipo):** RUT/correo/teléfono/URL = TEXT + `config.format`;
+    porcentaje/moneda = NUMBER + `config.format`; radio/segmentos = SELECT + `config.displayAs`; casillas/modal =
+    MULTISELECT + `config.displayAs`.
   - **Capa 3 — rol semántico:** `semanticRole?` (enum `FieldSemanticRole?`: EFFECTIVE_DATE/TITLE/PRIMARY_EQUIPMENT/
     SEVERITY_DRIVER; null = ninguno). Qué significa para la plataforma. En 2.1.1 solo `EFFECTIVE_DATE` actúa
     (promueve `LogEntry.effectiveAt`, 2.4); **a lo sumo uno por versión** (validado en contrato + backend).

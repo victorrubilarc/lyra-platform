@@ -1,15 +1,16 @@
 import { useRef, useState, type CSSProperties, type DragEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Plus, Search } from "lucide-react";
-import type { FieldType } from "@lyra/contracts";
-import { FIELD_TYPE_META, type FieldTypeMeta } from "./builder-model.js";
+import { FIELD_PALETTE, PALETTE_CATEGORIES, type FieldPreset } from "./builder-model.js";
 import styles from "./TemplateBuilder.module.css";
 
 /**
- * Agregar campo de forma MINIMALISTA (Fase 2.1.7): un botón "＋ Agregar campo" abre
- * un menú compacto y BUSCABLE (estilo Notion "/"), sin paleta lateral fija ⇒ el
- * lienzo usa todo el ancho. Cada objeto se puede agregar con clic (al final de la
- * sección) o ARRASTRAR a una posición exacta del lienzo (HTML5 drop). Los ítems son
+ * Agregar objeto de forma MINIMALISTA (Fase 2.1.7 → Ola 1): un botón "＋ Agregar
+ * campo" abre un menú compacto, BUSCABLE y agrupado por CATEGORÍA (Básicos /
+ * Selección / Evaluación / Presentación). Cada objeto se agrega con clic (al final
+ * de la sección) o ARRASTRAR a una posición exacta del lienzo (HTML5 drop). El
+ * `onPick`/drag transportan el ID DE PRESET (no el tipo): un mismo tipo tiene
+ * varios presets (RUT/Correo son TEXT; Radio/Segmentos son SELECT). Los ítems son
  * `div` (no `button`): Chrome no inicia drag HTML5 confiable sobre botones.
  */
 export function AddFieldPopover({
@@ -17,7 +18,7 @@ export function AddFieldPopover({
   canEdit,
   variant = "section",
 }: {
-  onPick: (type: FieldType) => void;
+  onPick: (presetId: string) => void;
   canEdit: boolean;
   variant?: "bar" | "section";
 }) {
@@ -29,9 +30,9 @@ export function AddFieldPopover({
   if (!canEdit) return null;
 
   const query = q.trim().toLowerCase();
-  const list = FIELD_TYPE_META.filter((m) => t(m.labelKey).toLowerCase().includes(query));
-  const POP_W = 280;
-  const POP_H = 380;
+  const list = FIELD_PALETTE.filter((m) => t(m.labelKey).toLowerCase().includes(query));
+  const POP_W = 300;
+  const POP_H = 440;
   const toggle = () => {
     if (open) {
       close();
@@ -41,8 +42,6 @@ export function AddFieldPopover({
     if (r) {
       const left = Math.max(12, Math.min(r.left, window.innerWidth - POP_W - 12));
       const spaceBelow = window.innerHeight - r.bottom;
-      // Abrir hacia ABAJO si cabe; si no, hacia ARRIBA. El alto se limita al espacio
-      // disponible (queda PEGADO al botón y scrollea adentro, sin invadir otra UI).
       const openDown = spaceBelow >= POP_H || spaceBelow >= r.top;
       const maxHeight = Math.min(POP_H, (openDown ? spaceBelow : r.top) - 12);
       setPos(
@@ -57,31 +56,31 @@ export function AddFieldPopover({
     setOpen(false);
     setQ("");
   };
-  const pick = (type: FieldType) => {
-    onPick(type);
+  const pick = (presetId: string) => {
+    onPick(presetId);
     close();
   };
-  const onDragStart = (e: DragEvent<HTMLDivElement>, type: FieldType) => {
-    e.dataTransfer.setData("text/plain", type);
+  const onDragStart = (e: DragEvent<HTMLDivElement>, presetId: string) => {
+    e.dataTransfer.setData("text/plain", presetId);
     e.dataTransfer.effectAllowed = "copy";
   };
 
-  const item = (m: FieldTypeMeta) => {
+  const item = (m: FieldPreset) => {
     const Icon = m.icon;
     return (
       <div
-        key={m.type}
+        key={m.id}
         role="button"
         tabIndex={0}
         className={styles.paletteItem}
         draggable
-        onDragStart={(e) => onDragStart(e, m.type)}
+        onDragStart={(e) => onDragStart(e, m.id)}
         onDragEnd={close}
-        onClick={() => pick(m.type)}
+        onClick={() => pick(m.id)}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
-            pick(m.type);
+            pick(m.id);
           }
         }}
       >
@@ -120,7 +119,20 @@ export function AddFieldPopover({
               />
             </div>
             <div className={styles.addList}>
-              {list.length > 0 ? list.map(item) : <div className={styles.addEmpty}>—</div>}
+              {list.length > 0 ? (
+                PALETTE_CATEGORIES.map((cat) => {
+                  const items = list.filter((m) => m.category === cat);
+                  if (items.length === 0) return null;
+                  return (
+                    <div key={cat} className={styles.paletteGroup}>
+                      <div className={styles.paletteGroupLabel}>{t(`templates.builder.paletteCat.${cat}`)}</div>
+                      {items.map(item)}
+                    </div>
+                  );
+                })
+              ) : (
+                <div className={styles.addEmpty}>—</div>
+              )}
             </div>
             <p className={styles.paletteFoot}>{t("templates.builder.paletteHint")}</p>
           </div>

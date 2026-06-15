@@ -42,6 +42,7 @@ import {
   isEditWindowExpired,
   isEmptyValue,
   isFieldVisible,
+  isPresentationalType,
   isSectionEditableInState,
   recomputeComputedValues,
   resolveEditWindow,
@@ -739,6 +740,7 @@ export class LogEntriesService {
     const warnings: string[] = [];
     for (const input of dto.values) {
       const def = fieldsByKey.get(input.fieldKey)!;
+      if (isPresentationalType(def.type)) continue; // objeto de presentación: no es dato
       if (!isFieldVisible(def.visibleWhen, valuesByKey)) continue;
       const res = validateFieldValue(def, input.value, { allowedCodes: allowed.get(def.key) });
       errors.push(...res.errors);
@@ -747,6 +749,8 @@ export class LogEntriesService {
 
     if (dto.markComplete) {
       for (const def of fieldsByKey.values()) {
+        // Objeto de presentación (LAYOUT): no es dato; nunca es obligatorio.
+        if (isPresentationalType(def.type)) continue;
         // Un campo formulado no se teclea (read-only) ⇒ "obligatorio" no aplica.
         if (!def.required || def.computed) continue;
         if (!isFieldVisible(def.visibleWhen, valuesByKey)) continue;
@@ -780,6 +784,7 @@ export class LogEntriesService {
     await this.prisma.$transaction(async (tx) => {
       for (const input of dto.values) {
         const def = fieldsByKey.get(input.fieldKey)!;
+        if (isPresentationalType(def.type)) continue; // objeto de presentación: no se persiste valor
         const before = existing.find((e) => e.fieldKey === input.fieldKey);
         const beforeVal = (before?.value ?? null) as unknown;
         const afterVal = input.value ?? null;
@@ -1467,6 +1472,7 @@ export class LogEntriesService {
       const defs = section.fields.map((f) => this.toFieldDef(f, section.key));
       const allowed = await this.resolveAllowedCodes(defs);
       for (const def of defs) {
+        if (isPresentationalType(def.type)) continue; // objeto de presentación: no es dato
         if (!isFieldVisible(def.visibleWhen, valuesByKey)) continue;
         const val = valuesByKey[def.key];
         if (def.required && isEmptyValue(val)) {

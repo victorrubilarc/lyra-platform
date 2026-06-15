@@ -1,9 +1,8 @@
 import { useTranslation } from "react-i18next";
 import { Copy, SlidersHorizontal, Trash2, X } from "lucide-react";
 import { Button, Checkbox, Input } from "@lyra/ui";
-import { GRID_COLUMNS } from "@lyra/contracts";
-import { WIDTH_PRESETS, type EditField } from "./builder-model.js";
-import { fieldTypeMeta } from "./builder-model.js";
+import { GRID_COLUMNS, isPresentationalType } from "@lyra/contracts";
+import { WIDTH_PRESETS, fieldDisplayMeta, type EditField } from "./builder-model.js";
 import styles from "./TemplateBuilder.module.css";
 
 /**
@@ -45,7 +44,7 @@ export function FieldPropertiesPanel({
     );
   }
 
-  const meta = fieldTypeMeta(field.type);
+  const meta = fieldDisplayMeta(field);
   const Icon = meta.icon;
 
   return (
@@ -64,10 +63,12 @@ export function FieldPropertiesPanel({
         <Input value={field.label} disabled={!canEdit} onChange={(e) => onLabel(e.target.value)} />
       </label>
 
-      <label className={styles.propCheck}>
-        <Checkbox checked={field.required} disabled={!canEdit} onChange={(v) => onRequired(v)} />
-        <span>{t("templates.builder.required")}</span>
-      </label>
+      {!isPresentationalType(field.type) && (
+        <label className={styles.propCheck}>
+          <Checkbox checked={field.required} disabled={!canEdit} onChange={(v) => onRequired(v)} />
+          <span>{t("templates.builder.required")}</span>
+        </label>
+      )}
 
       <div className={styles.propRow}>
         <span className={styles.propLabel}>{t("templates.builder.propWidth")}</span>

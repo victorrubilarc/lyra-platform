@@ -1,5 +1,36 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-15 — Catálogo de objetos premium · OLA 1 (objetos sin infraestructura) ✅** (`feat/objetos-ola1` →
+`main`). El núcleo (NUMBER/TEXT/TEXTAREA/SELECT/MULTISELECT/BOOLEAN/DATE/DATETIME/SEVERITY/SIGNATURE) se amplió con los
+objetos que esperan las bitácoras industriales, todos sobre el **render ÚNICO** `FieldControl`↔`FieldGrid` (builder =
+llenado = visor). **5 forks confirmados por el dueño (DECISIONS 2026-06-15):** (1) **`displayAs`** en SELECT
+(dropdown/radio/segmented) y MULTISELECT (dropdown/checkboxes/**modal** = Value Help con `LookupPicker`) — misma
+validación/`dataType`; **tipos NUEVOS solo** donde la semántica difiere: **CONFORMITY** (tri-estado Conforme/No
+conforme/N.A., `dataType CODE` con catálogo cerrado) y **RATING** (valoración estrellas/numérica/Likert, `dataType
+NUMBER`). (2) Objetos de **PRESENTACIÓN** (HEADING/STATIC_TEXT/DIVIDER/NOTICE/PROCEDURE_LINK/REFERENCE_IMAGE) con
+**`dataType LAYOUT`** dedicado que el llenado IGNORA (no `LogEntryValue`, no valida, fuera de reglas/resumen/obligatorios),
+vía la fuente única `isPresentationalType`. (3) **HORA** (`TIME`) y **DURACIÓN HH:MM** (`DURATION`, minutos canónicos)
+como tipos propios; **RUT/correo/teléfono/URL** = `TEXT + config.format` y **porcentaje/moneda** = `NUMBER + config.format`
+(validación regional `isValidTextFormat`/`isValidRut`); **RANGO mín–máx** = tipo `RANGE` con valor estructurado `{from,to}`
+(`dataType RANGE`; único no-escalar). (4) modal de multiselección reusa `LookupPicker`. (5) **paleta** del builder
+reorganizada en **PRESETS por categoría** (Básicos · Selección · Evaluación · Presentación): un mismo `type` ofrece varios
+presets (RUT/Correo son TEXT; Radio/Segmentos son SELECT) ⇒ la superficie de `FieldType` queda chica y la paleta rica.
+**Contratos** (`@lyra/contracts`): +11 `FIELD_TYPES`, +`LAYOUT`/`RANGE` en `FIELD_DATA_TYPES`, `FIELD_TYPE_TO_DATA_TYPE`,
+config Zod `.strict()` por tipo, `fieldConfigSchemaFor`, `validateFieldValue` (tri-estado/rating/time/duration/range +
+format RUT/email/url/percent; presentación se ignora), `isEmptyValue` soporta RANGE, helpers puros RUT/formato/hora.
+**Migración aditiva** `20260615120000_add_ola1_field_types` (ALTER enum, PG12+, idempotente; cero ruptura). **API**:
+`saveSection` y `collectCompletionErrors` saltan LAYOUT en validación/persistencia/completitud (defensa en profundidad);
+`assertGridFieldKeysExist` rechaza LAYOUT como candidato de Resumen; `deriveDataType`/clone/`mapVersion` ya cubren los
+tipos. **Web**: `FieldControl` rinde los 13 objetos (premium, tokens claro+oscuro, 44px) + CSS; `lib/format`
+(`formatRut`/`formatDurationHm`/`formatPercent`); paleta `FIELD_PALETTE`+`fieldDisplayMeta`; editores de config
+(format/displayAs/rating/conformity/notice/heading/divider/enlace/imagen) en `BuilderConfigPanel`/`FieldPropertiesPanel`;
+`EntryFillPage` excluye presentación de los valores; i18n es-CL completo. Se eliminó `AddFieldMenu` (huérfano).
+**Sin permisos nuevos — catálogo 60.** Tests: **contracts 204** (+9) · **API 234**. **Smoke en vivo
+`scripts/smoke-objetos-ola1.py` 21/21** (round-trip: tipo+config en versión CONGELADA por cada objeto; validación en vivo
+válidos→2xx / inválidos→400 con ≥5 errores; presentación NO persiste valor; crea y LIMPIA por ID). typecheck/lint(0)/build
+verdes. **Pendiente: smoke VISUAL del dueño** (§4: cada objeto premium, estados, claro/oscuro, responsive). **Siguiente:
+Ola 2** (selectores de equipo/usuario/nodo/turno + lectura con tolerancia + contador + matriz de riesgo).
+
 **2026-06-14 — Fase 2.1.7 Diseñador visual de formularios (lienzo de posicionamiento libre) ✅ FASE 1**
 (`feat/builder-visual-designer` → `main`). El modelo auto-fila (orden + colSpan, ancho derivado) era rígido: no se
 podía colocar un campo donde uno quería ni redimensionar uno libremente. Contradije el píxel-absoluto puro (Figma/Canva)

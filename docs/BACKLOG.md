@@ -5,7 +5,11 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-14** (**Fase 2.1.7 Diseñador visual de formularios ✅ FASE 1** — `feat/builder-visual-designer`:
+> actualización: **2026-06-15** (**Catálogo de objetos premium · Ola 1 ✅** — `feat/objetos-ola1`: +11 tipos
+> (CONFORMITY/RATING/TIME/DURATION/RANGE + 6 de presentación), `displayAs` en SELECT/MULTISELECT y `format` en
+> TEXT/NUMBER, dataType `LAYOUT`/`RANGE`, migración ALTER enum aditiva, render único FieldControl premium, paleta por
+> presets, guardas LAYOUT en API. Contracts 204 · API 234 · smoke 21/21. Pendiente: smoke VISUAL [§4]. Anterior:
+> **Fase 2.1.7 Diseñador visual de formularios ✅ FASE 1** — `feat/builder-visual-designer`:
 > el modelo auto-fila era rígido (no se podía colocar/redimensionar libre). Se contradijo el píxel-absoluto puro (rompe el
 > responsive de terreno) y el dueño aceptó **grilla responsiva de posicionamiento libre** (`react-grid-layout`): geometría
 > EXPLÍCITA `{x,y,w,h}` por campo (columnas `TemplateField.gridX/gridY/gridH` NULLABLE, migración aditiva; `null`=legacy ⇒
@@ -133,6 +137,7 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Fase 2.1.5 Builder auto-layout por arrastre (Notion)** (ancho completo + soltar-al-lado/a-su-línea con ancho auto `splitRow`/`rowRangeOf`/`applyDrop` + divisor de borde `resizeDivider` + quitar menú "12/12" + responsive 1/2/12 + indicadores de soltado; frontend puro) | `feat/builder-autolayout` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Fase 2.1.6 Builder motor de arrastre con dnd-kit (Canva-grade)** (adopta `@dnd-kit/core`6+`sortable`10+`utilities`3; nodo sortable = celda con reflow animado; tarjeta = activador; `DragOverlay` sigue al cursor; intención al-lado/fila por píxeles reusando `applyDrop`/`splitRow`; `SectionDropArea` droppable de sección; arregla el bug del grip-SVG; frontend puro) | `feat/builder-dnd-kit` → `main` | ✅ fusionado y publicado en `origin/main` (`20e236b`) | ninguna |
 | **Fase 2.1.7 Diseñador visual de formularios (lienzo libre)** (geometría `TemplateField.gridX/gridY/gridH` nullable + migración `…_add_field_grid_geometry` + contratos + 3 map sites API; `react-grid-layout` en `SectionCanvas` + `FieldPalette` + `FieldPropertiesPanel`; `FieldGrid` data-driven + container-queries; deriva legacy del orden+colSpan; smoke geometría 14/14) | `feat/builder-visual-designer` → `main` | ✅ fusionado y publicado en `origin/main` (`85cd2c4`) | ninguna |
+| **Catálogo de objetos premium · Ola 1** (+11 `FIELD_TYPES` + `LAYOUT`/`RANGE` dataType + migración `…_add_ola1_field_types` ALTER enum; `displayAs` SELECT/MULTISELECT + `format` TEXT/NUMBER + tri-estado/rating/time/duration/range + presentación LAYOUT; `validateFieldValue`/`isEmptyValue`/helpers; guardas LAYOUT en API; FieldControl premium + paleta presets + editores config + lib/format; contracts 204 · API 234 · smoke 21/21) | `feat/objetos-ola1` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 
 **Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
@@ -159,16 +164,15 @@ a11y AA + teclado + foco visible + táctil ≥44px; validación clara + formato 
 listas largas virtualizadas/paginadas; WYSIWYG fiel (control real); render ÚNICO (FieldControl). Si no
 llega al nivel, NO se publica: queda aquí con lo que falta.
 
-- [ ] **Ola 1 — objetos SIN infra (próxima sesión).** Conforme/No conforme/N.A. (tri-estado) · radio
-      (opción única visible) · casillas múltiples visibles · chips/segmentos · escala Likert/valoración +
-      estrellas · **multiselección con MODAL (Value Help, reusa LookupPicker)** · Hora · Duración HH:MM ·
-      Rango (mín–máx) · Porcentaje · Moneda CLP · RUT (dígito verificador) · Correo/Teléfono/URL ·
-      **presentación (no-dato):** encabezado, texto/instrucción, separador, aviso, enlace a procedimiento,
-      imagen de referencia. **Forks a resolver:** (1) tipos nuevos vs `displayAs` en config de SELECT/
-      MULTISELECT (recomendado displayAs para radio/checkbox/segmentos/modal; tipos nuevos solo para
-      tri-estado y rating); (2) dataType `LAYOUT`/`presentational` que el llenado IGNORA (no crea
-      LogEntryValue, no valida, no entra a reglas/resumen); (3) RUT/moneda/% como TEXT/NUMBER + `format`
-      vs tipos propios; (4) categorías de la paleta (AddFieldPopover).
+- [x] **Ola 1 — objetos SIN infra ✅ (2026-06-15, `feat/objetos-ola1` → `main`).** Tri-estado `CONFORMITY` ·
+      radio/segmentos/casillas/multiselección-modal vía `displayAs` (SELECT/MULTISELECT) · valoración `RATING`
+      (estrellas/numérica/Likert) · `TIME` · `DURATION` (minutos) · `RANGE` {from,to} · RUT/correo/teléfono/URL
+      (`TEXT+format`) · porcentaje/moneda (`NUMBER+format`) · presentación `HEADING/STATIC_TEXT/DIVIDER/NOTICE/
+      PROCEDURE_LINK/REFERENCE_IMAGE` (`dataType LAYOUT`, el llenado los ignora). 5 forks resueltos (DECISIONS
+      2026-06-15). Paleta = presets por categoría. Sin permisos nuevos (catálogo 60). Contracts 204 · API 234 ·
+      smoke 21/21. **Pendiente: smoke VISUAL del dueño** (§4). **Deuda fina:** RANGE es el único valor no-escalar
+      ({from,to}); revisar export/línea Resumen si se necesita mostrarlo. La imagen de referencia es por URL (el
+      upload de imágenes propias es Ola 3/MinIO).
 - [ ] **Ola 2 — objetos de referencia.** Selector de equipo/activo (ISO 14224) · usuario/responsable ·
       nodo de estructura · turno/cuadrilla · lectura con tolerancia (esperado ± tol) · contador/acumulado ·
       matriz de riesgo (probabilidad × consecuencia, extiende Severidad). Reusa pickers existentes.
@@ -877,6 +881,15 @@ implementación esperada:
 ## 4. Pendiente por PROBAR (gaps de verificación)
 
 > Lo construido puede estar "verde en tests" pero no ejercido en condiciones reales.
+
+- [ ] **Catálogo de objetos · Ola 1 — smoke VISUAL en navegador** (se verificó typecheck/lint/build + smoke API
+      round-trip 21/21; falta el clic). Por cada objeto nuevo: agregarlo desde la paleta (categorías Básicos/
+      Selección/Evaluación/Presentación), verlo en el lienzo (WYSIWYG), configurarlo (format/displayAs/rating
+      estilo+máx/conformidad N.A./aviso variante+texto/encabezado nivel/enlace/imagen URL), y llenarlo en una
+      entrada. Revisar **estados** (default/hover/focus/inválido/vacío/readOnly), **claro y oscuro**, áreas
+      táctiles 44px y **responsive** (tablet 2 col / móvil 1). Casos: tri-estado colores; estrellas/likert;
+      duración HH:MM y rango mín–máx; RUT/correo/% con su validación; multiselección MODAL (LookupPicker);
+      objetos de presentación (encabezado/aviso/separador/enlace/imagen) que NO piden dato. App en `:5173`.
 
 - [ ] **App Shell — smoke VISUAL en navegador** (se verificó typecheck/lint/build/test + que el dev
       sirve; falta el clic): colapsar/expandir sidebar, abrir/cerrar/fijar pestañas (sin refrescos),
