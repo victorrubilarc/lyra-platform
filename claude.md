@@ -9,7 +9,7 @@ Plataforma de bitácoras operacionales para industria (minería, manufactura, en
 1. Al EMPEZAR: lee `docs/PROGRESS.md`, `docs/ARCHITECTURE.md`, `docs/DATA_MODEL.md`, `docs/SECURITY.md`, `docs/DECISIONS.md`, `docs/AUTH_FLOW.md` y **`docs/BACKLOG.md`** (el registro de todo lo abierto: por hacer, por probar y por publicar). Si el backlog muestra trabajo de la sesión anterior **sin publicar** (commits/ramas que no están en `origin`), resuélvelo ANTES de empezar lo nuevo.
 2. Confirma en dos líneas dónde estamos y qué vamos a hacer en esta sesión antes de escribir cualquier código.
 3. Durante el trabajo: si tomas una decisión de diseño, regístrala en `docs/DECISIONS.md` con fecha y motivo. Si detectas deuda o algo que queda fuera de alcance, anótalo en `docs/BACKLOG.md` (no lo dejes solo "en la cabeza").
-4. Al TERMINAR: actualiza `docs/PROGRESS.md` (qué quedó hecho) y **`docs/BACKLOG.md`** (qué queda por hacer/probar/publicar), más cualquier doc afectado.
+4. Al TERMINAR: actualiza `docs/PROGRESS.md` (qué quedó hecho) y **`docs/BACKLOG.md`** (qué queda por hacer/probar/publicar), más cualquier doc afectado. Si la sesión **completó una funcionalidad de cara al usuario**, actualiza también **`docs/USER_GUIDE.md`** (manual de uso VIVO): agrega/actualiza su sección con las 4 partes (para qué sirve · cómo se usa · quién puede · importante) y marca la entrada del índice como redactada (✅). Si quedan funcionalidades antiguas sin redactar (✍️), aprovecha de rellenar 1–2 por sesión (backfill incremental).
 5. **Publica siempre antes de cerrar** (regla "nada se queda atrás"): haz push de la rama y/o merge a `main` + push de `main`. Un commit que solo vive en el disco local es trabajo en riesgo. Si por instrucción explícita no se publica, queda registrado en `docs/BACKLOG.md` §1 como pendiente.
 6. No asumas contexto que no esté en los docs o en el código. Si falta información, pregúntame.
 
@@ -167,6 +167,7 @@ No es una app genérica: es software industrial de alto estándar.
   2. Actualiza `docs/PROGRESS.md` con lo completado, el estado actual y los próximos pasos exactos.
   3. Actualiza `docs/BACKLOG.md`: tacha lo cerrado y registra lo que quede por hacer/probar/publicar.
   4. Actualiza cualquier otro doc afectado (`ARCHITECTURE.md`, `DATA_MODEL.md`, etc.).
+  4.1. Si se completó una funcionalidad de cara al usuario, actualiza **`docs/USER_GUIDE.md`** (manual de uso VIVO): redacta/actualiza su sección (para qué sirve · cómo se usa · quién puede · importante) y marca el índice (✅). Rellena de paso 1–2 secciones antiguas pendientes (✍️) cuando puedas (backfill incremental).
   5. Haz un commit descriptivo con todo el trabajo de la sesión.
   6. **Publica** (regla "nada se queda atrás"): push de la rama y/o merge a `main` + push de `main`. Verifica con `git status` / `git log origin/main..` que no quede nada solo en local. Si no se publica por instrucción mía, anótalo en `docs/BACKLOG.md` §1.
   7. Muéstrame un resumen de lo que se completó y lo que viene.

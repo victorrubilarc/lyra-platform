@@ -13,6 +13,7 @@ import { z } from "zod";
  */
 
 export const FIELD_TYPES = [
+  // --- Núcleo (Fase 2.1) ---
   "NUMBER",
   "TEXT",
   "TEXTAREA",
@@ -23,6 +24,21 @@ export const FIELD_TYPES = [
   "DATETIME",
   "SEVERITY",
   "SIGNATURE",
+  // --- Catálogo de objetos premium · Ola 1 (2026-06-15) -------------------
+  // Evaluación (semántica propia, no son variantes de SELECT/NUMBER):
+  "CONFORMITY", // tri-estado de inspección: Conforme / No conforme / N.A.
+  "RATING", // valoración ordinal: estrellas / numérica / Likert
+  // Fecha/hora/cantidad (teclado y validación distintos del núcleo):
+  "TIME", // hora del día HH:MM
+  "DURATION", // duración HH:MM (almacenada en MINUTOS canónicos)
+  "RANGE", // rango mín–máx (valor estructurado {from,to})
+  // Presentación (NO-dato: el llenado los IGNORA, dataType = LAYOUT):
+  "HEADING", // encabezado / subtítulo de bloque
+  "STATIC_TEXT", // texto / instrucción fija
+  "DIVIDER", // separador visual
+  "NOTICE", // aviso (info / advertencia / éxito / peligro)
+  "PROCEDURE_LINK", // enlace a un procedimiento / documento
+  "REFERENCE_IMAGE", // imagen de referencia (URL configurada por el diseñador)
 ] as const;
 
 export const fieldTypeSchema = z.enum(FIELD_TYPES);
@@ -38,6 +54,21 @@ export const CORE_FIELD_TYPES = [
   "BOOLEAN",
   "DATE",
   "DATETIME",
+] as const satisfies readonly FieldType[];
+
+/**
+ * Objetos de PRESENTACIÓN (no-dato, Ola 1): el LLENADO los ignora por completo
+ * (no crea `LogEntryValue`, no valida, no entra a reglas/resumen/obligatorios).
+ * Mapean todos a `dataType = LAYOUT`. La fuente única para "saltarlos" es
+ * `isPresentationalType` (basada en el dataType, no en una lista que se desincronice).
+ */
+export const PRESENTATIONAL_FIELD_TYPES = [
+  "HEADING",
+  "STATIC_TEXT",
+  "DIVIDER",
+  "NOTICE",
+  "PROCEDURE_LINK",
+  "REFERENCE_IMAGE",
 ] as const satisfies readonly FieldType[];
 
 // === Modelo de campo en 3 capas (Fase 2.1.1) ================================
@@ -72,6 +103,8 @@ export const FIELD_DATA_TYPES = [
   "FILE",
   "GEO",
   "COMPUTED",
+  "RANGE", // rango estructurado {from,to} de dos números (Ola 1)
+  "LAYOUT", // objeto de PRESENTACIÓN: no es dato, el llenado lo ignora (Ola 1)
 ] as const;
 export const fieldDataTypeSchema = z.enum(FIELD_DATA_TYPES);
 export type FieldDataType = z.infer<typeof fieldDataTypeSchema>;
@@ -102,11 +135,112 @@ export const FIELD_TYPE_TO_DATA_TYPE: Record<FieldType, FieldDataType> = {
   DATETIME: "DATETIME",
   SEVERITY: "CODE", // escala cerrada {1..5} = code/dimensión (lista de sistema implícita)
   SIGNATURE: "REFERENCE", // el valor referencia la firma/identidad del firmante (2.5)
+  // --- Ola 1 ---
+  CONFORMITY: "CODE", // escala cerrada {CONFORME, NO_CONFORME, NA} = dimensión reportable
+  RATING: "NUMBER", // valoración ordinal almacenada como entero 1..max
+  TIME: "TIME", // "HH:MM"
+  DURATION: "NUMBER", // minutos canónicos (espejo de SLA / ventana de edición)
+  RANGE: "RANGE", // {from, to}
+  HEADING: "LAYOUT",
+  STATIC_TEXT: "LAYOUT",
+  DIVIDER: "LAYOUT",
+  NOTICE: "LAYOUT",
+  PROCEDURE_LINK: "LAYOUT",
+  REFERENCE_IMAGE: "LAYOUT",
 };
 
 /** Deriva el `dataType` de un `type` (la presentación define el almacenamiento). */
 export function deriveDataType(type: FieldType): FieldDataType {
   return FIELD_TYPE_TO_DATA_TYPE[type];
+}
+
+/**
+ * ¿Es un objeto de PRESENTACIÓN (no-dato)? Fuente única para que el llenado lo
+ * salte (no exige, no valida, no persiste valor, no entra a reglas/resumen).
+ * Basada en el `dataType = LAYOUT` derivado, no en una lista paralela.
+ */
+export function isPresentationalType(type: FieldType): boolean {
+  return FIELD_TYPE_TO_DATA_TYPE[type] === "LAYOUT";
+}
+
+/** Códigos cerrados del tri-estado de inspección (Conforme / No conforme / N.A.). */
+export const CONFORMITY_CODES = ["CONFORME", "NO_CONFORME", "NA"] as const;
+export type ConformityCode = (typeof CONFORMITY_CODES)[number];
+
+/** Estilos de la valoración (RATING). `numeric` = botones 1..max; `stars` = estrellas; `likert` = escala con rótulos. */
+export const RATING_STYLES = ["stars", "numeric", "likert"] as const;
+export type RatingStyle = (typeof RATING_STYLES)[number];
+/** Máximo por defecto de la valoración (5 estrellas / 1..5). */
+export const RATING_DEFAULT_MAX = 5;
+
+// === Validadores de FORMATO regional/semántico (fuente única back↔front) ======
+//
+// RUT/correo/teléfono/URL son VARIANTES de TEXT (config.format); su validación
+// vive aquí para que backend (autoritativo) y frontend (feedback) usen lo mismo.
+// El FORMATEO visual (puntos/guion del RUT, etc.) es responsabilidad de la UI
+// (apps/.../lib/format.ts); aquí solo se decide validez.
+
+/** Formatos semánticos de un campo de TEXTO. */
+export const TEXT_FORMATS = ["rut", "email", "phone", "url"] as const;
+export type TextFormat = (typeof TEXT_FORMATS)[number];
+/** Formatos semánticos de un campo NUMÉRICO. */
+export const NUMBER_FORMATS = ["percent", "currency"] as const;
+export type NumberFormat = (typeof NUMBER_FORMATS)[number];
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const URL_RE = /^https?:\/\/[^\s.]+\.[^\s]+$/i;
+// Teléfono permisivo (E.164-ish): + opcional, dígitos/espacios/guiones/paréntesis, 7..20 dígitos.
+const PHONE_RE = /^\+?[0-9()\s-]{7,24}$/;
+
+/** Normaliza un RUT chileno a "cuerpo-DV" sin puntos, DV en mayúscula. null si no parsea. */
+export function normalizeRut(raw: string): string | null {
+  const cleaned = raw.replace(/[.\s]/g, "").replace(/-/g, "").toUpperCase();
+  if (cleaned.length < 2) return null;
+  const body = cleaned.slice(0, -1);
+  const dv = cleaned.slice(-1);
+  if (!/^\d+$/.test(body) || !/^[0-9K]$/.test(dv)) return null;
+  return `${body}-${dv}`;
+}
+
+/** Dígito verificador esperado (módulo 11) del cuerpo numérico de un RUT. */
+export function rutCheckDigit(body: string): string {
+  let sum = 0;
+  let mul = 2;
+  for (let i = body.length - 1; i >= 0; i--) {
+    sum += Number(body[i]) * mul;
+    mul = mul === 7 ? 2 : mul + 1;
+  }
+  const res = 11 - (sum % 11);
+  return res === 11 ? "0" : res === 10 ? "K" : String(res);
+}
+
+/** ¿RUT chileno válido (con dígito verificador correcto)? */
+export function isValidRut(raw: string): boolean {
+  const norm = normalizeRut(raw);
+  if (!norm) return false;
+  const [body, dv] = norm.split("-");
+  return rutCheckDigit(body!) === dv;
+}
+
+/** Valida un valor de texto contra su formato semántico. true = válido. */
+export function isValidTextFormat(format: TextFormat, value: string): boolean {
+  const v = value.trim();
+  if (v === "") return true; // vacío lo gobierna "obligatorio", no el formato
+  switch (format) {
+    case "rut":
+      return isValidRut(v);
+    case "email":
+      return EMAIL_RE.test(v);
+    case "phone":
+      return PHONE_RE.test(v) && (v.match(/\d/g)?.length ?? 0) >= 7;
+    case "url":
+      return URL_RE.test(v);
+  }
+}
+
+/** "HH:MM" 24h válido (00:00..23:59). */
+export function isValidTimeOfDay(value: string): boolean {
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
 }
 
 // === Ancho del campo en la grilla (Fase 2.1.2 → 2.1.3) =======================
@@ -196,6 +330,10 @@ export const numberFieldConfigSchema = z
     warnHigh: z.number().optional(),
     critLow: z.number().optional(),
     critHigh: z.number().optional(),
+    /** Formato semántico (Ola 1): `percent` (0..100, sufijo %) o `currency` (moneda regional). */
+    format: z.enum(NUMBER_FORMATS).optional(),
+    /** Código ISO de moneda cuando `format=currency` (default CLP). */
+    currency: z.string().trim().length(3).optional(),
   })
   .strict()
   .superRefine((c, ctx) => {
@@ -212,6 +350,8 @@ export const textFieldConfigSchema = z
     maxLength: z.number().int().min(1).max(10000).optional(),
     /** Regex de formato (validada en backend al llenar, Fase 2.4). */
     pattern: z.string().trim().max(300).optional(),
+    /** Formato semántico (Ola 1): rut/email/phone/url. Validado por `isValidTextFormat`. */
+    format: z.enum(TEXT_FORMATS).optional(),
   })
   .strict();
 export type TextFieldConfig = z.infer<typeof textFieldConfigSchema>;
@@ -244,12 +384,43 @@ function upgradeLegacyOptions(input: unknown): unknown {
   return { ...rest, optionSource: { kind: "inline", items } };
 }
 
-/** SELECT / MULTISELECT con fuente de opciones discriminada (`optionSource`). */
+/**
+ * Presentación de un SELECT (Ola 1, fork `displayAs`): un único `code` con la
+ * MISMA fuente de opciones y validación; solo cambia el widget.
+ *  - dropdown (default): combobox buscable. - radio: opciones visibles 1-toque.
+ *  - segmented: chips/segmentos (pocas opciones).
+ */
+export const SELECT_DISPLAYS = ["dropdown", "radio", "segmented"] as const;
+export type SelectDisplay = (typeof SELECT_DISPLAYS)[number];
+
+/**
+ * Presentación de un MULTISELECT (Ola 1): varios `code`, misma fuente/validación.
+ *  - dropdown (default): tags + menú. - checkboxes: casillas visibles.
+ *  - modal: Value Help emergente (reusa LookupPicker) para listas grandes.
+ */
+export const MULTISELECT_DISPLAYS = ["dropdown", "checkboxes", "modal"] as const;
+export type MultiselectDisplay = (typeof MULTISELECT_DISPLAYS)[number];
+
+/** SELECT / MULTISELECT con fuente de opciones discriminada (`optionSource`). Base común. */
 export const optionsFieldConfigSchema = z.preprocess(
   upgradeLegacyOptions,
   z.object({ optionSource: optionSourceSchema.optional() }).strict(),
 );
 export type OptionsFieldConfig = z.infer<typeof optionsFieldConfigSchema>;
+
+/** Config de SELECT: fuente de opciones + presentación (`displayAs`). */
+export const selectFieldConfigSchema = z.preprocess(
+  upgradeLegacyOptions,
+  z.object({ optionSource: optionSourceSchema.optional(), displayAs: z.enum(SELECT_DISPLAYS).optional() }).strict(),
+);
+
+/** Config de MULTISELECT: fuente de opciones + presentación (`displayAs`). */
+export const multiselectFieldConfigSchema = z.preprocess(
+  upgradeLegacyOptions,
+  z
+    .object({ optionSource: optionSourceSchema.optional(), displayAs: z.enum(MULTISELECT_DISPLAYS).optional() })
+    .strict(),
+);
 
 export const booleanFieldConfigSchema = z
   .object({
@@ -272,6 +443,111 @@ export const signatureFieldConfigSchema = z
   })
   .strict();
 
+// === Config de objetos Ola 1 =================================================
+
+/** CONFORMITY (tri-estado): `allowNa` permite/oculta la opción N.A. (default true). */
+export const conformityFieldConfigSchema = z
+  .object({
+    allowNa: z.boolean().optional(),
+  })
+  .strict();
+
+/** RATING (valoración): estilo (estrellas/numérica/Likert), máximo y rótulos opcionales. */
+export const ratingFieldConfigSchema = z
+  .object({
+    style: z.enum(RATING_STYLES).optional(),
+    max: z.number().int().min(2).max(10).optional(),
+    /** Rótulos de la escala Likert (1 por punto; opcional, solo display). */
+    labels: z.array(z.string().trim().max(40)).max(10).optional(),
+  })
+  .strict()
+  .superRefine((c, ctx) => {
+    if (c.labels && c.max && c.labels.length > c.max) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Más rótulos que puntos de la escala", path: ["labels"] });
+    }
+  });
+
+/** TIME (hora del día) — sin config en Ola 1. */
+export const timeFieldConfigSchema = z.object({}).strict();
+
+/** DURATION (duración HH:MM, almacenada en minutos) — sin config en Ola 1. */
+export const durationFieldConfigSchema = z.object({}).strict();
+
+/** RANGE (mín–máx): unidad/decimales + cotas duras opcionales para ambos extremos. */
+export const rangeFieldConfigSchema = z
+  .object({
+    unit: z.string().trim().max(24).optional(),
+    decimals: z.number().int().min(0).max(6).optional(),
+    min: z.number().optional(),
+    max: z.number().optional(),
+  })
+  .strict()
+  .superRefine((c, ctx) => {
+    if (c.min !== undefined && c.max !== undefined && c.min > c.max) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "min no puede ser mayor que max", path: ["min"] });
+    }
+  });
+
+// --- Objetos de PRESENTACIÓN (dataType LAYOUT; el llenado los ignora) --------
+
+/** HEADING — nivel jerárquico del encabezado (1..3). El texto va en `label`. */
+export const headingFieldConfigSchema = z
+  .object({
+    level: z.number().int().min(1).max(3).optional(),
+  })
+  .strict();
+
+/** STATIC_TEXT — cuerpo del texto/instrucción (el `label` es el título opcional). */
+export const staticTextFieldConfigSchema = z
+  .object({
+    text: z.string().trim().max(4000).optional(),
+  })
+  .strict();
+
+/** DIVIDER — separador. `spacing` controla el aire vertical. */
+export const dividerFieldConfigSchema = z
+  .object({
+    spacing: z.enum(["sm", "md", "lg"]).optional(),
+  })
+  .strict();
+
+/** NOTICE — aviso con intención semántica + cuerpo. */
+export const NOTICE_VARIANTS = ["info", "warning", "success", "danger"] as const;
+export type NoticeVariant = (typeof NOTICE_VARIANTS)[number];
+export const noticeFieldConfigSchema = z
+  .object({
+    variant: z.enum(NOTICE_VARIANTS).optional(),
+    text: z.string().trim().max(2000).optional(),
+  })
+  .strict();
+
+/** PROCEDURE_LINK — enlace a un procedimiento/documento (URL + texto del enlace). */
+export const procedureLinkFieldConfigSchema = z
+  .object({
+    url: z.string().trim().max(2000).optional(),
+    linkText: z.string().trim().max(200).optional(),
+  })
+  .strict()
+  .superRefine((c, ctx) => {
+    if (c.url && !isValidTextFormat("url", c.url)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "URL inválida", path: ["url"] });
+    }
+  });
+
+/** REFERENCE_IMAGE — imagen de referencia por URL (sin upload: eso es Ola 3/MinIO). */
+export const referenceImageFieldConfigSchema = z
+  .object({
+    url: z.string().trim().max(2000).optional(),
+    alt: z.string().trim().max(200).optional(),
+    caption: z.string().trim().max(300).optional(),
+  })
+  .strict()
+  .superRefine((c, ctx) => {
+    if (c.url && !isValidTextFormat("url", c.url)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "URL inválida", path: ["url"] });
+    }
+  });
+
 /**
  * Normaliza la config almacenada de un campo al shape vigente (2.1.1): para
  * SELECT/MULTISELECT, sube el `options[]` legacy a `optionSource.inline`. Para
@@ -293,8 +569,9 @@ export function fieldConfigSchemaFor(type: FieldType): z.ZodTypeAny {
     case "TEXTAREA":
       return textareaFieldConfigSchema;
     case "SELECT":
+      return selectFieldConfigSchema;
     case "MULTISELECT":
-      return optionsFieldConfigSchema;
+      return multiselectFieldConfigSchema;
     case "BOOLEAN":
       return booleanFieldConfigSchema;
     case "DATE":
@@ -304,6 +581,29 @@ export function fieldConfigSchemaFor(type: FieldType): z.ZodTypeAny {
       return severityFieldConfigSchema;
     case "SIGNATURE":
       return signatureFieldConfigSchema;
+    // --- Ola 1 ---
+    case "CONFORMITY":
+      return conformityFieldConfigSchema;
+    case "RATING":
+      return ratingFieldConfigSchema;
+    case "TIME":
+      return timeFieldConfigSchema;
+    case "DURATION":
+      return durationFieldConfigSchema;
+    case "RANGE":
+      return rangeFieldConfigSchema;
+    case "HEADING":
+      return headingFieldConfigSchema;
+    case "STATIC_TEXT":
+      return staticTextFieldConfigSchema;
+    case "DIVIDER":
+      return dividerFieldConfigSchema;
+    case "NOTICE":
+      return noticeFieldConfigSchema;
+    case "PROCEDURE_LINK":
+      return procedureLinkFieldConfigSchema;
+    case "REFERENCE_IMAGE":
+      return referenceImageFieldConfigSchema;
   }
 }
 

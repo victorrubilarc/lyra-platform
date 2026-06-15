@@ -511,6 +511,19 @@ enum FieldType {
   DATETIME
   SEVERITY
   SIGNATURE
+  // Catálogo de objetos premium — Ola 1 (2026-06-15). Evaluación, fecha/hora/
+  // cantidad y PRESENTACIÓN (no-dato → dataType LAYOUT). Ver field-types.ts.
+  CONFORMITY
+  RATING
+  TIME
+  DURATION
+  RANGE
+  HEADING
+  STATIC_TEXT
+  DIVIDER
+  NOTICE
+  PROCEDURE_LINK
+  REFERENCE_IMAGE
 }
 
 // Recurrencia (rondas/lecturas programadas). Modelada para no re-migrar; su
@@ -558,6 +571,8 @@ enum FieldDataType {
   FILE
   GEO
   COMPUTED
+  RANGE // rango estructurado {from,to} de dos números (Ola 1)
+  LAYOUT // objeto de PRESENTACIÓN: no es dato, el llenado lo ignora (Ola 1)
 }
 
 // Capa 3 del campo: rol semántico opcional (qué significa para la plataforma).

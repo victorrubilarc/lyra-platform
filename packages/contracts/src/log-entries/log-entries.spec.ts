@@ -129,6 +129,75 @@ describe("isEmptyValue", () => {
     expect(isEmptyValue(false)).toBe(false);
     expect(isEmptyValue(["a"])).toBe(false);
   });
+
+  it("RANGE: {from,to} vacío si ambos lo están; 0 cuenta como valor", () => {
+    expect(isEmptyValue({ from: null, to: null })).toBe(true);
+    expect(isEmptyValue({ from: "", to: "" })).toBe(true);
+    expect(isEmptyValue({ from: 0, to: null })).toBe(false);
+    expect(isEmptyValue({ from: 1, to: 5 })).toBe(false);
+  });
+});
+
+describe("validateFieldValue — objetos Ola 1", () => {
+  const f = (type: FieldForValidation["type"], config: Record<string, unknown> = {}): FieldForValidation => ({
+    key: "x",
+    type,
+    dataType: "STRING",
+    label: "Campo",
+    config,
+  });
+
+  it("CONFORMITY: acepta el catálogo; N.A. configurable", () => {
+    expect(validateFieldValue(f("CONFORMITY"), "CONFORME").errors).toHaveLength(0);
+    expect(validateFieldValue(f("CONFORMITY"), "NA").errors).toHaveLength(0);
+    expect(validateFieldValue(f("CONFORMITY"), "OTRO").errors).toHaveLength(1);
+    expect(validateFieldValue(f("CONFORMITY", { allowNa: false }), "NA").errors).toHaveLength(1);
+  });
+
+  it("RATING: entero 1..max (default 5)", () => {
+    expect(validateFieldValue(f("RATING"), 3).errors).toHaveLength(0);
+    expect(validateFieldValue(f("RATING"), 6).errors).toHaveLength(1);
+    expect(validateFieldValue(f("RATING", { max: 10 }), 9).errors).toHaveLength(0);
+    expect(validateFieldValue(f("RATING"), 0).errors).toHaveLength(1);
+  });
+
+  it("TIME: HH:MM 24h", () => {
+    expect(validateFieldValue(f("TIME"), "08:30").errors).toHaveLength(0);
+    expect(validateFieldValue(f("TIME"), "23:59").errors).toHaveLength(0);
+    expect(validateFieldValue(f("TIME"), "24:00").errors).toHaveLength(1);
+    expect(validateFieldValue(f("TIME"), "8:5").errors).toHaveLength(1);
+  });
+
+  it("DURATION: entero de minutos no negativo", () => {
+    expect(validateFieldValue(f("DURATION"), 90).errors).toHaveLength(0);
+    expect(validateFieldValue(f("DURATION"), -5).errors).toHaveLength(1);
+    expect(validateFieldValue(f("DURATION"), 1.5).errors).toHaveLength(1);
+  });
+
+  it("RANGE: from<=to dentro de cotas", () => {
+    expect(validateFieldValue(f("RANGE"), { from: 1, to: 5 }).errors).toHaveLength(0);
+    expect(validateFieldValue(f("RANGE"), { from: 5, to: 1 }).errors).toHaveLength(1);
+    expect(validateFieldValue(f("RANGE", { min: 0, max: 10 }), { from: -1, to: 12 }).errors.length).toBeGreaterThan(0);
+  });
+
+  it("TEXT con format valida RUT/correo/URL", () => {
+    expect(validateFieldValue(f("TEXT", { format: "rut" }), "11.111.111-1").errors).toHaveLength(0);
+    expect(validateFieldValue(f("TEXT", { format: "rut" }), "11.111.111-2").errors).toHaveLength(1);
+    expect(validateFieldValue(f("TEXT", { format: "email" }), "a@b.cl").errors).toHaveLength(0);
+    expect(validateFieldValue(f("TEXT", { format: "email" }), "no-mail").errors).toHaveLength(1);
+    expect(validateFieldValue(f("TEXT", { format: "url" }), "https://itesic.cl/x").errors).toHaveLength(0);
+  });
+
+  it("NUMBER con format percent acota 0..100", () => {
+    expect(validateFieldValue(f("NUMBER", { format: "percent" }), 50).errors).toHaveLength(0);
+    expect(validateFieldValue(f("NUMBER", { format: "percent" }), 120).errors).toHaveLength(1);
+  });
+
+  it("PRESENTACIÓN: nunca produce errores aunque llegue un valor", () => {
+    expect(validateFieldValue(f("HEADING"), "loquesea").errors).toHaveLength(0);
+    expect(validateFieldValue(f("NOTICE"), null).errors).toHaveLength(0);
+    expect(validateFieldValue(f("DIVIDER"), 123).errors).toHaveLength(0);
+  });
 });
 
 describe("validateFieldValue — NUMBER", () => {
