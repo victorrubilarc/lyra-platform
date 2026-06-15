@@ -4,6 +4,12 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-15 · `docs/FORM_GUIDE.md` — mapa de capacidades del FORMULARIO como doc VIVO
+
+A pedido del dueño (sesión de "entender a cabalidad el formulario"), se crea **`docs/FORM_GUIDE.md`**: mapa en lenguaje simple, con ejemplos de planta, de TODO lo que el formulario puede hacer hoy (catálogo de objetos Olas 1–4 agrupado por la paleta real `basics/selection/evaluation/reference/evidence/structured/presentation` + transversales: layout en grilla, obligatoriedad, condicional, motor de reglas, umbrales/excepción, formato regional, gobernanza). Cada objeto sigue una **plantilla fija de 7 partes** (qué es · para qué · cómo se ve/usa · cómo se configura · qué valida ✅/❌ · ejemplo punta a punta · qué agregar a futuro). *Motivo:* es DISTINTO de `USER_GUIDE.md` (cara al usuario final); `FORM_GUIDE.md` es para **entender el sistema a fondo** (incluye tipos internos, dataType, qué se congela). **Decisión clave: es VIVO** — se actualiza en la misma sesión que cambie/agregue/elimine un objeto o capacidad del formulario (regla §0.3 del propio doc + añadida al cierre de sesión en `CLAUDE.md` paso 4). Fuentes de verdad citadas en el encabezado (`field-types.ts`, `log-entries.ts`, `rules/*`, paleta web). No es desarrollo de features (solo documentación + lectura del código).
+
+---
+
 ### 2026-06-15 · Objetos estructurados: umbral por celda → excepción + agregados de tabla en reglas — ✅ IMPLEMENTADO (`feat/tablas-umbral-reglas` → `main`)
 
 Tras la evaluación de brechas con el dueño, dos mejoras para que las tablas/matrices dejen de ser "opacas". **2 forks confirmados (recomendación aceptada en los 2):** (1) alcance del motor sobre tablas = **agregados de COLUMNA** (`sum/avg/min/max/count`), difiriendo las condiciones por FILA (`any/all`); (2) los agregados se usan en **campos calculados Y reglas cruzadas** (mismo evaluador puro).
