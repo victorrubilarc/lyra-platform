@@ -1162,6 +1162,18 @@
   flex: 1 1 200px;
   min-width: 0;
 }
+/* El root de <Input> es un <span> con width:100% (otro módulo): en una fila de
+   varios campos eso fuerza el salto de línea. Acotamos el ancho del campo para
+   que la duración (HH + MM) y el rango (mín–máx) queden HORIZONTALES. Las
+   etiquetas de unidad y el guion conservan su ancho automático. */
+.durationRow > span:not(.previewUnit) {
+  flex: 0 0 88px;
+  width: 88px;
+}
+.rangeRow > span:not(.previewUnit):not(.rangeDash) {
+  flex: 0 0 132px;
+  width: 132px;
+}
 .rangeDash {
   color: var(--color-text-muted);
   font-weight: 700;
