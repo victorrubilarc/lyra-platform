@@ -223,6 +223,60 @@ describe("validateFieldValue — objetos Ola 2 (referencia)", () => {
   });
 });
 
+describe("validateFieldValue — ATTACHMENT (Ola 3)", () => {
+  const f = (config: Record<string, unknown> = { kind: "photo" }): FieldForValidation => ({
+    key: "a",
+    type: "ATTACHMENT",
+    dataType: "FILE_ARRAY",
+    label: "Evidencia",
+    config,
+  });
+  const desc = (over: Record<string, unknown> = {}) => ({
+    id: "d1",
+    key: "entries/e1/a/d1-foto.jpg",
+    filename: "foto.jpg",
+    size: 1024,
+    contentType: "image/jpeg",
+    uploadedAt: "2026-06-15T00:00:00.000Z",
+    uploadedById: "u1",
+    ...over,
+  });
+
+  it("vacío (array vacío / null) es válido", () => {
+    expect(validateFieldValue(f(), []).errors).toHaveLength(0);
+    expect(validateFieldValue(f(), null).errors).toHaveLength(0);
+  });
+
+  it("acepta un descriptor bien formado de un tipo permitido", () => {
+    expect(validateFieldValue(f({ kind: "photo" }), [desc()]).errors).toHaveLength(0);
+  });
+
+  it("rechaza un valor que no es arreglo", () => {
+    expect(validateFieldValue(f(), { id: "x" }).errors).toHaveLength(1);
+  });
+
+  it("rechaza un descriptor malformado", () => {
+    expect(validateFieldValue(f(), [{ id: "d1" }]).errors).toHaveLength(1);
+  });
+
+  it("rechaza un tipo fuera de accept (foto exige image/*)", () => {
+    expect(validateFieldValue(f({ kind: "photo" }), [desc({ contentType: "application/pdf" })]).errors).toHaveLength(1);
+  });
+
+  it("rechaza un archivo sobre el tamaño máximo", () => {
+    expect(validateFieldValue(f({ kind: "file", maxSizeMb: 1 }), [desc({ size: 5 * 1024 * 1024 })]).errors).toHaveLength(
+      1,
+    );
+  });
+
+  it("multiple=false limita a 1 archivo", () => {
+    expect(validateFieldValue(f({ kind: "photo" }), [desc(), desc({ id: "d2" })]).errors).toHaveLength(1);
+    expect(
+      validateFieldValue(f({ kind: "photo", multiple: true, maxCount: 3 }), [desc(), desc({ id: "d2" })]).errors,
+    ).toHaveLength(0);
+  });
+});
+
 describe("validateFieldValue — RISK_MATRIX", () => {
   // Matriz 3×3: cells[p-1][c-1] = severidad 1..5.
   const matrix = {
