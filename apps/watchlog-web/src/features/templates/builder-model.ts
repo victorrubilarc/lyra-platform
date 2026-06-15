@@ -128,6 +128,28 @@ export function nextFreeRow(fields: EditField[]): number {
   return Math.max(...fields.map((f) => f.gridY + f.gridH)) ;
 }
 
+/**
+ * Compactación vertical (gravedad hacia arriba): reasigna `gridY` para que ningún
+ * campo se encime, preservando la columna (`gridX`) y los que están lado a lado.
+ * Se usa al AGREGAR/soltar un campo (el lienzo ya compacta al arrastrar/redimensionar).
+ */
+export function compactFields(fields: EditField[]): EditField[] {
+  const sorted = [...fields].sort((a, b) => a.gridY - b.gridY || a.gridX - b.gridX);
+  const placed: { x: number; y: number; w: number; h: number }[] = [];
+  const newY = new Map<string, number>();
+  for (const f of sorted) {
+    const w = f.colSpan;
+    const h = f.gridH;
+    let y = 0;
+    const hits = (yy: number) =>
+      placed.some((p) => f.gridX < p.x + p.w && f.gridX + w > p.x && yy < p.y + p.h && yy + h > p.y);
+    while (hits(y)) y += 1;
+    placed.push({ x: f.gridX, y, w, h });
+    newY.set(f.uid, y);
+  }
+  return fields.map((f) => ({ ...f, gridY: newY.get(f.uid) ?? f.gridY }));
+}
+
 /** Reparte 12 columnas en n partes iguales (2→6,6; 3→4,4,4; 4→3,3,3,3). */
 export function splitRow(n: number): number[] {
   if (n <= 1) return [GRID_TOTAL];

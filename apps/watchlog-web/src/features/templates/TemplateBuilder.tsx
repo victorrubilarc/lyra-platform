@@ -32,6 +32,7 @@ import { useOrgTree } from "../structure/structure-queries.js";
 import {
   collectFieldKeys,
   collectSectionKeys,
+  compactFields,
   defaultFieldConfig,
   defaultFieldH,
   detailToEditState,
@@ -245,7 +246,8 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
     };
     patchState({
       ...state,
-      sections: state.sections.map((s) => (s.uid === sUid ? { ...s, fields: [...s.fields, field] } : s)),
+      // Compactar tras soltar: el campo nuevo no se encima de los existentes.
+      sections: state.sections.map((s) => (s.uid === sUid ? { ...s, fields: compactFields([...s.fields, field]) } : s)),
     });
     setSelected({ s: sUid, f: field.uid });
   }

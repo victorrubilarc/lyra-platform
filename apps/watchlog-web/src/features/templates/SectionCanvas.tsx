@@ -79,6 +79,10 @@ export function SectionCanvas({
   const fieldsRef = useRef(fields);
   fieldsRef.current = fields;
   const [active, setActive] = useState<Active | null>(null);
+  // `activeRef` = espejo síncrono de `active`: los listeners de ventana leen de aquí
+  // (NO se llaman efectos secundarios dentro del actualizador de setState, que debe
+  // ser puro — ese era el motivo de que la selección no abriera el panel).
+  const activeRef = useRef<Active | null>(null);
   const [dropAt, setDropAt] = useState<CanvasGeometry | null>(null);
   // Inicio del gesto + bandera de "se movió" (para distinguir clic de arrastre).
   const startRef = useRef({ x: 0, y: 0, colW: 100, moved: false });
@@ -86,49 +90,50 @@ export function SectionCanvas({
   const geomOf = (f: EditField): CanvasGeometry =>
     active && active.uid === f.uid ? active.live : { uid: f.uid, x: f.gridX, y: f.gridY, w: f.colSpan, h: f.gridH };
 
-  const rows = Math.max(
-    2,
+  const contentRows = Math.max(
+    1,
     ...fields.map((f) => geomOf(f).y + geomOf(f).h),
     active ? active.live.y + active.live.h : 0,
     dropAt ? dropAt.y + dropAt.h : 0,
   );
+  // Una fila de MARGEN abajo (editando) = zona de drop para crear una fila nueva.
+  const rows = contentRows + (canEdit ? 1 : 0);
 
-  // Listeners de puntero a nivel de ventana mientras dura un gesto (se enlazan al
-  // EMPEZAR: las deps son uid+type, estables durante el gesto).
+  // Listeners de puntero a nivel de ventana durante un gesto (se enlazan al EMPEZAR).
   useEffect(() => {
     if (!active) return;
     const onMove = (ev: PointerEvent) => {
+      const a = activeRef.current;
+      if (!a) return;
       const s = startRef.current;
       if (Math.abs(ev.clientX - s.x) > 3 || Math.abs(ev.clientY - s.y) > 3) s.moved = true;
       const dCol = Math.round((ev.clientX - s.x) / s.colW);
       const dRow = Math.round((ev.clientY - s.y) / PITCH);
-      setActive((a) => {
-        if (!a) return a;
-        const b = a.base;
-        const n: CanvasGeometry = { ...b };
-        if (a.type === "move") {
-          n.x = clamp(b.x + dCol, 0, CANVAS_COLS - b.w);
-          n.y = Math.max(0, b.y + dRow);
-        }
-        if (a.type === "e" || a.type === "se") n.w = clamp(b.w + dCol, MIN_W, CANVAS_COLS - b.x);
-        if (a.type === "s" || a.type === "se") n.h = clamp(b.h + dRow, 1, 16);
-        return { ...a, live: n };
-      });
+      const b = a.base;
+      const n: CanvasGeometry = { ...b };
+      if (a.type === "move") {
+        n.x = clamp(b.x + dCol, 0, CANVAS_COLS - b.w);
+        n.y = Math.max(0, b.y + dRow);
+      }
+      if (a.type === "e" || a.type === "se") n.w = clamp(b.w + dCol, MIN_W, CANVAS_COLS - b.x);
+      if (a.type === "s" || a.type === "se") n.h = clamp(b.h + dRow, 1, 16);
+      activeRef.current = { ...a, live: n };
+      setActive({ ...a, live: n });
     };
     const onUp = () => {
-      setActive((a) => {
-        if (a) {
-          if (a.type === "move" && !startRef.current.moved) {
-            onSelectField(a.uid); // fue un clic, no un arrastre ⇒ seleccionar
-          } else {
-            const others = fieldsRef.current
-              .filter((f) => f.uid !== a.uid)
-              .map((f) => ({ uid: f.uid, x: f.gridX, y: f.gridY, w: f.colSpan, h: f.gridH }));
-            onGeometryChange(compact([...others, a.live]));
-          }
+      const a = activeRef.current;
+      if (a) {
+        if (a.type === "move" && !startRef.current.moved) {
+          onSelectField(a.uid); // fue un clic, no un arrastre ⇒ seleccionar
+        } else {
+          const others = fieldsRef.current
+            .filter((f) => f.uid !== a.uid)
+            .map((f) => ({ uid: f.uid, x: f.gridX, y: f.gridY, w: f.colSpan, h: f.gridH }));
+          onGeometryChange(compact([...others, a.live]));
         }
-        return null;
-      });
+      }
+      activeRef.current = null;
+      setActive(null);
     };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
@@ -154,7 +159,9 @@ export function SectionCanvas({
       colW: (ref.current?.clientWidth ?? 1200) / CANVAS_COLS,
       moved: false,
     };
-    setActive({ uid, type, base, live: base });
+    const a = { uid, type, base, live: base };
+    activeRef.current = a;
+    setActive(a);
   }
 
   // ── Arrastrar desde la paleta (HTML5 drop) ──────────────────────────────────
@@ -217,6 +224,7 @@ export function SectionCanvas({
                 aria-label="Etiqueta del campo"
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={(e) => e.stopPropagation()}
+                onFocus={() => onSelectField(f.uid)}
                 onChange={(e) => onLabel(f.uid, e.target.value)}
               />
               <div className={styles.canvasItemControl} aria-hidden>
