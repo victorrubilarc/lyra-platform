@@ -54,7 +54,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 - ✍️ Lectura de auditoría (quién hizo qué, antes/después)
 
 ### 6. Plantillas / Form Builder  [Configurador]
-- ✅ **Catálogo de objetos del formulario** (Olas 1 y 2: básicos, selección, evaluación, **referencia**, presentación) (§ Plantillas ▸ Objetos del formulario)
+- ✅ **Catálogo de objetos del formulario** (Olas 1–3: básicos, selección, evaluación, **referencia**, **evidencia / terreno**, presentación) (§ Plantillas ▸ Objetos del formulario)
 - ✅ Secciones y campos (tipos, obligatorios, ayuda) (§ Plantillas ▸ Secciones y campos)
 - ✅ Ancho de campo / layout en grilla (completo / mitad / tercio)
 - ✅ Umbrales de alerta (rangos warn/crit, ISA-18.2)
@@ -251,6 +251,11 @@ Elige uno (clic o arrástralo al lienzo) y ajústalo en el panel de propiedades.
 - **Referencia** (apuntan a algo de la plataforma): **Equipo / activo** (acotado al nodo de la entrada),
   **Usuario / responsable**, **Nodo de estructura** y **Turno**. Eliges de una lista buscable; el sistema
   guarda la referencia y muestra su nombre.
+- **Evidencia / Terreno (Ola 3).** **Foto / evidencia** (captura con la cámara de la tablet o sube de la
+  galería; admite varias), **Archivo adjunto** (PDF/documento/imagen), **Nota de voz** (graba audio en
+  terreno o sube un archivo), **Croquis / dibujo** (dibuja a mano en un lienzo y se guarda como imagen) y
+  **Escáner QR / código de barras** (apunta la cámara a un código y rellena el campo — p. ej. el TAG de un
+  equipo; **no** guarda un archivo, solo el valor leído).
 - **Presentación** (no piden dato): **Encabezado**, **Texto / instrucción**, **Separador**, **Aviso**
   (información/advertencia/éxito/peligro), **Enlace a procedimiento** e **Imagen de referencia** (por URL).
 
@@ -265,6 +270,11 @@ Elige uno (clic o arrástralo al lienzo) y ajústalo en el panel de propiedades.
 - Los objetos de **Referencia** se validan **en el servidor**: solo aceptan algo que **existe, está
   activo y está dentro de tu alcance** (p. ej. un equipo debe pertenecer al nodo de la entrada). Las
   opciones que ves ya están filtradas por tus permisos; el backend siempre decide.
+- Los objetos de **Evidencia** suben el archivo **a través del servidor** (que valida tamaño y tipo antes
+  de guardarlo); la **descarga** usa un enlace temporal firmado, así que solo quien puede ver la entrada
+  ve su evidencia. Una vez que la entrada queda **sellada**, su evidencia es **inmutable** (no se cambia ni
+  borra). El **escáner QR** funciona en navegadores con cámara; si no hay cámara, igual puedes escribir el
+  valor a mano. *El diseñador puede limitar tipos permitidos, tamaño máximo y cantidad por campo.*
 - La **matriz de riesgo** la configura el diseñador pintando la severidad de cada celda (ejes editables).
 - Cambiar un objeto crea un nuevo **borrador**; aplica a las entradas nuevas al **publicar** (la versión
   publicada queda inmutable).

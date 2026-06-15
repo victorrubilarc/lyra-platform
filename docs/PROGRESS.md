@@ -1,5 +1,36 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-15 — Catálogo de objetos premium · OLA 3 (adjuntos / terreno, infra MinIO) ✅** (`feat/objetos-ola3` →
+`main`). Tercera ola: objetos de EVIDENCIA con almacenamiento de objetos on-prem, todos sobre el **render ÚNICO**
+`FieldControl`↔`FieldGrid`. **4 forks confirmados por el dueño (DECISIONS 2026-06-15, recomendación aceptada en los 4):**
+(1) **subida PROXIED por la API** (multipart `@fastify/multipart`): la API es el **choke-point** que valida tamaño/tipo y
+audita antes de hacer stream a MinIO (presigned directo = camino de escala en BACKLOG); (2) **materializar al adjuntar** en
+compose (la subida crea la entrada y guarda en `entries/{id}/{fieldKey}/{uuid}-{file}`; sin prefijo temporal ni sweeper en el
+MVP); (3) **QR/código = `config.scan` sobre TEXT** (decode client-side con `@zxing/browser` que rellena el valor; NO es
+archivo, sin storage; REFERENCE(equipment)-scan diferido); (4) **un `FieldType ATTACHMENT` + presets**, `dataType FILE_ARRAY`,
+valor SIEMPRE `descriptor[]` (multiple=false limita a 1 ⇒ mapa dataType estático). **Storage:** `StorageService` (clase
+abstracta = token DI, patrón `EmailService`) + `MinioStorageService` (SDK `minio`): put/stat/remove/removePrefix/presignedGetUrl,
+bucket idempotente al arrancar; `StorageModule` `@Global`; `env.schema` `MINIO_*`. **Descriptor** persistido en
+`LogEntryValue.value` (jsonb), **NUNCA una URL**: `{id,key,filename,size,contentType,checksum(sha256),uploadedAt,uploadedById}`;
+la descarga = **presigned GET de vida corta** firmado server-side con la **MISMA ABAC** que `getDetail`. **API:** `POST
+:id/attachments/:sectionKey/:fieldKey` (`logentry:fill`, valida+audita `attachment.uploaded`) + `GET
+:id/attachments/:descriptorId/url` (`logentry:view`, resuelve el descriptor de los valores persistidos, audita `.downloaded`);
+`saveSection` verifica la **pertenencia** de cada descriptor NUEVO (prefijo de objeto + existencia en storage, análogo a
+`allowedRefIds` por prefijo) y **borra el objeto** quitado del campo tras commit (delete-on-remove); `voidEntry`
+`removePrefix(entries/{id}/)` limpia la evidencia de un borrador anulado. **Migración aditiva**
+`20260615160000_add_ola3_field_types` (ALTER enum `FieldType +ATTACHMENT`, `FieldDataType +FILE_ARRAY`, idempotente). **Web:**
+`AttachmentControl` (render único: lista + descarga + subida por kind — foto/galería + cámara, archivo, nota de voz con
+`MediaRecorder`, croquis en canvas→PNG), `QrScanButton` (cámara `@zxing/browser`), `api-client.apiUpload` (multipart con
+Bearer/CSRF/refresh), paleta **categoría "Evidencia / Terreno"** (Foto/Archivo/Nota de voz/Croquis/Escáner QR), editor de
+config (multiple/maxCount/maxSizeMb/accept/capture) + toggle scan en TEXT, `lib/format.formatFileSize` (regional), i18n es-CL.
+**Sin permisos nuevos — catálogo 60.** Tests: **contracts 222** (+7) · **API 234**. **Smoke en vivo
+`scripts/smoke-objetos-ola3.py` 26/26**: versión CONGELADA viaja type/dataType/config; PNG real → MinIO (descriptor
+key/contentType/checksum); guardar + descargar presigned con bytes coincidentes; tipo/tamaño/key-ajena ⇒ 400; **entrada
+SELLADA: subir ⇒ 400 y el objeto PERMANECE**; **VOID limpia el huérfano de MinIO (404)**; crea y LIMPIA por ID + objetos del
+bucket. typecheck/lint(0)/build verdes. **Pendiente: smoke VISUAL del dueño** (§4). **Deuda diferida (BACKLOG):** antivirus
+(ClamAV), object-lock/WORM, thumbnails/lightbox, retención automática, sweeper de subidas abandonadas, presigned directo
+(escala), escáner solo `BarcodeDetector`/zxing (sin REFERENCE-scan). **Siguiente: Ola 4** (tabla/grupo repetible).
+
 **2026-06-15 — Catálogo de objetos premium · OLA 2 (objetos de REFERENCIA + tolerancia/contador/riesgo) ✅** (`feat/objetos-ola2` →
 `main`). Segunda ola del catálogo: objetos que apuntan a **entidades de la plataforma** (resolución y validación server-side
 con ABAC) + tres analíticos, todos sobre el **render ÚNICO** `FieldControl`↔`FieldGrid`. **6 forks confirmados por el dueño
