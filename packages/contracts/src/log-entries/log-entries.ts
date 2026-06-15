@@ -1336,6 +1336,20 @@ export function tableRowIsEmpty(row: Record<string, unknown>, columns: readonly 
   return columns.every((col) => isEmptyValue(row[col.key]));
 }
 
+/**
+ * Quita las filas COMPLETAMENTE vacías de un valor TABLE (placeholders que el
+ * operador agregó pero no llenó). Higiene de dato (ALCOA+) + evita que `maxRows`
+ * cuente filas en blanco. Las filas con contenido (aunque sea parcial) se conservan
+ * para que la validación por celda las revise. No es un array ⇒ se devuelve igual.
+ */
+export function pruneEmptyTableRows(config: Record<string, unknown>, value: unknown): unknown {
+  if (!Array.isArray(value)) return value;
+  const cols = ((config as TableFieldConfig).columns ?? []) as readonly { key: string }[];
+  return value.filter(
+    (row) => !(row !== null && typeof row === "object" && !Array.isArray(row) && tableRowIsEmpty(row as Record<string, unknown>, cols)),
+  );
+}
+
 /** Filas COMPLETAS de un TABLE: no vacías y con todas sus columnas `required` llenas. */
 export function countCompleteTableRows(config: Record<string, unknown>, value: unknown): number {
   if (!Array.isArray(value)) return 0;

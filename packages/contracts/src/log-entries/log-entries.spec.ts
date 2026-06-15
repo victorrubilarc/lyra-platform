@@ -28,6 +28,7 @@ import {
   validateFieldValue,
   countCompleteTableRows,
   isEmptyMatrixValue,
+  pruneEmptyTableRows,
   requiredFieldError,
   tableRowIsEmpty,
   type FieldForValidation,
@@ -859,6 +860,29 @@ describe("validateFieldValue — objetos Ola 4 (estructurados)", () => {
     const cols = [{ key: "a" }, { key: "b" }];
     expect(tableRowIsEmpty({ a: "", b: null }, cols)).toBe(true);
     expect(tableRowIsEmpty({ a: 0, b: null }, cols)).toBe(false); // 0 cuenta
+  });
+
+  it("pruneEmptyTableRows quita placeholders y conserva filas con contenido", () => {
+    const cfg = { columns: [{ key: "hora", type: "TIME" }, { key: "temp", type: "NUMBER" }] };
+    const pruned = pruneEmptyTableRows(cfg, [{ hora: "08:00", temp: 5 }, { hora: "", temp: "" }, { temp: 9 }, {}]);
+    expect(pruned).toEqual([{ hora: "08:00", temp: 5 }, { temp: 9 }]);
+    expect(pruneEmptyTableRows(cfg, "no-array")).toBe("no-array");
+  });
+
+  it("una columna/celda SELECT por lista de referencia se RECHAZA en el diseño (solo inline)", () => {
+    const refCol = {
+      columns: [{ key: "modo", label: "Modo", type: "SELECT", config: { optionSource: { kind: "referenceList", listKey: "failure-modes" } } }],
+    };
+    expect(fieldConfigSchemaFor("TABLE").safeParse(refCol).success).toBe(false);
+    const inlineCol = {
+      columns: [{ key: "modo", label: "Modo", type: "SELECT", config: { optionSource: { kind: "inline", items: [{ code: "a", label: "A" }] } } }],
+    };
+    expect(fieldConfigSchemaFor("TABLE").safeParse(inlineCol).success).toBe(true);
+    const refCell = {
+      rows: [{ key: "r1", label: "R1" }], columns: [{ key: "c1", label: "C1" }],
+      cell: { type: "SELECT", config: { optionSource: { kind: "referenceList", listKey: "x" } } },
+    };
+    expect(fieldConfigSchemaFor("MATRIX").safeParse(refCell).success).toBe(false);
   });
 
   const matrixConfig = {

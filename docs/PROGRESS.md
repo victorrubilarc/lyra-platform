@@ -1,5 +1,22 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-15 — Pulido del catálogo de objetos (QA en vivo del dueño) ✅** (`fix/objetos-pulido` → `main`). Tras armar una
+**bitácora de demostración** (seed `scripts/seed-showcase-objetos.py`: ronda operacional de planta concentradora, 6 secciones ·
+58 campos · 25 tipos de objeto distintos, con campo CALCULADO "recuperación" y regla CRUZADA concentrado≤alimentado, todo
+verificado en vivo) y **sondear brechas**, se cerraron 3 hallazgos: **(1) Adjuntos (Ola 3): VISTA PREVIA al hacer clic** —
+`AttachmentControl` gana un botón "Ver" + ítem clicable que abre un modal y muestra el archivo según su tipo (imagen en
+lightbox · audio/video reproducibles · PDF en iframe · otros → abrir en pestaña), resolviendo la URL **presigned con ABAC**
+(antes solo se podía descargar a ciegas, sin corroborar que el archivo subido fuera el correcto). **(2) Tablas (Ola 4):
+validación de catálogo de celda server-side** — una columna/celda `SELECT` por **lista de referencia** ya no es aceptada (el
+backend solo valida catálogos INLINE en celdas; ahora se **rechaza en el diseño**, cerrando el hueco de validación; el builder
+ya solo ofrecía inline). **(3) Tablas (Ola 4): poda de filas vacías al guardar** — `pruneEmptyTableRows` elimina las filas
+placeholder completamente vacías antes de validar/persistir ⇒ `maxRows` ya no cuenta filas en blanco y el jsonb queda limpio
+(ALCOA+). Tests: **contracts 232** (+2) · API **234**. typecheck/lint(0)/build verdes; smoke Ola 4 **22/22** sin regresión +
+verificación en vivo de los dos fixes de tabla (3/3). **Pendientes mayores (BACKLOG §4, evaluación del dueño):** banda de
+umbral por celda numérica → review-by-exception/grilla (hoy las tablas/matrices son opacas a la excepción); reglas/agregados
+del motor sobre celdas (`sum(col)`, "si alguna fila…"); resumen "N filas" en la grilla; obligatoriedad fina de matriz
+(completa / por fila-columna); `minRows` cuando la tabla no es obligatoria.
+
 **2026-06-15 — Catálogo de objetos premium · OLA 4 (objetos ESTRUCTURADOS / repetibles) ✅** (`feat/objetos-ola4` →
 `main`). Cuarta ola: objetos que capturan una **colección de celdas** en un solo campo, todos sobre el **render ÚNICO**
 `FieldControl`↔`FieldGrid`. **NO estrena infraestructura** (contratos + render, como Olas 1–2). **4 forks confirmados por el

@@ -278,7 +278,8 @@ Elige uno (clic o arrástralo al lienzo) y ajústalo en el panel de propiedades.
   opciones que ves ya están filtradas por tus permisos; el backend siempre decide.
 - Los objetos de **Evidencia** suben el archivo **a través del servidor** (que valida tamaño y tipo antes
   de guardarlo); la **descarga** usa un enlace temporal firmado, así que solo quien puede ver la entrada
-  ve su evidencia. Una vez que la entrada queda **sellada**, su evidencia es **inmutable** (no se cambia ni
+  ve su evidencia. Puedes **hacer clic en un adjunto para previsualizarlo** (la imagen se ve en grande, el
+  audio/video se reproduce, el PDF se abre incrustado) y así corroborar que subiste el archivo correcto. Una vez que la entrada queda **sellada**, su evidencia es **inmutable** (no se cambia ni
   borra). El **escáner QR** funciona en navegadores con cámara; si no hay cámara, igual puedes escribir el
   valor a mano. *El diseñador puede limitar tipos permitidos, tamaño máximo y cantidad por campo.*
 - La **matriz de riesgo** la configura el diseñador pintando la severidad de cada celda (ejes editables).
