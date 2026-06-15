@@ -144,6 +144,42 @@ nunca queda más de una sesión atrás.
 
 ## 2. Pendiente por HACER (módulos / submódulos)
 
+### Form Builder — CATÁLOGO DE OBJETOS PREMIUM (olas 1–5) — acordado con el dueño (2026-06-15)
+El set actual (NUMBER, TEXT, TEXTAREA, SELECT, MULTISELECT, BOOLEAN, DATE, DATETIME, SEVERITY,
+SIGNATURE) es el núcleo; el dueño pidió **TODOS** los objetos que ofrecen los sistemas de este tipo,
+a nivel **premium/enterprise**. El `prototipo.tsx` ya dibuja varios (radio, checklist, slider, foto,
+GPS, tabla, activo/QR). Se entrega por **OLAS** (una por sesión; cerrar cada una).
+
+**ESTÁNDAR PREMIUM (obligatorio por objeto — "terminado" = cumple TODO):** identidad Lyra WatchLog
+(solo tokens, Sora/Inter, Lucide, glow no sombras negras, claro+oscuro); componentes en `packages/ui`
+(reusar Input/Select/Combobox/LookupPicker/Checkbox/Toggle/Drawer/Modal/Chip/Table; primitivo nuevo
+documentado si falta); anatomía común (etiqueta/ayuda/obligatorio/error/readOnly); estados completos
+(default/hover/focus-visible/activo/disabled/**inválido**/**vacío**/**cargando**/**readOnly premium**);
+a11y AA + teclado + foco visible + táctil ≥44px; validación clara + formato regional (`lib/format.ts`);
+listas largas virtualizadas/paginadas; WYSIWYG fiel (control real); render ÚNICO (FieldControl). Si no
+llega al nivel, NO se publica: queda aquí con lo que falta.
+
+- [ ] **Ola 1 — objetos SIN infra (próxima sesión).** Conforme/No conforme/N.A. (tri-estado) · radio
+      (opción única visible) · casillas múltiples visibles · chips/segmentos · escala Likert/valoración +
+      estrellas · **multiselección con MODAL (Value Help, reusa LookupPicker)** · Hora · Duración HH:MM ·
+      Rango (mín–máx) · Porcentaje · Moneda CLP · RUT (dígito verificador) · Correo/Teléfono/URL ·
+      **presentación (no-dato):** encabezado, texto/instrucción, separador, aviso, enlace a procedimiento,
+      imagen de referencia. **Forks a resolver:** (1) tipos nuevos vs `displayAs` en config de SELECT/
+      MULTISELECT (recomendado displayAs para radio/checkbox/segmentos/modal; tipos nuevos solo para
+      tri-estado y rating); (2) dataType `LAYOUT`/`presentational` que el llenado IGNORA (no crea
+      LogEntryValue, no valida, no entra a reglas/resumen); (3) RUT/moneda/% como TEXT/NUMBER + `format`
+      vs tipos propios; (4) categorías de la paleta (AddFieldPopover).
+- [ ] **Ola 2 — objetos de referencia.** Selector de equipo/activo (ISO 14224) · usuario/responsable ·
+      nodo de estructura · turno/cuadrilla · lectura con tolerancia (esperado ± tol) · contador/acumulado ·
+      matriz de riesgo (probabilidad × consecuencia, extiende Severidad). Reusa pickers existentes.
+- [ ] **Ola 3 — adjuntos/terreno (infra MinIO, Req-2; sesión propia).** Foto/cámara · galería · archivo ·
+      nota de voz · croquis/dibujo · **escaneo QR/código de barras** (identificar activo). Requiere
+      almacenamiento de objetos on-prem + endpoint de subida + URLs prefirmadas + dataType FILE/FILE_ARRAY.
+- [ ] **Ola 4 — estructurados (sesión propia).** **Tabla/grilla repetible** (columnas = sub-campos, valor =
+      array de filas, validación por celda, agregar/quitar/reordenar) — el mayor diferenciador · grupo/
+      sección repetible · matriz parámetro×turno.
+- [ ] **Ola 5 — origen de datos (Fase 3).** Lectura autocompletada desde tag SCADA/PI/OPC (modelar + stub).
+
 ### Transversal — Manual de uso (`docs/USER_GUIDE.md`)
 - [ ] **Backfill INCREMENTAL del manual de uso** (decidido 2026-06-14 con el dueño). Existe
       `docs/USER_GUIDE.md` (documento VIVO) con el **índice completo de funcionalidades** (las pendientes
