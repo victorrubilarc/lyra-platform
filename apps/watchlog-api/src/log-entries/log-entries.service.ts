@@ -740,6 +740,7 @@ export class LogEntriesService {
     const warnings: string[] = [];
     for (const input of dto.values) {
       const def = fieldsByKey.get(input.fieldKey)!;
+      if (isPresentationalType(def.type)) continue; // objeto de presentación: no es dato
       if (!isFieldVisible(def.visibleWhen, valuesByKey)) continue;
       const res = validateFieldValue(def, input.value, { allowedCodes: allowed.get(def.key) });
       errors.push(...res.errors);
@@ -783,6 +784,7 @@ export class LogEntriesService {
     await this.prisma.$transaction(async (tx) => {
       for (const input of dto.values) {
         const def = fieldsByKey.get(input.fieldKey)!;
+        if (isPresentationalType(def.type)) continue; // objeto de presentación: no se persiste valor
         const before = existing.find((e) => e.fieldKey === input.fieldKey);
         const beforeVal = (before?.value ?? null) as unknown;
         const afterVal = input.value ?? null;
