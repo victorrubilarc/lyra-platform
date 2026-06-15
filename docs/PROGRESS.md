@@ -1,5 +1,28 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-15 — Pulidos de UX del Form Builder (QA en vivo del dueño) ✅** (`feat/builder-ux-pulidos` → `main`). Cuatro
+mejoras pedidas tras probar el builder, todas sobre el render/edición ÚNICOS (sin tocar el modelo de datos salvo un campo de
+config aditivo). **(1) Mín./Máx. caracteres en Texto corto y Párrafo + contador en vivo:** TEXT ya tenía `minLength/maxLength`
+en contrato+validación pero no estaban EXPUESTOS en el builder; ahora ambos tipos muestran los inputs Mín./Máx. y un
+**contador discreto** bajo el campo (`CharCounter` en `FieldControl`: "Quedan N", ámbar bajo el mínimo, rojo sobre el máximo;
+oculto en celdas `bare`). Se agregó `minLength` a `textareaFieldConfigSchema` (Párrafo solo tenía `maxLength`) + guarda
+min≤máx en ambos (la validación de valor ya lo soportaba). **(2) Hover de información en el lienzo:** al pasar el cursor sobre
+un campo NO seleccionado de `SectionCanvas` aparece un panel con el ícono+nombre del objeto (`fieldDisplayMeta`) y chips de su
+configuración (obligatorio/calculado/condicional/unidad/rango/umbrales/formato/caracteres/opciones/columnas…). **OJO:** se
+descubrió que `BuilderFieldCard` (era dnd-kit, Fase 2.1.6) es **código MUERTO** — el lienzo real es `SectionCanvas` (motor
+pointer-events, 2.1.7); el hover se montó ahí (en `.canvasCell`, no `.canvasItem` que tiene `overflow:hidden`). **(3) Footer
+Aceptar/Cancelar en el drawer de opciones avanzadas:** el `Drawer` (@lyra/ui, ya soportaba `footer`) gana **Aceptar** (cierra
+conservando) y **Cancelar** (revierte vía SNAPSHOT del `EditState` tomado al abrir, restaurado con `patchState`). **(4) Fix del
+Enter en las listas:** el textarea de opciones inline (SELECT/MULTISELECT y columnas SELECT de tabla) mostraba un valor
+re-derivado de los ítems ya parseados (líneas vacías filtradas) ⇒ al pulsar Enter la línea nueva se borraba y era IMPOSIBLE
+crear un 2.º ítem; nuevo `LinesTextarea` conserva el TEXTO CRUDO local y solo propaga los ítems parseados. **+ Fix preexistente
+destapado:** `logbook-query.service.spec.ts` llamaba al constructor de `LogEntriesService` con 10 args (faltaba `storage`,
+añadido en Ola 3) ⇒ el typecheck del API estaba ROJO desde Ola 3 (vitest no chequea aridad); corregido (mock de `storage`).
+Doc VIVO `FORM_GUIDE.md` actualizado (fichas Texto/Área de texto + §3.1 hover). Tests: contracts **239** (+3) · API **234**.
+typecheck/lint(0)/build verdes. **Pendiente: smoke VISUAL del dueño** (confirmado en vivo el hover; resto por confirmar).
+**Siguiente: formateo en vivo de campos (A): RUT con puntos+guion, número/moneda con miles+decimales** (acordado con el dueño;
+máscara de texto genérica tipo `OT-#####` = paso B, diferido).
+
 **2026-06-15 — Objetos estructurados: umbral por celda → excepción + agregados de tabla en reglas ✅**
 (`feat/tablas-umbral-reglas` → `main`). Dos mejoras grandes pedidas por el dueño tras la evaluación de brechas, que dejan
 de tratar a las tablas/matrices como "opacas". **(1) Umbral por celda → review-by-exception:** `thresholdBandFor` (fuente

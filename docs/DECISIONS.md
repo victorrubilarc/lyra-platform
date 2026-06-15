@@ -4,6 +4,26 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-15 · Pulidos de UX del Form Builder (mín/máx caract. + contador, hover de info, footer del drawer, fix Enter)
+
+QA en vivo del dueño sobre el builder. Decisiones: **(1)** El contador de caracteres y los inputs Mín./Máx. se exponen en
+Texto corto y Párrafo; el contador es **discreto** (línea atenuada a la derecha, "Quedan N"/ámbar/rojo) para "no invadir" el
+formulario. Se agregó `minLength` a Párrafo (TEXT ya lo tenía) en vez de inventar un tipo nuevo. **(2)** El hover de
+información se montó en **`SectionCanvas`** tras detectar que `BuilderFieldCard` (era dnd-kit, 2.1.6) quedó como **código
+muerto** al adoptarse el motor pointer-events de 2.1.7; va en `.canvasCell` (no `.canvasItem`, `overflow:hidden`) con
+`pointer-events:none` para no estorbar arrastre/clic. *Motivo:* reconocer un campo sin pincharlo (estándar de builders tipo
+Typeform/Jotform). **Deuda:** borrar `BuilderFieldCard` y su overlay (código muerto) — anotado en BACKLOG. **(3)** Footer del
+drawer = **Aceptar** (conserva; igual que la X/Escape, edición en vivo) + **Cancelar** (revierte vía **snapshot del EditState
+al abrir**, restaurado con `patchState`). *Motivo:* el panel edita en vivo; un Cancelar honesto necesita snapshot, no solo
+cerrar. **(4)** Fix del Enter en listas: el textarea de opciones inline derivaba su `value` de los ítems ya parseados (líneas
+vacías filtradas) ⇒ borraba la línea nueva en el re-render; nuevo `LinesTextarea` conserva el texto crudo local y solo propaga
+los ítems. *También* destapó y corrigió un fix preexistente: el spec `logbook-query.service` no pasaba `storage` al
+constructor de `LogEntriesService` (typecheck API rojo desde Ola 3; vitest no chequea aridad). Sin permisos nuevos, sin
+migración. Contracts 239 · API 234. **Siguiente acordado: formateo en vivo (A)** — RUT puntos+guion y número/moneda
+miles+decimales (reusan `lib/format`); máscara de texto genérica (`OT-#####`) = paso **B**, diferido.
+
+---
+
 ### 2026-06-15 · `docs/FORM_GUIDE.md` — mapa de capacidades del FORMULARIO como doc VIVO
 
 A pedido del dueño (sesión de "entender a cabalidad el formulario"), se crea **`docs/FORM_GUIDE.md`**: mapa en lenguaje simple, con ejemplos de planta, de TODO lo que el formulario puede hacer hoy (catálogo de objetos Olas 1–4 agrupado por la paleta real `basics/selection/evaluation/reference/evidence/structured/presentation` + transversales: layout en grilla, obligatoriedad, condicional, motor de reglas, umbrales/excepción, formato regional, gobernanza). Cada objeto sigue una **plantilla fija de 7 partes** (qué es · para qué · cómo se ve/usa · cómo se configura · qué valida ✅/❌ · ejemplo punta a punta · qué agregar a futuro). *Motivo:* es DISTINTO de `USER_GUIDE.md` (cara al usuario final); `FORM_GUIDE.md` es para **entender el sistema a fondo** (incluye tipos internos, dataType, qué se congela). **Decisión clave: es VIVO** — se actualiza en la misma sesión que cambie/agregue/elimine un objeto o capacidad del formulario (regla §0.3 del propio doc + añadida al cierre de sesión en `CLAUDE.md` paso 4). Fuentes de verdad citadas en el encabezado (`field-types.ts`, `log-entries.ts`, `rules/*`, paleta web). No es desarrollo de features (solo documentación + lectura del código).

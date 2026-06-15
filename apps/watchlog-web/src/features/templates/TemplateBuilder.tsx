@@ -1,4 +1,4 @@
-import { useMemo, useState, type ComponentProps } from "react";
+import { useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -125,6 +125,20 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
   const selectedSection = selected ? state.sections.find((s) => s.uid === selected.s) ?? null : null;
   const selectedField =
     selected?.f && selectedSection ? selectedSection.fields.find((f) => f.uid === selected.f) ?? null : null;
+
+  // Snapshot del estado al ABRIR el drawer de configuración avanzada: "Cancelar" lo
+  // restaura (deshace lo editado en esta sesión); "Aceptar" cierra conservando. Se
+  // captura SOLO al abrir (no en cada cambio de `state`).
+  const drawerSnapshot = useRef<EditState | null>(null);
+  useEffect(() => {
+    if (drawerOpen) drawerSnapshot.current = state;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drawerOpen]);
+  const acceptDrawer = () => setDrawerOpen(false);
+  const cancelDrawer = () => {
+    if (drawerSnapshot.current) patchState(drawerSnapshot.current);
+    setDrawerOpen(false);
+  };
 
   const booleanFields = useMemo(
     () =>
@@ -664,9 +678,21 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
           el lienzo). Se abre con "Más opciones"; en escritorio convive con el lienzo. */}
       <Drawer
         open={drawerOpen && view === "design" && designTab === "editor" && Boolean(selectedField || selectedSection)}
-        onClose={() => setDrawerOpen(false)}
+        onClose={acceptDrawer}
         title={selectedField ? t("templates.builder.fieldOptions") : t("templates.builder.sectionOptions")}
         width={420}
+        footer={
+          <div className={styles.drawerFooter}>
+            {editable && (
+              <Button variant="secondary" onClick={cancelDrawer}>
+                {t("common.cancel")}
+              </Button>
+            )}
+            <Button variant="primary" onClick={acceptDrawer}>
+              {editable ? t("common.accept") : t("common.close")}
+            </Button>
+          </div>
+        }
       >
         <BuilderConfigPanel
           section={selectedSection}

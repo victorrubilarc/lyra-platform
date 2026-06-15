@@ -409,6 +409,21 @@ describe("validateFieldValue — tipos varios", () => {
     const f: FieldForValidation = { key: "sig", type: "SIGNATURE", dataType: "REFERENCE", label: "Firma", config: {} };
     expect(validateFieldValue(f, "x").errors).toHaveLength(1);
   });
+
+  it("TEXT respeta minLength/maxLength", () => {
+    const f: FieldForValidation = { key: "ot", type: "TEXT", dataType: "STRING", label: "OT", config: { minLength: 3, maxLength: 10 } };
+    expect(validateFieldValue(f, "OT-7788").errors).toHaveLength(0);
+    expect(validateFieldValue(f, "AB").errors).toHaveLength(1); // bajo el mínimo
+    expect(validateFieldValue(f, "ABCDEFGHIJK").errors).toHaveLength(1); // sobre el máximo
+    expect(validateFieldValue(f, "").errors).toHaveLength(0); // vacío lo gobierna "obligatorio"
+  });
+
+  it("TEXTAREA respeta minLength/maxLength (igual que TEXT)", () => {
+    const f: FieldForValidation = { key: "obs", type: "TEXTAREA", dataType: "STRING", label: "Obs", config: { minLength: 5, maxLength: 8 } };
+    expect(validateFieldValue(f, "hola!").errors).toHaveLength(0);
+    expect(validateFieldValue(f, "hi").errors).toHaveLength(1);
+    expect(validateFieldValue(f, "demasiado largo").errors).toHaveLength(1);
+  });
 });
 
 describe("isFieldVisible", () => {

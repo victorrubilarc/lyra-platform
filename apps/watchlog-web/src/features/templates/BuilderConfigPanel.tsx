@@ -1,4 +1,4 @@
-import { Fragment } from "react";
+import { Fragment, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Checkbox, Combobox, FormField, Input, MultiSelect, Select, Textarea, Toggle } from "@lyra/ui";
 import { isPresentationalType, STRUCTURED_CELL_TYPES, type FieldType, type OptionInlineItem, type RoleSummary, type WorkflowStateDto } from "@lyra/contracts";
@@ -285,6 +285,57 @@ function linesToOptionSource(text: string): Record<string, unknown> {
   return { optionSource: { kind: "inline", items } };
 }
 
+/** Parsea las líneas del editor de opciones inline a `{code,label}` (code estable, dedup). */
+function parseInlineOptions(text: string): OptionInlineItem[] {
+  const used = new Set<string>();
+  return text
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .map((label, i) => {
+      let code = slugifyKey(label, `op_${i + 1}`);
+      while (used.has(code)) code = `${code}_${i}`;
+      used.add(code);
+      return { code, label };
+    });
+}
+
+/**
+ * Textarea de "una opción por línea" que conserva el TEXTO CRUDO mientras se edita.
+ * Antes el `value` se re-derivaba de los ítems ya parseados (líneas vacías filtradas),
+ * así que al pulsar Enter la línea nueva se borraba en el re-render y era IMPOSIBLE
+ * crear un segundo ítem. Aquí el textarea muestra exactamente lo tecleado (estado
+ * local) y solo PROPAGA los ítems parseados hacia arriba. Reseed por `key` del padre
+ * (uid del campo / key de la columna) al cambiar de objetivo.
+ */
+function LinesTextarea({
+  id,
+  initial,
+  rows,
+  placeholder,
+  onText,
+}: {
+  id?: string;
+  initial: string;
+  rows?: number;
+  placeholder?: string;
+  onText: (text: string) => void;
+}) {
+  const [text, setText] = useState(initial);
+  return (
+    <Textarea
+      id={id}
+      rows={rows ?? 4}
+      value={text}
+      placeholder={placeholder}
+      onChange={(e) => {
+        setText(e.target.value);
+        onText(e.target.value);
+      }}
+    />
+  );
+}
+
 /** Editor de TABLE: layout, columnas (sub-campos escalares) y límites de filas. */
 function TableConfigEditor({
   config,
@@ -336,11 +387,12 @@ function TableConfigEditor({
             </button>
           </div>
           {col.type === "SELECT" && (
-            <Textarea
-              value={selectOptionsLines(col.config)}
-              placeholder={t("templates.builder.optionsPlaceholder")}
-              onChange={(e) => updateCol(i, { config: linesToOptionSource(e.target.value) })}
+            <LinesTextarea
+              key={`${col.key}-opts`}
+              initial={selectOptionsLines(col.config)}
               rows={3}
+              placeholder={t("templates.builder.optionsPlaceholder")}
+              onText={(text) => updateCol(i, { config: linesToOptionSource(text) })}
             />
           )}
         </Fragment>
@@ -551,12 +603,27 @@ export function BuilderConfigPanel({
                 </Select>
               )}
             </FormField>
+            {/* Largo de caracteres (min/max): se valida en backend y se muestra un contador en el render. */}
+            <div className={styles.twoCol}>
+              {numberConfigField(field.config, "minLength", t("templates.builder.minLength"), setConfig)}
+              {numberConfigField(field.config, "maxLength", t("templates.builder.maxLength"), setConfig)}
+            </div>
             {/* Escáner QR/código (Ola 3): botón de cámara que decodifica y rellena el texto. */}
             <FormField label={t("templates.builder.scanEnable")} hint={t("templates.builder.scanHint")}>
               {() => (
                 <Toggle checked={field.config.scan === true} onChange={(checked) => setConfig("scan", checked ? true : undefined)} />
               )}
             </FormField>
+          </>
+        )}
+
+        {field.type === "TEXTAREA" && (
+          <>
+            {/* Largo de caracteres (min/max): se valida en backend y se muestra un contador en el render. */}
+            <div className={styles.twoCol}>
+              {numberConfigField(field.config, "minLength", t("templates.builder.minLength"), setConfig)}
+              {numberConfigField(field.config, "maxLength", t("templates.builder.maxLength"), setConfig)}
+            </div>
           </>
         )}
 
@@ -701,26 +768,12 @@ export function BuilderConfigPanel({
             {optionSourceKind(field.config) === "inline" ? (
               <FormField label={t("templates.builder.options")}>
                 {({ id }) => (
-                  <Textarea
+                  <LinesTextarea
+                    key={field.uid}
                     id={id}
-                    rows={4}
-                    value={optionLines}
+                    initial={optionLines}
                     placeholder={t("templates.builder.optionsPlaceholder")}
-                    onChange={(e) => {
-                      const used = new Set<string>();
-                      const items: OptionInlineItem[] = e.target.value
-                        .split("\n")
-                        .map((l) => l.trim())
-                        .filter(Boolean)
-                        .map((label, i) => {
-                          // El `code` es el valor estable que se persiste (no el label).
-                          let code = slugifyKey(label, `op_${i + 1}`);
-                          while (used.has(code)) code = `${code}_${i}`;
-                          used.add(code);
-                          return { code, label };
-                        });
-                      setConfig("optionSource", { kind: "inline", items });
-                    }}
+                    onText={(text) => setConfig("optionSource", { kind: "inline", items: parseInlineOptions(text) })}
                   />
                 )}
               </FormField>
