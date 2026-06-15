@@ -83,17 +83,27 @@ const literalValueSchema = z.union([z.number(), z.string().max(500), z.boolean()
  * Nodo del AST (unión etiquetada por `kind`):
  *  - `lit`: literal (número/string/booleano/null).
  *  - `var`: referencia a un campo de la versión por su `key` estable.
+ *  - `col`: referencia a una COLUMNA de un campo TABLA (Ola 4): se expande a la lista
+ *           de valores no vacíos de esa columna. Solo tiene sentido DENTRO de un
+ *           operador de agregación (suma/promedio/mín/máx/cantidad); en otro contexto
+ *           evalúa a vacío. `table` = key del campo TABLE; `column` = key de la columna.
  *  - `op` : operador de la lista blanca aplicado a sub-expresiones.
  */
 export type Expression =
   | { kind: "lit"; value: number | string | boolean | null }
   | { kind: "var"; key: string }
+  | { kind: "col"; table: string; column: string }
   | { kind: "op"; op: ExpressionOperator; args: Expression[] };
 
 export const expressionSchema: z.ZodType<Expression> = z.lazy(() =>
   z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("lit"), value: literalValueSchema }),
     z.object({ kind: z.literal("var"), key: z.string().trim().min(1).max(64) }),
+    z.object({
+      kind: z.literal("col"),
+      table: z.string().trim().min(1).max(64),
+      column: z.string().trim().min(1).max(64),
+    }),
     z.object({
       kind: z.literal("op"),
       op: expressionOperatorSchema,
@@ -102,12 +112,26 @@ export const expressionSchema: z.ZodType<Expression> = z.lazy(() =>
   ]),
 );
 
+/** Operadores de AGREGACIÓN: los únicos que expanden un operando `col` (columna de tabla). */
+export const AGGREGATION_OPERATORS = new Set<ExpressionOperator>(["min", "max", "sum", "avg", "count"]);
+
 // === Análisis estático ======================================================
 
-/** Recolecta TODAS las `key` referenciadas por `var(...)` en una expresión (dependencias). */
+/** Recolecta TODAS las `key` referenciadas por `var(...)` y `col(...)` en una expresión (dependencias). */
 export function collectVarRefs(expr: Expression, into: Set<string> = new Set()): Set<string> {
   if (expr.kind === "var") into.add(expr.key);
+  else if (expr.kind === "col") into.add(expr.table); // depende del campo TABLA
   else if (expr.kind === "op") for (const a of expr.args) collectVarRefs(a, into);
+  return into;
+}
+
+/** Recolecta las referencias a COLUMNAS de tabla (`col(...)`) de una expresión. */
+export function collectColRefs(
+  expr: Expression,
+  into: Array<{ table: string; column: string }> = [],
+): Array<{ table: string; column: string }> {
+  if (expr.kind === "col") into.push({ table: expr.table, column: expr.column });
+  else if (expr.kind === "op") for (const a of expr.args) collectColRefs(a, into);
   return into;
 }
 
@@ -200,9 +224,31 @@ export function evaluateExpression(
       }
       return null;
     }
+    case "col":
+      // Una columna de tabla NO es un escalar: solo la agregación la expande (ver evalOp).
+      // En cualquier otro contexto evalúa a vacío (degradación elegante).
+      return null;
     case "op":
       return evalOp(expr.op, expr.args, valuesByKey, opts);
   }
+}
+
+/**
+ * Valores NO vacíos de una COLUMNA de un campo TABLA (Ola 4) desde la foto de valores.
+ * El valor del campo tabla es `Array<Record<colKey, escalar>>`; se devuelven los
+ * valores escalares de `column` (omitiendo filas/celdas vacías).
+ */
+function columnValues(values: Record<string, unknown>, table: string, column: string): ExprValue[] {
+  const rows = values[table];
+  if (!Array.isArray(rows)) return [];
+  const out: ExprValue[] = [];
+  for (const row of rows) {
+    if (!row || typeof row !== "object" || Array.isArray(row)) continue;
+    const v = (row as Record<string, unknown>)[column];
+    if (v === null || v === undefined || v === "") continue;
+    if (typeof v === "number" || typeof v === "string" || typeof v === "boolean") out.push(v);
+  }
+  return out;
 }
 
 function evalOp(
@@ -257,7 +303,21 @@ function evalOp(
     case "sum":
     case "avg":
     case "count": {
-      const nums = args.map((a) => toNum(ev(a))).filter((n): n is number => n !== null);
+      // Cada operando aporta UNO o VARIOS números: un `col` (columna de tabla) se
+      // expande a TODOS sus valores; cualquier otro operando es un escalar. Se ignoran
+      // los vacíos (estilo hoja de cálculo).
+      const nums: number[] = [];
+      for (const a of args) {
+        if (a && a.kind === "col") {
+          for (const v of columnValues(values, a.table, a.column)) {
+            const n = toNum(v);
+            if (n !== null) nums.push(n);
+          }
+        } else {
+          const n = toNum(ev(a));
+          if (n !== null) nums.push(n);
+        }
+      }
       if (op === "count") return nums.length;
       if (nums.length === 0) return null;
       if (op === "min") return Math.min(...nums);

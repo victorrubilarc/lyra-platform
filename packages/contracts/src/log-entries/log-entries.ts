@@ -1404,15 +1404,57 @@ export function requiredFieldError(field: FieldForValidation, value: unknown): s
  * backend y de los badges de excepción en el frontend.
  */
 export function thresholdBandFor(field: FieldForValidation, value: unknown): ThresholdBand | null {
-  if (field.type !== "NUMBER" || isEmptyValue(value)) return null;
+  if (isEmptyValue(value)) return null;
+  if (field.type === "NUMBER") return numberThresholdBand(field.config, value);
+  // Objetos ESTRUCTURADOS (Ola 4): la banda del CAMPO = la PEOR banda de sus celdas
+  // numéricas (CRIT domina a WARN). Así una lectura crítica DENTRO de una tabla/matriz
+  // marca la entrada como excepción y muestra su badge en la grilla (review-by-exception).
+  if (field.type === "TABLE") {
+    const cols = ((field.config as TableFieldConfig).columns ?? []).filter((c) => c.type === "NUMBER");
+    if (cols.length === 0 || !Array.isArray(value)) return null;
+    let worst: ThresholdBand | null = null;
+    for (const row of value) {
+      if (!row || typeof row !== "object" || Array.isArray(row)) continue;
+      for (const col of cols) {
+        worst = worseBand(worst, numberThresholdBand(col.config ?? {}, (row as Record<string, unknown>)[col.key]));
+        if (worst === "CRIT") return "CRIT";
+      }
+    }
+    return worst;
+  }
+  if (field.type === "MATRIX") {
+    const cfg = field.config as MatrixFieldConfig;
+    if (cfg.cell?.type !== "NUMBER" || typeof value !== "object" || value === null || Array.isArray(value)) return null;
+    let worst: ThresholdBand | null = null;
+    for (const rowVal of Object.values(value as Record<string, unknown>)) {
+      if (!rowVal || typeof rowVal !== "object" || Array.isArray(rowVal)) continue;
+      for (const cell of Object.values(rowVal as Record<string, unknown>)) {
+        worst = worseBand(worst, numberThresholdBand(cfg.cell.config ?? {}, cell));
+        if (worst === "CRIT") return "CRIT";
+      }
+    }
+    return worst;
+  }
+  return null;
+}
+
+/** Banda de umbral de un valor NUMÉRICO suelto contra un config (bandas EFECTIVAS). */
+function numberThresholdBand(config: Record<string, unknown>, value: unknown): ThresholdBand | null {
+  if (isEmptyValue(value)) return null;
   const n = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(n)) return null;
-  // Bandas EFECTIVAS: derivadas de `expected ± tolerance` (Ola 2) o explícitas.
-  const c = effectiveNumberBands(field.config);
+  const c = effectiveNumberBands(config);
   if (typeof c.critLow === "number" && n < c.critLow) return "CRIT";
   if (typeof c.critHigh === "number" && n > c.critHigh) return "CRIT";
   if (typeof c.warnLow === "number" && n < c.warnLow) return "WARN";
   if (typeof c.warnHigh === "number" && n > c.warnHigh) return "WARN";
+  return null;
+}
+
+/** La PEOR de dos bandas (CRIT > WARN > null). */
+function worseBand(a: ThresholdBand | null, b: ThresholdBand | null): ThresholdBand | null {
+  if (a === "CRIT" || b === "CRIT") return "CRIT";
+  if (a === "WARN" || b === "WARN") return "WARN";
   return null;
 }
 

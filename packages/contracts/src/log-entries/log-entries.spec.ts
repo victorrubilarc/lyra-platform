@@ -901,6 +901,30 @@ describe("validateFieldValue — objetos Ola 4 (estructurados)", () => {
     expect(matrixField({ p1: {} }).errors).toHaveLength(0); // parcial
   });
 
+  it("thresholdBandFor: peor banda de las celdas (TABLE/MATRIX) → excepción", () => {
+    const tcfg = {
+      columns: [
+        { key: "hora", label: "Hora", type: "TIME" },
+        { key: "temp", label: "Temp", type: "NUMBER", config: { warnHigh: 80, critHigh: 90 } },
+      ],
+    };
+    const tf: FieldForValidation = { key: "t", type: "TABLE", dataType: "TABLE", label: "Lecturas", config: tcfg };
+    expect(thresholdBandFor(tf, [{ hora: "08:00", temp: 50 }])).toBeNull();
+    expect(thresholdBandFor(tf, [{ temp: 85 }, { temp: 50 }])).toBe("WARN");
+    expect(thresholdBandFor(tf, [{ temp: 85 }, { temp: 95 }])).toBe("CRIT"); // crítico domina
+    expect(thresholdBandFor(tf, [])).toBeNull();
+
+    const mcfg = {
+      rows: [{ key: "p1", label: "P1" }],
+      columns: [{ key: "c1", label: "C1" }, { key: "c2", label: "C2" }],
+      cell: { type: "NUMBER", config: { warnHigh: 10, critHigh: 20 } },
+    };
+    const mf: FieldForValidation = { key: "m", type: "MATRIX", dataType: "MATRIX", label: "Matriz", config: mcfg };
+    expect(thresholdBandFor(mf, { p1: { c1: 5, c2: 12 } })).toBe("WARN");
+    expect(thresholdBandFor(mf, { p1: { c1: 25 } })).toBe("CRIT");
+    expect(thresholdBandFor(mf, { p1: { c1: 5 } })).toBeNull();
+  });
+
   it("isEmptyMatrixValue + requiredFieldError(MATRIX)", () => {
     const f: FieldForValidation = { key: "m", type: "MATRIX", dataType: "MATRIX", label: "Lecturas", config: matrixConfig };
     expect(isEmptyMatrixValue({})).toBe(true);

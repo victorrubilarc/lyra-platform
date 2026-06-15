@@ -13,7 +13,41 @@ import {
 // Helpers para construir AST legibles en los tests.
 const lit = (value: number | string | boolean | null): Expression => ({ kind: "lit", value });
 const v = (key: string): Expression => ({ kind: "var", key });
+const col = (table: string, column: string): Expression => ({ kind: "col", table, column });
 const op = (o: string, ...args: Expression[]): Expression => ({ kind: "op", op: o as never, args });
+
+describe("agregados sobre columnas de tabla (Ola 4)", () => {
+  const rows = [{ ton: 100, ley: 1.2 }, { ton: 50, ley: null }, { ton: "30", ley: 0.8 }, {}];
+  const values = { lecturas: rows };
+
+  it("sum/avg/min/max/count expanden una columna e ignoran vacíos", () => {
+    expect(evaluateExpression(op("sum", col("lecturas", "ton")), values)).toBe(180); // 100+50+30
+    expect(evaluateExpression(op("count", col("lecturas", "ton")), values)).toBe(3);
+    expect(evaluateExpression(op("avg", col("lecturas", "ley")), values)).toBe(1); // (1.2+0.8)/2
+    expect(evaluateExpression(op("max", col("lecturas", "ton")), values)).toBe(100);
+    expect(evaluateExpression(op("min", col("lecturas", "ton")), values)).toBe(30);
+  });
+
+  it("mezcla columna + escalar; columna inexistente o tabla vacía → 0/null", () => {
+    expect(evaluateExpression(op("sum", col("lecturas", "ton"), lit(20)), values)).toBe(200);
+    expect(evaluateExpression(op("count", col("lecturas", "noexiste")), values)).toBe(0);
+    expect(evaluateExpression(op("sum", col("vacia", "x")), {})).toBeNull();
+    // `col` fuera de agregación = vacío (no escalar)
+    expect(evaluateExpression(op("add", col("lecturas", "ton"), lit(1)), values)).toBeNull();
+  });
+
+  it("validateRulesDesign acepta col sobre TABLE y rechaza col sobre no-tabla", () => {
+    const fields: FieldForRules[] = [
+      { key: "lecturas", dataType: "TABLE" },
+      { key: "total", dataType: "NUMBER", computed: { expression: op("sum", col("lecturas", "ton")) } },
+      { key: "n", dataType: "NUMBER" },
+      { key: "malo", dataType: "NUMBER", computed: { expression: op("sum", col("n", "x")) } },
+    ];
+    const errs = validateRulesDesign(fields, []);
+    expect(errs.some((e) => e.key === "total")).toBe(false);
+    expect(errs.some((e) => e.key === "malo" && /no es una tabla/.test(e.message))).toBe(true);
+  });
+});
 
 describe("evaluateExpression — aritmética y nulos", () => {
   it("suma/resta/multiplica/divide", () => {
