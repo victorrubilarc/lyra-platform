@@ -48,10 +48,11 @@ export function uploadAttachment(
   );
 }
 
-/** URL prefirmada de descarga de un adjunto (vida corta, ABAC de getDetail). */
-export function fetchAttachmentUrl(entryId: string, descriptorId: string): Promise<AttachmentDownloadResponse> {
+/** URL prefirmada de un adjunto (vida corta, ABAC de getDetail). `inline` la sirve
+ *  para PREVISUALIZAR en el navegador (imagen/audio/video/PDF) en vez de descargar. */
+export function fetchAttachmentUrl(entryId: string, descriptorId: string, inline = false): Promise<AttachmentDownloadResponse> {
   return apiJson(
-    `/log-entries/${entryId}/attachments/${encodeURIComponent(descriptorId)}/url`,
+    `/log-entries/${entryId}/attachments/${encodeURIComponent(descriptorId)}/url${inline ? "?inline=1" : ""}`,
     attachmentDownloadResponseSchema,
   );
 }

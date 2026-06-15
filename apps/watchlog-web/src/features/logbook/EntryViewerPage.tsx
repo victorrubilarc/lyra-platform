@@ -518,7 +518,7 @@ export function EntryViewerPage() {
                   // Adjuntos (Ola 3): el visor lista + descarga (presigned GET con ABAC); read-only.
                   const attachments =
                     f.type === "ATTACHMENT"
-                      ? { upload: async () => Promise.reject(new Error("read-only")), getDownloadUrl: (id: string) => fetchAttachmentUrl(entry.id, id) }
+                      ? { upload: async () => Promise.reject(new Error("read-only")), getDownloadUrl: (id: string, inline?: boolean) => fetchAttachmentUrl(entry.id, id, inline) }
                       : undefined;
                   return (
                     <>

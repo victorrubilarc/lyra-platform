@@ -15,7 +15,8 @@ import styles from "./AttachmentControl.module.css";
 /** Handlers de subida/descarga ligados a una entrada+sección+campo por el llamador. */
 export interface AttachmentHandlers {
   upload: (file: File) => Promise<FileDescriptor>;
-  getDownloadUrl: (descriptorId: string) => Promise<{ url: string }>;
+  /** `inline` = URL para PREVISUALIZAR (disposición inline); sin él, para descargar. */
+  getDownloadUrl: (descriptorId: string, inline?: boolean) => Promise<{ url: string }>;
 }
 
 function descriptors(value: unknown): FileDescriptor[] {
@@ -226,7 +227,7 @@ function PreviewModal({
   onClose,
 }: {
   descriptor: FileDescriptor;
-  getUrl: (id: string) => Promise<{ url: string }>;
+  getUrl: (id: string, inline?: boolean) => Promise<{ url: string }>;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -236,7 +237,7 @@ function PreviewModal({
 
   useEffect(() => {
     let alive = true;
-    getUrl(descriptor.id)
+    getUrl(descriptor.id, true)
       .then(({ url }) => alive && setUrl(url))
       .catch(() => alive && setFailed(true));
     return () => {

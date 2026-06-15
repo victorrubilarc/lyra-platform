@@ -689,8 +689,8 @@ export function EntryFillPage() {
                             const id = composeActive ? await materialize() : activeId!;
                             return uploadAttachment(id, section.key, f.key, file);
                           },
-                          getDownloadUrl: (descriptorId: string) =>
-                            fetchAttachmentUrl(activeId ?? materializedId ?? "", descriptorId),
+                          getDownloadUrl: (descriptorId: string, inline?: boolean) =>
+                            fetchAttachmentUrl(activeId ?? materializedId ?? "", descriptorId, inline),
                         }
                       : undefined;
                   return (
