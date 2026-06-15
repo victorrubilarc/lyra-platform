@@ -1,3 +1,4 @@
+import { normalizeRut } from "@lyra/contracts";
 import i18n, { DEFAULT_LANGUAGE } from "../i18n/i18n.js";
 
 /**
@@ -55,4 +56,41 @@ export function formatDuration(ms: number): string {
   if (totalMin >= 1440) return fmt(Math.floor(totalMin / 1440), "day");
   if (totalMin >= 60) return fmt(Math.floor(totalMin / 60), "hour");
   return fmt(totalMin, "minute");
+}
+
+// === Objetos del Form Builder (Ola 1) ========================================
+
+/**
+ * Duración en MINUTOS → "HH:MM" (objeto DURATION; los minutos son la unidad
+ * canónica de almacenamiento). 90 ⇒ "01:30". Negativos se acotan a 0.
+ */
+export function formatDurationHm(minutes: number): string {
+  const m = Math.max(0, Math.round(minutes));
+  const h = Math.floor(m / 60);
+  const mm = m % 60;
+  return `${String(h).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+}
+
+/** Convierte "HH:MM" a minutos (objeto DURATION). null si no parsea. */
+export function durationHmToMinutes(hhmm: string): number | null {
+  const m = /^(\d{1,3}):([0-5]\d)$/.exec(hhmm.trim());
+  if (!m) return null;
+  return Number(m[1]) * 60 + Number(m[2]);
+}
+
+/**
+ * RUT formateado para display (puntos de miles + guion del DV), p. ej.
+ * "12.345.678-5". Devuelve la entrada tal cual si no parsea (feedback honesto).
+ */
+export function formatRut(value: string): string {
+  const norm = normalizeRut(value);
+  if (!norm) return value;
+  const [body, dv] = norm.split("-");
+  const grouped = body!.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return `${grouped}-${dv}`;
+}
+
+/** Porcentaje regional (el valor ya está en escala 0..100). 42 ⇒ "42%". */
+export function formatPercent(value: number, opts?: Intl.NumberFormatOptions): string {
+  return new Intl.NumberFormat(locale(), { style: "unit", unit: "percent", unitDisplay: "narrow", ...opts }).format(value);
 }

@@ -1,8 +1,8 @@
 import { useTranslation } from "react-i18next";
 import { Checkbox, Combobox, FormField, Input, MultiSelect, Select, Textarea, Toggle } from "@lyra/ui";
-import type { OptionInlineItem, RoleSummary, WorkflowStateDto } from "@lyra/contracts";
+import { isPresentationalType, type OptionInlineItem, type RoleSummary, type WorkflowStateDto } from "@lyra/contracts";
 import { useReferenceLists } from "../reference-data/reference-data-queries.js";
-import { fieldTypeMeta, slugifyKey, WIDTH_PRESETS, type EditField, type EditSection } from "./builder-model.js";
+import { fieldDisplayMeta, slugifyKey, WIDTH_PRESETS, type EditField, type EditSection } from "./builder-model.js";
 import { ExpressionEditor } from "./ExpressionEditor.js";
 import type { RuleFieldRef } from "./expression-meta.js";
 import styles from "./TemplateBuilder.module.css";
@@ -81,7 +81,7 @@ export function BuilderConfigPanel({
 
   // ── Config de CAMPO ────────────────────────────────────────────────────────
   if (field) {
-    const meta = fieldTypeMeta(field.type);
+    const meta = fieldDisplayMeta(field);
     const setConfig = (key: string, value: unknown) => {
       const next = { ...field.config };
       if (value === undefined) delete next[key];
@@ -90,6 +90,7 @@ export function BuilderConfigPanel({
     };
     const isOptions = field.type === "SELECT" || field.type === "MULTISELECT";
     const isDateLike = field.type === "DATE" || field.type === "DATETIME";
+    const isPresentational = isPresentationalType(field.type);
     const optionLines = inlineItems(field.config)
       .map((o) => o.label)
       .join("\n");
@@ -129,7 +130,9 @@ export function BuilderConfigPanel({
           )}
         </FormField>
 
-        {!field.computed && (
+        {isPresentational && <p className={styles.modeledNote}>{t("templates.builder.presentationalNote")}</p>}
+
+        {!field.computed && !isPresentational && (
           <div className={styles.inlineCheck}>
             <Checkbox
               checked={field.required}
@@ -140,7 +143,7 @@ export function BuilderConfigPanel({
         )}
 
         {/* Campo FORMULADO (Req-7): valor derivado de una fórmula (read-only). */}
-        {field.type !== "SIGNATURE" && (
+        {field.type !== "SIGNATURE" && !isPresentational && (
           <div className={styles.computedBox}>
             <div className={styles.inlineCheck}>
               <Toggle
@@ -168,18 +171,68 @@ export function BuilderConfigPanel({
           </div>
         )}
 
+        {field.type === "TEXT" && (
+          <FormField label={t("templates.builder.textFormat")}>
+            {({ id }) => (
+              <Select
+                id={id}
+                value={(field.config.format as string) ?? ""}
+                onChange={(e) => setConfig("format", e.target.value || undefined)}
+              >
+                <option value="">{t("templates.builder.textFormatNone")}</option>
+                <option value="rut">{t("templates.builder.textFormatRut")}</option>
+                <option value="email">{t("templates.builder.textFormatEmail")}</option>
+                <option value="phone">{t("templates.builder.textFormatPhone")}</option>
+                <option value="url">{t("templates.builder.textFormatUrl")}</option>
+              </Select>
+            )}
+          </FormField>
+        )}
+
         {field.type === "NUMBER" && (
           <>
-            <FormField label={t("templates.builder.unit")}>
+            <FormField label={t("templates.builder.numberFormat")}>
               {({ id }) => (
-                <Input
+                <Select
                   id={id}
-                  value={(field.config.unit as string) ?? ""}
-                  onChange={(e) => setConfig("unit", e.target.value || undefined)}
-                  placeholder="°C, bar, t…"
-                />
+                  value={(field.config.format as string) ?? ""}
+                  onChange={(e) => {
+                    const fmt = e.target.value || undefined;
+                    setConfig("format", fmt);
+                    if (fmt !== "currency") setConfig("currency", undefined);
+                    else if (!field.config.currency) setConfig("currency", "CLP");
+                  }}
+                >
+                  <option value="">{t("templates.builder.numberFormatNone")}</option>
+                  <option value="percent">{t("templates.builder.numberFormatPercent")}</option>
+                  <option value="currency">{t("templates.builder.numberFormatCurrency")}</option>
+                </Select>
               )}
             </FormField>
+            {field.config.format === "currency" && (
+              <FormField label={t("templates.builder.currency")}>
+                {({ id }) => (
+                  <Input
+                    id={id}
+                    value={(field.config.currency as string) ?? "CLP"}
+                    maxLength={3}
+                    onChange={(e) => setConfig("currency", e.target.value.toUpperCase() || undefined)}
+                  />
+                )}
+              </FormField>
+            )}
+            {field.config.format !== "percent" && field.config.format !== "currency" && (
+              <FormField label={t("templates.builder.unit")}>
+                {({ id }) => (
+                  <Input
+                    id={id}
+                    value={(field.config.unit as string) ?? ""}
+                    onChange={(e) => setConfig("unit", e.target.value || undefined)}
+                    placeholder="°C, bar, t…"
+                  />
+                )}
+              </FormField>
+            )}
             <div className={styles.twoCol}>
               {numberConfigField(field.config, "min", t("templates.builder.min"), setConfig)}
               {numberConfigField(field.config, "max", t("templates.builder.max"), setConfig)}
@@ -201,6 +254,29 @@ export function BuilderConfigPanel({
 
         {isOptions && (
           <>
+            <FormField label={t("templates.builder.displayAs")}>
+              {({ id }) => (
+                <Select
+                  id={id}
+                  value={(field.config.displayAs as string) ?? "dropdown"}
+                  onChange={(e) => setConfig("displayAs", e.target.value)}
+                >
+                  {field.type === "SELECT" ? (
+                    <>
+                      <option value="dropdown">{t("templates.builder.displayDropdown")}</option>
+                      <option value="radio">{t("templates.builder.displayRadio")}</option>
+                      <option value="segmented">{t("templates.builder.displaySegmented")}</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="dropdown">{t("templates.builder.displayDropdown")}</option>
+                      <option value="checkboxes">{t("templates.builder.displayCheckboxes")}</option>
+                      <option value="modal">{t("templates.builder.displayModal")}</option>
+                    </>
+                  )}
+                </Select>
+              )}
+            </FormField>
             <FormField label={t("templates.builder.optionSource")} hint={t("templates.builder.optionSourceHint")}>
               {({ id }) => (
                 <Select
@@ -264,6 +340,157 @@ export function BuilderConfigPanel({
         )}
         {isDateLike && field.semanticRole === "EFFECTIVE_DATE" && (
           <p className={styles.thresholdHint}>{t("templates.builder.effectiveDateHint")}</p>
+        )}
+
+        {field.type === "CONFORMITY" && (
+          <div className={styles.inlineCheck}>
+            <Checkbox
+              checked={(field.config.allowNa as boolean) !== false}
+              onChange={(checked) => setConfig("allowNa", checked ? undefined : false)}
+              label={t("templates.builder.conformityAllowNa")}
+            />
+          </div>
+        )}
+
+        {field.type === "RATING" && (
+          <>
+            <FormField label={t("templates.builder.ratingStyle")}>
+              {({ id }) => (
+                <Select id={id} value={(field.config.style as string) ?? "stars"} onChange={(e) => setConfig("style", e.target.value)}>
+                  <option value="stars">{t("templates.builder.ratingStyleStars")}</option>
+                  <option value="numeric">{t("templates.builder.ratingStyleNumeric")}</option>
+                  <option value="likert">{t("templates.builder.ratingStyleLikert")}</option>
+                </Select>
+              )}
+            </FormField>
+            <FormField label={t("templates.builder.ratingMax")}>
+              {({ id }) => (
+                <Input
+                  id={id}
+                  type="number"
+                  min={2}
+                  max={10}
+                  value={String((field.config.max as number) ?? 5)}
+                  onChange={(e) => setConfig("max", e.target.value === "" ? undefined : Number(e.target.value))}
+                />
+              )}
+            </FormField>
+            {field.config.style === "likert" && (
+              <FormField label={t("templates.builder.ratingLabels")}>
+                {({ id }) => (
+                  <Textarea
+                    id={id}
+                    rows={3}
+                    value={Array.isArray(field.config.labels) ? (field.config.labels as string[]).join("\n") : ""}
+                    onChange={(e) => {
+                      const labels = e.target.value.split("\n").map((l) => l.trim()).filter(Boolean);
+                      setConfig("labels", labels.length ? labels : undefined);
+                    }}
+                  />
+                )}
+              </FormField>
+            )}
+          </>
+        )}
+
+        {field.type === "RANGE" && (
+          <>
+            <FormField label={t("templates.builder.unit")}>
+              {({ id }) => (
+                <Input id={id} value={(field.config.unit as string) ?? ""} onChange={(e) => setConfig("unit", e.target.value || undefined)} placeholder="°C, bar…" />
+              )}
+            </FormField>
+            <div className={styles.twoCol}>
+              {numberConfigField(field.config, "min", t("templates.builder.min"), setConfig)}
+              {numberConfigField(field.config, "max", t("templates.builder.max"), setConfig)}
+            </div>
+          </>
+        )}
+
+        {field.type === "HEADING" && (
+          <FormField label={t("templates.builder.headingLevel")}>
+            {({ id }) => (
+              <Select id={id} value={String((field.config.level as number) ?? 2)} onChange={(e) => setConfig("level", Number(e.target.value))}>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+              </Select>
+            )}
+          </FormField>
+        )}
+
+        {(field.type === "STATIC_TEXT" || field.type === "NOTICE") && (
+          <FormField label={t("templates.builder.bodyText")}>
+            {({ id }) => (
+              <Textarea
+                id={id}
+                rows={3}
+                value={(field.config.text as string) ?? ""}
+                placeholder={t("templates.builder.bodyTextPlaceholder")}
+                onChange={(e) => setConfig("text", e.target.value || undefined)}
+              />
+            )}
+          </FormField>
+        )}
+
+        {field.type === "NOTICE" && (
+          <FormField label={t("templates.builder.noticeVariant")}>
+            {({ id }) => (
+              <Select id={id} value={(field.config.variant as string) ?? "info"} onChange={(e) => setConfig("variant", e.target.value)}>
+                <option value="info">{t("templates.builder.noticeInfo")}</option>
+                <option value="warning">{t("templates.builder.noticeWarning")}</option>
+                <option value="success">{t("templates.builder.noticeSuccess")}</option>
+                <option value="danger">{t("templates.builder.noticeDanger")}</option>
+              </Select>
+            )}
+          </FormField>
+        )}
+
+        {field.type === "DIVIDER" && (
+          <FormField label={t("templates.builder.dividerSpacing")}>
+            {({ id }) => (
+              <Select id={id} value={(field.config.spacing as string) ?? "md"} onChange={(e) => setConfig("spacing", e.target.value)}>
+                <option value="sm">{t("templates.builder.spacingSm")}</option>
+                <option value="md">{t("templates.builder.spacingMd")}</option>
+                <option value="lg">{t("templates.builder.spacingLg")}</option>
+              </Select>
+            )}
+          </FormField>
+        )}
+
+        {field.type === "PROCEDURE_LINK" && (
+          <>
+            <FormField label={t("templates.builder.linkUrl")}>
+              {({ id }) => (
+                <Input id={id} type="url" value={(field.config.url as string) ?? ""} onChange={(e) => setConfig("url", e.target.value || undefined)} placeholder="https://…" />
+              )}
+            </FormField>
+            <FormField label={t("templates.builder.linkText")}>
+              {({ id }) => (
+                <Input id={id} value={(field.config.linkText as string) ?? ""} onChange={(e) => setConfig("linkText", e.target.value || undefined)} />
+              )}
+            </FormField>
+          </>
+        )}
+
+        {field.type === "REFERENCE_IMAGE" && (
+          <>
+            <FormField label={t("templates.builder.imageUrl")}>
+              {({ id }) => (
+                <Input id={id} type="url" value={(field.config.url as string) ?? ""} onChange={(e) => setConfig("url", e.target.value || undefined)} placeholder="https://…" />
+              )}
+            </FormField>
+            <FormField label={t("templates.builder.imageAlt")}>
+              {({ id }) => (
+                <Input id={id} value={(field.config.alt as string) ?? ""} onChange={(e) => setConfig("alt", e.target.value || undefined)} />
+              )}
+            </FormField>
+            <FormField label={t("templates.builder.imageCaption")}>
+              {({ id }) => (
+                <Input id={id} value={(field.config.caption as string) ?? ""} onChange={(e) => setConfig("caption", e.target.value || undefined)} />
+              )}
+            </FormField>
+          </>
         )}
 
         {(field.type === "SEVERITY" || field.type === "SIGNATURE") && (

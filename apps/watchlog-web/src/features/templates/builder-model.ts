@@ -1,11 +1,32 @@
 import {
   AlignLeft,
+  ArrowLeftRight,
   Calendar,
   CalendarClock,
-  CheckSquare,
+  CheckCheck,
+  ChevronDownSquare,
+  CircleDot,
+  Clock,
+  CircleDollarSign,
+  ExternalLink,
+  Fingerprint,
   Hash,
+  Heading,
+  Image,
+  Info,
+  Link as LinkIcon,
   ListChecks,
+  ListPlus,
+  Mail,
+  Minus,
   PenLine,
+  Percent,
+  Phone,
+  Rows3,
+  SearchCheck,
+  Star,
+  Text as TextIcon,
+  Timer,
   TriangleAlert,
   Type,
   ToggleRight,
@@ -40,30 +61,102 @@ export function flattenNodeOptions(nodes: OrgNodeTree[], depth = 0): NodeOption[
   return out;
 }
 
-/** Metadatos de cada tipo de campo para la paleta del builder. */
-export interface FieldTypeMeta {
+// === Paleta de objetos (Catálogo premium · Ola 1) ============================
+//
+// La PALETA está hecha de PRESETS, no de tipos: varios presets comparten un mismo
+// `type` y se diferencian por su `config` (p. ej. RUT/Correo/URL son TEXT con
+// `format`; Radio/Segmentos son SELECT con `displayAs`). Así la superficie de
+// FIELD_TYPES queda chica y la paleta se ve rica. Cada preset declara su categoría
+// para agruparse en el popover "＋ Agregar campo".
+
+export const PALETTE_CATEGORIES = ["basics", "selection", "evaluation", "presentation"] as const;
+export type PaletteCategory = (typeof PALETTE_CATEGORIES)[number];
+
+/** Un objeto ofrecido en la paleta (tipo + config inicial + presentación). */
+export interface FieldPreset {
+  /** Id estable del preset (≠ FieldType; varios presets comparten type). */
+  id: string;
   type: FieldType;
+  category: PaletteCategory;
   labelKey: string;
   icon: LucideIcon;
-  /** Tipo con editor completo en 2.1 (los 8 núcleo). */
-  core: boolean;
+  /** Config inicial del campo al insertarlo. Vacío si el tipo no lleva config. */
+  config: () => Record<string, unknown>;
 }
 
-export const FIELD_TYPE_META: readonly FieldTypeMeta[] = [
-  { type: "NUMBER", labelKey: "templates.fieldTypes.number", icon: Hash, core: true },
-  { type: "TEXT", labelKey: "templates.fieldTypes.text", icon: Type, core: true },
-  { type: "TEXTAREA", labelKey: "templates.fieldTypes.textarea", icon: AlignLeft, core: true },
-  { type: "SELECT", labelKey: "templates.fieldTypes.select", icon: CheckSquare, core: true },
-  { type: "MULTISELECT", labelKey: "templates.fieldTypes.multiselect", icon: ListChecks, core: true },
-  { type: "BOOLEAN", labelKey: "templates.fieldTypes.boolean", icon: ToggleRight, core: true },
-  { type: "DATE", labelKey: "templates.fieldTypes.date", icon: Calendar, core: true },
-  { type: "DATETIME", labelKey: "templates.fieldTypes.datetime", icon: CalendarClock, core: true },
-  { type: "SEVERITY", labelKey: "templates.fieldTypes.severity", icon: TriangleAlert, core: false },
-  { type: "SIGNATURE", labelKey: "templates.fieldTypes.signature", icon: PenLine, core: false },
+/** Opciones inline de arranque para los objetos de selección. */
+const starterOptions = () => ({ optionSource: { kind: "inline", items: [{ code: "opcion_1", label: "Opción 1" }] } });
+
+export const FIELD_PALETTE: readonly FieldPreset[] = [
+  // --- Básicos ---
+  { id: "text", type: "TEXT", category: "basics", labelKey: "templates.fieldTypes.text", icon: Type, config: () => ({}) },
+  { id: "textarea", type: "TEXTAREA", category: "basics", labelKey: "templates.fieldTypes.textarea", icon: AlignLeft, config: () => ({}) },
+  { id: "number", type: "NUMBER", category: "basics", labelKey: "templates.fieldTypes.number", icon: Hash, config: () => ({}) },
+  { id: "percent", type: "NUMBER", category: "basics", labelKey: "templates.fieldTypes.percent", icon: Percent, config: () => ({ format: "percent" }) },
+  { id: "currency", type: "NUMBER", category: "basics", labelKey: "templates.fieldTypes.currency", icon: CircleDollarSign, config: () => ({ format: "currency", currency: "CLP" }) },
+  { id: "rut", type: "TEXT", category: "basics", labelKey: "templates.fieldTypes.rut", icon: Fingerprint, config: () => ({ format: "rut" }) },
+  { id: "email", type: "TEXT", category: "basics", labelKey: "templates.fieldTypes.email", icon: Mail, config: () => ({ format: "email" }) },
+  { id: "phone", type: "TEXT", category: "basics", labelKey: "templates.fieldTypes.phone", icon: Phone, config: () => ({ format: "phone" }) },
+  { id: "url", type: "TEXT", category: "basics", labelKey: "templates.fieldTypes.url", icon: LinkIcon, config: () => ({ format: "url" }) },
+  { id: "boolean", type: "BOOLEAN", category: "basics", labelKey: "templates.fieldTypes.boolean", icon: ToggleRight, config: () => ({}) },
+  { id: "date", type: "DATE", category: "basics", labelKey: "templates.fieldTypes.date", icon: Calendar, config: () => ({}) },
+  { id: "datetime", type: "DATETIME", category: "basics", labelKey: "templates.fieldTypes.datetime", icon: CalendarClock, config: () => ({}) },
+  { id: "time", type: "TIME", category: "basics", labelKey: "templates.fieldTypes.time", icon: Clock, config: () => ({}) },
+  { id: "duration", type: "DURATION", category: "basics", labelKey: "templates.fieldTypes.duration", icon: Timer, config: () => ({}) },
+  { id: "range", type: "RANGE", category: "basics", labelKey: "templates.fieldTypes.range", icon: ArrowLeftRight, config: () => ({}) },
+  // --- Selección ---
+  { id: "select", type: "SELECT", category: "selection", labelKey: "templates.fieldTypes.select", icon: ChevronDownSquare, config: () => ({ displayAs: "dropdown", ...starterOptions() }) },
+  { id: "radio", type: "SELECT", category: "selection", labelKey: "templates.fieldTypes.radio", icon: CircleDot, config: () => ({ displayAs: "radio", ...starterOptions() }) },
+  { id: "segmented", type: "SELECT", category: "selection", labelKey: "templates.fieldTypes.segmented", icon: Rows3, config: () => ({ displayAs: "segmented", ...starterOptions() }) },
+  { id: "checkboxes", type: "MULTISELECT", category: "selection", labelKey: "templates.fieldTypes.checkboxes", icon: ListChecks, config: () => ({ displayAs: "checkboxes", ...starterOptions() }) },
+  { id: "multiselect", type: "MULTISELECT", category: "selection", labelKey: "templates.fieldTypes.multiselect", icon: ListPlus, config: () => ({ displayAs: "dropdown", ...starterOptions() }) },
+  { id: "multiselectModal", type: "MULTISELECT", category: "selection", labelKey: "templates.fieldTypes.multiselectModal", icon: SearchCheck, config: () => ({ displayAs: "modal", ...starterOptions() }) },
+  // --- Evaluación ---
+  { id: "conformity", type: "CONFORMITY", category: "evaluation", labelKey: "templates.fieldTypes.conformity", icon: CheckCheck, config: () => ({}) },
+  { id: "severity", type: "SEVERITY", category: "evaluation", labelKey: "templates.fieldTypes.severity", icon: TriangleAlert, config: () => ({}) },
+  { id: "rating", type: "RATING", category: "evaluation", labelKey: "templates.fieldTypes.rating", icon: Star, config: () => ({ style: "stars", max: 5 }) },
+  { id: "signature", type: "SIGNATURE", category: "evaluation", labelKey: "templates.fieldTypes.signature", icon: PenLine, config: () => ({}) },
+  // --- Presentación (no-dato) ---
+  { id: "heading", type: "HEADING", category: "presentation", labelKey: "templates.fieldTypes.heading", icon: Heading, config: () => ({ level: 2 }) },
+  { id: "staticText", type: "STATIC_TEXT", category: "presentation", labelKey: "templates.fieldTypes.staticText", icon: TextIcon, config: () => ({}) },
+  { id: "divider", type: "DIVIDER", category: "presentation", labelKey: "templates.fieldTypes.divider", icon: Minus, config: () => ({}) },
+  { id: "notice", type: "NOTICE", category: "presentation", labelKey: "templates.fieldTypes.notice", icon: Info, config: () => ({ variant: "info" }) },
+  { id: "procedureLink", type: "PROCEDURE_LINK", category: "presentation", labelKey: "templates.fieldTypes.procedureLink", icon: ExternalLink, config: () => ({}) },
+  { id: "referenceImage", type: "REFERENCE_IMAGE", category: "presentation", labelKey: "templates.fieldTypes.referenceImage", icon: Image, config: () => ({}) },
 ];
 
-export function fieldTypeMeta(type: FieldType): FieldTypeMeta {
-  return FIELD_TYPE_META.find((m) => m.type === type) ?? FIELD_TYPE_META[0]!;
+export function fieldPresetById(id: string): FieldPreset | undefined {
+  return FIELD_PALETTE.find((p) => p.id === id);
+}
+
+/** Metadatos de display de un campo EXISTENTE (icono + etiqueta), eligiendo el
+ *  preset que mejor calza con su tipo + config (p. ej. TEXT+format:rut ⇒ "RUT"). */
+export function fieldDisplayMeta(field: { type: FieldType; config?: Record<string, unknown> }): {
+  labelKey: string;
+  icon: LucideIcon;
+} {
+  const cfg = field.config ?? {};
+  const byType = FIELD_PALETTE.filter((p) => p.type === field.type);
+  // Distinguir variantes por `format` (TEXT/NUMBER) o `displayAs` (SELECT/MULTISELECT).
+  const match =
+    byType.find((p) => {
+      const pc = p.config();
+      if ("format" in pc) return pc.format === cfg.format;
+      if ("displayAs" in pc) return pc.displayAs === (cfg.displayAs ?? "dropdown");
+      return false;
+    }) ??
+    byType.find((p) => {
+      const pc = p.config();
+      return !("format" in pc) && !("displayAs" in pc);
+    }) ??
+    byType[0];
+  return match ?? { labelKey: "templates.fieldTypes.text", icon: Type };
+}
+
+/** Metadatos por TIPO (compat con paneles que solo conocen el `type`). */
+export function fieldTypeMeta(type: FieldType): { type: FieldType; labelKey: string; icon: LucideIcon } {
+  const p = FIELD_PALETTE.find((m) => m.type === type) ?? FIELD_PALETTE[0]!;
+  return { type, labelKey: p.labelKey, icon: p.icon };
 }
 
 /**
@@ -96,9 +189,12 @@ export const ROW_MAX_FIELDS = 4;
 // llenado/visor la reproduce. Las plantillas LEGACY (sin geometría persistida)
 // la derivan del orden + colSpan (idéntico a la vista anterior).
 
-/** Alto por defecto (filas lógicas) según el control: textarea/firma ocupan 2. */
+/** Alto por defecto (filas lógicas) según el control. Los objetos con cuerpo
+ *  (textarea/firma/texto/aviso) ocupan 2; la imagen de referencia 3. */
 export function defaultFieldH(type: FieldType): number {
-  return type === "TEXTAREA" || type === "SIGNATURE" ? 2 : 1;
+  if (type === "REFERENCE_IMAGE") return 3;
+  if (type === "TEXTAREA" || type === "SIGNATURE" || type === "STATIC_TEXT" || type === "NOTICE") return 2;
+  return 1;
 }
 
 const clampCol = (n: number) => Math.min(Math.max(Math.round(n || GRID_TOTAL), 1), GRID_TOTAL);
@@ -266,6 +362,12 @@ export function defaultFieldConfig(type: FieldType): Record<string, unknown> {
     case "SELECT":
     case "MULTISELECT":
       return { optionSource: { kind: "inline", items: [{ code: "opcion_1", label: "Opción 1" }] } };
+    case "RATING":
+      return { style: "stars", max: 5 };
+    case "HEADING":
+      return { level: 2 };
+    case "NOTICE":
+      return { variant: "info" };
     default:
       return {};
   }
