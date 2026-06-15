@@ -851,7 +851,11 @@
 /* ── Vista previa ─────────────────────────────────────────────────────────── */
 .previewCard {
   padding: var(--space-5, 26px) var(--space-5, 30px);
-  max-width: 760px;
+  /* Ancho de escritorio: la Vista previa refleja el DISEÑO del lienzo (geometría
+     side-by-side). El contenedor debe superar 1024px para no caer en las
+     container-queries de tablet/móvil de FieldGrid. El responsive de terreno se
+     prueba con el selector escritorio/tablet/móvil del Editor. */
+  max-width: 1200px;
 }
 .previewTitle {
   font-family: var(--font-brand);
@@ -1626,14 +1630,30 @@
   border-color: var(--color-accent-primary);
   box-shadow: 0 0 0 1px var(--color-accent-primary);
 }
+/* Título editable inline dentro del objeto. */
 .canvasItemLabel {
+  width: 100%;
+  margin-bottom: 6px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm, 8px);
+  background: transparent;
+  color: var(--color-text-primary);
+  font-family: inherit;
   font-size: 12.5px;
   font-weight: 600;
-  color: var(--color-text-primary);
-  margin-bottom: 6px;
-  white-space: nowrap;
-  overflow: hidden;
+  padding: 2px 4px;
+  outline: none;
   text-overflow: ellipsis;
+}
+.canvasItemLabel:hover:not(:disabled) {
+  border-color: var(--color-border-subtle);
+}
+.canvasItemLabel:focus {
+  border-color: var(--color-accent-primary);
+  background: var(--color-surface-2, rgba(255, 255, 255, 0.04));
+}
+.canvasItemLabel:disabled {
+  cursor: default;
 }
 .canvasReq {
   color: var(--color-error, #ef4444);
@@ -1646,18 +1666,25 @@
 .canvasItemControl :global(.previewLabel) {
   display: none;
 }
-/* Tiradores de redimensionar (solo en el campo seleccionado). Marca de acento. */
+/* Tiradores de redimensionar: visibles al pasar el mouse o cuando el campo está
+   seleccionado (así no hay que seleccionar primero para agarrarlos). */
 .cvHandleE,
 .cvHandleS,
 .cvHandleSE {
   position: absolute;
   z-index: 6;
   touch-action: none;
-}
-.cvHandleE,
-.cvHandleS,
-.cvHandleSE {
   background: transparent;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.canvasCell:hover .cvHandleE,
+.canvasCell:hover .cvHandleS,
+.canvasCell:hover .cvHandleSE,
+.canvasCellSelected .cvHandleE,
+.canvasCellSelected .cvHandleS,
+.canvasCellSelected .cvHandleSE {
+  opacity: 1;
 }
 .cvHandleE::after,
 .cvHandleS::after {

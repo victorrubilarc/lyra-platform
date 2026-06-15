@@ -60,6 +60,7 @@ interface SectionCanvasProps {
   showGrid: boolean;
   selectedFUid: string | null;
   onSelectField: (fUid: string) => void;
+  onLabel: (fUid: string, label: string) => void;
   onGeometryChange: (geom: CanvasGeometry[]) => void;
   onDropNew: (type: FieldType, x: number, y: number) => void;
 }
@@ -70,6 +71,7 @@ export function SectionCanvas({
   showGrid,
   selectedFUid,
   onSelectField,
+  onLabel,
   onGeometryChange,
   onDropNew,
 }: SectionCanvasProps) {
@@ -202,21 +204,27 @@ export function SectionCanvas({
         return (
           <div
             key={f.uid}
-            className={`${styles.canvasCell}${dragging ? " " + styles.canvasCellDragging : ""}`}
+            className={`${styles.canvasCell}${dragging ? " " + styles.canvasCellDragging : ""}${sel ? " " + styles.canvasCellSelected : ""}`}
             style={cellStyle(g)}
             onPointerDown={(e) => begin(e, f.uid, "move")}
           >
             <div className={`${styles.canvasItem}${sel ? " " + styles.canvasItemActive : ""}`}>
-              <div className={styles.canvasItemLabel}>
-                {f.label}
-                {f.required && <span className={styles.canvasReq}>*</span>}
-              </div>
+              {/* Título EDITABLE dentro del objeto (no arrastra: stopPropagation). */}
+              <input
+                className={styles.canvasItemLabel}
+                value={f.label}
+                disabled={!canEdit}
+                aria-label="Etiqueta del campo"
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+                onChange={(e) => onLabel(f.uid, e.target.value)}
+              />
               <div className={styles.canvasItemControl} aria-hidden>
                 <FieldControl field={f} value={undefined} onChange={() => undefined} />
               </div>
             </div>
 
-            {canEdit && sel && (
+            {canEdit && (
               <>
                 <div className={styles.cvHandleE} onPointerDown={(e) => begin(e, f.uid, "e")} aria-hidden />
                 <div className={styles.cvHandleS} onPointerDown={(e) => begin(e, f.uid, "s")} aria-hidden />
