@@ -1,7 +1,7 @@
 import { Fragment } from "react";
 import { useTranslation } from "react-i18next";
 import { Checkbox, Combobox, FormField, Input, MultiSelect, Select, Textarea, Toggle } from "@lyra/ui";
-import { isPresentationalType, type OptionInlineItem, type RoleSummary, type WorkflowStateDto } from "@lyra/contracts";
+import { isPresentationalType, STRUCTURED_CELL_TYPES, type FieldType, type OptionInlineItem, type RoleSummary, type WorkflowStateDto } from "@lyra/contracts";
 import { useReferenceLists } from "../reference-data/reference-data-queries.js";
 import { fieldDisplayMeta, slugifyKey, WIDTH_PRESETS, type EditField, type EditSection } from "./builder-model.js";
 import { ExpressionEditor } from "./ExpressionEditor.js";
@@ -219,6 +219,216 @@ function RiskMatrixEditor({
   );
 }
 
+// === Editores de objetos ESTRUCTURADOS / repetibles (Ola 4) =================
+
+interface StructCol {
+  key: string;
+  label: string;
+  type: FieldType;
+  required?: boolean;
+  config?: Record<string, unknown>;
+}
+
+/** Clave estable única (alfanumérica) derivada del rótulo, evitando colisiones. */
+function uniqueStructKey(label: string, taken: readonly string[], fallback: string): string {
+  const base = slugifyKey(label, fallback);
+  let key = base;
+  let n = 2;
+  while (taken.includes(key)) key = `${base}_${n++}`;
+  return key;
+}
+
+const CELL_TYPE_LABEL_KEY: Record<string, string> = {
+  TEXT: "text",
+  TEXTAREA: "textarea",
+  NUMBER: "number",
+  SELECT: "select",
+  BOOLEAN: "boolean",
+  DATE: "date",
+  TIME: "time",
+  DURATION: "duration",
+  CONFORMITY: "conformity",
+  RATING: "rating",
+};
+
+function CellTypeSelect({
+  value,
+  onChange,
+  t,
+}: {
+  value: FieldType;
+  onChange: (type: FieldType) => void;
+  t: (k: string) => string;
+}) {
+  return (
+    <Select className={styles.structColType} value={value} onChange={(e) => onChange(e.target.value as FieldType)} aria-label={t("templates.builder.tableColumnType")}>
+      {STRUCTURED_CELL_TYPES.map((type) => (
+        <option key={type} value={type}>
+          {t(`templates.fieldTypes.${CELL_TYPE_LABEL_KEY[type] ?? "text"}`)}
+        </option>
+      ))}
+    </Select>
+  );
+}
+
+/** Opciones inline (una por línea) para una columna/celda SELECT. */
+function selectOptionsLines(config: Record<string, unknown> | undefined): string {
+  const src = (config ?? {}).optionSource as { kind?: string; items?: OptionInlineItem[] } | undefined;
+  return src?.kind === "inline" && Array.isArray(src.items) ? src.items.map((o) => o.label).join("\n") : "";
+}
+function linesToOptionSource(text: string): Record<string, unknown> {
+  const items = text
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .map((label, i) => ({ code: slugifyKey(label, `opcion_${i + 1}`), label }));
+  return { optionSource: { kind: "inline", items } };
+}
+
+/** Editor de TABLE: layout, columnas (sub-campos escalares) y límites de filas. */
+function TableConfigEditor({
+  config,
+  setConfig,
+  t,
+}: {
+  config: Record<string, unknown>;
+  setConfig: (key: string, value: unknown) => void;
+  t: (k: string, o?: Record<string, unknown>) => string;
+}) {
+  const columns = (config.columns as StructCol[]) ?? [];
+  const layout = (config.layout as string) === "cards" ? "cards" : "table";
+  const setColumns = (next: StructCol[]) => setConfig("columns", next);
+  const updateCol = (i: number, patch: Partial<StructCol>) => setColumns(columns.map((c, j) => (j === i ? { ...c, ...patch } : c)));
+  const addCol = () => {
+    const label = t("templates.builder.tableColumn") + ` ${columns.length + 1}`;
+    const key = uniqueStructKey(label, columns.map((c) => c.key), `col${columns.length + 1}`);
+    setColumns([...columns, { key, label, type: "TEXT" }]);
+  };
+  const removeCol = (i: number) => setColumns(columns.filter((_, j) => j !== i));
+
+  return (
+    <div className={styles.structColEditor}>
+      <FormField label={t("templates.builder.tableLayout")}>
+        {({ id }) => (
+          <Select id={id} value={layout} onChange={(e) => setConfig("layout", e.target.value)}>
+            <option value="table">{t("templates.builder.tableLayoutTable")}</option>
+            <option value="cards">{t("templates.builder.tableLayoutCards")}</option>
+          </Select>
+        )}
+      </FormField>
+
+      <div className={styles.configTypeTag}>{t("templates.builder.tableColumns")}</div>
+      {columns.length === 0 && <p className={styles.thresholdHint}>{t("templates.builder.tableNeedsColumn")}</p>}
+      {columns.map((col, i) => (
+        <Fragment key={col.key}>
+          <div className={styles.structColRow}>
+            <div className={styles.structColGrow}>
+              <Input
+                value={col.label}
+                onChange={(e) => updateCol(i, { label: e.target.value })}
+                aria-label={t("templates.builder.tableColumnLabel")}
+              />
+            </div>
+            <CellTypeSelect value={col.type} onChange={(type) => updateCol(i, { type })} t={t} />
+            <Checkbox checked={col.required === true} onChange={(c) => updateCol(i, { required: c ? true : undefined })} label={t("templates.builder.tableColumnRequired")} />
+            <button type="button" className={styles.repIconBtn} data-danger onClick={() => removeCol(i)} aria-label={t("templates.builder.tableRemoveColumn")}>
+              ✕
+            </button>
+          </div>
+          {col.type === "SELECT" && (
+            <Textarea
+              value={selectOptionsLines(col.config)}
+              placeholder={t("templates.builder.optionsPlaceholder")}
+              onChange={(e) => updateCol(i, { config: linesToOptionSource(e.target.value) })}
+              rows={3}
+            />
+          )}
+        </Fragment>
+      ))}
+      <button type="button" className={styles.repAddBtn} onClick={addCol}>
+        ＋ {t("templates.builder.tableAddColumn")}
+      </button>
+
+      {numberConfigField(config, "minRows", t("templates.builder.tableMinRows"), setConfig)}
+      {numberConfigField(config, "maxRows", t("templates.builder.tableMaxRows"), setConfig)}
+      <FormField label={t("templates.builder.tableAddRowLabel")}>
+        {({ id }) => (
+          <Input id={id} value={(config.addRowLabel as string) ?? ""} onChange={(e) => setConfig("addRowLabel", e.target.value || undefined)} />
+        )}
+      </FormField>
+    </div>
+  );
+}
+
+/** Editor de MATRIX: parámetros (filas), turnos (columnas) y tipo de celda uniforme. */
+function MatrixConfigEditor({
+  config,
+  setConfig,
+  t,
+}: {
+  config: Record<string, unknown>;
+  setConfig: (key: string, value: unknown) => void;
+  t: (k: string, o?: Record<string, unknown>) => string;
+}) {
+  const rows = (config.rows as { key: string; label: string }[]) ?? [];
+  const cols = (config.columns as { key: string; label: string }[]) ?? [];
+  const cell = (config.cell as { type?: FieldType; config?: Record<string, unknown> }) ?? { type: "NUMBER" };
+
+  const setAxis = (axis: "rows" | "columns", next: { key: string; label: string }[]) => setConfig(axis, next);
+  const updateAxis = (axis: "rows" | "columns", list: { key: string; label: string }[], i: number, label: string) =>
+    setAxis(axis, list.map((it, j) => (j === i ? { ...it, label } : it)));
+  const addAxis = (axis: "rows" | "columns", list: { key: string; label: string }[], fallback: string) => {
+    const label = (axis === "rows" ? t("templates.builder.matrixParameter") : t("templates.fieldTypes.refShift")) + ` ${list.length + 1}`;
+    const key = uniqueStructKey(label, list.map((it) => it.key), `${fallback}${list.length + 1}`);
+    setAxis(axis, [...list, { key, label }]);
+  };
+  const removeAxis = (axis: "rows" | "columns", list: { key: string; label: string }[], i: number) =>
+    setAxis(axis, list.filter((_, j) => j !== i));
+
+  const axisBlock = (axis: "rows" | "columns", list: { key: string; label: string }[], titleKey: string, addKey: string, removeKey: string, fallback: string) => (
+    <>
+      <div className={styles.configTypeTag}>{t(titleKey)}</div>
+      {list.map((it, i) => (
+        <div key={it.key} className={styles.structColRow}>
+          <div className={styles.structColGrow}>
+            <Input value={it.label} onChange={(e) => updateAxis(axis, list, i, e.target.value)} aria-label={t(titleKey)} />
+          </div>
+          <button type="button" className={styles.repIconBtn} data-danger onClick={() => removeAxis(axis, list, i)} aria-label={t(removeKey)}>
+            ✕
+          </button>
+        </div>
+      ))}
+      <button type="button" className={styles.repAddBtn} onClick={() => addAxis(axis, list, fallback)}>
+        ＋ {t(addKey)}
+      </button>
+    </>
+  );
+
+  return (
+    <div className={styles.structColEditor}>
+      {(rows.length === 0 || cols.length === 0) && <p className={styles.thresholdHint}>{t("templates.builder.matrixNeedsAxes")}</p>}
+      {axisBlock("rows", rows, "templates.builder.matrixRows", "templates.builder.matrixAddRow", "templates.builder.matrixRemoveRow", "param")}
+      {axisBlock("columns", cols, "templates.builder.matrixColumns", "templates.builder.matrixAddColumn", "templates.builder.matrixRemoveColumn", "turno")}
+      <FormField label={t("templates.builder.matrixCellType")}>
+        {() => <CellTypeSelect value={cell.type ?? "NUMBER"} onChange={(type) => setConfig("cell", { ...cell, type })} t={t} />}
+      </FormField>
+      {cell.type === "SELECT" && (
+        <Textarea
+          value={selectOptionsLines(cell.config)}
+          placeholder={t("templates.builder.optionsPlaceholder")}
+          onChange={(e) => setConfig("cell", { ...cell, config: linesToOptionSource(e.target.value) })}
+          rows={3}
+        />
+      )}
+      <FormField label={t("templates.builder.matrixRowHeaderLabel")}>
+        {({ id }) => (
+          <Input id={id} value={(config.rowHeaderLabel as string) ?? ""} onChange={(e) => setConfig("rowHeaderLabel", e.target.value || undefined)} />
+        )}
+      </FormField>
+    </div>
+  );
+}
+
 export function BuilderConfigPanel({
   section,
   field,
@@ -351,6 +561,10 @@ export function BuilderConfigPanel({
         )}
 
         {field.type === "ATTACHMENT" && <AttachmentConfigEditor config={field.config} setConfig={setConfig} t={t} />}
+
+        {field.type === "TABLE" && <TableConfigEditor config={field.config} setConfig={setConfig} t={t} />}
+
+        {field.type === "MATRIX" && <MatrixConfigEditor config={field.config} setConfig={setConfig} t={t} />}
 
         {field.type === "NUMBER" && (
           <>

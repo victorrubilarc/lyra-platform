@@ -2255,3 +2255,232 @@
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+/* === Objetos ESTRUCTURADOS / repetibles (Ola 4) ========================== */
+.repWrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.repScroll {
+  overflow-x: auto;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg, 14px);
+  background: var(--color-bg-surface-1);
+  -webkit-overflow-scrolling: touch;
+}
+.repTable,
+.matrixTable {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: var(--text-sm-size, 13px);
+}
+.repColHead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-surface-2, var(--color-bg-surface-1));
+  border-bottom: 1px solid var(--color-border-subtle);
+  white-space: nowrap;
+}
+.repRowNumHead,
+.repActionsHead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--color-bg-surface-2, var(--color-bg-surface-1));
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+.repRowNum {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  width: 34px;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+  background: var(--color-bg-surface-1);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+.repCell {
+  padding: 6px 8px;
+  vertical-align: top;
+  border-bottom: 1px solid var(--color-border-subtle);
+  min-width: 120px;
+}
+.repTable tbody tr:hover .repCell,
+.repTable tbody tr:hover .repRowNum {
+  background: color-mix(in srgb, var(--color-accent, #6366f1) 5%, transparent);
+}
+.repActionsCell {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  white-space: nowrap;
+}
+.repRowActions {
+  display: inline-flex;
+  gap: 4px;
+}
+.repIconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md, 10px);
+  border: 1px solid var(--color-border-subtle);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.repIconBtn:hover:not(:disabled) {
+  color: var(--color-text-primary);
+  border-color: var(--color-border-active, rgba(99, 102, 241, 0.4));
+}
+.repIconBtn[data-danger]:hover:not(:disabled) {
+  color: var(--color-error, #ef4444);
+  border-color: color-mix(in srgb, var(--color-error, #ef4444) 50%, transparent);
+}
+.repIconBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.repAddBtn {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md, 10px);
+  border: 1px dashed var(--color-border-active, rgba(99, 102, 241, 0.4));
+  background: color-mix(in srgb, var(--color-accent, #6366f1) 8%, transparent);
+  color: var(--color-text-primary);
+  font-weight: 600;
+  font-size: var(--text-sm-size, 13px);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.repAddBtn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-accent, #6366f1) 14%, transparent);
+}
+.repAddBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  border-style: solid;
+}
+.repEmpty {
+  padding: var(--space-3);
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+/* --- Layout TARJETAS (grupo repetible) --- */
+.repCards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.repCard {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg, 14px);
+  background: var(--color-bg-surface-1);
+  padding: var(--space-3);
+}
+.repCardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
+}
+.repCardIndex {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 7px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-accent, #6366f1);
+  background: color-mix(in srgb, var(--color-accent, #6366f1) 14%, transparent);
+}
+.repCardFields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-3);
+}
+.repCardField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.repCardLabel {
+  font-size: var(--text-sm-size, 13px);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+/* --- MATRIZ parámetro × turno --- */
+.matrixCornerHead {
+  position: sticky;
+  left: 0;
+  top: 0;
+  z-index: 2;
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-surface-2, var(--color-bg-surface-1));
+  border-bottom: 1px solid var(--color-border-subtle);
+  border-right: 1px solid var(--color-border-subtle);
+  white-space: nowrap;
+}
+.matrixRowHead {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  text-align: left;
+  padding: 6px var(--space-3);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  background: var(--color-bg-surface-1);
+  border-bottom: 1px solid var(--color-border-subtle);
+  border-right: 1px solid var(--color-border-subtle);
+  white-space: nowrap;
+}
+
+/* --- Editor de columnas/ejes en el builder --- */
+.structColEditor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.structColRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md, 10px);
+  background: var(--color-bg-surface-1);
+}
+.structColRow input,
+.structColRow select {
+  min-height: 38px;
+}
+.structColGrow {
+  flex: 1;
+  min-width: 0;
+}
+.structColType {
+  width: 130px;
+  flex-shrink: 0;
+}

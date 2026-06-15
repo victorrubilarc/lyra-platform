@@ -3,11 +3,15 @@ import { useTranslation } from "react-i18next";
 import {
   AlertTriangle,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   ExternalLink,
   FunctionSquare,
   Image as ImageIcon,
   Info,
+  Plus,
   Star,
+  Trash2,
   XCircle,
 } from "lucide-react";
 import { Checkbox, Combobox, Input, LookupPicker, MultiSelect, Textarea, Toggle } from "@lyra/ui";
@@ -78,6 +82,7 @@ export function FieldControl({
   nodeId = null,
   counterPrevious,
   attachments,
+  bare = false,
 }: {
   field: FieldControlField;
   value: unknown;
@@ -90,6 +95,8 @@ export function FieldControl({
   counterPrevious?: number;
   /** Subida/descarga de ADJUNTOS (Ola 3) ligados a entrada+sección+campo por el llamador. */
   attachments?: AttachmentHandlers;
+  /** Render SIN anatomía de campo (sin etiqueta/ayuda): para CELDAS de objetos estructurados (Ola 4). */
+  bare?: boolean;
 }) {
   const { t } = useTranslation();
 
@@ -138,13 +145,16 @@ export function FieldControl({
     </label>
   );
 
-  const wrap = (control: React.ReactNode) => (
-    <div className={styles.previewField}>
-      {labelEl}
-      {field.help && <div className={styles.previewHelp}>{field.help}</div>}
-      {control}
-    </div>
-  );
+  const wrap = (control: React.ReactNode) =>
+    bare ? (
+      <>{control}</>
+    ) : (
+      <div className={styles.previewField}>
+        {labelEl}
+        {field.help && <div className={styles.previewHelp}>{field.help}</div>}
+        {control}
+      </div>
+    );
 
   // --- Adjuntos / evidencia (Ola 3): render ÚNICO en builder/llenado/visor. Va
   // ANTES del early-return de read-only porque el visor necesita lista + descarga
@@ -152,6 +162,17 @@ export function FieldControl({
   // marcador "se sube al llenar".
   if (field.type === "ATTACHMENT") {
     return wrap(<AttachmentControl field={field} value={value} onChange={onChange} readOnly={readOnly} handlers={attachments} />);
+  }
+
+  // --- Objetos ESTRUCTURADOS / repetibles (Ola 4): render ÚNICO en builder/llenado/
+  // visor. Cada celda reusa el MISMO FieldControl (modo `bare`), de modo que un NUMBER
+  // de columna trae su unidad/umbral y un SELECT su catálogo inline. Va antes del
+  // early-return de read-only porque el visor necesita la grilla, no un texto plano.
+  if (field.type === "TABLE") {
+    return wrap(<RepeatableControl field={field} value={value} onChange={onChange} readOnly={readOnly} nodeId={nodeId} t={t} />);
+  }
+  if (field.type === "MATRIX") {
+    return wrap(<MatrixControl field={field} value={value} onChange={onChange} readOnly={readOnly} nodeId={nodeId} t={t} />);
   }
 
   // --- Campo FORMULADO o modo solo-lectura: valor formateado (read-only) ----
@@ -211,20 +232,20 @@ export function FieldControl({
               style={{ maxWidth: 180 }}
             />
             {suffix && <span className={styles.previewUnit}>{suffix}</span>}
-            {isTolerance && (
+            {!bare && isTolerance && (
               <span className={styles.previewRange}>
                 {t("templates.builder.toleranceTarget")} {String(c.expected)}
                 {typeof c.tolerance === "number" ? ` ± ${c.tolerance}` : ""}
                 {suffix ? ` ${suffix}` : ""}
               </span>
             )}
-            {!isTolerance && (c.min !== undefined || c.max !== undefined) && (
+            {!bare && !isTolerance && (c.min !== undefined || c.max !== undefined) && (
               <span className={styles.previewRange}>
                 {t("templates.builder.min")} {c.min ?? "—"} · {t("templates.builder.max")} {c.max ?? "—"}
               </span>
             )}
           </div>
-          {isCounter && (
+          {!bare && isCounter && (
             <div className={styles.counterDelta}>
               {typeof counterPrevious === "number"
                 ? t("templates.builder.counterPrevious", { value: formatNumber(counterPrevious) })
@@ -234,7 +255,7 @@ export function FieldControl({
               )}
             </div>
           )}
-          {st !== "ok" && (
+          {!bare && st !== "ok" && (
             <div className={st === "crit" ? styles.previewCrit : styles.previewWarn}>
               <AlertTriangle size={13} /> {st === "crit" ? t("templates.builder.outOfRangeHint") : t("templates.builder.thresholds")}
             </div>
@@ -564,6 +585,220 @@ function RiskMatrixControl({
           <strong>{t(`templates.builder.riskLevel.${level.severity}`)}</strong>
         </div>
       )}
+    </div>
+  );
+}
+
+// === Objetos ESTRUCTURADOS / repetibles (Ola 4) ==============================
+
+interface StructuredColumn {
+  key: string;
+  label: string;
+  type: FieldType;
+  required?: boolean;
+  config?: Record<string, unknown>;
+}
+
+/** Vista de una columna/celda como campo para reusar `FieldControl` (modo `bare`). */
+function cellControlField(col: StructuredColumn): FieldControlField {
+  return { key: col.key, type: col.type, label: col.label, config: col.config ?? {} };
+}
+
+/**
+ * TABLE — tabla/grupo repetible. Filas dinámicas (`Array<Record<colKey, escalar>>`).
+ * `layout=table` ⇒ grilla con scroll horizontal y encabezado sticky; `layout=cards`
+ * ⇒ bloques verticales "agregar otro". Cada celda reusa `FieldControl` (render único).
+ */
+function RepeatableControl({
+  field,
+  value,
+  onChange,
+  readOnly,
+  nodeId,
+  t,
+}: {
+  field: FieldControlField;
+  value: unknown;
+  onChange: (value: unknown) => void;
+  readOnly: boolean;
+  nodeId: string | null;
+  t: (k: string, o?: Record<string, unknown>) => string;
+}) {
+  const cfg = field.config as { layout?: string; columns?: StructuredColumn[]; minRows?: number; maxRows?: number; addRowLabel?: string };
+  const columns = cfg.columns ?? [];
+  const layout = cfg.layout === "cards" ? "cards" : "table";
+  const rows: Record<string, unknown>[] = Array.isArray(value) ? (value as Record<string, unknown>[]) : [];
+  const atMax = typeof cfg.maxRows === "number" && rows.length >= cfg.maxRows;
+
+  const setCell = (ri: number, key: string, v: unknown) => {
+    const next = rows.map((r, i) => (i === ri ? { ...r, [key]: v } : r));
+    onChange(next);
+  };
+  const addRow = () => onChange([...rows, {}]);
+  const removeRow = (ri: number) => onChange(rows.filter((_, i) => i !== ri));
+  const moveRow = (ri: number, dir: -1 | 1) => {
+    const j = ri + dir;
+    if (j < 0 || j >= rows.length) return;
+    const next = [...rows];
+    [next[ri], next[j]] = [next[j]!, next[ri]!];
+    onChange(next);
+  };
+
+  const addLabel = cfg.addRowLabel || t("templates.builder.tableAddRow");
+  const rowActions = (ri: number) =>
+    !readOnly && (
+      <div className={styles.repRowActions}>
+        <button type="button" className={styles.repIconBtn} disabled={ri === 0} onClick={() => moveRow(ri, -1)} aria-label={t("templates.builder.tableMoveUp")}>
+          <ChevronUp size={16} />
+        </button>
+        <button type="button" className={styles.repIconBtn} disabled={ri === rows.length - 1} onClick={() => moveRow(ri, 1)} aria-label={t("templates.builder.tableMoveDown")}>
+          <ChevronDown size={16} />
+        </button>
+        <button type="button" className={styles.repIconBtn} data-danger onClick={() => removeRow(ri)} aria-label={t("templates.builder.tableRemoveRow")}>
+          <Trash2 size={16} />
+        </button>
+      </div>
+    );
+
+  if (rows.length === 0 && readOnly) return <div className={styles.repEmpty}>{t("templates.builder.tableEmpty")}</div>;
+
+  const body =
+    layout === "cards" ? (
+      <div className={styles.repCards}>
+        {rows.map((row, ri) => (
+          <div key={ri} className={styles.repCard}>
+            <div className={styles.repCardHead}>
+              <span className={styles.repCardIndex}>{ri + 1}</span>
+              {rowActions(ri)}
+            </div>
+            <div className={styles.repCardFields}>
+              {columns.map((col) => (
+                <div key={col.key} className={styles.repCardField}>
+                  <label className={styles.repCardLabel}>
+                    {col.label}
+                    {col.required && <span className={styles.req}> *</span>}
+                  </label>
+                  <FieldControl field={cellControlField(col)} value={row[col.key]} onChange={(v) => setCell(ri, col.key, v)} readOnly={readOnly} nodeId={nodeId} bare />
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    ) : (
+      <div className={styles.repScroll}>
+        <table className={styles.repTable}>
+          <thead>
+            <tr>
+              <th className={styles.repRowNumHead} aria-hidden />
+              {columns.map((col) => (
+                <th key={col.key} className={styles.repColHead}>
+                  {col.label}
+                  {col.required && <span className={styles.req}> *</span>}
+                </th>
+              ))}
+              {!readOnly && <th className={styles.repActionsHead} aria-hidden />}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, ri) => (
+              <tr key={ri}>
+                <td className={styles.repRowNum}>{ri + 1}</td>
+                {columns.map((col) => (
+                  <td key={col.key} className={styles.repCell}>
+                    <FieldControl field={cellControlField(col)} value={row[col.key]} onChange={(v) => setCell(ri, col.key, v)} readOnly={readOnly} nodeId={nodeId} bare />
+                  </td>
+                ))}
+                {!readOnly && <td className={styles.repActionsCell}>{rowActions(ri)}</td>}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+
+  return (
+    <div className={styles.repWrap}>
+      {body}
+      {!readOnly && (
+        <button type="button" className={styles.repAddBtn} onClick={addRow} disabled={atMax}>
+          <Plus size={16} /> {atMax ? t("templates.builder.tableMaxReached", { max: cfg.maxRows }) : addLabel}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/**
+ * MATRIX — parámetro×turno. Filas (parámetros) y columnas (turnos) FIJAS; celda
+ * uniforme. Valor `Record<rowKey, Record<colKey, escalar>>`. Cabeceras read-only;
+ * solo las celdas son editables. Scroll horizontal con la 1ª columna sticky.
+ */
+function MatrixControl({
+  field,
+  value,
+  onChange,
+  readOnly,
+  nodeId,
+  t,
+}: {
+  field: FieldControlField;
+  value: unknown;
+  onChange: (value: unknown) => void;
+  readOnly: boolean;
+  nodeId: string | null;
+  t: (k: string, o?: Record<string, unknown>) => string;
+}) {
+  const cfg = field.config as {
+    rows?: { key: string; label: string }[];
+    columns?: { key: string; label: string }[];
+    cell?: { type: FieldType; config?: Record<string, unknown> };
+    rowHeaderLabel?: string;
+  };
+  const rows = cfg.rows ?? [];
+  const cols = cfg.columns ?? [];
+  const cellType = cfg.cell?.type ?? "NUMBER";
+  const cellConfig = cfg.cell?.config ?? {};
+  const v = (value && typeof value === "object" && !Array.isArray(value) ? value : {}) as Record<string, Record<string, unknown>>;
+
+  const setCell = (rowKey: string, colKey: string, cellVal: unknown) => {
+    const nextRow = { ...(v[rowKey] ?? {}), [colKey]: cellVal };
+    onChange({ ...v, [rowKey]: nextRow });
+  };
+
+  return (
+    <div className={styles.repWrap}>
+      <div className={styles.repScroll}>
+        <table className={styles.matrixTable}>
+          <thead>
+            <tr>
+              <th className={styles.matrixCornerHead}>{cfg.rowHeaderLabel || t("templates.builder.matrixParameter")}</th>
+              {cols.map((col) => (
+                <th key={col.key} className={styles.repColHead}>{col.label}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.key}>
+                <th scope="row" className={styles.matrixRowHead}>{row.label}</th>
+                {cols.map((col) => (
+                  <td key={col.key} className={styles.repCell}>
+                    <FieldControl
+                      field={cellControlField({ key: `${row.key}__${col.key}`, label: `${row.label} / ${col.label}`, type: cellType, config: cellConfig })}
+                      value={v[row.key]?.[col.key]}
+                      onChange={(cv) => setCell(row.key, col.key, cv)}
+                      readOnly={readOnly}
+                      nodeId={nodeId}
+                      bare
+                    />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

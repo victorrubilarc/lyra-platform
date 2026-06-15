@@ -29,6 +29,9 @@ import {
   Percent,
   Phone,
   Rows3,
+  Rows4,
+  Table2,
+  Grid2x2,
   ScanLine,
   SearchCheck,
   Star,
@@ -80,7 +83,7 @@ export function flattenNodeOptions(nodes: OrgNodeTree[], depth = 0): NodeOption[
 // FIELD_TYPES queda chica y la paleta se ve rica. Cada preset declara su categoría
 // para agruparse en el popover "＋ Agregar campo".
 
-export const PALETTE_CATEGORIES = ["basics", "selection", "evaluation", "reference", "evidence", "presentation"] as const;
+export const PALETTE_CATEGORIES = ["basics", "selection", "evaluation", "reference", "evidence", "structured", "presentation"] as const;
 export type PaletteCategory = (typeof PALETTE_CATEGORIES)[number];
 
 /** Un objeto ofrecido en la paleta (tipo + config inicial + presentación). */
@@ -155,6 +158,54 @@ export const FIELD_PALETTE: readonly FieldPreset[] = [
   { id: "voiceNote", type: "ATTACHMENT", category: "evidence", labelKey: "templates.fieldTypes.voiceNote", icon: Mic, config: () => ({ kind: "audio" }) },
   { id: "sketch", type: "ATTACHMENT", category: "evidence", labelKey: "templates.fieldTypes.sketch", icon: PenLine, config: () => ({ kind: "sketch" }) },
   { id: "qrScan", type: "TEXT", category: "evidence", labelKey: "templates.fieldTypes.qrScan", icon: ScanLine, config: () => ({ scan: true }) },
+  // --- Estructurados / repetibles (Ola 4) ---
+  {
+    id: "table",
+    type: "TABLE",
+    category: "structured",
+    labelKey: "templates.fieldTypes.table",
+    icon: Table2,
+    config: () => ({
+      layout: "table",
+      columns: [
+        { key: "col1", label: "Columna 1", type: "TEXT" },
+        { key: "col2", label: "Columna 2", type: "NUMBER", config: {} },
+      ],
+    }),
+  },
+  {
+    id: "repeatableGroup",
+    type: "TABLE",
+    category: "structured",
+    labelKey: "templates.fieldTypes.repeatableGroup",
+    icon: Rows4,
+    config: () => ({
+      layout: "cards",
+      addRowLabel: "Agregar otro",
+      columns: [
+        { key: "campo1", label: "Campo 1", type: "TEXT" },
+        { key: "campo2", label: "Campo 2", type: "TEXTAREA" },
+      ],
+    }),
+  },
+  {
+    id: "matrix",
+    type: "MATRIX",
+    category: "structured",
+    labelKey: "templates.fieldTypes.matrix",
+    icon: Grid2x2,
+    config: () => ({
+      rows: [
+        { key: "param1", label: "Parámetro 1" },
+        { key: "param2", label: "Parámetro 2" },
+      ],
+      columns: [
+        { key: "turno_a", label: "Turno A" },
+        { key: "turno_b", label: "Turno B" },
+      ],
+      cell: { type: "NUMBER", config: {} },
+    }),
+  },
   // --- Presentación (no-dato) ---
   { id: "heading", type: "HEADING", category: "presentation", labelKey: "templates.fieldTypes.heading", icon: Heading, config: () => ({ level: 2 }) },
   { id: "staticText", type: "STATIC_TEXT", category: "presentation", labelKey: "templates.fieldTypes.staticText", icon: TextIcon, config: () => ({}) },
@@ -183,6 +234,7 @@ export function fieldDisplayMeta(field: { type: FieldType; config?: Record<strin
       const pc = p.config() as Record<string, unknown>;
       if ("entity" in pc) return pc.entity === cfg.entity;
       if ("kind" in pc) return pc.kind === cfg.kind; // ATTACHMENT: foto/archivo/voz/croquis
+      if ("layout" in pc) return (pc.layout ?? "table") === (cfg.layout ?? "table"); // TABLE: grilla vs tarjetas
       if ("scan" in pc) return cfg.scan === true; // TEXT con escáner QR/código
       if ("counter" in pc) return cfg.counter === true;
       if ("expected" in pc) return cfg.expected !== undefined && cfg.counter !== true;
@@ -196,6 +248,7 @@ export function fieldDisplayMeta(field: { type: FieldType; config?: Record<strin
       return (
         !("entity" in pc) &&
         !("kind" in pc) &&
+        !("layout" in pc) &&
         !("scan" in pc) &&
         !("counter" in pc) &&
         !("expected" in pc) &&
