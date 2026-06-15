@@ -5,7 +5,14 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-15** (**Catálogo de objetos premium · Ola 2 ✅** — `feat/objetos-ola2`: objetos de REFERENCIA
+> actualización: **2026-06-15** (**Catálogo de objetos premium · Ola 3 ✅** — `feat/objetos-ola3`: adjuntos/terreno con
+> infra MinIO. `StorageService` abstracto (token DI) + `MinioStorageService` (SDK `minio`, bucket idempotente). Un
+> `FieldType ATTACHMENT` + presets → `dataType FILE_ARRAY` (valor `descriptor[]`); foto/cámara · archivo · nota de voz
+> (`MediaRecorder`) · croquis (canvas→PNG) · escáner QR (`config.scan` sobre TEXT, `@zxing/browser`, NO archivo). Subida
+> **PROXIED** (`@fastify/multipart`, choke-point) a `entries/{id}/{fieldKey}/…`; descriptor en `LogEntryValue.value` (NUNCA
+> URL); descarga = **presigned GET** con la ABAC de `getDetail`; pertenencia por prefijo + delete-on-remove + VOID limpia
+> huérfanos. Migración ALTER enum aditiva. Render único `AttachmentControl` + paleta "Evidencia / Terreno". Contracts 222 ·
+> API 234 · smoke 26/26. Pendiente: smoke VISUAL [§4]. Anterior: **Catálogo de objetos premium · Ola 2 ✅** — `feat/objetos-ola2`: objetos de REFERENCIA
 > (un tipo `REFERENCE` + `config.entity` equipo/usuario/nodo/turno, `dataType REFERENCE`) con resolución + validación ABAC
 > server-side (`opts.allowedRefIds` espejo de `allowedCodes`; endpoint `GET /log-entries/references/:kind/options`); lectura
 > con tolerancia (NUMBER + expected±tol que deriva bandas warn/crit); contador/acumulado (NUMBER + delta vs lectura previa
@@ -145,6 +152,7 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Fase 2.1.7 Diseñador visual de formularios (lienzo libre)** (geometría `TemplateField.gridX/gridY/gridH` nullable + migración `…_add_field_grid_geometry` + contratos + 3 map sites API; `react-grid-layout` en `SectionCanvas` + `FieldPalette` + `FieldPropertiesPanel`; `FieldGrid` data-driven + container-queries; deriva legacy del orden+colSpan; smoke geometría 14/14) | `feat/builder-visual-designer` → `main` | ✅ fusionado y publicado en `origin/main` (`85cd2c4`) | ninguna |
 | **Catálogo de objetos premium · Ola 1** (+11 `FIELD_TYPES` + `LAYOUT`/`RANGE` dataType + migración `…_add_ola1_field_types` ALTER enum; `displayAs` SELECT/MULTISELECT + `format` TEXT/NUMBER + tri-estado/rating/time/duration/range + presentación LAYOUT; `validateFieldValue`/`isEmptyValue`/helpers; guardas LAYOUT en API; FieldControl premium + paleta presets + editores config + lib/format; contracts 204 · API 234 · smoke 21/21) | `feat/objetos-ola1` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Catálogo de objetos premium · Ola 2** (+`REFERENCE`/`RISK_MATRIX` FieldType + `RISK` dataType + migración `…_add_ola2_field_types` ALTER enum; selectores de referencia con ABAC server-side `GET /references/:kind/options` + `opts.allowedRefIds`; tolerancia NUMBER `deriveToleranceBands`; contador `resolveCounterPreviousValues`/delta; `riskLevelFor`; FieldControl render único + paleta "Referencia" + editores; contracts 215 · API 234 · smoke 22/22) | `feat/objetos-ola2` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
+| **Catálogo de objetos premium · Ola 3** (+`ATTACHMENT` FieldType + `FILE_ARRAY` dataType + migración `…_add_ola3_field_types` ALTER enum; `StorageService`/`MinioStorageService` (SDK minio) + `StorageModule` @Global + env MINIO_*; subida PROXIED `@fastify/multipart` + endpoints `POST/GET :id/attachments/…`; descriptor jsonb + presigned GET con ABAC; pertenencia por prefijo + delete-on-remove + VOID limpia; `AttachmentControl`/`QrScanButton` (@zxing) + paleta "Evidencia / Terreno" + `apiUpload`; contracts 222 · API 234 · smoke 26/26) | `feat/objetos-ola3` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 
 **Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
@@ -190,9 +198,21 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
       `OperationalShift`); usuario filtrado por alcance de nodo; contador no-decreciente y delta cross-entry sin smoke en
       vivo (requieren entrada sellada previa); estampar el delta del contador como `computed` si se necesita reportar;
       banda de umbral para `RISK_MATRIX` (review-by-exception); resolver id→label de REFERENCE en la grilla/summary.
-- [ ] **Ola 3 — adjuntos/terreno (infra MinIO, Req-2; sesión propia).** Foto/cámara · galería · archivo ·
-      nota de voz · croquis/dibujo · **escaneo QR/código de barras** (identificar activo). Requiere
-      almacenamiento de objetos on-prem + endpoint de subida + URLs prefirmadas + dataType FILE/FILE_ARRAY.
+- [x] **Ola 3 — adjuntos/terreno ✅ (2026-06-15, `feat/objetos-ola3` → `main`).** Foto/cámara · archivo ·
+      nota de voz (`MediaRecorder`) · croquis (canvas→PNG) · **escáner QR/código** (`config.scan` sobre TEXT,
+      `@zxing/browser`, NO es archivo). Un `FieldType ATTACHMENT` + presets → `dataType FILE_ARRAY` (valor =
+      `descriptor[]`). `StorageService` abstracto (token DI) + `MinioStorageService` (SDK `minio`, bucket
+      idempotente). Subida **PROXIED** (`@fastify/multipart`, choke-point de validación) a
+      `entries/{id}/{fieldKey}/…`; descriptor `{id,key,filename,size,contentType,checksum,uploadedAt,uploadedById}`
+      en `LogEntryValue.value` (NUNCA URL); descarga = **presigned GET** con la ABAC de `getDetail`. Pertenencia
+      verificada por prefijo + existencia (análogo a `allowedRefIds`); delete-on-remove; VOID limpia huérfanos.
+      Migración `…_add_ola3_field_types` (ALTER enum). Render único `AttachmentControl` + paleta "Evidencia /
+      Terreno". 4 forks resueltos (DECISIONS 2026-06-15). Sin permisos nuevos (catálogo 60). Contracts 222 · API
+      234 · smoke 26/26. **Pendiente: smoke VISUAL** (§4). **Deuda:** antivirus (ClamAV) · object-lock/WORM ·
+      thumbnails/lightbox · retención automática · **sweeper de subidas abandonadas** (hoy solo VOID/delete-on-remove
+      limpian) · **presigned directo** (escala; hoy proxied) · escáner solo cámara (sin REFERENCE(equipment)-scan) ·
+      adjuntos a nivel de REGISTRO/TRANSICIÓN (Req-2 b/c; hoy solo a nivel de CAMPO) · ocultar la `key` cruda del
+      descriptor en el detalle (hoy round-trip al cliente; inofensivo: el presign+ABAC es la guarda real).
 - [ ] **Ola 4 — estructurados (sesión propia).** **Tabla/grilla repetible** (columnas = sub-campos, valor =
       array de filas, validación por celda, agregar/quitar/reordenar) — el mayor diferenciador · grupo/
       sección repetible · matriz parámetro×turno.
@@ -896,6 +916,15 @@ implementación esperada:
 
 > Lo construido puede estar "verde en tests" pero no ejercido en condiciones reales.
 
+- [ ] **Catálogo de objetos · Ola 3 (adjuntos/terreno) — smoke VISUAL en navegador** (se verificó typecheck/lint/build +
+      smoke API/MinIO 26/26; falta el clic). Por cada objeto de **Evidencia / Terreno**: agregarlo desde la paleta, verlo
+      en el lienzo (marcador "se sube al llenar"), configurarlo (multiple/maxCount/maxSizeMb/accept/cámara), y en una
+      entrada: **Foto** (capturar con cámara en tablet / subir de galería; miniatura/descarga), **Archivo** (PDF), **Nota
+      de voz** (grabar con `MediaRecorder` + detener + reproducir/descargar), **Croquis** (dibujar en el lienzo→guardar
+      PNG), **Escáner QR** (apuntar la cámara, decodifica y rellena el TAG). Verificar: descarga (presigned), quitar un
+      adjunto, estados (busy/error/inválido/vacío/readOnly), claro+oscuro, 44px, responsive. App en `:5173`.
+- [ ] **Catálogo de objetos · Ola 2 — smoke VISUAL en navegador** (selectores de referencia equipo/usuario/nodo/turno con
+      dropdown/modal, tolerancia objetivo±tol, contador con delta, matriz de riesgo clicable + heatmap del editor).
 - [ ] **Catálogo de objetos · Ola 1 — smoke VISUAL en navegador** (se verificó typecheck/lint/build + smoke API
       round-trip 21/21; falta el clic). Por cada objeto nuevo: agregarlo desde la paleta (categorías Básicos/
       Selección/Evaluación/Presentación), verlo en el lienzo (WYSIWYG), configurarlo (format/displayAs/rating

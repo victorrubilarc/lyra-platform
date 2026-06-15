@@ -16,6 +16,7 @@ import type {
   ExecuteTransitionRequest,
   FieldForRules,
   FieldForValidation,
+  FileDescriptor,
   LogEntryDetail,
   LogEntrySectionState,
   LogEntrySectionStateDto,
@@ -38,23 +39,30 @@ import type {
   WorkflowVersionDto,
 } from "@lyra/contracts";
 import {
+  acceptMatches,
   availableTransitionsFor,
   canonicalSignaturePayload,
   editWindowDeadline,
+  effectiveAccept,
   evaluateCrossRules,
+  fileDescriptorSchema,
   isEditWindowExpired,
   isEmptyValue,
   isFieldVisible,
   isPresentationalType,
   isSectionEditableInState,
+  maxAttachmentBytes,
   recomputeComputedValues,
   resolveEditWindow,
   resolveEffectiveAt,
   thresholdBandFor,
   upgradeFieldConfig,
   validateFieldValue,
+  type AttachmentFieldConfig,
 } from "@lyra/contracts";
+import { createHash, randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
+import { StorageService } from "../storage/storage.service";
 import { ReauthService } from "../auth/reauth.service";
 import { AuditService, type AuditContext } from "../audit/audit.service";
 import { PermissionService } from "../authz/permission.service";
@@ -215,6 +223,7 @@ export class LogEntriesService {
     private readonly periods: OperationalPeriodService,
     private readonly permissions: PermissionService,
     private readonly settings: SettingsService,
+    private readonly storage: StorageService,
   ) {}
 
   // --- Crear (abrir) una entrada ---------------------------------------------
@@ -777,6 +786,16 @@ export class LogEntriesService {
       errors.push(...this.counterMonotonicErrors(def, input.value, prevCounters.get(def.key)));
     }
 
+    // Adjuntos (Ola 3): los descriptores NUEVOS deben pertenecer a ESTA entrada+campo
+    // (prefijo de objeto) y existir en el storage (anti-fabricación de key ajena).
+    // Análogo a allowedRefIds pero por prefijo; exige I/O ⇒ fuera del validador puro.
+    for (const input of dto.values) {
+      const def = fieldsByKey.get(input.fieldKey)!;
+      if (def.type !== "ATTACHMENT") continue;
+      const beforeVal = existing.find((e) => e.fieldKey === input.fieldKey)?.value ?? null;
+      errors.push(...(await this.assertAttachmentDescriptors(id, def.key, def.label, beforeVal, input.value ?? null)));
+    }
+
     if (dto.markComplete) {
       for (const def of fieldsByKey.values()) {
         // Objeto de presentación (LAYOUT): no es dato; nunca es obligatorio.
@@ -913,6 +932,21 @@ export class LogEntriesService {
         await tx.logEntry.update({ where: { id }, data: { updatedById: userId } });
       }
     });
+
+    // Limpieza de objetos QUITADOS del campo (delete-on-remove): tras COMMIT, para
+    // no borrar storage si la tx falla. La entrada sigue siendo DRAFT (no sellada);
+    // los objetos de entradas SELLADAS son inmutables (no se llega aquí). Best-effort.
+    for (const input of dto.values) {
+      const def = fieldsByKey.get(input.fieldKey)!;
+      if (def.type !== "ATTACHMENT") continue;
+      const beforeVal = existing.find((e) => e.fieldKey === input.fieldKey)?.value ?? null;
+      const removed = this.attachmentKeysToRemove(beforeVal, input.value ?? null);
+      for (const key of removed) {
+        await this.storage.removeObject(key).catch(() => {
+          /* huérfano: lo recoge el sweeper diferido (BACKLOG); no rompe el guardado */
+        });
+      }
+    }
 
     if (windowOverride) {
       await this.auditEditWindowOverride(ctx, id, "section.saved", windowOverride, { sectionKey });
@@ -1159,7 +1193,200 @@ export class LogEntriesService {
       before: { status: entry.status },
       after: { status: "VOID", voidReason: dto.reason },
     });
+    // Un borrador VOID no tiene peso GxP (nunca se selló): su evidencia se descarta
+    // del storage (limpieza de huérfanos). Best-effort, tras anular en BD.
+    await this.storage.removePrefix(`entries/${id}/`).catch(() => {
+      /* huérfanos: los recoge el sweeper diferido (BACKLOG) */
+    });
     return this.getDetail(userId, id);
+  }
+
+  // --- Adjuntos / evidencia (Ola 3) ------------------------------------------
+
+  /** Prefijo de objeto de un campo de adjunto en una entrada (`entries/{id}/{fieldKey}/`). */
+  private attachmentPrefix(entryId: string, fieldKey: string): string {
+    return `entries/${entryId}/${fieldKey}/`;
+  }
+
+  /** Nombre de archivo seguro para la `key` (sin rutas ni caracteres peligrosos). */
+  private sanitizeFilename(name: string): string {
+    const base = (name || "archivo").split(/[\\/]/).pop() ?? "archivo";
+    const cleaned = base
+      .replace(/[^\w.\- ]+/g, "_")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 180);
+    return cleaned || "archivo";
+  }
+
+  /**
+   * Sube un objeto de evidencia (PROXIED por la API: choke-point de validación
+   * tamaño/tipo + auditoría) y devuelve su descriptor. NO persiste el valor del
+   * campo: el cliente agrega el descriptor al arreglo del campo y guarda la sección
+   * por el canal normal (donde se verifica la pertenencia de la key). Mismas guardas
+   * que `saveSection` (DRAFT, ABAC nodo×plantilla, sección editable × rol).
+   */
+  async uploadAttachment(
+    userId: string,
+    entryId: string,
+    sectionKey: string,
+    fieldKey: string,
+    file: { buffer: Buffer; filename: string; mimetype: string; truncated: boolean },
+    ctx: AuditContext,
+  ): Promise<FileDescriptor> {
+    const entry = await this.loadEntry(entryId);
+    if (entry.status !== "DRAFT" || entry.sealedAt) {
+      throw new BadRequestException("Solo se adjunta evidencia a un borrador no sellado");
+    }
+    await this.assertNodeInScope(userId, entry.orgNodeId);
+    await this.scope.assertTemplateInScope(userId, entry.templateId);
+
+    const version = await this.loadVersion(entry.templateVersionId);
+    const sectionDef = version.sections.find((s) => s.key === sectionKey);
+    if (!sectionDef) throw new NotFoundException("Sección no encontrada en la versión");
+    const fieldRaw = sectionDef.fields.find((f) => f.key === fieldKey);
+    if (!fieldRaw) throw new NotFoundException("Campo no encontrado en la sección");
+    const def = this.toFieldDef(fieldRaw, sectionKey);
+    if (def.type !== "ATTACHMENT") throw new BadRequestException("El campo no admite adjuntos");
+
+    // Sección editable en el estado actual × rol de sección × override de rol por campo.
+    const roleIds = await this.userRoleIds(userId);
+    const blockedReason = this.sectionBlockedReasonFor(
+      sectionDef.editableInStateKey,
+      sectionDef.roles.map((r) => r.roleId),
+      entry.currentStateKey,
+      roleIds,
+    );
+    if (blockedReason !== null) {
+      throw new ForbiddenException(
+        blockedReason === "MISSING_ROLE"
+          ? "La sección está asignada a otro rol: no puede adjuntar evidencia"
+          : "La sección no se edita en la etapa actual del flujo",
+      );
+    }
+    if (def.roleIds.length > 0 && !def.roleIds.some((r) => roleIds.has(r))) {
+      throw new ForbiddenException(`El campo "${def.label}" está reservado a otro rol: no puede adjuntar`);
+    }
+
+    // Validación en el choke-point: tamaño (config o default) y tipo (accept del kind).
+    if (file.truncated) throw new BadRequestException("El archivo supera el tamaño máximo permitido");
+    const cfg = def.config as AttachmentFieldConfig;
+    const size = file.buffer.length;
+    if (size === 0) throw new BadRequestException("El archivo está vacío");
+    if (size > maxAttachmentBytes(cfg)) throw new BadRequestException("El archivo supera el tamaño máximo permitido");
+    const contentType = (file.mimetype || "application/octet-stream").toLowerCase();
+    if (!acceptMatches(effectiveAccept(cfg), contentType)) {
+      throw new BadRequestException("El tipo de archivo no está permitido para este campo");
+    }
+
+    const id = randomUUID();
+    const filename = this.sanitizeFilename(file.filename);
+    const key = `${this.attachmentPrefix(entryId, fieldKey)}${id}-${filename}`;
+    const checksum = createHash("sha256").update(file.buffer).digest("hex");
+    await this.storage.putObject(key, file.buffer, contentType);
+
+    const descriptor: FileDescriptor = {
+      id,
+      key,
+      filename,
+      size,
+      contentType,
+      checksum,
+      uploadedAt: new Date().toISOString(),
+      uploadedById: userId,
+    };
+    await this.audit.record({
+      ...ctx,
+      action: "logentry.attachment.uploaded",
+      entityType: "LogEntry",
+      entityId: entryId,
+      metadata: { fieldKey, filename, size, contentType, checksum },
+    });
+    return descriptor;
+  }
+
+  /**
+   * URL prefirmada de descarga (GET de vida corta) de un adjunto, con la MISMA ABAC
+   * que `getDetail`. El descriptor se resuelve por `id` desde los valores PERSISTIDOS
+   * (el cliente nunca presigna una key arbitraria). Se audita el acceso (GxP).
+   */
+  async getAttachmentDownloadUrl(
+    userId: string,
+    entryId: string,
+    descriptorId: string,
+    ctx: AuditContext,
+  ): Promise<{ url: string; filename: string; expiresAt: string }> {
+    const entry = await this.loadEntry(entryId);
+    await this.assertNodeInScope(userId, entry.orgNodeId);
+    await this.scope.assertTemplateInScope(userId, entry.templateId);
+
+    const rows = await this.prisma.logEntryValue.findMany({
+      where: { logEntryId: entryId, dataType: "FILE_ARRAY" },
+    });
+    let found: FileDescriptor | null = null;
+    for (const row of rows) {
+      const arr = Array.isArray(row.value) ? (row.value as unknown[]) : [];
+      for (const item of arr) {
+        const parsed = fileDescriptorSchema.safeParse(item);
+        if (parsed.success && parsed.data.id === descriptorId) {
+          found = parsed.data;
+          break;
+        }
+      }
+      if (found) break;
+    }
+    if (!found) throw new NotFoundException("Adjunto no encontrado en la entrada");
+
+    const { url, expiresAt } = await this.storage.presignedGetUrl(found.key, found.filename);
+    await this.audit.record({
+      ...ctx,
+      action: "logentry.attachment.downloaded",
+      entityType: "LogEntry",
+      entityId: entryId,
+      metadata: { descriptorId, filename: found.filename },
+    });
+    return { url, filename: found.filename, expiresAt };
+  }
+
+  /**
+   * Verifica que los descriptores NUEVOS de un campo ATTACHMENT pertenecen a ESTA
+   * entrada+campo (prefijo de objeto) y existen en el storage (anti-fabricación de
+   * key ajena). Devuelve los mensajes de error (estilo `errors[]`); I/O ⇒ async.
+   */
+  private async assertAttachmentDescriptors(
+    entryId: string,
+    fieldKey: string,
+    label: string,
+    beforeVal: unknown,
+    afterVal: unknown,
+  ): Promise<string[]> {
+    const errors: string[] = [];
+    const after = Array.isArray(afterVal) ? (afterVal as FileDescriptor[]) : [];
+    const beforeKeys = new Set(
+      (Array.isArray(beforeVal) ? (beforeVal as FileDescriptor[]) : []).map((d) => d?.key).filter(Boolean),
+    );
+    const prefix = this.attachmentPrefix(entryId, fieldKey);
+    for (const d of after) {
+      if (!d || typeof d.key !== "string") continue; // la forma ya la validó validateFieldValue
+      if (beforeKeys.has(d.key)) continue; // ya persistido y verificado en un guardado previo
+      if (!d.key.startsWith(prefix)) {
+        errors.push(`${label}: un adjunto no pertenece a esta entrada`);
+        continue;
+      }
+      const stat = await this.storage.statObject(d.key);
+      if (!stat) errors.push(`${label}: un adjunto no existe en el almacenamiento`);
+    }
+    return errors;
+  }
+
+  /** Keys de adjuntos QUITADOS del campo (estaban en `before`, ya no en `after`). */
+  private attachmentKeysToRemove(beforeVal: unknown, afterVal: unknown): string[] {
+    const afterKeys = new Set(
+      (Array.isArray(afterVal) ? (afterVal as FileDescriptor[]) : []).map((d) => d?.key).filter(Boolean),
+    );
+    return (Array.isArray(beforeVal) ? (beforeVal as FileDescriptor[]) : [])
+      .map((d) => d?.key)
+      .filter((k): k is string => typeof k === "string" && !afterKeys.has(k));
   }
 
   /** Campo con `semanticRole = EFFECTIVE_DATE` de la versión congelada (≤1 por diseño). */

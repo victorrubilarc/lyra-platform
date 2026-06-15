@@ -1151,11 +1151,16 @@
 
 /* Duración (HH:MM) y rango (mín–máx). */
 .durationRow,
-.rangeRow {
+.rangeRow,
+.scanRow {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+.scanRow > :first-child {
+  flex: 1 1 200px;
+  min-width: 0;
 }
 .rangeDash {
   color: var(--color-text-muted);

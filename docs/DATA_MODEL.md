@@ -56,10 +56,10 @@
   un campo son **3 capas separadas** (ver DECISIONS 2026-06-09):
   - **Capa 1 — presentación/widget:** `type` (enum `FieldType`: 10 base + **Ola 1** `CONFORMITY`/`RATING`/`TIME`/
     `DURATION`/`RANGE` + presentación `HEADING`/`STATIC_TEXT`/`DIVIDER`/`NOTICE`/`PROCEDURE_LINK`/`REFERENCE_IMAGE`
-    + **Ola 2** `REFERENCE`/`RISK_MATRIX`; migraciones `20260615120000_add_ola1_field_types` /
-    `20260615140000_add_ola2_field_types`). Cómo se ve.
+    + **Ola 2** `REFERENCE`/`RISK_MATRIX` + **Ola 3** `ATTACHMENT`; migraciones `20260615120000_add_ola1_field_types` /
+    `20260615140000_add_ola2_field_types` / `20260615160000_add_ola3_field_types`). Cómo se ve.
   - **Capa 2 — tipo de dato:** `dataType` (enum `FieldDataType`: STRING/NUMBER/BOOLEAN/DATE/DATETIME/TIME/
-    **CODE**/**CODE_ARRAY**/**REFERENCE**/FILE/GEO/COMPUTED/**RANGE**/**LAYOUT**/**RISK**). Cómo se almacena/valida/reporta. Es
+    **CODE**/**CODE_ARRAY**/**REFERENCE**/FILE/**FILE_ARRAY**/GEO/COMPUTED/**RANGE**/**LAYOUT**/**RISK**). Cómo se almacena/valida/reporta. Es
     **derivado del `type`** en backend (fuente única `deriveDataType` en `@lyra/contracts`); la UI no lo edita. Mapeo:
     NUMBER→NUMBER, TEXT/TEXTAREA→STRING, SELECT→CODE, MULTISELECT→CODE_ARRAY, BOOLEAN→BOOLEAN, DATE→DATE,
     DATETIME→DATETIME, SEVERITY→CODE (escala cerrada {1..5}), SIGNATURE→REFERENCE. **Ola 1:** CONFORMITY→CODE
@@ -75,7 +75,14 @@
     casillas/modal = MULTISELECT + `config.displayAs`; **lectura con tolerancia** = NUMBER + `{expected,tolerance,
     critTolerance}` (deriva bandas warn/crit vía `deriveToleranceBands`/`effectiveNumberBands`); **contador/acumulado**
     = NUMBER + `{counter,counterNonDecreasing}` (delta vs la última lectura sellada del mismo equipo+campo;
-    `LogEntryDetail.counterPreviousValues`).
+    `LogEntryDetail.counterPreviousValues`). **Ola 3:** `ATTACHMENT`→**FILE_ARRAY** (adjuntos de evidencia en MinIO; un
+    solo tipo discriminado por `config.kind` = file/photo/audio/sketch; valor = **descriptor[]**); el escáner QR/código
+    es `TEXT` + `config.scan` (decode client-side que rellena el valor, NO es archivo). El **descriptor** (lo que se
+    persiste en `LogEntryValue.value`, NUNCA una URL) = `{id,key,filename,size,contentType,checksum(sha256),uploadedAt,
+    uploadedById}`; la `key` = `entries/{logEntryId}/{fieldKey}/{uuid}-{filename}` en el bucket `MINIO_BUCKET`. La subida
+    es PROXIED por la API (choke-point de validación tamaño/tipo); la descarga = **presigned GET** de vida corta firmado
+    server-side con la ABAC de `getDetail`. Pertenencia verificada por prefijo de objeto + existencia (análogo a
+    `allowedRefIds`); delete-on-remove al quitar un adjunto; `voidEntry` borra el prefijo del borrador anulado.
   - **Capa 3 — rol semántico:** `semanticRole?` (enum `FieldSemanticRole?`: EFFECTIVE_DATE/TITLE/PRIMARY_EQUIPMENT/
     SEVERITY_DRIVER; null = ninguno). Qué significa para la plataforma. En 2.1.1 solo `EFFECTIVE_DATE` actúa
     (promueve `LogEntry.effectiveAt`, 2.4); **a lo sumo uno por versión** (validado en contrato + backend).

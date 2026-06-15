@@ -177,7 +177,15 @@
       "Bash(sed -n '1,40p' apps/watchlog-web/src/features/reference-data/reference-data-queries.js)",
       "Bash(sed -n '1,40p' apps/watchlog-web/src/features/reference-data/reference-data-queries.ts)",
       "Bash(sed -n '1,40p' apps/watchlog-web/src/features/log-entries/log-entries-api.ts)",
-      "Bash(sed -n '1,45p' apps/watchlog-web/src/features/log-entries/log-entries-queries.ts)"
+      "Bash(sed -n '1,45p' apps/watchlog-web/src/features/log-entries/log-entries-queries.ts)",
+      "Bash(pnpm --filter watchlog-api add minio @fastify/multipart)",
+      "Bash(awk '/private async loadEntry|async loadEntry/{f=1} f{print NR\": \"$0} f&&/^  }$/{exit}' apps/watchlog-api/src/log-entries/log-entries.service.ts)",
+      "Bash(pnpm --filter watchlog-web add @zxing/browser @zxing/library)",
+      "Bash(grep -n \"from \\\\\"./log-entries-api\\\\|from \\\\\"../templates/FieldControl\\\\|import {\" apps/watchlog-web/src/features/log-entries/EntryFillPage.tsx)",
+      "Bash(echo \"started dev, pid $!\")",
+      "Bash(curl -s -m 3 http://localhost:3000/api/health)",
+      "Bash(curl -s -m 3 http://localhost:5173 -o /dev/null -w \"web:%{http_code}\\\\n\")",
+      "Bash(python scripts/smoke-objetos-ola3.py)"
     ],
     "additionalDirectories": [
       "\\tmp"

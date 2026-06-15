@@ -6,8 +6,14 @@ import {
 } from "@nestjs/platform-fastify";
 import helmet from "@fastify/helmet";
 import cookie from "@fastify/cookie";
+import multipart from "@fastify/multipart";
 import { Logger } from "nestjs-pino";
 import { AppModule } from "./app.module";
+
+/** Tope DURO de subida (bytes) en el borde Fastify. El límite fino por campo
+ *  (accept/maxSizeMb) lo aplica el servicio de adjuntos; esto solo evita cuerpos
+ *  abusivos. 100 MB = cap del modelo (ATTACHMENT_MAX_SIZE_MB_CAP). */
+const UPLOAD_HARD_LIMIT_BYTES = 100 * 1024 * 1024;
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestFastifyApplication>(
@@ -24,6 +30,13 @@ async function bootstrap(): Promise<void> {
 
   // Lectura/escritura de cookies (refresh token httpOnly + CSRF).
   await app.register(cookie);
+
+  // Subida de archivos (adjuntos/evidencia, Ola 3): la API es el choke-point de
+  // validación (tamaño/tipo/auditoría) antes de stream a MinIO. Un solo archivo
+  // por request; el tope duro evita cuerpos abusivos.
+  await app.register(multipart, {
+    limits: { fileSize: UPLOAD_HARD_LIMIT_BYTES, files: 1 },
+  });
 
   // CORS con credenciales en desarrollo (la web corre en otro puerto vía Vite).
   // En producción todo va same-origin detrás de Caddy, así que no se necesita.

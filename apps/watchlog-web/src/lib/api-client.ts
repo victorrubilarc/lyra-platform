@@ -152,6 +152,31 @@ export async function apiBlob(path: string, options: RequestOptions = {}): Promi
   return res.blob();
 }
 
+/**
+ * Subida multipart (adjuntos/evidencia, Ola 3). El navegador fija el
+ * `Content-Type: multipart/form-data; boundary=…` a partir del `FormData` (NO se
+ * setea a mano). Mantiene Bearer + CSRF + un refresh transparente ante 401.
+ */
+export async function apiUpload<T>(path: string, form: FormData, schema: ZodType<T>): Promise<T> {
+  const doFetch = (): Promise<Response> => {
+    const headers = new Headers();
+    headers.set("Accept", "application/json");
+    const token = getAccessToken();
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+    const csrf = readCookie(CSRF_COOKIE);
+    if (csrf) headers.set(CSRF_HEADER, csrf);
+    return fetch(`${API_BASE}${path}`, { method: "POST", credentials: "include", headers, body: form });
+  };
+  let res = await doFetch();
+  if (res.status === 401 && getAccessToken() !== null) {
+    const ok = await refreshAccessToken();
+    if (ok) res = await doFetch();
+    else notifySessionExpired();
+  }
+  if (!res.ok) throw await toApiError(res);
+  return schema.parse(await res.json());
+}
+
 /** Petición que devuelve JSON validado con un esquema Zod del contrato. */
 export async function apiJson<T>(
   path: string,

@@ -46,6 +46,11 @@ export const FIELD_TYPES = [
   "RISK_MATRIX", // matriz de riesgo probabilidad×consecuencia → nivel (ISO 31000)
   // Lectura con tolerancia y contador/acumulado son VARIANTES de NUMBER (config),
   // no tipos nuevos (espejo de percent/currency en Ola 1).
+  // --- Catálogo de objetos premium · Ola 3 (2026-06-15) -------------------
+  // Adjuntos/terreno (infra MinIO; valor = descriptor[] de objetos almacenados):
+  "ATTACHMENT", // foto/archivo/nota de voz/croquis, discriminado por config.kind
+  // El escaneo QR/código de barras NO es archivo: es config.scan sobre TEXT
+  // (decode client-side que rellena el valor), sin storage ni dataType nuevo.
 ] as const;
 
 export const fieldTypeSchema = z.enum(FIELD_TYPES);
@@ -107,7 +112,8 @@ export const FIELD_DATA_TYPES = [
   "CODE", // un code estable de una lista (dimensión reportable)
   "CODE_ARRAY", // varios codes
   "REFERENCE", // id de una entidad (equipo/usuario/nodo/firma)
-  "FILE",
+  "FILE", // un objeto almacenado (descriptor único) — reservado
+  "FILE_ARRAY", // varios objetos almacenados (descriptor[]) — adjuntos Ola 3
   "GEO",
   "COMPUTED",
   "RANGE", // rango estructurado {from,to} de dos números (Ola 1)
@@ -158,6 +164,8 @@ export const FIELD_TYPE_TO_DATA_TYPE: Record<FieldType, FieldDataType> = {
   // --- Ola 2 ---
   REFERENCE: "REFERENCE", // id de una entidad (equipo/usuario/nodo/turno)
   RISK_MATRIX: "RISK", // {probability, consequence}
+  // --- Ola 3 ---
+  ATTACHMENT: "FILE_ARRAY", // descriptor[] (multiple=false solo limita a 1)
 };
 
 /** Deriva el `dataType` de un `type` (la presentación define el almacenamiento). */
@@ -463,6 +471,12 @@ export const textFieldConfigSchema = z
     pattern: z.string().trim().max(300).optional(),
     /** Formato semántico (Ola 1): rut/email/phone/url. Validado por `isValidTextFormat`. */
     format: z.enum(TEXT_FORMATS).optional(),
+    /**
+     * Escáner QR/código de barras (Ola 3): habilita un botón de captura por cámara
+     * que decodifica un código client-side y rellena el valor. NO es un archivo (sin
+     * storage): el código queda como el texto del campo. Validación = la del TEXT.
+     */
+    scan: z.boolean().optional(),
   })
   .strict();
 export type TextFieldConfig = z.infer<typeof textFieldConfigSchema>;
@@ -681,6 +695,107 @@ export function riskLevelFor(
   };
 }
 
+// === Objetos de ADJUNTO / TERRENO (Ola 3, infra MinIO) ======================
+//
+// Un ATTACHMENT almacena uno o varios OBJETOS en el storage on-prem (MinIO). El
+// valor persistido en `LogEntryValue.value` es un **descriptor[]** (NUNCA una
+// URL): metadata inmutable del objeto. La descarga = presigned GET de vida corta
+// firmado server-side con la MISMA ABAC que `getDetail`. Un único `FieldType
+// ATTACHMENT` discriminado por `config.kind` cubre los cuatro presets (patrón de
+// Ola 1/2): foto/cámara, archivo, nota de voz, croquis. El valor es SIEMPRE un
+// arreglo (multiple=false solo limita a 1) ⇒ mapa `dataType` estático intacto.
+// La subida es PROXIED por la API (choke-point de validación tamaño/tipo/audit);
+// la pertenencia de la `key` a esta entrada+campo se verifica server-side (por
+// prefijo de objeto, análogo a `allowedRefIds` pero por prefijo).
+
+/** Tipo de adjunto: elige el widget de captura y el `accept` por defecto. */
+export const ATTACHMENT_KINDS = ["file", "photo", "audio", "sketch"] as const;
+export type AttachmentKind = (typeof ATTACHMENT_KINDS)[number];
+
+/** Tamaño máximo por archivo por defecto (MB). Foto/voz/croquis de terreno son chicos. */
+export const ATTACHMENT_DEFAULT_MAX_SIZE_MB = 25;
+export const ATTACHMENT_MAX_SIZE_MB_CAP = 100;
+/** Tope de archivos por defecto cuando `multiple`. */
+export const ATTACHMENT_DEFAULT_MAX_COUNT = 10;
+export const ATTACHMENT_MAX_COUNT_CAP = 30;
+
+/** `accept` (patrón MIME) por defecto según el tipo de adjunto. "" = cualquiera. */
+export const ATTACHMENT_KIND_DEFAULT_ACCEPT: Record<AttachmentKind, string> = {
+  file: "", // cualquier tipo (acotado por tamaño); el diseñador puede restringir
+  photo: "image/*",
+  audio: "audio/*",
+  sketch: "image/png", // el croquis se exporta del canvas a PNG
+};
+
+/**
+ * ATTACHMENT — adjunto de uno o varios objetos. `kind` elige el widget de captura
+ * y el `accept` por defecto; `accept` (MIME) lo restringe; `multiple`/`maxCount`
+ * la cardinalidad; `maxSizeMb` el tamaño por archivo; `capture` sugiere la cámara
+ * trasera en móvil para fotos. La validación de tipo/tamaño la aplica el backend
+ * (autoritativo) y la reusa el cliente (`validateFieldValue`).
+ */
+export const attachmentFieldConfigSchema = z
+  .object({
+    kind: z.enum(ATTACHMENT_KINDS),
+    accept: z.array(z.string().trim().min(1).max(120)).max(20).optional(),
+    multiple: z.boolean().optional(),
+    maxCount: z.number().int().min(1).max(ATTACHMENT_MAX_COUNT_CAP).optional(),
+    maxSizeMb: z.number().int().min(1).max(ATTACHMENT_MAX_SIZE_MB_CAP).optional(),
+    capture: z.boolean().optional(),
+  })
+  .strict();
+export type AttachmentFieldConfig = z.infer<typeof attachmentFieldConfigSchema>;
+
+/**
+ * Descriptor de un objeto almacenado: lo que se persiste en `LogEntryValue.value`
+ * (NUNCA una URL). `id` direcciona la descarga sin exponer la `key` cruda; `key`
+ * es la ruta en el bucket (`entries/{entryId}/{fieldKey}/{id}-{filename}`);
+ * `checksum` (sha256) da integridad ALCOA+/Part 11. Fuente única back↔front.
+ */
+export const fileDescriptorSchema = z
+  .object({
+    id: z.string().min(1).max(64),
+    key: z.string().min(1).max(512),
+    filename: z.string().min(1).max(255),
+    size: z.number().int().min(0),
+    contentType: z.string().min(1).max(160),
+    checksum: z.string().min(1).max(128).optional(),
+    uploadedAt: z.string().min(1),
+    uploadedById: z.string().min(1).max(64),
+  })
+  .strict();
+export type FileDescriptor = z.infer<typeof fileDescriptorSchema>;
+
+/** ¿El `contentType` cae bajo alguno de los patrones `accept` (p. ej. `image/` parcial, `application/pdf`, comodín total)? */
+export function acceptMatches(accept: readonly string[] | undefined, contentType: string): boolean {
+  if (!accept || accept.length === 0) return true; // sin restricción
+  const ct = contentType.trim().toLowerCase();
+  return accept.some((a) => {
+    const pat = a.trim().toLowerCase();
+    if (pat === "*" || pat === "*/*") return true;
+    if (pat.endsWith("/*")) return ct.startsWith(pat.slice(0, -1)); // "image/" como prefijo
+    return ct === pat;
+  });
+}
+
+/** Lista `accept` EFECTIVA: la explícita del config o la del `kind` por defecto. */
+export function effectiveAccept(config: { kind?: AttachmentKind; accept?: readonly string[] }): readonly string[] {
+  if (config.accept && config.accept.length > 0) return config.accept;
+  const def = config.kind ? ATTACHMENT_KIND_DEFAULT_ACCEPT[config.kind] : "";
+  return def ? [def] : [];
+}
+
+/** Tamaño máximo por archivo en BYTES (config o default). */
+export function maxAttachmentBytes(config: { maxSizeMb?: number }): number {
+  return (config.maxSizeMb ?? ATTACHMENT_DEFAULT_MAX_SIZE_MB) * 1024 * 1024;
+}
+
+/** Cantidad máxima de archivos EFECTIVA (1 si no es múltiple). */
+export function maxAttachmentCount(config: { multiple?: boolean; maxCount?: number }): number {
+  if (!config.multiple) return 1;
+  return config.maxCount ?? ATTACHMENT_DEFAULT_MAX_COUNT;
+}
+
 // --- Objetos de PRESENTACIÓN (dataType LAYOUT; el llenado los ignora) --------
 
 /** HEADING — nivel jerárquico del encabezado (1..3). El texto va en `label`. */
@@ -802,6 +917,9 @@ export function fieldConfigSchemaFor(type: FieldType): z.ZodTypeAny {
       return referenceFieldConfigSchema;
     case "RISK_MATRIX":
       return riskMatrixFieldConfigSchema;
+    // --- Ola 3 ---
+    case "ATTACHMENT":
+      return attachmentFieldConfigSchema;
   }
 }
 

@@ -17,15 +17,19 @@ import {
   Image,
   Info,
   Link as LinkIcon,
+  Camera,
+  FileUp,
   ListChecks,
   ListPlus,
   Mail,
+  Mic,
   Minus,
   Network,
   PenLine,
   Percent,
   Phone,
   Rows3,
+  ScanLine,
   SearchCheck,
   Star,
   Target,
@@ -76,7 +80,7 @@ export function flattenNodeOptions(nodes: OrgNodeTree[], depth = 0): NodeOption[
 // FIELD_TYPES queda chica y la paleta se ve rica. Cada preset declara su categoría
 // para agruparse en el popover "＋ Agregar campo".
 
-export const PALETTE_CATEGORIES = ["basics", "selection", "evaluation", "reference", "presentation"] as const;
+export const PALETTE_CATEGORIES = ["basics", "selection", "evaluation", "reference", "evidence", "presentation"] as const;
 export type PaletteCategory = (typeof PALETTE_CATEGORIES)[number];
 
 /** Un objeto ofrecido en la paleta (tipo + config inicial + presentación). */
@@ -145,6 +149,12 @@ export const FIELD_PALETTE: readonly FieldPreset[] = [
   { id: "refUser", type: "REFERENCE", category: "reference", labelKey: "templates.fieldTypes.refUser", icon: User, config: () => ({ entity: "user", display: "dropdown" }) },
   { id: "refNode", type: "REFERENCE", category: "reference", labelKey: "templates.fieldTypes.refNode", icon: Network, config: () => ({ entity: "orgNode", display: "dropdown" }) },
   { id: "refShift", type: "REFERENCE", category: "reference", labelKey: "templates.fieldTypes.refShift", icon: Users, config: () => ({ entity: "shift", display: "dropdown" }) },
+  // --- Evidencia / Terreno (adjuntos en MinIO + escáner) ---
+  { id: "photo", type: "ATTACHMENT", category: "evidence", labelKey: "templates.fieldTypes.photo", icon: Camera, config: () => ({ kind: "photo", capture: true, multiple: true }) },
+  { id: "attachment", type: "ATTACHMENT", category: "evidence", labelKey: "templates.fieldTypes.attachment", icon: FileUp, config: () => ({ kind: "file" }) },
+  { id: "voiceNote", type: "ATTACHMENT", category: "evidence", labelKey: "templates.fieldTypes.voiceNote", icon: Mic, config: () => ({ kind: "audio" }) },
+  { id: "sketch", type: "ATTACHMENT", category: "evidence", labelKey: "templates.fieldTypes.sketch", icon: PenLine, config: () => ({ kind: "sketch" }) },
+  { id: "qrScan", type: "TEXT", category: "evidence", labelKey: "templates.fieldTypes.qrScan", icon: ScanLine, config: () => ({ scan: true }) },
   // --- Presentación (no-dato) ---
   { id: "heading", type: "HEADING", category: "presentation", labelKey: "templates.fieldTypes.heading", icon: Heading, config: () => ({ level: 2 }) },
   { id: "staticText", type: "STATIC_TEXT", category: "presentation", labelKey: "templates.fieldTypes.staticText", icon: TextIcon, config: () => ({}) },
@@ -172,6 +182,8 @@ export function fieldDisplayMeta(field: { type: FieldType; config?: Record<strin
     byType.find((p) => {
       const pc = p.config() as Record<string, unknown>;
       if ("entity" in pc) return pc.entity === cfg.entity;
+      if ("kind" in pc) return pc.kind === cfg.kind; // ATTACHMENT: foto/archivo/voz/croquis
+      if ("scan" in pc) return cfg.scan === true; // TEXT con escáner QR/código
       if ("counter" in pc) return cfg.counter === true;
       if ("expected" in pc) return cfg.expected !== undefined && cfg.counter !== true;
       if ("format" in pc) return pc.format === cfg.format;
@@ -183,13 +195,16 @@ export function fieldDisplayMeta(field: { type: FieldType; config?: Record<strin
       // El preset base (NÚMERO/TEXTO simple) gana solo si el campo no es variante.
       return (
         !("entity" in pc) &&
+        !("kind" in pc) &&
+        !("scan" in pc) &&
         !("counter" in pc) &&
         !("expected" in pc) &&
         !("format" in pc) &&
         !("displayAs" in pc) &&
         cfg.counter !== true &&
         cfg.expected === undefined &&
-        cfg.format === undefined
+        cfg.format === undefined &&
+        cfg.scan !== true
       );
     }) ??
     byType[0];

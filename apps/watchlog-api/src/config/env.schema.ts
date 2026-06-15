@@ -54,6 +54,20 @@ export const envSchema = z.object({
   SMTP_PASSWORD: z.string().optional(),
   SMTP_FROM: z.string().default("Lyra WatchLog <no-reply@watchlog.local>"),
 
+  // --- Object storage (MinIO / S3, adjuntos de evidencia — Ola 3) ---
+  // Interfaz abstracta StorageService → implementación MinIO (SDK `minio`). On-prem,
+  // sin SaaS. El navegador NUNCA recibe credenciales ni accede directo: la API es el
+  // choke-point de subida (proxied) y firma las descargas (presigned GET de vida corta).
+  // ENDPOINT como URL (http(s)://host:puerto): el servicio deriva host/puerto/TLS.
+  MINIO_ENDPOINT: z.string().url().default("http://localhost:9000"),
+  MINIO_ACCESS_KEY: z.string().default("watchlog"),
+  MINIO_SECRET_KEY: z.string().default("watchlogsecret"),
+  MINIO_BUCKET: z.string().default("watchlog-evidence"),
+  MINIO_REGION: z.string().default("us-east-1"),
+  // Vida (segundos) de las URLs prefirmadas de descarga (def. 5 min: suficiente
+  // para abrir/descargar, corto para no dejar enlaces reusables).
+  MINIO_PRESIGN_TTL: z.coerce.number().int().positive().default(300),
+
   // --- Admin de arranque (seed idempotente) ---
   BOOTSTRAP_ADMIN_EMAIL: z.string().email().optional(),
   BOOTSTRAP_ADMIN_PASSWORD: z.string().optional(),

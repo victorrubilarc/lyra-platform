@@ -218,6 +218,30 @@ GxP: MHRA Data Integrity 2018 / FDA DI Q&A (corrección tardía justificada + at
   (evento `VOIDED`: quién/cuándo/por qué). La anulación GxP de un registro **SELLADO** (firma §11.200 + transición inversa)
   es un corte posterior.
 
+### Almacenamiento de evidencia / adjuntos (Ola 3, infra MinIO)
+- **Object storage on-prem tras interfaz abstracta.** `StorageService` (token DI) → `MinioStorageService` (SDK `minio`).
+  El navegador **NUNCA** recibe credenciales del bucket ni accede directo: la API es el **choke-point**. Bucket creado de
+  forma idempotente al arrancar; credenciales por env (`MINIO_*`), nada en el repo.
+- **Subida PROXIED (`POST /log-entries/:id/attachments/:sectionKey/:fieldKey`, `logentry:fill`).** `@fastify/multipart`
+  con tope DURO (100 MB) en el borde; el servicio valida **tamaño** (config `maxSizeMb`) y **tipo** (`accept` por kind)
+  ANTES de persistir en MinIO, calcula `sha256`, y aplica las MISMAS guardas que `saveSection` (DRAFT no sellado · ABAC
+  nodo×plantilla · sección editable en el estado × rol de sección × override de rol por campo). Auditado
+  (`logentry.attachment.uploaded`). *Estándar:* OWASP file-upload (validación server-side, nombre saneado, sin servir el
+  byte desde la API). **Antivirus (ClamAV) = diferido (BACKLOG).**
+- **Descarga = presigned GET de vida corta, ABAC server-side** (`GET /log-entries/:id/attachments/:descriptorId/url`,
+  `logentry:view`). El descriptor se resuelve por `id` desde los valores PERSISTIDOS (el cliente nunca presigna una key
+  arbitraria); la URL caduca (`MINIO_PRESIGN_TTL`, def. 5 min) y fuerza `Content-Disposition: attachment`. Acceso auditado
+  (`logentry.attachment.downloaded`: quién accedió a la evidencia = valor GxP).
+- **Pertenencia del objeto (anti-fabricación).** Al guardar, cada descriptor NUEVO debe (a) tener su `key` bajo el prefijo
+  `entries/{logEntryId}/{fieldKey}/` y (b) existir en el storage (`statObject`) — análogo a `allowedRefIds` pero por
+  prefijo. Una key ajena/fabricada ⇒ 400. **delete-on-remove**: quitar un adjunto borra el objeto; **VOID** de un borrador
+  hace `removePrefix(entries/{id}/)`.
+- **Inmutabilidad GxP.** El descriptor (no una URL) se persiste con su `sha256` (ALCOA+/Part 11: evidencia íntegra +
+  metadata). Una entrada **SELLADA** rechaza subir/borrar (estado ≠ DRAFT ⇒ 400); sus objetos quedan **retenidos**.
+  **object-lock/WORM del bucket + retención automática + sweeper de huérfanos = diferidos (BACKLOG).**
+- **Sin permisos nuevos** (catálogo **60**): `logentry:fill`/`logentry:view` + ABAC ya gobiernan llenar/leer; el alcance de
+  la entrada autoriza ver su evidencia.
+
 ### Motor de reglas de negocio — expresión SEGURA (Req-7, primer corte)
 - **Sin `eval` ni scripting libre.** Las fórmulas (campos formulados) y las reglas cruzadas se expresan como un **AST
   con LISTA BLANCA de operadores** (tipo JSONLogic) evaluado por un intérprete **PURO** y SÍNCRONO en `@lyra/contracts/

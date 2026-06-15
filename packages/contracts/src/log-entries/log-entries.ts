@@ -16,6 +16,12 @@ import {
   isValidTimeOfDay,
   effectiveNumberBands,
   riskLevelFor,
+  fileDescriptorSchema,
+  effectiveAccept,
+  acceptMatches,
+  maxAttachmentBytes,
+  maxAttachmentCount,
+  type AttachmentFieldConfig,
   type NumberFormat,
   type TextFormat,
   type VisibleWhen,
@@ -925,6 +931,18 @@ export const signatureVerifyResultSchema = z.object({
 });
 export type SignatureVerifyResult = z.infer<typeof signatureVerifyResultSchema>;
 
+/**
+ * Respuesta de la URL prefirmada de descarga de un adjunto (Ola 3): URL de vida
+ * corta + nombre de archivo + expiración. El navegador nunca recibe la key cruda
+ * ni credenciales de MinIO; la API firma con la misma ABAC que `getDetail`.
+ */
+export const attachmentDownloadResponseSchema = z.object({
+  url: z.string(),
+  filename: z.string(),
+  expiresAt: z.string(),
+});
+export type AttachmentDownloadResponse = z.infer<typeof attachmentDownloadResponseSchema>;
+
 // === Lógica compartida (fuente única backend + frontend) =====================
 
 /** ¿Está vacío el valor (a efectos de "obligatorio")? */
@@ -1205,6 +1223,34 @@ export function validateFieldValue(
       // `riskLevelFor` valida que (probabilidad, consecuencia) caigan en los ejes
       // de la matriz configurada; null = fuera de rango / matriz inválida.
       if (!riskLevelFor(field.config, value)) errors.push(`${field.label}: combinación de riesgo fuera de la matriz`);
+      break;
+    }
+    // --- Ola 3 ---------------------------------------------------------------
+    case "ATTACHMENT": {
+      // El valor es un descriptor[] de objetos almacenados. Aquí se valida la
+      // FORMA + tamaño + tipo (lo replicable en cliente). La pertenencia de la
+      // `key` a ESTA entrada+campo y la autoría se verifican server-side (por
+      // prefijo de objeto), análogo a `allowedRefIds` pero por prefijo.
+      if (!Array.isArray(value)) {
+        errors.push(`${field.label}: adjunto inválido`);
+        break;
+      }
+      const c = field.config as AttachmentFieldConfig;
+      const maxCount = maxAttachmentCount(c);
+      if (value.length > maxCount) errors.push(`${field.label}: máximo ${maxCount} archivo(s)`);
+      const accept = effectiveAccept(c);
+      const maxBytes = maxAttachmentBytes(c);
+      for (const item of value) {
+        const parsed = fileDescriptorSchema.safeParse(item);
+        if (!parsed.success) {
+          errors.push(`${field.label}: descriptor de archivo inválido`);
+          break;
+        }
+        const d = parsed.data;
+        if (d.size > maxBytes) errors.push(`${field.label}: ${d.filename} supera el tamaño máximo`);
+        if (!acceptMatches(accept, d.contentType))
+          errors.push(`${field.label}: ${d.filename} es de un tipo no permitido`);
+      }
       break;
     }
   }
