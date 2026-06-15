@@ -14,6 +14,8 @@ import {
   isPresentationalType,
   isValidTextFormat,
   isValidTimeOfDay,
+  effectiveNumberBands,
+  riskLevelFor,
   type NumberFormat,
   type TextFormat,
   type VisibleWhen,
@@ -936,10 +938,16 @@ export interface FieldForValidation {
   config: Record<string, unknown>;
 }
 
-/** Opciones de validación: códigos permitidos resueltos por el backend (listas vivas). */
+/** Opciones de validación: códigos/ids permitidos resueltos por el backend (catálogos/entidades vivas). */
 export interface ValidateFieldValueOptions {
   /** Conjunto de `code` válidos para SELECT/MULTISELECT (inline o lista resuelta). */
   allowedCodes?: ReadonlySet<string> | readonly string[];
+  /**
+   * Conjunto de `id` válidos para un campo REFERENCE (entidad existe + activa +
+   * EN ALCANCE ABAC), resuelto server-side. Espejo de `allowedCodes`: si está
+   * presente y el id no pertenece, el valor se rechaza (fuera de alcance).
+   */
+  allowedRefIds?: ReadonlySet<string> | readonly string[];
 }
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -970,6 +978,12 @@ export function validateFieldValue(
       : opts.allowedCodes
         ? new Set(opts.allowedCodes as readonly string[])
         : undefined;
+  const allowedRefs =
+    opts.allowedRefIds instanceof Set
+      ? opts.allowedRefIds
+      : opts.allowedRefIds
+        ? new Set(opts.allowedRefIds as readonly string[])
+        : undefined;
 
   switch (field.type) {
     case "NUMBER": {
@@ -981,10 +995,6 @@ export function validateFieldValue(
       const c = field.config as {
         min?: number;
         max?: number;
-        warnLow?: number;
-        warnHigh?: number;
-        critLow?: number;
-        critHigh?: number;
         decimals?: number;
         format?: NumberFormat;
       };
@@ -1000,11 +1010,13 @@ export function validateFieldValue(
           errors.push(`${field.label}: máximo ${c.decimals} decimal(es)`);
         }
       }
-      // Bandas de umbral (advertencia, no bloquean).
-      if (typeof c.critLow === "number" && n < c.critLow) warnings.push(`${field.label}: bajo crítico`);
-      else if (typeof c.warnLow === "number" && n < c.warnLow) warnings.push(`${field.label}: bajo advertencia`);
-      if (typeof c.critHigh === "number" && n > c.critHigh) warnings.push(`${field.label}: alto crítico`);
-      else if (typeof c.warnHigh === "number" && n > c.warnHigh) warnings.push(`${field.label}: alto advertencia`);
+      // Bandas de umbral (advertencia, no bloquean). EFECTIVAS: derivadas de
+      // `expected ± tolerance` (Ola 2) o las explícitas warn/crit del config.
+      const b = effectiveNumberBands(field.config);
+      if (typeof b.critLow === "number" && n < b.critLow) warnings.push(`${field.label}: bajo crítico`);
+      else if (typeof b.warnLow === "number" && n < b.warnLow) warnings.push(`${field.label}: bajo advertencia`);
+      if (typeof b.critHigh === "number" && n > b.critHigh) warnings.push(`${field.label}: alto crítico`);
+      else if (typeof b.warnHigh === "number" && n > b.warnHigh) warnings.push(`${field.label}: alto advertencia`);
       break;
     }
     case "TEXT":
@@ -1132,6 +1144,35 @@ export function validateFieldValue(
       }
       break;
     }
+    // --- Ola 2 ---------------------------------------------------------------
+    case "REFERENCE": {
+      // El valor es el `id` de la entidad referida. La existencia/actividad/
+      // alcance (ABAC) se resuelve SERVER-SIDE en `allowedRefs` (espejo de los
+      // catálogos); aquí solo se valida la forma y la pertenencia al set.
+      if (typeof value !== "string") {
+        errors.push(`${field.label}: referencia inválida`);
+        break;
+      }
+      if (allowedRefs && !allowedRefs.has(value)) errors.push(`${field.label}: referencia fuera de alcance o inexistente`);
+      break;
+    }
+    case "RISK_MATRIX": {
+      if (typeof value !== "object" || value === null || Array.isArray(value)) {
+        errors.push(`${field.label}: riesgo inválido`);
+        break;
+      }
+      const rv = value as { probability?: unknown; consequence?: unknown };
+      const hasP = rv.probability !== null && rv.probability !== undefined && rv.probability !== "";
+      const hasC = rv.consequence !== null && rv.consequence !== undefined && rv.consequence !== "";
+      if (!hasP || !hasC) {
+        errors.push(`${field.label}: indique probabilidad y consecuencia`);
+        break;
+      }
+      // `riskLevelFor` valida que (probabilidad, consecuencia) caigan en los ejes
+      // de la matriz configurada; null = fuera de rango / matriz inválida.
+      if (!riskLevelFor(field.config, value)) errors.push(`${field.label}: combinación de riesgo fuera de la matriz`);
+      break;
+    }
   }
   return { errors, warnings };
 }
@@ -1146,7 +1187,8 @@ export function thresholdBandFor(field: FieldForValidation, value: unknown): Thr
   if (field.type !== "NUMBER" || isEmptyValue(value)) return null;
   const n = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(n)) return null;
-  const c = field.config as { warnLow?: number; warnHigh?: number; critLow?: number; critHigh?: number };
+  // Bandas EFECTIVAS: derivadas de `expected ± tolerance` (Ola 2) o explícitas.
+  const c = effectiveNumberBands(field.config);
   if (typeof c.critLow === "number" && n < c.critLow) return "CRIT";
   if (typeof c.critHigh === "number" && n > c.critHigh) return "CRIT";
   if (typeof c.warnLow === "number" && n < c.warnLow) return "WARN";

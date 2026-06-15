@@ -524,6 +524,12 @@ enum FieldType {
   NOTICE
   PROCEDURE_LINK
   REFERENCE_IMAGE
+  // Catálogo de objetos premium — Ola 2 (2026-06-15). Objetos de REFERENCIA
+  // (apuntan a entidades: equipo/usuario/nodo/turno vía config.entity → dataType
+  // REFERENCE) y matriz de riesgo (valor estructurado → dataType RISK). Tolerancia
+  // y contador son variantes de NUMBER (sin tipo nuevo). Ver field-types.ts.
+  REFERENCE
+  RISK_MATRIX
 }
 
 // Recurrencia (rondas/lecturas programadas). Modelada para no re-migrar; su
@@ -573,6 +579,7 @@ enum FieldDataType {
   COMPUTED
   RANGE // rango estructurado {from,to} de dos números (Ola 1)
   LAYOUT // objeto de PRESENTACIÓN: no es dato, el llenado lo ignora (Ola 1)
+  RISK // matriz de riesgo: valor estructurado {probability,consequence} (Ola 2)
 }
 
 // Capa 3 del campo: rol semántico opcional (qué significa para la plataforma).

@@ -29,6 +29,7 @@ import {
   type FieldForValidation,
   type TransitionForAvailability,
 } from "./log-entries.js";
+import { deriveToleranceBands, riskLevelFor } from "../templates/field-types.js";
 
 const numberField = (config: Record<string, unknown> = {}): FieldForValidation => ({
   key: "temp",
@@ -197,6 +198,98 @@ describe("validateFieldValue — objetos Ola 1", () => {
     expect(validateFieldValue(f("HEADING"), "loquesea").errors).toHaveLength(0);
     expect(validateFieldValue(f("NOTICE"), null).errors).toHaveLength(0);
     expect(validateFieldValue(f("DIVIDER"), 123).errors).toHaveLength(0);
+  });
+});
+
+describe("validateFieldValue — objetos Ola 2 (referencia)", () => {
+  const f = (type: FieldForValidation["type"], config: Record<string, unknown> = {}): FieldForValidation => ({
+    key: "x",
+    type,
+    dataType: "REFERENCE",
+    label: "Campo",
+    config,
+  });
+
+  it("REFERENCE: exige string; valida pertenencia al set de ids (ABAC server-side)", () => {
+    const ref = f("REFERENCE", { entity: "equipment" });
+    expect(validateFieldValue(ref, "eq1").errors).toHaveLength(0); // sin set: solo forma
+    expect(validateFieldValue(ref, 123).errors).toHaveLength(1); // no string
+    expect(validateFieldValue(ref, "eq1", { allowedRefIds: ["eq1", "eq2"] }).errors).toHaveLength(0);
+    expect(validateFieldValue(ref, "eq9", { allowedRefIds: ["eq1", "eq2"] }).errors).toHaveLength(1); // fuera de alcance
+  });
+
+  it("REFERENCE: vacío es válido (lo gobierna 'obligatorio', no la validación)", () => {
+    expect(validateFieldValue(f("REFERENCE", { entity: "user" }), "", { allowedRefIds: ["u1"] }).errors).toHaveLength(0);
+  });
+});
+
+describe("validateFieldValue — RISK_MATRIX", () => {
+  // Matriz 3×3: cells[p-1][c-1] = severidad 1..5.
+  const matrix = {
+    probabilityLabels: ["Baja", "Media", "Alta"],
+    consequenceLabels: ["Leve", "Moderada", "Grave"],
+    cells: [
+      [1, 2, 3],
+      [2, 3, 4],
+      [3, 4, 5],
+    ],
+  };
+  const f = (config: Record<string, unknown>): FieldForValidation => ({
+    key: "r",
+    type: "RISK_MATRIX",
+    dataType: "RISK",
+    label: "Riesgo",
+    config,
+  });
+
+  it("acepta una combinación dentro de la matriz", () => {
+    expect(validateFieldValue(f(matrix), { probability: 3, consequence: 3 }).errors).toHaveLength(0);
+  });
+
+  it("rechaza combinación fuera de los ejes", () => {
+    expect(validateFieldValue(f(matrix), { probability: 4, consequence: 1 }).errors).toHaveLength(1);
+  });
+
+  it("exige ambos ejes", () => {
+    expect(validateFieldValue(f(matrix), { probability: 2 }).errors).toHaveLength(1);
+  });
+
+  it("riskLevelFor deriva severidad y rótulos", () => {
+    expect(riskLevelFor(matrix, { probability: 3, consequence: 3 })).toEqual({
+      severity: 5,
+      probabilityLabel: "Alta",
+      consequenceLabel: "Grave",
+    });
+    expect(riskLevelFor(matrix, { probability: 9, consequence: 1 })).toBeNull();
+  });
+});
+
+describe("lectura con tolerancia (NUMBER + expected ± tolerance)", () => {
+  const f = (config: Record<string, unknown>): FieldForValidation => ({
+    key: "t",
+    type: "NUMBER",
+    dataType: "NUMBER",
+    label: "Presión",
+    config,
+  });
+
+  it("deriveToleranceBands: warn = ±tolerance, crit = ±critTolerance", () => {
+    expect(deriveToleranceBands({ expected: 100, tolerance: 5, critTolerance: 10 })).toEqual({
+      warnLow: 95,
+      warnHigh: 105,
+      critLow: 90,
+      critHigh: 110,
+    });
+    expect(deriveToleranceBands({ tolerance: 5 })).toEqual({}); // sin expected
+  });
+
+  it("advertencia/crítico se derivan de la tolerancia", () => {
+    const cfg = { expected: 100, tolerance: 5, critTolerance: 10 };
+    expect(validateFieldValue(f(cfg), 100).warnings).toHaveLength(0);
+    expect(validateFieldValue(f(cfg), 107).warnings).toHaveLength(1); // fuera de ±5 ⇒ WARN
+    expect(thresholdBandFor(f(cfg), 107)).toBe("WARN");
+    expect(thresholdBandFor(f(cfg), 115)).toBe("CRIT"); // fuera de ±10 ⇒ CRIT
+    expect(thresholdBandFor(f(cfg), 100)).toBeNull();
   });
 });
 

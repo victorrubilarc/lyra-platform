@@ -39,6 +39,13 @@ export const FIELD_TYPES = [
   "NOTICE", // aviso (info / advertencia / éxito / peligro)
   "PROCEDURE_LINK", // enlace a un procedimiento / documento
   "REFERENCE_IMAGE", // imagen de referencia (URL configurada por el diseñador)
+  // --- Catálogo de objetos premium · Ola 2 (2026-06-15) -------------------
+  // Referencia (apuntan a una entidad de la plataforma; almacenan un id):
+  "REFERENCE", // selector de equipo/usuario/nodo/turno (discriminado por config.entity)
+  // Evaluación estructurada:
+  "RISK_MATRIX", // matriz de riesgo probabilidad×consecuencia → nivel (ISO 31000)
+  // Lectura con tolerancia y contador/acumulado son VARIANTES de NUMBER (config),
+  // no tipos nuevos (espejo de percent/currency en Ola 1).
 ] as const;
 
 export const fieldTypeSchema = z.enum(FIELD_TYPES);
@@ -105,6 +112,7 @@ export const FIELD_DATA_TYPES = [
   "COMPUTED",
   "RANGE", // rango estructurado {from,to} de dos números (Ola 1)
   "LAYOUT", // objeto de PRESENTACIÓN: no es dato, el llenado lo ignora (Ola 1)
+  "RISK", // matriz de riesgo: valor estructurado {probability,consequence} (Ola 2)
 ] as const;
 export const fieldDataTypeSchema = z.enum(FIELD_DATA_TYPES);
 export type FieldDataType = z.infer<typeof fieldDataTypeSchema>;
@@ -147,6 +155,9 @@ export const FIELD_TYPE_TO_DATA_TYPE: Record<FieldType, FieldDataType> = {
   NOTICE: "LAYOUT",
   PROCEDURE_LINK: "LAYOUT",
   REFERENCE_IMAGE: "LAYOUT",
+  // --- Ola 2 ---
+  REFERENCE: "REFERENCE", // id de una entidad (equipo/usuario/nodo/turno)
+  RISK_MATRIX: "RISK", // {probability, consequence}
 };
 
 /** Deriva el `dataType` de un `type` (la presentación define el almacenamiento). */
@@ -172,6 +183,33 @@ export const RATING_STYLES = ["stars", "numeric", "likert"] as const;
 export type RatingStyle = (typeof RATING_STYLES)[number];
 /** Máximo por defecto de la valoración (5 estrellas / 1..5). */
 export const RATING_DEFAULT_MAX = 5;
+
+// === Objetos de REFERENCIA (Ola 2) ==========================================
+//
+// Un objeto de referencia apunta a una ENTIDAD de la plataforma y almacena su
+// `id` (dataType REFERENCE). Un único `FieldType REFERENCE` discriminado por
+// `config.entity` cubre las cuatro entidades (patrón de presets de Ola 1). La
+// resolución de opciones y la validación "existe + activo + EN ALCANCE" (ABAC)
+// son SERVER-SIDE (el cliente solo ofrece): `validateFieldValue` recibe el set
+// de ids válidos por `opts.allowedRefIds`, espejo de `allowedCodes`.
+
+/** Entidades a las que puede apuntar un campo de REFERENCIA. */
+export const REFERENCE_ENTITIES = ["equipment", "user", "orgNode", "shift"] as const;
+export type ReferenceEntity = (typeof REFERENCE_ENTITIES)[number];
+
+/** Presentación del selector de referencia. `dropdown` = Combobox buscable; `modal` = Value Help (LookupPicker). */
+export const REFERENCE_DISPLAYS = ["dropdown", "modal"] as const;
+export type ReferenceDisplay = (typeof REFERENCE_DISPLAYS)[number];
+
+// === Matriz de riesgo (Ola 2, ISO 31000) ====================================
+//
+// Valor estructurado {probability, consequence} (índices 1-based, como RATING);
+// el NIVEL se DERIVA por una matriz configurable: `cells[p-1][c-1]` = severidad
+// 1..5 (extiende la escala de Severidad del DS). Ejes 2..7 con rótulos.
+export const RISK_AXIS_MIN = 2;
+export const RISK_AXIS_MAX = 7;
+export const RISK_SEVERITY_MIN = 1;
+export const RISK_SEVERITY_MAX = 5;
 
 // === Validadores de FORMATO regional/semántico (fuente única back↔front) ======
 //
@@ -334,14 +372,87 @@ export const numberFieldConfigSchema = z
     format: z.enum(NUMBER_FORMATS).optional(),
     /** Código ISO de moneda cuando `format=currency` (default CLP). */
     currency: z.string().trim().length(3).optional(),
+    // --- Ola 2: lectura con tolerancia (target ± tol) -----------------------
+    // Cuando `expected` está definido, las bandas warn/crit se DERIVAN de él
+    // (`deriveToleranceBands`) y mandan sobre warnLow/warnHigh/critLow/critHigh.
+    /** Valor esperado (objetivo) de la lectura. */
+    expected: z.number().optional(),
+    /** Tolerancia de advertencia: fuera de `expected ± tolerance` ⇒ WARN. */
+    tolerance: z.number().min(0).optional(),
+    /** Tolerancia crítica (≥ tolerance): fuera de `expected ± critTolerance` ⇒ CRIT. */
+    critTolerance: z.number().min(0).optional(),
+    // --- Ola 2: contador / acumulado ---------------------------------------
+    /** Lectura incremental (horómetro/medidor): el backend muestra el delta vs la previa del mismo equipo. */
+    counter: z.boolean().optional(),
+    /** El contador no puede decrecer (nuevo ≥ previo). Validado server-side contra la lectura anterior. */
+    counterNonDecreasing: z.boolean().optional(),
   })
   .strict()
   .superRefine((c, ctx) => {
     if (c.min !== undefined && c.max !== undefined && c.min > c.max) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: "min no puede ser mayor que max", path: ["min"] });
     }
+    if (c.tolerance !== undefined && c.expected === undefined) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "La tolerancia exige un valor esperado", path: ["expected"] });
+    }
+    if (c.critTolerance !== undefined && c.tolerance !== undefined && c.critTolerance < c.tolerance) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "La tolerancia crítica no puede ser menor que la de advertencia",
+        path: ["critTolerance"],
+      });
+    }
   });
 export type NumberFieldConfig = z.infer<typeof numberFieldConfigSchema>;
+
+/**
+ * Deriva las bandas ISA-18.2 (warn/crit) de una lectura con tolerancia
+ * (`expected ± tolerance` / `± critTolerance`). FUENTE ÚNICA: la consumen
+ * `validateFieldValue` (advertencias) y `thresholdBandFor` (estampado) para que
+ * tolerancia y umbral compartan exactamente la misma semántica. Sin `expected`
+ * devuelve `{}` (el campo usa sus warn/crit explícitos, si los tiene).
+ */
+export function deriveToleranceBands(config: Record<string, unknown>): {
+  warnLow?: number;
+  warnHigh?: number;
+  critLow?: number;
+  critHigh?: number;
+} {
+  const c = config as { expected?: number; tolerance?: number; critTolerance?: number };
+  if (typeof c.expected !== "number") return {};
+  const out: { warnLow?: number; warnHigh?: number; critLow?: number; critHigh?: number } = {};
+  if (typeof c.tolerance === "number") {
+    out.warnLow = c.expected - c.tolerance;
+    out.warnHigh = c.expected + c.tolerance;
+  }
+  if (typeof c.critTolerance === "number") {
+    out.critLow = c.expected - c.critTolerance;
+    out.critHigh = c.expected + c.critTolerance;
+  }
+  return out;
+}
+
+/**
+ * Bandas warn/crit EFECTIVAS de un campo numérico: si tiene `expected`
+ * (tolerancia), se derivan; si no, son las explícitas del config. Fuente única
+ * compartida por la validación y el estampado de umbral.
+ */
+export function effectiveNumberBands(config: Record<string, unknown>): {
+  warnLow?: number;
+  warnHigh?: number;
+  critLow?: number;
+  critHigh?: number;
+} {
+  const c = config as {
+    expected?: number;
+    warnLow?: number;
+    warnHigh?: number;
+    critLow?: number;
+    critHigh?: number;
+  };
+  if (typeof c.expected === "number") return deriveToleranceBands(config);
+  return { warnLow: c.warnLow, warnHigh: c.warnHigh, critLow: c.critLow, critHigh: c.critHigh };
+}
 
 export const textFieldConfigSchema = z
   .object({
@@ -488,6 +599,88 @@ export const rangeFieldConfigSchema = z
     }
   });
 
+// === Config de objetos Ola 2 =================================================
+
+/**
+ * REFERENCE — selector que apunta a una entidad. `entity` discrimina el endpoint
+ * de opciones, las columnas y el alcance (ABAC), todo resuelto SERVER-SIDE. El
+ * valor almacenado es el `id` (string) de la entidad. `display` elige el widget.
+ */
+export const referenceFieldConfigSchema = z
+  .object({
+    entity: z.enum(REFERENCE_ENTITIES),
+    display: z.enum(REFERENCE_DISPLAYS).optional(),
+  })
+  .strict();
+export type ReferenceFieldConfig = z.infer<typeof referenceFieldConfigSchema>;
+
+/**
+ * RISK_MATRIX — ejes de probabilidad×consecuencia (2..7 rótulos cada uno) y la
+ * cuadrícula `cells[p-1][c-1]` con la severidad 1..5 resultante (ISO 31000). El
+ * valor de la entrada es {probability, consequence} (índices 1-based); el nivel
+ * se DERIVA con `riskLevelFor`. La matriz vive en la versión INMUTABLE (config).
+ */
+export const riskMatrixFieldConfigSchema = z
+  .object({
+    probabilityLabels: z.array(z.string().trim().min(1).max(40)).min(RISK_AXIS_MIN).max(RISK_AXIS_MAX),
+    consequenceLabels: z.array(z.string().trim().min(1).max(40)).min(RISK_AXIS_MIN).max(RISK_AXIS_MAX),
+    cells: z.array(z.array(z.number().int().min(RISK_SEVERITY_MIN).max(RISK_SEVERITY_MAX))),
+  })
+  .strict()
+  .superRefine((c, ctx) => {
+    if (c.cells.length !== c.probabilityLabels.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "La cuadrícula debe tener una fila por nivel de probabilidad",
+        path: ["cells"],
+      });
+      return;
+    }
+    for (let i = 0; i < c.cells.length; i++) {
+      if (c.cells[i]!.length !== c.consequenceLabels.length) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Cada fila debe tener una celda por nivel de consecuencia",
+          path: ["cells", i],
+        });
+      }
+    }
+  });
+export type RiskMatrixFieldConfig = z.infer<typeof riskMatrixFieldConfigSchema>;
+
+/** Valor de una matriz de riesgo: índices 1-based sobre los ejes (probabilidad × consecuencia). */
+export const riskValueSchema = z.object({
+  probability: z.number().int().min(1),
+  consequence: z.number().int().min(1),
+});
+export type RiskValue = z.infer<typeof riskValueSchema>;
+
+/**
+ * Nivel de riesgo (severidad 1..5 + rótulos de ejes) que resulta de un valor en
+ * la matriz configurada. FUENTE ÚNICA del color/etiqueta en builder, llenado y
+ * visor. Devuelve null si el valor está fuera de los ejes o la matriz es inválida.
+ */
+export function riskLevelFor(
+  config: Record<string, unknown>,
+  value: unknown,
+): { severity: number; probabilityLabel: string; consequenceLabel: string } | null {
+  const c = config as Partial<RiskMatrixFieldConfig>;
+  if (!c.probabilityLabels || !c.consequenceLabels || !c.cells) return null;
+  if (typeof value !== "object" || value === null) return null;
+  const v = value as { probability?: unknown; consequence?: unknown };
+  const p = typeof v.probability === "number" ? v.probability : Number(v.probability);
+  const cons = typeof v.consequence === "number" ? v.consequence : Number(v.consequence);
+  if (!Number.isInteger(p) || !Number.isInteger(cons)) return null;
+  if (p < 1 || p > c.probabilityLabels.length || cons < 1 || cons > c.consequenceLabels.length) return null;
+  const severity = c.cells[p - 1]?.[cons - 1];
+  if (typeof severity !== "number") return null;
+  return {
+    severity,
+    probabilityLabel: c.probabilityLabels[p - 1]!,
+    consequenceLabel: c.consequenceLabels[cons - 1]!,
+  };
+}
+
 // --- Objetos de PRESENTACIÓN (dataType LAYOUT; el llenado los ignora) --------
 
 /** HEADING — nivel jerárquico del encabezado (1..3). El texto va en `label`. */
@@ -604,6 +797,11 @@ export function fieldConfigSchemaFor(type: FieldType): z.ZodTypeAny {
       return procedureLinkFieldConfigSchema;
     case "REFERENCE_IMAGE":
       return referenceImageFieldConfigSchema;
+    // --- Ola 2 ---
+    case "REFERENCE":
+      return referenceFieldConfigSchema;
+    case "RISK_MATRIX":
+      return riskMatrixFieldConfigSchema;
   }
 }
 
