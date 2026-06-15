@@ -21,7 +21,7 @@ import styles from "./TemplateBuilder.module.css";
  * opciones válidas (evita escribir códigos a mano).
  */
 
-type NodeKind = "var" | "lit" | "op";
+type NodeKind = "var" | "lit" | "col" | "op";
 
 function defaultArg(): Expression {
   return { kind: "lit", value: null };
@@ -42,12 +42,19 @@ function OperandEditor({
   suggest?: ValueSuggest;
 }) {
   const kind: NodeKind | "" = value ? value.kind : "";
+  // Tablas con columnas numéricas: habilitan el operando "Columna de tabla" (agregados).
+  const tableFields = fields.filter((f) => f.columns && f.columns.length > 0);
 
   function setKind(k: NodeKind) {
     if (k === "var") onChange({ kind: "var", key: fields[0]?.key ?? "" });
     else if (k === "lit") onChange({ kind: "lit", value: suggest?.kind === "boolean" ? true : suggest?.kind === "select" ? (suggest.options[0]?.code ?? "") : 0 });
-    else onChange({ kind: "op", op: "gt", args: [defaultArg(), defaultArg()] });
+    else if (k === "col") {
+      const tf = tableFields[0];
+      onChange({ kind: "col", table: tf?.key ?? "", column: tf?.columns?.[0]?.key ?? "" });
+    } else onChange({ kind: "op", op: "gt", args: [defaultArg(), defaultArg()] });
   }
+
+  const colTable = value?.kind === "col" ? tableFields.find((f) => f.key === value.table) : undefined;
 
   return (
     <div className={styles.exprOperand} style={{ marginLeft: depth > 0 ? 10 : 0 }}>
@@ -55,6 +62,7 @@ function OperandEditor({
         <Select aria-label="Tipo de operando" value={kind} onChange={(e) => setKind(e.target.value as NodeKind)} className={styles.exprKindSel}>
           <option value="var">Campo</option>
           <option value="lit">Valor</option>
+          {tableFields.length > 0 && <option value="col">Columna de tabla</option>}
           <option value="op">Operación</option>
         </Select>
 
@@ -67,6 +75,32 @@ function OperandEditor({
               </option>
             ))}
           </Select>
+        )}
+
+        {value?.kind === "col" && (
+          <>
+            <Select
+              aria-label="Tabla"
+              value={value.table}
+              onChange={(e) => {
+                const tf = tableFields.find((f) => f.key === e.target.value);
+                onChange({ kind: "col", table: e.target.value, column: tf?.columns?.[0]?.key ?? "" });
+              }}
+            >
+              {tableFields.map((f) => (
+                <option key={f.key} value={f.key}>
+                  {f.label}
+                </option>
+              ))}
+            </Select>
+            <Select aria-label="Columna" value={value.column} onChange={(e) => onChange({ kind: "col", table: value.table, column: e.target.value })}>
+              {(colTable?.columns ?? []).map((c) => (
+                <option key={c.key} value={c.key}>
+                  {c.label}
+                </option>
+              ))}
+            </Select>
+          </>
         )}
 
         {value?.kind === "lit" && suggest?.kind === "select" && (

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  collectColRefs,
   collectVarRefs,
   evaluateExpression,
   expressionSchema,
@@ -168,6 +169,7 @@ export interface RulesDesignError {
 export function validateRulesDesign(fields: FieldForRules[], rules: CrossRule[]): RulesDesignError[] {
   const errors: RulesDesignError[] = [];
   const allKeys = new Set(fields.map((f) => f.key));
+  const tableKeys = new Set(fields.filter((f) => f.dataType === "TABLE").map((f) => f.key));
 
   for (const f of fields) {
     if (!f.computed) continue;
@@ -180,6 +182,11 @@ export function validateRulesDesign(fields: FieldForRules[], rules: CrossRule[])
         errors.push({ scope: "computed", key: f.key, message: `Referencia a un campo inexistente: ${ref}` });
       }
     }
+    for (const c of collectColRefs(f.computed.expression)) {
+      if (allKeys.has(c.table) && !tableKeys.has(c.table)) {
+        errors.push({ scope: "computed", key: f.key, message: `"${c.table}" no es una tabla: no se puede agregar su columna` });
+      }
+    }
   }
 
   for (const r of rules) {
@@ -188,6 +195,11 @@ export function validateRulesDesign(fields: FieldForRules[], rules: CrossRule[])
     for (const ref of collectVarRefs(r.when)) {
       if (!allKeys.has(ref)) {
         errors.push({ scope: "rule", key: r.key, message: `Referencia a un campo inexistente: ${ref}` });
+      }
+    }
+    for (const c of collectColRefs(r.when)) {
+      if (allKeys.has(c.table) && !tableKeys.has(c.table)) {
+        errors.push({ scope: "rule", key: r.key, message: `"${c.table}" no es una tabla: no se puede agregar su columna` });
       }
     }
   }

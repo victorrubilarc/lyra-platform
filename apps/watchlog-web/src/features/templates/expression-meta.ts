@@ -12,6 +12,8 @@ export interface RuleFieldRef {
   type: FieldType;
   /** Opciones {code,label} si el campo es un SELECT/MULTISELECT inline. */
   options?: { code: string; label: string }[];
+  /** Columnas NUMÉRICAS {key,label} si el campo es una TABLA (Ola 4) — para agregados. */
+  columns?: { key: string; label: string }[];
 }
 
 export interface OpMeta {
@@ -99,13 +101,15 @@ export function deriveValueSuggest(
 export function expressionToInfix(expr: Expression | null, fields: RuleFieldRef[]): string {
   const labelByKey = new Map(fields.map((f) => [f.key, f.label]));
   const optByKey = new Map(fields.map((f) => [f.key, new Map((f.options ?? []).map((o) => [o.code, o.label]))]));
-  return render(expr, labelByKey, optByKey);
+  const colByKey = new Map(fields.map((f) => [f.key, new Map((f.columns ?? []).map((c) => [c.key, c.label]))]));
+  return render(expr, labelByKey, optByKey, colByKey);
 }
 
 function render(
   expr: Expression | null,
   labelByKey: Map<string, string>,
   optByKey: Map<string, Map<string, string>>,
+  colByKey: Map<string, Map<string, string>>,
 ): string {
   if (!expr) return "—";
   if (expr.kind === "lit") {
@@ -115,8 +119,13 @@ function render(
     return String(expr.value);
   }
   if (expr.kind === "var") return labelByKey.get(expr.key) ?? expr.key;
+  if (expr.kind === "col") {
+    const colLabel = colByKey.get(expr.table)?.get(expr.column) ?? expr.column;
+    const tableLabel = labelByKey.get(expr.table) ?? expr.table;
+    return `«${colLabel}» de ${tableLabel}`;
+  }
   const meta = OP_BY.get(expr.op);
-  const parts = expr.args.map((a) => render(a, labelByKey, optByKey));
+  const parts = expr.args.map((a) => render(a, labelByKey, optByKey, colByKey));
   if (meta?.infix && expr.args.length === 2) return `(${parts[0]} ${meta.infix} ${parts[1]})`;
   return `${meta?.label.replace(/^[^a-zA-Z]+/, "").trim() ?? expr.op}(${parts.join(", ")})`;
 }

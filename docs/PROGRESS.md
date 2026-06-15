@@ -1,5 +1,25 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-15 — Objetos estructurados: umbral por celda → excepción + agregados de tabla en reglas ✅**
+(`feat/tablas-umbral-reglas` → `main`). Dos mejoras grandes pedidas por el dueño tras la evaluación de brechas, que dejan
+de tratar a las tablas/matrices como "opacas". **(1) Umbral por celda → review-by-exception:** `thresholdBandFor` (fuente
+única del estampado de `LogEntryValue.thresholdBand`) ahora calcula la **PEOR banda** (CRIT>WARN) de las celdas numéricas de
+un `TABLE`/`MATRIX` (reusando `effectiveNumberBands` por columna/celda). Como el API ya estampa `thresholdBand` por campo, una
+lectura **crítica DENTRO de una tabla/matriz marca la entrada como excepción** y muestra su badge en la grilla / la captura
+`exceptionsOnly` — sin tocar el API ni migrar. **(2) Agregados de columna en el motor de reglas:** nuevo nodo de AST
+`{kind:"col",table,column}` que los operadores de agregación (`sum/avg/min/max/count`) **expanden** a los valores no vacíos de
+esa columna; fuera de agregación evalúa vacío (degradación elegante). Usable en **campos CALCULADOS** (KPI: *Total = suma de
+una columna*) y **reglas CRUZADAS** (bloquear/avisar según un agregado, ej. *si suma(tonelaje) > tope ⇒ error*). `collectVarRefs`
+suma la dependencia al campo TABLA (orden topológico + resaltado); `collectColRefs` + `validateRulesDesign` rechazan agregar una
+columna de algo que **no es tabla**. Server-authoritative (mismo evaluador puro back↔front). **Web:** el `ExpressionEditor` gana
+el operando **"Columna de tabla"** (selector tabla + columna), ofrecido solo si hay tablas con columnas numéricas; `RuleFieldRef`
+expone las columnas numéricas; `expressionToInfix` rinde `«columna» de Tabla`. **Condiciones por fila** ("si alguna fila…")
+DIFERIDAS (BACKLOG). Sin migración, sin permisos nuevos (catálogo 60). Tests: **contracts 236** (+4) · API **234**.
+typecheck/lint(0)/build verdes; **probe en vivo 9/9** (calculado=suma de columna=400; banda WARN→CRIT por celda; la entrada
+entra a `exceptionsOnly`; regla `sum(col)>1000` bloquea completar) + smokes Ola 4 22/22 y reglas 20/20 sin regresión.
+**Pendiente: smoke VISUAL del dueño** (§4). **Deuda restante de tablas:** condiciones por fila (`any/all`), resumen "N filas"
+en la grilla, export CSV de tablas, agregados como columna visible.
+
 **2026-06-15 — Pulido del catálogo de objetos (QA en vivo del dueño) ✅** (`fix/objetos-pulido` → `main`). Tras armar una
 **bitácora de demostración** (seed `scripts/seed-showcase-objetos.py`: ronda operacional de planta concentradora, 6 secciones ·
 58 campos · 25 tipos de objeto distintos, con campo CALCULADO "recuperación" y regla CRUZADA concentrado≤alimentado, todo
