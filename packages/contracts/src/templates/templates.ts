@@ -4,6 +4,9 @@ import {
   fieldConfigSchemaFor,
   fieldDataTypeSchema,
   colSpanSchema,
+  gridXSchema,
+  gridYSchema,
+  gridHSchema,
   fieldSemanticRoleSchema,
   fieldTypeSchema,
   recurrenceConfigSchema,
@@ -135,6 +138,15 @@ export const templateFieldSchema = z.object({
    * 12 (ancho completo) por default, así el render nunca ramifica sobre null.
    */
   colSpan: colSpanSchema,
+  /**
+   * Geometría EXPLÍCITA en el lienzo de posicionamiento libre (Fase 2.1.7):
+   * `gridX` columna (0..11), `gridY` fila lógica, `gridH` alto en filas; el ANCHO
+   * es `colSpan` (= w). NULLABLE: null = plantilla legacy ⇒ el editor deriva la
+   * geometría del orden + colSpan y la persiste al guardar.
+   */
+  gridX: gridXSchema.nullable(),
+  gridY: gridYSchema.nullable(),
+  gridH: gridHSchema.nullable(),
   /** Override por campo del permiso de la sección (vacío = hereda la sección). */
   roleIds: z.array(z.string()),
 });
@@ -297,6 +309,10 @@ export const draftFieldInputSchema = z
     computed: computedFieldConfigSchema.nullable().optional(),
     /** Ancho en columnas de la grilla de 12 (Fase 2.1.3). Ausente = 12 (ancho completo). */
     colSpan: colSpanSchema.optional(),
+    /** Geometría en el lienzo (Fase 2.1.7): columna/fila/alto. Ausente = el backend deja null. */
+    gridX: gridXSchema.nullable().optional(),
+    gridY: gridYSchema.nullable().optional(),
+    gridH: gridHSchema.nullable().optional(),
     roleIds: z.array(z.string()).max(50).optional(),
   })
   .superRefine((field, ctx) => {
