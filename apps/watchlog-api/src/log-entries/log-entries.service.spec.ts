@@ -11,6 +11,7 @@ import type { OperationalPeriodService } from "../operational-periods/operationa
 import type { PermissionService } from "../authz/permission.service";
 import type { PrismaService } from "../prisma/prisma.service";
 import type { SettingsService } from "../settings/settings.service";
+import type { StorageService } from "../storage/storage.service";
 
 const ctx = { actorId: "u1", actorEmail: "u@x.cl", ip: null, userAgent: null };
 
@@ -66,6 +67,7 @@ function makeService(
     perms?: string[];
     /** Ventana de edición global (2.7.2). Default: sin ventana (hours null). */
     editWindow?: { editWindowAnchor: "RECORDED" | "EFFECTIVE"; editWindowMinutes: number | null; requireMfaEditWindowOverride: boolean };
+    storage?: Partial<StorageService>;
   } = {},
 ) {
   const tx = {
@@ -123,8 +125,16 @@ function makeService(
         opts.editWindow ?? { editWindowAnchor: "RECORDED", editWindowMinutes: null, requireMfaEditWindowOverride: false },
       ),
   } as unknown as SettingsService;
+  const storage = {
+    putObject: vi.fn().mockResolvedValue(undefined),
+    statObject: vi.fn().mockResolvedValue({ size: 1, contentType: "image/jpeg" }),
+    removeObject: vi.fn().mockResolvedValue(undefined),
+    removePrefix: vi.fn().mockResolvedValue(undefined),
+    presignedGetUrl: vi.fn().mockResolvedValue({ url: "http://minio/presigned", expiresAt: "2026-06-15T00:05:00.000Z" }),
+    ...opts.storage,
+  } as unknown as StorageService;
   return {
-    service: new LogEntriesService(prisma, audit, scope, shiftResolver, fiscalResolver, reauth, enc, periods, permissions, settings),
+    service: new LogEntriesService(prisma, audit, scope, shiftResolver, fiscalResolver, reauth, enc, periods, permissions, settings, storage),
     prisma,
     audit,
     shiftResolver,

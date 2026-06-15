@@ -1,4 +1,5 @@
-import { Body, Controller, Get, NotFoundException, Param, Post, Put, Query, Req, Res } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Get, NotFoundException, Param, Post, Put, Query, Req, Res } from "@nestjs/common";
+import type { MultipartFile } from "@fastify/multipart";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import {
   createLogEntryRequestSchema,
@@ -252,6 +253,50 @@ export class LogEntriesController {
     @Req() req: FastifyRequest,
   ) {
     return this.entries.voidEntry(user.id, id, dto, this.ctx(user, req));
+  }
+
+  /**
+   * Sube un objeto de EVIDENCIA (adjunto, Ola 3) a un campo ATTACHMENT de un
+   * borrador (subida PROXIED: la API valida tamaño/tipo y audita antes de MinIO).
+   * Devuelve el descriptor; el cliente lo agrega al valor del campo y guarda la
+   * sección por el canal normal. Gate = `logentry:fill` (mismo que escribir).
+   */
+  @Post(":id/attachments/:sectionKey/:fieldKey")
+  @RequirePermission("logentry:fill")
+  async uploadAttachment(
+    @Param("id") id: string,
+    @Param("sectionKey") sectionKey: string,
+    @Param("fieldKey") fieldKey: string,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ) {
+    const data = await (req as FastifyRequest & { file: () => Promise<MultipartFile | undefined> }).file();
+    if (!data) throw new BadRequestException("No se recibió ningún archivo");
+    const buffer = await data.toBuffer();
+    return this.entries.uploadAttachment(
+      user.id,
+      id,
+      sectionKey,
+      fieldKey,
+      { buffer, filename: data.filename, mimetype: data.mimetype, truncated: data.file.truncated },
+      this.ctx(user, req),
+    );
+  }
+
+  /**
+   * URL prefirmada de DESCARGA (GET de vida corta) de un adjunto, resuelta por
+   * `descriptorId` desde los valores persistidos con la MISMA ABAC que `getDetail`.
+   * El navegador nunca recibe credenciales de MinIO. Gate = `logentry:view`.
+   */
+  @Get(":id/attachments/:descriptorId/url")
+  @RequirePermission("logentry:view")
+  attachmentUrl(
+    @Param("id") id: string,
+    @Param("descriptorId") descriptorId: string,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.entries.getAttachmentDownloadUrl(user.id, id, descriptorId, this.ctx(user, req));
   }
 
   @Post(":id/submit")

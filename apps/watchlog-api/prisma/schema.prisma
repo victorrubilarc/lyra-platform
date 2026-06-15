@@ -530,6 +530,11 @@ enum FieldType {
   // y contador son variantes de NUMBER (sin tipo nuevo). Ver field-types.ts.
   REFERENCE
   RISK_MATRIX
+  // Catálogo de objetos premium — Ola 3 (2026-06-15). Adjuntos/terreno (infra
+  // MinIO): foto/archivo/nota de voz/croquis, un solo tipo ATTACHMENT
+  // discriminado por config.kind → dataType FILE_ARRAY (descriptor[]). El
+  // escaneo QR/código NO agrega tipo (es config.scan sobre TEXT). Ver field-types.ts.
+  ATTACHMENT
 }
 
 // Recurrencia (rondas/lecturas programadas). Modelada para no re-migrar; su
@@ -580,6 +585,7 @@ enum FieldDataType {
   RANGE // rango estructurado {from,to} de dos números (Ola 1)
   LAYOUT // objeto de PRESENTACIÓN: no es dato, el llenado lo ignora (Ola 1)
   RISK // matriz de riesgo: valor estructurado {probability,consequence} (Ola 2)
+  FILE_ARRAY // varios objetos almacenados (descriptor[]) — adjuntos (Ola 3)
 }
 
 // Capa 3 del campo: rol semántico opcional (qué significa para la plataforma).

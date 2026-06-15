@@ -8,6 +8,7 @@ import { CryptoModule } from "./crypto/crypto.module";
 import { CacheModule } from "./redis/cache.module";
 import { AuditModule } from "./audit/audit.module";
 import { EmailModule } from "./email/email.module";
+import { StorageModule } from "./storage/storage.module";
 import { AuthzModule } from "./authz/authz.module";
 import { AuthModule } from "./auth/auth.module";
 import { StructureModule } from "./structure/structure.module";
@@ -48,6 +49,7 @@ import { SecurityModule } from "./security/security.module";
     CacheModule,
     AuditModule,
     EmailModule,
+    StorageModule,
     AuthzModule,
     AuthModule,
     StructureModule,
