@@ -15,7 +15,11 @@
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
   grid-auto-rows: min-content;
-  gap: var(--space-4) var(--space-5);
+  /* SIN gap: el ancho de cada celda es EXACTAMENTE w/12 (= el modelo del lienzo del
+     editor, que posiciona por porcentaje). La separación visual va como padding
+     interno de la celda (igual que el inset de la tarjeta del lienzo) ⇒ el llenado,
+     el visor y la Vista previa coinciden al pixel con el diseño. */
+  gap: 0;
   align-items: start;
 }
 
@@ -23,6 +27,7 @@
   grid-column: var(--gx, auto) / span var(--gw, 12);
   grid-row: var(--grow, auto);
   min-width: 0;
+  padding: 5px;
 }
 
 /* ≥768px (escritorio y tablet): se RESPETA la geometría del diseño (12 columnas),

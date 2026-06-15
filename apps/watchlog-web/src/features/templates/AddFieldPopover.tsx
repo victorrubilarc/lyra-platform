@@ -41,12 +41,15 @@ export function AddFieldPopover({
     if (r) {
       const left = Math.max(12, Math.min(r.left, window.innerWidth - POP_W - 12));
       const spaceBelow = window.innerHeight - r.bottom;
-      // Abrir hacia ABAJO si hay espacio; si no, hacia ARRIBA (no se sale de pantalla).
-      const next: CSSProperties =
-        spaceBelow >= POP_H || spaceBelow >= r.top
-          ? { left, top: r.bottom + 6 }
-          : { left, bottom: window.innerHeight - r.top + 6 };
-      setPos(next);
+      // Abrir hacia ABAJO si cabe; si no, hacia ARRIBA. El alto se limita al espacio
+      // disponible (queda PEGADO al botón y scrollea adentro, sin invadir otra UI).
+      const openDown = spaceBelow >= POP_H || spaceBelow >= r.top;
+      const maxHeight = Math.min(POP_H, (openDown ? spaceBelow : r.top) - 12);
+      setPos(
+        openDown
+          ? { left, top: r.bottom + 6, maxHeight }
+          : { left, bottom: window.innerHeight - r.top + 6, maxHeight },
+      );
     }
     setOpen(true);
   };

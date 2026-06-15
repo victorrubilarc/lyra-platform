@@ -1328,10 +1328,17 @@
   font-size: 12px;
   padding: 6px;
 }
-/* Fila "＋ Agregar campo" al final de una sección. */
+/* Fila "＋ Agregar campo" al final de una sección: afordancia a ancho completo. */
 .sectionAddRow {
   margin-top: var(--space-3);
+}
+.sectionAddRow .addWrap {
   display: flex;
+  width: 100%;
+}
+.sectionAddRow .addFieldBtn {
+  width: 100%;
+  justify-content: center;
 }
 
 /* Panel de PROPIEDADES flotante (aparece al seleccionar un campo). */
