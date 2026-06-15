@@ -42,6 +42,7 @@ import {
   isEditWindowExpired,
   isEmptyValue,
   isFieldVisible,
+  isPresentationalType,
   isSectionEditableInState,
   recomputeComputedValues,
   resolveEditWindow,
@@ -747,6 +748,8 @@ export class LogEntriesService {
 
     if (dto.markComplete) {
       for (const def of fieldsByKey.values()) {
+        // Objeto de presentación (LAYOUT): no es dato; nunca es obligatorio.
+        if (isPresentationalType(def.type)) continue;
         // Un campo formulado no se teclea (read-only) ⇒ "obligatorio" no aplica.
         if (!def.required || def.computed) continue;
         if (!isFieldVisible(def.visibleWhen, valuesByKey)) continue;
@@ -1467,6 +1470,7 @@ export class LogEntriesService {
       const defs = section.fields.map((f) => this.toFieldDef(f, section.key));
       const allowed = await this.resolveAllowedCodes(defs);
       for (const def of defs) {
+        if (isPresentationalType(def.type)) continue; // objeto de presentación: no es dato
         if (!isFieldVisible(def.visibleWhen, valuesByKey)) continue;
         const val = valuesByKey[def.key];
         if (def.required && isEmptyValue(val)) {
