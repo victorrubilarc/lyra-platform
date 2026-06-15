@@ -1,4 +1,4 @@
-import { useState, type DragEvent } from "react";
+import { useRef, useState, type CSSProperties, type DragEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Plus, Search } from "lucide-react";
 import type { FieldType } from "@lyra/contracts";
@@ -22,12 +22,34 @@ export function AddFieldPopover({
   variant?: "bar" | "section";
 }) {
   const { t } = useTranslation();
+  const btnRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<CSSProperties>({});
   const [q, setQ] = useState("");
   if (!canEdit) return null;
 
   const query = q.trim().toLowerCase();
   const list = FIELD_TYPE_META.filter((m) => t(m.labelKey).toLowerCase().includes(query));
+  const POP_W = 280;
+  const POP_H = 380;
+  const toggle = () => {
+    if (open) {
+      close();
+      return;
+    }
+    const r = btnRef.current?.getBoundingClientRect();
+    if (r) {
+      const left = Math.max(12, Math.min(r.left, window.innerWidth - POP_W - 12));
+      const spaceBelow = window.innerHeight - r.bottom;
+      // Abrir hacia ABAJO si hay espacio; si no, hacia ARRIBA (no se sale de pantalla).
+      const next: CSSProperties =
+        spaceBelow >= POP_H || spaceBelow >= r.top
+          ? { left, top: r.bottom + 6 }
+          : { left, bottom: window.innerHeight - r.top + 6 };
+      setPos(next);
+    }
+    setOpen(true);
+  };
   const close = () => {
     setOpen(false);
     setQ("");
@@ -71,9 +93,10 @@ export function AddFieldPopover({
   return (
     <div className={styles.addWrap}>
       <button
+        ref={btnRef}
         type="button"
         className={variant === "bar" ? styles.addSectionBtn : styles.addFieldBtn}
-        onClick={() => setOpen((v) => !v)}
+        onClick={toggle}
         aria-expanded={open}
       >
         <Plus size={15} /> {t("templates.builder.addField")}
@@ -81,7 +104,7 @@ export function AddFieldPopover({
       {open && (
         <>
           <div className={styles.addBackdrop} onClick={close} aria-hidden />
-          <div className={styles.addPopover} role="dialog" aria-label={t("templates.builder.addField")}>
+          <div className={styles.addPopover} style={pos} role="dialog" aria-label={t("templates.builder.addField")}>
             <div className={styles.paletteSearch}>
               <Search size={14} />
               <input
