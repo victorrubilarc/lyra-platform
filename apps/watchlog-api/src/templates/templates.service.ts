@@ -786,6 +786,13 @@ export class TemplatesService {
     if (presentational.length > 0) {
       throw new BadRequestException(`Los objetos de presentación no pueden ser campos de resumen: ${presentational.join(", ")}`);
     }
+    // Los objetos ESTRUCTURADOS (Ola 4: TABLE/MATRIX) son colecciones de celdas:
+    // opacos a la línea "Resumen" de la grilla en el MVP (no hay un valor escalar que
+    // mostrar). El conteo de filas como resumen queda diferido (BACKLOG §4).
+    const structured = fields.filter((f) => f.dataType === "TABLE" || f.dataType === "MATRIX").map((f) => f.key);
+    if (structured.length > 0) {
+      throw new BadRequestException(`Los objetos estructurados (tabla/matriz) no pueden ser campos de resumen: ${structured.join(", ")}`);
+    }
   }
 
   /** Reemplaza por completo el set de asignaciones de la plantilla (dentro de una tx). */
