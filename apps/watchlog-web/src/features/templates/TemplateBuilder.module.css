@@ -1170,9 +1170,16 @@
   flex: 0 0 88px;
   width: 88px;
 }
+/* Las dos cajas del rango COMPARTEN el ancho y se encogen (min-width:0) para
+   quedar horizontales incluso en columnas angostas (mitad/tercio); tope para que
+   no se agranden en ancho completo. */
+.rangeRow {
+  flex-wrap: nowrap;
+}
 .rangeRow > span:not(.previewUnit):not(.rangeDash) {
-  flex: 0 0 132px;
-  width: 132px;
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 160px;
 }
 .rangeDash {
   color: var(--color-text-muted);
