@@ -878,9 +878,27 @@ export const tableColumnSchema = z
         message: `Configuración inválida para la columna "${col.key}"`,
         path: ["config"],
       });
+      return;
+    }
+    // Las celdas SOLO admiten catálogos INLINE (MVP Ola 4). Una lista de referencia/
+    // externa en una columna NO se valida server-side (no hay resolución por celda) ⇒
+    // se rechaza en el diseño (el backend es la autoridad; el builder solo ofrece inline).
+    if (nonInlineCellSelect(col.type, r.data)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `La columna "${col.key}" de selección solo admite opciones definidas en la columna (lista de referencia no soportada en celdas)`,
+        path: ["config", "optionSource"],
+      });
     }
   });
 export type TableColumn = z.infer<typeof tableColumnSchema>;
+
+/** ¿Una celda de selección usa un catálogo NO inline (no soportado en celdas, Ola 4)? */
+function nonInlineCellSelect(type: StructuredCellType, parsedConfig: unknown): boolean {
+  if (type !== "SELECT") return false;
+  const src = (parsedConfig as { optionSource?: { kind?: string } }).optionSource;
+  return !!src && src.kind !== "inline";
+}
 
 /** TABLE — tabla/grupo repetible. Columnas = sub-campos escalares; filas dinámicas. */
 export const tableFieldConfigSchema = z
@@ -949,7 +967,15 @@ export const matrixFieldConfigSchema = z
       seenC.add(col.key);
     });
     const r = fieldConfigSchemaFor(c.cell.type).safeParse(c.cell.config ?? {});
-    if (!r.success) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Configuración de celda inválida", path: ["cell", "config"] });
+    if (!r.success) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Configuración de celda inválida", path: ["cell", "config"] });
+    } else if (nonInlineCellSelect(c.cell.type, r.data)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "La celda de selección solo admite opciones definidas (lista de referencia no soportada en celdas)",
+        path: ["cell", "config", "optionSource"],
+      });
+    }
   });
 export type MatrixFieldConfig = z.infer<typeof matrixFieldConfigSchema>;
 
