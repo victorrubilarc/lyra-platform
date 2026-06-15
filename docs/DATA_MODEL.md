@@ -56,10 +56,10 @@
   un campo son **3 capas separadas** (ver DECISIONS 2026-06-09):
   - **Capa 1 — presentación/widget:** `type` (enum `FieldType`: 10 base + **Ola 1** `CONFORMITY`/`RATING`/`TIME`/
     `DURATION`/`RANGE` + presentación `HEADING`/`STATIC_TEXT`/`DIVIDER`/`NOTICE`/`PROCEDURE_LINK`/`REFERENCE_IMAGE`
-    + **Ola 2** `REFERENCE`/`RISK_MATRIX` + **Ola 3** `ATTACHMENT`; migraciones `20260615120000_add_ola1_field_types` /
-    `20260615140000_add_ola2_field_types` / `20260615160000_add_ola3_field_types`). Cómo se ve.
+    + **Ola 2** `REFERENCE`/`RISK_MATRIX` + **Ola 3** `ATTACHMENT` + **Ola 4** `TABLE`/`MATRIX`; migraciones `20260615120000_add_ola1_field_types` /
+    `20260615140000_add_ola2_field_types` / `20260615160000_add_ola3_field_types` / `20260615180000_add_ola4_field_types`). Cómo se ve.
   - **Capa 2 — tipo de dato:** `dataType` (enum `FieldDataType`: STRING/NUMBER/BOOLEAN/DATE/DATETIME/TIME/
-    **CODE**/**CODE_ARRAY**/**REFERENCE**/FILE/**FILE_ARRAY**/GEO/COMPUTED/**RANGE**/**LAYOUT**/**RISK**). Cómo se almacena/valida/reporta. Es
+    **CODE**/**CODE_ARRAY**/**REFERENCE**/FILE/**FILE_ARRAY**/GEO/COMPUTED/**RANGE**/**LAYOUT**/**RISK**/**TABLE**/**MATRIX**). Cómo se almacena/valida/reporta. Es
     **derivado del `type`** en backend (fuente única `deriveDataType` en `@lyra/contracts`); la UI no lo edita. Mapeo:
     NUMBER→NUMBER, TEXT/TEXTAREA→STRING, SELECT→CODE, MULTISELECT→CODE_ARRAY, BOOLEAN→BOOLEAN, DATE→DATE,
     DATETIME→DATETIME, SEVERITY→CODE (escala cerrada {1..5}), SIGNATURE→REFERENCE. **Ola 1:** CONFORMITY→CODE
@@ -82,7 +82,18 @@
     uploadedById}`; la `key` = `entries/{logEntryId}/{fieldKey}/{uuid}-{filename}` en el bucket `MINIO_BUCKET`. La subida
     es PROXIED por la API (choke-point de validación tamaño/tipo); la descarga = **presigned GET** de vida corta firmado
     server-side con la ABAC de `getDetail`. Pertenencia verificada por prefijo de objeto + existencia (análogo a
-    `allowedRefIds`); delete-on-remove al quitar un adjunto; `voidEntry` borra el prefijo del borrador anulado.
+    `allowedRefIds`); delete-on-remove al quitar un adjunto; `voidEntry` borra el prefijo del borrador anulado. **Ola 4
+    (objetos ESTRUCTURADOS / repetibles):** `TABLE`→**TABLE** (valor = `Array<Record<colKey, escalar>>`; **tabla repetible**
+    `config.layout=table` o **grupo repetible** `config.layout=cards`; filas dinámicas) y `MATRIX`→**MATRIX** (valor =
+    `Record<rowKey, Record<colKey, escalar>>`; filas=parámetros × columnas=turnos FIJAS configuradas + celda uniforme).
+    Las **columnas/ejes** son sub-campos ESCALARES (`{key,label,type,config,required}`) definidos en `config` y CONGELADOS
+    en la versión (jsonb); los tipos de celda permitidos son TEXT/TEXTAREA/NUMBER/SELECT(inline)/BOOLEAN/DATE/TIME/DURATION/
+    CONFORMITY/RATING. La **validación es POR CELDA**: `validateFieldValue` (casos TABLE/MATRIX) delega en la validación del
+    tipo de cada celda — un SELECT de celda resuelve su catálogo desde las opciones INLINE de la columna (sin ABAC por
+    celda); las filas totalmente vacías se ignoran (placeholder); una columna `required` vacía en una fila NO vacía es
+    error. La **obligatoriedad** se generaliza con `requiredFieldError` (TABLE ⇒ ≥ `max(1,minRows)` filas COMPLETAS; MATRIX
+    ⇒ ≥1 celda; resto ⇒ no vacío). Son **opacos** al motor de reglas y a la línea "Resumen" de la grilla en el MVP
+    (`assertGridFieldKeysExist` los rechaza como candidatos de resumen). Sin permisos nuevos.
   - **Capa 3 — rol semántico:** `semanticRole?` (enum `FieldSemanticRole?`: EFFECTIVE_DATE/TITLE/PRIMARY_EQUIPMENT/
     SEVERITY_DRIVER; null = ninguno). Qué significa para la plataforma. En 2.1.1 solo `EFFECTIVE_DATE` actúa
     (promueve `LogEntry.effectiveAt`, 2.4); **a lo sumo uno por versión** (validado en contrato + backend).

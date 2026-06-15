@@ -1,5 +1,38 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-15 — Catálogo de objetos premium · OLA 4 (objetos ESTRUCTURADOS / repetibles) ✅** (`feat/objetos-ola4` →
+`main`). Cuarta ola: objetos que capturan una **colección de celdas** en un solo campo, todos sobre el **render ÚNICO**
+`FieldControl`↔`FieldGrid`. **NO estrena infraestructura** (contratos + render, como Olas 1–2). **4 forks confirmados por el
+dueño (DECISIONS 2026-06-15, recomendación aceptada en los 4):** (1) **DOS tipos `TABLE` + `MATRIX`** — `TABLE` unifica
+**tabla repetible** (`config.layout=table`) y **grupo repetible** (`config.layout=cards`): valor `Array<Record<colKey,
+escalar>>`, filas dinámicas; `MATRIX` (parámetro×turno) aparte: filas/columnas FIJAS × celda uniforme, valor
+`Record<rowKey, Record<colKey, escalar>>`. (2) **columnas de la matriz CONFIGURADAS** en la plantilla y congeladas (sin
+ShiftResolver; ligar al calendario en vivo = follow-up). (3) **sub-tipos de celda = SOLO escalares** (TEXT/TEXTAREA/NUMBER/
+SELECT-inline/BOOLEAN/DATE/TIME/DURATION/CONFORMITY/RATING; REFERENCE/ATTACHMENT/anidada = diferido). (4) **sin agregados**
+(total/promedio diferido). **Contratos:** `FIELD_TYPES += TABLE/MATRIX`, `FIELD_DATA_TYPES += TABLE/MATRIX`,
+`tableFieldConfigSchema`/`matrixFieldConfigSchema` (columnas/ejes = sub-campos escalares validados con
+`fieldConfigSchemaFor`), `validateFieldValue` casos TABLE/MATRIX (**validación POR CELDA** delegando en el tipo de columna;
+SELECT de celda resuelve su catálogo desde opciones INLINE sin ABAC por celda; filas vacías = placeholder ignoradas;
+columna `required` vacía en fila no vacía ⇒ error), helpers `countCompleteTableRows`/`isEmptyMatrixValue`/`tableRowIsEmpty`
++ **`requiredFieldError`** (obligatoriedad generalizada: TABLE ≥ max(1,minRows) filas completas · MATRIX ≥1 celda · resto no
+vacío). **Migración aditiva** `20260615180000_add_ola4_field_types` (ALTER enum, idempotente). **API:** config viaja
+verbatim en saveDraft/clone-al-publicar/mapVersion (×2: templates + log-entries.service); las dos rutas de completitud
+(saveSection markComplete + `collectCompletionErrors`) usan `requiredFieldError`; `assertGridFieldKeysExist` rechaza
+TABLE/MATRIX como candidato de Resumen (**opacos** a la grilla y al motor de reglas en el MVP). **Web:** `RepeatableControl`
+(scroll horizontal + encabezado/1ª columna sticky, agregar/quitar/reordenar fila 44px; layout `cards`) y `MatrixControl`
+(cabeceras read-only, celdas editables) co-ubicados en `FieldControl.tsx` y **recursivos sobre `FieldControl`** (modo nuevo
+`bare` = celda sin etiqueta ⇒ un NUMBER trae su unidad/umbral, un SELECT su catálogo, sin duplicar render); editores
+`TableConfigEditor`/`MatrixConfigEditor` en `BuilderConfigPanel`; paleta categoría nueva **"Estructurados"**; i18n es-CL;
+CSS premium (sticky, glow, claro+oscuro). **Sin permisos nuevos — catálogo 60.** Tests: **contracts 230** (+8) · **API 234**.
+**Smoke en vivo `scripts/smoke-objetos-ola4.py` 22/22**: versión CONGELADA viaja dataType TABLE/MATRIX + config
+columnas/ejes/celda; guardar tabla con filas válidas → 2xx + array JSONB; quitar/reordenar fila persiste; celda fuera de
+rango/tipo/catálogo → 400; columna required vacía en fila no vacía → 400; matriz válida → 2xx, celda > max → 400;
+markComplete con tabla obligatoria vacía → 400, con ≥1 fila completa → 2xx; crea y LIMPIA por ID. typecheck/lint(0)/build
+verdes. **Pendiente: smoke VISUAL del dueño** (§4). **Deuda diferida (BACKLOG):** agregados por columna · refs del motor de
+reglas a celdas/agregados · resumen "N filas" en la grilla · export CSV de tablas · REFERENCE/ATTACHMENT en celda · tabla
+anidada · columnas de matriz desde el calendario operacional en vivo · stripping de filas vacías al persistir · pulido fino
+sticky/táctil en tablet. **Siguiente: Ola 5** (origen de datos SCADA/PI/OPC, Fase 3).
+
 **2026-06-15 — Catálogo de objetos premium · OLA 3 (adjuntos / terreno, infra MinIO) ✅** (`feat/objetos-ola3` →
 `main`). Tercera ola: objetos de EVIDENCIA con almacenamiento de objetos on-prem, todos sobre el **render ÚNICO**
 `FieldControl`↔`FieldGrid`. **4 forks confirmados por el dueño (DECISIONS 2026-06-15, recomendación aceptada en los 4):**
