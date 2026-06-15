@@ -1,21 +1,7 @@
-import { useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react";
+import { useMemo, useState, type ComponentProps } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import {
-  closestCenter,
-  DndContext,
-  DragOverlay,
-  KeyboardSensor,
-  PointerSensor,
-  useDroppable,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-  type DragMoveEvent,
-  type DragStartEvent,
-} from "@dnd-kit/core";
-import { SortableContext, rectSortingStrategy, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import {
   ArrowDown,
   ArrowLeft,
@@ -23,13 +9,16 @@ import {
   Eye,
   FilePlus2,
   FunctionSquare,
+  Grid3x3,
   IdCard,
   LayoutPanelLeft,
+  Monitor,
   Network,
   Pencil,
-  Plus,
   Save,
   SlidersHorizontal,
+  Smartphone,
+  Tablet,
   Trash2,
 } from "lucide-react";
 import { Button, Card, Checkbox, Chip, Drawer, FormField, Input, Modal, Select, Textarea, useToast } from "@lyra/ui";
@@ -44,25 +33,26 @@ import {
   collectFieldKeys,
   collectSectionKeys,
   defaultFieldConfig,
+  defaultFieldH,
   detailToEditState,
   editStateToConfigRequest,
   editStateToDraftRequest,
   fieldTypeMeta,
+  nextFreeRow,
   nextUid,
-  rowRangeOf,
-  ROW_MAX_FIELDS,
   slugifyKey,
-  splitRow,
   totalFields,
   uniqueKey,
   type EditField,
   type EditSection,
   type EditState,
 } from "./builder-model.js";
-import { AddFieldMenu } from "./AddFieldMenu.js";
 import { BuilderConfigPanel } from "./BuilderConfigPanel.js";
-import { BuilderFieldCard, BuilderFieldOverlay } from "./BuilderFieldCard.js";
+import { FieldControl } from "./FieldControl.js";
 import { FieldGrid } from "./FieldGrid.js";
+import { FieldPalette } from "./FieldPalette.js";
+import { FieldPropertiesPanel } from "./FieldPropertiesPanel.js";
+import { SectionCanvas, type CanvasGeometry } from "./SectionCanvas.js";
 import { RulesEditor } from "./RulesEditor.js";
 import type { RuleFieldRef } from "./expression-meta.js";
 import { PreviewForm } from "./FieldPreview.js";
@@ -75,8 +65,10 @@ interface Selection {
   f?: string;
 }
 
-/** Zona de soltado del auto-layout (Fase 2.1.5). */
-type DropMode = "beside-left" | "beside-right" | "row-before" | "row-after";
+/** Dispositivo del lienzo (Fase 2.1.7): escritorio editable · tablet/móvil = preview. */
+type Device = "desktop" | "tablet" | "mobile";
+/** Ancho del marco de preview por dispositivo (activa las container-queries de FieldGrid). */
+const DEVICE_WIDTH: Record<Device, number | null> = { desktop: null, tablet: 834, mobile: 390 };
 
 export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
   const { t } = useTranslation();
@@ -94,15 +86,12 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
   const [dirty, setDirty] = useState(false); // cambios de DEFINICIÓN (borrador)
   const [configDirty, setConfigDirty] = useState(false); // cambios de CONFIGURACIÓN (PATCH en vivo)
   const [publishOpen, setPublishOpen] = useState(false);
-  // Arrastre de campos en el lienzo (dnd-kit, pointer/teclado): campo activo + destino-hint.
-  // El destino se refleja en `dropHint` (indicador) y en `dropIntentRef` (lectura síncrona
-  // en onDragEnd, sin depender del estado asíncrono). `dragSrcRef` = origen del arrastre.
-  const [dragField, setDragField] = useState<EditField | null>(null);
-  const [dropHint, setDropHint] = useState<{ sUid: string; anchorFUid: string; mode: DropMode } | null>(null);
-  const dragSrcRef = useRef<{ sUid: string; fUid: string } | null>(null);
-  const dropIntentRef = useRef<{ sUid: string; anchorFUid: string; mode: DropMode } | null>(null);
+  // Lienzo de posicionamiento libre (Fase 2.1.7): dispositivo activo (escritorio edita;
+  // tablet/móvil = preview responsivo) + cuadrícula visible.
+  const [device, setDevice] = useState<Device>("desktop");
+  const [showGrid, setShowGrid] = useState(true);
   // Drawer de configuración AVANZADA (umbral/opciones/condicional/fórmula/roles): se abre
-  // con "Más opciones" del campo o de la sección. Lo común se edita en el lienzo.
+  // con "Opciones avanzadas" del panel de propiedades o de la sección.
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const save = useSaveTemplateDraft();
@@ -189,11 +178,11 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
   }
 
   /**
-   * Inserta un campo nuevo. `targetSUid`/`index` definen DÓNDE (estilo Canva/Google
-   * Forms: agregar desde el lienzo en una posición). Si no hay sección, crea una.
-   * `index` undefined = al final de la sección.
+   * Agrega un campo a ANCHO COMPLETO en una fila libre al final de la sección
+   * (clic en la paleta). Si no hay sección, crea una. Para soltar en una posición
+   * concreta del lienzo se usa `addFieldAtGeom`.
    */
-  function addFieldAt(type: FieldType, targetSUid?: string, index?: number) {
+  function addFieldAt(type: FieldType, targetSUid?: string) {
     const label = t(fieldTypeMeta(type).labelKey);
     let sections = state.sections;
     let sUid = targetSUid ?? selected?.s ?? sections[sections.length - 1]?.uid ?? null;
@@ -205,32 +194,97 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
       sUid = sec.uid;
     }
     const fkey = uniqueKey(slugifyKey(label, "campo"), collectFieldKeys({ ...state, sections }));
-    const field: EditField = { uid: nextUid(), key: fkey, type, semanticRole: null, label, help: null, required: false, config: defaultFieldConfig(type), visibleWhen: null, computed: null, colSpan: 12, roleIds: [] };
-    sections = sections.map((s) => {
-      if (s.uid !== sUid) return s;
-      const fields = [...s.fields];
-      fields.splice(index === undefined ? fields.length : Math.max(0, Math.min(index, fields.length)), 0, field);
-      return { ...s, fields };
-    });
+    const target = sections.find((s) => s.uid === sUid);
+    // Campo nuevo a ANCHO COMPLETO en una FILA LIBRE al final (clic en la paleta).
+    const field: EditField = {
+      uid: nextUid(),
+      key: fkey,
+      type,
+      semanticRole: null,
+      label,
+      help: null,
+      required: false,
+      config: defaultFieldConfig(type),
+      visibleWhen: null,
+      computed: null,
+      colSpan: 12,
+      gridX: 0,
+      gridY: target ? nextFreeRow(target.fields) : 0,
+      gridH: defaultFieldH(type),
+      roleIds: [],
+    };
+    sections = sections.map((s) => (s.uid === sUid ? { ...s, fields: [...s.fields, field] } : s));
     patchState({ ...state, sections });
     setSelected({ s: sUid, f: field.uid });
   }
 
-  /** Duplica un campo (clon con uid + key únicos), insertado justo después del original. */
-  function duplicateField(sUid: string, fUid: string) {
-    const src = state.sections.find((s) => s.uid === sUid)?.fields.find((f) => f.uid === fUid);
-    if (!src) return;
-    const fkey = uniqueKey(`${src.key}_copia`, collectFieldKeys(state));
-    const clone: EditField = { ...src, uid: nextUid(), key: fkey, config: { ...src.config } };
+  /**
+   * Inserta un campo NUEVO en una POSICIÓN del lienzo (arrastre desde la paleta).
+   * El ancho por defecto es 6 columnas (medio); el operador lo redimensiona luego.
+   */
+  function addFieldAtGeom(type: FieldType, sUid: string, x: number, y: number) {
+    const label = t(fieldTypeMeta(type).labelKey);
+    const fkey = uniqueKey(slugifyKey(label, "campo"), collectFieldKeys(state));
+    const w = 6;
+    const field: EditField = {
+      uid: nextUid(),
+      key: fkey,
+      type,
+      semanticRole: null,
+      label,
+      help: null,
+      required: false,
+      config: defaultFieldConfig(type),
+      visibleWhen: null,
+      computed: null,
+      colSpan: w,
+      gridX: Math.max(0, Math.min(x, 12 - w)),
+      gridY: Math.max(0, y),
+      gridH: defaultFieldH(type),
+      roleIds: [],
+    };
+    patchState({
+      ...state,
+      sections: state.sections.map((s) => (s.uid === sUid ? { ...s, fields: [...s.fields, field] } : s)),
+    });
+    setSelected({ s: sUid, f: field.uid });
+  }
+
+  /** Commit de geometría {x,y,w,h} desde el lienzo (al soltar/redimensionar). */
+  function updateFieldGeometry(sUid: string, geom: CanvasGeometry[]) {
+    const byUid = new Map(geom.map((g) => [g.uid, g]));
     patchState({
       ...state,
       sections: state.sections.map((s) => {
         if (s.uid !== sUid) return s;
-        const i = s.fields.findIndex((f) => f.uid === fUid);
-        const fields = [...s.fields];
-        fields.splice(i + 1, 0, clone);
-        return { ...s, fields };
+        return {
+          ...s,
+          fields: s.fields.map((f) => {
+            const g = byUid.get(f.uid);
+            return g ? { ...f, gridX: g.x, gridY: g.y, colSpan: g.w, gridH: g.h } : f;
+          }),
+        };
       }),
+    });
+  }
+
+  /** Duplica un campo (clon con uid + key únicos), colocado en una fila libre al final. */
+  function duplicateField(sUid: string, fUid: string) {
+    const section = state.sections.find((s) => s.uid === sUid);
+    const src = section?.fields.find((f) => f.uid === fUid);
+    if (!src || !section) return;
+    const fkey = uniqueKey(`${src.key}_copia`, collectFieldKeys(state));
+    const clone: EditField = {
+      ...src,
+      uid: nextUid(),
+      key: fkey,
+      config: { ...src.config },
+      gridX: 0,
+      gridY: nextFreeRow(section.fields),
+    };
+    patchState({
+      ...state,
+      sections: state.sections.map((s) => (s.uid === sUid ? { ...s, fields: [...s.fields, clone] } : s)),
     });
     setSelected({ s: sUid, f: clone.uid });
   }
@@ -264,178 +318,6 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
     next[idx] = next[j]!;
     next[j] = tmp;
     patchState({ ...state, sections: next });
-  }
-
-  function moveField(sUid: string, fUid: string, dir: -1 | 1) {
-    patchState({
-      ...state,
-      sections: state.sections.map((s) => {
-        if (s.uid !== sUid) return s;
-        const idx = s.fields.findIndex((f) => f.uid === fUid);
-        const j = idx + dir;
-        if (j < 0 || j >= s.fields.length) return s;
-        if (idx < 0) return s;
-        const fields = [...s.fields];
-        const tmp = fields[idx]!;
-        fields[idx] = fields[j]!;
-        fields[j] = tmp;
-        return { ...s, fields };
-      }),
-    });
-  }
-
-  /**
-   * AUTO-LAYOUT por arrastre (Fase 2.1.5/2.1.6): suelta un campo AL LADO de otro
-   * (`beside-left`/`beside-right`) ⇒ comparten fila y el ancho se reparte solo; o
-   * en su propia línea (`row-before`/`row-after`, o sin anchor = al final) ⇒ ancho
-   * completo. El usuario nunca elige "columnas": el ancho se DERIVA del arrastre.
-   */
-  function applyDrop(src: { sUid: string; fUid: string }, dstSUid: string, anchorFUid: string, mode: DropMode) {
-    const { sUid: srcSUid, fUid } = src;
-    let moved: EditField | undefined;
-    let sections = state.sections.map((s) => {
-      if (s.uid !== srcSUid) return s;
-      moved = s.fields.find((f) => f.uid === fUid);
-      return { ...s, fields: s.fields.filter((f) => f.uid !== fUid) };
-    });
-    if (!moved) return endDrag();
-    sections = sections.map((s) => {
-      if (s.uid !== dstSUid) return s;
-      const fields = [...s.fields];
-      const anchorIdx = fields.findIndex((f) => f.uid === anchorFUid);
-      if (anchorIdx < 0) {
-        // Sin anchor (sección vacía / soltar al final) ⇒ fila nueva completa.
-        fields.push({ ...moved!, colSpan: 12 });
-        return { ...s, fields };
-      }
-      const [rs, re] = rowRangeOf(fields, anchorIdx);
-      if (mode === "row-before" || mode === "row-after") {
-        fields.splice(mode === "row-before" ? rs : re, 0, { ...moved!, colSpan: 12 });
-        return { ...s, fields };
-      }
-      // beside-*: compartir la fila del anchor (si cabe), repartiendo el ancho.
-      const rowCount = re - rs;
-      if (rowCount >= ROW_MAX_FIELDS) {
-        fields.splice(re, 0, { ...moved!, colSpan: 12 }); // fila llena ⇒ nueva fila
-        return { ...s, fields };
-      }
-      const insertAt = mode === "beside-left" ? anchorIdx : anchorIdx + 1;
-      fields.splice(insertAt, 0, { ...moved! });
-      const widths = splitRow(rowCount + 1);
-      for (let i = 0; i < rowCount + 1; i += 1) fields[rs + i] = { ...fields[rs + i]!, colSpan: widths[i]! };
-      return { ...s, fields };
-    });
-    patchState({ ...state, sections });
-    endDrag();
-  }
-
-  /**
-   * Ajuste fino tipo DIVISOR (Notion): mover el borde de un campo transfiere
-   * columnas a su vecino de la misma fila (la suma de la fila no cambia; cada uno
-   * mín. 3). `absCol` = columna 1..12 bajo el puntero. `delta` = nudge por teclado.
-   */
-  function resizeDivider(sUid: string, fUid: string, opts: { absCol?: number; delta?: number }) {
-    const MIN = 3;
-    patchState({
-      ...state,
-      sections: state.sections.map((s) => {
-        if (s.uid !== sUid) return s;
-        const fields = [...s.fields];
-        const idx = fields.findIndex((f) => f.uid === fUid);
-        if (idx < 0) return s;
-        const [rs, re] = rowRangeOf(fields, idx);
-        if (idx + 1 >= re) return s; // sin vecino a la derecha (último de la fila)
-        const f = fields[idx]!;
-        const nb = fields[idx + 1]!;
-        const pairTotal = f.colSpan + nb.colSpan;
-        const precedingCols = fields.slice(rs, idx).reduce((a, x) => a + x.colSpan, 0);
-        const desired = opts.absCol !== undefined ? opts.absCol - precedingCols : f.colSpan + (opts.delta ?? 0);
-        const fSpan = Math.min(Math.max(desired, MIN), pairTotal - MIN);
-        if (fSpan === f.colSpan) return s;
-        fields[idx] = { ...f, colSpan: fSpan };
-        fields[idx + 1] = { ...nb, colSpan: pairTotal - fSpan };
-        return { ...s, fields };
-      }),
-    });
-  }
-
-  function endDrag() {
-    setDragField(null);
-    setDropHint(null);
-    dragSrcRef.current = null;
-    dropIntentRef.current = null;
-  }
-
-  // ── Arrastre del lienzo con dnd-kit ─────────────────────────────────────────
-  // Pointer (con umbral de 5px para no robar los clics) + teclado (accesible y
-  // usable en tablet). El nodo sortable es la celda; el reflow de vecinos lo anima
-  // dnd-kit. La intención (al-lado / fila) se deriva de la posición del campo
-  // arrastrado sobre el destino; el ancho final se aplica al soltar.
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  );
-
-  function findField(uid: string): { sUid: string; field: EditField } | null {
-    for (const s of state.sections) {
-      const field = s.fields.find((f) => f.uid === uid);
-      if (field) return { sUid: s.uid, field };
-    }
-    return null;
-  }
-
-  function onDragStart(e: DragStartEvent) {
-    const data = e.active.data.current as { sUid?: string; fUid?: string } | undefined;
-    if (!data?.sUid || !data.fUid) return;
-    dragSrcRef.current = { sUid: data.sUid, fUid: data.fUid };
-    dropIntentRef.current = null;
-    setDragField(findField(data.fUid)?.field ?? null);
-  }
-
-  function onDragMove(e: DragMoveEvent) {
-    const over = e.over;
-    const dragRect = e.active.rect.current.translated;
-    if (!over || !dragRect) {
-      dropIntentRef.current = null;
-      setDropHint(null);
-      return;
-    }
-    // Soltar sobre el área de una sección (vacía o al final) ⇒ fila nueva al final.
-    const overData = over.data.current as { type?: string; sUid?: string } | undefined;
-    if (overData?.type === "section" && overData.sUid) {
-      const hint = { sUid: overData.sUid, anchorFUid: "", mode: "row-after" as DropMode };
-      dropIntentRef.current = hint;
-      setDropHint(hint);
-      return;
-    }
-    if (over.id === e.active.id) {
-      dropIntentRef.current = null;
-      setDropHint(null);
-      return;
-    }
-    const target = findField(String(over.id));
-    if (!target) return;
-    // Centro del campo arrastrado respecto del destino: arriba/abajo ⇒ fila propia,
-    // mitad izq/der ⇒ al lado (comparten fila). Mismo espacio de coordenadas dnd-kit.
-    const r = over.rect;
-    const cx = dragRect.left + dragRect.width / 2;
-    const cy = dragRect.top + dragRect.height / 2;
-    const relY = (cy - r.top) / r.height;
-    const relX = (cx - r.left) / r.width;
-    const mode: DropMode =
-      relY < 0.3 ? "row-before" : relY > 0.7 ? "row-after" : relX < 0.5 ? "beside-left" : "beside-right";
-    const hint = { sUid: target.sUid, anchorFUid: target.field.uid, mode };
-    dropIntentRef.current = hint;
-    setDropHint(hint);
-  }
-
-  function onDragEnd(_e: DragEndEvent) {
-    const src = dragSrcRef.current;
-    const intent = dropIntentRef.current;
-    if (src && intent && !(intent.anchorFUid === src.fUid)) {
-      applyDrop(src, intent.sUid, intent.anchorFUid, intent.mode);
-    }
-    endDrag();
   }
 
   function deleteSection(uid: string) {
@@ -595,146 +477,134 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
                   onChange={setRules}
                 />
               ) : (
-                /* Lienzo CANVAS-FIRST a todo el ancho (artboard centrado). La paleta es un
-                   popover "＋ Agregar", la configuración avanzada vive en un Drawer. */
-                <div className={styles.workspace}>
-                  {/* Barra del lienzo: flujo (definición versionada) + agregar sección. */}
-                  <div className={styles.canvasBar}>
-                    <div className={styles.canvasBarFlow}>
-                      <FormField label={t("templates.builder.workflow")} hint={t("templates.builder.workflowHint")}>
-                        {({ id }) => (
-                          <Select id={id} value={state.workflowDefinitionId ?? ""} disabled={!canEdit} onChange={(e) => setWorkflow(e.target.value)}>
-                            <option value="">{t("templates.builder.workflowNone")}</option>
-                            {publishedWorkflows.map((w) => (
-                              <option key={w.id} value={w.id}>
-                                {w.name}
-                              </option>
-                            ))}
-                            {state.workflowDefinitionId &&
-                              !publishedWorkflows.some((w) => w.id === state.workflowDefinitionId) && (
-                                <option value={state.workflowDefinitionId}>
-                                  {assignedWorkflow.data?.name ?? state.workflowDefinitionId}
-                                </option>
-                              )}
-                          </Select>
-                        )}
-                      </FormField>
-                    </div>
-                    <button type="button" className={styles.addSectionBtn} onClick={addSection} disabled={!canEdit}>
-                      <FilePlus2 size={15} /> {t("templates.builder.addSection")}
-                    </button>
-                  </div>
+                /* DISEÑADOR VISUAL (Fase 2.1.7): paleta (izq) · lienzo de posicionamiento
+                   LIBRE (centro, react-grid-layout) · propiedades (der). Se arrastra desde
+                   la paleta a una posición, y se mueve/redimensiona cualquier campo. */
+                <div className={styles.designer}>
+                  <FieldPalette canEdit={canEdit && !isPublishedView} onAdd={(type) => addFieldAt(type)} />
 
-                  <DndContext
-                    sensors={sensors}
-                    collisionDetection={closestCenter}
-                    onDragStart={onDragStart}
-                    onDragMove={onDragMove}
-                    onDragEnd={onDragEnd}
-                    onDragCancel={endDrag}
-                  >
-                  {state.sections.length === 0 ? (
-                    <div className={styles.emptyCanvas}>
-                      {t("templates.builder.emptyCanvas")}
-                      {canEdit && (
-                        <div className={styles.emptyCanvasAdd}>
-                          <AddFieldMenu
-                            onPick={(type) => addFieldAt(type)}
-                            trigger={<button type="button" className={styles.addFieldBtn}><Plus size={15} /> {t("templates.builder.addField")}</button>}
-                          />
+                  <div className={styles.designerCenter}>
+                    {/* Barra superior del lienzo: flujo + dispositivo + cuadrícula + sección. */}
+                    <div className={styles.canvasBar}>
+                      <div className={styles.canvasBarFlow}>
+                        <FormField label={t("templates.builder.workflow")} hint={t("templates.builder.workflowHint")}>
+                          {({ id }) => (
+                            <Select id={id} value={state.workflowDefinitionId ?? ""} disabled={!canEdit} onChange={(e) => setWorkflow(e.target.value)}>
+                              <option value="">{t("templates.builder.workflowNone")}</option>
+                              {publishedWorkflows.map((w) => (
+                                <option key={w.id} value={w.id}>
+                                  {w.name}
+                                </option>
+                              ))}
+                              {state.workflowDefinitionId &&
+                                !publishedWorkflows.some((w) => w.id === state.workflowDefinitionId) && (
+                                  <option value={state.workflowDefinitionId}>
+                                    {assignedWorkflow.data?.name ?? state.workflowDefinitionId}
+                                  </option>
+                                )}
+                            </Select>
+                          )}
+                        </FormField>
+                      </div>
+                      <div className={styles.canvasTools}>
+                        <div className={styles.deviceSwitch} role="group" aria-label={t("templates.builder.deviceDesktop")}>
+                          <button type="button" className={device === "desktop" ? styles.deviceOn : styles.deviceBtn} onClick={() => setDevice("desktop")} title={t("templates.builder.deviceDesktop")}><Monitor size={15} /></button>
+                          <button type="button" className={device === "tablet" ? styles.deviceOn : styles.deviceBtn} onClick={() => setDevice("tablet")} title={t("templates.builder.deviceTablet")}><Tablet size={15} /></button>
+                          <button type="button" className={device === "mobile" ? styles.deviceOn : styles.deviceBtn} onClick={() => setDevice("mobile")} title={t("templates.builder.deviceMobile")}><Smartphone size={15} /></button>
+                        </div>
+                        <button type="button" className={showGrid ? styles.toolOn : styles.toolBtn} onClick={() => setShowGrid((v) => !v)} title={t("templates.builder.toggleGrid")} aria-pressed={showGrid}><Grid3x3 size={15} /></button>
+                        <button type="button" className={styles.addSectionBtn} onClick={addSection} disabled={!canEdit}>
+                          <FilePlus2 size={15} /> {t("templates.builder.addSection")}
+                        </button>
+                      </div>
+                    </div>
+
+                    {device !== "desktop" && <div className={styles.devicePreviewHint}>{t("templates.builder.devicePreviewHint")}</div>}
+
+                    <div className={styles.canvasScroll} onClick={() => setSelected(null)}>
+                      {state.sections.length === 0 ? (
+                        <div className={styles.emptyCanvas}>{t("templates.builder.canvasDropHint")}</div>
+                      ) : (
+                        <div
+                          className={styles.deviceFrame}
+                          style={device !== "desktop" ? { maxWidth: DEVICE_WIDTH[device]!, marginInline: "auto" } : undefined}
+                        >
+                          {state.sections.map((s, si) => (
+                            <Card
+                              key={s.uid}
+                              className={selected?.s === s.uid && !selected.f ? styles.sectionCardActive : styles.sectionCard}
+                              onClick={(e) => { e.stopPropagation(); setSelected({ s: s.uid }); }}
+                            >
+                              <div className={styles.sectionHeader}>
+                                <div className={styles.sectionTitleWrap}>
+                                  <input
+                                    className={styles.inlineSectionTitle}
+                                    value={s.title}
+                                    disabled={!canEdit}
+                                    aria-label={t("templates.builder.sectionTitle")}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onChange={(e) => updateSection(s.uid, { title: e.target.value })}
+                                  />
+                                  <input
+                                    className={styles.inlineSectionDesc}
+                                    value={s.description ?? ""}
+                                    disabled={!canEdit}
+                                    placeholder={t("templates.builder.sectionDescription")}
+                                    aria-label={t("templates.builder.sectionDescription")}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onChange={(e) => updateSection(s.uid, { description: e.target.value || null })}
+                                  />
+                                </div>
+                                {s.requireSignature && <Chip variant="info" label="Part 11" />}
+                                <div className={styles.rowActions} onClick={(e) => e.stopPropagation()}>
+                                  <button type="button" className={styles.iconBtn} onClick={() => { setSelected({ s: s.uid }); setDrawerOpen(true); }} title={t("templates.builder.sectionOptions")}><SlidersHorizontal size={14} /></button>
+                                  <button type="button" className={styles.iconBtn} onClick={() => moveSection(s.uid, -1)} disabled={si === 0} aria-label={t("common.moveUp")}><ArrowUp size={13} /></button>
+                                  <button type="button" className={styles.iconBtn} onClick={() => moveSection(s.uid, 1)} disabled={si === state.sections.length - 1} aria-label={t("common.moveDown")}><ArrowDown size={13} /></button>
+                                  <button type="button" className={styles.iconBtnDanger} onClick={() => deleteSection(s.uid)} aria-label={t("common.delete")}><Trash2 size={13} /></button>
+                                </div>
+                              </div>
+
+                              {s.fields.length === 0 ? (
+                                <div className={styles.emptySection}>{t("templates.builder.canvasDropHint")}</div>
+                              ) : device === "desktop" ? (
+                                <SectionCanvas
+                                  fields={s.fields}
+                                  canEdit={canEdit && !isPublishedView}
+                                  showGrid={showGrid}
+                                  selectedFUid={selected?.s === s.uid ? selected.f ?? null : null}
+                                  onSelectField={(fUid) => setSelected({ s: s.uid, f: fUid })}
+                                  onGeometryChange={(geom) => updateFieldGeometry(s.uid, geom)}
+                                  onDropNew={(type, x, y) => addFieldAtGeom(type, s.uid, x, y)}
+                                />
+                              ) : (
+                                /* Preview responsivo (tablet/móvil): MISMO render que el operador. */
+                                <FieldGrid
+                                  fields={s.fields}
+                                  renderCell={(f) => <FieldControl field={f} value={undefined} onChange={() => undefined} readOnly />}
+                                />
+                              )}
+                            </Card>
+                          ))}
                         </div>
                       )}
                     </div>
-                  ) : (
-                    state.sections.map((s, si) => (
-                      <Card
-                        key={s.uid}
-                        className={selected?.s === s.uid && !selected.f ? styles.sectionCardActive : styles.sectionCard}
-                        onClick={() => setSelected({ s: s.uid })}
-                      >
-                        <div className={styles.sectionHeader}>
-                          {/* Título + descripción de sección editables EN EL LUGAR. */}
-                          <div className={styles.sectionTitleWrap}>
-                            <input
-                              className={styles.inlineSectionTitle}
-                              value={s.title}
-                              disabled={!canEdit}
-                              aria-label={t("templates.builder.sectionTitle")}
-                              onClick={(e) => e.stopPropagation()}
-                              onChange={(e) => updateSection(s.uid, { title: e.target.value })}
-                            />
-                            <input
-                              className={styles.inlineSectionDesc}
-                              value={s.description ?? ""}
-                              disabled={!canEdit}
-                              placeholder={t("templates.builder.sectionDescription")}
-                              aria-label={t("templates.builder.sectionDescription")}
-                              onClick={(e) => e.stopPropagation()}
-                              onChange={(e) => updateSection(s.uid, { description: e.target.value || null })}
-                            />
-                          </div>
-                          {s.requireSignature && <Chip variant="info" label="Part 11" />}
-                          <div className={styles.rowActions} onClick={(e) => e.stopPropagation()}>
-                            <button type="button" className={styles.iconBtn} onClick={() => { setSelected({ s: s.uid }); setDrawerOpen(true); }} title={t("templates.builder.moreOptions")}><SlidersHorizontal size={14} /></button>
-                            <button type="button" className={styles.iconBtn} onClick={() => moveSection(s.uid, -1)} disabled={si === 0} aria-label={t("common.moveUp")}><ArrowUp size={13} /></button>
-                            <button type="button" className={styles.iconBtn} onClick={() => moveSection(s.uid, 1)} disabled={si === state.sections.length - 1} aria-label={t("common.moveDown")}><ArrowDown size={13} /></button>
-                            <button type="button" className={styles.iconBtnDanger} onClick={() => deleteSection(s.uid)} aria-label={t("common.delete")}><Trash2 size={13} /></button>
-                          </div>
-                        </div>
+                  </div>
 
-                        <SectionDropArea sUid={s.uid} highlight={dropHint?.sUid === s.uid && s.fields.length === 0} disabled={s.fields.length > 0}>
-                          {s.fields.length === 0 ? (
-                            <div className={styles.emptySection}>{t("templates.builder.emptySectionFields")}</div>
-                          ) : (
-                            <SortableContext items={s.fields.map((f) => f.uid)} strategy={rectSortingStrategy}>
-                              <FieldGrid>
-                                {s.fields.map((f, fi) => {
-                                  const [, re] = rowRangeOf(s.fields, fi);
-                                  const resizable = fi + 1 < re; // tiene vecino a la derecha en la fila
-                                  const dm = dropHint?.sUid === s.uid && dropHint.anchorFUid === f.uid ? dropHint.mode : null;
-                                  return (
-                                    <BuilderFieldCard
-                                      key={f.uid}
-                                      field={f}
-                                      sUid={s.uid}
-                                      active={selected?.f === f.uid}
-                                      canEdit={canEdit}
-                                      dropMode={dm}
-                                      resizable={resizable}
-                                      onSelect={() => setSelected({ s: s.uid, f: f.uid })}
-                                      onLabel={(label) => updateField(s.uid, f.uid, { label })}
-                                      onResizeAbs={(absCol) => resizeDivider(s.uid, f.uid, { absCol })}
-                                      onNudge={(delta) => resizeDivider(s.uid, f.uid, { delta })}
-                                      onToggleRequired={() => updateField(s.uid, f.uid, { required: !f.required })}
-                                      onDuplicate={() => duplicateField(s.uid, f.uid)}
-                                      onDelete={() => deleteField(s.uid, f.uid)}
-                                      onMoreOptions={() => { setSelected({ s: s.uid, f: f.uid }); setDrawerOpen(true); }}
-                                      onMoveUp={() => moveField(s.uid, f.uid, -1)}
-                                      onMoveDown={() => moveField(s.uid, f.uid, 1)}
-                                    />
-                                  );
-                                })}
-                              </FieldGrid>
-                            </SortableContext>
-                          )}
-
-                          {/* Agregar campo AL FINAL de esta sección (estilo Canva/Google Forms). */}
-                          {canEdit && (
-                            <div className={styles.addFieldRow} onClick={(e) => e.stopPropagation()}>
-                              <AddFieldMenu
-                                onPick={(type) => addFieldAt(type, s.uid)}
-                                trigger={<button type="button" className={styles.addFieldBtn}><Plus size={15} /> {t("templates.builder.addField")}</button>}
-                              />
-                            </div>
-                          )}
-                        </SectionDropArea>
-                      </Card>
-                    ))
-                  )}
-                  <DragOverlay dropAnimation={null}>
-                    {dragField ? <BuilderFieldOverlay field={dragField} /> : null}
-                  </DragOverlay>
-                  </DndContext>
+                  <FieldPropertiesPanel
+                    field={selectedField}
+                    canEdit={canEdit && !isPublishedView}
+                    onLabel={(label) => selectedSection && selectedField && updateField(selectedSection.uid, selectedField.uid, { label })}
+                    onRequired={(required) => selectedSection && selectedField && updateField(selectedSection.uid, selectedField.uid, { required })}
+                    onWidth={(w) => {
+                      if (!selectedSection || !selectedField) return;
+                      const gridX = Math.max(0, Math.min(selectedField.gridX, 12 - w));
+                      updateField(selectedSection.uid, selectedField.uid, { colSpan: w, gridX });
+                    }}
+                    onHeight={(h) => selectedSection && selectedField && updateField(selectedSection.uid, selectedField.uid, { gridH: h })}
+                    onAdvanced={() => setDrawerOpen(true)}
+                    onDuplicate={() => selectedSection && selectedField && duplicateField(selectedSection.uid, selectedField.uid)}
+                    onDelete={() => selectedSection && selectedField && deleteField(selectedSection.uid, selectedField.uid)}
+                  />
                 </div>
               )}
             </>
@@ -780,32 +650,6 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
       >
         <p style={{ margin: 0, color: "var(--color-text-secondary)", lineHeight: 1.5 }}>{t("templates.builder.publishConfirmBody")}</p>
       </Modal>
-    </div>
-  );
-}
-
-/**
- * Área droppable de una sección: destino de arrastre para soltar AL FINAL o en una
- * sección vacía (fila nueva). Los campos con contenido son droppables propios
- * (sortables); este contenedor cubre el resto.
- */
-function SectionDropArea({
-  sUid,
-  highlight,
-  disabled,
-  children,
-}: {
-  sUid: string;
-  highlight: boolean;
-  /** Con campos, el contenedor se desactiva: así `closestCenter` elige un CAMPO
-   *  (intención al-lado/fila) y no el contenedor (que solo sirve para sección vacía). */
-  disabled: boolean;
-  children: ReactNode;
-}) {
-  const { setNodeRef } = useDroppable({ id: `sec:${sUid}`, data: { type: "section", sUid }, disabled });
-  return (
-    <div ref={setNodeRef} className={highlight ? styles.emptySectionDrop : undefined}>
-      {children}
     </div>
   );
 }

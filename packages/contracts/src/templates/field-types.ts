@@ -125,6 +125,22 @@ export const DEFAULT_COL_SPAN = GRID_COLUMNS; // 12 = ancho completo (cero ruptu
 export const colSpanSchema = z.number().int().min(1).max(GRID_COLUMNS);
 export type ColSpan = z.infer<typeof colSpanSchema>;
 
+// === Geometría del campo en el LIENZO (Fase 2.1.7) ===========================
+//
+// El editor evoluciona de "lista auto-acomodada" a un LIENZO DE POSICIONAMIENTO
+// LIBRE sobre una grilla responsiva (modelo react-grid-layout). Cada campo lleva
+// geometría EXPLÍCITA y persistente (NO en CSS): `gridX` (columna 0..11), `gridY`
+// (fila lógica 0..N), `gridH` (alto en filas; el ANCHO sigue siendo `colSpan` = w).
+// Viven en la versión INMUTABLE como columnas dedicadas (paralelas a `colSpan`).
+// Son NULLABLE: `null` = plantilla legacy sin geometría ⇒ el editor la DERIVA del
+// orden + `colSpan` (idéntica a la vista anterior) y la persiste al primer guardado.
+// El render del llenado/visor usa (x, w, y) para reproducir columnas/filas; en
+// celular la grilla colapsa a 1 columna (regla de terreno).
+export const GRID_DEFAULT_H = 1; // alto por defecto (1 fila lógica)
+export const gridXSchema = z.number().int().min(0).max(GRID_COLUMNS - 1); // 0..11
+export const gridYSchema = z.number().int().min(0).max(2000);
+export const gridHSchema = z.number().int().min(1).max(40);
+
 // === Config por tipo =========================================================
 
 /** Opción de un selector (valor estable + etiqueta visible). @deprecated 2.1.1 → usar inline `optionSource`. */

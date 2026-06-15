@@ -512,6 +512,11 @@ export class TemplatesService {
               computed: field.computed ? (field.computed as Prisma.InputJsonValue) : Prisma.DbNull,
               // Ancho en columnas de la grilla de 12 (2.1.3). Ausente = 12 (completo).
               colSpan: field.colSpan ?? 12,
+              // Geometría del lienzo (2.1.7): columna/fila/alto. Ausente = null
+              // (legacy/sin geometría); el editor la deriva al abrir y la persiste.
+              gridX: field.gridX ?? null,
+              gridY: field.gridY ?? null,
+              gridH: field.gridH ?? null,
               roles: field.roleIds?.length
                 ? { create: field.roleIds.map((roleId) => ({ roleId })) }
                 : undefined,
@@ -635,6 +640,10 @@ export class TemplatesService {
               computed: field.computed == null ? Prisma.DbNull : (field.computed as Prisma.InputJsonValue),
               // Ancho en columnas (2.1.3): viaja en la versión CONGELADA al clonar.
               colSpan: field.colSpan,
+              // Geometría del lienzo (2.1.7): congelada al clonar (preserva el diseño).
+              gridX: field.gridX,
+              gridY: field.gridY,
+              gridH: field.gridH,
               roles: field.roles.length ? { create: field.roles.map((r) => ({ roleId: r.roleId })) } : undefined,
             },
           });
@@ -683,6 +692,9 @@ export class TemplatesService {
           visibleWhen: (f.visibleWhen as TemplateVersionDto["sections"][number]["fields"][number]["visibleWhen"]) ?? null,
           computed: (f.computed as TemplateVersionDto["sections"][number]["fields"][number]["computed"]) ?? null,
           colSpan: f.colSpan,
+          gridX: f.gridX,
+          gridY: f.gridY,
+          gridH: f.gridH,
           roleIds: f.roles.map((r) => r.roleId),
         })),
       })),

@@ -1283,3 +1283,360 @@
   background: color-mix(in srgb, var(--color-warning, #f59e0b) 12%, transparent);
   border-color: color-mix(in srgb, var(--color-warning, #f59e0b) 40%, transparent);
 }
+
+/* ── Diseñador visual (Fase 2.1.7): paleta · lienzo libre · propiedades ───────── */
+.designer {
+  display: grid;
+  grid-template-columns: 232px minmax(0, 1fr) 304px;
+  gap: var(--space-3);
+  align-items: start;
+}
+
+/* Panel IZQUIERDO: biblioteca de componentes. */
+.palette {
+  position: sticky;
+  top: var(--wl-sticky-top, 132px);
+  align-self: start;
+  max-height: calc(100vh - var(--wl-sticky-top, 132px) - 24px);
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-1, transparent);
+}
+.paletteSearch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  height: 38px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-surface-2, rgba(255, 255, 255, 0.03));
+  color: var(--color-text-muted);
+}
+.paletteSearch input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text-primary);
+  font: inherit;
+  outline: none;
+}
+.paletteGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.paletteGroupHead {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 4px 2px;
+}
+.paletteItems {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.paletteItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-surface-2, rgba(255, 255, 255, 0.025));
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: grab;
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s, transform 0.05s;
+}
+.paletteItem:hover {
+  border-color: var(--color-accent-primary);
+  background: var(--color-accent-soft, rgba(99, 102, 241, 0.1));
+}
+.paletteItem:active {
+  cursor: grabbing;
+  transform: scale(0.99);
+}
+.paletteItem:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.paletteIcon {
+  display: inline-flex;
+  color: var(--color-accent-secondary, #06b6d4);
+}
+.paletteFoot {
+  margin: 0;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  line-height: 1.4;
+}
+
+/* CENTRO: lienzo. */
+.designerCenter {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.canvasTools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.deviceSwitch {
+  display: inline-flex;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.deviceBtn,
+.deviceOn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+.deviceBtn:hover {
+  background: var(--color-hover);
+  color: var(--color-text-primary);
+}
+.deviceOn {
+  background: var(--color-accent-soft, rgba(99, 102, 241, 0.2));
+  color: var(--color-accent-primary);
+}
+.toolBtn,
+.toolOn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-subtle);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+.toolBtn:hover {
+  color: var(--color-text-primary);
+  border-color: var(--color-border-active);
+}
+.toolOn {
+  background: var(--color-accent-soft, rgba(99, 102, 241, 0.2));
+  color: var(--color-accent-primary);
+  border-color: var(--color-border-active);
+}
+.devicePreviewHint {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-accent-secondary, #06b6d4) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-accent-secondary, #06b6d4) 30%, transparent);
+}
+.canvasScroll {
+  min-width: 0;
+}
+.deviceFrame {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  width: 100%;
+  transition: max-width 0.2s ease;
+}
+
+/* Panel DERECHO: propiedades del campo seleccionado. */
+.props {
+  position: sticky;
+  top: var(--wl-sticky-top, 132px);
+  align-self: start;
+  max-height: calc(100vh - var(--wl-sticky-top, 132px) - 24px);
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-1, transparent);
+}
+.propsEmpty {
+  color: var(--color-text-muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+  padding: var(--space-3) 2px;
+}
+.propsHead {
+  border-bottom: 1px solid var(--color-border-subtle);
+  padding-bottom: var(--space-2);
+}
+.propsType {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+.propRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.propLabel {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+.propCheck {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+.propPresets {
+  display: flex;
+  gap: 4px;
+}
+.propPreset,
+.propPresetOn {
+  flex: 1;
+  height: 32px;
+  border-radius: var(--radius-sm, 8px);
+  border: 1px solid var(--color-border-subtle);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.propPreset:hover {
+  border-color: var(--color-border-active);
+  color: var(--color-text-primary);
+}
+.propPresetOn {
+  background: var(--color-accent-soft, rgba(99, 102, 241, 0.2));
+  border-color: var(--color-border-active);
+  color: var(--color-accent-primary);
+}
+.propReadout {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.propPosition {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.propActions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+/* Tarjeta de campo EN EL LIENZO (dentro de react-grid-layout). */
+.canvasItem {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-surface-1, var(--color-surface-2, rgba(255, 255, 255, 0.03)));
+  cursor: grab;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.canvasItem:hover {
+  border-color: var(--color-border-active);
+}
+.canvasItem:active {
+  cursor: grabbing;
+}
+.canvasItemActive {
+  border-color: var(--color-accent-primary);
+  box-shadow: 0 0 0 1px var(--color-accent-primary);
+}
+.canvasItemLabel {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.canvasReq {
+  color: var(--color-error, #ef4444);
+  margin-left: 2px;
+}
+.canvasItemControl {
+  pointer-events: none;
+}
+.canvasItemControl :global(.previewLabel) {
+  display: none;
+}
+
+/* react-grid-layout: placeholder + handles con el acento de marca. */
+.rgl {
+  position: relative;
+}
+.rglShowGrid {
+  background-image: repeating-linear-gradient(
+    to right,
+    color-mix(in srgb, var(--color-accent-primary) 7%, transparent) 0,
+    color-mix(in srgb, var(--color-accent-primary) 7%, transparent) 1px,
+    transparent 1px,
+    transparent calc(100% / 12)
+  );
+  border-radius: var(--radius-md);
+}
+.rgl :global(.react-grid-placeholder) {
+  background: var(--color-accent-primary) !important;
+  opacity: 0.18;
+  border-radius: var(--radius-md);
+}
+.rgl :global(.react-resizable-handle) {
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.rgl :global(.react-grid-item:hover .react-resizable-handle),
+.rgl :global(.react-grid-item.react-draggable-dragging .react-resizable-handle) {
+  opacity: 1;
+}
+.rgl :global(.react-resizable-handle::after) {
+  border-color: var(--color-accent-primary) !important;
+}

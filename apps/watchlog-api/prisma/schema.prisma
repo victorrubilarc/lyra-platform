@@ -732,6 +732,13 @@ model TemplateField {
   // PRESENTACIÓN puro (SAP Fiori / ServiceNow / Bootstrap). 12 = ancho completo
   // (default, cero ruptura), 6 = media, 4 = tercio… Check 1..12 en la migración.
   colSpan     Int       @default(12)
+  // Geometría EXPLÍCITA en el lienzo de posicionamiento libre (Fase 2.1.7):
+  // gridX = columna (0..11), gridY = fila lógica, gridH = alto en filas (el ANCHO
+  // es colSpan = w). NULLABLE: null = plantilla legacy ⇒ el editor deriva la
+  // geometría del orden + colSpan y la persiste al guardar. No vive en CSS.
+  gridX       Int?
+  gridY       Int?
+  gridH       Int?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 

@@ -89,6 +89,45 @@ export const WIDTH_PRESETS = [
 export const GRID_TOTAL = 12;
 export const ROW_MAX_FIELDS = 4;
 
+// === Geometría en el LIENZO de posicionamiento libre (Fase 2.1.7) ============
+// Cada campo tiene geometría EXPLÍCITA: gridX (columna 0..11), gridY (fila
+// lógica), gridH (alto en filas); el ANCHO es colSpan (= w). El editor (lienzo
+// react-grid-layout) la escribe al arrastrar/redimensionar; el render del
+// llenado/visor la reproduce. Las plantillas LEGACY (sin geometría persistida)
+// la derivan del orden + colSpan (idéntico a la vista anterior).
+
+/** Alto por defecto (filas lógicas) según el control: textarea/firma ocupan 2. */
+export function defaultFieldH(type: FieldType): number {
+  return type === "TEXTAREA" || type === "SIGNATURE" ? 2 : 1;
+}
+
+const clampCol = (n: number) => Math.min(Math.max(Math.round(n || GRID_TOTAL), 1), GRID_TOTAL);
+
+/**
+ * Deriva geometría {gridX,gridY,gridH} empaquetando los campos por orden + colSpan
+ * en filas de 12 (reproduce la vista previa a 2.1.7). Para plantillas legacy.
+ */
+export function deriveSectionGeometry(fields: EditField[]): EditField[] {
+  let x = 0;
+  let y = 0;
+  return fields.map((f) => {
+    const w = clampCol(f.colSpan);
+    if (x + w > GRID_TOTAL) {
+      x = 0;
+      y += 1;
+    }
+    const placed = { ...f, gridX: x, gridY: y, gridH: f.gridH || defaultFieldH(f.type) };
+    x += w;
+    return placed;
+  });
+}
+
+/** Primer `gridY` libre al final de la sección (para insertar un campo nuevo). */
+export function nextFreeRow(fields: EditField[]): number {
+  if (fields.length === 0) return 0;
+  return Math.max(...fields.map((f) => f.gridY + f.gridH)) ;
+}
+
 /** Reparte 12 columnas en n partes iguales (2→6,6; 3→4,4,4; 4→3,3,3,3). */
 export function splitRow(n: number): number[] {
   if (n <= 1) return [GRID_TOTAL];
@@ -131,8 +170,13 @@ export interface EditField {
   visibleWhen: VisibleWhen | null;
   /** Campo FORMULADO (Req-7): fórmula que deriva el valor (read-only). null = tecleado. */
   computed: ComputedFieldConfig | null;
-  /** Ancho del campo en columnas de la grilla de 12 (Fase 2.1.3). Default 12. */
+  /** Ancho del campo en columnas de la grilla de 12 (Fase 2.1.3). Default 12. = w del lienzo. */
   colSpan: number;
+  /** Geometría EXPLÍCITA en el lienzo (Fase 2.1.7): columna, fila lógica, alto en filas.
+   *  Siempre concreta en el modelo del editor (se deriva al cargar si la plantilla es legacy). */
+  gridX: number;
+  gridY: number;
+  gridH: number;
   roleIds: string[];
 }
 
@@ -222,29 +266,50 @@ export function detailToEditState(detail: TemplateDetail): EditState {
     equipmentMode: detail.equipmentMode,
     gridFieldKeys: detail.gridFieldKeys,
     rules: detail.version.rules.map((r) => ({ ...r })),
-    sections: detail.version.sections.map((s) => ({
-      uid: nextUid(),
-      key: s.key,
-      title: s.title,
-      description: s.description,
-      requireSignature: s.requireSignature,
-      editableInStateKey: s.editableInStateKey,
-      roleIds: s.roleIds,
-      fields: s.fields.map((f) => ({
+    sections: detail.version.sections.map((s) => {
+      // Geometría: si ALGÚN campo no la trae (plantilla legacy), se deriva TODA la
+      // sección del orden + colSpan (vista idéntica a la anterior). Si la trae, se usa.
+      const legacy = s.fields.some((f) => f.gridX == null || f.gridY == null);
+      let x = 0;
+      let y = 0;
+      const fields = s.fields.map((f) => {
+        const base = {
+          uid: nextUid(),
+          key: f.key,
+          type: f.type,
+          semanticRole: f.semanticRole,
+          label: f.label,
+          help: f.help,
+          required: f.required,
+          config: f.config,
+          visibleWhen: f.visibleWhen,
+          computed: f.computed,
+          colSpan: f.colSpan,
+          roleIds: f.roleIds,
+        };
+        if (legacy) {
+          const w = clampCol(f.colSpan);
+          if (x + w > GRID_TOTAL) {
+            x = 0;
+            y += 1;
+          }
+          const placed = { ...base, gridX: x, gridY: y, gridH: f.gridH ?? defaultFieldH(f.type) };
+          x += w;
+          return placed;
+        }
+        return { ...base, gridX: f.gridX!, gridY: f.gridY!, gridH: f.gridH ?? defaultFieldH(f.type) };
+      });
+      return {
         uid: nextUid(),
-        key: f.key,
-        type: f.type,
-        semanticRole: f.semanticRole,
-        label: f.label,
-        help: f.help,
-        required: f.required,
-        config: f.config,
-        visibleWhen: f.visibleWhen,
-        computed: f.computed,
-        colSpan: f.colSpan,
-        roleIds: f.roleIds,
-      })),
-    })),
+        key: s.key,
+        title: s.title,
+        description: s.description,
+        requireSignature: s.requireSignature,
+        editableInStateKey: s.editableInStateKey,
+        roleIds: s.roleIds,
+        fields,
+      };
+    }),
   };
 }
 
@@ -301,6 +366,10 @@ export function editStateToDraftRequest(state: EditState): SaveTemplateDraftRequ
         visibleWhen: f.visibleWhen,
         computed: f.computed,
         colSpan: f.colSpan,
+        // Geometría EXPLÍCITA del lienzo (2.1.7): se persiste en la versión inmutable.
+        gridX: f.gridX,
+        gridY: f.gridY,
+        gridH: f.gridH,
         roleIds: f.roleIds,
       })),
     })),

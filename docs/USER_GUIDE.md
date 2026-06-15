@@ -159,51 +159,42 @@ guardar.
 
 ---
 
-## Plantillas ▸ Ancho de campo / layout en grilla  [Configurador]
+## Plantillas ▸ Diseñador visual de formularios  [Configurador]
 
-**Para qué sirve.** Acomodar los campos de una sección en **varias columnas** en vez de una
-sola lista que obliga a desplazarse. Campos cortos (una fecha, un número, un sí/no) pueden ir
-**lado a lado**; campos largos (un comentario) ocupan todo el ancho. El formulario queda más
-compacto y rápido de leer, y se ve **igual** al diseñarlo, al llenarlo y al revisarlo. El editor
-es **WYSIWYG**: armas el formulario sobre una grilla de **12 columnas** (estilo SAP Fiori),
-arrastrando, sin adivinar.
+**Para qué sirve.** Diseñar cada sección del formulario **visualmente**, como en Canva o Power
+Apps pero para formularios: arrastras los campos donde quieras, los **mueves** libremente y les
+cambias el **ancho y el alto** con tiradores. Lo que ves al diseñar es lo que se llena y lo que se
+revisa. Pensado para que la bitácora se vea bien también en **tablet y celular** (terreno).
 
-**Cómo se usa.** El editor es **canvas-first** (el lienzo a todo el ancho) y se configura **sobre
-el lienzo**, como en Canva / Notion / Google Forms. **No tienes que pensar en columnas ni anchos:**
-arrastras los campos y el editor los acomoda solo.
-1. En el **builder de plantillas** (`/plantillas/:id`), pestaña **Diseño ▸ Editor**: cada campo se
-   ve con su **control real** (lo que ves es lo que será el formulario).
-2. **Agregar un campo**: botón **"＋ Agregar campo"** (en la barra del lienzo o al final de una
-   sección) → elige el tipo.
-3. **Acomodar (arrastrando, ancho automático):** **agarra el campo en casi cualquier parte** (no solo
-   en el asa ⋮⋮) y arrástralo. La copia **sigue a tu cursor** y los demás campos **se corren solos**…
-   - …suéltalo **al lado** de otro ⇒ **comparten fila** y el ancho se reparte solo (2 = mitad y mitad,
-     3 = tercios, hasta 4 por fila).
-   - …suéltalo **arriba o abajo** (a su propia línea) ⇒ queda a **ancho completo**.
-   - Puedes arrastrar un campo **entre dos** de la misma fila o **a otra sección**.
-   - Una **guía azul** te muestra dónde va a caer (vertical = al lado; horizontal = nueva fila).
-   - (También funciona con **teclado**: enfoca el campo, **Espacio** para tomarlo, **flechas** para
-     moverlo, **Espacio** para soltar.)
-4. **Editar el rótulo**: haz clic en el texto del campo y escríbelo **en el lienzo** (igual el
-   **título/descripción** de la sección).
-5. **Barra flotante** (al seleccionar un campo): **obligatorio**, **mover ↑↓**, **duplicar**,
-   **eliminar**, y **"Más opciones"** (panel lateral con lo avanzado: umbrales, opciones de lista,
-   condicional, fórmula, permisos por campo).
-6. **Ajuste fino del ancho** (opcional): si dos campos comparten fila, **arrastra el borde** entre
-   ellos para dejarlos, por ejemplo, 70/30 (o **← / →** con el borde enfocado).
-7. Publica la plantilla como siempre (borrador → publicar).
+**Cómo se usa.** El editor (`/plantillas/:id`, pestaña **Diseño ▸ Editor**) tiene **3 zonas**:
 
-**Quién puede.** El **Configurador** que puede editar la plantilla (`template:edit`). Es parte
-del diseño del formulario.
+- **Izquierda — Objetos:** la biblioteca de campos, con buscador y categorías. **Arrástralos al
+  lienzo** en la posición que quieras (o haz **clic** para agregarlos al final).
+- **Centro — Lienzo:** tu formulario sobre una grilla. **Arrastra** un campo para moverlo; tira de
+  sus **bordes o esquinas** para cambiar su tamaño (ancho y alto). Cada sección es un contenedor.
+- **Derecha — Propiedades:** al seleccionar un campo, edita su **rótulo**, si es **obligatorio**, su
+  **ancho** y **alto**, y verás su **posición**. El botón **"Opciones avanzadas…"** abre el panel con
+  lo profundo (umbrales, opciones de lista, lógica condicional, fórmula, permisos por campo).
+
+En la **barra superior** del lienzo: el selector de **dispositivo** (Escritorio · Tablet · Móvil) y
+el interruptor de **cuadrícula**. En **Tablet/Móvil** ves una **vista previa** de cómo queda el
+formulario en ese tamaño (se edita en Escritorio). Publica como siempre (borrador → publicar).
+
+**Quién puede.** El **Configurador** que puede editar la plantilla (`template:edit`).
 
 **Importante.**
-- Es **solo presentación**: el ancho y el orden **no cambian** qué es obligatorio, los umbrales,
-  la lógica condicional ni quién puede llenar cada campo.
-- **Responsivo para terreno** (la bitácora se llena en tablet/celular): en **celular** todo se apila
-  en **una sola columna** y en **tablet** se ven **2 por fila** (áreas táctiles amplias, para guantes),
-  sin importar cómo lo acomodaste en el escritorio.
-- El layout viaja en la **versión publicada** (diseño controlado): cambiarlo crea un nuevo borrador y
-  se aplica a las entradas nuevas tras publicar; las ya registradas conservan su layout.
+- La **posición y el tamaño** de cada campo se **guardan** con la plantilla: al recargar siguen donde
+  los dejaste. Es **diseño controlado** (viaja en la versión publicada): cambiarlo crea un nuevo
+  borrador y se aplica a las entradas nuevas al publicar; las ya registradas conservan su diseño.
+- El diseño es **solo presentación**: no cambia qué es obligatorio, los umbrales, la lógica
+  condicional ni quién puede llenar cada campo.
+- **Responsivo para terreno:** en **celular** todo se apila en **una columna** y en **tablet** se ven
+  **2 por fila** (áreas táctiles amplias, para guantes), sin importar cómo lo acomodaste en escritorio.
+  Los campos **nunca se cortan** ni se salen de la pantalla.
+- Las **plantillas antiguas** (de antes del diseñador) se abren igual que siempre: el editor calcula
+  una posición inicial razonable a partir de su orden y ancho.
+- _En camino (no disponible aún):_ deshacer/rehacer, selección múltiple, alinear/distribuir, panel de
+  capas, copiar/pegar y atajos de teclado.
 
 ---
 
