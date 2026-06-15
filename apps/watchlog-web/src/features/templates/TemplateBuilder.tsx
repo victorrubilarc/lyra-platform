@@ -136,13 +136,20 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
 
   // Todos los campos (key + label + tipo + opciones) para fórmulas y reglas del
   // motor (Req-7). Las opciones inline alimentan el selector de valores del editor.
+  // Las columnas NUMÉRICAS de una TABLA (Ola 4) habilitan los agregados (suma/promedio…).
   const allFields = useMemo<RuleFieldRef[]>(
     () =>
       state.sections.flatMap((s) =>
         s.fields.map((f) => {
           const src = (f.config as { optionSource?: { kind?: string; items?: { code: string; label: string }[] } }).optionSource;
           const options = src?.kind === "inline" && Array.isArray(src.items) ? src.items : undefined;
-          return { key: f.key, label: f.label, type: f.type, options };
+          const cols =
+            f.type === "TABLE"
+              ? ((f.config as { columns?: { key: string; label: string; type: string }[] }).columns ?? [])
+                  .filter((c) => c.type === "NUMBER")
+                  .map((c) => ({ key: c.key, label: c.label }))
+              : undefined;
+          return { key: f.key, label: f.label, type: f.type, options, columns: cols && cols.length > 0 ? cols : undefined };
         }),
       ),
     [state],
