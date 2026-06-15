@@ -54,7 +54,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 - ✍️ Lectura de auditoría (quién hizo qué, antes/después)
 
 ### 6. Plantillas / Form Builder  [Configurador]
-- ✅ **Catálogo de objetos del formulario** (Olas 1–3: básicos, selección, evaluación, **referencia**, **evidencia / terreno**, presentación) (§ Plantillas ▸ Objetos del formulario)
+- ✅ **Catálogo de objetos del formulario** (Olas 1–4: básicos, selección, evaluación, **referencia**, **evidencia / terreno**, **estructurados / repetibles**, presentación) (§ Plantillas ▸ Objetos del formulario)
 - ✅ Secciones y campos (tipos, obligatorios, ayuda) (§ Plantillas ▸ Secciones y campos)
 - ✅ Ancho de campo / layout en grilla (completo / mitad / tercio)
 - ✅ Umbrales de alerta (rangos warn/crit, ISA-18.2)
@@ -62,7 +62,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 - ✅ Borrador / publicar (versión inmutable) (§ Plantillas ▸ Borrador y publicación)
 - ✍️ Alcance de estructura (en qué nodos vive la plantilla)
 - ✍️ Alcance por plantilla (quién ve qué plantillas) y acceso por rol
-- ✍️ Modo de equipo (ninguno/opcional/sugerido/requerido)
+- ✅ Modo de equipo (ninguno/opcional/sugerido/requerido) (§ Plantillas ▸ Modo de equipo en la entrada)
 - ✍️ Ventana de edición (plazo para corregir)
 - ✍️ Campos del resumen en la grilla
 - ✍️ Motor de reglas: campos calculados y validaciones cruzadas
@@ -256,6 +256,12 @@ Elige uno (clic o arrástralo al lienzo) y ajústalo en el panel de propiedades.
   terreno o sube un archivo), **Croquis / dibujo** (dibuja a mano en un lienzo y se guarda como imagen) y
   **Escáner QR / código de barras** (apunta la cámara a un código y rellena el campo — p. ej. el TAG de un
   equipo; **no** guarda un archivo, solo el valor leído).
+- **Estructurados / repetibles (Ola 4).** **Tabla repetible** (una grilla donde el operador **agrega,
+  quita y reordena filas**; cada columna es un sub-campo escalar —hora, número con umbral, lista, etc.—
+  validado celda a celda), **Grupo repetible** (el mismo concepto en formato **tarjetas** apiladas, ideal
+  para "agregar otro hallazgo") y **Matriz parámetro × turno** (una tabla de filas FIJAS = parámetros y
+  columnas FIJAS = turnos/intervalos; cada celda es una lectura). El diseñador define las columnas/ejes y
+  el tipo de cada celda.
 - **Presentación** (no piden dato): **Encabezado**, **Texto / instrucción**, **Separador**, **Aviso**
   (información/advertencia/éxito/peligro), **Enlace a procedimiento** e **Imagen de referencia** (por URL).
 
@@ -276,6 +282,12 @@ Elige uno (clic o arrástralo al lienzo) y ajústalo en el panel de propiedades.
   borra). El **escáner QR** funciona en navegadores con cámara; si no hay cámara, igual puedes escribir el
   valor a mano. *El diseñador puede limitar tipos permitidos, tamaño máximo y cantidad por campo.*
 - La **matriz de riesgo** la configura el diseñador pintando la severidad de cada celda (ejes editables).
+- En los objetos **estructurados** cada celda se valida **en el servidor** con las mismas reglas de su tipo
+  (rango, catálogo, formato). Una **columna obligatoria** debe llenarse en cada fila que uses; si marcas la
+  **tabla como obligatoria**, debe tener al menos una fila completa para poder completar la sección. Las
+  filas que dejes totalmente vacías se ignoran. En tablet la tabla se desplaza en horizontal con el
+  encabezado y la primera columna fijos. *(Por ahora estos objetos no aparecen en el resumen de la grilla
+  ni en las reglas; eso llegará más adelante.)*
 - Cambiar un objeto crea un nuevo **borrador**; aplica a las entradas nuevas al **publicar** (la versión
   publicada queda inmutable).
 
@@ -301,6 +313,30 @@ cuando esté lista la **publicas**: esa versión queda **congelada** (inmutable)
   edición, campos del resumen) se guarda **aparte** con *Guardar configuración* — **no** exige republicar.
 - Publicar **no toca** las entradas existentes; solo cambia la versión que usarán las nuevas.
 - Una plantilla **publicada** que vuelves a editar genera **otro borrador**; nada cambia hasta publicar.
+
+---
+
+## Plantillas ▸ Modo de equipo en la entrada  [Configurador]
+
+**Para qué sirve.** Decidir, por plantilla, **cómo se trata el equipo/activo** al crear una entrada:
+desde "no aplica" hasta "es obligatorio". Así una bitácora de ronda exige el equipo y una nota general
+no lo pide (patrón de tipos de aviso de SAP PM / tipos de OT de Maximo).
+
+**Cómo se usa.** En la configuración de la plantilla (*Identidad y gobernanza*), elige el **Modo de
+equipo**:
+- **Ninguno** — la entrada no lleva equipo (ni se ofrece el selector).
+- **Opcional** — se ofrece, pero se puede dejar vacío (comportamiento por defecto).
+- **Sugerido** — se ofrece y se **recomienda**; si el nodo tiene un único equipo, se autoselecciona.
+- **Requerido** — **obliga** a elegir un equipo para poder crear la entrada.
+
+**Quién puede.** El **Configurador** con `template:edit`. Es **gobernanza viva**: se guarda con *Guardar
+configuración* (no exige republicar la versión).
+
+**Importante.**
+- El equipo se elige **dentro del nodo** de la entrada, y el backend **verifica** que pertenezca a él.
+- El cumplimiento del modo se decide **en el servidor** (Requerido sin equipo ⇒ se rechaza; Ninguno con
+  equipo ⇒ se rechaza), no solo en pantalla.
+- Una vez elegido, el equipo se muestra en la cabecera del llenado y del visor, y en la grilla de Bitácoras.
 
 ---
 

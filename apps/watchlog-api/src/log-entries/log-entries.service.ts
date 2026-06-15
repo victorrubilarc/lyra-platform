@@ -53,6 +53,7 @@ import {
   isSectionEditableInState,
   maxAttachmentBytes,
   recomputeComputedValues,
+  requiredFieldError,
   resolveEditWindow,
   resolveEffectiveAt,
   thresholdBandFor,
@@ -803,7 +804,10 @@ export class LogEntriesService {
         // Un campo formulado no se teclea (read-only) ⇒ "obligatorio" no aplica.
         if (!def.required || def.computed) continue;
         if (!isFieldVisible(def.visibleWhen, valuesByKey)) continue;
-        if (isEmptyValue(valuesByKey[def.key])) errors.push(`${def.label}: obligatorio`);
+        // Obligatoriedad generalizada: TABLE exige ≥ filas completas, MATRIX ≥1 celda,
+        // el resto = no vacío (fuente única `requiredFieldError`).
+        const reqErr = requiredFieldError(def, valuesByKey[def.key]);
+        if (reqErr) errors.push(reqErr);
       }
     }
 
@@ -1744,9 +1748,12 @@ export class LogEntriesService {
         if (isPresentationalType(def.type)) continue; // objeto de presentación: no es dato
         if (!isFieldVisible(def.visibleWhen, valuesByKey)) continue;
         const val = valuesByKey[def.key];
-        if (def.required && isEmptyValue(val)) {
-          errors.push(`${def.label}: obligatorio`);
-          continue;
+        if (def.required) {
+          const reqErr = requiredFieldError(def, val);
+          if (reqErr) {
+            errors.push(reqErr);
+            continue;
+          }
         }
         errors.push(
           ...validateFieldValue(def, val, {

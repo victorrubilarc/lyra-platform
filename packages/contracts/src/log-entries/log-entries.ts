@@ -21,7 +21,12 @@ import {
   acceptMatches,
   maxAttachmentBytes,
   maxAttachmentCount,
+  tableLayoutOf,
+  inlineCellCodes,
+  columnAsField,
   type AttachmentFieldConfig,
+  type TableFieldConfig,
+  type MatrixFieldConfig,
   type NumberFormat,
   type TextFormat,
   type VisibleWhen,
@@ -1253,8 +1258,129 @@ export function validateFieldValue(
       }
       break;
     }
+    // --- Ola 4 ---------------------------------------------------------------
+    case "TABLE": {
+      // Valor = Array<Record<colKey, escalar>>. Validación POR CELDA reusando
+      // `validateFieldValue` del tipo de la columna; los SELECT de celda resuelven
+      // su catálogo desde las opciones INLINE de la columna (sin ABAC por celda).
+      if (!Array.isArray(value)) {
+        errors.push(`${field.label}: tabla inválida`);
+        break;
+      }
+      const c = field.config as unknown as TableFieldConfig;
+      const cols = c.columns ?? [];
+      if (typeof c.maxRows === "number" && value.length > c.maxRows)
+        errors.push(`${field.label}: máximo ${c.maxRows} fila(s)`);
+      value.forEach((row, ri) => {
+        if (typeof row !== "object" || row === null || Array.isArray(row)) {
+          errors.push(`${field.label}: fila ${ri + 1} inválida`);
+          return;
+        }
+        if (tableRowIsEmpty(row as Record<string, unknown>, cols)) return; // fila vacía = placeholder, se ignora
+        const r = row as Record<string, unknown>;
+        for (const col of cols) {
+          const cell = r[col.key];
+          if (col.required && isEmptyValue(cell)) {
+            errors.push(`${field.label} (fila ${ri + 1}) · ${col.label}: obligatorio`);
+            continue;
+          }
+          const cf = columnAsField(col);
+          const res = validateFieldValue({ ...cf, label: `${field.label} (fila ${ri + 1}) · ${col.label}` }, cell, {
+            allowedCodes: inlineCellCodes(col.config),
+          });
+          errors.push(...res.errors);
+          warnings.push(...res.warnings);
+        }
+      });
+      break;
+    }
+    case "MATRIX": {
+      // Valor = Record<rowKey, Record<colKey, escalar>>. Filas (parámetros) y
+      // columnas (turnos) FIJAS; celda uniforme. Validación POR CELDA.
+      if (typeof value !== "object" || value === null || Array.isArray(value)) {
+        errors.push(`${field.label}: matriz inválida`);
+        break;
+      }
+      const c = field.config as unknown as MatrixFieldConfig;
+      const cellCfg = c.cell;
+      const allowedCells = inlineCellCodes(cellCfg?.config);
+      const v = value as Record<string, Record<string, unknown>>;
+      for (const rowDef of c.rows ?? []) {
+        const rowVal = v[rowDef.key];
+        if (rowVal === undefined || rowVal === null) continue;
+        if (typeof rowVal !== "object" || Array.isArray(rowVal)) {
+          errors.push(`${field.label} · ${rowDef.label}: fila inválida`);
+          continue;
+        }
+        for (const colDef of c.columns ?? []) {
+          const cell = rowVal[colDef.key];
+          if (isEmptyValue(cell)) continue; // celda vacía permitida (matriz parcial en curso)
+          const cf = columnAsField({ key: colDef.key, label: colDef.label, type: cellCfg.type, config: cellCfg.config });
+          const res = validateFieldValue(
+            { ...cf, label: `${field.label} · ${rowDef.label} / ${colDef.label}` },
+            cell,
+            { allowedCodes: allowedCells },
+          );
+          errors.push(...res.errors);
+          warnings.push(...res.warnings);
+        }
+      }
+      break;
+    }
   }
   return { errors, warnings };
+}
+
+/** ¿Está vacía una fila de TABLE (todas sus columnas vacías)? */
+export function tableRowIsEmpty(row: Record<string, unknown>, columns: readonly { key: string }[]): boolean {
+  return columns.every((col) => isEmptyValue(row[col.key]));
+}
+
+/** Filas COMPLETAS de un TABLE: no vacías y con todas sus columnas `required` llenas. */
+export function countCompleteTableRows(config: Record<string, unknown>, value: unknown): number {
+  if (!Array.isArray(value)) return 0;
+  const cols = ((config as TableFieldConfig).columns ?? []) as TableFieldConfig["columns"];
+  let n = 0;
+  for (const row of value) {
+    if (typeof row !== "object" || row === null || Array.isArray(row)) continue;
+    const r = row as Record<string, unknown>;
+    if (tableRowIsEmpty(r, cols)) continue;
+    const complete = cols.every((col) => !col.required || !isEmptyValue(r[col.key]));
+    if (complete) n++;
+  }
+  return n;
+}
+
+/** ¿Está vacía una MATRIX (ninguna celda con valor)? */
+export function isEmptyMatrixValue(value: unknown): boolean {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return true;
+  for (const rowVal of Object.values(value as Record<string, unknown>)) {
+    if (typeof rowVal !== "object" || rowVal === null) continue;
+    for (const cell of Object.values(rowVal as Record<string, unknown>)) {
+      if (!isEmptyValue(cell)) return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Error de OBLIGATORIEDAD de un campo (null = satisfecho). Generaliza el chequeo
+ * `required && isEmptyValue` para incluir los objetos estructurados de la Ola 4:
+ *  - TABLE  → al menos `max(1, minRows)` filas COMPLETAS.
+ *  - MATRIX → al menos una celda con valor.
+ *  - resto  → no vacío. FUENTE ÚNICA back↔front.
+ */
+export function requiredFieldError(field: FieldForValidation, value: unknown): string | null {
+  if (field.type === "TABLE") {
+    const min = Math.max(1, Number((field.config as { minRows?: number }).minRows ?? 1));
+    return countCompleteTableRows(field.config, value) < min
+      ? `${field.label}: requiere al menos ${min} fila(s) completa(s)`
+      : null;
+  }
+  if (field.type === "MATRIX") {
+    return isEmptyMatrixValue(value) ? `${field.label}: obligatorio` : null;
+  }
+  return isEmptyValue(value) ? `${field.label}: obligatorio` : null;
 }
 
 /**

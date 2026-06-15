@@ -5,7 +5,15 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-15** (**Catálogo de objetos premium · Ola 3 ✅** — `feat/objetos-ola3`: adjuntos/terreno con
+> actualización: **2026-06-15** (**Catálogo de objetos premium · Ola 4 ✅** — `feat/objetos-ola4`: objetos ESTRUCTURADOS /
+> repetibles, sin infra. Dos `FieldType` nuevos: `TABLE` (tabla repetible `layout=table` + grupo repetible `layout=cards`,
+> valor `Array<Record<colKey,escalar>>`, filas dinámicas) y `MATRIX` (parámetro×turno, filas/columnas FIJAS + celda
+> uniforme, `Record<rowKey,Record<colKey,escalar>>`). Columnas/ejes = sub-campos ESCALARES en config, congelados en la
+> versión; **validación POR CELDA** reusando `validateFieldValue` del tipo de columna (SELECT de celda = opciones inline);
+> `requiredFieldError` generaliza la obligatoriedad. Render único `RepeatableControl`/`MatrixControl` recursivos sobre
+> `FieldControl` (modo `bare`) + paleta "Estructurados" + editores en el builder. Opacos a resumen/reglas en el MVP.
+> Migración ALTER enum. Contracts 230 · API 234 · smoke 22/22. Pendiente: smoke VISUAL [§4]. Anterior:
+> **Catálogo de objetos premium · Ola 3 ✅** — `feat/objetos-ola3`: adjuntos/terreno con
 > infra MinIO. `StorageService` abstracto (token DI) + `MinioStorageService` (SDK `minio`, bucket idempotente). Un
 > `FieldType ATTACHMENT` + presets → `dataType FILE_ARRAY` (valor `descriptor[]`); foto/cámara · archivo · nota de voz
 > (`MediaRecorder`) · croquis (canvas→PNG) · escáner QR (`config.scan` sobre TEXT, `@zxing/browser`, NO archivo). Subida
@@ -153,6 +161,7 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Catálogo de objetos premium · Ola 1** (+11 `FIELD_TYPES` + `LAYOUT`/`RANGE` dataType + migración `…_add_ola1_field_types` ALTER enum; `displayAs` SELECT/MULTISELECT + `format` TEXT/NUMBER + tri-estado/rating/time/duration/range + presentación LAYOUT; `validateFieldValue`/`isEmptyValue`/helpers; guardas LAYOUT en API; FieldControl premium + paleta presets + editores config + lib/format; contracts 204 · API 234 · smoke 21/21) | `feat/objetos-ola1` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Catálogo de objetos premium · Ola 2** (+`REFERENCE`/`RISK_MATRIX` FieldType + `RISK` dataType + migración `…_add_ola2_field_types` ALTER enum; selectores de referencia con ABAC server-side `GET /references/:kind/options` + `opts.allowedRefIds`; tolerancia NUMBER `deriveToleranceBands`; contador `resolveCounterPreviousValues`/delta; `riskLevelFor`; FieldControl render único + paleta "Referencia" + editores; contracts 215 · API 234 · smoke 22/22) | `feat/objetos-ola2` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Catálogo de objetos premium · Ola 3** (+`ATTACHMENT` FieldType + `FILE_ARRAY` dataType + migración `…_add_ola3_field_types` ALTER enum; `StorageService`/`MinioStorageService` (SDK minio) + `StorageModule` @Global + env MINIO_*; subida PROXIED `@fastify/multipart` + endpoints `POST/GET :id/attachments/…`; descriptor jsonb + presigned GET con ABAC; pertenencia por prefijo + delete-on-remove + VOID limpia; `AttachmentControl`/`QrScanButton` (@zxing) + paleta "Evidencia / Terreno" + `apiUpload`; contracts 222 · API 234 · smoke 26/26) | `feat/objetos-ola3` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
+| **Catálogo de objetos premium · Ola 4** (+`TABLE`/`MATRIX` FieldType + `TABLE`/`MATRIX` dataType + migración `…_add_ola4_field_types` ALTER enum; `tableFieldConfigSchema`/`matrixFieldConfigSchema` con columnas/ejes = sub-campos escalares; `validateFieldValue` casos TABLE/MATRIX POR CELDA + `requiredFieldError`/`countCompleteTableRows`/`isEmptyMatrixValue`; opacos a resumen/reglas; `RepeatableControl`/`MatrixControl` recursivos sobre `FieldControl` modo `bare` + `TableConfigEditor`/`MatrixConfigEditor` + paleta "Estructurados"; contracts 230 · API 234 · smoke 22/22) | `feat/objetos-ola4` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 
 **Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
@@ -213,9 +222,19 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
       limpian) · **presigned directo** (escala; hoy proxied) · escáner solo cámara (sin REFERENCE(equipment)-scan) ·
       adjuntos a nivel de REGISTRO/TRANSICIÓN (Req-2 b/c; hoy solo a nivel de CAMPO) · ocultar la `key` cruda del
       descriptor en el detalle (hoy round-trip al cliente; inofensivo: el presign+ABAC es la guarda real).
-- [ ] **Ola 4 — estructurados (sesión propia).** **Tabla/grilla repetible** (columnas = sub-campos, valor =
-      array de filas, validación por celda, agregar/quitar/reordenar) — el mayor diferenciador · grupo/
-      sección repetible · matriz parámetro×turno.
+- [x] **Ola 4 — estructurados ✅ (2026-06-15, `feat/objetos-ola4` → `main`).** **Tabla/grilla repetible**
+      (columnas = sub-campos escalares, valor `Array<Record<colKey,escalar>>`, validación POR CELDA, agregar/quitar/
+      reordenar) · **grupo/sección repetible** (mismo tipo `TABLE` + `config.layout=cards`) · **matriz parámetro×turno**
+      (tipo `MATRIX`, filas/columnas FIJAS configuradas + celda uniforme, `Record<rowKey,Record<colKey,escalar>>`). 4 forks
+      resueltos (DECISIONS 2026-06-15): 2 tipos (TABLE+MATRIX) · matriz con columnas configuradas (sin ShiftResolver) ·
+      celda solo escalares · sin agregados. `requiredFieldError` generaliza la obligatoriedad (TABLE ≥ filas completas /
+      MATRIX ≥1 celda). Opacos a resumen/reglas. Render `RepeatableControl`/`MatrixControl` recursivos sobre `FieldControl`
+      (modo `bare`); paleta categoría "Estructurados". Migración ALTER enum. **Sin permisos nuevos (catálogo 60).** Contracts
+      230 · API 234 · smoke 22/22. **Pendiente: smoke VISUAL** (§4). **Deuda:** agregados (total/promedio por columna) ·
+      refs del motor de reglas a celdas/agregados (AST sobre arrays) · resumen "N filas" en la grilla (hoy opaco) · export
+      CSV de tablas (hoy JSON/conteo) · REFERENCE/ATTACHMENT/RANGE/RISK en celda · tabla ANIDADA · columnas de la matriz
+      desde el calendario operacional en vivo (ShiftResolver) · stripping de filas vacías al persistir (hoy se ignoran en
+      validación pero se guardan) · pulido fino del sticky/scroll/táctil en tablet.
 - [ ] **Ola 5 — origen de datos (Fase 3).** Lectura autocompletada desde tag SCADA/PI/OPC (modelar + stub).
 
 ### Transversal — Manual de uso (`docs/USER_GUIDE.md`)
@@ -916,6 +935,14 @@ implementación esperada:
 
 > Lo construido puede estar "verde en tests" pero no ejercido en condiciones reales.
 
+- [ ] **Catálogo de objetos · Ola 4 (estructurados) — smoke VISUAL en navegador** (se verificó typecheck/lint/build +
+      smoke API round-trip 22/22; falta el clic). Por cada objeto: agregarlo desde la paleta (categoría **Estructurados**),
+      configurarlo en el builder (columnas: rótulo/tipo/obligatoria + opciones inline de un SELECT; minRows/maxRows; layout
+      tabla vs tarjetas; ejes y celda de la matriz), y en una entrada: **Tabla repetible** (agregar/quitar/reordenar fila a
+      44px, scroll horizontal con encabezado/1ª columna sticky en tablet, celda inválida marca borde rojo, total de filas
+      ≥ min al completar), **Grupo repetible** (tarjetas "agregar otro" apiladas), **Matriz parámetro×turno** (cabeceras
+      read-only, celdas editables, 1ª columna sticky). Verificar estados (vacío/inválido/readOnly del visor), claro+oscuro,
+      44px, responsive. App en `:5173`.
 - [ ] **Catálogo de objetos · Ola 3 (adjuntos/terreno) — smoke VISUAL en navegador** (se verificó typecheck/lint/build +
       smoke API/MinIO 26/26; falta el clic). Por cada objeto de **Evidencia / Terreno**: agregarlo desde la paleta, verlo
       en el lienzo (marcador "se sube al llenar"), configurarlo (multiple/maxCount/maxSizeMb/accept/cámara), y en una
