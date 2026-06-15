@@ -4,7 +4,7 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
-### 2026-06-15 · Catálogo de objetos premium — OLA 2 (objetos de REFERENCIA + tolerancia/contador/riesgo) — 🔄 EN CURSO (`feat/objetos-ola2`)
+### 2026-06-15 · Catálogo de objetos premium — OLA 2 (objetos de REFERENCIA + tolerancia/contador/riesgo) — ✅ IMPLEMENTADO (`feat/objetos-ola2` → `main`)
 
 Segunda ola del catálogo: objetos que apuntan a **entidades de la plataforma** (resolución y validación server-side con ABAC) + tres objetos analíticos. A diferencia de Ola 1 (objetos puros sin BD), aquí el backend debe **resolver opciones y validar referencias en alcance**. **6 forks confirmados con el dueño antes de codear** (recomendación aceptada en los 6):
 
@@ -16,6 +16,8 @@ Segunda ola del catálogo: objetos que apuntan a **entidades de la plataforma** 
 6. **Paleta: nueva categoría "Referencia"** para los 4 selectores de entidad; tolerancia y contador en "Básicos"; matriz de riesgo en "Evaluación".
 
 **Notas de alcance (resistencia a sobre-ingeniería):** "cuadrilla/crew" no existe como entidad ⇒ TURNO mapea a `OperationalShift`; crew = deuda en BACKLOG. El selector de USUARIO lista usuarios activos (single-tenant); filtrar usuarios por alcance de nodo = mejora futura. Migración única ALTER enum aditiva (PG12+, idempotente, sin backfill). **Fuera de alcance (olas propias):** adjuntos/QR (Ola 3/MinIO), tabla repetible (Ola 4), lectura SCADA/PI (Ola 5).
+
+**Implementación:** migración aditiva `20260615140000_add_ola2_field_types` (ALTER enum). Contratos: `REFERENCE`/`RISK_MATRIX` en `FIELD_TYPES`, `RISK` en `FIELD_DATA_TYPES`, `referenceFieldConfigSchema`/`riskMatrixFieldConfigSchema`, NUMBER += tolerancia/contador, helpers puros `deriveToleranceBands`/`effectiveNumberBands`/`riskLevelFor`, `validateFieldValue` (REFERENCE con `opts.allowedRefIds`, RISK_MATRIX, NUMBER con bandas efectivas), `thresholdBandFor` usa bandas efectivas. API: `GET /log-entries/references/:kind/options` (ABAC), `resolveAllowedReferences`/`validReferenceIds` (en saveSection + collectCompletionErrors), `resolveCounterPreviousValues`/`counterMonotonicErrors`, `counterPreviousValues` en el detalle. Web: render único `FieldControl` (4 selectores Combobox/LookupPicker, matriz clicable, tolerancia, delta de contador), `useReferenceOptions`, paleta categoría "Referencia", editores de config (tolerancia/contador/heatmap de riesgo). **Sin permisos nuevos — catálogo 60.** Tests contracts 204→**215** · API **234**. **Smoke `scripts/smoke-objetos-ola2.py` 22/22** (round-trip + ABAC: equipo de otro nodo / riesgo fuera de matriz / usuario inexistente ⇒ 400; banda WARN derivada de tolerancia; crea y LIMPIA por ID). **Deuda:** contador no-decreciente y delta cross-entry sin smoke en vivo (requieren entrada sellada previa); estampar el delta como `computed` si se necesita reportar; banda de umbral para RISK; crew como entidad; usuario filtrado por nodo. **Smoke VISUAL pendiente** (BACKLOG §4). **Siguiente: Ola 3** (adjuntos + QR, infra MinIO).
 
 ---
 

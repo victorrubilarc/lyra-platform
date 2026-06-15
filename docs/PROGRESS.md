@@ -1,5 +1,29 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-15 — Catálogo de objetos premium · OLA 2 (objetos de REFERENCIA + tolerancia/contador/riesgo) ✅** (`feat/objetos-ola2` →
+`main`). Segunda ola del catálogo: objetos que apuntan a **entidades de la plataforma** (resolución y validación server-side
+con ABAC) + tres analíticos, todos sobre el **render ÚNICO** `FieldControl`↔`FieldGrid`. **6 forks confirmados por el dueño
+(DECISIONS 2026-06-15, recomendación aceptada en los 6):** (1) selectores de referencia = **UN tipo `REFERENCE` + `config.entity`**
+(`equipment|user|orgNode|shift`), 4 presets en la paleta, `dataType REFERENCE` (ya existía) ⇒ cero migración de dataType. (2)
+resolución + validación **espejo de `allowedCodes`**: `validateFieldValue` gana `opts.allowedRefIds`; endpoint genérico
+`GET /log-entries/references/:kind/options?nodeId&q` con **ABAC en el backend** (equipo/turno acotados al nodo de la entrada; nodo a
+accesibles; usuario activo); asserts en saveSection + collectCompletionErrors. (3) **lectura con tolerancia = NUMBER + `{expected,
+tolerance,critTolerance}`** que DERIVA las bandas warn/crit (`deriveToleranceBands`/`effectiveNumberBands`, fuente única en validación
+y `thresholdBandFor`). (4) **contador = NUMBER + `{counter,counterNonDecreasing}`** con lookup del último valor sellado del mismo
+equipo+campo (`resolveCounterPreviousValues`/`counterMonotonicErrors`); `counterPreviousValues` en el detalle para el delta (delta =
+presentación, no se persiste). (5) **matriz de riesgo = tipo `RISK_MATRIX` con `dataType RISK` nuevo** (valor `{probability,
+consequence}`, nivel DERIVADO por matriz configurable ejes 2..7 + celda→severidad 1..5, ISO 31000; `riskLevelFor`). (6) paleta:
+nueva categoría **"Referencia"**. **Migración aditiva** `20260615140000_add_ola2_field_types` (ALTER enum, idempotente; cero ruptura).
+**API**: endpoint de opciones (gate `logentry:view`), validación ABAC de referencias, monotonicidad de contador, delta en el detalle.
+**Web**: render único (4 selectores Combobox/LookupPicker que resuelven id→label en fill y visor; matriz clicable; tolerancia con
+objetivo±tol; delta de contador), `useReferenceOptions`, paleta + editores de config (tolerancia/contador/**heatmap pintable** de
+riesgo), i18n es-CL, CSS premium (tokens severidad, glow). **Sin permisos nuevos — catálogo 60.** Tests: **contracts 215** (+11) ·
+**API 234**. **Smoke en vivo `scripts/smoke-objetos-ola2.py` 22/22** (round-trip tipo+config en versión CONGELADA por objeto; opciones
+ABAC; válidos 2xx + banda WARN derivada de tolerancia; equipo de otro nodo / riesgo fuera de matriz / usuario inexistente ⇒ 400; crea
+y LIMPIA por ID). typecheck/lint(0)/build verdes. **Pendiente: smoke VISUAL del dueño** (§4). **Deuda:** contador no-decreciente y
+delta cross-entry sin smoke en vivo (requieren entrada sellada previa); estampar delta como `computed`; banda de umbral para RISK;
+crew como entidad; usuario filtrado por nodo. **Siguiente: Ola 3** (adjuntos + QR, infra MinIO).
+
 **2026-06-15 — Catálogo de objetos premium · OLA 1 (objetos sin infraestructura) ✅** (`feat/objetos-ola1` →
 `main`). El núcleo (NUMBER/TEXT/TEXTAREA/SELECT/MULTISELECT/BOOLEAN/DATE/DATETIME/SEVERITY/SIGNATURE) se amplió con los
 objetos que esperan las bitácoras industriales, todos sobre el **render ÚNICO** `FieldControl`↔`FieldGrid` (builder =

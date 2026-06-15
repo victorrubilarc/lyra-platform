@@ -5,7 +5,13 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-15** (**Catálogo de objetos premium · Ola 1 ✅** — `feat/objetos-ola1`: +11 tipos
+> actualización: **2026-06-15** (**Catálogo de objetos premium · Ola 2 ✅** — `feat/objetos-ola2`: objetos de REFERENCIA
+> (un tipo `REFERENCE` + `config.entity` equipo/usuario/nodo/turno, `dataType REFERENCE`) con resolución + validación ABAC
+> server-side (`opts.allowedRefIds` espejo de `allowedCodes`; endpoint `GET /log-entries/references/:kind/options`); lectura
+> con tolerancia (NUMBER + expected±tol que deriva bandas warn/crit); contador/acumulado (NUMBER + delta vs lectura previa
+> sellada); matriz de riesgo (`RISK_MATRIX`/`dataType RISK`, ejes 2..7 + celda→severidad, ISO 31000). Migración ALTER enum
+> aditiva. Render único FieldControl + paleta categoría "Referencia" + editores. Contracts 215 · API 234 · smoke 22/22.
+> Pendiente: smoke VISUAL [§4]. Anterior: **Catálogo de objetos premium · Ola 1 ✅** — `feat/objetos-ola1`: +11 tipos
 > (CONFORMITY/RATING/TIME/DURATION/RANGE + 6 de presentación), `displayAs` en SELECT/MULTISELECT y `format` en
 > TEXT/NUMBER, dataType `LAYOUT`/`RANGE`, migración ALTER enum aditiva, render único FieldControl premium, paleta por
 > presets, guardas LAYOUT en API. Contracts 204 · API 234 · smoke 21/21. Pendiente: smoke VISUAL [§4]. Anterior:
@@ -138,6 +144,7 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Fase 2.1.6 Builder motor de arrastre con dnd-kit (Canva-grade)** (adopta `@dnd-kit/core`6+`sortable`10+`utilities`3; nodo sortable = celda con reflow animado; tarjeta = activador; `DragOverlay` sigue al cursor; intención al-lado/fila por píxeles reusando `applyDrop`/`splitRow`; `SectionDropArea` droppable de sección; arregla el bug del grip-SVG; frontend puro) | `feat/builder-dnd-kit` → `main` | ✅ fusionado y publicado en `origin/main` (`20e236b`) | ninguna |
 | **Fase 2.1.7 Diseñador visual de formularios (lienzo libre)** (geometría `TemplateField.gridX/gridY/gridH` nullable + migración `…_add_field_grid_geometry` + contratos + 3 map sites API; `react-grid-layout` en `SectionCanvas` + `FieldPalette` + `FieldPropertiesPanel`; `FieldGrid` data-driven + container-queries; deriva legacy del orden+colSpan; smoke geometría 14/14) | `feat/builder-visual-designer` → `main` | ✅ fusionado y publicado en `origin/main` (`85cd2c4`) | ninguna |
 | **Catálogo de objetos premium · Ola 1** (+11 `FIELD_TYPES` + `LAYOUT`/`RANGE` dataType + migración `…_add_ola1_field_types` ALTER enum; `displayAs` SELECT/MULTISELECT + `format` TEXT/NUMBER + tri-estado/rating/time/duration/range + presentación LAYOUT; `validateFieldValue`/`isEmptyValue`/helpers; guardas LAYOUT en API; FieldControl premium + paleta presets + editores config + lib/format; contracts 204 · API 234 · smoke 21/21) | `feat/objetos-ola1` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
+| **Catálogo de objetos premium · Ola 2** (+`REFERENCE`/`RISK_MATRIX` FieldType + `RISK` dataType + migración `…_add_ola2_field_types` ALTER enum; selectores de referencia con ABAC server-side `GET /references/:kind/options` + `opts.allowedRefIds`; tolerancia NUMBER `deriveToleranceBands`; contador `resolveCounterPreviousValues`/delta; `riskLevelFor`; FieldControl render único + paleta "Referencia" + editores; contracts 215 · API 234 · smoke 22/22) | `feat/objetos-ola2` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 
 **Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
@@ -173,9 +180,16 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
       smoke 21/21. **Pendiente: smoke VISUAL del dueño** (§4). **Deuda fina:** RANGE es el único valor no-escalar
       ({from,to}); revisar export/línea Resumen si se necesita mostrarlo. La imagen de referencia es por URL (el
       upload de imágenes propias es Ola 3/MinIO).
-- [ ] **Ola 2 — objetos de referencia.** Selector de equipo/activo (ISO 14224) · usuario/responsable ·
-      nodo de estructura · turno/cuadrilla · lectura con tolerancia (esperado ± tol) · contador/acumulado ·
-      matriz de riesgo (probabilidad × consecuencia, extiende Severidad). Reusa pickers existentes.
+- [x] **Ola 2 — objetos de referencia ✅ (2026-06-15, `feat/objetos-ola2` → `main`).** Selector de equipo/activo
+      (ISO 14224) · usuario/responsable · nodo de estructura · turno — **un tipo `REFERENCE` + `config.entity`**,
+      `dataType REFERENCE`, opciones + validación ABAC server-side (`GET /log-entries/references/:kind/options`;
+      `opts.allowedRefIds`). Lectura con tolerancia (NUMBER + expected±tol → bandas derivadas), contador/acumulado
+      (NUMBER + delta vs lectura previa sellada), matriz de riesgo (`RISK_MATRIX`/`dataType RISK`, ejes 2..7 +
+      celda→severidad, ISO 31000). 6 forks resueltos (DECISIONS 2026-06-15). Sin permisos nuevos (catálogo 60).
+      Contracts 215 · API 234 · smoke 22/22. **Pendiente: smoke VISUAL** (§4). **Deuda:** crew como entidad (hoy TURNO =
+      `OperationalShift`); usuario filtrado por alcance de nodo; contador no-decreciente y delta cross-entry sin smoke en
+      vivo (requieren entrada sellada previa); estampar el delta del contador como `computed` si se necesita reportar;
+      banda de umbral para `RISK_MATRIX` (review-by-exception); resolver id→label de REFERENCE en la grilla/summary.
 - [ ] **Ola 3 — adjuntos/terreno (infra MinIO, Req-2; sesión propia).** Foto/cámara · galería · archivo ·
       nota de voz · croquis/dibujo · **escaneo QR/código de barras** (identificar activo). Requiere
       almacenamiento de objetos on-prem + endpoint de subida + URLs prefirmadas + dataType FILE/FILE_ARRAY.
