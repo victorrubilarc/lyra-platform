@@ -4,6 +4,16 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-15 · Objetos estructurados: umbral por celda → excepción + agregados de tabla en reglas — ✅ IMPLEMENTADO (`feat/tablas-umbral-reglas` → `main`)
+
+Tras la evaluación de brechas con el dueño, dos mejoras para que las tablas/matrices dejen de ser "opacas". **2 forks confirmados (recomendación aceptada en los 2):** (1) alcance del motor sobre tablas = **agregados de COLUMNA** (`sum/avg/min/max/count`), difiriendo las condiciones por FILA (`any/all`); (2) los agregados se usan en **campos calculados Y reglas cruzadas** (mismo evaluador puro).
+
+1. **Umbral por celda → review-by-exception.** `thresholdBandFor` (fuente única del estampado de `LogEntryValue.thresholdBand`) ahora, para `TABLE`/`MATRIX`, devuelve la **PEOR banda** (CRIT>WARN) de sus celdas numéricas (reusa `effectiveNumberBands` por columna/celda; corta en el primer CRIT). *Motivo:* el API ya estampa `thresholdBand` por campo y la grilla/`exceptionsOnly` lo leen ⇒ una lectura crítica dentro de una tabla **marca la entrada como excepción** sin tocar API ni migrar. Estampar banda POR CELDA (no solo a nivel campo) se difiere (no hay columna por-celda; el campo basta para la excepción).
+
+2. **Agregados de columna en el motor de reglas.** Nodo de AST nuevo **`{kind:"col",table,column}`** que SOLO los operadores de agregación expanden a los valores no vacíos de esa columna (fuera de agregación = vacío, degradación elegante). *Motivo del `col` node vs var con path "tabla.col":* explícito y type-safe (el `ExprValue` sigue siendo escalar; la expansión vive dentro de la agregación). `collectVarRefs` añade la dependencia al campo TABLA (orden topológico + resaltado); `collectColRefs` + `validateRulesDesign` rechazan agregar la columna de algo que no es TABLA. Server-authoritative (mismo evaluador back↔front; el valor de la tabla viaja en `valuesByKey`). UI: operando "Columna de tabla" en `ExpressionEditor` (ofrecido solo si hay tablas con columnas numéricas), `RuleFieldRef.columns`, `expressionToInfix` rinde «columna» de Tabla. Sin migración, sin permisos nuevos (catálogo 60). Tests contracts 236 · API 234 · probe en vivo 9/9. **Diferido (BACKLOG):** condiciones por fila (`any/all`), resumen "N filas" en la grilla, agregado como columna visible.
+
+---
+
 ### 2026-06-15 · Catálogo de objetos premium — OLA 4 (objetos ESTRUCTURADOS / repetibles) — ✅ IMPLEMENTADO (`feat/objetos-ola4` → `main`)
 
 Cuarta ola: objetos que capturan una **colección de celdas** en un solo campo (el mayor diferenciador del catálogo). **NO estrena infraestructura** (como Olas 1–2): es contratos + render sobre el **render ÚNICO** `FieldControl`↔`FieldGrid`. **4 forks confirmados con el dueño antes de codear** (recomendación aceptada en los 4):

@@ -232,11 +232,12 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
       (modo `bare`); paleta categoría "Estructurados". Migración ALTER enum. **Sin permisos nuevos (catálogo 60).** Contracts
       230 · API 234 · smoke 22/22. **Pendiente: smoke VISUAL** (§4). **+ Pulido (`fix/objetos-pulido`, 2026-06-15):** ✅ poda
       de filas vacías al guardar (`pruneEmptyTableRows`; maxRows ya no cuenta vacías + jsonb limpio) · ✅ catálogo de celda
-      SELECT por lista de referencia RECHAZADO en el diseño (cierra el hueco de validación). **Deuda mayor (de la evaluación
-      del dueño):** **banda de umbral por celda numérica → review-by-exception / grilla** (hoy una lectura CRÍTICA dentro de
-      una tabla/matriz NO marca la entrada como excepción — la brecha funcional más relevante) · refs del motor de reglas a
-      celdas/agregados (AST sobre arrays: `sum(col)`, "si alguna fila estado=fuera ⇒ alerta") · agregados (total/promedio por
-      columna) · resumen "N filas" en la grilla · export CSV de tablas · obligatoriedad fina de MATRIZ (completa / por
+      SELECT por lista de referencia RECHAZADO en el diseño (cierra el hueco de validación). **+ (`feat/tablas-umbral-reglas`,
+      2026-06-15):** ✅ **umbral por celda numérica → review-by-exception/grilla** (`thresholdBandFor` estampa la PEOR banda de
+      las celdas de TABLE/MATRIX) · ✅ **agregados de columna en el motor de reglas** (nodo AST `col` + `sum/avg/min/max/count`
+      sobre una columna, en campos calculados y reglas cruzadas; operando "Columna de tabla" en el editor). **Deuda restante:**
+      condiciones por FILA del motor (`any/all`: "si alguna fila estado=fuera ⇒ alerta") · resumen "N filas" en la grilla ·
+      export CSV de tablas · agregado como COLUMNA visible (pie de tabla) · obligatoriedad fina de MATRIZ (completa / por
       fila-columna; hoy solo ≥1 celda) · `minRows` cuando la tabla NO es obligatoria · REFERENCE/ATTACHMENT/RANGE/RISK en
       celda · tabla ANIDADA · columnas de la matriz desde el calendario operacional en vivo (ShiftResolver) · pulido fino
       sticky/scroll/táctil en tablet.
