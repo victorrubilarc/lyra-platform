@@ -307,6 +307,12 @@ export const logEntryDetailSchema = logEntrySchema.extend({
   editWindow: editWindowInfoSchema.nullable(),
   sectionStates: z.array(logEntrySectionStateDtoSchema),
   values: z.array(logEntryValueSchema),
+  /**
+   * Lectura PREVIA por campo CONTADOR/acumulado (Ola 2), por `fieldKey`: el último
+   * valor sellado del mismo equipo+campo. La UI muestra el delta (actual − previa).
+   * Es PRESENTACIÓN (no se persiste). Ausente = sin lectura previa.
+   */
+  counterPreviousValues: z.record(z.number()).default({}),
   /** Transiciones que ESTE usuario puede ejecutar ahora (gateado en backend). */
   availableTransitions: z.array(availableTransitionSchema),
   /** Historial de transiciones ejecutadas (append-only, orden cronológico). */
@@ -315,6 +321,34 @@ export const logEntryDetailSchema = logEntrySchema.extend({
   signatures: z.array(logEntrySignatureSchema),
 });
 export type LogEntryDetail = z.infer<typeof logEntryDetailSchema>;
+
+// === Opciones de objetos de REFERENCIA (Ola 2) ===============================
+//
+// El endpoint `GET /log-entries/references/:kind/options?nodeId&q` resuelve las
+// opciones de un selector de entidad (equipo/usuario/nodo/turno) con ABAC en el
+// backend. La UI las consume para `FieldControl` (Combobox/LookupPicker). Las
+// claves (kind) son las `REFERENCE_ENTITIES` de field-types.
+
+/** Una opción de referencia: `id` estable + rótulo visible (+ subrótulo: tag/ruta/correo/horario). */
+export const referenceOptionSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  sublabel: z.string().nullable().optional(),
+});
+export type ReferenceOption = z.infer<typeof referenceOptionSchema>;
+
+export const referenceOptionsResultSchema = z.object({
+  kind: z.enum(["equipment", "user", "orgNode", "shift"]),
+  options: z.array(referenceOptionSchema),
+});
+export type ReferenceOptionsResult = z.infer<typeof referenceOptionsResultSchema>;
+
+/** Query del endpoint de opciones de referencia (nodo de la entrada + búsqueda). */
+export const referenceOptionsQuerySchema = z.object({
+  nodeId: z.string().trim().min(1).optional(),
+  q: z.string().trim().max(120).optional(),
+});
+export type ReferenceOptionsQuery = z.infer<typeof referenceOptionsQuerySchema>;
 
 // === Listado enterprise (Fase 2.6 — módulo de Bitácoras) =====================
 
