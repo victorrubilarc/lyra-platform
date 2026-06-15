@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Camera, Download, FileText, Image as ImageIcon, Loader2, Mic, PenLine, Square, Trash2, Upload } from "lucide-react";
+import { Camera, Download, ExternalLink, Eye, FileText, Image as ImageIcon, Loader2, Mic, PenLine, Square, Trash2, Upload, X } from "lucide-react";
 import { Button } from "@lyra/ui";
 import {
   effectiveAccept,
@@ -58,6 +58,7 @@ export function AttachmentControl({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sketchOpen, setSketchOpen] = useState(false);
+  const [preview, setPreview] = useState<FileDescriptor | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const canAdd = !readOnly && !!handlers && items.length < maxCount;
@@ -108,13 +109,32 @@ export function AttachmentControl({
         <ul className={styles.list}>
           {items.map((d) => (
             <li key={d.id} className={styles.item}>
-              <span className={styles.itemIcon}>{kindIcon(kind, d.contentType)}</span>
-              <span className={styles.itemMeta}>
-                <span className={styles.itemName} title={d.filename}>
-                  {d.filename}
+              {handlers ? (
+                <button type="button" className={styles.itemOpen} onClick={() => setPreview(d)} title={t("templates.attachment.view")}>
+                  <span className={styles.itemIcon}>{kindIcon(kind, d.contentType)}</span>
+                  <span className={styles.itemMeta}>
+                    <span className={styles.itemName} title={d.filename}>
+                      {d.filename}
+                    </span>
+                    <span className={styles.itemSize}>{formatFileSize(d.size)}</span>
+                  </span>
+                </button>
+              ) : (
+                <span className={styles.itemOpen}>
+                  <span className={styles.itemIcon}>{kindIcon(kind, d.contentType)}</span>
+                  <span className={styles.itemMeta}>
+                    <span className={styles.itemName} title={d.filename}>
+                      {d.filename}
+                    </span>
+                    <span className={styles.itemSize}>{formatFileSize(d.size)}</span>
+                  </span>
                 </span>
-                <span className={styles.itemSize}>{formatFileSize(d.size)}</span>
-              </span>
+              )}
+              {handlers && (
+                <button type="button" className={styles.itemBtn} onClick={() => setPreview(d)} title={t("templates.attachment.view")}>
+                  <Eye size={15} />
+                </button>
+              )}
               {handlers && (
                 <button type="button" className={styles.itemBtn} onClick={() => void download(d)} title={t("templates.attachment.download")}>
                   <Download size={15} />
@@ -187,6 +207,82 @@ export function AttachmentControl({
           }}
         />
       )}
+
+      {preview && handlers && (
+        <PreviewModal descriptor={preview} getUrl={handlers.getDownloadUrl} onClose={() => setPreview(null)} />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Vista previa de un adjunto: resuelve la URL prefirmada (ABAC) y la muestra según
+ * el tipo (imagen / audio / video / PDF / otros). Permite corroborar que el archivo
+ * subido es el correcto sin descargarlo. La URL es de vida corta y se firma server-side.
+ */
+function PreviewModal({
+  descriptor,
+  getUrl,
+  onClose,
+}: {
+  descriptor: FileDescriptor;
+  getUrl: (id: string) => Promise<{ url: string }>;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const [url, setUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  const ct = descriptor.contentType || "";
+
+  useEffect(() => {
+    let alive = true;
+    getUrl(descriptor.id)
+      .then(({ url }) => alive && setUrl(url))
+      .catch(() => alive && setFailed(true));
+    return () => {
+      alive = false;
+    };
+  }, [descriptor.id, getUrl]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const body = () => {
+    if (failed) return <div className={styles.previewMsg}>{t("templates.attachment.downloadError")}</div>;
+    if (!url) return <div className={styles.previewMsg}><Loader2 size={20} className={styles.spin} /> {t("common.loading")}</div>;
+    if (ct.startsWith("image/")) return <img src={url} alt={descriptor.filename} className={styles.previewImage} />;
+    if (ct.startsWith("audio/")) return <audio src={url} controls autoPlay className={styles.previewAudio} />;
+    if (ct.startsWith("video/")) return <video src={url} controls className={styles.previewVideo} />;
+    if (ct === "application/pdf") return <iframe src={url} title={descriptor.filename} className={styles.previewFrame} />;
+    return (
+      <div className={styles.previewMsg}>
+        <FileText size={28} />
+        <span>{t("templates.attachment.previewUnsupported")}</span>
+      </div>
+    );
+  };
+
+  return (
+    <div className={styles.previewOverlay} role="dialog" aria-modal aria-label={descriptor.filename} onClick={onClose}>
+      <div className={styles.previewCard} onClick={(e) => e.stopPropagation()}>
+        <div className={styles.previewHead}>
+          <span className={styles.previewName} title={descriptor.filename}>{descriptor.filename}</span>
+          <span className={styles.previewSize}>{formatFileSize(descriptor.size)}</span>
+          <span style={{ flex: 1 }} />
+          {url && (
+            <a className={styles.previewIconLink} href={url} target="_blank" rel="noreferrer noopener" title={t("templates.attachment.openInTab")}>
+              <ExternalLink size={16} />
+            </a>
+          )}
+          <button type="button" className={styles.previewIconBtn} onClick={onClose} title={t("common.close")}>
+            <X size={16} />
+          </button>
+        </div>
+        <div className={styles.previewBody}>{body()}</div>
+      </div>
     </div>
   );
 }
