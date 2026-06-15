@@ -94,6 +94,11 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
   // Drawer de configuración AVANZADA (umbral/opciones/condicional/fórmula/roles): se abre
   // con "Opciones avanzadas" del panel de propiedades o de la sección.
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // Una versión PUBLICADA es de solo lectura; "Editar" entra a modo borrador para
+  // tocar la definición (al guardar, el backend CLONA un nuevo borrador). Las
+  // ediciones de DEFINICIÓN (secciones/campos/flujo/reglas) se habilitan con esto;
+  // la GOBERNANZA (Configuración: identidad/alcance/ventana/equipo) se edita en vivo.
+  const [draftMode, setDraftMode] = useState(false);
 
   const save = useSaveTemplateDraft();
   const publish = usePublishTemplate();
@@ -112,6 +117,10 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
 
   const canEdit = perms.can("template:edit");
   const isPublishedView = detail.version.status === "PUBLISHED";
+  // ¿Se puede editar la DEFINICIÓN ahora? Si la versión está publicada, solo tras
+  // pulsar "Editar" (modo borrador). Fuente única para gobernar TODOS los controles
+  // de definición (secciones/campos/flujo/reglas) de forma coherente.
+  const editable = canEdit && (!isPublishedView || draftMode);
 
   const selectedSection = selected ? state.sections.find((s) => s.uid === selected.s) ?? null : null;
   const selectedField =
@@ -404,7 +413,12 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
               )
             : (designTab === "editor" || designTab === "rules") && (
                 <>
-                  {canEdit && (
+                  {canEdit && isPublishedView && !draftMode && (
+                    <Button variant="primary" onClick={() => setDraftMode(true)}>
+                      <Pencil size={15} /> {t("templates.builder.editDraft")}
+                    </Button>
+                  )}
+                  {editable && (
                     <Button variant="secondary" onClick={handleSave} loading={save.isPending} disabled={busy || !dirty}>
                       <Save size={15} /> {t("templates.builder.saveDraft")}
                     </Button>
@@ -466,8 +480,18 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
                 </button>
               </div>
 
-              {isPublishedView && (designTab === "editor" || designTab === "rules") && (
-                <div className={styles.readOnlyBanner}>{t("templates.builder.publishedReadOnly")}</div>
+              {isPublishedView && !draftMode && (designTab === "editor" || designTab === "rules") && (
+                <div className={styles.readOnlyBanner}>
+                  <span>{t("templates.builder.publishedReadOnly")}</span>
+                  {canEdit && (
+                    <button type="button" className={styles.readOnlyBannerBtn} onClick={() => setDraftMode(true)}>
+                      <Pencil size={13} /> {t("templates.builder.editDraft")}
+                    </button>
+                  )}
+                </div>
+              )}
+              {isPublishedView && draftMode && (designTab === "editor" || designTab === "rules") && (
+                <div className={styles.draftEditingBanner}>{t("templates.builder.draftEditingHint")}</div>
               )}
 
               {designTab === "preview" ? (
@@ -480,7 +504,7 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
                 <RulesEditor
                   rules={state.rules}
                   fields={allFields}
-                  canEdit={canEdit}
+                  canEdit={editable}
                   onChange={setRules}
                 />
               ) : (
@@ -494,7 +518,7 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
                       <div className={styles.canvasBarFlow}>
                         <FormField label={t("templates.builder.workflow")} hint={t("templates.builder.workflowHint")}>
                           {({ id }) => (
-                            <Select id={id} value={state.workflowDefinitionId ?? ""} disabled={!canEdit} onChange={(e) => setWorkflow(e.target.value)}>
+                            <Select id={id} value={state.workflowDefinitionId ?? ""} disabled={!editable} onChange={(e) => setWorkflow(e.target.value)}>
                               <option value="">{t("templates.builder.workflowNone")}</option>
                               {publishedWorkflows.map((w) => (
                                 <option key={w.id} value={w.id}>
@@ -518,8 +542,8 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
                           <button type="button" className={device === "mobile" ? styles.deviceOn : styles.deviceBtn} onClick={() => setDevice("mobile")} title={t("templates.builder.deviceMobile")}><Smartphone size={15} /></button>
                         </div>
                         <button type="button" className={showGrid ? styles.toolOn : styles.toolBtn} onClick={() => setShowGrid((v) => !v)} title={t("templates.builder.toggleGrid")} aria-pressed={showGrid}><Grid3x3 size={15} /></button>
-                        {state.sections.length > 0 && <AddFieldPopover canEdit={canEdit && !isPublishedView} variant="bar" onPick={(type) => addFieldAt(type)} />}
-                        <button type="button" className={styles.addSectionBtn} onClick={addSection} disabled={!canEdit}>
+                        {state.sections.length > 0 && <AddFieldPopover canEdit={editable} variant="bar" onPick={(type) => addFieldAt(type)} />}
+                        <button type="button" className={styles.addSectionBtn} onClick={addSection} disabled={!editable}>
                           <FilePlus2 size={15} /> {t("templates.builder.addSection")}
                         </button>
                       </div>
@@ -546,7 +570,7 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
                                   <input
                                     className={styles.inlineSectionTitle}
                                     value={s.title}
-                                    disabled={!canEdit}
+                                    disabled={!editable}
                                     aria-label={t("templates.builder.sectionTitle")}
                                     onClick={(e) => e.stopPropagation()}
                                     onChange={(e) => updateSection(s.uid, { title: e.target.value })}
@@ -554,7 +578,7 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
                                   <input
                                     className={styles.inlineSectionDesc}
                                     value={s.description ?? ""}
-                                    disabled={!canEdit}
+                                    disabled={!editable}
                                     placeholder={t("templates.builder.sectionDescription")}
                                     aria-label={t("templates.builder.sectionDescription")}
                                     onClick={(e) => e.stopPropagation()}
@@ -564,9 +588,9 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
                                 {s.requireSignature && <Chip variant="info" label="Part 11" />}
                                 <div className={styles.rowActions} onClick={(e) => e.stopPropagation()}>
                                   <button type="button" className={styles.iconBtn} onClick={() => { setSelected({ s: s.uid }); setDrawerOpen(true); }} title={t("templates.builder.sectionOptions")}><SlidersHorizontal size={14} /></button>
-                                  <button type="button" className={styles.iconBtn} onClick={() => moveSection(s.uid, -1)} disabled={si === 0} aria-label={t("common.moveUp")}><ArrowUp size={13} /></button>
-                                  <button type="button" className={styles.iconBtn} onClick={() => moveSection(s.uid, 1)} disabled={si === state.sections.length - 1} aria-label={t("common.moveDown")}><ArrowDown size={13} /></button>
-                                  <button type="button" className={styles.iconBtnDanger} onClick={() => deleteSection(s.uid)} aria-label={t("common.delete")}><Trash2 size={13} /></button>
+                                  <button type="button" className={styles.iconBtn} onClick={() => moveSection(s.uid, -1)} disabled={!editable || si === 0} aria-label={t("common.moveUp")}><ArrowUp size={13} /></button>
+                                  <button type="button" className={styles.iconBtn} onClick={() => moveSection(s.uid, 1)} disabled={!editable || si === state.sections.length - 1} aria-label={t("common.moveDown")}><ArrowDown size={13} /></button>
+                                  <button type="button" className={styles.iconBtnDanger} onClick={() => deleteSection(s.uid)} disabled={!editable} aria-label={t("common.delete")}><Trash2 size={13} /></button>
                                 </div>
                               </div>
 
@@ -574,7 +598,7 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
                                 /* Lienzo SIEMPRE (también vacío ⇒ zona de drop con altura mínima). */
                                 <SectionCanvas
                                   fields={s.fields}
-                                  canEdit={canEdit && !isPublishedView}
+                                  canEdit={editable}
                                   showGrid={showGrid}
                                   selectedFUid={selected?.s === s.uid ? selected.f ?? null : null}
                                   onSelectField={(fUid) => setSelected({ s: s.uid, f: fUid })}
@@ -594,7 +618,7 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
 
                               {device === "desktop" && (
                                 <div className={styles.sectionAddRow} onClick={(e) => e.stopPropagation()}>
-                                  <AddFieldPopover canEdit={canEdit && !isPublishedView} variant="section" onPick={(type) => addFieldAt(type, s.uid)} />
+                                  <AddFieldPopover canEdit={editable} variant="section" onPick={(type) => addFieldAt(type, s.uid)} />
                                 </div>
                               )}
                             </Card>
@@ -608,7 +632,7 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
                   {selectedField && selectedSection && (
                     <FieldPropertiesPanel
                       field={selectedField}
-                      canEdit={canEdit && !isPublishedView}
+                      canEdit={editable}
                       onClose={() => setSelected({ s: selectedSection.uid })}
                       onLabel={(label) => updateField(selectedSection.uid, selectedField.uid, { label })}
                       onRequired={(required) => updateField(selectedSection.uid, selectedField.uid, { required })}

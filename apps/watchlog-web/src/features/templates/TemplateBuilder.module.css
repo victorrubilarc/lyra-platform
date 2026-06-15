@@ -209,12 +209,42 @@
   border-bottom: 1px solid var(--color-border-default);
 }
 .readOnlyBanner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
   padding: var(--space-2) var(--space-4);
   background: var(--color-warning-bg);
   border: 1px solid rgba(245, 158, 11, 0.22);
   border-radius: var(--radius-md);
   font-size: var(--text-body-sm-size);
   color: var(--color-warning);
+}
+.readOnlyBannerBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: var(--radius-md, 10px);
+  border: 1px solid color-mix(in srgb, var(--color-warning, #f59e0b) 45%, transparent);
+  background: color-mix(in srgb, var(--color-warning, #f59e0b) 14%, transparent);
+  color: var(--color-warning, #f59e0b);
+  font-weight: 600;
+  font-size: var(--text-body-sm-size);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.readOnlyBannerBtn:hover {
+  background: color-mix(in srgb, var(--color-warning, #f59e0b) 22%, transparent);
+}
+.draftEditingBanner {
+  padding: var(--space-2) var(--space-4);
+  background: color-mix(in srgb, var(--color-accent, #6366f1) 12%, transparent);
+  border: 1px solid var(--color-border-active, rgba(99, 102, 241, 0.4));
+  border-radius: var(--radius-md);
+  font-size: var(--text-body-sm-size);
+  color: var(--color-text-secondary);
 }
 
 /* ── Layout 3 columnas ────────────────────────────────────────────────────── */
@@ -851,10 +881,12 @@
 /* ── Vista previa ─────────────────────────────────────────────────────────── */
 .previewCard {
   padding: var(--space-5, 26px) var(--space-5, 30px);
-  /* Ancho COMPLETO: la Vista previa refleja el DISEÑO del lienzo a ancho de
-     escritorio (geometría side-by-side), sin quedar centrada/angosta. El responsive
-     de terreno se prueba con el selector escritorio/tablet/móvil del Editor. */
+  /* WYSIWYG: la Vista previa replica el ANCHO de la pantalla de llenado (Nueva
+     entrada usa max-width 920px), para que la grilla de campos se acomode IGUAL
+     que lo que verá el operador. El responsive de terreno (tablet/móvil) se prueba
+     con el selector de dispositivo del Editor. */
   width: 100%;
+  max-width: 920px;
 }
 .previewTitle {
   font-family: var(--font-brand);

@@ -442,6 +442,8 @@ export const esCL = {
       publishConfirmBody:
         "Al publicar se CONGELA esta versión (queda inmutable). Las bitácoras futuras usarán esta versión. Para cambios posteriores se creará un nuevo borrador.",
       publishedReadOnly: "Versión publicada (solo lectura). Edita para crear un nuevo borrador.",
+      editDraft: "Editar",
+      draftEditingHint: "Estás editando un nuevo borrador. Guárdalo para conservar los cambios; al publicar quedará como nueva versión vigente.",
       paletteTitle: "Objetos",
       // Diseñador visual (lienzo, Fase 2.1.7)
       designerSearch: "Buscar objeto…",
