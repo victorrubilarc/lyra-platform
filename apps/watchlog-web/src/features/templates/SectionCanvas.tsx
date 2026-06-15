@@ -86,9 +86,10 @@ export function SectionCanvas({
       rowHeight={CANVAS_ROW_H}
       margin={[12, 12]}
       containerPadding={[0, 0]}
+      measureBeforeMount
+      useCSSTransforms={false}
       layout={layout}
-      compactType={null}
-      preventCollision
+      compactType="vertical"
       isBounded
       isDraggable={canEdit}
       isResizable={canEdit}
