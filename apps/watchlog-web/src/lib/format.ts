@@ -44,6 +44,20 @@ export function formatCurrency(value: number, currency = "CLP", opts?: Intl.Numb
   return new Intl.NumberFormat(locale(), { style: "currency", currency, ...opts }).format(value);
 }
 
+/** Tamaño de archivo legible (B/KB/MB/GB) con número regional (adjuntos, Ola 3). */
+export function formatFileSize(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return "—";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let n = bytes;
+  let u = 0;
+  while (n >= 1024 && u < units.length - 1) {
+    n /= 1024;
+    u += 1;
+  }
+  const digits = u === 0 ? 0 : n < 10 ? 1 : 0;
+  return `${formatNumber(n, { maximumFractionDigits: digits })} ${units[u]}`;
+}
+
 /**
  * Duración COMPACTA en la UNIDAD dominante (días / horas / minutos), formateada con la
  * configuración regional activa (`Intl.NumberFormat` style:unit). Para señales como el

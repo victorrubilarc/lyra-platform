@@ -21,6 +21,8 @@
     "@lyra/permissions": "workspace:*",
     "@lyra/ui": "workspace:*",
     "@tanstack/react-query": "^5.64.1",
+    "@zxing/browser": "^0.2.0",
+    "@zxing/library": "^0.23.0",
     "cmdk": "^1.1.1",
     "i18next": "^26.3.1",
     "lucide-react": "^0.471.0",

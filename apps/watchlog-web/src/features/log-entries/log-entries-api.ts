@@ -1,7 +1,9 @@
 import { z } from "zod";
 import {
+  attachmentDownloadResponseSchema,
   createLogEntryRequestSchema,
   executeTransitionRequestSchema,
+  fileDescriptorSchema,
   logEntryDetailSchema,
   referenceOptionsResultSchema,
   saveLogEntrySectionRequestSchema,
@@ -10,8 +12,10 @@ import {
   templateEligibleNodesSchema,
   templateListItemSchema,
   voidLogEntryRequestSchema,
+  type AttachmentDownloadResponse,
   type CreateLogEntryRequest,
   type ExecuteTransitionRequest,
+  type FileDescriptor,
   type LogEntryDetail,
   type ReferenceEntity,
   type ReferenceOptionsResult,
@@ -22,7 +26,35 @@ import {
   type TemplateListItem,
   type VoidLogEntryRequest,
 } from "@lyra/contracts";
-import { apiJson } from "../../lib/api-client.js";
+import { apiJson, apiUpload } from "../../lib/api-client.js";
+
+/**
+ * Sube un archivo de EVIDENCIA a un campo ATTACHMENT (Ola 3). Subida PROXIED por
+ * la API (choke-point de validación tamaño/tipo). Devuelve el descriptor; el
+ * llamador lo agrega al valor del campo y guarda la sección por el canal normal.
+ */
+export function uploadAttachment(
+  entryId: string,
+  sectionKey: string,
+  fieldKey: string,
+  file: File,
+): Promise<FileDescriptor> {
+  const form = new FormData();
+  form.append("file", file, file.name);
+  return apiUpload(
+    `/log-entries/${entryId}/attachments/${encodeURIComponent(sectionKey)}/${encodeURIComponent(fieldKey)}`,
+    form,
+    fileDescriptorSchema,
+  );
+}
+
+/** URL prefirmada de descarga de un adjunto (vida corta, ABAC de getDetail). */
+export function fetchAttachmentUrl(entryId: string, descriptorId: string): Promise<AttachmentDownloadResponse> {
+  return apiJson(
+    `/log-entries/${entryId}/attachments/${encodeURIComponent(descriptorId)}/url`,
+    attachmentDownloadResponseSchema,
+  );
+}
 
 /**
  * Opciones de un selector de REFERENCIA (Ola 2) con ABAC server-side. `nodeId` =

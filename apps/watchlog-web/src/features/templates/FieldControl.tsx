@@ -25,6 +25,8 @@ import {
 import { formatCurrency, formatDurationHm, formatNumber, formatPercent, formatRut } from "../../lib/format.js";
 import { useResolvedReferenceList } from "../reference-data/reference-data-queries.js";
 import { useReferenceOptions } from "../log-entries/log-entries-queries.js";
+import { AttachmentControl, type AttachmentHandlers } from "./AttachmentControl.js";
+import { QrScanButton } from "./QrScanButton.js";
 import styles from "./TemplateBuilder.module.css";
 
 /** Forma mínima de un campo para renderizar su control (común a builder y llenado). */
@@ -75,6 +77,7 @@ export function FieldControl({
   invalid = false,
   nodeId = null,
   counterPrevious,
+  attachments,
 }: {
   field: FieldControlField;
   value: unknown;
@@ -85,6 +88,8 @@ export function FieldControl({
   nodeId?: string | null;
   /** Lectura previa de un campo CONTADOR (Ola 2): la UI muestra el delta (actual − previa). */
   counterPrevious?: number;
+  /** Subida/descarga de ADJUNTOS (Ola 3) ligados a entrada+sección+campo por el llamador. */
+  attachments?: AttachmentHandlers;
 }) {
   const { t } = useTranslation();
 
@@ -141,6 +146,14 @@ export function FieldControl({
     </div>
   );
 
+  // --- Adjuntos / evidencia (Ola 3): render ÚNICO en builder/llenado/visor. Va
+  // ANTES del early-return de read-only porque el visor necesita lista + descarga
+  // (no un texto plano). Sin `attachments` (vista previa del builder) muestra el
+  // marcador "se sube al llenar".
+  if (field.type === "ATTACHMENT") {
+    return wrap(<AttachmentControl field={field} value={value} onChange={onChange} readOnly={readOnly} handlers={attachments} />);
+  }
+
   // --- Campo FORMULADO o modo solo-lectura: valor formateado (read-only) ----
   // Un formulado es read-only SIEMPRE (su valor lo deriva el servidor); se muestra
   // el valor calculado que el llamador recomputó.
@@ -151,8 +164,9 @@ export function FieldControl({
   switch (field.type) {
     case "TEXT": {
       const fmt = (field.config as { format?: string }).format;
+      const scan = (field.config as { scan?: boolean }).scan === true;
       const inputMode = fmt === "email" ? "email" : fmt === "phone" ? "tel" : fmt === "url" ? "url" : undefined;
-      return wrap(
+      const input = (
         <Input
           type={fmt === "email" ? "email" : fmt === "url" ? "url" : fmt === "phone" ? "tel" : "text"}
           inputMode={inputMode}
@@ -160,8 +174,19 @@ export function FieldControl({
           onChange={(e) => onChange(e.target.value)}
           placeholder={(field.config.placeholder as string) ?? placeholderForFormat(fmt)}
           invalid={invalid}
-        />,
+        />
       );
+      // Escáner QR/código (Ola 3): decodifica con la cámara y rellena el texto. El
+      // usuario siempre puede teclear el valor manualmente (degradación elegante).
+      if (scan) {
+        return wrap(
+          <div className={styles.scanRow}>
+            {input}
+            <QrScanButton onResult={(text) => onChange(text)} />
+          </div>,
+        );
+      }
+      return wrap(input);
     }
     case "TEXTAREA":
       return wrap(<Textarea value={(value as string) ?? ""} onChange={(e) => onChange(e.target.value)} invalid={invalid} />);

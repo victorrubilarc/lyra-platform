@@ -36,6 +36,7 @@ import { usePermissions } from "../../auth/use-permissions.js";
 import { FieldControl } from "../templates/FieldControl.js";
 import { FieldGrid } from "../templates/FieldGrid.js";
 import { useLogEntry } from "../log-entries/log-entries-queries.js";
+import { fetchAttachmentUrl } from "../log-entries/log-entries-api.js";
 import {
   useLogbookChanges,
   useLogbookRelated,
@@ -514,9 +515,21 @@ export function EntryViewerPage() {
                 fields={visible}
                 renderCell={(f) => {
                   const band = fieldBand(f);
+                  // Adjuntos (Ola 3): el visor lista + descarga (presigned GET con ABAC); read-only.
+                  const attachments =
+                    f.type === "ATTACHMENT"
+                      ? { upload: async () => Promise.reject(new Error("read-only")), getDownloadUrl: (id: string) => fetchAttachmentUrl(entry.id, id) }
+                      : undefined;
                   return (
                     <>
-                      <FieldControl field={f} value={valuesByKey[f.key]} onChange={() => undefined} readOnly nodeId={entry.orgNodeId} />
+                      <FieldControl
+                        field={f}
+                        value={valuesByKey[f.key]}
+                        onChange={() => undefined}
+                        readOnly
+                        nodeId={entry.orgNodeId}
+                        attachments={attachments}
+                      />
                       {band && (
                         <span className={styles.bandChip}>
                           <Chip variant={band === "CRIT" ? "error" : "warning"} label={t(`logbook.band.${band}`)} />

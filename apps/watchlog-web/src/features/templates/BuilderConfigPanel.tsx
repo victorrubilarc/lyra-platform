@@ -68,6 +68,59 @@ function numberConfigField(
 }
 
 /**
+ * Editor de config de un ADJUNTO (Ola 3): el `kind` lo fija el preset (foto/
+ * archivo/voz/croquis); aquí se ajusta cardinalidad (varios + tope), tamaño máximo
+ * por archivo, los tipos MIME aceptados (solo `file`) y la cámara trasera (`photo`).
+ */
+function AttachmentConfigEditor({
+  config,
+  setConfig,
+  t,
+}: {
+  config: Record<string, unknown>;
+  setConfig: (key: string, value: unknown) => void;
+  t: (k: string, o?: Record<string, unknown>) => string;
+}) {
+  const kind = (config.kind as string) ?? "file";
+  const accept = Array.isArray(config.accept) ? (config.accept as string[]).join(", ") : "";
+  return (
+    <div className={styles.thresholdBox}>
+      <div className={styles.thresholdTitle}>{t(`templates.attachment.kindLabel.${kind}`)}</div>
+      <FormField label={t("templates.attachment.multiple")}>
+        {() => <Toggle checked={config.multiple === true} onChange={(c) => setConfig("multiple", c ? true : undefined)} />}
+      </FormField>
+      <div className={styles.twoCol}>
+        {config.multiple === true && numberConfigField(config, "maxCount", t("templates.attachment.maxCount"), setConfig)}
+        {numberConfigField(config, "maxSizeMb", t("templates.attachment.maxSizeMb"), setConfig)}
+      </div>
+      {kind === "photo" && (
+        <FormField label={t("templates.attachment.useCamera")} hint={t("templates.attachment.captureHint")}>
+          {() => <Toggle checked={config.capture === true} onChange={(c) => setConfig("capture", c ? true : undefined)} />}
+        </FormField>
+      )}
+      {kind === "file" && (
+        <FormField label={t("templates.attachment.accept")} hint={t("templates.attachment.acceptHint")}>
+          {({ id }) => (
+            <Input
+              id={id}
+              value={accept}
+              placeholder="application/pdf, image/*"
+              onChange={(e) => {
+                const parts = e.target.value
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter(Boolean);
+                setConfig("accept", parts.length > 0 ? parts : undefined);
+              }}
+            />
+          )}
+        </FormField>
+      )}
+    </div>
+  );
+}
+
+/**
  * Editor de la MATRIZ DE RIESGO (Ola 2, ISO 31000): rótulos de ejes editables +
  * cuadrícula "pintable" donde cada celda cicla su severidad 1..5. Ejes de 2..7.
  */
@@ -272,22 +325,32 @@ export function BuilderConfigPanel({
         )}
 
         {field.type === "TEXT" && (
-          <FormField label={t("templates.builder.textFormat")}>
-            {({ id }) => (
-              <Select
-                id={id}
-                value={(field.config.format as string) ?? ""}
-                onChange={(e) => setConfig("format", e.target.value || undefined)}
-              >
-                <option value="">{t("templates.builder.textFormatNone")}</option>
-                <option value="rut">{t("templates.builder.textFormatRut")}</option>
-                <option value="email">{t("templates.builder.textFormatEmail")}</option>
-                <option value="phone">{t("templates.builder.textFormatPhone")}</option>
-                <option value="url">{t("templates.builder.textFormatUrl")}</option>
-              </Select>
-            )}
-          </FormField>
+          <>
+            <FormField label={t("templates.builder.textFormat")}>
+              {({ id }) => (
+                <Select
+                  id={id}
+                  value={(field.config.format as string) ?? ""}
+                  onChange={(e) => setConfig("format", e.target.value || undefined)}
+                >
+                  <option value="">{t("templates.builder.textFormatNone")}</option>
+                  <option value="rut">{t("templates.builder.textFormatRut")}</option>
+                  <option value="email">{t("templates.builder.textFormatEmail")}</option>
+                  <option value="phone">{t("templates.builder.textFormatPhone")}</option>
+                  <option value="url">{t("templates.builder.textFormatUrl")}</option>
+                </Select>
+              )}
+            </FormField>
+            {/* Escáner QR/código (Ola 3): botón de cámara que decodifica y rellena el texto. */}
+            <FormField label={t("templates.builder.scanEnable")} hint={t("templates.builder.scanHint")}>
+              {() => (
+                <Toggle checked={field.config.scan === true} onChange={(checked) => setConfig("scan", checked ? true : undefined)} />
+              )}
+            </FormField>
+          </>
         )}
+
+        {field.type === "ATTACHMENT" && <AttachmentConfigEditor config={field.config} setConfig={setConfig} t={t} />}
 
         {field.type === "NUMBER" && (
           <>

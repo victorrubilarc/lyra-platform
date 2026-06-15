@@ -45,7 +45,7 @@ import { ApiError } from "../../lib/api-client.js";
 import { formatDateTime } from "../../lib/format.js";
 import { FieldControl } from "../templates/FieldControl.js";
 import { FieldGrid } from "../templates/FieldGrid.js";
-import { createLogEntry, executeTransition as executeTransitionApi, saveLogEntrySection, submitLogEntry } from "./log-entries-api.js";
+import { createLogEntry, executeTransition as executeTransitionApi, fetchAttachmentUrl, saveLogEntrySection, submitLogEntry, uploadAttachment } from "./log-entries-api.js";
 import {
   LOG_ENTRY_KEYS,
   useExecuteTransition,
@@ -680,6 +680,19 @@ export function EntryFillPage() {
                     fieldEditable && !f.computed
                       ? validateFieldValue(fieldForValidation(f), draft[f.key], { allowedCodes: inlineCodes(f.config) }).errors
                       : [];
+                  // Adjuntos (Ola 3): handlers ligados a entrada+sección+campo. La subida
+                  // MATERIALIZA la entrada si está en compose (fork "materializar al adjuntar").
+                  const attachments =
+                    f.type === "ATTACHMENT"
+                      ? {
+                          upload: async (file: File) => {
+                            const id = composeActive ? await materialize() : activeId!;
+                            return uploadAttachment(id, section.key, f.key, file);
+                          },
+                          getDownloadUrl: (descriptorId: string) =>
+                            fetchAttachmentUrl(activeId ?? materializedId ?? "", descriptorId),
+                        }
+                      : undefined;
                   return (
                     <>
                       <FieldControl
@@ -690,6 +703,7 @@ export function EntryFillPage() {
                         invalid={errs.length > 0 || ruleProblemFields.has(f.key)}
                         nodeId={entry.orgNodeId}
                         counterPrevious={entry.counterPreviousValues?.[f.key]}
+                        attachments={attachments}
                       />
                       {restricted && editable && (
                         <div className={styles.lockedNote}>

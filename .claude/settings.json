@@ -179,7 +179,9 @@
       "Bash(sed -n '1,40p' apps/watchlog-web/src/features/log-entries/log-entries-api.ts)",
       "Bash(sed -n '1,45p' apps/watchlog-web/src/features/log-entries/log-entries-queries.ts)",
       "Bash(pnpm --filter watchlog-api add minio @fastify/multipart)",
-      "Bash(awk '/private async loadEntry|async loadEntry/{f=1} f{print NR\": \"$0} f&&/^  }$/{exit}' apps/watchlog-api/src/log-entries/log-entries.service.ts)"
+      "Bash(awk '/private async loadEntry|async loadEntry/{f=1} f{print NR\": \"$0} f&&/^  }$/{exit}' apps/watchlog-api/src/log-entries/log-entries.service.ts)",
+      "Bash(pnpm --filter watchlog-web add @zxing/browser @zxing/library)",
+      "Bash(grep -n \"from \\\\\"./log-entries-api\\\\|from \\\\\"../templates/FieldControl\\\\|import {\" apps/watchlog-web/src/features/log-entries/EntryFillPage.tsx)"
     ],
     "additionalDirectories": [
       "\\tmp"
