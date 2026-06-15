@@ -173,7 +173,11 @@
       "Bash(curl -s -o /dev/null -w \"health: %{http_code}\\\\n\" http://localhost:3000/api/health/ready)",
       "Bash(echo \"health: $\\(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/health/ready\\)\")",
       "Bash(echo \"API :3000  -> $\\(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/health/ready 2>/dev/null\\)\")",
-      "Bash(echo \"WEB :5173  -> $\\(curl -s -o /dev/null -w '%{http_code}' http://localhost:5173 2>/dev/null\\)\")"
+      "Bash(echo \"WEB :5173  -> $\\(curl -s -o /dev/null -w '%{http_code}' http://localhost:5173 2>/dev/null\\)\")",
+      "Bash(sed -n '1,40p' apps/watchlog-web/src/features/reference-data/reference-data-queries.js)",
+      "Bash(sed -n '1,40p' apps/watchlog-web/src/features/reference-data/reference-data-queries.ts)",
+      "Bash(sed -n '1,40p' apps/watchlog-web/src/features/log-entries/log-entries-api.ts)",
+      "Bash(sed -n '1,45p' apps/watchlog-web/src/features/log-entries/log-entries-queries.ts)"
     ],
     "additionalDirectories": [
       "\\tmp"

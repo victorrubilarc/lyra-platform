@@ -58,6 +58,53 @@ describe("config de campos por tipo", () => {
   });
 });
 
+describe("config de objetos Ola 2", () => {
+  it("REFERENCE exige una entidad válida (strict)", () => {
+    expect(fieldConfigSchemaFor("REFERENCE").safeParse({ entity: "equipment" }).success).toBe(true);
+    expect(fieldConfigSchemaFor("REFERENCE").safeParse({ entity: "equipment", display: "modal" }).success).toBe(true);
+    expect(fieldConfigSchemaFor("REFERENCE").safeParse({ entity: "otra" }).success).toBe(false);
+    expect(fieldConfigSchemaFor("REFERENCE").safeParse({}).success).toBe(false);
+    expect(deriveDataType("REFERENCE")).toBe("REFERENCE");
+  });
+
+  it("RISK_MATRIX valida que la cuadrícula calce con los ejes", () => {
+    const ok = fieldConfigSchemaFor("RISK_MATRIX").safeParse({
+      probabilityLabels: ["Baja", "Alta"],
+      consequenceLabels: ["Leve", "Grave"],
+      cells: [
+        [1, 3],
+        [3, 5],
+      ],
+    });
+    expect(ok.success).toBe(true);
+    expect(deriveDataType("RISK_MATRIX")).toBe("RISK");
+
+    const dimsMismatch = fieldConfigSchemaFor("RISK_MATRIX").safeParse({
+      probabilityLabels: ["Baja", "Alta"],
+      consequenceLabels: ["Leve", "Grave"],
+      cells: [[1, 3]], // falta una fila
+    });
+    expect(dimsMismatch.success).toBe(false);
+
+    const sevOut = fieldConfigSchemaFor("RISK_MATRIX").safeParse({
+      probabilityLabels: ["Baja", "Alta"],
+      consequenceLabels: ["Leve", "Grave"],
+      cells: [
+        [1, 3],
+        [3, 9], // severidad fuera de 1..5
+      ],
+    });
+    expect(sevOut.success).toBe(false);
+  });
+
+  it("NUMBER: la tolerancia exige expected y critTolerance ≥ tolerance", () => {
+    expect(numberFieldConfigSchema.safeParse({ expected: 100, tolerance: 5, critTolerance: 10 }).success).toBe(true);
+    expect(numberFieldConfigSchema.safeParse({ tolerance: 5 }).success).toBe(false); // sin expected
+    expect(numberFieldConfigSchema.safeParse({ expected: 100, tolerance: 10, critTolerance: 5 }).success).toBe(false);
+    expect(numberFieldConfigSchema.safeParse({ counter: true, counterNonDecreasing: true }).success).toBe(true);
+  });
+});
+
 describe("ancho del campo en la grilla de 12 columnas (2.1.3)", () => {
   it("colSpan acepta 1..12 y rechaza fuera de rango / no entero", () => {
     expect(GRID_COLUMNS).toBe(12);

@@ -23,6 +23,9 @@ import type {
   LogEntrySignatureSummaryDto,
   LogEntryTransitionDto,
   LogEntryValueDto,
+  ReferenceEntity,
+  ReferenceOption,
+  ReferenceOptionsResult,
   SaveLogEntrySectionRequest,
   SectionBlockedReason,
   SetDeferralRequest,
@@ -557,6 +560,14 @@ export class LogEntriesService {
       updatedById: v.updatedById,
     }));
 
+    // Lectura previa de los campos CONTADOR (Ola 2) para mostrar el delta en la UI.
+    const counterPreviousValues = Object.fromEntries(
+      await this.resolveCounterPreviousValues(
+        version.sections.flatMap((s) => s.fields.map((f) => this.toFieldDef(f, s.key))),
+        { templateId: entry.templateId, equipmentId: entry.equipmentId, excludeEntryId: entry.id },
+      ),
+    );
+
     // Transiciones que ESTE usuario puede ejecutar ahora (solo si sigue editable).
     const labelByKey = new Map((wfVersion?.transitions ?? []).map((t) => [t.key, t.label]));
     const availableTransitions: AvailableTransitionDto[] =
@@ -624,6 +635,7 @@ export class LogEntriesService {
       currentStateName,
       sectionStates,
       values,
+      counterPreviousValues,
       availableTransitions,
       transitions,
       signatures,
@@ -735,16 +747,34 @@ export class LogEntriesService {
 
     // Validación 100% en servidor (tipo/rango/umbral/formato/catálogo), saltando
     // campos ocultos por visibleWhen. Los obligatorios solo se exigen al completar.
-    const allowed = await this.resolveAllowedCodes([...fieldsByKey.values()]);
+    const allFields = [...fieldsByKey.values()];
+    const allowed = await this.resolveAllowedCodes(allFields);
+    // Referencias (Ola 2): ids válidos EN ALCANCE (ABAC server-side), por campo.
+    const allowedRefs = await this.resolveAllowedReferences(
+      allFields,
+      { userId, orgNodeId: entry.orgNodeId },
+      valuesByKey,
+    );
+    // Lecturas previas de los contadores para validar monotonicidad (Ola 2).
+    const prevCounters = await this.resolveCounterPreviousValues(allFields, {
+      templateId: entry.templateId,
+      equipmentId: entry.equipmentId,
+      excludeEntryId: entry.id,
+    });
     const errors: string[] = [];
     const warnings: string[] = [];
     for (const input of dto.values) {
       const def = fieldsByKey.get(input.fieldKey)!;
       if (isPresentationalType(def.type)) continue; // objeto de presentación: no es dato
       if (!isFieldVisible(def.visibleWhen, valuesByKey)) continue;
-      const res = validateFieldValue(def, input.value, { allowedCodes: allowed.get(def.key) });
+      const res = validateFieldValue(def, input.value, {
+        allowedCodes: allowed.get(def.key),
+        allowedRefIds: allowedRefs.get(def.key),
+      });
       errors.push(...res.errors);
       warnings.push(...res.warnings);
+      // Contador no decreciente: nuevo ≥ lectura previa del mismo equipo+campo.
+      errors.push(...this.counterMonotonicErrors(def, input.value, prevCounters.get(def.key)));
     }
 
     if (dto.markComplete) {
@@ -930,7 +960,10 @@ export class LogEntriesService {
     // firma de completitud de sección (TemplateSection.requireSignature).
     const inCurrentState = (section: VersionWithGraph["sections"][number]): boolean =>
       isSectionEditableInState(section.editableInStateKey, entry.currentStateKey);
-    const errors = await this.collectCompletionErrors(version, valuesByKey, inCurrentState);
+    const errors = await this.collectCompletionErrors(version, valuesByKey, inCurrentState, {
+      userId,
+      orgNodeId: entry.orgNodeId,
+    });
     // Validación CRUZADA (Req-7): los ERROR bloquean el sellado del registro completo.
     errors.push(...evaluateCrossRules(this.versionRules(version), valuesByKey, { now: evalNow }).errors.map((e) => e.message));
     const sectionRows = await this.prisma.logEntrySection.findMany({ where: { logEntryId: id } });
@@ -1300,7 +1333,10 @@ export class LogEntriesService {
 
     // (d) completitud: las secciones editables en el estado de ORIGEN deben estar
     // marcadas COMPLETED y sin errores de validación (defensa en profundidad).
-    const errors = await this.collectCompletionErrors(version, valuesByKey, editableInFrom);
+    const errors = await this.collectCompletionErrors(version, valuesByKey, editableInFrom, {
+      userId,
+      orgNodeId: entry.orgNodeId,
+    });
     // Validación CRUZADA (Req-7): los ERROR bloquean el avance del flujo.
     errors.push(...evaluateCrossRules(this.versionRules(version), valuesByKey, { now: evalNow }).errors.map((e) => e.message));
     for (const section of version.sections) {
@@ -1465,12 +1501,18 @@ export class LogEntriesService {
     version: VersionWithGraph,
     valuesByKey: Record<string, unknown>,
     predicate: (section: VersionWithGraph["sections"][number]) => boolean,
+    refContext?: { userId: string; orgNodeId: string },
   ): Promise<string[]> {
     const errors: string[] = [];
     for (const section of version.sections) {
       if (!predicate(section)) continue;
       const defs = section.fields.map((f) => this.toFieldDef(f, section.key));
       const allowed = await this.resolveAllowedCodes(defs);
+      // Referencias (Ola 2): re-valida que sigan EN ALCANCE al sellar/avanzar
+      // (defensa en profundidad: una entidad pudo desactivarse tras el guardado).
+      const allowedRefs = refContext
+        ? await this.resolveAllowedReferences(defs, refContext, valuesByKey)
+        : new Map<string, Set<string>>();
       for (const def of defs) {
         if (isPresentationalType(def.type)) continue; // objeto de presentación: no es dato
         if (!isFieldVisible(def.visibleWhen, valuesByKey)) continue;
@@ -1479,7 +1521,12 @@ export class LogEntriesService {
           errors.push(`${def.label}: obligatorio`);
           continue;
         }
-        errors.push(...validateFieldValue(def, val, { allowedCodes: allowed.get(def.key) }).errors);
+        errors.push(
+          ...validateFieldValue(def, val, {
+            allowedCodes: allowed.get(def.key),
+            allowedRefIds: allowedRefs.get(def.key),
+          }).errors,
+        );
       }
     }
     return errors;
@@ -1750,6 +1797,221 @@ export class LogEntriesService {
       }
     }
     return result;
+  }
+
+  // === Objetos de REFERENCIA (Ola 2) =========================================
+  //
+  // Resolución + validación SERVER-SIDE de los selectores de entidad. Espejo de
+  // `resolveAllowedCodes`: arma el set de ids VÁLIDOS (existe + activo + EN
+  // ALCANCE ABAC) por campo REFERENCE, acotando la consulta a los ids realmente
+  // presentes en la foto. Los pickers NO son fuente de verdad de permisos: el
+  // backend SIEMPRE decide el alcance.
+
+  /** Ids válidos por campo REFERENCE para `validateFieldValue` (opts.allowedRefIds). */
+  private async resolveAllowedReferences(
+    fields: FieldDef[],
+    ctx: { userId: string; orgNodeId: string },
+    valuesByKey: Record<string, unknown>,
+  ): Promise<Map<string, Set<string>>> {
+    const result = new Map<string, Set<string>>();
+    const entityByField = new Map<string, ReferenceEntity>();
+    const idsByEntity = new Map<ReferenceEntity, Set<string>>();
+    for (const f of fields) {
+      if (f.type !== "REFERENCE") continue;
+      const entity = (f.config as { entity?: ReferenceEntity }).entity;
+      if (!entity) {
+        result.set(f.key, new Set()); // referencia mal configurada ⇒ nada es válido
+        continue;
+      }
+      entityByField.set(f.key, entity);
+      const v = valuesByKey[f.key];
+      if (typeof v === "string" && v.trim() !== "") {
+        const set = idsByEntity.get(entity) ?? new Set<string>();
+        set.add(v);
+        idsByEntity.set(entity, set);
+      }
+    }
+    if (entityByField.size === 0) return result;
+    const validByEntity = new Map<ReferenceEntity, Set<string>>();
+    for (const [entity, ids] of idsByEntity) {
+      validByEntity.set(entity, await this.validReferenceIds(entity, [...ids], ctx));
+    }
+    for (const [fieldKey, entity] of entityByField) {
+      result.set(fieldKey, validByEntity.get(entity) ?? new Set());
+    }
+    return result;
+  }
+
+  /** Subconjunto de `ids` que existe, está activo y está EN ALCANCE para la entidad. */
+  private async validReferenceIds(
+    entity: ReferenceEntity,
+    ids: string[],
+    ctx: { userId: string; orgNodeId: string },
+  ): Promise<Set<string>> {
+    if (ids.length === 0) return new Set();
+    switch (entity) {
+      case "equipment": {
+        // Equipo activo INSTALADO en el nodo de la entrada (mismo alcance EAM que el header).
+        const rows = await this.prisma.equipment.findMany({
+          where: { id: { in: ids }, deletedAt: null, active: true, orgNodeId: ctx.orgNodeId },
+          select: { id: true },
+        });
+        return new Set(rows.map((r) => r.id));
+      }
+      case "user": {
+        const rows = await this.prisma.user.findMany({
+          where: { id: { in: ids }, status: "ACTIVE" },
+          select: { id: true },
+        });
+        return new Set(rows.map((r) => r.id));
+      }
+      case "orgNode": {
+        const access = await this.scope.getAccessibleNodeIds(ctx.userId);
+        const rows = await this.prisma.orgNode.findMany({
+          where: { id: { in: ids }, deletedAt: null },
+          select: { id: true },
+        });
+        const valid = rows.map((r) => r.id).filter((id) => access === null || access.has(id));
+        return new Set(valid);
+      }
+      case "shift": {
+        // Turno del calendario operacional que aplica al nodo de la entrada.
+        const calendarId = await this.calendarIdForNode(ctx.orgNodeId);
+        const rows = await this.prisma.operationalShift.findMany({
+          where: { id: { in: ids }, ...(calendarId ? { calendarId } : {}) },
+          select: { id: true },
+        });
+        return new Set(rows.map((r) => r.id));
+      }
+    }
+  }
+
+  /** Calendario operacional que aplica a un nodo (vía ShiftResolver). null = ninguno. */
+  private async calendarIdForNode(orgNodeId: string | null): Promise<string | null> {
+    const r = await this.shiftResolver.resolveWithCalendar(new Date(), orgNodeId);
+    return r?.calendarId ?? null;
+  }
+
+  /**
+   * Opciones de un selector de REFERENCIA (Ola 2) con ABAC en el backend. El
+   * `kind` discrimina entidad/columnas/alcance; `nodeId` = nodo de la entrada
+   * (acota equipo/turno); `q` filtra case-insensitive. La verdad de permisos
+   * vive aquí, NO en el cliente.
+   */
+  async referenceOptions(
+    userId: string,
+    kind: ReferenceEntity,
+    opts: { nodeId?: string; q?: string },
+  ): Promise<ReferenceOptionsResult> {
+    const q = opts.q?.trim().toLowerCase() ?? "";
+    const match = (s: string | null | undefined) => !q || (s ?? "").toLowerCase().includes(q);
+    let options: ReferenceOption[] = [];
+
+    switch (kind) {
+      case "equipment": {
+        if (!opts.nodeId) break; // sin nodo no hay equipos que ofrecer
+        await this.assertNodeInScope(userId, opts.nodeId); // ABAC
+        const rows = await this.prisma.equipment.findMany({
+          where: { orgNodeId: opts.nodeId, deletedAt: null, active: true },
+          select: { id: true, name: true, tag: true },
+          orderBy: [{ reportOrder: "asc" }, { name: "asc" }],
+        });
+        options = rows
+          .filter((r) => match(r.name) || match(r.tag))
+          .map((r) => ({ id: r.id, label: r.name, sublabel: r.tag }));
+        break;
+      }
+      case "user": {
+        const rows = await this.prisma.user.findMany({
+          where: { status: "ACTIVE" },
+          select: { id: true, displayName: true, email: true },
+          orderBy: { displayName: "asc" },
+        });
+        options = rows
+          .filter((r) => match(r.displayName) || match(r.email))
+          .slice(0, 100)
+          .map((r) => ({ id: r.id, label: r.displayName, sublabel: r.email }));
+        break;
+      }
+      case "orgNode": {
+        const access = await this.scope.getAccessibleNodes(userId);
+        const rows = await this.prisma.orgNode.findMany({
+          where: { deletedAt: null, ...(access ? { id: { in: [...access.ids] } } : {}) },
+          select: { id: true, name: true },
+          orderBy: { name: "asc" },
+        });
+        const ids = new Set(rows.map((r) => r.id));
+        const paths = await this.nodePaths(ids);
+        options = rows
+          .filter((r) => match(r.name) || match(paths.get(r.id)))
+          .map((r) => ({ id: r.id, label: r.name, sublabel: paths.get(r.id) ?? null }))
+          .sort((a, b) => (a.sublabel ?? a.label).localeCompare(b.sublabel ?? b.label, "es"));
+        break;
+      }
+      case "shift": {
+        const calendarId = await this.calendarIdForNode(opts.nodeId ?? null);
+        if (!calendarId) break;
+        const rows = await this.prisma.operationalShift.findMany({
+          where: { calendarId },
+          select: { id: true, code: true, label: true, startTime: true, durationMinutes: true },
+          orderBy: { sortOrder: "asc" },
+        });
+        options = rows
+          .filter((r) => match(r.label) || match(r.code))
+          .map((r) => ({ id: r.id, label: r.label, sublabel: `${r.code} · ${r.startTime}` }));
+        break;
+      }
+    }
+    return { kind, options };
+  }
+
+  /**
+   * Lectura PREVIA por campo CONTADOR/acumulado (Ola 2): el último valor SELLADO
+   * del mismo equipo+campo (o por plantilla+campo si la entrada no tiene equipo).
+   * Alimenta el delta de la UI y la validación de monotonicidad. Vive en los
+   * `LogEntryValue` existentes (sin infraestructura nueva).
+   */
+  private async resolveCounterPreviousValues(
+    fields: FieldDef[],
+    ctx: { templateId: string; equipmentId: string | null; excludeEntryId?: string },
+  ): Promise<Map<string, number>> {
+    const result = new Map<string, number>();
+    const counterKeys = fields
+      .filter((f) => f.type === "NUMBER" && (f.config as { counter?: boolean }).counter === true)
+      .map((f) => f.key);
+    if (counterKeys.length === 0) return result;
+
+    for (const fieldKey of counterKeys) {
+      const prev = await this.prisma.logEntryValue.findFirst({
+        where: {
+          fieldKey,
+          value: { not: Prisma.JsonNull },
+          logEntry: {
+            templateId: ctx.templateId,
+            sealedAt: { not: null },
+            ...(ctx.equipmentId ? { equipmentId: ctx.equipmentId } : {}),
+            ...(ctx.excludeEntryId ? { id: { not: ctx.excludeEntryId } } : {}),
+          },
+        },
+        orderBy: { logEntry: { effectiveAt: "desc" } },
+        select: { value: true },
+      });
+      const n = typeof prev?.value === "number" ? prev.value : Number(prev?.value);
+      if (prev && Number.isFinite(n)) result.set(fieldKey, n);
+    }
+    return result;
+  }
+
+  /** Error de monotonicidad de un contador `counterNonDecreasing` (nuevo ≥ previo). */
+  private counterMonotonicErrors(def: FieldDef, value: unknown, previous: number | undefined): string[] {
+    const c = def.config as { counter?: boolean; counterNonDecreasing?: boolean };
+    if (def.type !== "NUMBER" || !c.counter || !c.counterNonDecreasing) return [];
+    if (previous === undefined || isEmptyValue(value)) return [];
+    const n = typeof value === "number" ? value : Number(value);
+    if (Number.isFinite(n) && n < previous) {
+      return [`${def.label}: la lectura no puede ser menor que la anterior (${previous})`];
+    }
+    return [];
   }
 
   /**

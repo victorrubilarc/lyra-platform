@@ -55,19 +55,27 @@
 - **TemplateField** *(implementado — modelo de 3 capas desde 2.1.1, migración `20260609155007_add_field_layers`)* —
   un campo son **3 capas separadas** (ver DECISIONS 2026-06-09):
   - **Capa 1 — presentación/widget:** `type` (enum `FieldType`: 10 base + **Ola 1** `CONFORMITY`/`RATING`/`TIME`/
-    `DURATION`/`RANGE` + presentación `HEADING`/`STATIC_TEXT`/`DIVIDER`/`NOTICE`/`PROCEDURE_LINK`/`REFERENCE_IMAGE`;
-    migración `20260615120000_add_ola1_field_types`). Cómo se ve.
+    `DURATION`/`RANGE` + presentación `HEADING`/`STATIC_TEXT`/`DIVIDER`/`NOTICE`/`PROCEDURE_LINK`/`REFERENCE_IMAGE`
+    + **Ola 2** `REFERENCE`/`RISK_MATRIX`; migraciones `20260615120000_add_ola1_field_types` /
+    `20260615140000_add_ola2_field_types`). Cómo se ve.
   - **Capa 2 — tipo de dato:** `dataType` (enum `FieldDataType`: STRING/NUMBER/BOOLEAN/DATE/DATETIME/TIME/
-    **CODE**/**CODE_ARRAY**/**REFERENCE**/FILE/GEO/COMPUTED/**RANGE**/**LAYOUT**). Cómo se almacena/valida/reporta. Es
+    **CODE**/**CODE_ARRAY**/**REFERENCE**/FILE/GEO/COMPUTED/**RANGE**/**LAYOUT**/**RISK**). Cómo se almacena/valida/reporta. Es
     **derivado del `type`** en backend (fuente única `deriveDataType` en `@lyra/contracts`); la UI no lo edita. Mapeo:
     NUMBER→NUMBER, TEXT/TEXTAREA→STRING, SELECT→CODE, MULTISELECT→CODE_ARRAY, BOOLEAN→BOOLEAN, DATE→DATE,
     DATETIME→DATETIME, SEVERITY→CODE (escala cerrada {1..5}), SIGNATURE→REFERENCE. **Ola 1:** CONFORMITY→CODE
     (catálogo cerrado {CONFORME,NO_CONFORME,NA}), RATING→NUMBER (ordinal), TIME→TIME, DURATION→NUMBER (minutos
     canónicos), RANGE→RANGE (valor estructurado `{from,to}`), y los 6 objetos de PRESENTACIÓN→**LAYOUT** (no-dato: el
     llenado los ignora — no `LogEntryValue`, no valida, fuera de reglas/resumen/obligatorios; fuente única
-    `isPresentationalType`). **Variantes por config (no tipo):** RUT/correo/teléfono/URL = TEXT + `config.format`;
-    porcentaje/moneda = NUMBER + `config.format`; radio/segmentos = SELECT + `config.displayAs`; casillas/modal =
-    MULTISELECT + `config.displayAs`.
+    `isPresentationalType`). **Ola 2:** `REFERENCE`→REFERENCE (almacena el **id** de una entidad; `config.entity` =
+    equipment/user/orgNode/shift discrimina endpoint/columnas/alcance ABAC; validación server-side vía
+    `opts.allowedRefIds` = ids existentes + activos + EN ALCANCE, espejo de `allowedCodes`), `RISK_MATRIX`→**RISK**
+    (valor estructurado `{probability,consequence}` 1-based; nivel DERIVADO por matriz en config `cells[p-1][c-1]`→
+    severidad 1..5, ISO 31000; `riskLevelFor`). **Variantes por config (no tipo):** RUT/correo/teléfono/URL = TEXT +
+    `config.format`; porcentaje/moneda = NUMBER + `config.format`; radio/segmentos = SELECT + `config.displayAs`;
+    casillas/modal = MULTISELECT + `config.displayAs`; **lectura con tolerancia** = NUMBER + `{expected,tolerance,
+    critTolerance}` (deriva bandas warn/crit vía `deriveToleranceBands`/`effectiveNumberBands`); **contador/acumulado**
+    = NUMBER + `{counter,counterNonDecreasing}` (delta vs la última lectura sellada del mismo equipo+campo;
+    `LogEntryDetail.counterPreviousValues`).
   - **Capa 3 — rol semántico:** `semanticRole?` (enum `FieldSemanticRole?`: EFFECTIVE_DATE/TITLE/PRIMARY_EQUIPMENT/
     SEVERITY_DRIVER; null = ninguno). Qué significa para la plataforma. En 2.1.1 solo `EFFECTIVE_DATE` actúa
     (promueve `LogEntry.effectiveAt`, 2.4); **a lo sumo uno por versión** (validado en contrato + backend).

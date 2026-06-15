@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { Fragment, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import {
   AlertTriangle,
@@ -14,13 +14,17 @@ import { Checkbox, Combobox, Input, LookupPicker, MultiSelect, Textarea, Toggle 
 import {
   CONFORMITY_CODES,
   RATING_DEFAULT_MAX,
+  effectiveNumberBands,
   isPresentationalType,
+  riskLevelFor,
   type ComputedFieldConfig,
   type FieldType,
   type OptionInlineItem,
+  type ReferenceEntity,
 } from "@lyra/contracts";
-import { formatCurrency, formatDurationHm, formatPercent, formatRut } from "../../lib/format.js";
+import { formatCurrency, formatDurationHm, formatNumber, formatPercent, formatRut } from "../../lib/format.js";
 import { useResolvedReferenceList } from "../reference-data/reference-data-queries.js";
+import { useReferenceOptions } from "../log-entries/log-entries-queries.js";
 import styles from "./TemplateBuilder.module.css";
 
 /** Forma mínima de un campo para renderizar su control (común a builder y llenado). */
@@ -42,15 +46,17 @@ function inlineOptions(config: Record<string, unknown>): OptionInlineItem[] {
   return raw.filter((o) => o && typeof o.code === "string");
 }
 
-/** Evalúa el estado de un valor numérico contra rango y bandas de umbral ISA-18.2. */
+/** Evalúa el estado de un valor numérico contra rango y bandas de umbral ISA-18.2
+ *  (bandas EFECTIVAS: derivadas de `expected ± tolerance` o explícitas). */
 function numberState(config: Record<string, unknown>, value: unknown): "ok" | "warn" | "crit" {
   if (value === "" || value === undefined || value === null) return "ok";
   const n = Number(value);
   if (Number.isNaN(n)) return "ok";
   const c = config as Record<string, number | undefined>;
   if ((c.min !== undefined && n < c.min) || (c.max !== undefined && n > c.max)) return "crit";
-  if ((c.critLow !== undefined && n < c.critLow) || (c.critHigh !== undefined && n > c.critHigh)) return "crit";
-  if ((c.warnLow !== undefined && n < c.warnLow) || (c.warnHigh !== undefined && n > c.warnHigh)) return "warn";
+  const b = effectiveNumberBands(config);
+  if ((b.critLow !== undefined && n < b.critLow) || (b.critHigh !== undefined && n > b.critHigh)) return "crit";
+  if ((b.warnLow !== undefined && n < b.warnLow) || (b.warnHigh !== undefined && n > b.warnHigh)) return "warn";
   return "ok";
 }
 
@@ -67,12 +73,18 @@ export function FieldControl({
   onChange,
   readOnly = false,
   invalid = false,
+  nodeId = null,
+  counterPrevious,
 }: {
   field: FieldControlField;
   value: unknown;
   onChange: (value: unknown) => void;
   readOnly?: boolean;
   invalid?: boolean;
+  /** Nodo de la entrada (Ola 2): acota las opciones de equipo/turno de los selectores de referencia. */
+  nodeId?: string | null;
+  /** Lectura previa de un campo CONTADOR (Ola 2): la UI muestra el delta (actual − previa). */
+  counterPrevious?: number;
 }) {
   const { t } = useTranslation();
 
@@ -83,6 +95,14 @@ export function FieldControl({
     ? (resolved.data ?? []).map((o) => ({ code: o.code, label: o.label }))
     : inlineOptions(field.config);
   const labelByCode = useMemo(() => new Map(opts.map((o) => [o.code, o.label])), [opts]);
+
+  // --- Objetos de REFERENCIA (Ola 2): opciones resueltas server-side (ABAC). El
+  // mismo render resuelve id→label en fill y en visor (read-only). Hook SIEMPRE
+  // llamado (deshabilitado si el campo no es REFERENCE) para no romper reglas de hooks.
+  const refEntity = field.type === "REFERENCE" ? ((field.config as { entity?: ReferenceEntity }).entity ?? null) : null;
+  const refQuery = useReferenceOptions(refEntity, nodeId, field.type === "REFERENCE");
+  const refOptions = useMemo(() => refQuery.data?.options ?? [], [refQuery.data]);
+  const labelByRefId = useMemo(() => new Map(refOptions.map((o) => [o.id, o.label])), [refOptions]);
   const detailByCode = useMemo(() => {
     const m = new Map<string, string>();
     for (const o of resolved.data ?? []) {
@@ -125,7 +145,7 @@ export function FieldControl({
   // Un formulado es read-only SIEMPRE (su valor lo deriva el servidor); se muestra
   // el valor calculado que el llamador recomputó.
   if (isComputed || readOnly) {
-    return wrap(<div className={styles.previewReadonly}>{formatReadonly(field, value, labelByCode, t)}</div>);
+    return wrap(<div className={styles.previewReadonly}>{formatReadonly(field, value, labelByCode, labelByRefId, t)}</div>);
   }
 
   switch (field.type) {
@@ -147,10 +167,14 @@ export function FieldControl({
       return wrap(<Textarea value={(value as string) ?? ""} onChange={(e) => onChange(e.target.value)} invalid={invalid} />);
     case "NUMBER": {
       const st = numberState(field.config, value);
-      const c = field.config as Record<string, string | number | undefined>;
+      const c = field.config as Record<string, string | number | boolean | undefined>;
       const isPercent = c.format === "percent";
       const isCurrency = c.format === "currency";
       const suffix = isPercent ? "%" : isCurrency ? ((c.currency as string) ?? "CLP") : (c.unit as string | undefined);
+      const isTolerance = typeof c.expected === "number";
+      const isCounter = c.counter === true;
+      const n = value === "" || value === null || value === undefined ? null : Number(value);
+      const delta = isCounter && n != null && typeof counterPrevious === "number" ? n - counterPrevious : null;
       return wrap(
         <div>
           <div className={styles.previewNumberRow}>
@@ -162,12 +186,29 @@ export function FieldControl({
               style={{ maxWidth: 180 }}
             />
             {suffix && <span className={styles.previewUnit}>{suffix}</span>}
-            {(c.min !== undefined || c.max !== undefined) && (
+            {isTolerance && (
+              <span className={styles.previewRange}>
+                {t("templates.builder.toleranceTarget")} {String(c.expected)}
+                {typeof c.tolerance === "number" ? ` ± ${c.tolerance}` : ""}
+                {suffix ? ` ${suffix}` : ""}
+              </span>
+            )}
+            {!isTolerance && (c.min !== undefined || c.max !== undefined) && (
               <span className={styles.previewRange}>
                 {t("templates.builder.min")} {c.min ?? "—"} · {t("templates.builder.max")} {c.max ?? "—"}
               </span>
             )}
           </div>
+          {isCounter && (
+            <div className={styles.counterDelta}>
+              {typeof counterPrevious === "number"
+                ? t("templates.builder.counterPrevious", { value: formatNumber(counterPrevious) })
+                : t("templates.builder.counterNoPrevious")}
+              {delta != null && (
+                <strong data-neg={delta < 0}> · Δ {delta >= 0 ? "+" : ""}{formatNumber(delta)}</strong>
+              )}
+            </div>
+          )}
           {st !== "ok" && (
             <div className={st === "crit" ? styles.previewCrit : styles.previewWarn}>
               <AlertTriangle size={13} /> {st === "crit" ? t("templates.builder.outOfRangeHint") : t("templates.builder.thresholds")}
@@ -386,9 +427,120 @@ export function FieldControl({
       );
     case "SIGNATURE":
       return wrap(<div className={styles.previewSignature}>{t("templates.fieldTypes.signature")}</div>);
+    case "REFERENCE": {
+      const display = (field.config as { display?: string }).display ?? "dropdown";
+      const cur = (value as string) ?? "";
+      const needsNode = refEntity === "equipment" || refEntity === "shift";
+      // En el builder (sin nodo) los selectores acotados al nodo no tienen opciones.
+      if (needsNode && !nodeId) {
+        return wrap(<div className={styles.referenceHint}>{t("templates.builder.referenceNeedsNode")}</div>);
+      }
+      const options = refOptions.map((o) => ({ value: o.id, label: o.label, hint: o.sublabel ?? undefined }));
+      if (display === "modal") {
+        return wrap(
+          <div style={{ maxWidth: 480 }}>
+            <LookupPicker
+              value={cur ? [cur] : []}
+              onChange={(vals) => onChange(vals[vals.length - 1] ?? null)}
+              options={options.map((o) => ({ value: o.value, label: o.label, hint: o.hint }))}
+              title={field.label}
+              placeholder={t("templates.builder.lookupPlaceholder")}
+              searchPlaceholder={t("common.search")}
+              confirmLabel={t("templates.builder.lookupConfirm")}
+              cancelLabel={t("common.cancel")}
+              clearLabel={t("common.clear")}
+              codeHeader={t("referenceData.item.code")}
+              labelHeader={t("referenceData.item.label")}
+              detailHeader={t("referenceData.item.metadata")}
+              summaryText={(count) => t("templates.builder.lookupSummary", { count })}
+            />
+          </div>,
+        );
+      }
+      return wrap(
+        <div style={{ maxWidth: 380 }}>
+          <Combobox
+            value={cur}
+            onChange={(val) => onChange(val || null)}
+            options={options}
+            placeholder={refQuery.isLoading ? t("common.loading") : "—"}
+            clearable
+          />
+        </div>,
+      );
+    }
+    case "RISK_MATRIX":
+      return wrap(<RiskMatrixControl field={field} value={value} onChange={onChange} t={t} />);
     default:
       return wrap(null);
   }
+}
+
+/** Cuadrícula de selección de la matriz de riesgo (probabilidad × consecuencia → nivel). */
+function RiskMatrixControl({
+  field,
+  value,
+  onChange,
+  t,
+}: {
+  field: FieldControlField;
+  value: unknown;
+  onChange: (value: unknown) => void;
+  t: (k: string, o?: Record<string, unknown>) => string;
+}) {
+  const cfg = field.config as { probabilityLabels?: string[]; consequenceLabels?: string[]; cells?: number[][] };
+  const pLabels = cfg.probabilityLabels ?? [];
+  const cLabels = cfg.consequenceLabels ?? [];
+  const cur = (value as { probability?: number; consequence?: number } | null) ?? {};
+  const level = riskLevelFor(field.config, value);
+  return (
+    <div>
+      <div
+        className={styles.riskMatrix}
+        role="grid"
+        aria-label={field.label}
+        style={{ gridTemplateColumns: `minmax(90px,max-content) repeat(${cLabels.length}, minmax(48px,1fr))` }}
+      >
+        <div className={styles.riskCorner} aria-hidden>
+          <span>{t("templates.builder.riskProbability")}</span>
+          <span>{t("templates.builder.riskConsequence")}</span>
+        </div>
+        {cLabels.map((cl, c) => (
+          <div key={`h${c}`} className={styles.riskColHead}>{cl}</div>
+        ))}
+        {pLabels.map((pl, p) => (
+          <Fragment key={`r${p}`}>
+            <div className={styles.riskRowHead}>{pl}</div>
+            {cLabels.map((_, c) => {
+              const sev = cfg.cells?.[p]?.[c] ?? 1;
+              const on = cur.probability === p + 1 && cur.consequence === c + 1;
+              return (
+                <button
+                  key={`${p}-${c}`}
+                  type="button"
+                  role="gridcell"
+                  aria-selected={on}
+                  className={styles.riskCell}
+                  data-sev={sev}
+                  data-on={on}
+                  title={`${pl} × ${_} → ${t(`templates.builder.riskLevel.${sev}`)}`}
+                  onClick={() => onChange(on ? null : { probability: p + 1, consequence: c + 1 })}
+                >
+                  {sev}
+                </button>
+              );
+            })}
+          </Fragment>
+        ))}
+      </div>
+      {level && (
+        <div className={styles.riskResult} data-sev={level.severity}>
+          {level.probabilityLabel} × {level.consequenceLabel} ·{" "}
+          <strong>{t(`templates.builder.riskLevel.${level.severity}`)}</strong>
+        </div>
+      )}
+    </div>
+  );
 }
 
 /** Placeholder por defecto según el formato semántico de un TEXT. */
@@ -481,12 +633,20 @@ function formatReadonly(
   field: FieldControlField,
   value: unknown,
   labelByCode: Map<string, string>,
+  labelByRefId: Map<string, string>,
   t: (k: string) => string,
 ): string {
   if (value === null || value === undefined || value === "") return "—";
   switch (field.type) {
     case "SELECT":
       return labelByCode.get(value as string) ?? String(value);
+    case "REFERENCE":
+      return labelByRefId.get(value as string) ?? String(value);
+    case "RISK_MATRIX": {
+      const level = riskLevelFor(field.config, value);
+      if (!level) return "—";
+      return `${level.probabilityLabel} × ${level.consequenceLabel} · ${t(`templates.builder.riskLevel.${level.severity}`)}`;
+    }
     case "MULTISELECT":
       return Array.isArray(value) && value.length > 0
         ? (value as string[]).map((c) => labelByCode.get(c) ?? c).join(", ")

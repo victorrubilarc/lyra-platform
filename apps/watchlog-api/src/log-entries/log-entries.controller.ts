@@ -1,10 +1,12 @@
-import { Body, Controller, Get, Param, Post, Put, Query, Req, Res } from "@nestjs/common";
+import { Body, Controller, Get, NotFoundException, Param, Post, Put, Query, Req, Res } from "@nestjs/common";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import {
   createLogEntryRequestSchema,
   executeTransitionRequestSchema,
   logEntryListQuerySchema,
   previewLogEntryQuerySchema,
+  REFERENCE_ENTITIES,
+  referenceOptionsQuerySchema,
   saveLogEntrySectionRequestSchema,
   setDeferralRequestSchema,
   submitLogEntryRequestSchema,
@@ -14,6 +16,8 @@ import {
   type ExecuteTransitionRequest,
   type LogEntryListQuery,
   type PreviewLogEntryQuery,
+  type ReferenceEntity,
+  type ReferenceOptionsQuery,
   type SaveLogEntrySectionRequest,
   type SetDeferralRequest,
   type SubmitLogEntryRequest,
@@ -121,6 +125,25 @@ export class LogEntriesController {
       .header("Content-Disposition", `attachment; filename="bitacoras-${stamp}.csv"`)
       .header("X-Export-Truncated", String(truncated))
       .send(csv);
+  }
+
+  /**
+   * Opciones de un selector de REFERENCIA (Ola 2): equipo/usuario/nodo/turno con
+   * ABAC en el backend. `nodeId` = nodo de la entrada (acota equipo/turno); `q`
+   * filtra. Gateado por `logentry:view` (audiencia de llenado/lectura). Va ANTES
+   * de `:id` para que "references" no se interprete como un id.
+   */
+  @Get("references/:kind/options")
+  @RequirePermission("logentry:view")
+  referenceOptions(
+    @Param("kind") kind: string,
+    @Query(new ZodValidationPipe(referenceOptionsQuerySchema)) query: ReferenceOptionsQuery,
+    @CurrentUser() user: RequestUser,
+  ) {
+    if (!(REFERENCE_ENTITIES as readonly string[]).includes(kind)) {
+      throw new NotFoundException(`Entidad de referencia desconocida: ${kind}`);
+    }
+    return this.entries.referenceOptions(user.id, kind as ReferenceEntity, query);
   }
 
   /** Vista previa de una entrada NUEVA sin persistir (modo compose 2.8.2). Va ANTES

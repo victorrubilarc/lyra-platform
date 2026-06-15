@@ -54,12 +54,12 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 - ✍️ Lectura de auditoría (quién hizo qué, antes/después)
 
 ### 6. Plantillas / Form Builder  [Configurador]
-- ✅ **Catálogo de objetos del formulario** (Ola 1) (§ Plantillas ▸ Objetos del formulario)
+- ✅ **Catálogo de objetos del formulario** (Olas 1 y 2: básicos, selección, evaluación, **referencia**, presentación) (§ Plantillas ▸ Objetos del formulario)
 - ✅ Secciones y campos (tipos, obligatorios, ayuda) (§ Plantillas ▸ Secciones y campos)
 - ✅ Ancho de campo / layout en grilla (completo / mitad / tercio)
 - ✅ Umbrales de alerta (rangos warn/crit, ISA-18.2)
 - ✅ Lógica condicional (mostrar campo según otro) (§ Plantillas ▸ Lógica condicional)
-- ✍️ Borrador / publicar (versión inmutable)
+- ✅ Borrador / publicar (versión inmutable) (§ Plantillas ▸ Borrador y publicación)
 - ✍️ Alcance de estructura (en qué nodos vive la plantilla)
 - ✍️ Alcance por plantilla (quién ve qué plantillas) y acceso por rol
 - ✍️ Modo de equipo (ninguno/opcional/sugerido/requerido)
@@ -241,8 +241,16 @@ Elige uno (clic o arrástralo al lienzo) y ajústalo en el panel de propiedades.
   (chips de 1 toque). Varias opciones: **Casillas**, **Selección múltiple** o **Multiselección con
   modal** (ventana de búsqueda para listas largas). Todas pueden alimentarse de una **Lista de
   referencia** gobernada.
+- **Básicos (Ola 2).** **Lectura con tolerancia** (defines un *valor esperado ± tolerancia*; el sistema
+  marca solo la advertencia/crítico cuando la lectura se sale de la banda) y **Contador / acumulado**
+  (lectura incremental tipo horómetro/medidor: muestra el **delta** contra la última lectura sellada del
+  mismo equipo y, si lo activas, impide registrar un valor menor al anterior).
 - **Evaluación.** **Conforme / No conforme / N.A.** (tri-estado de inspección, con N.A. opcional),
-  **Severidad 1–5**, **Valoración** (estrellas, numérica o Likert con rótulos) y **Firma electrónica**.
+  **Severidad 1–5**, **Valoración** (estrellas, numérica o Likert con rótulos), **Matriz de riesgo**
+  (probabilidad × consecuencia → nivel de riesgo, ISO 31000) y **Firma electrónica**.
+- **Referencia** (apuntan a algo de la plataforma): **Equipo / activo** (acotado al nodo de la entrada),
+  **Usuario / responsable**, **Nodo de estructura** y **Turno**. Eliges de una lista buscable; el sistema
+  guarda la referencia y muestra su nombre.
 - **Presentación** (no piden dato): **Encabezado**, **Texto / instrucción**, **Separador**, **Aviso**
   (información/advertencia/éxito/peligro), **Enlace a procedimiento** e **Imagen de referencia** (por URL).
 
@@ -254,8 +262,35 @@ Elige uno (clic o arrástralo al lienzo) y ajústalo en el panel de propiedades.
   en reglas ni en el resumen de la grilla.
 - **RUT, correo, %, hora, duración y rango** validan su formato al guardar (en el servidor, no solo en
   pantalla). La duración se guarda en minutos y los montos/porcentajes se muestran con el formato regional.
+- Los objetos de **Referencia** se validan **en el servidor**: solo aceptan algo que **existe, está
+  activo y está dentro de tu alcance** (p. ej. un equipo debe pertenecer al nodo de la entrada). Las
+  opciones que ves ya están filtradas por tus permisos; el backend siempre decide.
+- La **matriz de riesgo** la configura el diseñador pintando la severidad de cada celda (ejes editables).
 - Cambiar un objeto crea un nuevo **borrador**; aplica a las entradas nuevas al **publicar** (la versión
   publicada queda inmutable).
+
+---
+
+## Plantillas ▸ Borrador y publicación (versión inmutable)  [Configurador]
+
+**Para qué sirve.** Separar el **diseño en curso** (lo que estás editando) de la **versión vigente**
+que se usa para registrar. Así puedes ajustar una plantilla sin afectar las bitácoras en marcha, y
+cuando esté lista la **publicas**: esa versión queda **congelada** (inmutable) para trazabilidad GxP.
+
+**Cómo se usa.**
+1. Editas la plantilla (secciones, campos, flujo, reglas): los cambios viven en un **borrador**.
+2. **Guardar borrador** conserva el avance sin afectar a nadie.
+3. **Publicar** crea una **versión nueva inmutable** y la deja vigente para las **entradas nuevas**.
+4. Las entradas ya creadas conservan la versión con la que nacieron (no se "re-escriben").
+
+**Quién puede.** El **Configurador** con `template:edit` (editar/guardar borrador) y la acción de
+**publicar** de la plantilla.
+
+**Importante.**
+- La **gobernanza** del contenedor (identidad, alcance de nodos/plantilla, modo de equipo, ventana de
+  edición, campos del resumen) se guarda **aparte** con *Guardar configuración* — **no** exige republicar.
+- Publicar **no toca** las entradas existentes; solo cambia la versión que usarán las nuevas.
+- Una plantilla **publicada** que vuelves a editar genera **otro borrador**; nada cambia hasta publicar.
 
 ---
 
