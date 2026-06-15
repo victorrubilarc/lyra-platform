@@ -100,7 +100,8 @@ export function SectionCanvas({
       isDroppable={canEdit}
       droppingItem={{ i: "__dropping__", w: 6, h: 1 }}
       onDrop={handleDrop}
-      onLayoutChange={(l) => commit(l)}
+      onDragStop={(l) => commit(l)}
+      onResizeStop={(l) => commit(l)}
     >
       {fields.map((f) => (
         <div
@@ -111,12 +112,16 @@ export function SectionCanvas({
             onSelectField(f.uid);
           }}
         >
-          <div className={styles.canvasItemLabel}>
-            {f.label}
-            {f.required && <span className={styles.canvasReq}>*</span>}
-          </div>
-          <div className={styles.canvasItemControl} aria-hidden>
-            <FieldControl field={f} value={undefined} onChange={() => undefined} />
+          {/* Inner recortado: el contenido no desborda; los handles (hermanos, fuera
+              de este inner) quedan visibles porque la raíz es overflow:visible. */}
+          <div className={styles.canvasItemInner}>
+            <div className={styles.canvasItemLabel}>
+              {f.label}
+              {f.required && <span className={styles.canvasReq}>*</span>}
+            </div>
+            <div className={styles.canvasItemControl} aria-hidden>
+              <FieldControl field={f} value={undefined} onChange={() => undefined} />
+            </div>
           </div>
         </div>
       ))}
