@@ -1376,7 +1376,7 @@
   cursor: grabbing;
   transform: scale(0.99);
 }
-.paletteItem:disabled {
+.paletteItemDisabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -1613,6 +1613,8 @@
 /* react-grid-layout: placeholder + handles con el acento de marca. */
 .rgl {
   position: relative;
+  /* Zona de drop garantizada aunque la sección esté vacía (RGL pone height:0). */
+  min-height: 140px;
 }
 .rglShowGrid {
   background-image: repeating-linear-gradient(

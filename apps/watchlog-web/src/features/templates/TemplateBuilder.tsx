@@ -564,9 +564,8 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
                                 </div>
                               </div>
 
-                              {s.fields.length === 0 ? (
-                                <div className={styles.emptySection}>{t("templates.builder.canvasDropHint")}</div>
-                              ) : device === "desktop" ? (
+                              {device === "desktop" ? (
+                                /* Lienzo SIEMPRE (también vacío ⇒ zona de drop con altura mínima). */
                                 <SectionCanvas
                                   fields={s.fields}
                                   canEdit={canEdit && !isPublishedView}
@@ -576,6 +575,8 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
                                   onGeometryChange={(geom) => updateFieldGeometry(s.uid, geom)}
                                   onDropNew={(type, x, y) => addFieldAtGeom(type, s.uid, x, y)}
                                 />
+                              ) : s.fields.length === 0 ? (
+                                <div className={styles.emptySection}>{t("templates.builder.canvasDropHint")}</div>
                               ) : (
                                 /* Preview responsivo (tablet/móvil): MISMO render que el operador. */
                                 <FieldGrid

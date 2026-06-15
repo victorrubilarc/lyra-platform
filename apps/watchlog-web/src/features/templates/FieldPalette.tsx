@@ -21,29 +21,37 @@ export function FieldPalette({ canEdit, onAdd }: { canEdit: boolean; onAdd: (typ
   const core = FIELD_TYPE_META.filter((m) => m.core && matches(m));
   const special = FIELD_TYPE_META.filter((m) => !m.core && matches(m));
 
-  const onDragStart = (e: DragEvent<HTMLButtonElement>, type: FieldType) => {
+  const onDragStart = (e: DragEvent<HTMLDivElement>, type: FieldType) => {
     e.dataTransfer.setData("text/plain", type);
     e.dataTransfer.effectAllowed = "copy";
   };
 
   const item = (m: FieldTypeMeta) => {
     const Icon = m.icon;
+    // DIV (no <button>): Chrome no inicia drag HTML5 confiable sobre botones.
     return (
-      <button
+      <div
         key={m.type}
-        type="button"
-        className={styles.paletteItem}
+        role="button"
+        tabIndex={canEdit ? 0 : -1}
+        aria-disabled={!canEdit}
+        className={`${styles.paletteItem}${canEdit ? "" : " " + styles.paletteItemDisabled}`}
         draggable={canEdit}
-        disabled={!canEdit}
-        onDragStart={(e) => onDragStart(e, m.type)}
+        onDragStart={(e) => canEdit && onDragStart(e, m.type)}
         onClick={() => canEdit && onAdd(m.type)}
+        onKeyDown={(e) => {
+          if (canEdit && (e.key === "Enter" || e.key === " ")) {
+            e.preventDefault();
+            onAdd(m.type);
+          }
+        }}
         title={t("templates.builder.paletteHint")}
       >
         <span className={styles.paletteIcon}>
           <Icon size={16} />
         </span>
         {t(m.labelKey)}
-      </button>
+      </div>
     );
   };
 
