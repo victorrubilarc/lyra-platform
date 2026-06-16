@@ -1619,6 +1619,7 @@ export const esCL = {
       back: "Volver a bitácoras",
       print: "Imprimir",
       edit: "Editar",
+      reportIncident: "Reportar incidencia",
       versionLabel: "Versión",
       equipment: "Equipo",
       sealedAt: "Sellada",

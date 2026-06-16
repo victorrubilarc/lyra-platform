@@ -511,6 +511,67 @@ export const PERMISSION_CATALOG = [
     group: "notifications",
     description: "Configurar el servidor de correo saliente (SMTP) del sistema y probar el envío.",
   },
+
+  // --- Incidencias operacionales / HSE (Fase 4.0) ----------------------------
+  // El ciclo de vida reutiliza WorkflowDefinition: QUIÉN puede ejecutar cada
+  // transición es DATO (roles por transición del flujo). Estas claves gobiernan
+  // el módulo y las acciones de alto nivel; la transición exige además el
+  // rol-dato. El alcance de datos (nodo) lo resuelve el ScopeService (ABAC).
+  {
+    key: "module:incidents:view",
+    dimension: "MODULE",
+    group: "incidents",
+    description: "Ver el módulo de incidencias (lista, tablero kanban y detalle).",
+  },
+  {
+    key: "incident:view",
+    dimension: "ACTION",
+    group: "incidents",
+    description: "Listar y ver incidencias.",
+  },
+  {
+    key: "incident:create",
+    dimension: "ACTION",
+    group: "incidents",
+    description: "Crear (reportar) incidencias, manualmente o desde una entrada de bitácora.",
+  },
+  {
+    key: "incident:edit",
+    dimension: "ACTION",
+    group: "incidents",
+    description: "Editar los atributos de una incidencia (severidad, prioridad, categoría, etc.).",
+  },
+  {
+    key: "incident:assign",
+    dimension: "ACTION",
+    group: "incidents",
+    description: "Asignar o cambiar el responsable de una incidencia.",
+  },
+  {
+    key: "incident:comment",
+    dimension: "ACTION",
+    group: "incidents",
+    description: "Agregar comentarios de gestión a una incidencia.",
+  },
+  {
+    key: "incident:transition",
+    dimension: "WORKFLOW",
+    group: "incidents",
+    description:
+      "Ejecutar transiciones de flujo y firmar una incidencia (QUIÉN puede cada transición es dato: roles por transición del flujo).",
+  },
+  {
+    key: "incident:cancel",
+    dimension: "ACTION",
+    group: "incidents",
+    description: "Anular (cancelar) una incidencia con motivo auditado (sin borrado físico).",
+  },
+  {
+    key: "incidentcatalog:manage",
+    dimension: "ACTION",
+    group: "incidents",
+    description: "Administrar el catálogo de tipos y categorías de incidencia.",
+  },
 ] as const satisfies readonly PermissionDef[];
 
 /** Unión literal de todas las claves de permiso conocidas. */

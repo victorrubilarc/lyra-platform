@@ -5,7 +5,10 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-16** (**Bloque N — Hardening de Notificaciones ✅** — `feat/notif-hardening`: **#1 config SMTP en BD**
+> actualización: **2026-06-16** (**Fase 4.0 — Núcleo de Incidencias ✅** — `feat/incidencias-nucleo`: módulo de incidencias
+> operacionales/HSE que reusa `WorkflowDefinition`; 6 entidades aditivas, catálogos configurables, lista+kanban+detalle, ABAC,
+> creación manual y desde bitácora, 9 permisos [cat. **77**], smoke 26/26. Plan por fases 4.1–4.5 aprobado [DECISIONS]. **Siguiente:
+> Fase 4.1 — Excepciones operacionales.** Anterior: **Bloque N — Hardening de Notificaciones ✅** — `feat/notif-hardening`: **#1 config SMTP en BD**
 > (pantalla en `/configuracion` tab "Correo saliente", permiso `notification:config` [cat. **68**]; `SystemSettings.email*`, `.env`
 > fallback, **contraseña CIFRADA write-only**, sin reiniciar; presets + probar conexión/envío contra Mailpit; sender suprime si está
 > apagado) **+ #2 editor de plantillas premium** (vista previa en vivo, diccionario de variables con descripción+ejemplo, insertar
@@ -205,6 +208,7 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Fase 2.3 Programación de rondas** (`LogSchedule`+`RoundOccurrence` + enum `RoundOccurrenceStatus` + migración `…_add_round_scheduling`; `enumerateOccurrences` puro + config por kind + 2 permisos `schedule:view/manage`; módulo API `schedules/` [CRUD/generate/start/skip/occurrences/stats] + hook de cierre en `LogEntriesService` + `ShiftResolver.calendarForNode`; página `/rondas` + `ScheduleDrawer` + badge en `/bitacoras` + menú/i18n; contracts 249 · API 234 · smoke 21/21) | `feat/programacion-rondas` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Fase 2.3.1 Worklist de rondas (separar planificar/ejecutar)** (permiso `round:execute` [cat. 63] + `LogSchedule.responsibleRoleId?` [FK Role SetNull] + migración `…_add_schedule_responsible_role`; `GET /schedules/my-rounds`+`/stats` [responsabilidad EN VIVO por rol ∩ ABAC ∩ turno] + `role-options` + start/skip re-gateados; web `/mis-rondas` [MyRoundsPage] + `/rondas` relabel "Programación de rondas" [monitoreo read-only + selector de rol] + widget Inicio + badge→mis-rondas + nav/i18n; contracts 249 · API 234 · smoke `smoke-mis-rondas.py` 18/18 + `smoke-rondas.py` 21/21) | `feat/rondas-worklist` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Bloque N Notificaciones (motor de avisos por correo)** (5 entidades `Notification*` + 4 enums + migración `…_add_notifications` [aditiva]; catálogo `NOTIFICATION_EVENTS` [4] + render sin eval + 4 permisos [cat. **67**]; `@nestjs/schedule`; API `notifications/` [emitter in-tx en `executeTransition`, channel/EmailChannel, resolver ABAC, worker sweeper/dispatcher/sender con backoff, service CRUD+bandeja, `POST /run`]; sweeper GENERA rondas antes de escanear vencidas + SLA breaches; seed 4 plantillas; web `/notificaciones` [Correo saliente/Plantillas/Mis preferencias] + `/mis-notificaciones` + nav/topbar/i18n; contracts 255 · API 234 · smoke `smoke-notificaciones.py` 17/17) | `feat/notificaciones` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
+| **Fase 4.0 Núcleo de Incidencias** (6 entidades `Incident`/`IncidentType`/`IncidentCategory`/`IncidentComment`/`IncidentActivity`/`IncidentTransition` + 3 enums + migración `…_add_incidents` aditiva; `@lyra/contracts/incidents` + 9 permisos [cat. **77**]; `IncidentsService` [ABAC por nodo, workflow reusado + reauth Part 11, catálogos, SLA derivado] + controller + módulo; seed flujo `incidencia-operacional` + 13 tipos + 13 categorías; web `features/incidents/` [/incidencias lista+kanban+GridPager, drawer detalle+stepper+transiciones, modal crear, botón "Reportar incidencia" en el visor] + nav/i18n; contracts 255 · API 234 · smoke `smoke-incidencias.py` 26/26) | `feat/incidencias-nucleo` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 
 **Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
@@ -294,6 +298,29 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
       celda · tabla ANIDADA · columnas de la matriz desde el calendario operacional en vivo (ShiftResolver) · pulido fino
       sticky/scroll/táctil en tablet.
 - [ ] **Ola 5 — origen de datos (Fase 3).** Lectura autocompletada desde tag SCADA/PI/OPC (modelar + stub).
+
+### Incidencias (Fase 4) — fases siguientes (plan aprobado 2026-06-16, DECISIONS)
+- [x] **4.0 — Núcleo ✅** (`feat/incidencias-nucleo`): Incident + catálogos + manual + link desde entrada + workflow reusado +
+      lista/kanban + ABAC + auditoría + navegación bitácora↔incidencia.
+- [ ] **4.1 — Excepciones operacionales desde bitácoras.** `LogEntryException` + `IncidentExceptionLink`; detección desde umbral/
+      valor inválido/crítico (reusa `thresholdBand`/reglas); panel de excepciones en la bitácora; convertir/asociar/agrupar/descartar
+      con motivo/corregir valor con trazabilidad (preserva original); deduplicación por sugerencia; **acción "abrir incidencia" del
+      motor de reglas vía evento DIFERIDO** (reusa el outbox transaccional del Bloque N).
+- [ ] **4.2 — Investigación + CAPA.** `IncidentInvestigation` (5 Porqués + causa inmediata/básica/raíz + lección) + `IncidentAction`
+      (CAPA con responsable/plazo/evidencia/**verificación de eficacia**/reapertura); bloqueo de cierre si hay CAPA obligatorias
+      abiertas; **registro Part 11 con `payloadHash` para incidencias** (hoy 4.0 exige re-auth pero no persiste la firma criptográfica);
+      adjuntos a nivel de incidencia (MinIO, patrón Ola 3).
+- [ ] **4.3 — HSE Chile / minería.** Clasificación (near-miss/CTP/STP/enf. profesional/ambiental/derrame/daño) + potencial de gravedad
+      fino + flags reportables (SERNAGEOMIN/mutualidad) + DIAT/DIEP (registro/adjunto) + **IF/IG** (requiere fuente de **HH trabajadas**,
+      que HOY no existe) + ICAM como plantilla de investigación (evaluar reuso del form-builder).
+- [ ] **4.4 — SLA + Notificaciones + Escalamiento.** SLA por estado/tipo/severidad + escalamiento + integración Bloque N (creación/
+      asignación/cambio de estado/SLA/crítica/CAPA vencida). **← roza el épico de notificaciones avanzadas** (abajo).
+- [ ] **4.5 — Dashboard e indicadores** (por tipo/estado/severidad/nodo/equipo/turno/origen + tendencias + reincidencias + MTTR + SLA +
+      CAPA + IF/IG + heatmap + export).
+- [ ] **Deuda fina 4.0:** equipo en el modal de creación (hoy solo en edición; el modelo lo soporta) · `incident:export` (CSV) ·
+      facetas/SavedView/peek/multi-sort en la lista (hoy filtros + paginación; el resto de la grilla premium = follow-up) · drag&drop
+      en el kanban (hoy clic para abrir + transición por botón con guarda server-side) · resolver id→label de `originLogEntryNumber`
+      sin query extra · vistas semilla guardadas (Mis/Críticas/Vencidas…).
 
 ### Notificaciones (Bloque N) — deuda diferida (registrada 2026-06-16)
 - [ ] **Digest / batching** (resumen diario/horario por usuario). El modelo ya tiene `NotificationPreference.mode IMMEDIATE|DIGEST|OFF`;

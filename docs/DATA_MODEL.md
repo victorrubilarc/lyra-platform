@@ -484,11 +484,32 @@ tabla existente. El catálogo de EVENTOS vive en CÓDIGO (`@lyra/contracts NOTIF
 - **DataSource** — URL base, tipo de auth, **credencial cifrada en reposo**. *1—N* **DataSourceEndpoint** (path, método, mapeo JSONPath, TTL). Caché en Redis. **Espejo ENTRANTE:** en Fase 3 un endpoint puede **alimentar/materializar** una `ReferenceList` (`source=EXTERNAL`).
 
 ### Incidencias (workflow HSE)
-- **Incident** — severidad, prioridad, estado, asignado, reporter, SLA/due, protocolo, origen.
-- **IncidentComment**, **IncidentActivity** (timeline append-only), **IncidentAttachment**.
-- **Flujo de incidencias** — reutiliza la entidad **WorkflowDefinition** ya implementada en Fase 2.2 (estados +
-  transiciones + roles por transición). En Fase 4 una incidencia instancia/avanza por un flujo configurable, igual
-  patrón que los registros de bitácora; no se duplica el modelo de máquina de estados.
+> **Fase 4.0 (implementado — núcleo):** migración `20260616180000_add_incidents`. Single-tenant: aislamiento por
+> NODO/PLANTILLA (ABAC), **sin `tenantId`**. El ciclo de vida **reutiliza `WorkflowDefinition`** (Fase 2.2): la
+> incidencia CONGELA una versión de flujo (denormalizada, patrón `LogEntry`) y avanza por sus transiciones con las
+> mismas guardas (rol-dato + firma Part 11 opt-in re-autenticada). **Sin borrado físico** (anulación = `lifecycle`
+> CANCELED con motivo); timeline **append-only**. Las referencias a usuario/flujo/entrada son **blandas** (sin FK,
+> patrón AuditLog). Ver DECISIONS 2026-06-16.
+- **IncidentType** *(implementado)* — catálogo CONFIGURABLE con **flags de comportamiento**: `key`/`name`/`color`,
+  `defaultWorkflowId?` (flujo que se congela al crear; ref. blanda), `requiresInvestigation`/`requiresCapa`/
+  `reportableDefault` (se honran en 4.2/4.3), `active`, `sortOrder`. Seed de 13 tipos.
+- **IncidentCategory** *(implementado)* — subtipos opcionalmente colgados de un tipo (`typeId?`). Seed de 13.
+- **Incident** *(implementado)* — `number` (folio `INC-####` derivado), `title`/`description`, `typeId`/`categoryId?`,
+  `severity` (1..5) + `potentialSeverity?` (MPL), `priority` (LOW/MEDIUM/HIGH/CRITICAL), `riskProbability?`/
+  `riskConsequence?` (ISO 31000, `riskLevelFor`), `originType` (MANUAL/LOG_ENTRY/EXCEPTION/RULE), `lifecycle`
+  (OPEN/CLOSED/CANCELED, denormalizado para filtros/KPIs), `workflowDefinitionId?`/`workflowDefinitionVersionId?`/
+  `currentStateKey?` + `currentStateSince` (base del SLA de permanencia, reusa `evaluateSla`/`maxStayMinutes`),
+  `orgNodeId` (FK Restrict) / `equipmentId?` (FK SetNull) / `shiftCode?`, `originLogEntryId?` (ref. blanda),
+  `reporterId?`/`ownerId?`, `dueAt?`, `reportable`, `closedAt?`/`closedById?`/`closureSummary?`, `canceledAt?`/
+  `cancelReason?`/`canceledById?`.
+- **IncidentComment** *(implementado)* — comentario de gestión (autor + snapshot de nombre).
+- **IncidentActivity** *(implementado)* — timeline **append-only**: `kind` (CREATED/ASSIGNED/FIELD_CHANGED/TRANSITION/
+  COMMENT/CLOSED/CANCELED) + `summary` + actor + `metadata` jsonb.
+- **IncidentTransition** *(implementado)* — transición de flujo EJECUTADA (espejo de `LogEntryTransition`): versión de
+  flujo congelada + `transitionKey`/`fromStateKey`/`toStateKey` + actor + `reason?` + `signatureId?` (ref. blanda).
+- **Diferido (4.1+):** `LogEntryException` + `IncidentExceptionLink` (capa de excepción, 4.1) · `IncidentInvestigation`/
+  `IncidentRcaAnswer`/`IncidentAction` (CAPA, 4.2) · `IncidentRegulatoryFlag`/clasificación minera/IF-IG (4.3) ·
+  adjuntos a nivel de incidencia (MinIO, patrón Ola 3) · registro Part 11 con `payloadHash` para incidencias (4.2).
 
 ### Turnos
 - **ShiftPattern** *1—N* **Shift** — régimen configurable.

@@ -1,5 +1,34 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-16 — Fase 4.0: Núcleo de Incidencias operacionales / HSE ✅** (`feat/incidencias-nucleo` → `main`). Primera fase del
+módulo de incidencias, tras una sesión de investigación + diseño + plan por fases aprobado (DECISIONS 2026-06-16; 14 forks resueltos
+en la opción recomendada; **single-tenant confirmado → SIN `tenantId`**). **Reusa `WorkflowDefinition`** para el ciclo de vida: la
+incidencia CONGELA una versión de flujo (denormalizada, patrón `LogEntry`) y avanza por sus transiciones con las MISMAS guardas
+(estado origen + rol-dato `WorkflowTransitionRole` + ABAC por nodo + **firma Part 11 opt-in re-autenticada** con `ReauthService`).
+**Modelo (6 entidades aditivas):** `IncidentType`/`IncidentCategory` (catálogos CONFIGURABLES con flags de comportamiento:
+defaultWorkflow, requiresInvestigation/Capa, reportableDefault), `Incident` (folio `INC-####`, severidad 1..5 + potencial de
+gravedad, prioridad, riesgo ISO 31000, `lifecycle` OPEN/CLOSED/CANCELED denormalizado, origen MANUAL/LOG_ENTRY/EXCEPTION/RULE,
+ligazón nodo/equipo/turno/entrada, SLA de permanencia reusando `evaluateSla`/`maxStayMinutes`), `IncidentComment`,
+`IncidentActivity` (timeline **append-only**), `IncidentTransition` (espejo de `LogEntryTransition`). **Sin borrado físico**
+(anulación = CANCELED con motivo); referencias blandas a usuario/flujo/entrada (patrón AuditLog). **Contratos** (`@lyra/contracts/
+incidents`): enums + DTOs + requests + `deriveLifecycle` + **9 permisos** (`module:incidents:view`, `incident:view/create/edit/
+assign/comment/transition[dim. WORKFLOW]/cancel`, `incidentcatalog:manage`; catálogo **68→77**). **API** `incidents/`:
+`IncidentsService` (ABAC por nodo en list/detail/mutaciones; `buildWhere` con filtros + paginación; resolución batched de nombres;
+SLA derivado; `resolveWorkflow` = flujo del tipo → global `incidencia-operacional`; transición con guardas + reauth; catálogos)
++ controller (list/detail/stats/users/types/categories + create/update/assign/comments/transitions/cancel) + módulo (importa
+AuthModule por `ReauthService`). **Seed**: flujo `incidencia-operacional` PUBLICADO (6 estados reportada→…→cerrada) + 13 tipos +
+13 categorías (idempotente). **Migración aditiva** `20260616180000_add_incidents` (se quitó del diff un `DROP INDEX` AJENO).
+**Web** (`features/incidents/`): página `/incidencias` (KPIs clicables · **filtros en UNA línea** · tabs **Lista**/**Tablero
+kanban** · **`GridPager` arriba y abajo** · tabla premium · kanban por estado del flujo) + **drawer de detalle** (stepper de
+estados · bloque Origen navegable a la bitácora · asignar responsable · transiciones con modal de confirmación/firma · comentarios ·
+timeline · anular) + **modal de creación** (manual o desde bitácora, picker de nodo) + **botón "Reportar incidencia" en el visor de
+bitácora** (`?fromEntry=&fromNode=`, trazabilidad entrada→incidencia) + ítem de menú + i18n es-CL + tokens Lyra. Tests:
+**contracts 255 · API 234** sin regresión. **Smoke en vivo `scripts/smoke-incidencias.py` 26/26** (catálogos · crear manual con folio/
+flujo/estado inicial/timeline · validación 400 severidad+nodo · editar con huella · asignar · comentar · recorrer flujo a cierre +
+transición inválida · lista/stats · anular · desde bitácora originType LOG_ENTRY · gates 403; crea y LIMPIA por ID). typecheck/lint(0)/
+build verdes. **Pendiente: smoke VISUAL del dueño.** **Siguiente: Fase 4.1 — Excepciones operacionales desde bitácoras.**
+🔔 Recordatorio: épico de **notificaciones avanzadas** sigue pendiente (`docs/prompts/notificaciones-avanzadas.md`).
+
 **2026-06-16 — Notificaciones: rediseño de la pantalla de PLANTILLAS (escala enterprise) ✅** (`feat/notif-templates-ux` → `main`).
 Por feedback del dueño (el 3-columnas quedaba apretado y no escalaba a "muchísimas plantillas"). Patrón **master-detail** de clase
 mundial (SendGrid/Customer.io/ServiceNow): **(1) lista administrable** = toolbar con **buscador + filtro por grupo de evento +

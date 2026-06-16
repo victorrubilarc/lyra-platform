@@ -15,6 +15,7 @@ import { DEMO_EQUIPMENT, EQUIPMENT_CATEGORIES } from "./equipment-seed-data.js";
 import { REFERENCE_LISTS } from "./reference-data-seed.js";
 import { DEMO_CALENDAR, DEMO_FISCAL_CALENDAR } from "./operational-calendar-seed.js";
 import { NOTIFICATION_TEMPLATE_SEEDS } from "./notification-templates-seed.js";
+import { INCIDENT_WORKFLOW, INCIDENT_TYPES, INCIDENT_CATEGORIES } from "./incidents-seed-data.js";
 
 const prisma = new PrismaClient();
 
@@ -420,6 +421,91 @@ async function seedNotificationTemplates(): Promise<void> {
   console.log(`✔ Plantillas de notificación: ${created} creadas, ${NOTIFICATION_TEMPLATE_SEEDS.length - created} ya existían`);
 }
 
+// Flujo de incidencias por defecto (Fase 4.0). Reusa WorkflowDefinition: crea la
+// definición + UNA versión PUBLICADA con sus estados y transiciones. Idempotente:
+// si ya existe la definición por clave, no la recrea.
+async function seedIncidentWorkflow(): Promise<void> {
+  const existing = await prisma.workflowDefinition.findFirst({ where: { key: INCIDENT_WORKFLOW.key } });
+  if (existing) {
+    console.log(`• Flujo de incidencias "${INCIDENT_WORKFLOW.key}" ya existe: no se recrea`);
+    return;
+  }
+  const def = await prisma.workflowDefinition.create({
+    data: { key: INCIDENT_WORKFLOW.key, name: INCIDENT_WORKFLOW.name, description: INCIDENT_WORKFLOW.description, status: "PUBLISHED" },
+  });
+  const version = await prisma.workflowDefinitionVersion.create({
+    data: {
+      workflowDefinitionId: def.id,
+      versionNumber: 1,
+      status: "PUBLISHED",
+      name: INCIDENT_WORKFLOW.name,
+      description: INCIDENT_WORKFLOW.description,
+      publishedAt: new Date(),
+    },
+  });
+  const stateIdByKey = new Map<string, string>();
+  for (const s of INCIDENT_WORKFLOW.states) {
+    const row = await prisma.workflowState.create({
+      data: {
+        workflowDefinitionVersionId: version.id,
+        key: s.key,
+        name: s.name,
+        order: s.order,
+        isInitial: s.isInitial,
+        isFinal: s.isFinal,
+        color: s.color,
+      },
+    });
+    stateIdByKey.set(s.key, row.id);
+  }
+  let order = 0;
+  for (const t of INCIDENT_WORKFLOW.transitions) {
+    await prisma.workflowTransition.create({
+      data: {
+        workflowDefinitionVersionId: version.id,
+        key: t.key,
+        label: t.label,
+        fromStateId: stateIdByKey.get(t.from)!,
+        toStateId: stateIdByKey.get(t.to)!,
+        order: order++,
+      },
+    });
+  }
+  await prisma.workflowDefinition.update({ where: { id: def.id }, data: { currentVersionId: version.id } });
+  console.log(`✔ Flujo de incidencias "${INCIDENT_WORKFLOW.key}" publicado (${INCIDENT_WORKFLOW.states.length} estados)`);
+}
+
+// Catálogo de tipos/categorías de incidencia (configurable; upsert idempotente por clave).
+async function seedIncidentCatalog(): Promise<void> {
+  const typeIdByKey = new Map<string, string>();
+  for (const t of INCIDENT_TYPES) {
+    const row = await prisma.incidentType.upsert({
+      where: { key: t.key },
+      create: {
+        key: t.key,
+        name: t.name,
+        description: t.description,
+        color: t.color,
+        requiresInvestigation: t.requiresInvestigation,
+        requiresCapa: t.requiresCapa,
+        reportableDefault: t.reportableDefault,
+        sortOrder: t.sortOrder,
+      },
+      update: { name: t.name, description: t.description, color: t.color, sortOrder: t.sortOrder },
+    });
+    typeIdByKey.set(t.key, row.id);
+  }
+  for (const c of INCIDENT_CATEGORIES) {
+    const typeId = c.typeKey ? typeIdByKey.get(c.typeKey) ?? null : null;
+    await prisma.incidentCategory.upsert({
+      where: { key: c.key },
+      create: { key: c.key, name: c.name, typeId, sortOrder: c.sortOrder },
+      update: { name: c.name, typeId, sortOrder: c.sortOrder },
+    });
+  }
+  console.log(`✔ Catálogo de incidencias sincronizado: ${INCIDENT_TYPES.length} tipos, ${INCIDENT_CATEGORIES.length} categorías`);
+}
+
 async function main(): Promise<void> {
   await seedPermissions();
   await seedAdminRole();
@@ -432,6 +518,8 @@ async function main(): Promise<void> {
   await seedDemoEquipment();
   await seedReferenceData();
   await seedOperationalCalendar();
+  await seedIncidentWorkflow();
+  await seedIncidentCatalog();
 }
 
 main()
