@@ -646,6 +646,21 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
           (y horarios al crecer); **endpoint de FACETAS** para poblar los dropdowns completos (como `/log-entries/facets`); el
           selector de EQUIPO como **value-help con typeahead server-side** sobre el catálogo de equipos en alcance (no derivado de la
           página). Mientras el volumen sea bajo (config + demos) el MVP basta; agendar antes de un cliente con alto volumen.
+    - [ ] **RONDAS · "RUN MODE" — ejecución guiada de la ronda (UX premium del OPERADOR). Retomar DESPUÉS de Notificaciones,
+          con PLAN DETALLADO (idea capturada 2026-06-16, pedido del dueño).** Hoy al "Iniciar" se cae en la pantalla genérica de
+          llenado; lo potente es un **modo a pantalla completa, paso a paso**, pensado para hacerse caminando en terreno
+          (tablet/guantes). **Alcance #1 (recomendado, frontend, reusa `FieldControl`/secciones — NO reinventa validación):**
+          una cosa a la vez (sección/equipo por pantalla) · **barra de progreso** ("3 de 8") · botón gigante Siguiente · áreas
+          táctiles enormes + teclado numérico grande · swipe entre equipos · **resumen final** (qué quedó fuera de rango) antes de
+          sellar. Patrón apps móviles SAP PM / Maximo / j5. **Complementos de alto impacto:** **(A)** "**Todo conforme**" por
+          excepción (pre-llena lo esperado, el operador solo toca lo anómalo — velocidad en rondas rutinarias; review-by-exception
+          en CAPTURA); **(B)** **escanear el equipo → abre su ronda** (reusa el escáner QR de Ola 3 `@zxing` + endpoint resolver
+          equipo→ocurrencia); **(C)** **tendencia/lectura anterior en línea** al capturar un número (valor previo + mini-sparkline +
+          delta; extiende el contador/delta de Ola 2). **Estratégica aparte (mayor esfuerzo, su propio proyecto):** **modo OFFLINE**
+          (PWA offline-first: descargar mis rondas → llenar sin señal → sincronizar con manejo de conflictos GxP) — alto valor en
+          faena minera sin cobertura. **Nota de criterio:** es UX del FLUJO DE LLENADO (no de la pantalla de rondas) ⇒ tratarlo como
+          su PROPIA sesión con plan/forks (un objetivo por sesión). **Al retomar: redactar el plan detallado del Run Mode (forks,
+          alcance, mockup en texto) y esperar visto bueno antes de codear.**
   - [x] **2.4 Llenado (Nueva entrada) multi-actor** ✅ (2026-06-10). Tablas `LogEntry`/`LogEntrySection`/
         `LogEntryValue`/`LogEntryFieldChange` (aditivas). Secciones editables por estado+rol (dato `TemplateSectionRole`
         + override por campo) × ABAC; validación 100% en servidor (`validateFieldValue` = fuente única reusada en
