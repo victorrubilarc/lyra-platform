@@ -58,7 +58,12 @@ el área); **paginación ARRIBA y ABAJO** de ambas grillas (`GridPager` propio r
 · se dejó de usar el paginado interno del Table para poder montarlo arriba y abajo); **más columnas** (Horarios +Plazo; Ocurrencias
 +Plantilla +Entrada N.º); **tooltips** en los botones (`Tooltip` @lyra/ui); **"Generar" contextualizado** → movido del header a la
 pestaña Ocurrencias (es materializar ocurrencias) con tooltip explicativo. Frontend puro. typecheck/lint(0)/build verdes.
-**+ demo `seed-demo-estanques.py`** (5 estanques como
+**+ Follow-up UX 7 — Mis rondas paginada (`feat/mis-rondas-paginada`):** la agenda del operador conserva lo bueno
+(agrupación por urgencia Vencidas→Hoy→Próximas, hora prominente, filtros, ejecutar) pero ahora **lista PLANA paginada** con
+**encabezados de grupo EN LÍNEA** (cuando cambia el bucket) + **`GridPager` arriba y abajo** (sin scroll infinito con cientos de
+rondas); **más info** en la tarjeta (la **plantilla/bitácora** a llenar) y **barra de filtros en UNA línea** (mismo fix que el
+planificador: búsqueda acotada + `toggles` `display:contents` + selects de ancho fijo). Frontend puro. typecheck/lint(0)/build
+verdes. **+ demo `seed-demo-estanques.py`** (5 estanques como
 equipos + ronda cada hora + umbrales) y **Route (fan-out por equipo) anotado en BACKLOG**. **Pendiente: smoke VISUAL del dueño**
 (§4). **Siguiente: Notificaciones (correo).**
 
