@@ -97,9 +97,16 @@ export class SchedulesService {
       where: { scheduleId: { in: rows.map((r) => r.id) }, status: "PENDING", dueAt: { lt: now } },
       _count: { _all: true },
     });
+    // "Próxima ronda" (next call date, patrón SAP PM): la ocurrencia PENDING más temprana.
+    const nextAt = await this.prisma.roundOccurrence.groupBy({
+      by: ["scheduleId"],
+      where: { scheduleId: { in: rows.map((r) => r.id) }, status: "PENDING" },
+      _min: { scheduledFor: true },
+    });
     const pendMap = new Map(grouped.map((g) => [g.scheduleId, g._count._all]));
     const overMap = new Map(overdue.map((g) => [g.scheduleId, g._count._all]));
-    return rows.map((r) => this.toScheduleDto(r, pendMap.get(r.id) ?? 0, overMap.get(r.id) ?? 0));
+    const nextMap = new Map(nextAt.map((g) => [g.scheduleId, g._min.scheduledFor]));
+    return rows.map((r) => this.toScheduleDto(r, pendMap.get(r.id) ?? 0, overMap.get(r.id) ?? 0, nextMap.get(r.id) ?? null));
   }
 
   async getDetail(userId: string, id: string): Promise<LogScheduleDto> {
@@ -494,7 +501,7 @@ export class SchedulesService {
     return row;
   }
 
-  private toScheduleDto(row: ScheduleRow, pendingCount?: number, overdueCount?: number): LogScheduleDto {
+  private toScheduleDto(row: ScheduleRow, pendingCount?: number, overdueCount?: number, nextOccurrenceAt?: Date | null): LogScheduleDto {
     return {
       id: row.id,
       name: row.name,
@@ -516,6 +523,7 @@ export class SchedulesService {
       updatedAt: row.updatedAt.toISOString(),
       ...(pendingCount !== undefined ? { pendingCount } : {}),
       ...(overdueCount !== undefined ? { overdueCount } : {}),
+      ...(nextOccurrenceAt !== undefined ? { nextOccurrenceAt: nextOccurrenceAt?.toISOString() ?? null } : {}),
     };
   }
 

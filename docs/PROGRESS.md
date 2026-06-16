@@ -30,7 +30,13 @@ táctiles con conteo), **filtro por área** (select), **selector de HORIZONTE de
 más urgente arriba); tag del equipo destacado en cada fila. **+ Fila estilo agenda:** columna de **HORA prominente** (24h, Sora,
 tabular-nums) a la izquierda con **cuenta regresiva de urgencia** ("Vence en 45 min" ámbar / "Vencida hace 2 h" rojo / "Vence
 HH:MM") y etiqueta de día (Mañana / "Jue 18") para próximas; `formatTime` regional nuevo en `lib/format`. Todo client-side sobre
-el worklist (sin tocar API). **+ demo `seed-demo-estanques.py`** (5 estanques como
+el worklist (sin tocar API). **+ Follow-up UX 3 — PLANIFICADOR (`feat/programacion-herramientas`):** "Programación de rondas"
+llevada a list-report estilo SAP PM (IP10/IP24) · Maximo (PM) · Fiori "Manage Maintenance Plans" — **filter bar** (búsqueda +
+estado activo/pausado + recurrencia + área), **KPIs de salud** (horarios activos/pausados + rondas pendientes/vencidas),
+**frecuencia legible** ("Cada turno"/"Cada 6 h"/"08:00, 20:00 · Lun a Vie"), **columna "Próxima ronda"** (= *next call date* de SAP;
+campo nuevo aditivo `LogScheduleDto.nextOccurrenceAt` = `_min(scheduledFor)` de las PENDING, con realce si está atrasada),
+**pausar/activar EN LÍNEA** (toggle que reusa update con el payload del dto), y **monitoreo de ocurrencias plegable** (query
+gateada por expansión). Contracts 249 · API 234. **+ demo `seed-demo-estanques.py`** (5 estanques como
 equipos + ronda cada hora + umbrales) y **Route (fan-out por equipo) anotado en BACKLOG**. **Pendiente: smoke VISUAL del dueño**
 (§4). **Siguiente: Notificaciones (correo).**
 

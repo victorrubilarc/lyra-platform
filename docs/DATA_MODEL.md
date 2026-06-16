@@ -311,8 +311,10 @@
   la liga; al **sellar** (submit/transición) la ocurrencia → COMPLETED; **VOID** del borrador la desliga → PENDING. Permisos
   `schedule:view`/`schedule:manage` (planificador) + **`round:execute`** (operador: ver+ejecutar "Mis rondas"; catálogo **63**,
   Fase 2.3.1). ABAC por nodo. **Worklist (2.3.1):** `GET /schedules/my-rounds` acota `PENDING ∩ nodos accesibles ∩ schedule
-  {responsibleRoleId null|∈ roles del usuario}`. Diferido: multi-nodo · fan-out por equipo (Route) · floating ·
-  completion-requirement · cron · rol responsable MULTI.
+  {responsibleRoleId null|∈ roles del usuario}`. El listado del planificador (`GET /schedules`) expone además por horario
+  `pendingCount`/`overdueCount` y **`nextOccurrenceAt`** (DTO; = `_min(scheduledFor)` de las ocurrencias PENDING, "next call date"
+  estilo SAP PM; no es columna persistida). Diferido: multi-nodo · fan-out por equipo (Route) · floating · completion-requirement ·
+  cron · rol responsable MULTI.
 
 ### Calendario FISCAL (período contable transversal)
 > **Fase 2.7.1.1 (implementado):** migración `20260611210000_add_fiscal_calendar` + script `db:migrate-fiscal` +

@@ -29,8 +29,8 @@ export function useSchedules() {
   return useQuery({ queryKey: SCHEDULE_KEYS.list(), queryFn: fetchSchedules });
 }
 
-export function useOccurrences(q: OccurrenceQuery = {}) {
-  return useQuery({ queryKey: SCHEDULE_KEYS.occurrences(q), queryFn: () => fetchOccurrences(q) });
+export function useOccurrences(q: OccurrenceQuery = {}, enabled = true) {
+  return useQuery({ queryKey: SCHEDULE_KEYS.occurrences(q), queryFn: () => fetchOccurrences(q), enabled });
 }
 
 export function useOccurrenceStats(enabled = true) {

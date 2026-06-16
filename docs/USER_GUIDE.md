@@ -135,6 +135,17 @@ patrón de rondas de operador / planes de mantención de la industria (SAP PM, M
 6. Las próximas rondas aparecen al toque en la lista (monitoreo). El botón **"Generar"** las
    refresca a mano (también se preparan solas al abrir la pantalla).
 
+**Herramientas de la lista (para analizar y encontrar).** La tabla de horarios funciona como
+los grandes sistemas de mantención (SAP PM, Maximo, Fiori):
+- **Buscador** por nombre, plantilla, área, equipo o responsable.
+- **Filtros**: estado (activos/pausados), tipo de recurrencia y área.
+- **KPIs de salud** arriba: horarios activos, pausados, rondas pendientes y vencidas.
+- **Frecuencia legible** por horario ("Cada turno", "Cada 6 h", "08:00, 20:00 · Lun a Vie").
+- **Próxima ronda**: cuándo abre la siguiente ocurrencia de cada horario (se marca en rojo si
+  ya está atrasada).
+- **Pausar / activar en un clic** con el interruptor de la columna *Estado* (sin entrar a editar).
+- **Monitoreo de ocurrencias** plegable al final (lo que ya se generó), para no estorbar la vista.
+
 **Quién puede.** Ver la programación requiere el permiso **"Ver rondas"** (`schedule:view`);
 crear o editar horarios requiere **"Administrar rondas"** (`schedule:manage`). Es un rol de
 **planificador**, distinto del que diseña la plantilla y del operador que las ejecuta. Cada

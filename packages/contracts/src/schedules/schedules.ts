@@ -106,6 +106,8 @@ export const logScheduleSchema = z.object({
   /** Conteos para la grilla (opcionales; los rellena el listado). */
   pendingCount: z.number().int().optional(),
   overdueCount: z.number().int().optional(),
+  /** Próxima ronda = instante de la ocurrencia PENDING más temprana (ISO; null = ninguna). Patrón "next call date" de SAP PM. */
+  nextOccurrenceAt: z.string().nullable().optional(),
 });
 export type LogScheduleDto = z.infer<typeof logScheduleSchema>;
 
