@@ -1,0 +1,78 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { CreateLogScheduleRequest, UpdateLogScheduleRequest, OccurrenceQuery } from "@lyra/contracts";
+import {
+  createSchedule,
+  deleteSchedule,
+  fetchOccurrenceStats,
+  fetchOccurrences,
+  fetchSchedules,
+  generateSchedules,
+  skipOccurrence,
+  startOccurrence,
+  updateSchedule,
+} from "./schedules-api.js";
+
+export const SCHEDULE_KEYS = {
+  all: ["schedules"] as const,
+  list: () => ["schedules", "list"] as const,
+  occurrences: (q: OccurrenceQuery) => ["schedules", "occurrences", q] as const,
+  stats: () => ["schedules", "stats"] as const,
+};
+
+export function useSchedules() {
+  return useQuery({ queryKey: SCHEDULE_KEYS.list(), queryFn: fetchSchedules });
+}
+
+export function useOccurrences(q: OccurrenceQuery = {}) {
+  return useQuery({ queryKey: SCHEDULE_KEYS.occurrences(q), queryFn: () => fetchOccurrences(q) });
+}
+
+export function useOccurrenceStats(enabled = true) {
+  return useQuery({ queryKey: SCHEDULE_KEYS.stats(), queryFn: fetchOccurrenceStats, enabled });
+}
+
+function invalidateAll(qc: ReturnType<typeof useQueryClient>): void {
+  qc.invalidateQueries({ queryKey: SCHEDULE_KEYS.all });
+}
+
+export function useCreateSchedule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (dto: CreateLogScheduleRequest) => createSchedule(dto),
+    onSuccess: () => invalidateAll(qc),
+  });
+}
+
+export function useUpdateSchedule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, dto }: { id: string; dto: UpdateLogScheduleRequest }) => updateSchedule(id, dto),
+    onSuccess: () => invalidateAll(qc),
+  });
+}
+
+export function useDeleteSchedule() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (id: string) => deleteSchedule(id), onSuccess: () => invalidateAll(qc) });
+}
+
+export function useGenerateSchedules() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (scheduleId?: string) => generateSchedules(scheduleId), onSuccess: () => invalidateAll(qc) });
+}
+
+export function useStartOccurrence() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, equipmentId }: { id: string; equipmentId?: string | null }) => startOccurrence(id, equipmentId),
+    onSuccess: () => invalidateAll(qc),
+  });
+}
+
+export function useSkipOccurrence() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) => skipOccurrence(id, reason),
+    onSuccess: () => invalidateAll(qc),
+  });
+}

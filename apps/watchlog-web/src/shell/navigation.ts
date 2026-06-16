@@ -1,4 +1,4 @@
-import { BookOpenCheck, CalendarClock, CalendarRange, FilePlus2, GitBranch, LayoutDashboard, Layers, ListChecks, Network, Settings, ShieldCheck, UserCog, type LucideIcon } from "lucide-react";
+import { BookOpenCheck, CalendarClock, CalendarRange, FilePlus2, GitBranch, LayoutDashboard, Layers, ListChecks, Network, Route, Settings, ShieldCheck, UserCog, type LucideIcon } from "lucide-react";
 import type { Permission } from "@lyra/permissions";
 
 /**
@@ -49,6 +49,13 @@ export const ROUTES: readonly NavRoute[] = [
     labelKey: "nav.logbook",
     icon: BookOpenCheck,
     permission: "module:logbook:view",
+    inSidebar: true,
+  },
+  {
+    path: "/rondas",
+    labelKey: "nav.rounds",
+    icon: Route,
+    permission: "schedule:view",
     inSidebar: true,
   },
   {

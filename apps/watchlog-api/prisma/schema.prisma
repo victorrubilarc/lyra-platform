@@ -370,6 +370,7 @@ model OrgNode {
   templates Template[]
   templateNodeAssignments TemplateNodeAssignment[]
   logEntries LogEntry[]
+  schedules  LogSchedule[]
   operationalCalendar OperationalCalendar? @relation(fields: [operationalCalendarId], references: [id], onDelete: SetNull)
   fiscalCalendar      FiscalCalendar?      @relation(fields: [fiscalCalendarId], references: [id], onDelete: SetNull)
 
@@ -429,6 +430,7 @@ model Equipment {
   orgNode      OrgNode             @relation(fields: [orgNodeId], references: [id])
   externalRefs ExternalReference[]
   logEntries   LogEntry[]
+  schedules    LogSchedule[]
 
   @@index([orgNodeId])
   @@index([categoryId])
@@ -662,6 +664,7 @@ model Template {
   logEntries     LogEntry[]
   templateScopes TemplateScope[]
   nodeAssignments TemplateNodeAssignment[]
+  schedules       LogSchedule[]
 
   @@index([orgNodeId])
   @@index([status])
@@ -1148,6 +1151,103 @@ model OperationalShift {
 }
 
 // ===========================================================================
+//  Programación de rondas (Fase 2.3) — recurrencia que ABRE entradas
+// ===========================================================================
+//
+// Patrón estándar de la industria (SAP PM Maintenance Plan → calls; IBM Maximo PM →
+// work orders; Hexagon j5 → schedules; ISA-95 shift handover): un HORARIO (gobernanza
+// operacional VIVA, separado de la versión GxP de la plantilla) genera OCURRENCIAS
+// materializadas; la ENTRADA real se crea al INICIAR la ronda (sin borradores
+// huérfanos, regla 2.8.2). El enum RecurrenceKind y la lógica pura de enumeración
+// viven en @lyra/contracts (enumerateOccurrences). Ver docs/DECISIONS.md 2026-06-15.
+
+// Estado de una ocurrencia. "VENCIDA" NO es un estado: se DERIVA en consulta
+// (status=PENDING AND dueAt < now()), sin cron que la voltee (igual que el SLA).
+enum RoundOccurrenceStatus {
+  PENDING
+  COMPLETED
+  SKIPPED
+  CANCELED
+}
+
+// Horario de ronda: plantilla × nodo × recurrencia. Contenedor MUTABLE (gobernanza
+// viva: reprogramar/pausar no republica la versión controlada). Apunta a UN nodo
+// (multi-nodo/fan-out por equipo = follow-up).
+model LogSchedule {
+  id          String         @id @default(cuid())
+  name        String?
+  templateId  String
+  orgNodeId   String
+  // Equipo fijado opcionalmente (EAM). Null = sin equipo / lo elige el operador al
+  // iniciar (si la plantilla exige equipo).
+  equipmentId String?
+  recurrenceKind RecurrenceKind
+  // Config validada por @lyra/contracts según el kind (shiftCodes / everyMinutes+anchor
+  // / times+weekdays+daysOfMonth).
+  recurrenceConfig Json
+  // Minutos tras scheduledFor dentro de los que la ronda debe completarse (= dueAt).
+  dueWindowMinutes Int
+  // Cuántos días hacia adelante materializa el generador idempotente.
+  horizonDays Int @default(2)
+  active      Boolean @default(true)
+  // Marca de agua: hasta qué instante (UTC) se materializaron ocurrencias. El
+  // generador parte de aquí para ser idempotente y barato.
+  lastGeneratedThrough DateTime?
+  // Autoría (referencia blanda, sin FK dura; igual que Template/AuditLog).
+  createdById String?
+  updatedById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime? // borrado lógico
+
+  template    Template   @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  orgNode     OrgNode    @relation(fields: [orgNodeId], references: [id], onDelete: Cascade)
+  equipment   Equipment? @relation(fields: [equipmentId], references: [id], onDelete: SetNull)
+  occurrences RoundOccurrence[]
+
+  @@index([templateId])
+  @@index([orgNodeId])
+  @@index([active, deletedAt])
+}
+
+// Ocurrencia materializada de un horario: un "slot" liviano (NO es una entrada). El
+// LogEntry se crea al iniciar la ronda y queda enlazado por logEntryId (@unique).
+model RoundOccurrence {
+  id         String  @id @default(cuid())
+  scheduleId String
+  // Denormalizados del horario (filtro/listado sin join; el horario es mutable pero
+  // estos no cambian para una ocurrencia ya generada).
+  templateId String
+  orgNodeId  String
+  equipmentId String?
+  // Anclaje y plazo (UTC). vencida = status PENDING && dueAt < now().
+  scheduledFor DateTime
+  dueAt        DateTime
+  // Dimensiones operacionales estampadas al generar (ShiftResolver del nodo).
+  shiftCode       String?
+  operationalDate String?
+  periodKey       String?
+  status     RoundOccurrenceStatus @default(PENDING)
+  // Entrada que cumplió la ronda (la ocurrencia POSEE el enlace; LogEntry tiene la
+  // relación inversa). SetNull si la entrada se borra en duro.
+  logEntryId String? @unique
+  // Omisión (SKIPPED): quién/cuándo/por qué (auditado además en AuditLog).
+  skippedById String?
+  skippedAt   DateTime?
+  skipReason  String?
+  generatedAt DateTime @default(now())
+
+  schedule LogSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  logEntry LogEntry?   @relation(fields: [logEntryId], references: [id], onDelete: SetNull)
+
+  // Idempotencia del generador: una sola ocurrencia por (horario, instante).
+  @@unique([scheduleId, scheduledFor])
+  @@index([status, dueAt])
+  @@index([orgNodeId])
+  @@index([templateId])
+}
+
+// ===========================================================================
 //  Auditoría — append-only / inmutable (trigger en la migración)
 // ===========================================================================
 
@@ -1276,6 +1376,10 @@ model LogEntry {
   changes         LogEntryFieldChange[]
   transitions     LogEntryTransition[]
   signatures      LogEntrySignature[]
+  // Ronda programada que originó esta entrada (Fase 2.3). null = entrada manual.
+  // El enlace lo posee la ocurrencia (RoundOccurrence.logEntryId @unique); aquí solo
+  // la relación inversa, sin columna duplicada.
+  roundOccurrence RoundOccurrence?
 
   @@index([templateId])
   @@index([templateVersionId])

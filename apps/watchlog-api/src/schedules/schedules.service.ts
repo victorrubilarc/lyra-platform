@@ -1,0 +1,473 @@
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import type { Prisma, LogSchedule, RoundOccurrence } from "@prisma/client";
+import {
+  enumerateOccurrences,
+  type CreateLogScheduleRequest,
+  type UpdateLogScheduleRequest,
+  type LogScheduleDto,
+  type RoundOccurrenceDto,
+  type OccurrenceQuery,
+  type SkipOccurrenceRequest,
+  type RecurrenceKind,
+} from "@lyra/contracts";
+import { PrismaService } from "../prisma/prisma.service";
+import { AuditService, type AuditContext } from "../audit/audit.service";
+import { ScopeService } from "../authz/scope.service";
+import { ShiftResolver } from "../operational-calendar/shift-resolver";
+import { FiscalResolver } from "../fiscal-calendar/fiscal-resolver";
+import { LogEntriesService } from "../log-entries/log-entries.service";
+
+const scheduleInclude = {
+  template: { select: { name: true } },
+  orgNode: { select: { name: true } },
+  equipment: { select: { tag: true } },
+} satisfies Prisma.LogScheduleInclude;
+
+type ScheduleRow = LogSchedule & {
+  template: { name: string } | null;
+  orgNode: { name: string } | null;
+  equipment: { tag: string | null } | null;
+};
+
+// RoundOccurrence denormaliza templateId/orgNodeId/equipmentId (sin relación propia):
+// los nombres para mostrar se resuelven vía la relación `schedule` (el nodo/plantilla
+// de una ocurrencia no cambian tras generarse).
+const occurrenceInclude = {
+  schedule: {
+    select: {
+      name: true,
+      template: { select: { name: true } },
+      orgNode: { select: { name: true } },
+      equipment: { select: { tag: true } },
+    },
+  },
+  logEntry: { select: { entryNumber: true } },
+} satisfies Prisma.RoundOccurrenceInclude;
+
+type OccurrenceRow = RoundOccurrence & {
+  schedule: {
+    name: string | null;
+    template: { name: string } | null;
+    orgNode: { name: string } | null;
+    equipment: { tag: string | null } | null;
+  } | null;
+  logEntry: { entryNumber: number } | null;
+};
+
+/**
+ * Programación de rondas (Fase 2.3). El HORARIO (`LogSchedule`) es gobernanza
+ * operacional VIVA; el generador materializa OCURRENCIAS (`RoundOccurrence`)
+ * idempotentes hacia un horizonte; la ENTRADA real se crea al INICIAR la ronda
+ * (reusa `LogEntriesService.create`, que aplica todas las guardas ABAC/EAM). La
+ * lógica pura de enumeración vive en `@lyra/contracts` (`enumerateOccurrences`).
+ */
+@Injectable()
+export class SchedulesService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+    private readonly scope: ScopeService,
+    private readonly shiftResolver: ShiftResolver,
+    private readonly fiscalResolver: FiscalResolver,
+    private readonly logEntries: LogEntriesService,
+  ) {}
+
+  // --- Horarios (LogSchedule) ------------------------------------------------
+
+  async list(userId: string): Promise<LogScheduleDto[]> {
+    const nodeIds = await this.scope.getAccessibleNodeIds(userId);
+    const rows = await this.prisma.logSchedule.findMany({
+      where: { deletedAt: null, ...(nodeIds ? { orgNodeId: { in: [...nodeIds] } } : {}) },
+      include: scheduleInclude,
+      orderBy: { createdAt: "desc" },
+    });
+    if (rows.length === 0) return [];
+    // Conteos de pendientes/vencidas por horario (una query agregada, sin N+1).
+    const now = new Date();
+    const grouped = await this.prisma.roundOccurrence.groupBy({
+      by: ["scheduleId"],
+      where: { scheduleId: { in: rows.map((r) => r.id) }, status: "PENDING" },
+      _count: { _all: true },
+    });
+    const overdue = await this.prisma.roundOccurrence.groupBy({
+      by: ["scheduleId"],
+      where: { scheduleId: { in: rows.map((r) => r.id) }, status: "PENDING", dueAt: { lt: now } },
+      _count: { _all: true },
+    });
+    const pendMap = new Map(grouped.map((g) => [g.scheduleId, g._count._all]));
+    const overMap = new Map(overdue.map((g) => [g.scheduleId, g._count._all]));
+    return rows.map((r) => this.toScheduleDto(r, pendMap.get(r.id) ?? 0, overMap.get(r.id) ?? 0));
+  }
+
+  async getDetail(userId: string, id: string): Promise<LogScheduleDto> {
+    const row = await this.loadSchedule(id);
+    await this.assertNodeAccess(userId, row.orgNodeId);
+    return this.toScheduleDto(row);
+  }
+
+  async create(userId: string, dto: CreateLogScheduleRequest, ctx: AuditContext): Promise<LogScheduleDto> {
+    await this.validateScheduleTarget(userId, dto.templateId, dto.orgNodeId, dto.equipmentId ?? null, dto.recurrenceKind, dto.recurrenceConfig);
+    const row = await this.prisma.logSchedule.create({
+      data: {
+        name: dto.name ?? null,
+        templateId: dto.templateId,
+        orgNodeId: dto.orgNodeId,
+        equipmentId: dto.equipmentId ?? null,
+        recurrenceKind: dto.recurrenceKind,
+        recurrenceConfig: dto.recurrenceConfig as Prisma.InputJsonValue,
+        dueWindowMinutes: dto.dueWindowMinutes,
+        horizonDays: dto.horizonDays ?? 2,
+        active: dto.active ?? true,
+        createdById: userId,
+        updatedById: userId,
+      },
+      include: scheduleInclude,
+    });
+    await this.audit.record({ ...ctx, action: "schedule.created", entityType: "LogSchedule", entityId: row.id, after: this.auditSnapshot(row) });
+    // Materializa de inmediato para que el planificador vea las próximas rondas.
+    await this.generateForSchedule(row);
+    return this.toScheduleDto(await this.loadSchedule(row.id));
+  }
+
+  async update(userId: string, id: string, dto: UpdateLogScheduleRequest, ctx: AuditContext): Promise<LogScheduleDto> {
+    const before = await this.loadSchedule(id);
+    await this.assertNodeAccess(userId, before.orgNodeId);
+    await this.validateRecurrence(before.orgNodeId, dto.recurrenceKind, dto.recurrenceConfig);
+    if (dto.equipmentId) await this.logEntriesEquipmentCheck(dto.equipmentId, before.orgNodeId);
+
+    // Si cambia la definición de recurrencia o se reactiva/cambia ventana/horizonte,
+    // se regeneran las ocurrencias FUTURAS: se borran las PENDIENTES aún no iniciadas
+    // (sin entrada ligada) cuyo scheduledFor > now y se reinicia la marca de agua.
+    const recurrenceChanged =
+      dto.recurrenceKind !== before.recurrenceKind ||
+      JSON.stringify(dto.recurrenceConfig) !== JSON.stringify(before.recurrenceConfig) ||
+      dto.dueWindowMinutes !== before.dueWindowMinutes ||
+      (dto.horizonDays ?? before.horizonDays) !== before.horizonDays;
+
+    const row = await this.prisma.logSchedule.update({
+      where: { id },
+      data: {
+        name: dto.name === undefined ? undefined : dto.name,
+        equipmentId: dto.equipmentId === undefined ? undefined : dto.equipmentId,
+        recurrenceKind: dto.recurrenceKind,
+        recurrenceConfig: dto.recurrenceConfig as Prisma.InputJsonValue,
+        dueWindowMinutes: dto.dueWindowMinutes,
+        horizonDays: dto.horizonDays ?? undefined,
+        active: dto.active ?? undefined,
+        lastGeneratedThrough: recurrenceChanged ? null : undefined,
+        updatedById: userId,
+      },
+      include: scheduleInclude,
+    });
+    if (recurrenceChanged) {
+      await this.prisma.roundOccurrence.deleteMany({
+        where: { scheduleId: id, status: "PENDING", logEntryId: null, scheduledFor: { gt: new Date() } },
+      });
+    }
+    await this.audit.record({ ...ctx, action: "schedule.updated", entityType: "LogSchedule", entityId: id, before: this.auditSnapshot(before), after: this.auditSnapshot(row) });
+    if (row.active) await this.generateForSchedule(row);
+    return this.toScheduleDto(await this.loadSchedule(id));
+  }
+
+  async remove(userId: string, id: string, ctx: AuditContext): Promise<void> {
+    const row = await this.loadSchedule(id);
+    await this.assertNodeAccess(userId, row.orgNodeId);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.logSchedule.update({ where: { id }, data: { deletedAt: new Date(), active: false, updatedById: userId } });
+      // Cancela las ocurrencias pendientes no iniciadas (no se pierden las cumplidas).
+      await tx.roundOccurrence.updateMany({
+        where: { scheduleId: id, status: "PENDING", logEntryId: null },
+        data: { status: "CANCELED" },
+      });
+    });
+    await this.audit.record({ ...ctx, action: "schedule.deleted", entityType: "LogSchedule", entityId: id, before: this.auditSnapshot(row) });
+  }
+
+  // --- Generación idempotente -------------------------------------------------
+
+  /** Genera ocurrencias de TODOS los horarios activos accesibles (uso lazy/manual). */
+  async generateAll(userId: string, scheduleId?: string): Promise<{ generated: number }> {
+    const nodeIds = await this.scope.getAccessibleNodeIds(userId);
+    const schedules = await this.prisma.logSchedule.findMany({
+      where: {
+        deletedAt: null,
+        active: true,
+        ...(scheduleId ? { id: scheduleId } : {}),
+        ...(nodeIds ? { orgNodeId: { in: [...nodeIds] } } : {}),
+      },
+    });
+    let generated = 0;
+    for (const s of schedules) generated += await this.generateForSchedule(s);
+    return { generated };
+  }
+
+  /**
+   * Materializa las ocurrencias de UN horario en [lastGeneratedThrough || now,
+   * now + horizonDays). Idempotente (upsert por la única `(scheduleId, scheduledFor)`;
+   * lo existente NO se toca) y barato (avanza la marca de agua). Sin backfill del
+   * pasado: un horario recién creado solo genera futuro.
+   */
+  private async generateForSchedule(schedule: LogSchedule): Promise<number> {
+    if (!schedule.active || schedule.deletedAt || schedule.recurrenceKind === "NONE") return 0;
+    const cal = await this.shiftResolver.calendarForNode(schedule.orgNodeId);
+    if (!cal?.timezone) return 0; // sin calendario que ubique la hora local: no se genera
+    const now = new Date();
+    const from = schedule.lastGeneratedThrough && schedule.lastGeneratedThrough > now ? now : schedule.lastGeneratedThrough ?? now;
+    const to = new Date(now.getTime() + schedule.horizonDays * 86_400_000);
+    if (from >= to) return 0;
+
+    const slots = enumerateOccurrences(
+      {
+        kind: schedule.recurrenceKind,
+        config: (schedule.recurrenceConfig as Record<string, unknown>) ?? {},
+        dueWindowMinutes: schedule.dueWindowMinutes,
+        timezone: cal.timezone,
+        shifts: cal.shifts.map((s) => ({ code: s.code, startTime: s.startTime, durationMinutes: s.durationMinutes })),
+      },
+      from,
+      to,
+    );
+
+    const data: Prisma.RoundOccurrenceCreateManyInput[] = [];
+    for (const slot of slots) {
+      const res = await this.shiftResolver.resolve(slot.scheduledFor, schedule.orgNodeId);
+      const periodKey = (await this.fiscalResolver.resolvePeriodKey(res?.operationalDate ?? null, schedule.orgNodeId))?.periodKey ?? null;
+      data.push({
+        scheduleId: schedule.id,
+        templateId: schedule.templateId,
+        orgNodeId: schedule.orgNodeId,
+        equipmentId: schedule.equipmentId,
+        scheduledFor: slot.scheduledFor,
+        dueAt: slot.dueAt,
+        shiftCode: slot.shiftCode ?? res?.shiftCode ?? null,
+        operationalDate: res?.operationalDate ?? null,
+        periodKey,
+      });
+    }
+    // Idempotente: `skipDuplicates` ignora las que ya existen por (scheduleId, scheduledFor).
+    const result = data.length > 0 ? await this.prisma.roundOccurrence.createMany({ data, skipDuplicates: true }) : { count: 0 };
+    await this.prisma.logSchedule.update({ where: { id: schedule.id }, data: { lastGeneratedThrough: to } });
+    return result.count;
+  }
+
+  // --- Ocurrencias (RoundOccurrence) -----------------------------------------
+
+  /** Lista ocurrencias (genera lazy primero). "Vencida" se DERIVA (PENDING && dueAt<now). */
+  async listOccurrences(userId: string, q: OccurrenceQuery): Promise<RoundOccurrenceDto[]> {
+    await this.generateAll(userId, q.scheduleId);
+    const nodeIds = await this.scope.getAccessibleNodeIds(userId);
+    const now = new Date();
+    const where: Prisma.RoundOccurrenceWhereInput = {
+      ...(nodeIds ? { orgNodeId: { in: [...nodeIds] } } : {}),
+      ...(q.scheduleId ? { scheduleId: q.scheduleId } : {}),
+      ...(q.templateId ? { templateId: q.templateId } : {}),
+      ...(q.orgNodeId ? { orgNodeId: q.orgNodeId } : {}),
+      ...(q.status ? { status: q.status } : {}),
+      ...(q.overdueOnly ? { status: "PENDING", dueAt: { lt: now } } : {}),
+      ...(q.todayOnly ? { scheduledFor: { gte: startOfUtcDay(now), lt: endOfUtcDay(now) } } : {}),
+    };
+    const rows = await this.prisma.roundOccurrence.findMany({
+      where,
+      include: occurrenceInclude,
+      orderBy: [{ status: "asc" }, { scheduledFor: "asc" }],
+      take: 500,
+    });
+    return rows.map((r) => this.toOccurrenceDto(r, now));
+  }
+
+  /** Conteos para el KPI de /bitacoras y /rondas. */
+  async occurrenceStats(userId: string): Promise<{ pending: number; overdue: number; today: number }> {
+    await this.generateAll(userId);
+    const nodeIds = await this.scope.getAccessibleNodeIds(userId);
+    const now = new Date();
+    const base: Prisma.RoundOccurrenceWhereInput = nodeIds ? { orgNodeId: { in: [...nodeIds] } } : {};
+    const [pending, overdue, today] = await Promise.all([
+      this.prisma.roundOccurrence.count({ where: { ...base, status: "PENDING" } }),
+      this.prisma.roundOccurrence.count({ where: { ...base, status: "PENDING", dueAt: { lt: now } } }),
+      this.prisma.roundOccurrence.count({
+        where: { ...base, status: "PENDING", scheduledFor: { gte: startOfUtcDay(now), lt: endOfUtcDay(now) } },
+      }),
+    ]);
+    return { pending, overdue, today };
+  }
+
+  /**
+   * Inicia una ronda: crea (materializa) la ENTRADA real reusando
+   * `LogEntriesService.create` (todas las guardas ABAC/EAM aplican) y la liga a la
+   * ocurrencia. Idempotente: si ya tiene entrada, devuelve esa. Devuelve el id de la
+   * entrada para que el front navegue al llenado.
+   */
+  async startOccurrence(userId: string, id: string, ctx: AuditContext, equipmentId?: string | null): Promise<{ logEntryId: string }> {
+    const occ = await this.prisma.roundOccurrence.findUnique({ where: { id } });
+    if (!occ) throw new NotFoundException("Ocurrencia no encontrada");
+    await this.assertNodeAccess(userId, occ.orgNodeId);
+    if (occ.logEntryId) return { logEntryId: occ.logEntryId };
+    if (occ.status !== "PENDING") throw new BadRequestException("La ronda no está pendiente");
+
+    const detail = await this.logEntries.create(
+      userId,
+      { templateId: occ.templateId, orgNodeId: occ.orgNodeId, equipmentId: occ.equipmentId ?? equipmentId ?? undefined },
+      ctx,
+    );
+    await this.prisma.roundOccurrence.update({ where: { id }, data: { logEntryId: detail.id } });
+    await this.audit.record({ ...ctx, action: "schedule.occurrence.started", entityType: "RoundOccurrence", entityId: id, after: { logEntryId: detail.id } });
+    return { logEntryId: detail.id };
+  }
+
+  /** Omite una ocurrencia con motivo obligatorio auditado (GxP). */
+  async skipOccurrence(userId: string, id: string, dto: SkipOccurrenceRequest, ctx: AuditContext): Promise<RoundOccurrenceDto> {
+    const occ = await this.prisma.roundOccurrence.findUnique({ where: { id } });
+    if (!occ) throw new NotFoundException("Ocurrencia no encontrada");
+    await this.assertNodeAccess(userId, occ.orgNodeId);
+    if (occ.status !== "PENDING") throw new BadRequestException("Solo se puede omitir una ronda pendiente");
+    if (occ.logEntryId) throw new BadRequestException("La ronda ya tiene una entrada en curso; anúlela en su lugar");
+    await this.prisma.roundOccurrence.update({
+      where: { id },
+      data: { status: "SKIPPED", skippedById: userId, skippedAt: new Date(), skipReason: dto.reason },
+    });
+    await this.audit.record({ ...ctx, action: "schedule.occurrence.skipped", entityType: "RoundOccurrence", entityId: id, after: { reason: dto.reason } });
+    const row = await this.prisma.roundOccurrence.findUniqueOrThrow({ where: { id }, include: occurrenceInclude });
+    return this.toOccurrenceDto(row, new Date());
+  }
+
+  // --- Validación / helpers ---------------------------------------------------
+
+  private async validateScheduleTarget(
+    userId: string,
+    templateId: string,
+    orgNodeId: string,
+    equipmentId: string | null,
+    kind: RecurrenceKind,
+    config: Record<string, unknown>,
+  ): Promise<void> {
+    const template = await this.prisma.template.findFirst({
+      where: { id: templateId, deletedAt: null },
+      include: { nodeAssignments: { select: { orgNodeId: true, includeDescendants: true, orgNode: { select: { path: true } } } } },
+    });
+    if (!template) throw new NotFoundException("Plantilla no encontrada");
+    if (template.status !== "PUBLISHED" || !template.currentVersionId) {
+      throw new BadRequestException("La plantilla debe estar publicada para programar rondas");
+    }
+    await this.assertNodeAccess(userId, orgNodeId);
+    await this.scope.assertTemplateInScope(userId, template.id);
+    // Multi-nodo (2.8.0): el nodo debe pertenecer al alcance de la plantilla.
+    if (template.nodeAssignments.length > 0) {
+      const direct = template.nodeAssignments.some((a) => !a.includeDescendants && a.orgNodeId === orgNodeId);
+      const branches = template.nodeAssignments.filter((a) => a.includeDescendants);
+      let ok = direct;
+      if (!ok && branches.length > 0) {
+        const node = await this.prisma.orgNode.findUnique({ where: { id: orgNodeId }, select: { path: true } });
+        ok = !!node && branches.some((a) => node.path.startsWith(a.orgNode.path));
+      }
+      if (!ok) throw new BadRequestException("El nodo no pertenece al alcance de la plantilla");
+    }
+    if (template.equipmentMode === "NONE" && equipmentId) throw new BadRequestException("Esta plantilla no admite equipo");
+    if (equipmentId) await this.logEntriesEquipmentCheck(equipmentId, orgNodeId);
+    await this.validateRecurrence(orgNodeId, kind, config);
+  }
+
+  /** SHIFT exige calendario con turnos; valida que los shiftCodes filtrados existan. */
+  private async validateRecurrence(orgNodeId: string, kind: RecurrenceKind, config: Record<string, unknown>): Promise<void> {
+    const cal = await this.shiftResolver.calendarForNode(orgNodeId);
+    if ((kind === "SHIFT" || kind === "INTERVAL" || kind === "CALENDAR") && !cal?.timezone) {
+      throw new BadRequestException("El nodo no tiene un calendario operacional; asígnele uno para programar rondas");
+    }
+    if (kind === "SHIFT") {
+      const codes = (config.shiftCodes as string[] | undefined) ?? [];
+      if (cal!.shifts.length === 0) throw new BadRequestException("El calendario del nodo no tiene turnos definidos");
+      const known = new Set(cal!.shifts.map((s) => s.code));
+      const bad = codes.filter((c) => !known.has(c));
+      if (bad.length > 0) throw new BadRequestException(`Turno(s) inexistente(s) en el calendario: ${bad.join(", ")}`);
+    }
+  }
+
+  private async logEntriesEquipmentCheck(equipmentId: string, orgNodeId: string): Promise<void> {
+    const eq = await this.prisma.equipment.findFirst({ where: { id: equipmentId, deletedAt: null }, select: { orgNodeId: true, active: true } });
+    if (!eq || !eq.active) throw new BadRequestException("El equipo indicado no existe o está inactivo");
+    if (eq.orgNodeId !== orgNodeId) throw new BadRequestException("El equipo no pertenece al nodo del horario");
+  }
+
+  private async assertNodeAccess(userId: string, orgNodeId: string): Promise<void> {
+    if (!(await this.scope.canAccessNode(userId, orgNodeId))) {
+      throw new ForbiddenException("El nodo indicado está fuera de su alcance");
+    }
+  }
+
+  private async loadSchedule(id: string): Promise<ScheduleRow> {
+    const row = await this.prisma.logSchedule.findFirst({ where: { id, deletedAt: null }, include: scheduleInclude });
+    if (!row) throw new NotFoundException("Horario no encontrado");
+    return row;
+  }
+
+  private toScheduleDto(row: ScheduleRow, pendingCount?: number, overdueCount?: number): LogScheduleDto {
+    return {
+      id: row.id,
+      name: row.name,
+      templateId: row.templateId,
+      templateName: row.template?.name,
+      orgNodeId: row.orgNodeId,
+      orgNodeName: row.orgNode?.name,
+      equipmentId: row.equipmentId,
+      equipmentTag: row.equipment?.tag ?? null,
+      recurrenceKind: row.recurrenceKind,
+      recurrenceConfig: (row.recurrenceConfig as Record<string, unknown>) ?? {},
+      dueWindowMinutes: row.dueWindowMinutes,
+      horizonDays: row.horizonDays,
+      active: row.active,
+      lastGeneratedThrough: row.lastGeneratedThrough?.toISOString() ?? null,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+      ...(pendingCount !== undefined ? { pendingCount } : {}),
+      ...(overdueCount !== undefined ? { overdueCount } : {}),
+    };
+  }
+
+  private toOccurrenceDto(row: OccurrenceRow, now: Date): RoundOccurrenceDto {
+    return {
+      id: row.id,
+      scheduleId: row.scheduleId,
+      scheduleName: row.schedule?.name ?? null,
+      templateId: row.templateId,
+      templateName: row.schedule?.template?.name,
+      orgNodeId: row.orgNodeId,
+      orgNodeName: row.schedule?.orgNode?.name,
+      equipmentId: row.equipmentId,
+      equipmentTag: row.schedule?.equipment?.tag ?? null,
+      scheduledFor: row.scheduledFor.toISOString(),
+      dueAt: row.dueAt.toISOString(),
+      shiftCode: row.shiftCode,
+      operationalDate: row.operationalDate,
+      periodKey: row.periodKey,
+      status: row.status,
+      overdue: row.status === "PENDING" && row.dueAt < now,
+      logEntryId: row.logEntryId,
+      entryNumber: row.logEntry?.entryNumber ?? null,
+      skippedById: row.skippedById,
+      skippedAt: row.skippedAt?.toISOString() ?? null,
+      skipReason: row.skipReason,
+      generatedAt: row.generatedAt.toISOString(),
+    };
+  }
+
+  private auditSnapshot(row: LogSchedule): Prisma.InputJsonValue {
+    return {
+      name: row.name,
+      templateId: row.templateId,
+      orgNodeId: row.orgNodeId,
+      equipmentId: row.equipmentId,
+      recurrenceKind: row.recurrenceKind,
+      recurrenceConfig: row.recurrenceConfig as Prisma.InputJsonValue,
+      dueWindowMinutes: row.dueWindowMinutes,
+      horizonDays: row.horizonDays,
+      active: row.active,
+    };
+  }
+}
+
+/** Inicio del día UTC de un instante (para el filtro "hoy"). */
+function startOfUtcDay(at: Date): Date {
+  return new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate()));
+}
+function endOfUtcDay(at: Date): Date {
+  return new Date(startOfUtcDay(at).getTime() + 86_400_000);
+}

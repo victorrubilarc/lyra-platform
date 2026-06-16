@@ -4,6 +4,44 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-15 · Fase 2.3 — Programación de rondas (`LogSchedule` + `RoundOccurrence`)
+
+Recurrencia que ABRE una entrada de bitácora por ocurrencia (estándar SAP PM Maintenance Plan/calls · IBM Maximo PM/WO ·
+Hexagon j5 schedules · ISA-95 shift handover). **Forks confirmados por el dueño (los 4 mayores + menores con default lean):**
+
+1. **Modelo A — entidad `LogSchedule` (horario) + `RoundOccurrence` (ocurrencia materializada).** *Motivo:* el patrón de la
+   industria separa el PLAN (mutable, gobernanza viva) del contenido versionado; la ocurrencia es un "slot" liviano
+   (PENDING/COMPLETED/SKIPPED/CANCELED) que da lista de pendientes, vencidas y omisión auditada. Se descartó (B) virtual
+   (sin id estable por ocurrencia ⇒ no se puede omitir-con-motivo ni auditar el atraso) y (C) recurrencia en `TemplateVersion`
+   (reprogramar/pausar obligaría a republicar una versión GxP). El placeholder `recurrenceKind/Config` de `TemplateVersion`
+   queda **dormido** (solo round-trip, sin lógica).
+2. **Nombre objetado.** El objetivo decía `LogPeriod`; se renombró a **`LogSchedule`/`RoundOccurrence`** porque "LogPeriod"
+   choca con `OperationalPeriod` (período fiscal) y "period" ≠ ronda.
+3. **Generación lazy idempotente + botón "Generar".** *Motivo:* on-prem sin SaaS ni daemon obligatorio. Un generador
+   idempotente materializa `[lastGeneratedThrough, now+horizonDays)` por horario (watermark + `createMany skipDuplicates` sobre
+   la única `@@unique(scheduleId, scheduledFor)`); se invoca al listar ocurrencias y por `POST /schedules/generate`. **"Vencida"
+   se DERIVA en consulta** (`status=PENDING AND dueAt<now`), espejo de `delayedEntryIds()` del SLA — sin cron que voltee
+   estados. Cron `@nestjs/schedule` = mejora opcional de Fase 7.
+4. **2 permisos nuevos** `schedule:view` / `schedule:manage` (catálogo **60→62**). *Motivo:* el PLANIFICADOR ≠ el diseñador de
+   la plantilla (SAP/Maximo: el maintenance planner es un rol distinto). Llenar la entrada reusa `logentry:create`.
+5. **UI superficie propia `/rondas`** (gestión de horarios + ocurrencias pendientes/vencidas) + KPI + badge "rondas vencidas"
+   en `/bitacoras` (atajo) + filtros "pendientes/hoy/vencidas". La ocurrencia NO es una entrada ⇒ no se mezcla en la grilla de
+   /bitacoras (dos entidades en un keyset sería frágil).
+6. **`dueAt = scheduledFor + dueWindowMinutes`** (regla uniforme en los 3 tipos), en vez de derivar la ventana del turno/intervalo.
+   *Motivo:* simplicidad y predecibilidad; el editor sugiere un default por tipo.
+7. **Forks menores (default lean):** horario apunta a **UN nodo** (multi-nodo/fan-out por equipo tipo Route = follow-up) ·
+   equipo **opcional** fijado en el horario · ocurrencias de horario **fijo** (no ancladas a la fecha de cierre real) ·
+   **sin completion-requirement** (cada ocurrencia independiente) · MISSED derivado, no persistido.
+
+**Integración del ciclo de vida:** iniciar una ronda crea la ENTRADA real reusando `LogEntriesService.create` (todas las guardas
+ABAC/EAM aplican) y la liga por `RoundOccurrence.logEntryId @unique` (una sola FK; `LogEntry` tiene la relación inversa, sin
+columna duplicada — se desvió del plan que proponía `LogEntry.scheduleOccurrenceId` para evitar doble fuente de verdad). Al
+**sellar** la entrada (submit / transición que sella) la ocurrencia pasa a **COMPLETED**; **anular** (VOID) el borrador la
+**desliga** y la devuelve a PENDING. Migración aditiva `20260615200000_add_round_scheduling`. Smoke en vivo `smoke-rondas.py`
+**21/21**; contracts **249** · API **234**.
+
+---
+
 ### 2026-06-15 · Form Builder: formateo en vivo, paleta de elementos docked y modal "Ver más"
 
 Continuación del pulido del builder (QA del dueño). **(A) Formateo en vivo:** RUT formatea **mientras se teclea** (no al blur)

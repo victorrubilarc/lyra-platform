@@ -1,5 +1,33 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-15 — Fase 2.3: Programación de rondas (`LogSchedule` + `RoundOccurrence`) ✅** (`feat/programacion-rondas` →
+`main`). Recurrencia que ABRE una entrada de bitácora por ocurrencia (estándar SAP PM Maintenance Plan/calls · Maximo PM/WO ·
+j5 schedules · ISA-95 shift handover). **Modelo (fork A del dueño):** entidad **`LogSchedule`** (horario: plantilla×nodo×
+recurrencia, gobernanza VIVA separada de la versión GxP) que genera **`RoundOccurrence`** (ocurrencias materializadas livianas,
+PENDING/COMPLETED/SKIPPED/CANCELED); la ENTRADA real se crea al **iniciar la ronda** (reusa `LogEntriesService.create` con todas
+las guardas ABAC/EAM), enlazada por `RoundOccurrence.logEntryId @unique` (sin borradores huérfanos, sin doble FK). **Contratos:**
+3 tipos de recurrencia con config `.strict()` por kind (SHIFT `{shiftCodes?}` · INTERVAL `{everyMinutes,anchorTime?}` · CALENDAR
+`{times,weekdays?,daysOfMonth?}`) + función PURA testeada **`enumerateOccurrences`** (genera `[from,to)`, `dueAt=scheduledFor+
+dueWindowMinutes`, en la línea de `resolveShift`/`evaluateSla`) + helpers `localDateInTz`/`zonedTimeToUtc` en `date-utils`; DTOs
+de horario/ocurrencia; **2 permisos** `schedule:view`/`schedule:manage` (catálogo **60→62**, el planificador ≠ el diseñador,
+patrón SAP/Maximo). **Generación lazy idempotente** (watermark `lastGeneratedThrough` + `createMany skipDuplicates` sobre
+`@@unique(scheduleId,scheduledFor)`) al listar + botón "Generar"; **"vencida" se DERIVA** (`status=PENDING AND dueAt<now`, espejo
+del SLA, sin cron). **API:** módulo `schedules/` (CRUD ABAC por nodo + valida plantilla publicada/nodo en alcance/equipo en nodo/
+turno existente; `start` crea+liga la entrada; `skip` con motivo ≥5 auditado; `generate`; `occurrences` + `occurrences/stats`);
+**hook de cierre** en `LogEntriesService`: al sellar (submit/transición) la ocurrencia → COMPLETED, al VOID → vuelve PENDING y se
+desliga. `ShiftResolver` gana `calendarForNode` (TZ+turnos del nodo). Migración aditiva `20260615200000_add_round_scheduling`
+(2 tablas + enum `RoundOccurrenceStatus`, idempotente). **Web:** página **`/rondas`** (KPIs pendientes/vencidas/hoy · lista de
+ocurrencias con Iniciar/Continuar/Omitir · tabla de horarios con drawer crear/editar [plantilla/nodo/equipo/recurrencia por kind/
+plazo/horizonte/activo] · botón Generar) + **badge "rondas vencidas"** en `/bitacoras` (atajo) + ítem de menú "Rondas"
+(`schedule:view`) + i18n es-CL. Tests: contracts **249** (+10, enumerador SHIFT cruza medianoche/INTERVAL anchor/CALENDAR weekdays/
+daysOfMonth + validación por kind) · API **234**. **Smoke en vivo `scripts/smoke-rondas.py` 21/21** (validación 400 ×3 · creación
+materializa 6 ocurrencias con shiftCode/dueAt · generar no duplica · overdueOnly deriva la vencida · iniciar crea entrada ligada ·
+VOID desliga → PENDING · omitir → SKIPPED+auditado · stats · gate de permiso 403 para no-admins; crea y LIMPIA por ID).
+typecheck/lint(0)/build verdes. **Pendiente: smoke VISUAL del dueño** (§4). **Deuda diferida (BACKLOG):** multi-nodo/descendientes ·
+fan-out por equipo (Route) · anclaje a cierre real (floating) · completion-requirement · escalamiento/notificación de vencidas
+(→ Notificaciones) · cron `@nestjs/schedule` · picker de plantilla/nodo propio del planificador (hoy reusa el de `logentry:create`).
+**Siguiente: a definir con el dueño.**
+
 **2026-06-15 — Form Builder: formateo en vivo + paleta de elementos + modal "Ver más" (Olas 1–2 de pulido) ✅**
 (`feat/builder-formateo-paleta` → `main`). Continuación del pulido del builder (QA en vivo del dueño), todo frontend salvo un
 campo de config aditivo. **(A) Formateo EN VIVO de campos:** RUT que pone puntos+guion **mientras se teclea**

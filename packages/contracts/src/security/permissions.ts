@@ -448,6 +448,23 @@ export const PERMISSION_CATALOG = [
     group: "logbook",
     description: "Anular (descartar) el borrador de OTRO usuario, con motivo auditado.",
   },
+
+  // --- Programación de rondas (Fase 2.3) ---
+  // El horario (LogSchedule) es gobernanza operacional VIVA (patrón Maintenance Plan
+  // de SAP PM / PM de Maximo): el PLANIFICADOR lo administra, distinto del diseñador
+  // de la plantilla (template:edit). `schedule:view` además gatea la pantalla /rondas.
+  {
+    key: "schedule:view",
+    dimension: "ACTION",
+    group: "schedules",
+    description: "Ver el programa de rondas (horarios y ocurrencias pendientes/vencidas).",
+  },
+  {
+    key: "schedule:manage",
+    dimension: "ACTION",
+    group: "schedules",
+    description: "Crear, editar y eliminar horarios de rondas; generar, omitir e iniciar ocurrencias.",
+  },
 ] as const satisfies readonly PermissionDef[];
 
 /** Unión literal de todas las claves de permiso conocidas. */

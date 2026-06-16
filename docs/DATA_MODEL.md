@@ -280,7 +280,34 @@
   (YYYY-MM-DD), shiftCode|null}` (en 2.7.1.1 **dejó de calcular el período**). **`ShiftResolver`** (clase abstracta =
   token DI, patrón `EmailService`) elige el calendario por nodo y delega; lo inyectan **2.4** (estampa `shiftCode`/
   `operationalDate`), **2.3 Rondas** y **Fase 5**. `validateOperationalCalendar` (sin solapes, huecos permitidos) =
-  fuente única contrato+backend+web. Endpoint `POST /operational-calendars/:id/preview` para el probador.
+  fuente única contrato+backend+web. Endpoint `POST /operational-calendars/:id/preview` para el probador. En **2.3 Rondas**
+  se le agregó **`calendarForNode(nodeId)`** (TZ + turnos del nodo, para el generador).
+
+### Programación de rondas (Fase 2.3)
+> Recurrencia que ABRE una entrada por ocurrencia (patrón SAP PM Maintenance Plan/calls · Maximo PM/WO · j5 schedules ·
+> ISA-95 shift handover). El HORARIO es gobernanza VIVA separada de la versión GxP; las OCURRENCIAS se materializan hacia un
+> horizonte. Migración aditiva `20260615200000_add_round_scheduling`. Ver DECISIONS 2026-06-15.
+- **LogSchedule** *(implementado — Fase 2.3)* — horario de ronda: `name?`, `templateId` (FK→Template, Cascade), `orgNodeId`
+  (FK→OrgNode, Cascade), `equipmentId?` (FK→Equipment, SetNull; equipo opcional fijado), `recurrenceKind` (enum
+  `RecurrenceKind` reusado: NONE/SHIFT/INTERVAL/CALENDAR), `recurrenceConfig` (Json, validado por `@lyra/contracts` según el
+  kind: SHIFT `{shiftCodes?}` · INTERVAL `{everyMinutes,anchorTime?}` · CALENDAR `{times,weekdays?,daysOfMonth?}`),
+  `dueWindowMinutes` (plazo: `dueAt = scheduledFor + dueWindowMinutes`), `horizonDays` (cuánto materializar adelante, default 2),
+  `active`, **`lastGeneratedThrough`** (marca de agua del generador idempotente), autoría + `deletedAt`. Contenedor MUTABLE:
+  reprogramar/pausar NO republica la versión de la plantilla. *1—N* **RoundOccurrence**.
+- **RoundOccurrence** *(implementado — Fase 2.3)* — ocurrencia materializada (un "slot" liviano, NO es una entrada):
+  `scheduleId` (FK→LogSchedule, Cascade), `templateId`/`orgNodeId`/`equipmentId?` (denormalizados del horario), `scheduledFor`
+  (anclaje UTC), `dueAt` (plazo UTC), `shiftCode?`/`operationalDate?`/`periodKey?` (estampados al generar vía `ShiftResolver`/
+  `FiscalResolver`), `status` (enum **`RoundOccurrenceStatus`** PENDING/COMPLETED/SKIPPED/CANCELED), **`logEntryId?` (FK→LogEntry,
+  SetNull, `@unique`)** = la entrada que cumplió la ronda (la ocurrencia POSEE el enlace; `LogEntry` tiene la relación inversa,
+  sin columna duplicada), omisión (`skippedById/At/Reason`), `generatedAt`. **`@@unique([scheduleId, scheduledFor])`** =
+  idempotencia del generador. **"Vencida" NO es un estado:** se DERIVA en consulta (`status=PENDING AND dueAt<now`), espejo del
+  SLA, sin cron.
+- **Generación** — `enumerateOccurrences` (función PURA en `@lyra/contracts`, solo `Intl` vía `localDateInTz`/`zonedTimeToUtc`):
+  `(horario, [from,to)) → slots`. Idempotente vía `createMany skipDuplicates` + watermark; invocada **lazy** al listar
+  ocurrencias y por `POST /schedules/generate`. **Ciclo de vida:** `start` crea la entrada (reusa `LogEntriesService.create`) y
+  la liga; al **sellar** (submit/transición) la ocurrencia → COMPLETED; **VOID** del borrador la desliga → PENDING. Permisos
+  `schedule:view`/`schedule:manage` (catálogo 62). ABAC por nodo. Diferido: multi-nodo · fan-out por equipo (Route) · floating ·
+  completion-requirement · cron.
 
 ### Calendario FISCAL (período contable transversal)
 > **Fase 2.7.1.1 (implementado):** migración `20260611210000_add_fiscal_calendar` + script `db:migrate-fiscal` +

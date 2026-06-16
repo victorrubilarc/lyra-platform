@@ -99,7 +99,75 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 ### 12. Configuración del sistema  [Admin]
 - ✍️ `/configuracion`: MFA por acción, ventana de edición global
 
+### 13. Rondas (programación)  [Planificador/Supervisor]
+- ✅ **Programar rondas** (horario por turno/intervalo/calendario) (§ Rondas ▸ Programar rondas)
+- ✅ **Iniciar y omitir una ronda** (pendientes/vencidas) (§ Rondas ▸ Iniciar y omitir)
+
 ---
+
+## Rondas ▸ Programar rondas  [Planificador/Supervisor]
+
+**Para qué sirve.** Hace que una bitácora se **abra sola cada vez que toca** — por turno,
+cada cierto tiempo o en días y horas fijas — en lugar de depender de que alguien recuerde
+crearla a mano. Así queda a la vista **qué rondas están pendientes**, cuáles se **vencieron**
+y cuáles se **omitieron** (con su motivo). Es el patrón de rondas de operador / planes de
+mantención de la industria (SAP PM, Maximo, j5).
+
+**Cómo se usa.**
+1. Entra a **Rondas** (menú lateral) y aprieta **"Nuevo horario"**.
+2. Elige la **plantilla** y el **nodo** de la estructura donde se hará la ronda (y, si
+   corresponde, el **equipo**).
+3. Elige la **recurrencia**:
+   - **Por turno** — una ronda por cada turno del calendario del nodo (opcionalmente solo
+     algunos turnos, p. ej. A y B).
+   - **Cada cierto tiempo** — cada N minutos/horas (p. ej. cada 6 h), con una hora de anclaje
+     opcional.
+   - **Días y horas fijas** — a las horas que indiques (p. ej. 08:00 y 20:00), en los días de
+     la semana que elijas.
+4. Indica el **plazo para cumplir** (minutos tras la hora programada antes de marcarse
+   *vencida*) y el **horizonte** (cuántos días adelante se preparan las rondas). Deja
+   **Activo** y guarda.
+5. Las próximas rondas aparecen al toque en la lista. El botón **"Generar"** las refresca a
+   mano (también se preparan solas al abrir la pantalla).
+
+**Quién puede.** Ver el programa requiere el permiso **"Ver rondas"** (`schedule:view`); crear
+o editar horarios requiere **"Administrar rondas"** (`schedule:manage`). Es un rol de
+**planificador/supervisor**, distinto del que diseña la plantilla. Cada quien solo ve las
+rondas de los **nodos dentro de su alcance**.
+
+**Importante.**
+- Cambiar la frecuencia o pausar un horario **NO** vuelve a publicar la plantilla: la
+  programación es configuración viva. Las rondas **ya cumplidas** no se tocan; solo se
+  recalculan las **futuras**.
+- Eliminar un horario **cancela** sus rondas pendientes (las cumplidas quedan).
+- Un horario por turno necesita que el nodo tenga un **calendario operacional** con turnos.
+
+## Rondas ▸ Iniciar y omitir una ronda  [Operador/Supervisor]
+
+**Para qué sirve.** Trabajar las rondas que el programa abrió: **registrar** la que toca o,
+si por una razón válida no se hará, **omitirla dejando constancia**.
+
+**Cómo se usa.**
+1. En **Rondas** verás arriba los contadores **Pendientes / Vencidas / De hoy** y la lista de
+   rondas. Usa los filtros **Pendientes · Hoy · Vencidas**.
+2. Aprieta **"Iniciar"** en una ronda: el sistema **crea la entrada de bitácora** ya ligada a
+   esa ronda y te lleva a llenarla (si ya la habías empezado, el botón dice **"Continuar"**).
+3. Al **completar y sellar** la entrada, la ronda queda **Cumplida** automáticamente.
+4. Si una ronda **no se realizará**, aprieta **"Omitir"**, escribe el **motivo** (mínimo 5
+   caracteres) y confirma: queda **Omitida** y auditada.
+
+**Quién puede.** Iniciar y omitir requieren **"Administrar rondas"** (`schedule:manage`).
+Llenar la entrada resultante se rige por los permisos normales de bitácora y el alcance del
+nodo/plantilla.
+
+**Importante.**
+- Una ronda **no es** todavía una entrada: es un "pendiente". La entrada real recién se crea
+  al **iniciar** (así no se llena la lista de borradores vacíos).
+- **Vencida** = pasó su plazo sin completarse. Sigue **pendiente** (no se cierra sola): puedes
+  completarla tarde u omitirla. En **Bitácoras** aparece un aviso **"N rondas vencidas"** que
+  lleva al programa.
+- Si **anulas** el borrador de una ronda iniciada, la ronda **vuelve a pendiente** y puede
+  reiniciarse — no se pierde.
 
 ## Bitácoras ▸ Anular un borrador  [Operador/Supervisor/Mantenedor/Admin]
 

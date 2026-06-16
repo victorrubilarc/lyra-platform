@@ -53,3 +53,6 @@ export * from "./system-settings/system-settings.js";
 
 // Vistas guardadas de plataforma (Fase 2.8.1b)
 export * from "./saved-views/saved-views.js";
+
+// Programación de rondas: horarios + ocurrencias (Fase 2.3)
+export * from "./schedules/schedules.js";
