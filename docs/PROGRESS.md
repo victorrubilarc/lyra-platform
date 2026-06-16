@@ -1,5 +1,16 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-16 — Notificaciones: rediseño de la pantalla de PLANTILLAS (escala enterprise) ✅** (`feat/notif-templates-ux` → `main`).
+Por feedback del dueño (el 3-columnas quedaba apretado y no escalaba a "muchísimas plantillas"). Patrón **master-detail** de clase
+mundial (SendGrid/Customer.io/ServiceNow): **(1) lista administrable** = toolbar con **buscador + filtro por grupo de evento +
+filtro por estado + contador** sobre una **tabla** (Plantilla/Evento/Canal/Idioma/Estado + Editar; responsive); **(2) editor a
+PANTALLA COMPLETA** al elegir una (sin apreturas): cabecera con **← Volver** + título + **toggle Activa/Inactiva**, cuerpo a 2
+columnas (formulario amplio: asunto + cuerpo texto + cuerpo HTML alto · **diccionario de variables** al costado, sticky, con
+descripción+ejemplo, insertar-en-cursor); **(3) vista previa en un MODAL grande** (`size=xl`) con **selector Escritorio/Móvil** +
+asunto + iframe del HTML renderizado con datos de ejemplo (reemplaza la previa inline apretada). El **toggle Activa** ahora se
+puede editar (la API ya lo soportaba). Solo frontend (sin contratos/API/migración). typecheck/lint(0)/build verdes. **Pendiente:
+smoke VISUAL del dueño.**
+
 **2026-06-16 — Bloque N: Hardening premium de Notificaciones (config SMTP en BD + editor de plantillas) ✅** (`feat/notif-hardening` →
 `main`). Dos mejoras pedidas por el dueño antes de Fase 4 (referencia revisada: `G:\Development\ruta-bus`; se SUPERA en seguridad —
 la referencia guarda la contraseña en claro). **#1 Configuración del correo saliente (SMTP en BD):** config persistida en
