@@ -1,12 +1,13 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  AlertTriangle, CalendarClock, CalendarDays, ChevronDown, ChevronRight, Clock, Plus, RefreshCw,
+  BookOpen, CalendarClock, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Clock, Plus, RefreshCw,
   Repeat, Search, Trash2, X,
 } from "lucide-react";
 import { Button, Card, Chip, EmptyState, Input, Select, Table, Toggle, useToast, type TableColumn } from "@lyra/ui";
-import type { LogScheduleDto, OccurrenceQuery, UpdateLogScheduleRequest } from "@lyra/contracts";
+import type { LogScheduleDto, OccurrenceQuery, RoundOccurrenceDto, UpdateLogScheduleRequest } from "@lyra/contracts";
 import { usePermissions } from "../../auth/use-permissions.js";
-import { formatDate, formatDateTime, formatDuration, formatTime } from "../../lib/format.js";
+import { formatDate, formatTime } from "../../lib/format.js";
+import { TemplateFilterModal, type TemplateOption } from "./TemplateFilterModal.js";
 import {
   useDeleteSchedule,
   useGenerateSchedules,
@@ -88,10 +89,15 @@ export function SchedulesPage() {
   const [estado, setEstado] = useState<"all" | "active" | "paused">("all");
   const [kind, setKind] = useState<string>("all");
   const [area, setArea] = useState<string>("");
+  const [tplFilter, setTplFilter] = useState<Set<string>>(new Set());
+  const [tplModalOpen, setTplModalOpen] = useState(false);
 
-  // Monitoreo de ocurrencias (plegable; solo se carga al expandir).
+  // Monitoreo de ocurrencias (plegable; solo se carga al expandir) — grilla paginable.
   const [showOcc, setShowOcc] = useState(false);
   const [occFilter, setOccFilter] = useState<OccFilter>("all");
+  const [occSearch, setOccSearch] = useState("");
+  const [occPage, setOccPage] = useState(0);
+  const [occPageSize, setOccPageSize] = useState(25);
   const occQuery: OccurrenceQuery = occFilter === "overdue" ? { overdueOnly: true } : occFilter === "today" ? { todayOnly: true } : { status: "PENDING" };
   const occurrences = useOccurrences(occQuery, showOcc);
 
@@ -102,6 +108,18 @@ export function SchedulesPage() {
     return [...set].sort((a, b) => a.localeCompare(b));
   }, [allSchedules]);
 
+  // Bitácoras DISPONIBLES = las presentes en los horarios visibles (ya acotados por ABAC
+  // nodo×plantilla en el backend). El value help solo ofrece estas.
+  const templateOptions = useMemo<TemplateOption[]>(() => {
+    const m = new Map<string, { name: string; count: number }>();
+    for (const s of allSchedules) {
+      const cur = m.get(s.templateId);
+      if (cur) cur.count += 1;
+      else m.set(s.templateId, { name: s.templateName ?? "—", count: 1 });
+    }
+    return [...m.entries()].map(([id, v]) => ({ id, name: v.name, count: v.count })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [allSchedules]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return allSchedules.filter((s) => {
@@ -109,21 +127,38 @@ export function SchedulesPage() {
       if (estado === "paused" && s.active) return false;
       if (kind !== "all" && s.recurrenceKind !== kind) return false;
       if (area && s.orgNodeName !== area) return false;
+      if (tplFilter.size > 0 && !tplFilter.has(s.templateId)) return false;
       if (q) {
         const hay = `${s.name ?? ""} ${s.templateName ?? ""} ${s.orgNodeName ?? ""} ${s.equipmentTag ?? ""} ${s.responsibleRoleName ?? ""}`.toLowerCase();
         if (!q.split(/\s+/).every((t) => hay.includes(t))) return false;
       }
       return true;
     });
-  }, [allSchedules, search, estado, kind, area]);
+  }, [allSchedules, search, estado, kind, area, tplFilter]);
 
   const kpi = useMemo(() => ({
     active: allSchedules.filter((s) => s.active).length,
     paused: allSchedules.filter((s) => !s.active).length,
   }), [allSchedules]);
 
-  const anyFilter = !!search || estado !== "all" || kind !== "all" || !!area;
-  function clearFilters() { setSearch(""); setEstado("all"); setKind("all"); setArea(""); }
+  const anyFilter = !!search || estado !== "all" || kind !== "all" || !!area || tplFilter.size > 0;
+  function clearFilters() { setSearch(""); setEstado("all"); setKind("all"); setArea(""); setTplFilter(new Set()); }
+
+  // --- Grilla de ocurrencias (búsqueda + paginación client-side sobre lo cargado) ---
+  const occAll = useMemo(() => occurrences.data ?? [], [occurrences.data]);
+  const occFiltered = useMemo(() => {
+    const q = occSearch.trim().toLowerCase();
+    if (!q) return occAll;
+    return occAll.filter((o) => {
+      const hay = `${o.scheduleName ?? ""} ${o.templateName ?? ""} ${o.equipmentTag ?? ""} ${o.orgNodeName ?? ""}`.toLowerCase();
+      return q.split(/\s+/).every((t) => hay.includes(t));
+    });
+  }, [occAll, occSearch]);
+  useEffect(() => { setOccPage(0); }, [occSearch, occFilter, occPageSize, showOcc]);
+  const occTotal = occFiltered.length;
+  const occPages = Math.max(1, Math.ceil(occTotal / occPageSize));
+  const occPageSafe = Math.min(occPage, occPages - 1);
+  const occSlice = occFiltered.slice(occPageSafe * occPageSize, occPageSafe * occPageSize + occPageSize);
 
   async function onGenerate() {
     try {
@@ -201,6 +236,19 @@ export function SchedulesPage() {
     }] : []),
   ];
 
+  const dm: Intl.DateTimeFormatOptions = { dateStyle: undefined, day: "2-digit", month: "short" };
+  const occColumns: TableColumn<RoundOccurrenceDto>[] = [
+    { key: "when", header: "Programada", render: (o) => <span className={styles.next}>{formatDate(o.scheduledFor, dm)} {formatTime(o.scheduledFor, HM)}</span> },
+    { key: "round", header: "Ronda", render: (o) => <span className={styles.strong}>{o.scheduleName ?? o.templateName ?? "Ronda"}</span> },
+    { key: "equip", header: "Equipo", render: (o) => o.equipmentTag ?? "—" },
+    { key: "node", header: "Nodo", render: (o) => o.orgNodeName ?? "—" },
+    { key: "shift", header: "Turno", render: (o) => o.shiftCode ?? "—" },
+    { key: "status", header: "Estado", render: (o) => o.overdue ? <Chip label="Vencida" variant="error" /> : o.logEntryId ? <Chip label="En curso" variant="info" /> : <Chip label="Pendiente" variant="default" /> },
+    { key: "due", header: "Vence", render: (o) => <span className={`${styles.next} ${o.overdue ? styles.nextPast : ""}`}>{formatDate(o.dueAt, dm)} {formatTime(o.dueAt, HM)}</span> },
+  ];
+  const occFrom = occTotal === 0 ? 0 : occPageSafe * occPageSize + 1;
+  const occTo = Math.min(occTotal, (occPageSafe + 1) * occPageSize);
+
   return (
     <div className={styles.page}>
       <header className={styles.header}>
@@ -264,11 +312,33 @@ export function SchedulesPage() {
               {areas.map((a) => <option key={a} value={a}>{a}</option>)}
             </Select>
           )}
+          {templateOptions.length > 1 && (
+            <button type="button" className={`${bar.toggle} ${tplFilter.size > 0 ? bar.toggleOn : ""}`} onClick={() => setTplModalOpen(true)}>
+              <BookOpen size={15} /> Bitácoras{tplFilter.size > 0 ? ` · ${tplFilter.size}` : ""}
+            </button>
+          )}
           {anyFilter && (
             <button type="button" className={bar.clear} onClick={clearFilters}><X size={14} /> Limpiar</button>
           )}
         </div>
       </Card>
+
+      {/* Chips de bitácoras seleccionadas (se muestran luego de elegirlas) */}
+      {tplFilter.size > 0 && (
+        <div className={styles.tplChips}>
+          {[...tplFilter].map((id) => {
+            const opt = templateOptions.find((o) => o.id === id);
+            return (
+              <span key={id} className={styles.tplChip}>
+                <BookOpen size={13} /> {opt?.name ?? id}
+                <button type="button" className={styles.tplChipX} aria-label={`Quitar ${opt?.name ?? ""}`} onClick={() => setTplFilter((p) => { const n = new Set(p); n.delete(id); return n; })}>
+                  <X size={12} />
+                </button>
+              </span>
+            );
+          })}
+        </div>
+      )}
 
       {/* Tabla de horarios */}
       <Card className={styles.section}>
@@ -299,45 +369,58 @@ export function SchedulesPage() {
         </button>
         {showOcc && (
           <>
-            <div className={styles.filters}>
-              <Button variant={occFilter === "all" ? "primary" : "secondary"} onClick={() => setOccFilter("all")}>Pendientes</Button>
-              <Button variant={occFilter === "today" ? "primary" : "secondary"} onClick={() => setOccFilter("today")}>Hoy</Button>
-              <Button variant={occFilter === "overdue" ? "primary" : "secondary"} onClick={() => setOccFilter("overdue")}>Vencidas</Button>
+            <div className={styles.occToolbar}>
+              <div className={styles.filters}>
+                <Button variant={occFilter === "all" ? "primary" : "secondary"} onClick={() => setOccFilter("all")}>Pendientes</Button>
+                <Button variant={occFilter === "today" ? "primary" : "secondary"} onClick={() => setOccFilter("today")}>Hoy</Button>
+                <Button variant={occFilter === "overdue" ? "primary" : "secondary"} onClick={() => setOccFilter("overdue")}>Vencidas</Button>
+              </div>
+              <div className={styles.occSearch}>
+                <Input
+                  value={occSearch}
+                  onChange={(e) => setOccSearch(e.target.value)}
+                  placeholder="Buscar ronda, equipo o nodo…"
+                  aria-label="Buscar ocurrencias"
+                  rightSlot={occSearch ? (
+                    <button type="button" className={bar.searchClear} onClick={() => setOccSearch("")} aria-label="Limpiar"><X size={14} /></button>
+                  ) : <Search size={16} aria-hidden="true" />}
+                />
+              </div>
             </div>
             {occurrences.isLoading ? (
               <p className={styles.muted}>Cargando…</p>
-            ) : (occurrences.data ?? []).length === 0 ? (
-              <EmptyState title="Sin rondas" description="No hay ocurrencias para este filtro." />
+            ) : occTotal === 0 ? (
+              <EmptyState title="Sin rondas" description={occSearch ? "Ninguna ocurrencia coincide con la búsqueda." : "No hay ocurrencias para este filtro."} />
             ) : (
-              <ul className={styles.occList}>
-                {(occurrences.data ?? []).map((o) => (
-                  <li key={o.id} className={`${styles.occ} ${o.overdue ? styles.occOverdue : ""}`}>
-                    <div className={styles.occMain}>
-                      <div className={styles.occTitle}>
-                        {o.scheduleName ?? o.templateName ?? "Ronda"}
-                        {o.shiftCode ? <Chip label={`Turno ${o.shiftCode}`} variant="default" className={styles.chip} /> : null}
-                        {o.equipmentTag ? <Chip label={o.equipmentTag} variant="default" className={styles.chip} /> : null}
-                      </div>
-                      <div className={styles.occMeta}>
-                        <span>{o.orgNodeName}</span>
-                        <span>· Programada: {formatDateTime(o.scheduledFor)}</span>
-                        {o.overdue ? (
-                          <span className={styles.overdueText}><AlertTriangle size={13} /> Vencida hace {formatDuration(Date.now() - new Date(o.dueAt).getTime())}</span>
-                        ) : (
-                          <span>· Vence: {formatDateTime(o.dueAt)}</span>
-                        )}
-                        {o.logEntryId ? <Chip label="En curso" variant="info" className={styles.chip} /> : null}
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+              <>
+                <Table data={occSlice} columns={occColumns} rowKey={(o) => o.id} />
+                <div className={styles.pager}>
+                  <span className={styles.pagerRange}>{occFrom}–{occTo} de {occTotal}</span>
+                  <div className={styles.pagerBtns}>
+                    <Button variant="icon" aria-label="Anterior" disabled={occPageSafe === 0} onClick={() => setOccPage(occPageSafe - 1)}><ChevronLeft size={16} /></Button>
+                    <span className={styles.pagerPage}>{occPageSafe + 1} / {occPages}</span>
+                    <Button variant="icon" aria-label="Siguiente" disabled={occPageSafe >= occPages - 1} onClick={() => setOccPage(occPageSafe + 1)}><ChevronRight size={16} /></Button>
+                  </div>
+                  <Select className={bar.nodoSelect} value={String(occPageSize)} onChange={(e) => setOccPageSize(Number(e.target.value))} aria-label="Por página">
+                    <option value="25">25 por página</option>
+                    <option value="50">50 por página</option>
+                    <option value="100">100 por página</option>
+                  </Select>
+                </div>
+              </>
             )}
           </>
         )}
       </Card>
 
       <ScheduleDrawer open={drawerOpen} schedule={editing} onClose={() => setDrawerOpen(false)} />
+      <TemplateFilterModal
+        open={tplModalOpen}
+        options={templateOptions}
+        selected={tplFilter}
+        onApply={setTplFilter}
+        onClose={() => setTplModalOpen(false)}
+      />
     </div>
   );
 }

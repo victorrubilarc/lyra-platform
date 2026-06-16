@@ -78,9 +78,9 @@ export class SchedulesService {
   // --- Horarios (LogSchedule) ------------------------------------------------
 
   async list(userId: string): Promise<LogScheduleDto[]> {
-    const nodeIds = await this.scope.getAccessibleNodeIds(userId);
+    const scope = await this.scopeFilters(userId);
     const rows = await this.prisma.logSchedule.findMany({
-      where: { deletedAt: null, ...(nodeIds ? { orgNodeId: { in: [...nodeIds] } } : {}) },
+      where: { deletedAt: null, ...scope },
       include: scheduleInclude,
       orderBy: { createdAt: "desc" },
     });
@@ -206,13 +206,13 @@ export class SchedulesService {
 
   /** Genera ocurrencias de TODOS los horarios activos accesibles (uso lazy/manual). */
   async generateAll(userId: string, scheduleId?: string): Promise<{ generated: number }> {
-    const nodeIds = await this.scope.getAccessibleNodeIds(userId);
+    const scope = await this.scopeFilters(userId);
     const schedules = await this.prisma.logSchedule.findMany({
       where: {
         deletedAt: null,
         active: true,
         ...(scheduleId ? { id: scheduleId } : {}),
-        ...(nodeIds ? { orgNodeId: { in: [...nodeIds] } } : {}),
+        ...scope,
       },
     });
     let generated = 0;
@@ -274,10 +274,10 @@ export class SchedulesService {
   /** Lista ocurrencias (genera lazy primero). "Vencida" se DERIVA (PENDING && dueAt<now). */
   async listOccurrences(userId: string, q: OccurrenceQuery): Promise<RoundOccurrenceDto[]> {
     await this.generateAll(userId, q.scheduleId);
-    const nodeIds = await this.scope.getAccessibleNodeIds(userId);
+    const scope = await this.scopeFilters(userId);
     const now = new Date();
     const where: Prisma.RoundOccurrenceWhereInput = {
-      ...(nodeIds ? { orgNodeId: { in: [...nodeIds] } } : {}),
+      ...scope,
       ...(q.scheduleId ? { scheduleId: q.scheduleId } : {}),
       ...(q.templateId ? { templateId: q.templateId } : {}),
       ...(q.orgNodeId ? { orgNodeId: q.orgNodeId } : {}),
@@ -297,9 +297,8 @@ export class SchedulesService {
   /** Conteos para el KPI de /bitacoras y /rondas. */
   async occurrenceStats(userId: string): Promise<{ pending: number; overdue: number; today: number }> {
     await this.generateAll(userId);
-    const nodeIds = await this.scope.getAccessibleNodeIds(userId);
     const now = new Date();
-    const base: Prisma.RoundOccurrenceWhereInput = nodeIds ? { orgNodeId: { in: [...nodeIds] } } : {};
+    const base: Prisma.RoundOccurrenceWhereInput = await this.scopeFilters(userId);
     const [pending, overdue, today] = await Promise.all([
       this.prisma.roundOccurrence.count({ where: { ...base, status: "PENDING" } }),
       this.prisma.roundOccurrence.count({ where: { ...base, status: "PENDING", dueAt: { lt: now } } }),
@@ -487,6 +486,24 @@ export class SchedulesService {
     if (!roleId) return;
     const role = await this.prisma.role.findUnique({ where: { id: roleId }, select: { id: true } });
     if (!role) throw new BadRequestException("El rol responsable indicado no existe");
+  }
+
+  /**
+   * Filtros ABAC del PLANIFICADOR: nodo ∩ plantilla (mismos dos ejes de 2.8, en AND;
+   * "gana la más estricta"). `null` en cualquiera = sin restricción en ese eje. Tanto
+   * `LogSchedule` como `RoundOccurrence` denormalizan `orgNodeId` y `templateId`, así que
+   * el mismo filtro sirve para horarios y ocurrencias. Aísla por ÁREA (nodo) y por TIPO de
+   * bitácora (plantilla): un planificador de un área no ve las de otra.
+   */
+  private async scopeFilters(userId: string): Promise<{ orgNodeId?: { in: string[] }; templateId?: { in: string[] } }> {
+    const [nodeIds, tplIds] = await Promise.all([
+      this.scope.getAccessibleNodeIds(userId),
+      this.scope.getAccessibleTemplateIds(userId),
+    ]);
+    return {
+      ...(nodeIds ? { orgNodeId: { in: [...nodeIds] } } : {}),
+      ...(tplIds ? { templateId: { in: [...tplIds] } } : {}),
+    };
   }
 
   private async assertNodeAccess(userId: string, orgNodeId: string): Promise<void> {
