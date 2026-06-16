@@ -5,7 +5,13 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-16** (**Fase 4.1.0 — Excepciones operacionales [BACKEND] ✅** — `feat/incidencias-excepciones`: capa
+> actualización: **2026-06-16** (**Fase 4.1.1 — Excepciones operacionales [UI] ✅** — `feat/incidencias-excepciones-ui`: panel
+> inline plegable de revisión en llenado/visor [resumen + lista accionable + selección múltiple], `ExceptionDetailDrawer` con
+> triage (reconocer/corregir[GxP+reauth]/crear-asociar incidencia/descartar), `ConvertExceptionModal` con dedup, banner "advertir
+> no bloquear" al completar con críticas, **bandeja global `/excepciones`** [KPIs + filtros + GridPager + menú], trazabilidad
+> campo→excepción→incidencia [filtro `incidentId` nuevo], toggle `warnRaisesException` en el builder de NUMBER. Contracts 255 ·
+> API 234 · smoke 39/39 + filtro live. **Siguiente: 4.1.2 — acción del motor de reglas (diferida, outbox).** Anterior:
+> **Fase 4.1.0 — Excepciones operacionales [BACKEND] ✅** — `feat/incidencias-excepciones`: capa
 > Bitácora→Excepción→Incidencia. `LogEntryException` + `IncidentExceptionLink` (migración aditiva); generación SÍNCRONA gobernada
 > por campo (CRIT siempre / WARN opt-in `warnRaisesException`) reconciliada en guardar/sellar + purga en VOID; triage completo
 > (ack/dismiss[crítica=permiso superior]/correct[GxP, preserva original]/convert→incidencia/associate/manual) + dedupe por sugerencia;
@@ -214,7 +220,8 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Fase 2.3.1 Worklist de rondas (separar planificar/ejecutar)** (permiso `round:execute` [cat. 63] + `LogSchedule.responsibleRoleId?` [FK Role SetNull] + migración `…_add_schedule_responsible_role`; `GET /schedules/my-rounds`+`/stats` [responsabilidad EN VIVO por rol ∩ ABAC ∩ turno] + `role-options` + start/skip re-gateados; web `/mis-rondas` [MyRoundsPage] + `/rondas` relabel "Programación de rondas" [monitoreo read-only + selector de rol] + widget Inicio + badge→mis-rondas + nav/i18n; contracts 249 · API 234 · smoke `smoke-mis-rondas.py` 18/18 + `smoke-rondas.py` 21/21) | `feat/rondas-worklist` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Bloque N Notificaciones (motor de avisos por correo)** (5 entidades `Notification*` + 4 enums + migración `…_add_notifications` [aditiva]; catálogo `NOTIFICATION_EVENTS` [4] + render sin eval + 4 permisos [cat. **67**]; `@nestjs/schedule`; API `notifications/` [emitter in-tx en `executeTransition`, channel/EmailChannel, resolver ABAC, worker sweeper/dispatcher/sender con backoff, service CRUD+bandeja, `POST /run`]; sweeper GENERA rondas antes de escanear vencidas + SLA breaches; seed 4 plantillas; web `/notificaciones` [Correo saliente/Plantillas/Mis preferencias] + `/mis-notificaciones` + nav/topbar/i18n; contracts 255 · API 234 · smoke `smoke-notificaciones.py` 17/17) | `feat/notificaciones` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Fase 4.0 Núcleo de Incidencias** (6 entidades `Incident`/`IncidentType`/`IncidentCategory`/`IncidentComment`/`IncidentActivity`/`IncidentTransition` + 3 enums + migración `…_add_incidents` aditiva; `@lyra/contracts/incidents` + 9 permisos [cat. **77**]; `IncidentsService` [ABAC por nodo, workflow reusado + reauth Part 11, catálogos, SLA derivado] + controller + módulo; seed flujo `incidencia-operacional` + 13 tipos + 13 categorías; web `features/incidents/` [/incidencias lista+kanban+GridPager, drawer detalle+stepper+transiciones, modal crear, botón "Reportar incidencia" en el visor] + nav/i18n; contracts 255 · API 234 · smoke `smoke-incidencias.py` 26/26) | `feat/incidencias-nucleo` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
-| **Fase 4.1.0 Excepciones (BACKEND)** (2 entidades `LogEntryException`/`IncidentExceptionLink` + 3 enums + migración `…_add_log_entry_exceptions` aditiva; `@lyra/contracts/incidents/exceptions` + `thresholdExceptionTrigger` + config `warnRaisesException` en NUMBER/TABLE/MATRIX + 4 permisos [cat. **81**]; `ExceptionGeneratorService` @Global [generación síncrona reconciliada en saveSection/seal + purga en VOID, 13.º arg de LogEntriesService] + `ExceptionsService`/controller/module [triage ack/dismiss/correct/convert/associate/manual + dedupe + ABAC + auditoría]; contracts 255 · API 234 · smoke `smoke-excepciones.py` 39/39) | `feat/incidencias-excepciones` → `main` | ✅ fusionado y publicado en `origin/main` | UI = 4.1.1 (pendiente) |
+| **Fase 4.1.0 Excepciones (BACKEND)** (2 entidades `LogEntryException`/`IncidentExceptionLink` + 3 enums + migración `…_add_log_entry_exceptions` aditiva; `@lyra/contracts/incidents/exceptions` + `thresholdExceptionTrigger` + config `warnRaisesException` en NUMBER/TABLE/MATRIX + 4 permisos [cat. **81**]; `ExceptionGeneratorService` @Global [generación síncrona reconciliada en saveSection/seal + purga en VOID, 13.º arg de LogEntriesService] + `ExceptionsService`/controller/module [triage ack/dismiss/correct/convert/associate/manual + dedupe + ABAC + auditoría]; contracts 255 · API 234 · smoke `smoke-excepciones.py` 39/39) | `feat/incidencias-excepciones` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
+| **Fase 4.1.1 Excepciones (UI)** (filtro `incidentId` en `exceptionListQuerySchema`+`buildWhere`; web `features/exceptions/` [api/queries/presentation + `ExceptionCard`/`ExceptionDetailDrawer`/`ConvertExceptionModal`/`ExceptionReviewPanel`/`ExceptionsPage`]; panel inline en EntryFillPage/EntryViewerPage + banner "advertir no bloquear" al completar con críticas; bandeja global `/excepciones` + ruta + nav `nav.exceptions`; trazabilidad en `IncidentDetailDrawer`; toggle `warnRaisesException` en `BuilderConfigPanel` [NUMBER umbral+tolerancia]; i18n es-CL; contracts 255 · API 234 · smoke 39/39 + filtro incidentId live) | `feat/incidencias-excepciones-ui` → `main` | ⏳ por publicar (push rama + merge + push main) | publicar al cerrar |
 
 **Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
@@ -318,10 +325,18 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
         4 permisos (cat. **81**). Smoke `smoke-excepciones.py` 39/39. **Deuda fina 4.1.0:** excepción por CELDA de TABLE/MATRIX (hoy
         a nivel de campo) · Part 11 `payloadHash` de la corrección (deuda compartida con 4.0) · `thresholdType=invalid` aún no se
         materializa (tier 1 = validación dura que bloquea guardar; reservado para la regla del motor 4.1.2).
-  - [ ] **4.1.1 — UI: panel de excepciones en la bitácora** (llenado/visor: "N críticas · N advertencias" + acciones convertir/
-        asociar/agrupar/descartar/corregir/marcar revisada · modal convertir prellenado · sugerencia de dedup · marca "tiene
-        excepciones" en la grilla de `/bitacoras` · trazabilidad campo→excepción→incidencia en el detalle de la incidencia ·
-        i18n es-CL · tokens Lyra · editor `warnRaisesException` en el builder de NUMBER/TABLE/MATRIX). Endpoints listos en 4.1.0.
+  - [x] **4.1.1 — UI: panel de excepciones en la bitácora ✅** (`feat/incidencias-excepciones-ui`): panel inline plegable en
+        llenado/visor (resumen "N críticas · N advertencias · N posibles inválidos" + lista accionable con selección múltiple),
+        `ExceptionDetailDrawer` (reconocer/corregir[GxP, reauth si sellada]/crear-asociar incidencia/descartar[crítica=permiso
+        superior]), `ConvertExceptionModal` (incidencia nueva o asociar a existente + sugerencia de dedup), banner "advertir no
+        bloquear" al completar con críticas, **bandeja GLOBAL `/excepciones`** (KPIs + filtros 1 línea + GridPager arriba/abajo +
+        menú, gate `module:incidents:view`), trazabilidad campo→excepción→incidencia en el detalle de la incidencia (filtro
+        **`incidentId`** nuevo en `GET /exceptions`), toggle **`warnRaisesException`** en el builder de NUMBER (umbral + tolerancia),
+        i18n es-CL · tokens Lyra. Contracts 255 · API 234 · smoke `smoke-excepciones.py` 39/39 (sin regresión; filtro incidentId
+        verificado en vivo). **Deuda 4.1.1:** toggle `warnRaisesException` por CELDA de TABLE/MATRIX (requiere antes un editor de
+        umbrales por columna, que el builder aún NO expone) · conteo de excepciones abiertas por entrada en la grilla `/bitacoras`
+        (hoy se reusa el indicador `worstThresholdBand`; el conteo exige que el listado devuelva el dato) · `CorrectModal` usa la
+        config mínima del campo (unidad), sin bandas/opciones completas (el backend valida igual). **Pendiente: smoke VISUAL del dueño.**
   - [ ] **4.1.2 — Acción "abrir incidencia" del motor de reglas (diferida)**: 2.º corte del motor (acción en `CrossRule` congelada
         en la versión) + emisión vía outbox in-tx (Bloque N) + worker que crea excepción/incidencia (regla `auto-incident` =
         incidencia directa; resto = excepción pendiente) + smoke.

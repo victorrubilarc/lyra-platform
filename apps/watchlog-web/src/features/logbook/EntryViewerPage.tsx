@@ -35,6 +35,7 @@ import { ApiError } from "../../lib/api-client.js";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { FieldControl } from "../templates/FieldControl.js";
 import { FieldGrid } from "../templates/FieldGrid.js";
+import { ExceptionReviewPanel } from "../exceptions/ExceptionReviewPanel.js";
 import { useLogEntry } from "../log-entries/log-entries-queries.js";
 import { fetchAttachmentUrl } from "../log-entries/log-entries-api.js";
 import {
@@ -384,6 +385,12 @@ export function EntryViewerPage() {
             {entry.voidReason ? ` — “${entry.voidReason}”` : ""}
           </span>
         </div>
+      )}
+
+      {/* Panel de revisión de excepciones (Fase 4.1.1): solo se monta si la
+          entrada tiene excepciones y el usuario puede ver incidencias. */}
+      {can("module:incidents:view") && (
+        <ExceptionReviewPanel logEntryId={entry.id} />
       )}
 
       {/* Cabecera de identidad (record review) */}

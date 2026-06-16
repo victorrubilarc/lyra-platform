@@ -4,6 +4,24 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-16 · Fase 4.1.1 — Panel de excepciones en la bitácora (UI): forks UX — ✅ IMPLEMENTADO
+
+Sesión de FRONTEND sobre la capa 4.1.0 (backend ya en `main`). 4 forks de UX resueltos con el dueño (recomendación aceptada salvo
+el #4, donde el dueño AMPLIÓ el alcance):
+1. **Contenedor = panel INLINE plegable + drawer de detalle por excepción** (no modal, no muro). Motivo: no tapa el formulario,
+   escala a N excepciones y reusa el patrón del drawer de Incidencias 4.0.
+2. **Al completar una sección con CRÍTICAS: advertir, NO bloquear** (banner con atajos *Revisar/Corregir/Crear incidencia*, deja
+   continuar). Motivo: el dato ya es válido; bloquear sería un muro nuevo. El crítico/imposible se prioriza visualmente "Corregir".
+3. **Agrupar = selección múltiple** (checkboxes → un solo `convert`/`associate` con `exceptionIds[]`). El backend ya lo soporta.
+4. **Bandeja GLOBAL `/excepciones` SÍ entra en esta fase** (el dueño la pidió, no como follow-up): lista paginada con KPIs +
+   filtros en una línea + `GridPager` arriba/abajo + menú, gate `module:incidents:view`. Reusa el drawer + acciones del panel.
+- **Toque mínimo de backend (aditivo, sin migración):** filtro **`incidentId`** en `exceptionListQuerySchema` + `buildWhere`, para
+  poder listar en el detalle de la incidencia las excepciones que la originaron (la lista solo tenía `logEntryId`/`unlinkedOnly`).
+- **Deuda asumida:** el toggle `warnRaisesException` se expone SOLO para NUMBER de nivel superior (umbral + tolerancia); para
+  CELDAS de TABLE/MATRIX se difiere porque el builder aún NO expone un editor de umbrales por columna (no hay banda a la que ligar
+  el toggle). La marca "tiene excepciones" en la grilla `/bitacoras` reusa el indicador `worstThresholdBand` existente; el conteo
+  de excepciones abiertas por entrada se difiere (exige que el listado lo devuelva). Sin permisos nuevos (cat. 81).
+
 ### 2026-06-16 · Fase 4.1 — Excepciones operacionales desde bitácoras: diseño + forks — 🔵 PLAN APROBADO
 
 Continúa la Fase 4 (Incidencias). Activa la capa explícita **Bitácora → Excepción operacional → Incidencia** y los orígenes

@@ -113,6 +113,9 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 - ✅ **Reportar y gestionar incidencias** (lista + tablero kanban + detalle con flujo) (§ Incidencias)
 - ✅ **Crear desde una bitácora** (botón "Reportar incidencia" en el visor de la entrada) (§ Incidencias ▸ Desde una bitácora)
 
+### 16. Excepciones operacionales  [Supervisor · Operador con triage]
+- ✅ **Revisar y triar excepciones** (panel en la bitácora + bandeja global; corregir/reconocer/convertir/asociar/descartar) (§ Excepciones operacionales)
+
 ---
 
 ## Rondas ▸ Programación de rondas  [Planificador]
@@ -621,6 +624,51 @@ categorías: `incidentcatalog:manage`. Todo se verifica en el servidor y respeta
 - El **timeline es inmutable** (append-only) y la incidencia **nunca se borra**: se anula
   con motivo. Cada cambio relevante (estado, responsable, severidad, prioridad) queda
   registrado con quién y cuándo.
-- Las incidencias se pueden originar **manualmente** o **desde una bitácora**; en fases
-  siguientes se sumarán las **excepciones operacionales** (desde umbrales) y la apertura
-  **automática por reglas**.
+- Las incidencias se pueden originar **manualmente**, **desde una bitácora** o **desde una
+  excepción operacional** (ver más abajo); la apertura **automática por reglas** llega en una
+  fase siguiente.
+
+---
+
+## Excepciones operacionales
+
+**Para qué sirve.** Cuando una lectura de la bitácora queda **fuera de umbral** (advertencia
+o crítica), una regla de negocio se dispara, o un operador anota algo anómalo, el sistema lo
+registra como una **excepción**: una desviación con estado, que alguien debe **revisar**
+(triar) en vez de que se pierda. Es la antesala de la incidencia: separa "esto se salió de
+rango" de "esto amerita abrir una incidencia formal". Conserva el **valor original** aunque
+después se corrija (trazabilidad GxP / ALCOA+).
+
+**Cómo se usa.**
+- **En la bitácora.** Al llenar o consultar una entrada, si tiene excepciones aparece arriba
+  un **panel de revisión** plegable con el resumen «N críticas · N advertencias · N posibles
+  inválidos». Al abrirlo ves cada excepción (campo, valor, rango esperado, estado) y puedes
+  actuar sobre ella. Si completas una sección con valores **críticos**, un aviso te lo
+  recuerda con atajos para revisarlos (no te bloquea: el dato ya quedó guardado).
+- **Acciones por excepción** (abre el detalle haciendo clic): **Corregir dato** (escribe el
+  valor correcto + motivo; el original se conserva; si la entrada ya está sellada se te pide
+  reconfirmar tu contraseña), **Reconocer / revisar** (acuse sin cambiar el dato), **Crear /
+  asociar incidencia** (abre una incidencia nueva prellenada o la liga a una existente; te
+  sugiere si ya hay una incidencia abierta para el mismo equipo en las últimas 24 h), y
+  **Descartar** con motivo (descartar una **crítica** requiere un permiso superior).
+- **Agrupar varias.** En el panel o en la bandeja, marca varias excepciones con su casilla y
+  **Agrupar en una incidencia**: se crean/asocian todas de una vez.
+- **Bandeja global `/excepciones`.** En el menú, **Excepciones** abre la lista de TODA la
+  operación (acotada a tu alcance): indicadores clicables, filtros en una línea (estado,
+  severidad, origen, "sin incidencia") y búsqueda, con paginación arriba y abajo.
+- **Trazabilidad.** En el detalle de una incidencia, el bloque de excepciones de origen lista
+  las que la generaron, cada una enlazada a su entrada de bitácora (campo y sección).
+
+**Quién puede.** Ver: `module:incidents:view`. Reconocer / convertir / asociar / agrupar:
+`exception:triage` (convertir exige además `incident:create`). Corregir: `exception:correct`.
+Descartar: `exception:dismiss`; descartar una **crítica**: `exception:dismiss-critical`. Todo
+respeta tu **alcance por nodo** y queda auditado.
+
+**Importante.**
+- El **valor original nunca se pierde**: una corrección lo preserva y queda registrada (quién,
+  cuándo, por qué). Las correcciones sobre entradas selladas exigen reconfirmar identidad.
+- Una excepción **no obliga** a abrir incidencia: el flujo normal es revisar y, si corresponde,
+  corregir, reconocer o descartar. Convertir es para lo que sí amerita gestión formal.
+- Qué genera excepción se configura en el **formulario**: un valor **crítico siempre** la
+  genera; una **advertencia** solo si el campo numérico tiene activado «Una advertencia genera
+  excepción» (en el builder, junto a los umbrales/tolerancia).

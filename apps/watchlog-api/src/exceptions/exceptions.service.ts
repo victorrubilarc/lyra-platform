@@ -418,6 +418,7 @@ export class ExceptionsService {
       ...(q.thresholdType ? { thresholdType: q.thresholdType } : {}),
       ...(q.triggerKind ? { triggerKind: q.triggerKind } : {}),
       ...(q.logEntryId ? { logEntryId: q.logEntryId } : {}),
+      ...(q.incidentId ? { incidentId: q.incidentId } : {}),
       ...(q.equipmentId ? { equipmentId: q.equipmentId } : {}),
       ...(q.unlinkedOnly ? { incidentId: null } : {}),
     };

@@ -109,6 +109,7 @@ export const esCL = {
     settings: "Configuración",
     dataSources: "Orígenes de datos",
     incidents: "Incidencias",
+    exceptions: "Excepciones",
   },
   shell: {
     brandTagline: "Bitácora operacional",
@@ -572,6 +573,9 @@ export const esCL = {
       warnHigh: "Adv. alto",
       critLow: "Crít. bajo",
       critHigh: "Crít. alto",
+      warnRaisesException: "Una advertencia genera excepción",
+      warnRaisesExceptionHint:
+        "Un valor CRÍTICO siempre genera una excepción para revisión. Actívalo si también quieres que una ADVERTENCIA la genere.",
       options: "Opciones (una por línea)",
       optionsPlaceholder: "Opción 1\nOpción 2",
       optionSource: "Fuente de opciones",

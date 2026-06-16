@@ -1,5 +1,37 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-16 — Fase 4.1.1: Panel de excepciones en la bitácora — UI ✅** (`feat/incidencias-excepciones-ui`). Le pone CARA a la
+capa **Bitácora → Excepción → Incidencia** del 4.1.0 (los endpoints ya existían; esta sesión es FRONTEND + un toque mínimo de
+backend). **4 forks resueltos con el dueño:** panel **inline plegable + drawer** (no modal/muro) · **advertir, no bloquear** al
+completar con críticas · **selección múltiple** para agrupar (`exceptionIds[]`) · **SÍ bandeja global** `/excepciones` (el dueño la
+pidió en la fase, no como follow-up). **Backend mínimo (DECISIONS 2026-06-16):** filtro **`incidentId`** nuevo en
+`exceptionListQuerySchema` + `buildWhere` (aditivo, sin migración) para listar las excepciones que originaron una incidencia.
+**Web (`features/exceptions/`):** capa `exceptions-api`/`-queries`/`-presentation` (consume `GET /exceptions[/summary|/:id|/:id/
+dedupe-suggestions]` + triage) · **`ExceptionCard`** (tarjeta compartida panel/bandeja, ícono+color por `thresholdType`, chip de
+estado, checkbox de multi-select) · **`ExceptionDetailDrawer`** (contexto congelado + acciones gateadas: reconocer · **corregir**
+[FieldControl del tipo real + motivo ≥5 + **reauth Part 11 si la entrada está sellada**, preserva original] · **crear/asociar
+incidencia** · **descartar** [crítica exige `exception:dismiss-critical`, deshabilitado con tooltip si falta]) · **`ConvertExceptionModal`**
+(incidencia NUEVA o **asociar a existente** [picker de incidencias abiertas] + **sugerencia de dedup** con "Asociar/Crear igual") ·
+**`ExceptionReviewPanel`** (inline plegable en llenado/visor: cabecera con resumen "N críticas · N advertencias · N posibles
+inválidos" de `GET /exceptions/summary`, lista de ESA entrada `?logEntryId=`, selección múltiple → agrupar; **no se monta si la
+entrada no tiene excepciones**) · **`ExceptionsPage`** = **bandeja global `/excepciones`** (KPIs clicables del `summary` · filtros en
+UNA línea [estado/severidad/origen/sin-incidencia/orden + búsqueda] · **`GridPager` arriba y abajo** · tarjetas con contexto ·
+multi-select). **Integración:** panel + **banner "advertir no bloquear"** al completar una sección con críticas (atajo *Revisar
+excepciones* que hace scroll al panel; se invalida el resumen tras cada guardado) en `EntryFillPage`; panel en `EntryViewerPage`;
+**trazabilidad campo→excepción→incidencia** en el bloque de `IncidentDetailDrawer` (lista navegable a la entrada, vía filtro
+`incidentId`); ruta `/excepciones` + ítem de menú `nav.exceptions` (gate `module:incidents:view`, ícono `AlertOctagon`). **Builder:**
+toggle **`warnRaisesException`** en `BuilderConfigPanel` para NUMBER (caja de **umbrales** y caja de **tolerancia**), con ayuda "el
+crítico siempre genera excepción". **Grilla `/bitacoras`:** se reusa el indicador `worstThresholdBand`/`exceptionsOnly` existente
+como marca "tiene excepciones" (sin cambios). **Sin permisos nuevos — catálogo 81.** Identidad Lyra (tokens, Sora/Inter, Lucide,
+glow, claro+oscuro, 44px, a11y AA con role/tab/teclado/foco). Tests: **contracts 255 · API 234** sin regresión. typecheck/lint(0
+errores)/build verdes. **Smoke `smoke-excepciones.py` 39/39** re-corrido sin regresión + **filtro `incidentId` verificado en vivo**
+(200 + vacío para id inexistente). **Pendiente: smoke VISUAL del dueño** (panel inline, drawer, convertir+dedup, bandeja global,
+banner, toggle del builder; claro/oscuro/responsive). **Deuda 4.1.1 (BACKLOG):** `warnRaisesException` por CELDA de TABLE/MATRIX
+(falta antes el editor de umbrales por columna en el builder) · conteo de excepciones abiertas por entrada en la grilla (requiere
+que el listado lo devuelva) · `CorrectModal` con la config completa del campo (bandas/opciones). **Siguiente: 4.1.2 — acción del
+motor de reglas (diferida vía outbox).** 🔔 Recordatorio: épico de **notificaciones avanzadas** sigue pendiente
+(`docs/prompts/notificaciones-avanzadas.md`).
+
 **2026-06-16 — Fase 4.1.0: Excepciones operacionales desde bitácoras — BACKEND ✅** (`feat/incidencias-excepciones`). Activa la
 capa explícita **Bitácora → Excepción → Incidencia** (DECISIONS 2026-06-16; 4 forks de alto impacto cerrados con el dueño en la
 recomendación). **NO reinventa motor:** reusa `thresholdBandFor`/`effectiveNumberBands` y el módulo de Incidencias 4.0.

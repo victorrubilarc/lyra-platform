@@ -705,6 +705,14 @@ export function BuilderConfigPanel({
                   {numberConfigField(field.config, "tolerance", t("templates.builder.toleranceWarn"), setConfig)}
                 </div>
                 {numberConfigField(field.config, "critTolerance", t("templates.builder.toleranceCrit"), setConfig)}
+                <FormField label={t("templates.builder.warnRaisesException")} hint={t("templates.builder.warnRaisesExceptionHint")}>
+                  {() => (
+                    <Toggle
+                      checked={field.config.warnRaisesException === true}
+                      onChange={(checked) => setConfig("warnRaisesException", checked ? true : undefined)}
+                    />
+                  )}
+                </FormField>
               </div>
             ) : field.config.counter === true ? (
               /* Contador/acumulado (Ola 2): lectura incremental; delta vs la previa del mismo equipo. */
@@ -732,6 +740,14 @@ export function BuilderConfigPanel({
                   {numberConfigField(field.config, "critLow", t("templates.builder.critLow"), setConfig)}
                   {numberConfigField(field.config, "critHigh", t("templates.builder.critHigh"), setConfig)}
                 </div>
+                <FormField label={t("templates.builder.warnRaisesException")} hint={t("templates.builder.warnRaisesExceptionHint")}>
+                  {() => (
+                    <Toggle
+                      checked={field.config.warnRaisesException === true}
+                      onChange={(checked) => setConfig("warnRaisesException", checked ? true : undefined)}
+                    />
+                  )}
+                </FormField>
               </div>
             )}
           </>

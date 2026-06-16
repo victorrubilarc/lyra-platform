@@ -45,6 +45,9 @@ import { ApiError } from "../../lib/api-client.js";
 import { formatDateTime } from "../../lib/format.js";
 import { FieldControl } from "../templates/FieldControl.js";
 import { FieldGrid } from "../templates/FieldGrid.js";
+import { ExceptionReviewPanel } from "../exceptions/ExceptionReviewPanel.js";
+import { EXCEPTION_KEYS, useExceptionSummary } from "../exceptions/exceptions-queries.js";
+import excStyles from "../exceptions/exceptions.module.css";
 import { createLogEntry, executeTransition as executeTransitionApi, fetchAttachmentUrl, saveLogEntrySection, submitLogEntry, uploadAttachment } from "./log-entries-api.js";
 import {
   LOG_ENTRY_KEYS,
@@ -141,6 +144,10 @@ export function EntryFillPage() {
 
   const [draft, setDraft] = useState<Draft>({});
   const [savingKey, setSavingKey] = useState<string | null>(null);
+  // Excepciones (Fase 4.1.1): resumen para el aviso al completar con críticas.
+  const canViewExceptions = perms.can("module:incidents:view");
+  const { data: excSummary } = useExceptionSummary(canViewExceptions && !composeActive ? activeId : null);
+  const [completedNudge, setCompletedNudge] = useState(false);
   const [deferralOpen, setDeferralOpen] = useState(false);
   const [voidOpen, setVoidOpen] = useState(false);
   const [activeTransition, setActiveTransition] = useState<AvailableTransitionDto | null>(null);
@@ -351,6 +358,8 @@ export function EntryFillPage() {
       });
       qc.setQueryData(LOG_ENTRY_KEYS.detail(newId), detail);
       toast.success(markComplete ? t("logbook.fill.sectionCompleted") : t("logbook.fill.sectionSaved"));
+      void qc.invalidateQueries({ queryKey: EXCEPTION_KEYS.all });
+      if (markComplete) setCompletedNudge(true);
       setSigningSection(null);
       setMaterializedId(newId); // pasa a modo edición (sin remontar; preserva el borrador)
     } catch (e) {
@@ -390,6 +399,8 @@ export function EntryFillPage() {
       {
         onSuccess: () => {
           toast.success(markComplete ? t("logbook.fill.sectionCompleted") : t("logbook.fill.sectionSaved"));
+          void qc.invalidateQueries({ queryKey: EXCEPTION_KEYS.all });
+          if (markComplete) setCompletedNudge(true);
           setSigningSection(null);
         },
         onError: (e) => {
@@ -624,6 +635,31 @@ export function EntryFillPage() {
             })}
             {entry.voidReason ? ` — “${entry.voidReason}”` : ""}
           </span>
+        </div>
+      )}
+
+      {/* Aviso al completar una sección con valores CRÍTICOS (Fase 4.1.1):
+          advierte, no bloquea — el dato ya es válido. Atajos a la revisión. */}
+      {completedNudge && (excSummary?.critical ?? 0) > 0 && (
+        <div className={excStyles.criticalBanner} role="alert">
+          <AlertTriangle size={18} style={{ color: "#EF4444" }} />
+          <span className={excStyles.bnText}>
+            <strong>Esta entrada contiene {excSummary!.critical} {excSummary!.critical === 1 ? "valor crítico" : "valores críticos"}.</strong>{" "}
+            Revísalos para corregir el dato o registrar una incidencia.
+          </span>
+          <div className={excStyles.bannerActions}>
+            <Button variant="primary" onClick={() => { document.getElementById("exception-review")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}>
+              Revisar excepciones
+            </Button>
+            <Button variant="secondary" onClick={() => setCompletedNudge(false)}>Más tarde</Button>
+          </div>
+        </div>
+      )}
+
+      {/* Panel de revisión de excepciones de esta entrada (Fase 4.1.1). */}
+      {canViewExceptions && !composeActive && (
+        <div id="exception-review">
+          <ExceptionReviewPanel logEntryId={activeId} defaultOpen={(excSummary?.critical ?? 0) > 0} />
         </div>
       )}
 
