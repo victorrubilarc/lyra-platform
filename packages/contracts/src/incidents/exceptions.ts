@@ -141,6 +141,8 @@ export const exceptionListQuerySchema = z.object({
   thresholdType: exceptionThresholdTypeSchema.optional(),
   triggerKind: exceptionTriggerSchema.optional(),
   logEntryId: z.string().optional(),
+  /** Excepciones ligadas a una incidencia concreta (trazabilidad campo→excepción→incidencia). */
+  incidentId: z.string().optional(),
   orgNodeIds: csv().optional(),
   equipmentId: z.string().optional(),
   /** Solo sin incidencia asociada. */

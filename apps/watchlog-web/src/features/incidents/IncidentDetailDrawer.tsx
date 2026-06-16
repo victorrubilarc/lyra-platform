@@ -14,6 +14,9 @@ import {
   useTransitionIncident,
 } from "./incidents-queries.js";
 import { LIFECYCLE_META, ORIGIN_META, PRIORITY_META, severityColor, severityLabel } from "./incidents-presentation.js";
+import { useExceptions } from "../exceptions/exceptions-queries.js";
+import { THRESHOLD_META, formatExceptionValue } from "../exceptions/exceptions-presentation.js";
+import excStyles from "../exceptions/exceptions.module.css";
 import styles from "./incidents.module.css";
 
 interface Props {
@@ -107,6 +110,9 @@ export function IncidentDetailDrawer({ incidentId, onClose }: Props) {
             </dl>
           </div>
 
+          {/* Trazabilidad campo → excepción → incidencia (Fase 4.1.1) */}
+          {can("module:incidents:view") && <IncidentExceptionsBlock incidentId={inc.id} />}
+
           {/* Responsable */}
           {can("incident:assign") && inc.lifecycle === "OPEN" && (
             <label className={styles.field}>
@@ -197,6 +203,36 @@ export function IncidentDetailDrawer({ incidentId, onClose }: Props) {
         />
       )}
     </Drawer>
+  );
+}
+
+/** Excepciones que originaron / se agruparon en la incidencia (trazabilidad). */
+function IncidentExceptionsBlock({ incidentId }: { incidentId: string }) {
+  const { data } = useExceptions({ incidentId, pageSize: 50, sort: "severity" });
+  const items = data?.items ?? [];
+  if (items.length === 0) return null;
+  return (
+    <div className={styles.originBox}>
+      <div className={styles.originTitle}>Excepciones de origen ({items.length})</div>
+      <div className={excStyles.excLinks}>
+        {items.map((exc) => {
+          const color = THRESHOLD_META[exc.thresholdType].color;
+          return (
+            <Link key={exc.id} to={`/bitacoras/${exc.logEntryId}`} className={excStyles.excLink}>
+              <span className={excStyles.excDot} style={{ background: color }} />
+              <span style={{ flex: 1 }}>
+                <strong>{exc.fieldLabel ?? (exc.fieldKey || "Registro manual")}</strong>
+                {exc.triggerKind !== "MANUAL" && (
+                  <> · {formatExceptionValue(exc.originalValue)}{exc.unit ? ` ${exc.unit}` : ""}</>
+                )}
+                {exc.sectionLabel ? <span className={styles.muted}> · {exc.sectionLabel}</span> : null}
+              </span>
+              <span className={styles.code}>{exc.code}</span>
+            </Link>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

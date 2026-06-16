@@ -130,8 +130,13 @@ previa es exactamente lo que verá el operador**. No hay tres pantallas que se d
   `warnLow/warnHigh` (amarillo) y `critLow/critHigh` (rojo). **Genera excepción (Fase 4.1):**
   una lectura en **crítico** SIEMPRE materializa una **excepción operacional** (entidad con
   triage); una en **advertencia** solo si activas **`warnRaisesException`** en el campo (por
-  defecto NO, para no inundar de excepciones). La banda efímera (badge en la grilla) sigue
-  igual; esto es lo que la convierte en algo accionable. Igual en columnas/celdas de Tabla y Matriz.
+  defecto NO, para no inundar de excepciones). Desde la Fase 4.1.1 el builder muestra el
+  **toggle «Una advertencia genera excepción»** dentro de la caja de **umbrales** y de la de
+  **tolerancia** del Número (con la ayuda "el crítico siempre la genera"). La banda efímera
+  (badge en la grilla) sigue igual; esto es lo que la convierte en algo accionable.
+  *(Nota: en columnas/celdas de Tabla y Matriz el contrato ya soporta `warnRaisesException`,
+  pero el toggle aún NO se expone en el builder porque falta el editor de umbrales por columna;
+  diferido en BACKLOG.)*
 - **• Qué valida.** Con `°C, min 0, max 120, 1 decimal, warnHigh 80, critHigh 90`:
   ✅ `72` (sin alerta) · ✅ `92` (válido, **marcado "alto crítico"** → la entrada entra a
   "Excepciones") · ❌ `130` ("por encima del máximo (120)") · ❌ `72,55` ("máximo 1 decimal") ·

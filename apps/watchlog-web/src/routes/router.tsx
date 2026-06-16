@@ -32,6 +32,7 @@ import { MyRoundsPage } from "../features/schedules/MyRoundsPage.js";
 import { NotificationsPage } from "../features/notifications/NotificationsPage.js";
 import { MyNotificationsPage } from "../features/notifications/MyNotificationsPage.js";
 import { IncidentsPage } from "../features/incidents/IncidentsPage.js";
+import { ExceptionsPage } from "../features/exceptions/ExceptionsPage.js";
 
 /**
  * Mapa de rutas. `/login` es pública; todo lo demás cuelga de `ProtectedRoute`
@@ -64,6 +65,7 @@ export const router = createBrowserRouter([
           { path: "/mis-rondas", element: <MyRoundsPage /> },
           { path: "/rondas", element: <SchedulesPage /> },
           { path: "/incidencias", element: <IncidentsPage /> },
+          { path: "/excepciones", element: <ExceptionsPage /> },
           { path: "/notificaciones", element: <NotificationsPage /> },
           { path: "/mis-notificaciones", element: <MyNotificationsPage /> },
           { path: "/bitacoras/:id", element: <EntryViewerPage /> },

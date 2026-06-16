@@ -1,4 +1,4 @@
-import { AlertTriangle, Bell, BookOpenCheck, CalendarClock, CalendarRange, FilePlus2, GitBranch, LayoutDashboard, Layers, ListChecks, ListTodo, Network, Route, Settings, ShieldCheck, UserCog, type LucideIcon } from "lucide-react";
+import { AlertOctagon, AlertTriangle, Bell, BookOpenCheck, CalendarClock, CalendarRange, FilePlus2, GitBranch, LayoutDashboard, Layers, ListChecks, ListTodo, Network, Route, Settings, ShieldCheck, UserCog, type LucideIcon } from "lucide-react";
 import type { Permission } from "@lyra/permissions";
 
 /**
@@ -73,6 +73,15 @@ export const ROUTES: readonly NavRoute[] = [
     path: "/incidencias",
     labelKey: "nav.incidents",
     icon: AlertTriangle,
+    permission: "module:incidents:view",
+    inSidebar: true,
+  },
+  // Excepciones operacionales (Fase 4.1.1): bandeja global de desviaciones de
+  // bitácora pendientes de triage. Mismo gate que incidencias.
+  {
+    path: "/excepciones",
+    labelKey: "nav.exceptions",
+    icon: AlertOctagon,
     permission: "module:incidents:view",
     inSidebar: true,
   },
