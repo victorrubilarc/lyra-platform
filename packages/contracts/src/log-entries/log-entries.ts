@@ -1438,6 +1438,28 @@ export function thresholdBandFor(field: FieldForValidation, value: unknown): Thr
   return null;
 }
 
+/**
+ * Fase 4.1 — ¿este valor de campo debe MATERIALIZAR una excepción operacional?
+ * Gobernanza (DECISIONS 2026-06-16): una lectura CRIT SIEMPRE genera excepción
+ * (piso de seguridad); una lectura WARN solo si el campo lo habilita
+ * (`config.warnRaisesException`), para evitar la tormenta de excepciones. Es la
+ * FUENTE ÚNICA de la decisión, reusando `thresholdBandFor` (no un 2.º motor).
+ * Devuelve el `triggerKind` de la excepción o null si no aplica.
+ */
+export type ThresholdExceptionTrigger = "THRESHOLD_WARN" | "THRESHOLD_CRIT";
+export function thresholdExceptionTrigger(
+  field: FieldForValidation,
+  value: unknown,
+): ThresholdExceptionTrigger | null {
+  const band = thresholdBandFor(field, value);
+  if (band === "CRIT") return "THRESHOLD_CRIT";
+  if (band === "WARN") {
+    const cfg = (field.config ?? {}) as { warnRaisesException?: boolean };
+    return cfg.warnRaisesException ? "THRESHOLD_WARN" : null;
+  }
+  return null;
+}
+
 /** Banda de umbral de un valor NUMÉRICO suelto contra un config (bandas EFECTIVAS). */
 function numberThresholdBand(config: Record<string, unknown>, value: unknown): ThresholdBand | null {
   if (isEmptyValue(value)) return null;

@@ -4,6 +4,74 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-16 · Fase 4.1 — Excepciones operacionales desde bitácoras: diseño + forks — 🔵 PLAN APROBADO
+
+Continúa la Fase 4 (Incidencias). Activa la capa explícita **Bitácora → Excepción operacional → Incidencia** y los orígenes
+`EXCEPTION`/`RULE` del enum `IncidentOrigin` (ya existían sin uso). Materializa la excepción HOY efímera (`thresholdBand` WARN/CRIT,
+reglas WARN) como entidad con estado y triage. **NO se reinventa motor:** reusa `thresholdBandFor`/`effectiveNumberBands`
+(`@lyra/contracts/log-entries`), `evaluateCrossRules` (`@lyra/contracts/rules`), el outbox del Bloque N
+(`NotificationEmitterService.emit({client})`) y el módulo de Incidencias 4.0.
+
+**Modelo (aditivo, SIN `tenantId` — single-tenant):**
+- **`LogEntryException`** — contexto CONGELADO en la detección: origen del dato (`logEntryId` FK Restrict, `templateId`/
+  `templateVersionId`, `sectionKey`+label, `fieldKey`+label, `fieldType`, `occurrenceRef?` para celda de TABLE/MATRIX), valor
+  (`originalValue` jsonb INMUTABLE, `unit?`, `bandsSnapshot` jsonb), disparador (`triggerKind` THRESHOLD_WARN/THRESHOLD_CRIT/RULE/
+  MANUAL, `ruleKey?`/`ruleVersionId?`/`ruleSeverity?`, `thresholdType` warning/critical/invalid), operacional denormalizado
+  (`orgNodeId`/`equipmentId?`/`shiftCode?`/`operatorId?`/`detectedAt`/`entrySealedAt?`), triage (`status` OPEN/ACKNOWLEDGED/
+  DISMISSED/CONVERTED/CORRECTED + `triagedById?`/`triagedAt?`/`dismissReason?`), corrección GxP (`correctedValue?`/`correctionReason?`/
+  `correctedById?`/`correctedAt?` — el original NUNCA se pierde), `incidentId?` denormalizado, `number?` folio `EXC-####` derivado.
+- **`IncidentExceptionLink`** (N:1) — una incidencia agrupa varias excepciones (fork 8 de 4.0). Refs blandas, sin borrado físico,
+  auditoría inmutable (`AuditLog`).
+
+**Forks resueltos (dueño, recomendación aceptada en los 4):**
+1+6. **Gobernanza POR CAMPO** (config `raisesException` en el campo, congelada en la versión): **CRIT siempre** genera excepción,
+     **WARN opt-in** por campo. Evita la tormenta de excepciones; coherente con umbrales/`computed` que ya viven en la versión
+     inmutable. Toca `FORM_GUIDE.md`.
+2. **AMBOS momentos con idempotencia**: provisional al **guardar sección** (donde ya se estampa `thresholdBand`), firme al **sellar**;
+   VOID purga las del borrador. Idempotencia por `(logEntryId, fieldKey, occurrenceRef, triggerKind)`. El operador la ve mientras llena.
+3. **Acción de regla = excepción pendiente de triage** salvo regla marcada `auto-incident` (raro, opt-in), vía outbox DIFERIDO. *(4.1.2)*
+4. **Corrección de valor sellado PERMITIDA** creando excepción `CORRECTED` con original preservado, detrás de permiso + motivo
+   (+ MFA opt-in), reusando la ventana de edición / `logentry:write-expired` y `LogEntryFieldChange`. En borrador = edición normal.
+5. **Dedup = sugerencia (nunca merge automático)**, default fijo `(orgNodeId, equipmentId, incidentType, 24h)`, configurable luego.
+
+**Alcance MVP:** excepción a nivel de **CAMPO** (no por celda de TABLE/MATRIX — `thresholdBandFor` colapsa a la peor banda;
+celda = deuda). **Permisos nuevos** (cat. 77→81): `exception:triage`, `exception:correct`, `exception:dismiss`,
+`exception:dismiss-critical` (descarte de crítica = permiso superior); ver = `module:incidents:view`. Tras tocar el catálogo:
+`db:seed` + Redis FLUSHALL.
+
+**Plan por subfases (la sesión cierra tras 4.1.0+4.1.1; 4.1.2 = sesión propia):**
+- **4.1.0** backend: modelo + migración aditiva + generación síncrona idempotente gobernada por campo + endpoints de triage
+  (ack/dismiss/correct/convert/associate/group) + ABAC por nodo + auditoría + smoke backend.
+- **4.1.1** UI: panel de excepciones en llenado/visor + acciones + modal convertir prellenado (origen EXCEPTION) + dedup
+  (sugerencia) + trazabilidad campo→excepción→incidencia + marca "tiene excepciones" en la grilla de `/bitacoras`.
+- **4.1.2** (sesión aparte) acción "abrir incidencia" del motor de reglas: 2.º corte del motor (acción en `CrossRule`,
+  congelada en la versión) + emisión vía outbox in-tx + worker que crea excepción/incidencia + smoke.
+
+**Aprobado por el dueño** (los 4 forks de alto impacto cerrados en la recomendación; alcance de sesión = 4.1.0 + 4.1.1).
+
+**🟢 4.1.0 IMPLEMENTADO** (`feat/incidencias-excepciones`): modelo `LogEntryException` + `IncidentExceptionLink` (migración aditiva
+`20260616200000_add_log_entry_exceptions`); generación SÍNCRONA reconciliada en `saveSection` (provisional) y al SELLAR
+(`submit`/`executeTransition`, firme + `entrySealedAt`), purga de provisionales en `voidEntry`; `ExceptionGeneratorService`
+(@Global, Prisma-only, inyectado en `LogEntriesService` como 13.º arg); `ExceptionsService`/controller/module de triage
+(list/summary/detail/dedupe-suggestions + acknowledge/dismiss/correct/convert/associate/manual), ABAC por nodo + auditoría;
+4 permisos (cat. **77→81**). Smoke `scripts/smoke-excepciones.py` **39/39**. **Desviaciones del diseño (justificadas):**
+- **Gobernanza WARN = booleano `config.warnRaisesException`** (no enum 3-modos): CRIT siempre dispara (piso de seguridad, no
+  configurable), WARN opt-in. Más simple y expresa exactamente la decisión.
+- **`IncidentExceptionLink` se conserva** como join autoritativo CON proveniencia (`linkedById`/`linkedAt`, `@@unique(exceptionId)`
+  = N:1) **+ `LogEntryException.incidentId` denormalizado** para filtros rápidos. (Se evaluó quitarlo por ser N:1 puro, pero el
+  audit del enlace + futura M:N lo justifican; patrón "denormaliza para query + relación autoritativa" del proyecto.)
+- **Excepción a nivel de CAMPO** (no por celda de TABLE/MATRIX): `thresholdBandFor` colapsa a la peor banda; celda = deuda 4.1.x.
+- **Idempotencia por `(entrada, campo)`** vía `dedupeKey = thr:{entryId}:{fieldKey}`: una excepción ya triada (CONVERTED/DISMISSED/
+  CORRECTED) CONGELA el slot — un re-disparo del mismo campo en la misma entrada no genera otra (no spamea; la decisión humana manda).
+- **`exception:dismiss-critical` permiso SEPARADO** (no flag): descartar una crítica exige el permiso superior; el endpoint admite
+  cualquiera de los dos (`RequireAnyPermission`) y el servicio exige el específico según `thresholdType`.
+- **Corrección de valor**: escribe `LogEntryValue` + `LogEntryFieldChange` (motivo) + re-estampa banda + preserva original; el
+  registro criptográfico Part 11 de la corrección = deuda 4.2 (igual que en incidencias 4.0).
+
+**Pendiente: 4.1.1 — panel de excepciones en la bitácora (UI)** + **4.1.2 — acción "abrir incidencia" del motor de reglas (diferida)**.
+
+---
+
 ### 2026-06-16 · Fase 4 — Módulo de Incidencias: investigación + diseño + plan por fases — 🔵 PLAN APROBADO
 
 Sesión de investigación (no se programó nada hasta aprobar). El dueño aprobó los 4 forks gating en su opción **recomendada** y

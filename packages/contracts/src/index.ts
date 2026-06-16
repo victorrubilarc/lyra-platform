@@ -65,3 +65,6 @@ export * from "./notifications/email-config.js";
 
 // Incidencias operacionales / HSE (Fase 4.0)
 export * from "./incidents/incidents.js";
+
+// Excepciones operacionales desde bitácoras (Fase 4.1)
+export * from "./incidents/exceptions.js";

@@ -76,6 +76,11 @@ import { OperationalPeriodService } from "../operational-periods/operational-per
 import { PrismaService } from "../prisma/prisma.service";
 import { SettingsService } from "../settings/settings.service";
 import { NotificationEmitterService } from "../notifications/notification-emitter.service";
+import {
+  ExceptionGeneratorService,
+  type ExceptionEntryContext,
+  type ExceptionFieldDef,
+} from "../exceptions/exception-generator.service";
 
 /** Significado por defecto de la firma de completitud de sección (las secciones no
  * portan un campo de significado; las transiciones sí vía `signatureMeaning`). */
@@ -228,6 +233,7 @@ export class LogEntriesService {
     private readonly settings: SettingsService,
     private readonly storage: StorageService,
     private readonly notifications: NotificationEmitterService,
+    private readonly exceptionGenerator: ExceptionGeneratorService,
   ) {}
 
   // --- Crear (abrir) una entrada ---------------------------------------------
@@ -945,6 +951,19 @@ export class LogEntriesService {
       } else {
         await tx.logEntry.update({ where: { id }, data: { updatedById: userId } });
       }
+
+      // Excepciones operacionales (Fase 4.1): materializa/reconcilia las de UMBRAL
+      // de ESTA sección (provisional mientras es DRAFT). Reusa valuesByKey (ya con
+      // los valores nuevos + formulados recomputados) DENTRO de la misma tx.
+      await this.exceptionGenerator.reconcileSection(
+        tx,
+        this.exceptionEntryCtx(entry),
+        sectionKey,
+        sectionDef.title,
+        this.exceptionFieldsOf(sectionDef),
+        valuesByKey,
+        userId,
+      );
     });
 
     // Limpieza de objetos QUITADOS del campo (delete-on-remove): tras COMMIT, para
@@ -1042,6 +1061,15 @@ export class LogEntriesService {
       });
       // Ronda programada (2.3): si esta entrada cumple una ocurrencia, márcala CUMPLIDA.
       await tx.roundOccurrence.updateMany({ where: { logEntryId: id, status: "PENDING" }, data: { status: "COMPLETED" } });
+      // Excepciones (Fase 4.1): reconciliación FIRME de toda la entrada al sellar.
+      await this.exceptionGenerator.reconcileEntryOnSeal(
+        tx,
+        { ...this.exceptionEntryCtx(entry), sealedAt },
+        this.exceptionSectionsOf(version),
+        valuesByKey,
+        userId,
+        sealedAt,
+      );
     });
     if (windowOverride) {
       await this.auditEditWindowOverride(ctx, id, "submitted", windowOverride);
@@ -1207,6 +1235,9 @@ export class LogEntriesService {
       where: { logEntryId: id },
       data: { status: "PENDING", logEntryId: null },
     });
+    // Excepciones (Fase 4.1): un borrador anulado no tiene peso GxP — purga sus
+    // excepciones PROVISIONALES (las ya triadas/convertidas se conservan).
+    await this.exceptionGenerator.purgeProvisionalForEntry(this.prisma, id);
     await this.audit.record({
       ...ctx,
       action: "logentry.voided",
@@ -1699,6 +1730,15 @@ export class LogEntriesService {
       // Ronda programada (2.3): la transición que SELLA cumple la ocurrencia ligada.
       if (seal) {
         await tx.roundOccurrence.updateMany({ where: { logEntryId: id, status: "PENDING" }, data: { status: "COMPLETED" } });
+        // Excepciones (Fase 4.1): reconciliación FIRME de toda la entrada al sellar.
+        await this.exceptionGenerator.reconcileEntryOnSeal(
+          tx,
+          { ...this.exceptionEntryCtx(entry), sealedAt: now },
+          this.exceptionSectionsOf(version),
+          valuesByKey,
+          userId,
+          now,
+        );
       }
 
       // Notificaciones (Bloque N) — ETAPA 1 del transactional outbox: se encola el
@@ -1972,6 +2012,37 @@ export class LogEntriesService {
       computed: (f.computed as ComputedFieldConfig | null) ?? null,
       roleIds: f.roles.map((r) => r.roleId),
     };
+  }
+
+  /** Contexto CONGELADO de la entrada para denormalizar en las excepciones (Fase 4.1). */
+  private exceptionEntryCtx(entry: LogEntryRow): ExceptionEntryContext {
+    return {
+      id: entry.id,
+      templateId: entry.templateId,
+      templateVersionId: entry.templateVersionId,
+      orgNodeId: entry.orgNodeId,
+      equipmentId: entry.equipmentId,
+      shiftCode: entry.shiftCode,
+      operatorId: entry.createdById,
+      sealedAt: entry.sealedAt,
+    };
+  }
+
+  /** Campos de una sección para el generador de excepciones (key/type/label/config). */
+  private exceptionFieldsOf(section: VersionWithGraph["sections"][number]): ExceptionFieldDef[] {
+    return section.fields.map((f) => ({
+      key: f.key,
+      type: f.type,
+      label: f.label,
+      config: upgradeFieldConfig(f.type, (f.config ?? {}) as Record<string, unknown>),
+    }));
+  }
+
+  /** Todas las secciones+campos para reconciliar excepciones al SELLAR (Fase 4.1). */
+  private exceptionSectionsOf(
+    version: VersionWithGraph,
+  ): { key: string; label: string | null; fields: ExceptionFieldDef[] }[] {
+    return version.sections.map((s) => ({ key: s.key, label: s.title, fields: this.exceptionFieldsOf(s) }));
   }
 
   /** Lista plana de campos de la versión para el motor de reglas (key/dataType/computed). */

@@ -127,7 +127,11 @@ previa es exactamente lo que verá el operador**. No hay tres pantallas que se d
   decimales configurados —año, folio— no se agrupa, para no mostrar "2.026".)
 - **• Cómo se configura.** Unidad, **decimales**, **rango válido duro** (min/max, fuera de
   esto **rechaza**), y **umbrales** ISA-18.2 que **no rechazan** sino que marcan:
-  `warnLow/warnHigh` (amarillo) y `critLow/critHigh` (rojo).
+  `warnLow/warnHigh` (amarillo) y `critLow/critHigh` (rojo). **Genera excepción (Fase 4.1):**
+  una lectura en **crítico** SIEMPRE materializa una **excepción operacional** (entidad con
+  triage); una en **advertencia** solo si activas **`warnRaisesException`** en el campo (por
+  defecto NO, para no inundar de excepciones). La banda efímera (badge en la grilla) sigue
+  igual; esto es lo que la convierte en algo accionable. Igual en columnas/celdas de Tabla y Matriz.
 - **• Qué valida.** Con `°C, min 0, max 120, 1 decimal, warnHigh 80, critHigh 90`:
   ✅ `72` (sin alerta) · ✅ `92` (válido, **marcado "alto crítico"** → la entrada entra a
   "Excepciones") · ❌ `130` ("por encima del máximo (120)") · ❌ `72,55` ("máximo 1 decimal") ·

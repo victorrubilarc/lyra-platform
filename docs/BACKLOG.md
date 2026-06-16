@@ -5,7 +5,12 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-16** (**Fase 4.0 — Núcleo de Incidencias ✅** — `feat/incidencias-nucleo`: módulo de incidencias
+> actualización: **2026-06-16** (**Fase 4.1.0 — Excepciones operacionales [BACKEND] ✅** — `feat/incidencias-excepciones`: capa
+> Bitácora→Excepción→Incidencia. `LogEntryException` + `IncidentExceptionLink` (migración aditiva); generación SÍNCRONA gobernada
+> por campo (CRIT siempre / WARN opt-in `warnRaisesException`) reconciliada en guardar/sellar + purga en VOID; triage completo
+> (ack/dismiss[crítica=permiso superior]/correct[GxP, preserva original]/convert→incidencia/associate/manual) + dedupe por sugerencia;
+> ABAC + auditoría; 4 permisos [cat. **81**]. Contracts 255 · API 234 · smoke `smoke-excepciones.py` 39/39. **Siguiente: 4.1.1 — panel
+> de excepciones en la bitácora (UI)** + 4.1.2 (acción del motor de reglas, diferida). Anterior: **Fase 4.0 — Núcleo de Incidencias ✅** — `feat/incidencias-nucleo`: módulo de incidencias
 > operacionales/HSE que reusa `WorkflowDefinition`; 6 entidades aditivas, catálogos configurables, lista+kanban+detalle, ABAC,
 > creación manual y desde bitácora, 9 permisos [cat. **77**], smoke 26/26. Plan por fases 4.1–4.5 aprobado [DECISIONS]. **Siguiente:
 > Fase 4.1 — Excepciones operacionales.** Anterior: **Bloque N — Hardening de Notificaciones ✅** — `feat/notif-hardening`: **#1 config SMTP en BD**
@@ -209,6 +214,7 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Fase 2.3.1 Worklist de rondas (separar planificar/ejecutar)** (permiso `round:execute` [cat. 63] + `LogSchedule.responsibleRoleId?` [FK Role SetNull] + migración `…_add_schedule_responsible_role`; `GET /schedules/my-rounds`+`/stats` [responsabilidad EN VIVO por rol ∩ ABAC ∩ turno] + `role-options` + start/skip re-gateados; web `/mis-rondas` [MyRoundsPage] + `/rondas` relabel "Programación de rondas" [monitoreo read-only + selector de rol] + widget Inicio + badge→mis-rondas + nav/i18n; contracts 249 · API 234 · smoke `smoke-mis-rondas.py` 18/18 + `smoke-rondas.py` 21/21) | `feat/rondas-worklist` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Bloque N Notificaciones (motor de avisos por correo)** (5 entidades `Notification*` + 4 enums + migración `…_add_notifications` [aditiva]; catálogo `NOTIFICATION_EVENTS` [4] + render sin eval + 4 permisos [cat. **67**]; `@nestjs/schedule`; API `notifications/` [emitter in-tx en `executeTransition`, channel/EmailChannel, resolver ABAC, worker sweeper/dispatcher/sender con backoff, service CRUD+bandeja, `POST /run`]; sweeper GENERA rondas antes de escanear vencidas + SLA breaches; seed 4 plantillas; web `/notificaciones` [Correo saliente/Plantillas/Mis preferencias] + `/mis-notificaciones` + nav/topbar/i18n; contracts 255 · API 234 · smoke `smoke-notificaciones.py` 17/17) | `feat/notificaciones` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Fase 4.0 Núcleo de Incidencias** (6 entidades `Incident`/`IncidentType`/`IncidentCategory`/`IncidentComment`/`IncidentActivity`/`IncidentTransition` + 3 enums + migración `…_add_incidents` aditiva; `@lyra/contracts/incidents` + 9 permisos [cat. **77**]; `IncidentsService` [ABAC por nodo, workflow reusado + reauth Part 11, catálogos, SLA derivado] + controller + módulo; seed flujo `incidencia-operacional` + 13 tipos + 13 categorías; web `features/incidents/` [/incidencias lista+kanban+GridPager, drawer detalle+stepper+transiciones, modal crear, botón "Reportar incidencia" en el visor] + nav/i18n; contracts 255 · API 234 · smoke `smoke-incidencias.py` 26/26) | `feat/incidencias-nucleo` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
+| **Fase 4.1.0 Excepciones (BACKEND)** (2 entidades `LogEntryException`/`IncidentExceptionLink` + 3 enums + migración `…_add_log_entry_exceptions` aditiva; `@lyra/contracts/incidents/exceptions` + `thresholdExceptionTrigger` + config `warnRaisesException` en NUMBER/TABLE/MATRIX + 4 permisos [cat. **81**]; `ExceptionGeneratorService` @Global [generación síncrona reconciliada en saveSection/seal + purga en VOID, 13.º arg de LogEntriesService] + `ExceptionsService`/controller/module [triage ack/dismiss/correct/convert/associate/manual + dedupe + ABAC + auditoría]; contracts 255 · API 234 · smoke `smoke-excepciones.py` 39/39) | `feat/incidencias-excepciones` → `main` | ✅ fusionado y publicado en `origin/main` | UI = 4.1.1 (pendiente) |
 
 **Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
@@ -302,10 +308,23 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
 ### Incidencias (Fase 4) — fases siguientes (plan aprobado 2026-06-16, DECISIONS)
 - [x] **4.0 — Núcleo ✅** (`feat/incidencias-nucleo`): Incident + catálogos + manual + link desde entrada + workflow reusado +
       lista/kanban + ABAC + auditoría + navegación bitácora↔incidencia.
-- [ ] **4.1 — Excepciones operacionales desde bitácoras.** `LogEntryException` + `IncidentExceptionLink`; detección desde umbral/
+- [~] **4.1 — Excepciones operacionales desde bitácoras.** `LogEntryException` + `IncidentExceptionLink`; detección desde umbral/
       valor inválido/crítico (reusa `thresholdBand`/reglas); panel de excepciones en la bitácora; convertir/asociar/agrupar/descartar
       con motivo/corregir valor con trazabilidad (preserva original); deduplicación por sugerencia; **acción "abrir incidencia" del
       motor de reglas vía evento DIFERIDO** (reusa el outbox transaccional del Bloque N).
+  - [x] **4.1.0 — BACKEND ✅** (`feat/incidencias-excepciones`): modelo + migración aditiva + generación síncrona gobernada por
+        campo (CRIT siempre / WARN opt-in `warnRaisesException`) reconciliada en guardar/sellar + purga en VOID + triage
+        (ack/dismiss[crítica=permiso superior]/correct[GxP]/convert/associate/manual) + dedupe (sugerencia) + ABAC + auditoría +
+        4 permisos (cat. **81**). Smoke `smoke-excepciones.py` 39/39. **Deuda fina 4.1.0:** excepción por CELDA de TABLE/MATRIX (hoy
+        a nivel de campo) · Part 11 `payloadHash` de la corrección (deuda compartida con 4.0) · `thresholdType=invalid` aún no se
+        materializa (tier 1 = validación dura que bloquea guardar; reservado para la regla del motor 4.1.2).
+  - [ ] **4.1.1 — UI: panel de excepciones en la bitácora** (llenado/visor: "N críticas · N advertencias" + acciones convertir/
+        asociar/agrupar/descartar/corregir/marcar revisada · modal convertir prellenado · sugerencia de dedup · marca "tiene
+        excepciones" en la grilla de `/bitacoras` · trazabilidad campo→excepción→incidencia en el detalle de la incidencia ·
+        i18n es-CL · tokens Lyra · editor `warnRaisesException` en el builder de NUMBER/TABLE/MATRIX). Endpoints listos en 4.1.0.
+  - [ ] **4.1.2 — Acción "abrir incidencia" del motor de reglas (diferida)**: 2.º corte del motor (acción en `CrossRule` congelada
+        en la versión) + emisión vía outbox in-tx (Bloque N) + worker que crea excepción/incidencia (regla `auto-incident` =
+        incidencia directa; resto = excepción pendiente) + smoke.
 - [ ] **4.2 — Investigación + CAPA.** `IncidentInvestigation` (5 Porqués + causa inmediata/básica/raíz + lección) + `IncidentAction`
       (CAPA con responsable/plazo/evidencia/**verificación de eficacia**/reapertura); bloqueo de cierre si hay CAPA obligatorias
       abiertas; **registro Part 11 con `payloadHash` para incidencias** (hoy 4.0 exige re-auth pero no persiste la firma criptográfica);

@@ -28,6 +28,8 @@ import { SecurityModule } from "./security/security.module";
 import { NotificationEmitterModule } from "./notifications/notification-emitter.module";
 import { NotificationsModule } from "./notifications/notifications.module";
 import { IncidentsModule } from "./incidents/incidents.module";
+import { ExceptionGeneratorModule } from "./exceptions/exception-generator.module";
+import { ExceptionsModule } from "./exceptions/exceptions.module";
 
 @Module({
   imports: [
@@ -74,7 +76,9 @@ import { IncidentsModule } from "./incidents/incidents.module";
     SecurityModule,
     NotificationEmitterModule,
     NotificationsModule,
+    ExceptionGeneratorModule,
     IncidentsModule,
+    ExceptionsModule,
     HealthModule,
   ],
 })

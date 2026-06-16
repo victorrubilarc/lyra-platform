@@ -1,5 +1,31 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-16 — Fase 4.1.0: Excepciones operacionales desde bitácoras — BACKEND ✅** (`feat/incidencias-excepciones`). Activa la
+capa explícita **Bitácora → Excepción → Incidencia** (DECISIONS 2026-06-16; 4 forks de alto impacto cerrados con el dueño en la
+recomendación). **NO reinventa motor:** reusa `thresholdBandFor`/`effectiveNumberBands` y el módulo de Incidencias 4.0.
+**Modelo (2 entidades aditivas, SIN `tenantId`):** `LogEntryException` (contexto CONGELADO en la detección: plantilla/versión/
+sección+label/campo+label/tipo/unidad/`originalValue` INMUTABLE/`bandsSnapshot`/operador/turno/nodo/equipo/fecha + `triggerKind`
+THRESHOLD_WARN|THRESHOLD_CRIT|RULE|MANUAL + `thresholdType` warning|critical|invalid + `status` OPEN|ACKNOWLEDGED|DISMISSED|
+CONVERTED|CORRECTED + corrección GxP que preserva el original + `incidentId?` denormalizado + folio `EXC-####` + `dedupeKey` único)
+y `IncidentExceptionLink` (join autoritativo N:1 con proveniencia; una incidencia agrupa varias excepciones). **Migración aditiva**
+`20260616200000_add_log_entry_exceptions` (se quitó del diff un `DROP INDEX` AJENO; el BOM de PowerShell rompió el 1.er deploy →
+reescrito sin BOM + `migrate resolve --rolled-back` + `db deploy`). **Generación SÍNCRONA gobernada por campo** (fork 1+6: CRIT
+siempre, WARN opt-in `config.warnRaisesException`, en NUMBER/TABLE/MATRIX): `ExceptionGeneratorService` (@Global, Prisma-only,
+13.º arg de `LogEntriesService`) reconcilia en `saveSection` (**provisional**, fork 2) y al **SELLAR** (`submit`/`executeTransition`,
+firme + `entrySealedAt`); volver a rango RETIRA la provisional OPEN; una ya triada CONGELA el slot `(entrada,campo)`; `voidEntry`
+purga las provisionales. Fuente única `thresholdExceptionTrigger` en `@lyra/contracts`. **Triage** (`ExceptionsService`/controller/
+module): `GET /exceptions` (lista ABAC + filtros + paginación + **resumen** críticas/advertencias), `/exceptions/summary`,
+`/:id`, `/:id/dedupe-suggestions` (incidencias ABIERTAS del mismo nodo/equipo/24h — **sugerencia**, nunca merge), `acknowledge`,
+`dismiss` (crítica exige permiso superior), `correct` (GxP: escribe `LogEntryValue`+`LogEntryFieldChange`+re-estampa banda,
+preserva original), `convert` (crea incidencia `originType=EXCEPTION` + link + CONVERTED), `associate` (a incidencia existente),
+`manual` (registro del operador). ABAC por nodo + auditoría en todo. **4 permisos** (`exception:triage`/`dismiss`/`dismiss-critical`/
+`correct`; catálogo **77→81**). Contracts **255** · API **234** sin regresión. **Smoke en vivo `scripts/smoke-excepciones.py`
+39/39** (generación CRIT/WARN gobernada · WARN opt-out no genera · contexto congelado · idempotencia · retiro al volver a rango ·
+resumen · gates 403 · acknowledge/dismiss-crítica/correct[preserva original + escribe valor]/convert[originType EXCEPTION+link]/
+dedupe/associate · registro manual · `entrySealedAt` al sellar; crea y LIMPIA por ID). typecheck/lint(0)/build/test verdes.
+**Pendiente: 4.1.1 — panel de excepciones en la bitácora (UI)** + **4.1.2 — acción del motor de reglas (diferida, outbox)**.
+🔔 Recordatorio: épico de **notificaciones avanzadas** sigue pendiente (`docs/prompts/notificaciones-avanzadas.md`).
+
 **2026-06-16 — Fase 4.0: Núcleo de Incidencias operacionales / HSE ✅** (`feat/incidencias-nucleo` → `main`). Primera fase del
 módulo de incidencias, tras una sesión de investigación + diseño + plan por fases aprobado (DECISIONS 2026-06-16; 14 forks resueltos
 en la opción recomendada; **single-tenant confirmado → SIN `tenantId`**). **Reusa `WorkflowDefinition`** para el ciclo de vida: la

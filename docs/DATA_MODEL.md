@@ -507,9 +507,25 @@ tabla existente. El catálogo de EVENTOS vive en CÓDIGO (`@lyra/contracts NOTIF
   COMMENT/CLOSED/CANCELED) + `summary` + actor + `metadata` jsonb.
 - **IncidentTransition** *(implementado)* — transición de flujo EJECUTADA (espejo de `LogEntryTransition`): versión de
   flujo congelada + `transitionKey`/`fromStateKey`/`toStateKey` + actor + `reason?` + `signatureId?` (ref. blanda).
-- **Diferido (4.1+):** `LogEntryException` + `IncidentExceptionLink` (capa de excepción, 4.1) · `IncidentInvestigation`/
-  `IncidentRcaAnswer`/`IncidentAction` (CAPA, 4.2) · `IncidentRegulatoryFlag`/clasificación minera/IF-IG (4.3) ·
-  adjuntos a nivel de incidencia (MinIO, patrón Ola 3) · registro Part 11 con `payloadHash` para incidencias (4.2).
+- **LogEntryException** *(implementado 4.1.0)* — materialización de una anomalía de bitácora con ESTADO y TRIAGE (migración
+  `20260616200000_add_log_entry_exceptions`). Contexto CONGELADO en la detección (refs BLANDAS, patrón AuditLog): `logEntryId`,
+  `templateId?`/`templateVersionId?`, `sectionKey`+`sectionLabel?`, `fieldKey`+`fieldLabel?`, `fieldType?`, `unit?`,
+  `occurrenceRef?` (celda de TABLE/MATRIX, hoy null — MVP a nivel de campo). Valor: `originalValue` jsonb **INMUTABLE** +
+  `bandsSnapshot` jsonb (warn/crit efectivos). Disparador: `triggerKind` (THRESHOLD_WARN/THRESHOLD_CRIT/RULE/MANUAL),
+  `ruleKey?`/`ruleVersionId?`/`ruleSeverity?`, `thresholdType` (warning/critical/invalid), `detail?`. Operacional (denormalizado):
+  `orgNodeId`/`equipmentId?`/`shiftCode?`/`operatorId?`/`detectedAt`/`entrySealedAt?`. Triage: `status` (OPEN/ACKNOWLEDGED/
+  DISMISSED/CONVERTED/CORRECTED) + `triagedById?`/`triagedAt?`/`dismissReason?`. Corrección GxP: `correctedValue?`/`correctionReason?`/
+  `correctedById?`/`correctedAt?` (el original NUNCA se pierde). Ligazón: `incidentId?` (N:1 denormalizado). `number` → folio
+  `EXC-####` derivado. **Idempotencia:** `dedupeKey` único `thr:{entryId}:{fieldKey}` (una provisional por entrada+campo;
+  re-guardar reconcilia; volver a rango RETIRA la provisional OPEN; al sellar se congela + `entrySealedAt`; VOID purga las
+  provisionales). Sin FK a entrada/nodo/equipo (refs blandas); índices por logEntry/orgNode/equipment/status/thresholdType/incident.
+- **IncidentExceptionLink** *(implementado 4.1.0)* — join AUTORITATIVO excepción↔incidencia con proveniencia (`linkedById?`/
+  `linkedAt`); `@@unique(exceptionId)` = N:1 (una incidencia agrupa varias excepciones). FK Cascade desde Incident y
+  LogEntryException. Convertir/asociar deja la excepción CONVERTED + `incidentId` + actividad en el timeline de la incidencia.
+- **Diferido (4.1.1+):** acción "abrir incidencia" del motor de reglas vía evento DIFERIDO/outbox (4.1.2) · excepción por CELDA de
+  TABLE/MATRIX · `IncidentInvestigation`/`IncidentRcaAnswer`/`IncidentAction` (CAPA, 4.2) · `IncidentRegulatoryFlag`/clasificación
+  minera/IF-IG (4.3) · adjuntos a nivel de incidencia (MinIO, patrón Ola 3) · registro Part 11 con `payloadHash` para incidencias y
+  para correcciones de excepción (4.2).
 
 ### Turnos
 - **ShiftPattern** *1—N* **Shift** — régimen configurable.
