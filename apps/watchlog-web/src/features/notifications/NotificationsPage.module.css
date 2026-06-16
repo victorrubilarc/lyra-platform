@@ -69,12 +69,15 @@
   gap: var(--space-4);
 }
 
-/* Filtros de la bandeja */
+/* Filtros de la bandeja — SIEMPRE en una sola línea (convención del producto) */
 .filters {
   display: flex;
   gap: var(--space-3);
-  flex-wrap: wrap;
   align-items: center;
+}
+.filters > form {
+  flex: 1;
+  min-width: 0;
 }
 .spacer {
   flex: 1;
@@ -348,14 +351,18 @@
 }
 
 /* === Plantillas: lista administrable (master) === */
+/* Filtros SIEMPRE en una sola línea (convención del producto). */
 .tplToolbar {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  flex-wrap: wrap;
+}
+.tplToolbar > :first-child {
+  flex: 1;
+  min-width: 0;
 }
 .tplToolbar .spacer {
-  flex: 1;
+  flex: 0 0 auto;
 }
 .tplCount {
   font-size: 0.82rem;

@@ -4,7 +4,7 @@ import {
   Search, Trash2, X,
 } from "lucide-react";
 import {
-  Button, Card, Chip, EmptyState, Input, Select, Table, Toggle, Tooltip, useToast,
+  Button, Card, Chip, EmptyState, GridPager, Input, Select, Table, Toggle, Tooltip, useToast,
   type TableColumn, type TableSort,
 } from "@lyra/ui";
 import type { LogScheduleDto, OccurrenceQuery, RoundOccurrenceDto, UpdateLogScheduleRequest } from "@lyra/contracts";
@@ -16,7 +16,6 @@ import {
 import { ScheduleDrawer } from "./ScheduleDrawer.js";
 import { TemplateFilterModal, type TemplateOption } from "./TemplateFilterModal.js";
 import { MiniBars, type BarItem } from "./MiniBars.js";
-import { GridPager } from "./GridPager.js";
 import styles from "./SchedulesPage.module.css";
 import bar from "./MyRoundsPage.module.css";
 

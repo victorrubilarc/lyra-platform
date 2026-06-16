@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AlertTriangle, Clock, FileText, Play, RefreshCw, Route, Search, SkipForward, X } from "lucide-react";
-import { Button, Card, Chip, EmptyState, Input, Modal, Select, useToast } from "@lyra/ui";
+import { Button, Card, Chip, EmptyState, GridPager, Input, Modal, Select, useToast } from "@lyra/ui";
 import type { RoundOccurrenceDto } from "@lyra/contracts";
 import { formatDate, formatDuration, formatTime } from "../../lib/format.js";
 import {
@@ -10,7 +10,6 @@ import {
   useSkipOccurrence,
   useStartOccurrence,
 } from "./schedules-queries.js";
-import { GridPager } from "./GridPager.js";
 import styles from "./SchedulesPage.module.css";
 import my from "./MyRoundsPage.module.css";
 

@@ -80,3 +80,6 @@ export type { TableProps, TableColumn, TableSort, TableColumnState } from "./com
 
 export { ResizableSplit } from "./components/ResizableSplit/ResizableSplit.js";
 export type { ResizableSplitProps } from "./components/ResizableSplit/ResizableSplit.js";
+
+export { GridPager } from "./components/GridPager/GridPager.js";
+export type { GridPagerProps } from "./components/GridPager/GridPager.js";
