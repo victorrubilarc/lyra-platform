@@ -606,6 +606,16 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
         notificación de vencidas (→ Notificaciones) · cron `@nestjs/schedule` · picker de plantilla/nodo propio del planificador
         (hoy reusa el de `logentry:create`) · COMPLETED-on-seal sin smoke en vivo (cubierto por el hook + unit; sellar es
         template-dependiente). **Pendiente: smoke VISUAL** (§4).
+  - [ ] **2.3.1 Rondas: separar PLANIFICAR de EJECUTAR (aprobado 2026-06-15, SIGUIENTE sesión, ANTES de Notificaciones).**
+        El MVP dejó UNA pantalla `/rondas` que mezcla crear horarios (planificador) con iniciar/omitir (operador) — el dueño lo
+        encontró poco natural. Estándar (SAP/Maximo/j5): el planificador configura, el operador ve un **worklist acotado a él**.
+        **A entregar:** (1) **"Mis rondas"** = worklist del OPERADOR (default Hoy/Pendientes; solo Iniciar/Continuar/Omitir;
+        widget en Inicio) + **"Programación de rondas"** = admin del PLANIFICADOR (CRUD, junto a Calendarios). (2)
+        **Responsabilidad por ROL** en el horario (`LogSchedule.responsibleRoleId?`, migración aditiva): el worklist filtra por
+        roles del usuario ∩ nodos accesibles ∩ turno; sin rol ⇒ fallback nodo+turno. (3) **Permiso separado**: `schedule:manage`
+        = planificar; **permiso operativo nuevo** = ejecutar (iniciar/omitir), asignable al rol operador. (4) menú/i18n + tests +
+        smoke. Ver DECISIONS 2026-06-15. **Forks a resolver al planificar:** nombre del permiso de ejecución · rol responsable
+        single vs multi · ruta (`/mis-rondas` + `/rondas` admin, o renombrar) · widget de Inicio sí/no.
   - [x] **2.4 Llenado (Nueva entrada) multi-actor** ✅ (2026-06-10). Tablas `LogEntry`/`LogEntrySection`/
         `LogEntryValue`/`LogEntryFieldChange` (aditivas). Secciones editables por estado+rol (dato `TemplateSectionRole`
         + override por campo) × ABAC; validación 100% en servidor (`validateFieldValue` = fuente única reusada en

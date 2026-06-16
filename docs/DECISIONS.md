@@ -4,6 +4,32 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-15 · Fase 2.3.1 — Separar PLANIFICAR de EJECUTAR rondas (decisión de diseño; implementación = sesión propia)
+
+Feedback del dueño tras ver el MVP de rondas: una sola pantalla `/rondas` que mezcla **crear horarios** (planificador)
+con **iniciar/omitir ocurrencias** (operador) "se ve rara" — son **dos trabajos, dos roles, dos momentos**. Correcto y
+alineado con el estándar (SAP PM Maintenance Plan vs *My Maintenance Tasks*/Fiori · Maximo PM vs *Start Center → My
+Assignments* · j5 schedules vs *shift logbook*): el **planificador** configura de vez en cuando; el **operador** ve una
+**lista de trabajo acotada a él, ahora** (su turno · su nodo · su rol) y ejecuta. **Decisiones aprobadas:**
+
+1. **Dos superficies independientes:** (a) **"Mis rondas"** = worklist del OPERADOR (default Hoy/Pendientes; solo
+   Iniciar/Continuar/Omitir; idealmente widget en Inicio); (b) **"Programación de rondas"** = admin del PLANIFICADOR (CRUD de
+   `LogSchedule`, junto a Calendarios/Plantillas).
+2. **Responsabilidad por ROL/posición** (no por persona): el horario declara un **rol responsable** (ej. "Operador de
+   Molienda"); el worklist muestra al usuario las rondas de SUS roles ∩ sus nodos accesibles ∩ su turno. *Motivo:* las rondas
+   son del PUESTO, no de un individuo (sobreviven a turnos rotativos/ausencias), patrón work center/responsible role de SAP/
+   Maximo. Sin rol responsable ⇒ fallback a nodo + turno (visible a todos los del nodo).
+3. **Permiso separado:** ejecutar una ronda (iniciar/omitir) ≠ gestionar horarios. `schedule:manage` queda para PLANIFICAR;
+   se añade un permiso operativo liviano para EJECUTAR (asignable al rol operador sin darle administración). Nombre/forma exactos
+   a resolver al planificar la sesión.
+4. **Prioridad:** se hace **ANTES** de Notificaciones (el dueño lo quiere natural antes del demo a cliente); Notificaciones
+   queda justo después y encaja (avisar al ROL responsable de su ronda pendiente/vencida).
+
+Pendiente de implementar (sesión 2.3.1): migración aditiva (`LogSchedule.responsibleRoleId?` + permiso nuevo), backend
+(filtro del worklist por roles del usuario), web (2 páginas + widget de inicio + menú/i18n), tests + smoke. Ver BACKLOG.
+
+---
+
 ### 2026-06-15 · Fase 2.3 — Programación de rondas (`LogSchedule` + `RoundOccurrence`)
 
 Recurrencia que ABRE una entrada de bitácora por ocurrencia (estándar SAP PM Maintenance Plan/calls · IBM Maximo PM/WO ·
