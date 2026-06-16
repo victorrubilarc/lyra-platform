@@ -96,13 +96,14 @@
   padding: 14px 16px;
 }
 .filterSearch {
-  flex: 1 1 280px;
-  min-width: 220px;
-  max-width: 460px;
+  flex: 1 1 240px;
+  min-width: 200px;
+  max-width: 480px;
 }
+/* Ancho FIJO compacto: el <select> interno es width:100%, así que sin esto se estira. */
 .filterSelect {
-  flex: 0 1 auto;
-  min-width: 168px;
+  flex: 0 0 auto;
+  width: 176px;
   min-height: 42px;
 }
 .filterBtn {
@@ -186,6 +187,15 @@
 .tabOn .tabBadge {
   background: rgba(99, 102, 241, 0.18);
   color: var(--color-accent-primary, #6366f1);
+}
+
+/* Cabecera de la pestaña Ocurrencias: filtros rápidos + acción contextual Generar */
+.occHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 /* Resumen: gráficas */

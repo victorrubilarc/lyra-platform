@@ -51,7 +51,14 @@ filtro** (activos/pausados/pendientes/vencidas calculados de los horarios visibl
 Ocurrencias · Resumen. **Ambas grillas** ahora con **orden por columna + paginación** nativos del `Table` de @lyra/ui (no propios);
 las ocurrencias se intersectan con los horarios filtrados (los filtros superiores afectan a las dos). **Resumen** = panel de
 análisis con gráficas (`MiniBars`, SVG/CSS sin dependencias): rondas pendientes por área · horarios por recurrencia · cumplimiento
-(% atrasadas). Frontend puro. typecheck/lint(0)/build verdes. **+ demo `seed-demo-estanques.py`** (5 estanques como
+(% atrasadas). Frontend puro. typecheck/lint(0)/build verdes. **+ Follow-up UX 6 — pulido del planificador
+(`feat/programacion-pulido`):** filtros en **UNA sola línea** (selects de ancho FIJO 176px — el `<select>` interno era
+`width:100%` y se estiraba; búsqueda flexible con tope); **filtro por EQUIPO en contexto con su nodo** ("TAG · Nodo", cascadea con
+el área); **paginación ARRIBA y ABAJO** de ambas grillas (`GridPager` propio reutilizable: rango + tamaño + primera/ant/sig/última
+· se dejó de usar el paginado interno del Table para poder montarlo arriba y abajo); **más columnas** (Horarios +Plazo; Ocurrencias
++Plantilla +Entrada N.º); **tooltips** en los botones (`Tooltip` @lyra/ui); **"Generar" contextualizado** → movido del header a la
+pestaña Ocurrencias (es materializar ocurrencias) con tooltip explicativo. Frontend puro. typecheck/lint(0)/build verdes.
+**+ demo `seed-demo-estanques.py`** (5 estanques como
 equipos + ronda cada hora + umbrales) y **Route (fan-out por equipo) anotado en BACKLOG**. **Pendiente: smoke VISUAL del dueño**
 (§4). **Siguiente: Notificaciones (correo).**
 
