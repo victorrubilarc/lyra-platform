@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { AlertTriangle, Clock, Play, RefreshCw, Route, Search, SkipForward, X } from "lucide-react";
+import { AlertTriangle, Clock, FileText, Play, RefreshCw, Route, Search, SkipForward, X } from "lucide-react";
 import { Button, Card, Chip, EmptyState, Input, Modal, Select, useToast } from "@lyra/ui";
 import type { RoundOccurrenceDto } from "@lyra/contracts";
 import { formatDate, formatDuration, formatTime } from "../../lib/format.js";
@@ -10,6 +10,7 @@ import {
   useSkipOccurrence,
   useStartOccurrence,
 } from "./schedules-queries.js";
+import { GridPager } from "./GridPager.js";
 import styles from "./SchedulesPage.module.css";
 import my from "./MyRoundsPage.module.css";
 
@@ -72,6 +73,8 @@ export function MyRoundsPage() {
   const [search, setSearch] = useState("");
   const [nodo, setNodo] = useState<string | null>(null);
   const [equipo, setEquipo] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(25);
 
   // Tope superior (timestamp) de lo que se muestra según el horizonte. null = sin tope.
   // Si la ventana cruza la medianoche, hay que pedir también las próximas (días futuros).
@@ -137,6 +140,18 @@ export function MyRoundsPage() {
     for (const b of BUCKET_ORDER) by[b].sort((a, c) => new Date(a.dueAt).getTime() - new Date(c.dueAt).getTime());
     return by;
   }, [filtered]);
+
+  // Lista PLANA en orden de urgencia (mantiene la agrupación vía encabezados en línea) +
+  // paginación arriba/abajo: el operador conserva la agenda pero sin scroll infinito.
+  const flatItems = useMemo(
+    () => BUCKET_ORDER.flatMap((b) => groups[b].map((o) => ({ o, bucket: b }))),
+    [groups],
+  );
+  const total = flatItems.length;
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  const pageSafe = Math.min(page, pages - 1);
+  const slice = flatItems.slice(pageSafe * pageSize, pageSafe * pageSize + pageSize);
+  useEffect(() => { setPage(0); }, [search, nodo, equipo, shiftOnly, horizon, pageSize]);
 
   const anyFilter = !!search || !!nodo || !!equipo || shiftOnly || horizon !== "today";
   function clearFilters() {
@@ -205,6 +220,7 @@ export function MyRoundsPage() {
           </div>
           <div className={styles.occMeta}>
             <span>{o.orgNodeName}</span>
+            {o.scheduleName && o.templateName ? <span className={my.metaTpl}><FileText size={12} /> {o.templateName}</span> : null}
             {o.shiftCode ? <span>· Turno {o.shiftCode}</span> : null}
           </div>
         </div>
@@ -221,8 +237,6 @@ export function MyRoundsPage() {
       </li>
     );
   }
-
-  const visibleBuckets = BUCKET_ORDER.filter((b) => groups[b].length > 0);
 
   return (
     <div className={styles.page}>
@@ -315,10 +329,10 @@ export function MyRoundsPage() {
         </div>
       )}
 
-      {/* Lista agrupada por urgencia */}
+      {/* Agenda por urgencia (encabezados en línea) + paginación arriba y abajo */}
       {rounds.isLoading ? (
         <Card className={styles.section}><p className={styles.muted}>Cargando…</p></Card>
-      ) : visibleBuckets.length === 0 ? (
+      ) : total === 0 ? (
         <Card className={styles.section}>
           <EmptyState
             icon={<Route size={28} />}
@@ -328,16 +342,29 @@ export function MyRoundsPage() {
           />
         </Card>
       ) : (
-        visibleBuckets.map((b) => (
-          <section key={b} className={my.group}>
-            <div className={`${my.groupHead} ${my[`bucket_${b}`] ?? ""}`}>
-              <span className={my.groupDot} aria-hidden="true" />
-              <h2 className={my.groupTitle}>{BUCKET_LABEL[b]}</h2>
-              <span className={my.groupCount}>{groups[b].length}</span>
-            </div>
-            <ul className={styles.occList}>{groups[b].map(renderOcc)}</ul>
-          </section>
-        ))
+        <Card className={styles.section}>
+          <GridPager page={pageSafe} pages={pages} total={total} pageSize={pageSize} unit="rondas" onPage={setPage} onPageSize={setPageSize} />
+          <ul className={styles.occList}>
+            {slice.map((item, i) => {
+              const showHeader = i === 0 || slice[i - 1]?.bucket !== item.bucket;
+              return (
+                <Fragment key={item.o.id}>
+                  {showHeader && (
+                    <li className={my.groupRow}>
+                      <div className={`${my.groupHead} ${my[`bucket_${item.bucket}`] ?? ""}`}>
+                        <span className={my.groupDot} aria-hidden="true" />
+                        <h2 className={my.groupTitle}>{BUCKET_LABEL[item.bucket]}</h2>
+                        <span className={my.groupCount}>{groups[item.bucket].length}</span>
+                      </div>
+                    </li>
+                  )}
+                  {renderOcc(item.o)}
+                </Fragment>
+              );
+            })}
+          </ul>
+          <GridPager page={pageSafe} pages={pages} total={total} pageSize={pageSize} unit="rondas" onPage={setPage} onPageSize={setPageSize} />
+        </Card>
       )}
 
       <Modal

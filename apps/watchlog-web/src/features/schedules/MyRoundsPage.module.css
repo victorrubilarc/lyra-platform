@@ -8,8 +8,9 @@
 }
 
 .searchWrap {
-  flex: 1 1 260px;
+  flex: 1 1 240px;
   min-width: 200px;
+  max-width: 460px;
 }
 
 .searchClear {
@@ -27,11 +28,10 @@
   color: var(--color-text);
 }
 
+/* display:contents → los controles pasan a ser hijos directos de .toolbar y caben en
+   una sola línea (sin un sub-grupo que envuelva). */
 .toggles {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+  display: contents;
 }
 
 /* Toggle pill (Mi turno / Incluir próximas) */
@@ -57,14 +57,17 @@
   color: var(--color-accent-primary, #6366f1);
 }
 
+/* Ancho FIJO (el <select> interno es width:100%; sin esto se estira a fila completa). */
 .nodoSelect {
+  flex: 0 0 auto;
+  width: 184px;
   min-height: 40px;
-  max-width: 220px;
 }
 
 .horizonSelect {
+  flex: 0 0 auto;
+  width: 184px;
   min-height: 40px;
-  max-width: 220px;
   font-weight: 600;
 }
 
@@ -139,6 +142,13 @@
   flex-direction: column;
   gap: 8px;
 }
+/* Encabezado de grupo EN LÍNEA dentro de la lista paginada (agenda + paginación). */
+.groupRow {
+  list-style: none;
+}
+.groupRow:not(:first-child) {
+  margin-top: 10px;
+}
 .groupHead {
   display: flex;
   align-items: center;
@@ -204,6 +214,13 @@
   font-weight: 700;
   color: var(--color-text);
   letter-spacing: 0.02em;
+}
+
+/* Plantilla (bitácora a llenar) en la meta de la tarjeta */
+.metaTpl {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 /* Columna de HORA prominente (estilo agenda) — lo que el operador escanea. */
