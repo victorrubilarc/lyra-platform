@@ -4,6 +4,36 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-16 · Bloque N — Hardening premium de Notificaciones (config SMTP en BD + editor de plantillas) — 🔵 PLAN APROBADO (`feat/notif-hardening`)
+
+Dos mejoras pedidas por el dueño antes de Fase 4, sobre el módulo de Notificaciones. Referencia revisada: `G:\Development\ruta-bus`
+(módulo email: config SMTP en BD + presets + probar envío) — se SUPERA en seguridad (la referencia guarda la contraseña en CLARO).
+
+**#1 — Pantalla de configuración del correo saliente (SMTP en BD).**
+- Config persistida en **`SystemSettings`** (singleton tipado; columnas `email*` aditivas), `.env` como **fallback de arranque**; la UI
+  indica `source: db|env`. Se aplica **sin reiniciar** (el `SmtpEmailService` resuelve desde BD con caché + invalidación por *firma*
+  del transporte). *Motivo:* impensable manejar el transporte solo por `.env`; el admin debe configurarlo en caliente.
+- **Contraseña SMTP cifrada en reposo** (`EncryptionService` AES), **write-only** (nunca vuelve a la UI; solo `passwordSet`). *Mejora
+  de seguridad sobre la referencia* (OWASP ASVS: credenciales cifradas en reposo).
+- **Presets de proveedor + diccionario de pistas** (Gmail/Workspace · M365 · Amazon SES · SendGrid · Mailpit dev · Personalizado).
+- **Probar conexión** (`verify()`) y **Probar envío** (correo de prueba con los valores del form sin guardar; muestra el error real
+  del SMTP). Toggle **"Correo activado"** (apagado ⇒ sender marca SUPPRESSED, no rompe el flujo).
+- **Permiso DEDICADO `notification:config`** (least-privilege, separable en la matriz de roles; catálogo **67→68**) — NO se reusa
+  `settings:manage`. **Ubicación: tab nuevo en `/configuracion`** (decisión del dueño: la config de correo es parte de la
+  configuración del SISTEMA, con roles y permisos; sub-tabs si crece), no en `/notificaciones`. Auditoría `email.config.updated/tested`.
+
+**#2 — Editor de plantillas premium.**
+- **Vista previa EN VIVO** (split editor/preview) con el MISMO `renderTemplate` (isomorfo, `@lyra/contracts`) + **valores de ejemplo
+  por variable** (`sample` nuevo en `NotificationVariableDef`). *Motivo:* el editor actual es ciego (sin preview).
+- **Diccionario de variables**: descripción + ejemplo por variable (ya en `NOTIFICATION_EVENTS`), insertar **en el cursor** del campo
+  enfocado (asunto/cuerpo), resaltado de variables inválidas.
+- **Compartir datos de la bitácora = `{{entry.summary}}`** (decisión del dueño "ambas: summary ahora + dinámicas como fase 2"):
+  renderiza los **campos de resumen** ya configurados por plantilla (`gridFieldKeys`, etiqueta+valor+unidad, formato regional). Reusa
+  gobernanza existente, cero explosión de modelo. **Variables de campo dinámicas por tipo de formulario** (`{{field.<key>}}`,
+  plantillas scoped al form-template) = **DISEÑADO, diferido a fase 2** (BACKLOG).
+
+---
+
 ### 2026-06-16 · Bloque N — Notificaciones (motor de avisos por correo) — 🔵 PLAN APROBADO (forks resueltos con el dueño; en implementación, `feat/notificaciones`)
 
 Motor de notificaciones premium **solo correo** (SMS/WhatsApp fuera de alcance), on-prem, fundacional para Fase 4 y para

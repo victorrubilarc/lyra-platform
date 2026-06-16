@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { BookOpenCheck, Lock, ShieldCheck } from "lucide-react";
+import { BookOpenCheck, Lock, Mail, ShieldCheck } from "lucide-react";
 import { EmptyState, Select, Skeleton, Toggle, cx, useToast } from "@lyra/ui";
 import type { LucideIcon } from "lucide-react";
 import type { EditWindowAnchor, SystemSettingsDto, UpdateSystemSettingsRequest } from "@lyra/contracts";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { ApiError } from "../../lib/api-client.js";
 import { EditWindowDurationField } from "./EditWindowDurationField.js";
+import { EmailSettingsPanel } from "./EmailSettingsPanel.js";
 import { useSystemSettings, useUpdateSystemSettings } from "./settings-queries.js";
 import styles from "./SettingsPage.module.css";
 
@@ -18,17 +19,20 @@ const MFA_ACTIONS: { field: keyof UpdateSystemSettingsRequest; labelKey: string 
   { field: "requireMfaPeriodUnlock", labelKey: "settings.mfa.unlock" },
 ];
 
-type Category = "security" | "logbook";
+type Category = "security" | "logbook" | "email";
 
 interface CategoryDef {
   id: Category;
   labelKey: string;
   icon: LucideIcon;
+  /** Permiso requerido para ver el tab (ausente = siempre, dentro de settings:view). */
+  permission?: string;
 }
 
 const CATEGORIES: CategoryDef[] = [
   { id: "security", labelKey: "settings.cat.security", icon: ShieldCheck },
   { id: "logbook", labelKey: "settings.cat.logbook", icon: BookOpenCheck },
+  { id: "email", labelKey: "settings.cat.email", icon: Mail, permission: "notification:config" },
 ];
 
 export function SettingsPage() {
@@ -71,7 +75,7 @@ export function SettingsPage() {
 
       <div className={styles.layout}>
         <nav className={styles.tabNav} aria-label={t("settings.tabsAria")}>
-          {CATEGORIES.map((c) => {
+          {CATEGORIES.filter((c) => !c.permission || perms.can(c.permission)).map((c) => {
             const Icon = c.icon;
             return (
               <button
@@ -178,6 +182,18 @@ export function SettingsPage() {
               )}
 
               {!canManage && <p className={styles.meta}>{t("settings.readOnly")}</p>}
+            </section>
+          )}
+
+          {tab === "email" && perms.can("notification:config") && (
+            <section className={styles.section}>
+              <header className={styles.sectionHead}>
+                <h2 className={styles.sectionTitle}>
+                  <Mail size={18} /> {t("settings.cat.email")}
+                </h2>
+                <p className={styles.sectionDesc}>{t("settings.emailDesc")}</p>
+              </header>
+              <EmailSettingsPanel />
             </section>
           )}
         </div>

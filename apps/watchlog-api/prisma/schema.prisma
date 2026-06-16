@@ -1129,6 +1129,22 @@ model SystemSettings {
   editWindowMinutes            Int?
   // Exigir re-auth con MFA al editar FUERA de ventana (override privilegiado).
   requireMfaEditWindowOverride Boolean          @default(false)
+  // --- Correo saliente / SMTP (Bloque N hardening) ---------------------------
+  // Config del transporte persistida en BD (editable sin reiniciar). El `.env`
+  // (SMTP_*) queda como FALLBACK por campo. La contraseña va CIFRADA en reposo
+  // (emailPasswordEnc) y es write-only (nunca vuelve a la UI). `emailConfiguredAt`
+  // null = nunca guardada en BD ⇒ la config vigente proviene del entorno (source=env).
+  emailEnabled                 Boolean          @default(false)
+  emailService                 String?
+  emailHost                    String?
+  emailPort                    Int?
+  emailSecure                  Boolean          @default(false)
+  emailUser                    String?
+  emailPasswordEnc             String?
+  emailFromName                String?
+  emailFromEmail               String?
+  emailConfiguredAt            DateTime?
+  emailConfiguredById          String?
   updatedById                  String?
   updatedAt                    DateTime         @updatedAt
 }

@@ -1,5 +1,26 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-16 — Bloque N: Hardening premium de Notificaciones (config SMTP en BD + editor de plantillas) ✅** (`feat/notif-hardening` →
+`main`). Dos mejoras pedidas por el dueño antes de Fase 4 (referencia revisada: `G:\Development\ruta-bus`; se SUPERA en seguridad —
+la referencia guarda la contraseña en claro). **#1 Configuración del correo saliente (SMTP en BD):** config persistida en
+`SystemSettings` (columnas `email*` aditivas) editable **sin reiniciar**, con `.env` como FALLBACK (`source: db|env` en la UI);
+**`SmtpEmailService` refactorizado** resuelve desde BD con caché + invalidación por *firma* del transporte; **contraseña cifrada en
+reposo** (`EncryptionService` AES), **write-only** (nunca vuelve a la UI, solo `passwordSet`). **`EmailConfigService`** (getPublic/
+getResolved/resolveFrom/set/isEnabled) + endpoints `GET/PUT /settings/email`, `POST /settings/email/verify` (probar conexión, sin
+enviar) y `/test` (probar envío con los valores del form sin guardar; error real del SMTP), auditados (`email.config.updated/tested`,
+sin registrar la clave). **Toggle "Correo activado"** → el sender del worker marca **SUPPRESSED** si está apagado (no rompe el flujo).
+**Permiso DEDICADO `notification:config`** (catálogo **67→68**), pantalla = **tab "Correo saliente" en `/configuracion`** (decisión
+del dueño: parte de la config del SISTEMA) con **presets de proveedor + diccionario de pistas** (Gmail/M365/SES/SendGrid/Mailpit/
+Personalizado). **#2 Editor de plantillas premium:** **vista previa EN VIVO** (split editor/preview con el MISMO `renderTemplate`
+isomorfo + **valores de ejemplo por variable**); **diccionario de variables** (nombre + descripción + ejemplo) que **inserta en el
+cursor** del campo enfocado (asunto/cuerpo); **`{{entry.summary}}`** nuevo = renderiza los campos de RESUMEN configurados por
+plantilla (`gridFieldKeys`, etiqueta+valor+unidad, resuelve code→label de SELECT inline) → el correo lleva datos PROPIOS de la
+bitácora sin acoplar la plantilla a un tipo de formulario (**variables de campo dinámicas `{{field.<key>}}` = diferido a fase 2,
+BACKLOG**). **Migración aditiva** `20260616160000_add_email_config`. Tests: contracts **255** · API **234**. **Smokes en vivo:
+`smoke-email-config.py` 8/8** (config sin password; guardar → source=db + clave CIFRADA len=64 no-claro; verify+test contra
+MAILPIT; gates 403; limpieza → env) **· `smoke-notificaciones.py` 17/17** sin regresión. typecheck/lint(0)/build verdes. **Pendiente:
+smoke VISUAL del dueño** (config de correo + editor con preview/diccionario/entry.summary). **Siguiente: Fase 4 — Incidencias.**
+
 **2026-06-16 — Bloque N: Notificaciones (motor de avisos por correo) ✅** (`feat/notificaciones` → `main`). Motor PREMIUM
 solo-correo (SMS/WhatsApp fuera de alcance), on-prem, fundacional para Fase 4 y para los avisos diferidos de rondas vencidas
 (2.3) y SLA (workflow-sla). Estándar ServiceNow (sys_email + templates) · Jira (notification schemes + watchers) · SAP/Maximo.

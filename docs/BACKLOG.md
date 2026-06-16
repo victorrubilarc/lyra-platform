@@ -5,7 +5,12 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-16** (**Bloque N — Notificaciones ✅** — `feat/notificaciones`: motor de avisos por CORREO premium,
+> actualización: **2026-06-16** (**Bloque N — Hardening de Notificaciones ✅** — `feat/notif-hardening`: **#1 config SMTP en BD**
+> (pantalla en `/configuracion` tab "Correo saliente", permiso `notification:config` [cat. **68**]; `SystemSettings.email*`, `.env`
+> fallback, **contraseña CIFRADA write-only**, sin reiniciar; presets + probar conexión/envío contra Mailpit; sender suprime si está
+> apagado) **+ #2 editor de plantillas premium** (vista previa en vivo, diccionario de variables con descripción+ejemplo, insertar
+> en cursor, **`{{entry.summary}}`** = campos de resumen de la bitácora). Migración aditiva. Contracts 255 · API 234 · smokes 8/8 +
+> 17/17. **Siguiente: Fase 4 — Incidencias.** Anterior: **Bloque N — Notificaciones ✅** — `feat/notificaciones`: motor de avisos por CORREO premium,
 > transactional outbox de 2 etapas + worker `@nestjs/schedule` (1.ª infra de cron); 5 entidades aditivas (`NotificationEvent`/
 > `Outbox`/`Template`/`Subscription`/`Preference`); catálogo de eventos en código (4: ronda vencida/SLA/transición/firma) con
 > variables whitelisteadas + render sin eval; emisión IN-TX en `executeTransition`; resolución de destinatarios con ABAC; sweeper
@@ -196,6 +201,7 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **FORM_GUIDE.md — mapa de capacidades del formulario (doc VIVO)** (catálogo de objetos + transversales en lenguaje simple, 7 partes por objeto; regla de doc vivo en §0.3 + cierre de CLAUDE.md + memoria) | `docs/form-guide` → `main` | ✅ fusionado y publicado en `origin/main` (`9421959`) | ninguna |
 | **Pulidos de UX del Form Builder** (mín/máx caracteres + contador `CharCounter` en Texto/Párrafo; hover de info en `SectionCanvas`; footer Aceptar/Cancelar en el drawer con revert por snapshot; fix Enter en listas `LinesTextarea`; fix preexistente del spec `logbook-query.service` [storage]; FORM_GUIDE actualizado; contracts 239 · API 234) | `feat/builder-ux-pulidos` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Builder: formateo en vivo + paleta de elementos + modal "Ver más"** (RUT al teclear · número/moneda/porcentaje miles+decimales `FormattedNumberInput` · máscara genérica `config.mask`/`applyMask` · «Decimales» expuesto · footer Aceptar/Cancelar en PROPIEDADES + snapshot · paleta DOCKED `FieldPalette` + scroll `scrollToUid` · modal `FieldInfoModal`+`field-info.ts` con demo en vivo · "objeto"→"elemento") | `feat/builder-formateo-paleta` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
+| **Bloque N Hardening (config SMTP en BD + editor de plantillas)** (`SystemSettings.email*` + migración `…_add_email_config` aditiva; `EmailConfigService` [getPublic/getResolved/resolveFrom/set, password AES write-only] + `SmtpEmailService` refactor [BD+cache+firma+verify/sendWith] + `EmailController` `GET/PUT/test/verify settings/email` + permiso `notification:config` [cat. **68**]; sender SUPPRESSED si apagado; web tab "Correo saliente" en `/configuracion` [presets+pistas+probar]; editor con vista previa en vivo + diccionario + insertar-en-cursor + `{{entry.summary}}`; contracts 255 · API 234 · smoke `smoke-email-config.py` 8/8 + `smoke-notificaciones.py` 17/17) | `feat/notif-hardening` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Fase 2.3 Programación de rondas** (`LogSchedule`+`RoundOccurrence` + enum `RoundOccurrenceStatus` + migración `…_add_round_scheduling`; `enumerateOccurrences` puro + config por kind + 2 permisos `schedule:view/manage`; módulo API `schedules/` [CRUD/generate/start/skip/occurrences/stats] + hook de cierre en `LogEntriesService` + `ShiftResolver.calendarForNode`; página `/rondas` + `ScheduleDrawer` + badge en `/bitacoras` + menú/i18n; contracts 249 · API 234 · smoke 21/21) | `feat/programacion-rondas` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Fase 2.3.1 Worklist de rondas (separar planificar/ejecutar)** (permiso `round:execute` [cat. 63] + `LogSchedule.responsibleRoleId?` [FK Role SetNull] + migración `…_add_schedule_responsible_role`; `GET /schedules/my-rounds`+`/stats` [responsabilidad EN VIVO por rol ∩ ABAC ∩ turno] + `role-options` + start/skip re-gateados; web `/mis-rondas` [MyRoundsPage] + `/rondas` relabel "Programación de rondas" [monitoreo read-only + selector de rol] + widget Inicio + badge→mis-rondas + nav/i18n; contracts 249 · API 234 · smoke `smoke-mis-rondas.py` 18/18 + `smoke-rondas.py` 21/21) | `feat/rondas-worklist` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Bloque N Notificaciones (motor de avisos por correo)** (5 entidades `Notification*` + 4 enums + migración `…_add_notifications` [aditiva]; catálogo `NOTIFICATION_EVENTS` [4] + render sin eval + 4 permisos [cat. **67**]; `@nestjs/schedule`; API `notifications/` [emitter in-tx en `executeTransition`, channel/EmailChannel, resolver ABAC, worker sweeper/dispatcher/sender con backoff, service CRUD+bandeja, `POST /run`]; sweeper GENERA rondas antes de escanear vencidas + SLA breaches; seed 4 plantillas; web `/notificaciones` [Correo saliente/Plantillas/Mis preferencias] + `/mis-notificaciones` + nav/topbar/i18n; contracts 255 · API 234 · smoke `smoke-notificaciones.py` 17/17) | `feat/notificaciones` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
@@ -294,6 +300,10 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
       el MVP solo entrega IMMEDIATE (DIGEST se trata como entrega inmediata). Falta la ventana de batch + render de resumen + su tick.
 - [ ] **UI de SUSCRIPCIONES** (watchers). El modelo `NotificationSubscription` + endpoints (`GET/POST/DELETE /notifications/subscriptions`,
       `notification:admin`) + la resolución por suscripción YA existen y se honran; falta la pantalla (pestaña en `/notificaciones`).
+- [ ] **Variables de campo DINÁMICAS por tipo de formulario** (`{{field.<key>}}`) — fase 2 del editor (decidido 2026-06-16). Hoy el
+      correo puede llevar datos de la bitácora vía **`{{entry.summary}}`** (los `gridFieldKeys` configurados, etiqueta+valor+unidad).
+      La evolución granular = plantillas de notificación scoped al **form-template** con una variable por campo + selector de campos
+      (modelo mayor: plantilla por tipo de bitácora). Diseñado, diferido.
 - [ ] **`round.overdue` sin rol responsable → fan-out por NODO para correo.** DECISIÓN CONSCIENTE del MVP: cuando `LogSchedule.responsibleRoleId`
       es null, el correo se resuelve **solo por suscripciones** (no se hace fan-out automático a todos los que alcanzan el nodo, para evitar
       tormentas de avisos). El worklist in-app SÍ muestra esas rondas a todos los que alcanzan el nodo. Si se quiere el fan-out por nodo en
@@ -1058,6 +1068,12 @@ implementación esperada:
 
 > Lo construido puede estar "verde en tests" pero no ejercido en condiciones reales.
 
+- [ ] **Notificaciones — hardening — smoke VISUAL** (se verificó typecheck/lint/build + smokes 8/8 y 17/17; falta el clic).
+      **`/configuracion` ▸ Correo saliente** (gate `notification:config`): elegir un preset (Gmail/Mailpit…) que rellena host/puerto
+      + muestra su pista; guardar (la clave no se muestra, queda "configurada"); **Probar conexión** y **Enviar prueba** (verlo en
+      MAILPIT `:8025`); apagar "Correo activado". **`/notificaciones` ▸ Plantillas**: insertar variables en el cursor del asunto/
+      cuerpo desde el diccionario (con descripción+ejemplo), ver la **vista previa en vivo** actualizarse, y comprobar que
+      `{{entry.summary}}` aparece en el catálogo de los eventos de entrada. Verificar claro+oscuro, 44px, tokens Lyra.
 - [ ] **Notificaciones (Bloque N) — smoke VISUAL en navegador** (se verificó typecheck/lint/build + smoke API 17/17; falta el
       clic). **`/notificaciones`** (gate `module:notifications:view`): pestaña **Correo saliente** (filtrar por estado/buscar,
       abrir un correo → vista previa HTML en iframe, reintentar uno FAILED), **Plantillas** (elegir una, insertar variables con

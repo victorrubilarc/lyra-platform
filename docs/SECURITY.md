@@ -290,6 +290,18 @@ GxP: MHRA Data Integrity 2018 / FDA DI Q&A (corrección tardía justificada + at
 - **Transporte**: el correo sale **solo desde el backend** (`EmailService` → SMTP/relay del cliente; Mailpit en dev), nunca desde
   el navegador. La interfaz `NotificationChannel` deja el modelo listo para in-app/SMS futuros sin tocar el motor.
 
+### Configuración del correo saliente (Bloque N hardening) — `notification:config`
+- **Permiso nuevo `notification:config`** (catálogo **67→68**, grupo `notifications`): administrar el servidor SMTP y probar el envío.
+  Pantalla en `/configuracion` (tab "Correo saliente"). Dedicado (least-privilege), separable de `notiftemplate:manage`/`settings:manage`.
+- **Credencial CIFRADA en reposo** (OWASP ASVS): la contraseña SMTP se guarda con `EncryptionService` (AES) en `SystemSettings.
+  emailPasswordEnc` y es **write-only** — la API NUNCA la devuelve (la UI solo ve `passwordSet`). El payload vacío conserva la guardada.
+- **Probar sin guardar**: `POST /settings/email/verify` (verify de nodemailer, sin enviar) y `/test` (envío con un transporter
+  TRANSITORIO). Auditado (`email.config.updated` / `email.config.tested`) **sin registrar la contraseña**; los errores del SMTP se
+  devuelven al admin para diagnosticar (no se filtran a usuarios sin el permiso).
+- **`.env` como fallback**: si nunca se guardó en BD (`emailConfiguredAt` null), la config vigente proviene del entorno (`source=env`);
+  el secreto del `.env` sigue fuera del repo. **Toggle "Correo activado"**: apagado ⇒ el worker marca los correos SUPPRESSED (no se
+  envía; la recuperación de contraseña y los avisos no rompen el flujo).
+
 ### Motor de reglas de negocio — expresión SEGURA (Req-7, primer corte)
 - **Sin `eval` ni scripting libre.** Las fórmulas (campos formulados) y las reglas cruzadas se expresan como un **AST
   con LISTA BLANCA de operadores** (tipo JSONLogic) evaluado por un intérprete **PURO** y SÍNCRONO en `@lyra/contracts/

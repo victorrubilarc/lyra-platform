@@ -242,11 +242,12 @@ export class NotificationResolverService {
         entryNumber: true,
         orgNodeId: true,
         templateId: true,
+        templateVersionId: true,
         currentStateKey: true,
         currentStateSince: true,
         status: true,
         workflowDefinitionVersionId: true,
-        template: { select: { name: true } },
+        template: { select: { name: true, gridFieldKeys: true } },
         orgNode: { select: { name: true } },
       },
     });
@@ -266,6 +267,7 @@ export class NotificationResolverService {
       status: entry.status,
       templateName: entry.template?.name ?? null,
       nodeName: entry.orgNode?.name ?? null,
+      summaryText: await this.buildEntrySummary(entry.id, entry.templateVersionId, entry.template?.gridFieldKeys ?? []),
       states: new Map(wf.states.map((s) => [s.key, { name: s.name, maxStayMinutes: s.maxStayMinutes }])),
       transitions: wf.transitions.map((t) => ({
         fromStateKey: t.fromState.key,
@@ -273,6 +275,44 @@ export class NotificationResolverService {
         roleIds: t.roles.map((r) => r.roleId),
       })),
     };
+  }
+
+  /**
+   * `{{entry.summary}}`: los campos de RESUMEN configurados en la plantilla
+   * (`gridFieldKeys`), formateados "Etiqueta: valor unidad" y unidos por " · ". Reusa
+   * la gobernanza existente (mismos campos que la grilla); resuelve code→label de los
+   * SELECT inline y la unidad de los NUMBER. Omite los vacíos. Cadena vacía si la
+   * plantilla no configuró resumen (la variable simplemente no aporta texto).
+   */
+  private async buildEntrySummary(entryId: string, templateVersionId: string, gridFieldKeys: string[]): Promise<string> {
+    const keys = gridFieldKeys.filter(Boolean);
+    if (keys.length === 0) return "";
+    const [version, values] = await Promise.all([
+      this.prisma.templateVersion.findUnique({
+        where: { id: templateVersionId },
+        select: { sections: { select: { fields: { select: { key: true, label: true, config: true } } } } },
+      }),
+      this.prisma.logEntryValue.findMany({
+        where: { logEntryId: entryId, fieldKey: { in: keys } },
+        select: { fieldKey: true, value: true },
+      }),
+    ]);
+    const meta = new Map<string, { label: string; config: Record<string, unknown> }>();
+    for (const s of version?.sections ?? []) {
+      for (const f of s.fields) meta.set(f.key, { label: f.label, config: (f.config as Record<string, unknown>) ?? {} });
+    }
+    const valueByKey = new Map(values.map((v) => [v.fieldKey, v.value]));
+    const parts: string[] = [];
+    for (const key of keys) {
+      const m = meta.get(key);
+      if (!m) continue;
+      const raw = valueByKey.get(key);
+      const text = formatSummaryScalar(raw, m.config);
+      if (text === "") continue;
+      const unit = typeof m.config.unit === "string" ? ` ${m.config.unit}` : "";
+      parts.push(`${m.label}: ${text}${unit}`);
+    }
+    return parts.join(" · ");
   }
 
   /**
@@ -342,6 +382,7 @@ export class NotificationResolverService {
       "entry.template": entry.templateName ?? "—",
       "entry.node": entry.nodeName ?? "—",
       "entry.url": `${this.appUrl()}/bitacoras/${entry.id}`,
+      "entry.summary": entry.summaryText,
     };
   }
 
@@ -387,6 +428,27 @@ interface LoadedEntry {
   status: string;
   templateName: string | null;
   nodeName: string | null;
+  /** `{{entry.summary}}` ya formateado (campos de resumen de la plantilla). */
+  summaryText: string;
   states: Map<string, { name: string; maxStayMinutes: number | null }>;
   transitions: Array<{ fromStateKey: string; requireSignature: boolean; roleIds: string[] }>;
+}
+
+/**
+ * Formatea un valor de campo de resumen a texto (resuelve code→label de SELECT
+ * inline; Sí/No para booleanos). Vacío ⇒ "" (se omite del resumen).
+ */
+function formatSummaryScalar(raw: unknown, config: Record<string, unknown>): string {
+  if (raw === null || raw === undefined || raw === "") return "";
+  if (typeof raw === "boolean") return raw ? "Sí" : "No";
+  // SELECT inline: resuelve el código a su etiqueta.
+  const options = Array.isArray(config.options) ? (config.options as Array<Record<string, unknown>>) : [];
+  if ((typeof raw === "string" || typeof raw === "number") && options.length > 0) {
+    const opt = options.find((o) => String(o.value ?? o.code) === String(raw));
+    if (opt && typeof opt.label === "string") return opt.label;
+  }
+  if (typeof raw === "number") return String(raw);
+  if (typeof raw === "string") return raw;
+  // Estructurado (tabla/matriz/rango/adjunto): no se incrusta en el resumen del correo.
+  return "";
 }

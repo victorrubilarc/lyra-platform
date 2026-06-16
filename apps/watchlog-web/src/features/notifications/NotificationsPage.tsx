@@ -1,8 +1,8 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Bell, Inbox, FileText, SlidersHorizontal, RefreshCw, Search, Send, Eye } from "lucide-react";
 import { Button, Card, Input, Modal, Select, Textarea, useToast } from "@lyra/ui";
-import type { NotificationOutboxStatus, NotificationTemplateDto } from "@lyra/contracts";
+import { renderTemplate, sampleContextForEvent, type NotificationOutboxStatus, type NotificationTemplateDto } from "@lyra/contracts";
 import { Can } from "../../auth/Can.js";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { formatDateTime } from "../../lib/format.js";
@@ -196,6 +196,8 @@ function OutboxPanel() {
 
 // --- Plantillas --------------------------------------------------------------
 
+type TplField = "subject" | "bodyText" | "bodyHtml";
+
 function TemplatesPanel() {
   const { t } = useTranslation();
   const toast = useToast();
@@ -213,6 +215,37 @@ function TemplatesPanel() {
   const [draft, setDraft] = useState<{ subject: string; bodyText: string; bodyHtml: string } | null>(null);
   const current = draft ?? (selected ? { subject: selected.subject, bodyText: selected.bodyText, bodyHtml: selected.bodyHtml } : null);
 
+  // Campo enfocado + posición del cursor, para INSERTAR la variable donde corresponde.
+  const focus = useRef<{ field: TplField; start: number; end: number }>({ field: "subject", start: 0, end: 0 });
+  const refs = {
+    subject: useRef<HTMLInputElement>(null),
+    bodyText: useRef<HTMLTextAreaElement>(null),
+    bodyHtml: useRef<HTMLTextAreaElement>(null),
+  };
+
+  function trackSel(field: TplField, el: HTMLInputElement | HTMLTextAreaElement) {
+    focus.current = { field, start: el.selectionStart ?? el.value.length, end: el.selectionEnd ?? el.value.length };
+  }
+
+  function insertVariable(name: string) {
+    if (!current) return;
+    const { field, start, end } = focus.current;
+    const token = `{{${name}}}`;
+    const val = current[field];
+    const next = val.slice(0, start) + token + val.slice(end);
+    setDraft({ ...current, [field]: next });
+    // Reposiciona el cursor tras el token insertado.
+    requestAnimationFrame(() => {
+      const el = refs[field].current;
+      if (el) {
+        const pos = start + token.length;
+        el.focus();
+        el.setSelectionRange(pos, pos);
+        focus.current = { field, start: pos, end: pos };
+      }
+    });
+  }
+
   function save() {
     if (!selected || !current) return;
     update.mutate(
@@ -226,6 +259,11 @@ function TemplatesPanel() {
       },
     );
   }
+
+  // Vista previa EN VIVO con datos de ejemplo (mismo render del backend, sin eval).
+  const sample = selected ? sampleContextForEvent(selected.eventKey) : {};
+  const previewSubject = current ? renderTemplate(current.subject, sample) : "";
+  const previewHtml = current ? renderTemplate(current.bodyHtml, sample) : "";
 
   if (templates.isLoading) return <div className={styles.empty}>{t("common.loading")}</div>;
 
@@ -255,44 +293,72 @@ function TemplatesPanel() {
       </div>
 
       {selected && current && (
-        <Card className={styles.editor}>
-          <div className={styles.editorRow}>
-            <span className={styles.label}>{t("notifications.templates.variables")}</span>
-            <div className={styles.varChips}>
-              {(eventDef?.variables ?? []).map((v) => (
-                <button
-                  key={v.name}
-                  type="button"
-                  className={styles.varChip}
-                  title={v.description}
-                  onClick={() => setDraft({ ...current, subject: `${current.subject}{{${v.name}}}` })}
-                >
-                  {`{{${v.name}}}`}
-                </button>
-              ))}
+        <div className={styles.editorSplit}>
+          <Card className={styles.editor}>
+            <div className={styles.editorRow}>
+              <span className={styles.label}>{t("notifications.templates.variables")}</span>
+              <span className={styles.insertHint}>{t("notifications.templates.insertHint")}</span>
+              <div className={styles.dict}>
+                {(eventDef?.variables ?? []).map((v) => (
+                  <button key={v.name} type="button" className={styles.dictItem} onClick={() => insertVariable(v.name)}>
+                    <span className={styles.dictName}>{`{{${v.name}}}`}</span>
+                    <span className={styles.dictDesc}>{v.description}</span>
+                    <span className={styles.dictSample}>{t("notifications.templates.egLabel")}: {v.sample}</span>
+                  </button>
+                ))}
+              </div>
             </div>
+            <div className={styles.editorRow}>
+              <span className={styles.label}>{t("notifications.templates.subject")}</span>
+              <Input
+                ref={refs.subject}
+                className={styles.mono}
+                value={current.subject}
+                onChange={(e) => setDraft({ ...current, subject: e.target.value })}
+                onSelect={(e) => trackSel("subject", e.currentTarget)}
+                onFocus={(e) => trackSel("subject", e.currentTarget)}
+              />
+            </div>
+            <div className={styles.editorRow}>
+              <span className={styles.label}>{t("notifications.templates.bodyText")}</span>
+              <Textarea
+                ref={refs.bodyText}
+                className={styles.mono}
+                rows={5}
+                value={current.bodyText}
+                onChange={(e) => setDraft({ ...current, bodyText: e.target.value })}
+                onSelect={(e) => trackSel("bodyText", e.currentTarget)}
+                onFocus={(e) => trackSel("bodyText", e.currentTarget)}
+              />
+            </div>
+            <div className={styles.editorRow}>
+              <span className={styles.label}>{t("notifications.templates.bodyHtml")}</span>
+              <Textarea
+                ref={refs.bodyHtml}
+                className={styles.mono}
+                rows={7}
+                value={current.bodyHtml}
+                onChange={(e) => setDraft({ ...current, bodyHtml: e.target.value })}
+                onSelect={(e) => trackSel("bodyHtml", e.currentTarget)}
+                onFocus={(e) => trackSel("bodyHtml", e.currentTarget)}
+              />
+            </div>
+            <div className={styles.editorActions}>
+              <Button variant="primary" onClick={save} loading={update.isPending} disabled={!draft}>
+                {t("common.save")}
+              </Button>
+              <Button variant="secondary" onClick={() => setDraft(null)} disabled={!draft}>
+                {t("common.cancel")}
+              </Button>
+            </div>
+          </Card>
+
+          <div className={styles.previewCard}>
+            <span className={styles.previewLabel}><Eye size={14} /> {t("notifications.templates.preview")}</span>
+            <div className={styles.previewSubject}>{previewSubject || "—"}</div>
+            <iframe title="preview" srcDoc={previewHtml} className={styles.previewFrame} />
           </div>
-          <div className={styles.editorRow}>
-            <span className={styles.label}>{t("notifications.templates.subject")}</span>
-            <Input className={styles.mono} value={current.subject} onChange={(e) => setDraft({ ...current, subject: e.target.value })} />
-          </div>
-          <div className={styles.editorRow}>
-            <span className={styles.label}>{t("notifications.templates.bodyText")}</span>
-            <Textarea className={styles.mono} rows={5} value={current.bodyText} onChange={(e) => setDraft({ ...current, bodyText: e.target.value })} />
-          </div>
-          <div className={styles.editorRow}>
-            <span className={styles.label}>{t("notifications.templates.bodyHtml")}</span>
-            <Textarea className={styles.mono} rows={7} value={current.bodyHtml} onChange={(e) => setDraft({ ...current, bodyHtml: e.target.value })} />
-          </div>
-          <div className={styles.editorActions}>
-            <Button variant="primary" onClick={save} loading={update.isPending} disabled={!draft}>
-              {t("common.save")}
-            </Button>
-            <Button variant="secondary" onClick={() => setDraft(null)} disabled={!draft}>
-              {t("common.cancel")}
-            </Button>
-          </div>
-        </Card>
+        </div>
       )}
     </div>
   );

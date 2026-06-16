@@ -505,6 +505,12 @@ export const PERMISSION_CATALOG = [
     group: "notifications",
     description: "Administrar suscripciones a eventos de notificación de usuarios y roles.",
   },
+  {
+    key: "notification:config",
+    dimension: "ACTION",
+    group: "notifications",
+    description: "Configurar el servidor de correo saliente (SMTP) del sistema y probar el envío.",
+  },
 ] as const satisfies readonly PermissionDef[];
 
 /** Unión literal de todas las claves de permiso conocidas. */
