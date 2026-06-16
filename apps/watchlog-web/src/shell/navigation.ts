@@ -1,4 +1,4 @@
-import { Bell, BookOpenCheck, CalendarClock, CalendarRange, FilePlus2, GitBranch, LayoutDashboard, Layers, ListChecks, ListTodo, Network, Route, Settings, ShieldCheck, UserCog, type LucideIcon } from "lucide-react";
+import { AlertTriangle, Bell, BookOpenCheck, CalendarClock, CalendarRange, FilePlus2, GitBranch, LayoutDashboard, Layers, ListChecks, ListTodo, Network, Route, Settings, ShieldCheck, UserCog, type LucideIcon } from "lucide-react";
 import type { Permission } from "@lyra/permissions";
 
 /**
@@ -66,6 +66,14 @@ export const ROUTES: readonly NavRoute[] = [
     labelKey: "nav.rounds",
     icon: Route,
     permission: "schedule:view",
+    inSidebar: true,
+  },
+  // Incidencias operacionales / HSE (Fase 4): lista + tablero kanban + detalle.
+  {
+    path: "/incidencias",
+    labelKey: "nav.incidents",
+    icon: AlertTriangle,
+    permission: "module:incidents:view",
     inSidebar: true,
   },
   {

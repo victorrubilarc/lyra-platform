@@ -372,6 +372,7 @@ model OrgNode {
   templateNodeAssignments TemplateNodeAssignment[]
   logEntries              LogEntry[]
   schedules               LogSchedule[]
+  incidents               Incident[]
   operationalCalendar     OperationalCalendar?     @relation(fields: [operationalCalendarId], references: [id], onDelete: SetNull)
   fiscalCalendar          FiscalCalendar?          @relation(fields: [fiscalCalendarId], references: [id], onDelete: SetNull)
 
@@ -432,6 +433,7 @@ model Equipment {
   externalRefs ExternalReference[]
   logEntries   LogEntry[]
   schedules    LogSchedule[]
+  incidents    Incident[]
 
   @@index([orgNodeId])
   @@index([categoryId])
@@ -1732,4 +1734,203 @@ model NotificationPreference {
 
   @@unique([userId, eventKey, channel])
   @@index([userId])
+}
+
+// ===========================================================================
+//  Incidencias operacionales / HSE (Fase 4.0) — núcleo
+// ===========================================================================
+//
+// Single-tenant: el aislamiento es por NODO/PLANTILLA (ABAC), NUNCA por tenant.
+// El CICLO DE VIDA reutiliza WorkflowDefinition (Fase 2.2): la incidencia CONGELA
+// una versión de flujo (denormalizada, patrón LogEntry) y avanza por sus
+// transiciones con las mismas guardas (rol-dato + firma Part 11 opt-in). El
+// `lifecycle` se mantiene denormalizado (OPEN/CLOSED/CANCELED) para filtros/KPIs
+// baratos. Sin borrado físico: anulación = lifecycle CANCELED con motivo. Las
+// referencias a usuario/flujo/entrada son BLANDAS (sin FK, patrón AuditLog).
+
+enum IncidentPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum IncidentOrigin {
+  MANUAL
+  LOG_ENTRY
+  EXCEPTION
+  RULE
+}
+
+enum IncidentLifecycle {
+  OPEN
+  CLOSED
+  CANCELED
+}
+
+// Catálogo configurable de TIPOS (con flags de comportamiento). El flujo por
+// defecto que se congela al crear es referencia BLANDA al WorkflowDefinition.
+model IncidentType {
+  id                    String   @id @default(cuid())
+  key                   String   @unique // estable, ej. "falla-equipo"
+  name                  String
+  description           String?
+  color                 String? // token del DS para el chip
+  defaultWorkflowId     String? // WorkflowDefinition que se congela al crear (ref. blanda)
+  requiresInvestigation Boolean  @default(false)
+  requiresCapa          Boolean  @default(false)
+  reportableDefault     Boolean  @default(false)
+  active                Boolean  @default(true)
+  sortOrder             Int      @default(0)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  deletedAt             DateTime?
+
+  categories IncidentCategory[]
+  incidents  Incident[]
+
+  @@index([active])
+  @@index([deletedAt])
+}
+
+// Catálogo configurable de CATEGORÍAS (subtipos), opcionalmente colgadas de un tipo.
+model IncidentCategory {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  name        String
+  description String?
+  typeId      String? // null = categoría transversal
+  active      Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  type      IncidentType? @relation(fields: [typeId], references: [id], onDelete: SetNull)
+  incidents Incident[]
+
+  @@index([typeId])
+  @@index([active])
+  @@index([deletedAt])
+}
+
+model Incident {
+  id          String           @id @default(cuid())
+  // Folio humano correlativo (patrón entryNumber/WO number). El código "INC-####"
+  // se DERIVA en el backend a partir de este número.
+  number      Int              @unique @default(autoincrement())
+  title       String
+  description String?
+  typeId      String
+  categoryId  String?
+  // Escala 1..5 (tokens severidad). potentialSeverity = potencial de gravedad (MPL).
+  severity         Int
+  potentialSeverity Int?
+  priority         IncidentPriority  @default(MEDIUM)
+  // Riesgo ISO 31000 (ejes de la matriz RISK_MATRIX; nivel se deriva con riskLevelFor).
+  riskProbability  Int?
+  riskConsequence  Int?
+  originType       IncidentOrigin    @default(MANUAL)
+  lifecycle        IncidentLifecycle @default(OPEN)
+  // --- Ciclo de vida por flujo (reusa WorkflowDefinition; ref. denormalizada) ---
+  workflowDefinitionId        String?
+  workflowDefinitionVersionId String?
+  currentStateKey             String? // clave del estado actual dentro de la versión congelada
+  // Momento de entrada al estado actual (base del cómputo de SLA de permanencia).
+  currentStateSince           DateTime @default(now())
+  // --- Alcance / ligazón (referencias blandas salvo nodo/equipo/catálogo) -------
+  orgNodeId       String
+  equipmentId     String?
+  shiftCode       String?
+  // Origen desde una entrada de bitácora (ref. blanda; 4.1 agrega excepciones).
+  originLogEntryId String?
+  // --- Personas (ref. blanda + snapshot de nombre en el timeline) ---------------
+  reporterId  String?
+  ownerId     String?
+  // --- SLA / cierre -------------------------------------------------------------
+  dueAt          DateTime?
+  reportable     Boolean   @default(false)
+  closedAt       DateTime?
+  closedById     String?
+  closureSummary String?
+  // --- Anulación (sin borrado físico) -------------------------------------------
+  canceledAt   DateTime?
+  cancelReason String?
+  canceledById String?
+  createdById  String?
+  updatedById  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  type       IncidentType         @relation(fields: [typeId], references: [id], onDelete: Restrict)
+  category   IncidentCategory?    @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  orgNode    OrgNode              @relation(fields: [orgNodeId], references: [id], onDelete: Restrict)
+  equipment  Equipment?           @relation(fields: [equipmentId], references: [id], onDelete: SetNull)
+  comments   IncidentComment[]
+  activities IncidentActivity[]
+  transitions IncidentTransition[]
+
+  @@index([typeId])
+  @@index([categoryId])
+  @@index([orgNodeId])
+  @@index([equipmentId])
+  @@index([lifecycle])
+  @@index([priority])
+  @@index([severity])
+  @@index([ownerId])
+  @@index([originType])
+  @@index([originLogEntryId])
+  @@index([currentStateKey])
+  @@index([createdAt, id])
+}
+
+// Comentario de gestión (append-only en la práctica; editar/borrar = futuro).
+model IncidentComment {
+  id         String   @id @default(cuid())
+  incidentId String
+  authorId   String?
+  authorName String? // snapshot del nombre impreso
+  body       String
+  createdAt  DateTime @default(now())
+
+  incident Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+
+  @@index([incidentId, createdAt])
+}
+
+// Timeline APPEND-ONLY: creación, asignación, cambio de severidad/prioridad,
+// transición de estado, comentario, cierre, anulación. `kind` clasifica el evento.
+model IncidentActivity {
+  id         String   @id @default(cuid())
+  incidentId String
+  kind       String // CREATED|ASSIGNED|FIELD_CHANGED|TRANSITION|COMMENT|CLOSED|CANCELED
+  summary    String
+  actorId    String?
+  actorName  String?
+  metadata   Json?
+  occurredAt DateTime @default(now())
+
+  incident Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+
+  @@index([incidentId, occurredAt])
+}
+
+// Transición de flujo EJECUTADA sobre una incidencia (append-only; integridad
+// histórica: claves de la versión CONGELADA). Espejo de LogEntryTransition.
+model IncidentTransition {
+  id                          String   @id @default(cuid())
+  incidentId                  String
+  workflowDefinitionVersionId String
+  transitionKey               String
+  fromStateKey                String
+  toStateKey                  String
+  actorId                     String?
+  actorEmail                  String?
+  reason                      String?
+  signatureId                 String? // ref. blanda a LogEntrySignature (firma Part 11)
+  occurredAt                  DateTime @default(now())
+
+  incident Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+
+  @@index([incidentId, occurredAt])
 }

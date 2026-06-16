@@ -355,6 +355,17 @@ export function EntryViewerPage() {
               {t("logbook.viewer.edit")}
             </Button>
           )}
+          {/* Reportar una incidencia ligada a esta entrada (Fase 4): preselecciona
+              el nodo y conserva la trazabilidad entrada→incidencia. */}
+          {can("incident:create") && entry.status !== "VOID" && (
+            <Button
+              variant="secondary"
+              leftIcon={<TriangleAlert size={15} />}
+              onClick={() => navigate(`/incidencias?fromEntry=${entry.id}&fromNode=${entry.orgNodeId}`)}
+            >
+              {t("logbook.viewer.reportIncident")}
+            </Button>
+          )}
           <Button variant="secondary" leftIcon={<Printer size={15} />} onClick={() => window.print()}>
             {t("logbook.viewer.print")}
           </Button>

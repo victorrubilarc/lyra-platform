@@ -27,6 +27,7 @@ import { SavedViewsModule } from "./saved-views/saved-views.module";
 import { SecurityModule } from "./security/security.module";
 import { NotificationEmitterModule } from "./notifications/notification-emitter.module";
 import { NotificationsModule } from "./notifications/notifications.module";
+import { IncidentsModule } from "./incidents/incidents.module";
 
 @Module({
   imports: [
@@ -73,6 +74,7 @@ import { NotificationsModule } from "./notifications/notifications.module";
     SecurityModule,
     NotificationEmitterModule,
     NotificationsModule,
+    IncidentsModule,
     HealthModule,
   ],
 })

@@ -109,6 +109,10 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 - ✅ **Plantillas de mensaje** (con vista previa, diccionario de variables, `{{entry.summary}}`) y **correo saliente** (§ Notificaciones ▸ Plantillas / Correo saliente) [Admin]
 - ✅ **Servidor de correo (SMTP)** — configurar el correo saliente (§ Configuración ▸ Servidor de correo) [Admin con `notification:config`]
 
+### 15. Incidencias  [todos los roles operativos]
+- ✅ **Reportar y gestionar incidencias** (lista + tablero kanban + detalle con flujo) (§ Incidencias)
+- ✅ **Crear desde una bitácora** (botón "Reportar incidencia" en el visor de la entrada) (§ Incidencias ▸ Desde una bitácora)
+
 ---
 
 ## Rondas ▸ Programación de rondas  [Planificador]
@@ -570,3 +574,53 @@ servidor de correo). Es un permiso aparte del de plantillas y del de bandeja.
   ejemplo), un **diccionario** que explica cada variable y la inserta donde está el
   cursor, y la variable **`{{entry.summary}}`** para incrustar los campos de resumen de
   la bitácora (los que configuraste en «Resumen en la grilla»).
+
+---
+
+## Incidencias
+
+**Para qué sirve.** Gestionar de forma formal y trazable los eventos, desviaciones,
+condiciones inseguras, fallas, impactos ambientales o incumplimientos que requieren un
+responsable, un estado, evidencia y un cierre auditado. Cubre casos reales de minería e
+industria (seguridad, salud ocupacional, medio ambiente, calidad, mantenimiento,
+geomecánica, continuidad operacional, cumplimiento). Cada incidencia avanza por un
+**flujo de estados** configurable (reusa el mismo motor de flujos del sistema).
+
+**Cómo se usa.**
+- Entra a **Incidencias** en el menú. Arriba ves **indicadores** (abiertas, críticas,
+  vencidas, sin responsable, desde bitácora, reportables): cada uno es un atajo que filtra.
+- La **barra de filtros** (en una línea) permite buscar por folio/título y filtrar por
+  estado, tipo, severidad, prioridad y vistas rápidas (mis incidencias, sin responsable,
+  vencidas, reportables, desde bitácora). Cambia entre **Lista** y **Tablero (kanban)** con
+  el botón de la derecha.
+- **Reportar** una incidencia: botón «Reportar incidencia». Completa título, tipo (y
+  categoría), severidad real, potencial de gravedad, prioridad y el nodo/ubicación. Se le
+  asigna un **folio** (INC-####) y arranca en el primer estado del flujo.
+- **Gestionarla**: haz clic en una fila o tarjeta para abrir el **detalle**. Ahí ves el
+  flujo (stepper), el **origen**, asignas **responsable**, escribes **comentarios**, ves el
+  **timeline** y avanzas de estado con los botones de transición. Al llegar al estado final
+  se cierra (puedes registrar un resumen de cierre). Si una transición exige **firma**, se
+  te pedirá reconfirmar tu contraseña (y MFA si aplica).
+- **Anular**: si una incidencia se creó por error o está duplicada, «Anular incidencia»
+  con un motivo. No se borra: queda trazable.
+
+**Desde una bitácora.** En el visor de una entrada de bitácora, el botón **«Reportar
+incidencia»** abre el formulario con el **nodo preseleccionado** y deja la incidencia
+**ligada a esa entrada** (en el detalle, el bloque «Origen» enlaza de vuelta a la bitácora).
+
+**Quién puede.** Ver: `incident:view` (+ módulo `module:incidents:view`). Crear:
+`incident:create`. Editar atributos: `incident:edit`. Asignar: `incident:assign`. Comentar:
+`incident:comment`. Avanzar de estado: `incident:transition` (además, **quién** puede cada
+transición lo define el flujo por rol). Anular: `incident:cancel`. Administrar tipos/
+categorías: `incidentcatalog:manage`. Todo se verifica en el servidor y respeta tu
+**alcance por nodo** (solo ves/gestionas incidencias de los nodos a tu alcance).
+
+**Importante.**
+- La **severidad real** (lo que pasó) es distinta del **potencial de gravedad** (lo que
+  pudo pasar): un cuasi-accidente puede ser severidad baja y potencial fatal.
+- El **timeline es inmutable** (append-only) y la incidencia **nunca se borra**: se anula
+  con motivo. Cada cambio relevante (estado, responsable, severidad, prioridad) queda
+  registrado con quién y cuándo.
+- Las incidencias se pueden originar **manualmente** o **desde una bitácora**; en fases
+  siguientes se sumarán las **excepciones operacionales** (desde umbrales) y la apertura
+  **automática por reglas**.

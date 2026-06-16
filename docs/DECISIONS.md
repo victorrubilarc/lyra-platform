@@ -4,6 +4,57 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-16 · Fase 4 — Módulo de Incidencias: investigación + diseño + plan por fases — 🔵 PLAN APROBADO
+
+Sesión de investigación (no se programó nada hasta aprobar). El dueño aprobó los 4 forks gating en su opción **recomendada** y
+confirmó **single-tenant**. Investigación sintetizada: EHS (Intelex/Cority/Enablon/Sphera/VelocityEHS/Gensuite/EcoOnline/Ideagen)
+converge en *intake→triage→investigación→CAPA→verificación→cierre* y separa **evento/observación** de **incidente registrable**
+(valida la capa de excepción); severidad real vs **potencial de gravedad (MPL)**; **CAPA con verificación de eficacia**;
+reportabilidad por flags. ITSM (ServiceNow/Jira): workflow-como-dato, kanban por estado, SLA por estado, "major incident" =
+flujo aparte. EAM (SAP PM/Maximo): notification→WO ligada al activo (ISO 14224); la OT es **frontera de integración futura**. RCA:
+**5 Porqués** en MVP, ICAM (minería) como plantilla de investigación posterior. Chile: SERNAGEOMIN **DS 132** (reporte de graves/
+fatales), **Ley 16.744** + mutualidades (**DIAT/DIEP**), **DS 40**; CTP/STP/near-miss/condición insegura/ambiental; **IF/IG**
+(requieren HH trabajadas, dato que HOY no existe → diferido a 4.5).
+
+**Principio central:** capa explícita **Bitácora → Excepción operacional → Incidencia** (no conectar bitácora→incidencia de forma
+simplista). Cuatro tiers mapeados a lo que YA existe: validación de dato (`validateFieldValue`+reglas ERROR, ya bloquea), excepción
+(`thresholdBand`/reglas WARN, hoy efímera → **se materializa como `LogEntryException` en 4.1**), incidencia (`Incident`+workflow),
+incidente mayor (workflow dedicado+escalamiento).
+
+**Forks resueltos (recomendación aceptada):**
+1. **Excepción = entidad propia** `LogEntryException` (no solo evento en timeline) — necesita estado/triage/corrección/link. *(4.1)*
+2. **Flujo = reusar `WorkflowDefinition`** (no dedicado) — ya tiene estados/transiciones/roles/SLA/firma Part 11. *(4.0)*
+3. **CAPA = `IncidentAction`** (sub-tareas) en MVP, evolución a entidad rica después. *(4.2)*
+4. **Kanban = estados del workflow como columnas** (config). *(4.0)*
+5. **Auto-creación = evento DIFERIDO** (no síncrona) — reusa el outbox transaccional del Bloque N (emite in-tx, worker crea); no
+   bloquea el guardado ni crea incidencias para borradores que luego se anulan (VOID). Hard-stop crítico = opt-in raro. *(4.1)*
+6. **RCA MVP = 5 Porqués** (no ICAM completo); ICAM = plantilla configurable. *(4.2/4.3)*
+7. **Formulario de incidencia = campos fijos + extra por tipo (JSONB validado)**, NO reusar el form-builder completo en MVP (es la
+   trampa de scope; acopla a la parte más pesada del código). El form-builder se reserva para los formularios de **investigación**. *(4.0/4.3)*
+8. **Agrupar N excepciones en una incidencia** (1:N), no 1:1. *(4.1)*
+9. **Asociar excepción a incidencia existente** (sí, con dedup por sugerencia). *(4.1)*
+10. **Flags regulatorios** = booleano `reportable` simple en 4.0; gobernanza regulatoria completa (SERNAGEOMIN/mutualidad/DIAT/DIEP) en **4.3**.
+11. **Generación de OT** = integración posterior (solo `externalRef` reservado), no MVP.
+12. **Catálogos = entidades dedicadas** `IncidentType`/`IncidentCategory` con flags de comportamiento (workflow default, requiere
+    investigación/CAPA, reportable) + **severidad escala 1–5 existente** + **riesgo vía `RISK_MATRIX`/`riskLevelFor`**. No reusar
+    `ReferenceList` puro (su metadata jsonb no expresa bien las FK de comportamiento ni el orden semántico).
+13. **Dato inválido = depende del tier**: imposible (tier 1) bloquea guardar; fuera de umbral (tier 2) permite con justificación + excepción. *(4.1)*
+14. **Cierre con firma = configurable por transición** (reusa `requireSignature` del workflow), no obligatorio. *(disponible desde 4.0)*
+
+**SINGLE-TENANT confirmado:** se quita `tenantId` de TODO el modelo de Incidencias (el prompt lo pedía, pero contradice la decisión
+fijada del proyecto). Aislamiento por **nodo/plantilla (ABAC)**, no por tenant. Migración aditiva, sin reset, timeline append-only,
+**sin borrado físico** (anulación/cancelación con motivo). ②③④ defaults aplicados: firma vía workflow disponible sin obligar · IF/IG → 4.5 · `reportable` booleano simple.
+
+**Plan por fases (cada una cierra sola):** **4.0** núcleo (Incident + catálogos + manual + link desde entrada + workflow reusado +
+kanban + lista premium + ABAC + auditoría) · **4.1** excepciones operacionales (LogEntryException + panel + convertir/asociar/agrupar/
+descartar/corregir + dedup + acción "abrir incidencia" del motor de reglas) · **4.2** investigación 5-Porqués + CAPA + firma de cierre ·
+**4.3** HSE Chile/minería (clasificación + reportables + DIAT/DIEP + ICAM) · **4.4** SLA + notificaciones + escalamiento (← roza el
+épico de **notificaciones avanzadas**, `docs/prompts/notificaciones-avanzadas.md`) · **4.5** dashboard/indicadores (IF/IG con HH).
+
+**Primera fase a construir = 4.0** (esta sesión).
+
+---
+
 ### 2026-06-16 · Bloque N — Hardening premium de Notificaciones (config SMTP en BD + editor de plantillas) — 🔵 PLAN APROBADO (`feat/notif-hardening`)
 
 Dos mejoras pedidas por el dueño antes de Fase 4, sobre el módulo de Notificaciones. Referencia revisada: `G:\Development\ruta-bus`
