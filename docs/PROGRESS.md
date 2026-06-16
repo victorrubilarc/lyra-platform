@@ -44,7 +44,14 @@ BITÁCORAS** — selector múltiple en modal (`TemplateFilterModal`, patrón F4/
 disponibles (las de sus horarios visibles) con búsqueda y conteo; lo elegido se muestra como **chips** removibles y acota la tabla.
 **(c) Ocurrencias = GRILLA paginable** con **búsqueda propia** (ronda/equipo/nodo) + paginación cliente (25/50/100 · rango ·
 prev/next) + columnas Programada/Ronda/Equipo/Nodo/Turno/Estado/Vence — reemplaza la lista plana. Sin permisos nuevos. Contracts 249
-· API 234 · smokes 18/18 + 21/21. **+ demo `seed-demo-estanques.py`** (5 estanques como
+· API 234 · smokes 18/18 + 21/21. **+ Follow-up UX 5 — OVERVIEW PAGE (`feat/programacion-overview`):** rediseño con
+JERARQUÍA estilo Fiori Overview Page — **barra de filtros unificada** (búsqueda acotada [max-width, ya no monopoliza] + estado +
+recurrencia + área + Bitácoras [botón premium, ícono+texto alineado]) que **gobierna TODA la pantalla**; **KPIs sensibles al
+filtro** (activos/pausados/pendientes/vencidas calculados de los horarios visibles, sin endpoint extra); **PESTAÑAS** Horarios ·
+Ocurrencias · Resumen. **Ambas grillas** ahora con **orden por columna + paginación** nativos del `Table` de @lyra/ui (no propios);
+las ocurrencias se intersectan con los horarios filtrados (los filtros superiores afectan a las dos). **Resumen** = panel de
+análisis con gráficas (`MiniBars`, SVG/CSS sin dependencias): rondas pendientes por área · horarios por recurrencia · cumplimiento
+(% atrasadas). Frontend puro. typecheck/lint(0)/build verdes. **+ demo `seed-demo-estanques.py`** (5 estanques como
 equipos + ronda cada hora + umbrales) y **Route (fan-out por equipo) anotado en BACKLOG**. **Pendiente: smoke VISUAL del dueño**
 (§4). **Siguiente: Notificaciones (correo).**
 

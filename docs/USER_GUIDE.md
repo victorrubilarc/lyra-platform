@@ -135,20 +135,22 @@ patrón de rondas de operador / planes de mantención de la industria (SAP PM, M
 6. Las próximas rondas aparecen al toque en la lista (monitoreo). El botón **"Generar"** las
    refresca a mano (también se preparan solas al abrir la pantalla).
 
-**Herramientas de la lista (para analizar y encontrar).** La tabla de horarios funciona como
-los grandes sistemas de mantención (SAP PM, Maximo, Fiori):
-- **Buscador** por nombre, plantilla, área, equipo o responsable.
-- **Filtros**: estado (activos/pausados), tipo de recurrencia y área.
-- **Selector de bitácoras** (botón "Bitácoras"): abre un modal para elegir **una o varias**
-  bitácoras; las elegidas se muestran como chips y acotan la lista.
-- **KPIs de salud** arriba: horarios activos, pausados, rondas pendientes y vencidas.
-- **Frecuencia legible** por horario ("Cada turno", "Cada 6 h", "08:00, 20:00 · Lun a Vie").
-- **Próxima ronda**: cuándo abre la siguiente ocurrencia de cada horario (se marca en rojo si
-  ya está atrasada).
-- **Pausar / activar en un clic** con el interruptor de la columna *Estado* (sin entrar a editar).
-- **Monitoreo de ocurrencias** plegable al final: una **grilla paginable** (25/50/100 por página)
-  con **su propia búsqueda** (por ronda, equipo o nodo) y columnas Programada/Ronda/Equipo/Nodo/
-  Turno/Estado/Vence — para encontrar cualquier ocurrencia entre cientos.
+**Herramientas de la pantalla (para analizar y encontrar).** La pantalla está organizada como
+los grandes sistemas de mantención (SAP PM, Maximo, Fiori Overview Page), con jerarquía clara:
+- **KPIs de salud** arriba (sensibles a los filtros): horarios activos, pausados, rondas
+  pendientes y vencidas — si filtras por un área, los KPIs reflejan esa área.
+- **Barra de filtros** que **gobierna toda la pantalla**: buscador (nombre/plantilla/área/equipo/
+  responsable), estado (activos/pausados), tipo de recurrencia, área y **Bitácoras** (botón que
+  abre un modal para elegir **una o varias**; las elegidas se muestran como chips).
+- **Pestañas**:
+  - **Horarios**: la tabla de horarios, con **orden por columna** y **paginación** (25/50/100).
+    Muestra frecuencia legible ("Cada turno", "Cada 6 h", "08:00, 20:00 · Lun a Vie"), la
+    **próxima ronda** (en rojo si está atrasada) y **pausar/activar en un clic** (columna *Estado*).
+  - **Ocurrencias**: una **grilla** de lo generado, con orden y paginación, filtros rápidos
+    (Pendientes/Hoy/Vencidas) y columnas Programada/Ronda/Equipo/Nodo/Turno/Estado/Vence. Respeta
+    los filtros superiores (solo muestra las de los horarios filtrados).
+  - **Resumen**: panel de análisis con gráficas — rondas pendientes por área, horarios por
+    recurrencia y cumplimiento (% atrasadas).
 
 **Quién puede.** Ver la programación requiere el permiso **"Ver rondas"** (`schedule:view`);
 crear o editar horarios requiere **"Administrar rondas"** (`schedule:manage`). Es un rol de
