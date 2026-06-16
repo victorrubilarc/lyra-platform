@@ -87,28 +87,132 @@
   font-weight: 600;
 }
 
-/* Cabecera plegable del monitoreo de ocurrencias */
-.collapseToggle {
+/* Barra de filtros (gobierna toda la pantalla): búsqueda acotada + selects parejos */
+.filterBar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+}
+.filterSearch {
+  flex: 1 1 280px;
+  min-width: 220px;
+  max-width: 460px;
+}
+.filterSelect {
+  flex: 0 1 auto;
+  min-width: 168px;
+  min-height: 42px;
+}
+.filterBtn {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  width: 100%;
+  white-space: nowrap;
+  min-height: 42px;
+  padding: 0 16px;
+  border-radius: var(--radius-full, 999px);
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.12));
+  background: var(--color-surface-1, rgba(255, 255, 255, 0.02));
+  color: var(--color-text);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+.filterBtn:hover { border-color: var(--color-border-active, rgba(99, 102, 241, 0.4)); }
+.filterBtnOn {
+  background: rgba(99, 102, 241, 0.16);
+  border-color: var(--color-accent-primary, #6366f1);
+  color: var(--color-accent-primary, #6366f1);
+}
+.clearBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 42px;
+  padding: 0 12px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 8px;
+}
+.clearBtn:hover { color: var(--color-error, #ef4444); }
+
+/* Pestañas */
+.tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--color-border, rgba(255, 255, 255, 0.08));
+}
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 18px;
   border: none;
   background: none;
-  cursor: pointer;
-  padding: 0;
+  color: var(--color-text-secondary);
   font-family: var(--font-display, "Sora", sans-serif);
-  font-size: 1.05rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color 0.12s ease;
+}
+.tab:hover { color: var(--color-text); }
+.tabOn {
+  color: var(--color-accent-primary, #6366f1);
+  border-bottom-color: var(--color-accent-primary, #6366f1);
+}
+.tabBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--color-surface-2, rgba(255, 255, 255, 0.06));
+  color: var(--color-text-secondary);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+.tabOn .tabBadge {
+  background: rgba(99, 102, 241, 0.18);
+  color: var(--color-accent-primary, #6366f1);
+}
+
+/* Resumen: gráficas */
+.charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 14px;
+}
+.chartCard {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+}
+.chartTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-family: var(--font-display, "Sora", sans-serif);
+  font-size: 0.96rem;
   font-weight: 600;
   color: var(--color-text);
 }
-.collapseToggle:hover {
-  color: var(--color-accent-primary, #6366f1);
-}
-.collapseCount {
-  margin-left: auto;
-  font-size: 0.8rem;
-  font-weight: 600;
+.chartNote {
+  margin: 0;
+  font-size: 0.82rem;
   color: var(--color-text-secondary);
 }
 
@@ -146,46 +250,6 @@
 .tplChipX:hover {
   background: var(--color-accent-primary, #6366f1);
   color: #fff;
-}
-
-/* Toolbar + paginador de la grilla de ocurrencias */
-.occToolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-.occSearch {
-  flex: 1 1 240px;
-  min-width: 180px;
-  max-width: 360px;
-}
-.pager {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 14px;
-  flex-wrap: wrap;
-  padding-top: 4px;
-}
-.pagerRange {
-  margin-right: auto;
-  font-size: 0.84rem;
-  color: var(--color-text-secondary);
-}
-.pagerBtns {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.pagerPage {
-  font-size: 0.86rem;
-  font-weight: 600;
-  color: var(--color-text);
-  min-width: 56px;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
 }
 
 /* Secciones */
