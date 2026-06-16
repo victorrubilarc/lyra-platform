@@ -3,7 +3,8 @@
  * (como `PERMISSION_CATALOG`), no en BD: el motor, el seed de plantillas y la UI
  * de preferencias se derivan de aquí. Cada evento declara las VARIABLES
  * (placeholders) que su plantilla puede usar — whitelist que valida el render
- * SIN `eval` (misma postura segura que el motor de reglas).
+ * SIN `eval` (misma postura segura que el motor de reglas) — con su descripción y
+ * un VALOR DE EJEMPLO (para el diccionario + la vista previa del editor).
  *
  * Un evento es `tx-driven` (lo emite el cambio de dominio dentro de su misma
  * transacción, p. ej. una transición de flujo) o `derived` (lo descubre un barrido
@@ -16,8 +17,10 @@
 export interface NotificationVariableDef {
   /** Nombre del placeholder, p. ej. `entry.folio`. Se referencia como `{{entry.folio}}`. */
   readonly name: string;
-  /** Descripción legible (se muestra en el editor de plantillas). */
+  /** Descripción legible (se muestra en el diccionario del editor de plantillas). */
   readonly description: string;
+  /** Valor de ejemplo (para la vista previa en vivo y el diccionario). */
+  readonly sample: string;
 }
 
 /** Definición de un evento de notificación del catálogo. */
@@ -38,9 +41,28 @@ export interface NotificationEventDef {
 
 /** Variables comunes a TODOS los eventos (contexto de la app + destinatario). */
 const COMMON_VARIABLES: readonly NotificationVariableDef[] = [
-  { name: "recipient.name", description: "Nombre del destinatario." },
-  { name: "app.name", description: "Nombre del producto (Lyra WatchLog)." },
-  { name: "app.url", description: "URL pública de la aplicación." },
+  { name: "recipient.name", description: "Nombre del destinatario.", sample: "Ana Pérez" },
+  { name: "app.name", description: "Nombre del producto.", sample: "Lyra WatchLog" },
+  { name: "app.url", description: "URL pública de la aplicación.", sample: "https://watchlog.tuempresa.cl" },
+] as const;
+
+/**
+ * Variables compartidas por los eventos ligados a una ENTRADA de bitácora. Incluye
+ * `entry.summary`: el bloque de campos de RESUMEN configurados en la plantilla
+ * (`gridFieldKeys`), ya formateados (etiqueta + valor + unidad, locale activo). Así
+ * el correo puede llevar datos PROPIOS de la bitácora sin acoplar la plantilla a un
+ * tipo de formulario (las variables de campo individuales = fase 2).
+ */
+const ENTRY_VARIABLES: readonly NotificationVariableDef[] = [
+  { name: "entry.folio", description: "Folio de la entrada.", sample: "#1248" },
+  { name: "entry.template", description: "Plantilla de la entrada.", sample: "Ronda de turno — Molienda" },
+  { name: "entry.node", description: "Nodo (área) de la entrada.", sample: "Planta Concentradora ▸ Molienda" },
+  { name: "entry.url", description: "Enlace directo a la entrada.", sample: "https://watchlog.tuempresa.cl/bitacoras/abc123" },
+  {
+    name: "entry.summary",
+    description: "Campos de resumen de la bitácora (los configurados en «Resumen en la grilla»), con etiqueta, valor y unidad.",
+    sample: "Temperatura molino: 78 °C · Presión: 2,1 bar · Estado: Conforme",
+  },
 ] as const;
 
 /**
@@ -53,17 +75,17 @@ export const NOTIFICATION_EVENTS = [
     group: "schedules",
     labelKey: "notifications.events.roundOverdue",
     description:
-      "Una ronda programada venció (pasó su plazo sin iniciarse). Avisa al rol responsable del horario (o, sin responsable, a quien alcanza el nodo).",
+      "Una ronda programada venció (pasó su plazo sin iniciarse). Avisa al rol responsable del horario (o, sin responsable, a quien se suscriba).",
     origin: "derived",
     variables: [
       ...COMMON_VARIABLES,
-      { name: "schedule.name", description: "Nombre del horario de la ronda." },
-      { name: "template.name", description: "Plantilla de la ronda." },
-      { name: "node.name", description: "Nodo (área) de la ronda." },
-      { name: "equipment.tag", description: "Equipo asociado (si lo hay)." },
-      { name: "occurrence.scheduledFor", description: "Momento programado de la ronda." },
-      { name: "occurrence.dueAt", description: "Plazo límite de la ronda." },
-      { name: "occurrence.overdueBy", description: "Tiempo de atraso (ej. «2 h 30 min»)." },
+      { name: "schedule.name", description: "Nombre del horario de la ronda.", sample: "Ronda turno A — Molienda" },
+      { name: "template.name", description: "Plantilla de la ronda.", sample: "Ronda de turno — Molienda" },
+      { name: "node.name", description: "Nodo (área) de la ronda.", sample: "Planta Concentradora ▸ Molienda" },
+      { name: "equipment.tag", description: "Equipo asociado (si lo hay).", sample: "ML-01" },
+      { name: "occurrence.scheduledFor", description: "Momento programado de la ronda.", sample: "16 jun 2026, 08:00" },
+      { name: "occurrence.dueAt", description: "Plazo límite de la ronda.", sample: "16 jun 2026, 09:00" },
+      { name: "occurrence.overdueBy", description: "Tiempo de atraso.", sample: "2 h 30 min" },
     ],
   },
   {
@@ -75,13 +97,10 @@ export const NOTIFICATION_EVENTS = [
     origin: "derived",
     variables: [
       ...COMMON_VARIABLES,
-      { name: "entry.folio", description: "Folio de la entrada." },
-      { name: "entry.template", description: "Plantilla de la entrada." },
-      { name: "entry.node", description: "Nodo (área) de la entrada." },
-      { name: "entry.state", description: "Estado de flujo actual." },
-      { name: "entry.sla", description: "SLA del estado (ej. «4 h»)." },
-      { name: "entry.delayedBy", description: "Tiempo de atraso sobre el SLA." },
-      { name: "entry.url", description: "Enlace directo a la entrada." },
+      ...ENTRY_VARIABLES,
+      { name: "entry.state", description: "Estado de flujo actual.", sample: "En revisión" },
+      { name: "entry.sla", description: "SLA del estado.", sample: "4 h" },
+      { name: "entry.delayedBy", description: "Tiempo de atraso sobre el SLA.", sample: "1 h 10 min" },
     ],
   },
   {
@@ -93,13 +112,10 @@ export const NOTIFICATION_EVENTS = [
     origin: "tx",
     variables: [
       ...COMMON_VARIABLES,
-      { name: "entry.folio", description: "Folio de la entrada." },
-      { name: "entry.template", description: "Plantilla de la entrada." },
-      { name: "entry.node", description: "Nodo (área) de la entrada." },
-      { name: "entry.fromState", description: "Estado de origen." },
-      { name: "entry.toState", description: "Estado de destino (el nuevo)." },
-      { name: "entry.actor", description: "Quién ejecutó la transición." },
-      { name: "entry.url", description: "Enlace directo a la entrada." },
+      ...ENTRY_VARIABLES,
+      { name: "entry.fromState", description: "Estado de origen.", sample: "Borrador" },
+      { name: "entry.toState", description: "Estado de destino (el nuevo).", sample: "En revisión" },
+      { name: "entry.actor", description: "Quién ejecutó la transición.", sample: "Juan Soto" },
     ],
   },
   {
@@ -111,11 +127,8 @@ export const NOTIFICATION_EVENTS = [
     origin: "tx",
     variables: [
       ...COMMON_VARIABLES,
-      { name: "entry.folio", description: "Folio de la entrada." },
-      { name: "entry.template", description: "Plantilla de la entrada." },
-      { name: "entry.node", description: "Nodo (área) de la entrada." },
-      { name: "entry.state", description: "Estado que requiere firma." },
-      { name: "entry.url", description: "Enlace directo a la entrada." },
+      ...ENTRY_VARIABLES,
+      { name: "entry.state", description: "Estado que requiere firma.", sample: "Aprobación supervisor" },
     ],
   },
 ] as const satisfies readonly NotificationEventDef[];
@@ -144,4 +157,12 @@ export function notificationEventDef(key: string): NotificationEventDef | undefi
 export function allowedVariablesForEvent(key: string): Set<string> {
   const def = EVENT_BY_KEY.get(key);
   return new Set((def?.variables ?? []).map((v) => v.name));
+}
+
+/** Contexto de EJEMPLO de un evento (variable → valor de ejemplo), para la vista previa. */
+export function sampleContextForEvent(key: string): Record<string, string> {
+  const def = EVENT_BY_KEY.get(key);
+  const ctx: Record<string, string> = {};
+  for (const v of def?.variables ?? []) ctx[v.name] = v.sample;
+  return ctx;
 }

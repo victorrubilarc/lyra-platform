@@ -61,3 +61,4 @@ export * from "./schedules/schedules.js";
 export * from "./notifications/events.js";
 export * from "./notifications/render.js";
 export * from "./notifications/notifications.js";
+export * from "./notifications/email-config.js";

@@ -3,6 +3,7 @@ import { Cron, CronExpression } from "@nestjs/schedule";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
+import { EmailConfigService } from "../email/email-config.service";
 import { SchedulesService } from "../schedules/schedules.service";
 import { NotificationEmitterService } from "./notification-emitter.service";
 import { NotificationResolverService } from "./notification-resolver.service";
@@ -39,6 +40,7 @@ export class NotificationWorkerService {
     private readonly emitter: NotificationEmitterService,
     private readonly resolver: NotificationResolverService,
     private readonly channel: NotificationChannel,
+    private readonly emailConfig: EmailConfigService,
   ) {}
 
   @Cron(CronExpression.EVERY_MINUTE)
@@ -188,6 +190,15 @@ export class NotificationWorkerService {
         orderBy: { createdAt: "asc" },
         take: BATCH,
       });
+      // Correo DESACTIVADO: no se intenta enviar; los pendientes se marcan SUPPRESSED
+      // (quedan visibles en la bandeja, sin reintentos infinitos).
+      if (rows.length > 0 && !(await this.emailConfig.isEnabled())) {
+        await this.prisma.notificationOutbox.updateMany({
+          where: { id: { in: rows.map((r) => r.id) } },
+          data: { status: "SUPPRESSED", lastError: "Correo saliente desactivado" },
+        });
+        return 0;
+      }
       for (const row of rows) {
         try {
           await this.channel.send({

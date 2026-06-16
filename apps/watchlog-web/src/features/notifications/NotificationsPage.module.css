@@ -255,3 +255,94 @@
   max-height: 420px;
   overflow: auto;
 }
+
+/* Editor + vista previa lado a lado */
+.editorSplit {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+  align-items: start;
+}
+@media (max-width: 1100px) {
+  .editorSplit {
+    grid-template-columns: 1fr;
+  }
+}
+.previewCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: sticky;
+  top: 12px;
+}
+.previewLabel {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.previewSubject {
+  font-weight: 600;
+  color: var(--color-text-primary);
+  font-size: 0.92rem;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-surface-2);
+}
+.previewFrame {
+  width: 100%;
+  height: 360px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: #fff;
+}
+
+/* Diccionario de variables */
+.dict {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 168px;
+  overflow: auto;
+  padding-right: 4px;
+}
+.dictItem {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  text-align: left;
+  appearance: none;
+  background: var(--color-bg-surface-2);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+  cursor: pointer;
+  transition: border-color 0.12s;
+}
+.dictItem:hover {
+  border-color: var(--color-accent-primary);
+}
+.dictName {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 0.76rem;
+  color: var(--color-accent-secondary, #06b6d4);
+}
+.dictDesc {
+  font-size: 0.76rem;
+  color: var(--color-text-muted);
+  line-height: 1.35;
+}
+.dictSample {
+  font-size: 0.72rem;
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+.insertHint {
+  font-size: 0.74rem;
+  color: var(--color-text-muted);
+}

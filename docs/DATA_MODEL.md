@@ -473,6 +473,12 @@ tabla existente. El catálogo de EVENTOS vive en CÓDIGO (`@lyra/contracts NOTIF
   `orgNodeId?`+`includeDescendants`, `templateId?`, `enabled`. Suma destinatarios (filtrados por ABAC en la resolución).
 - **NotificationPreference** *(implementado — Bloque N)* — DATO PERSONAL (ownership, sin permiso RBAC): `@@unique(userId, eventKey,
   channel)`, `mode` (enum **`NotificationMode`** IMMEDIATE/DIGEST/OFF; el MVP entrega IMMEDIATE, OFF suprime). DIGEST diseñado, diferido.
+- **SystemSettings** *(ampliado — Bloque N hardening)* — columnas `email*` para la **config SMTP del correo saliente** (singleton,
+  editable sin reiniciar): `emailEnabled`, `emailService`, `emailHost`, `emailPort`, `emailSecure`, `emailUser`, **`emailPasswordEnc`
+  (AES, write-only)**, `emailFromName`, `emailFromEmail`, `emailConfiguredAt` (null = nunca guardado en BD ⇒ `source=env`; el `.env`
+  SMTP_* es el fallback), `emailConfiguredById`. La config es "toda BD o toda env" según `emailConfiguredAt`; la contraseña cae al
+  env si la BD no tiene. La administra `EmailConfigService` (permiso `notification:config`); el `SmtpEmailService` la resuelve con
+  caché por *firma* del transporte.
 
 ### Orígenes de datos
 - **DataSource** — URL base, tipo de auth, **credencial cifrada en reposo**. *1—N* **DataSourceEndpoint** (path, método, mapeo JSONPath, TTL). Caché en Redis. **Espejo ENTRANTE:** en Fase 3 un endpoint puede **alimentar/materializar** una `ReferenceList` (`source=EXTERNAL`).

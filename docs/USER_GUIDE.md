@@ -106,7 +106,8 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 ### 14. Notificaciones  [Admin · todos]
 - ✅ **Avisos por correo** (qué se avisa: ronda vencida, SLA, transición, firma pendiente) (§ Notificaciones)
 - ✅ **Mis notificaciones** (activar/desactivar avisos propios) (§ Notificaciones ▸ Mis preferencias)
-- ✅ **Plantillas de mensaje** y **correo saliente** (§ Notificaciones ▸ Plantillas / Correo saliente) [Admin]
+- ✅ **Plantillas de mensaje** (con vista previa, diccionario de variables, `{{entry.summary}}`) y **correo saliente** (§ Notificaciones ▸ Plantillas / Correo saliente) [Admin]
+- ✅ **Servidor de correo (SMTP)** — configurar el correo saliente (§ Configuración ▸ Servidor de correo) [Admin con `notification:config`]
 
 ---
 
@@ -536,3 +537,36 @@ algo que el destinatario no podría ver en la aplicación.
   lo revise varias veces.
 - El **resumen agrupado (digest)**, la **gestión de suscripciones desde la pantalla** y los
   **recordatorios escalonados** están planificados pero aún no disponibles.
+
+---
+
+## Configuración ▸ Servidor de correo (SMTP)  [Admin]
+
+**Para qué sirve.** Define **cómo y desde dónde** salen los correos de Lyra WatchLog
+(notificaciones, recuperación de contraseña). Antes esto vivía solo en variables de
+entorno; ahora se configura desde la aplicación y **se aplica sin reiniciar**.
+
+**Cómo se usa.** En **Configuración ▸ Correo saliente**:
+1. Elige un **proveedor** (Gmail/Workspace, Microsoft 365, Amazon SES, SendGrid,
+   Mailpit para desarrollo, o Personalizado): rellena host/puerto/seguridad y te
+   muestra una **pista** con qué credencial usar.
+2. Completa **usuario** y **contraseña** (la contraseña se guarda **cifrada** y nunca
+   se vuelve a mostrar; déjala vacía para no cambiarla), y el **remitente** (nombre +
+   correo, que debe ser de un dominio verificado en tu proveedor).
+3. **Probar conexión** valida las credenciales sin enviar nada; **Enviar prueba**
+   manda un correo real al destinatario que indiques (si falla, te mostramos el
+   motivo exacto del servidor). Luego **Guardar configuración**.
+4. El interruptor **Correo activado** apaga el envío globalmente (los avisos quedan en
+   la bandeja como «suprimidos»; nada se rompe).
+
+**Quién puede.** Solo quien tenga el permiso **`notification:config`** (configurar el
+servidor de correo). Es un permiso aparte del de plantillas y del de bandeja.
+
+**Importante.**
+- La **contraseña SMTP se guarda cifrada** en el sistema; la API nunca la devuelve.
+- Si nunca guardas la config aquí, el sistema usa las **variables de entorno** (`.env`)
+  como respaldo — la pantalla indica si la config actual viene «del sistema» o «del .env».
+- En **plantillas** de notificación tienes **vista previa en vivo** (con datos de
+  ejemplo), un **diccionario** que explica cada variable y la inserta donde está el
+  cursor, y la variable **`{{entry.summary}}`** para incrustar los campos de resumen de
+  la bitácora (los que configuraste en «Resumen en la grilla»).

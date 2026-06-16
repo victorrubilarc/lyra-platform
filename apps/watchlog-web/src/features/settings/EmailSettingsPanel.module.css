@@ -1,0 +1,135 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 720px;
+}
+.banner {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  background: color-mix(in srgb, var(--color-accent-secondary, #06b6d4) 8%, transparent);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+.bannerIcon {
+  color: var(--color-accent-secondary, #06b6d4);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+}
+.cardTitle {
+  font-weight: 700;
+  color: var(--color-text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95rem;
+}
+.row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+.grid3 {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: var(--space-4);
+}
+@media (max-width: 640px) {
+  .grid2,
+  .grid3 {
+    grid-template-columns: 1fr;
+  }
+}
+.label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+}
+.labelNote {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+.hint {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+  margin-top: 4px;
+}
+.hintIcon {
+  color: var(--color-accent-secondary, #06b6d4);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.note {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+.toggleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+.toggleInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.toggleName {
+  font-weight: 700;
+  color: var(--color-text-primary);
+  font-size: 0.92rem;
+}
+.dim {
+  opacity: 0.45;
+  pointer-events: none;
+}
+.ok {
+  color: #22c55e;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.actions {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  flex-wrap: wrap;
+}
+.testRow {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  flex-wrap: wrap;
+}
+.source {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+.sourceDb {
+  color: #22c55e;
+  font-weight: 600;
+}

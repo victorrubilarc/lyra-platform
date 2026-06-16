@@ -27,7 +27,7 @@ const eventDefSchema = z.object({
   labelKey: z.string(),
   description: z.string(),
   origin: z.enum(["tx", "derived"]),
-  variables: z.array(z.object({ name: z.string(), description: z.string() })),
+  variables: z.array(z.object({ name: z.string(), description: z.string(), sample: z.string() })),
 });
 export type NotificationEventDefDto = z.infer<typeof eventDefSchema>;
 
