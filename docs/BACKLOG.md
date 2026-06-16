@@ -300,10 +300,15 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
       el MVP solo entrega IMMEDIATE (DIGEST se trata como entrega inmediata). Falta la ventana de batch + render de resumen + su tick.
 - [ ] **UI de SUSCRIPCIONES** (watchers). El modelo `NotificationSubscription` + endpoints (`GET/POST/DELETE /notifications/subscriptions`,
       `notification:admin`) + la resolución por suscripción YA existen y se honran; falta la pantalla (pestaña en `/notificaciones`).
-- [ ] **Variables de campo DINÁMICAS por tipo de formulario** (`{{field.<key>}}`) — fase 2 del editor (decidido 2026-06-16). Hoy el
-      correo puede llevar datos de la bitácora vía **`{{entry.summary}}`** (los `gridFieldKeys` configurados, etiqueta+valor+unidad).
-      La evolución granular = plantillas de notificación scoped al **form-template** con una variable por campo + selector de campos
-      (modelo mayor: plantilla por tipo de bitácora). Diseñado, diferido.
+- [ ] **🎯 NOTIFICACIONES AVANZADAS — épico (requerimiento del dueño 2026-06-16).** Prompt enterprise listo en
+      **`docs/prompts/notificaciones-avanzadas.md`** (pégalo en una sesión nueva). Personalización a la medida de cada bitácora/flujo:
+      **(1)** disparo **por TRANSICIÓN** configurable en el builder de flujos (¿envía? · qué plantilla · a quién), DATO en
+      `WorkflowTransition` congelado en la versión; **(2)** **listas de distribución** (rol/usuarios/autor/rol-del-estado/alcance/
+      correos externos con gobernanza); **(3)** **plantillas por bitácora** (`NotificationTemplate.templateId?`, override de la genérica
+      con fallback); **(4)** **variables de campo `{{campo.<key>}}`** con **VERSIONADO** (keys estables, valores de la versión congelada
+      de la entrada, degradación elegante) — expande el `{{entry.summary}}` actual; **(5)** **defaults a nivel de sistema**
+      (`SystemSettings`); **(6)** **canal IN-APP (la campanita)** en el Topbar (contador + dropdown + marcar leídas; poll vs SSE). **ÉPICO
+      grande: plan POR FASES** (A=email por transición/bitácora/campos/defaults · B=in-app). Ver memoria [[notif-advanced-requirement]].
 - [ ] **`round.overdue` sin rol responsable → fan-out por NODO para correo.** DECISIÓN CONSCIENTE del MVP: cuando `LogSchedule.responsibleRoleId`
       es null, el correo se resuelve **solo por suscripciones** (no se hace fan-out automático a todos los que alcanzan el nodo, para evitar
       tormentas de avisos). El worklist in-app SÍ muestra esas rondas a todos los que alcanzan el nodo. Si se quiere el fan-out por nodo en
