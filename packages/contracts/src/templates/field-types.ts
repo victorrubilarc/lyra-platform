@@ -403,6 +403,13 @@ export const numberFieldConfigSchema = z
     counter: z.boolean().optional(),
     /** El contador no puede decrecer (nuevo ≥ previo). Validado server-side contra la lectura anterior. */
     counterNonDecreasing: z.boolean().optional(),
+    // --- Fase 4.1: gobernanza de excepciones operacionales -----------------
+    /**
+     * ¿Una lectura en banda WARN materializa una EXCEPCIÓN operacional (no solo
+     * el badge efímero)? Default false (evita la tormenta de excepciones). Una
+     * lectura CRIT SIEMPRE genera excepción (piso de seguridad, no configurable).
+     */
+    warnRaisesException: z.boolean().optional(),
   })
   .strict()
   .superRefine((c, ctx) => {
@@ -930,6 +937,8 @@ export const tableFieldConfigSchema = z
     maxRows: z.number().int().min(1).max(TABLE_ROWS_CAP).optional(),
     /** Rótulo del botón "agregar fila" (default "Agregar fila"). */
     addRowLabel: z.string().trim().max(60).optional(),
+    /** Fase 4.1: una celda numérica en banda WARN materializa excepción (CRIT siempre lo hace). Default false. */
+    warnRaisesException: z.boolean().optional(),
   })
   .strict()
   .superRefine((c, ctx) => {
@@ -972,6 +981,8 @@ export const matrixFieldConfigSchema = z
       .strict(),
     /** Rótulo de la cabecera de la columna de parámetros (default "Parámetro"). */
     rowHeaderLabel: z.string().trim().max(60).optional(),
+    /** Fase 4.1: una celda numérica en banda WARN materializa excepción (CRIT siempre lo hace). Default false. */
+    warnRaisesException: z.boolean().optional(),
   })
   .strict()
   .superRefine((c, ctx) => {

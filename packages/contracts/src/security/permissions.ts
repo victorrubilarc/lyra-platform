@@ -572,6 +572,39 @@ export const PERMISSION_CATALOG = [
     group: "incidents",
     description: "Administrar el catálogo de tipos y categorías de incidencia.",
   },
+
+  // --- Excepciones operacionales desde bitácoras (Fase 4.1) ------------------
+  // La capa Bitácora → Excepción → Incidencia. Ver una excepción usa
+  // `module:incidents:view` (es parte del módulo). Estas claves gobiernan el
+  // TRIAGE; el descarte de una excepción CRÍTICA exige un permiso superior. El
+  // alcance de datos (nodo) lo resuelve el ScopeService (ABAC). Convertir una
+  // excepción en incidencia exige además `incident:create`.
+  {
+    key: "exception:triage",
+    dimension: "ACTION",
+    group: "incidents",
+    description:
+      "Triar excepciones operacionales: reconocer, marcar revisada, asociar o agrupar en una incidencia.",
+  },
+  {
+    key: "exception:dismiss",
+    dimension: "ACTION",
+    group: "incidents",
+    description: "Descartar (con motivo auditado) una excepción de advertencia que no requiere acción.",
+  },
+  {
+    key: "exception:dismiss-critical",
+    dimension: "ACTION",
+    group: "incidents",
+    description: "Descartar una excepción CRÍTICA (con motivo auditado) — permiso superior al descarte normal.",
+  },
+  {
+    key: "exception:correct",
+    dimension: "ACTION",
+    group: "incidents",
+    description:
+      "Corregir el valor que originó una excepción, preservando el original con motivo auditado (GxP/ALCOA+).",
+  },
 ] as const satisfies readonly PermissionDef[];
 
 /** Unión literal de todas las claves de permiso conocidas. */

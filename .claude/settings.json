@@ -257,7 +257,26 @@
       "Bash(powershell.exe -NoProfile -Command \"Stop-Process -Id 9060 -Force\")",
       "Bash(python scripts/smoke-incidencias.py)",
       "Bash(sed -n '94,140p' apps/watchlog-web/src/i18n/locales/es-CL.ts)",
-      "Bash(sed -n '1,40p' apps/watchlog-web/src/auth/use-permissions.ts)"
+      "Bash(sed -n '1,40p' apps/watchlog-web/src/auth/use-permissions.ts)",
+      "PowerShell($p = Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty OwningProcess; if \\($p\\) { Stop-Process -Id $p -Force; \"Killed PID $p on :3000\" } else { \"Nothing on :3000\" })",
+      "PowerShell(pnpm exec prisma generate)",
+      "PowerShell(Get-Process node -ErrorAction SilentlyContinue | Select-Object Id, StartTime, @{N='CPU';E={$_.CPU}} | Format-Table -AutoSize; \"---\"; Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Where-Object {$_.LocalPort -in 3000,5173} | Select-Object LocalPort, OwningProcess)",
+      "PowerShell(Stop-Process -Id 94564 -Force)",
+      "PowerShell(pnpm --filter @lyra/watchlog-api typecheck 2>&1)",
+      "PowerShell(pnpm --filter @lyra/watchlog-api typecheck; \"EXIT=$LASTEXITCODE\")",
+      "PowerShell(docker exec lyra-watchlog-dev-redis-1 redis-cli FLUSHALL)",
+      "PowerShell(\"---REDIS---\")",
+      "PowerShell(pnpm --filter @lyra/watchlog-api build; \"EXIT=$LASTEXITCODE\")",
+      "PowerShell($env:NODE_ENV=\"development\"; pnpm --filter @lyra/watchlog-api start:dev)",
+      "PowerShell($ok=$false; for \\($i=0; $i -lt 40; $i++\\) { try { $r = Invoke-WebRequest -Uri \"http://localhost:3000/api/health\" -UseBasicParsing -TimeoutSec 2; if \\($r.StatusCode -eq 200\\) { $ok=$true; break } } catch { Start-Sleep -Milliseconds 1500 } }; if \\($ok\\) { \"API UP\" } else { \"API not responding yet\" })",
+      "PowerShell($ok=$false; for \\($i=0; $i -lt 50; $i++\\) { try { $r = Invoke-WebRequest -Uri \"http://localhost:3000/api/health\" -UseBasicParsing -TimeoutSec 2; if \\($r.StatusCode -eq 200\\) { $ok=$true; break } } catch { Start-Sleep -Milliseconds 1500 } }; if \\($ok\\) { \"API UP after $i tries\" } else { \"API not responding\" })",
+      "PowerShell(python scripts/smoke-excepciones.py)",
+      "PowerShell(Start-Sleep -Seconds 6; for \\($i=0; $i -lt 30; $i++\\) { try { $r = Invoke-WebRequest -Uri \"http://localhost:3000/api/health\" -UseBasicParsing -TimeoutSec 2; if \\($r.StatusCode -eq 200\\) { break } } catch { Start-Sleep -Milliseconds 1500 } }; python scripts/smoke-excepciones.py)",
+      "PowerShell(pnpm --filter @lyra/watchlog-api lint; \"LINT_EXIT=$LASTEXITCODE\")",
+      "PowerShell(pnpm -w run typecheck; \"TYPECHECK=$LASTEXITCODE\")",
+      "PowerShell(pnpm -w run lint; \"LINT=$LASTEXITCODE\")",
+      "PowerShell(pnpm -w run build; \"BUILD=$LASTEXITCODE\")",
+      "PowerShell(pnpm -w run test 2>&1 | Select-String -Pattern \"Tests |Test Files|FAIL|passed|failed\" | Select-Object -Last 20; \"TEST=$LASTEXITCODE\")"
     ],
     "additionalDirectories": [
       "\\tmp"

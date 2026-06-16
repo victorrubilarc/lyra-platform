@@ -42,6 +42,17 @@ Keycloak **descartado** para el MVP (complejidad operacional); si un cliente lo 
 - **La UI solo oculta** (mejor UX), nunca es la fuente de verdad.
 - El **catálogo de permisos** vive en `@lyra/contracts` (enum tipado), compartido por UI y backend.
 
+### Excepciones operacionales (Fase 4.1) — triage gobernado + corrección GxP
+- 4 permisos nuevos (catálogo **77→81**, grupo `incidents`): **`exception:triage`** (reconocer/asociar/agrupar/convertir —
+  convertir exige además `incident:create`, AND), **`exception:dismiss`** (descartar una advertencia con motivo), **`exception:dismiss-critical`**
+  (descartar una excepción CRÍTICA — permiso SUPERIOR; el endpoint admite cualquiera de los dos con `@RequireAnyPermission`, y el
+  servicio exige el específico según `thresholdType`), **`exception:correct`** (corregir el valor de origen). **Ver** excepciones usa
+  `module:incidents:view` (son parte del módulo). ABAC por nodo (`canAccessNode`/`getAccessibleNodeIds`) en todas las operaciones.
+- **Corrección de valor = GxP/ALCOA+:** el `originalValue` es INMUTABLE; corregir escribe el nuevo valor en `LogEntryValue` + un
+  `LogEntryFieldChange` con motivo (huella por campo) + re-estampa la banda, y marca la excepción `CORRECTED` preservando el original.
+  El registro criptográfico Part 11 de la corrección queda como deuda 4.2 (igual que las transiciones de incidencia 4.0). Toda acción
+  de triage (acknowledge/dismiss/correct/convert/associate/manual) se **audita** (`AuditLog`).
+
 ### Datos PERSONALES → autorización por OWNERSHIP (no RBAC)
 - Las preferencias de presentación del propio usuario **no** se gobiernan con permisos del catálogo: se autorizan por **pertenencia** (el recurso es del actor). Patrón aplicado a **`SavedView`** (vistas guardadas de Bitácoras, Fase 2.8.1b): toda consulta/mutación filtra por `userId === session.user.id` (404 si la vista es de otro); el endpoint se gatea además por acceso al módulo (`logentry:view`). No infla el catálogo (sigue en **59**). Inflar RBAC con preferencias de UI sería ruido administrativo; el límite real es la propiedad del dato.
 

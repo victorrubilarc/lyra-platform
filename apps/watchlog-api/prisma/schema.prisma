@@ -1869,6 +1869,7 @@ model Incident {
   comments   IncidentComment[]
   activities IncidentActivity[]
   transitions IncidentTransition[]
+  exceptionLinks IncidentExceptionLink[]
 
   @@index([typeId])
   @@index([categoryId])
@@ -1913,6 +1914,114 @@ model IncidentActivity {
   incident Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
 
   @@index([incidentId, occurredAt])
+}
+
+// === Excepciones operacionales desde bitácoras (Fase 4.1) =====================
+
+enum ExceptionTrigger {
+  THRESHOLD_WARN
+  THRESHOLD_CRIT
+  RULE
+  MANUAL
+}
+
+enum ExceptionThresholdType {
+  warning
+  critical
+  invalid
+}
+
+enum ExceptionStatus {
+  OPEN
+  ACKNOWLEDGED
+  DISMISSED
+  CONVERTED
+  CORRECTED
+}
+
+// Materialización de una anomalía de bitácora (umbral WARN/CRIT, regla WARN,
+// registro manual) con ESTADO y TRIAGE. El contexto se CONGELA en la detección
+// (no se re-deriva): refs BLANDAS a entrada/nodo/equipo/operador/plantilla
+// (patrón AuditLog/Incident), sin FK que ate la entrada. El valor ORIGINAL nunca
+// se pierde; una corrección lo preserva (GxP). Una incidencia agrupa N excepciones.
+model LogEntryException {
+  id     String @id @default(cuid())
+  // Folio humano correlativo. El código "EXC-####" se DERIVA en el backend.
+  number Int    @unique @default(autoincrement())
+  // --- Origen del dato (contexto congelado; refs blandas) -----------------------
+  logEntryId        String
+  templateId        String?
+  templateVersionId String?
+  sectionKey        String
+  sectionLabel      String?
+  fieldKey          String
+  fieldLabel        String?
+  fieldType         String?
+  unit              String?
+  // Referencia a la celda de una TABLE/MATRIX (MVP: nivel de campo, suele null).
+  occurrenceRef     String?
+  // --- Valor (jsonb; el original es INMUTABLE) ----------------------------------
+  originalValue Json?
+  bandsSnapshot Json? // {warnLow,warnHigh,critLow,critHigh} efectivas en la detección
+  // --- Disparador ---------------------------------------------------------------
+  triggerKind   ExceptionTrigger
+  thresholdType ExceptionThresholdType
+  ruleKey       String?
+  ruleVersionId String?
+  ruleSeverity  String?
+  detail        String? // descripción legible (regla/manual)
+  // --- Operacional (denormalizado; refs blandas) --------------------------------
+  orgNodeId     String
+  equipmentId   String?
+  shiftCode     String?
+  operatorId    String?
+  detectedAt    DateTime  @default(now())
+  entrySealedAt DateTime?
+  // --- Triage -------------------------------------------------------------------
+  status        ExceptionStatus @default(OPEN)
+  triagedById   String?
+  triagedAt     DateTime?
+  dismissReason String?
+  // --- Corrección (GxP: el original arriba NUNCA se pierde) ----------------------
+  correctedValue  Json?
+  correctionReason String?
+  correctedById   String?
+  correctedAt     DateTime?
+  // --- Ligazón (N:1 denormalizado para filtros rápidos; el link table es la fuente) -
+  incidentId String?
+  // Idempotencia: una sola excepción viva por (entrada, campo, ocurrencia, disparador).
+  dedupeKey  String? @unique
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  links IncidentExceptionLink[]
+
+  @@index([logEntryId])
+  @@index([orgNodeId])
+  @@index([equipmentId])
+  @@index([status])
+  @@index([thresholdType])
+  @@index([incidentId])
+  @@index([detectedAt, id])
+}
+
+// Join AUTORITATIVO excepción↔incidencia (N:1 en MVP: @@unique(exceptionId)).
+// Carga la PROVENIENCIA del enlace (quién/cuándo), que el `incidentId`
+// denormalizado de la excepción no registra. Cascade desde ambos lados.
+model IncidentExceptionLink {
+  id          String   @id @default(cuid())
+  incidentId  String
+  exceptionId String
+  linkedById  String?
+  linkedAt    DateTime @default(now())
+
+  incident  Incident          @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  exception LogEntryException @relation(fields: [exceptionId], references: [id], onDelete: Cascade)
+
+  @@unique([exceptionId])
+  @@index([incidentId])
 }
 
 // Transición de flujo EJECUTADA sobre una incidencia (append-only; integridad

@@ -139,8 +139,13 @@ function makeService(
   const notifications = {
     emit: vi.fn().mockResolvedValue(undefined),
   } as unknown as import("../notifications/notification-emitter.service").NotificationEmitterService;
+  const exceptionGenerator = {
+    reconcileSection: vi.fn().mockResolvedValue(undefined),
+    reconcileEntryOnSeal: vi.fn().mockResolvedValue(undefined),
+    purgeProvisionalForEntry: vi.fn().mockResolvedValue(undefined),
+  } as unknown as import("../exceptions/exception-generator.service").ExceptionGeneratorService;
   return {
-    service: new LogEntriesService(prisma, audit, scope, shiftResolver, fiscalResolver, reauth, enc, periods, permissions, settings, storage, notifications),
+    service: new LogEntriesService(prisma, audit, scope, shiftResolver, fiscalResolver, reauth, enc, periods, permissions, settings, storage, notifications, exceptionGenerator),
     prisma,
     audit,
     shiftResolver,
