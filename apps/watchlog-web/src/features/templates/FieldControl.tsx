@@ -1,4 +1,4 @@
-import { Fragment, useMemo } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   AlertTriangle,
@@ -26,7 +26,7 @@ import {
   type OptionInlineItem,
   type ReferenceEntity,
 } from "@lyra/contracts";
-import { formatCurrency, formatDurationHm, formatNumber, formatPercent, formatRut } from "../../lib/format.js";
+import { applyMask, formatCurrency, formatDurationHm, formatNumber, formatPercent, formatRut, formatRutLive } from "../../lib/format.js";
 import { useResolvedReferenceList } from "../reference-data/reference-data-queries.js";
 import { useReferenceOptions } from "../log-entries/log-entries-queries.js";
 import { AttachmentControl, type AttachmentHandlers } from "./AttachmentControl.js";
@@ -99,6 +99,57 @@ function CharCounter({
           : null}
       </span>
     </div>
+  );
+}
+
+/**
+ * Input numérico con FORMATEO EN VIVO (formateo A): al DESENFOCAR muestra el número
+ * con separador de miles + decimales regionales (`lib/format`, p. ej. es-CL
+ * "1.250.000,50"); al ENFOCAR se edita en plano (punto decimal, sin separadores).
+ * Persiste SIEMPRE el número (o null), nunca el texto formateado. Caret estable
+ * porque mientras se edita el textbox muestra exactamente lo tecleado (estado local).
+ */
+function FormattedNumberInput({
+  value,
+  onChange,
+  decimals,
+  invalid,
+}: {
+  value: unknown;
+  onChange: (v: number | null) => void;
+  decimals?: number;
+  invalid?: boolean;
+}) {
+  const [focused, setFocused] = useState(false);
+  const [draft, setDraft] = useState("");
+  const n = value === "" || value === null || value === undefined ? null : Number(value);
+  const formatted =
+    n === null || !Number.isFinite(n)
+      ? ""
+      : formatNumber(n, { minimumFractionDigits: decimals ?? 0, maximumFractionDigits: decimals ?? 20 });
+  return (
+    <Input
+      type="text"
+      inputMode="decimal"
+      value={focused ? draft : formatted}
+      invalid={invalid}
+      style={{ maxWidth: 180 }}
+      onFocus={() => {
+        setDraft(n === null ? "" : String(n));
+        setFocused(true);
+      }}
+      onChange={(e) => {
+        const raw = e.target.value;
+        setDraft(raw);
+        const cleaned = raw.replace(",", ".").replace(/[^\d.-]/g, "");
+        if (cleaned === "" || cleaned === "-" || cleaned === ".") onChange(null);
+        else {
+          const parsed = Number(cleaned);
+          onChange(Number.isFinite(parsed) ? parsed : null);
+        }
+      }}
+      onBlur={() => setFocused(false)}
+    />
   );
 }
 
@@ -222,14 +273,18 @@ export function FieldControl({
     case "TEXT": {
       const fmt = (field.config as { format?: string }).format;
       const scan = (field.config as { scan?: boolean }).scan === true;
-      const inputMode = fmt === "email" ? "email" : fmt === "phone" ? "tel" : fmt === "url" ? "url" : undefined;
+      const mask = (field.config as { mask?: string }).mask;
+      const inputMode = fmt === "email" ? "email" : fmt === "phone" ? "tel" : fmt === "url" ? "url" : fmt === "rut" || mask ? "numeric" : undefined;
+      // Formateo EN VIVO al teclear: RUT (puntos+guion incremental, manda sobre máscara)
+      // o máscara genérica (#=dígito, A=letra, *=alfanumérico, resto literales).
+      const onText = (raw: string) => onChange(fmt === "rut" ? formatRutLive(raw) : mask ? applyMask(mask, raw) : raw);
       const input = (
         <Input
           type={fmt === "email" ? "email" : fmt === "url" ? "url" : fmt === "phone" ? "tel" : "text"}
           inputMode={inputMode}
           value={(value as string) ?? ""}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={(field.config.placeholder as string) ?? placeholderForFormat(fmt)}
+          onChange={(e) => onText(e.target.value)}
+          placeholder={(field.config.placeholder as string) ?? mask ?? placeholderForFormat(fmt)}
           invalid={invalid}
         />
       );
@@ -270,16 +325,29 @@ export function FieldControl({
       const isCounter = c.counter === true;
       const n = value === "" || value === null || value === undefined ? null : Number(value);
       const delta = isCounter && n != null && typeof counterPrevious === "number" ? n - counterPrevious : null;
+      // Formateo en vivo (A): moneda y porcentaje SIEMPRE formatean (miles+decimales);
+      // un número simple solo si el diseñador fijó `decimals` (así un año/folio queda sin
+      // agrupar). Moneda sin decimales explícitos = 0 (CLP). El símbolo lo da el sufijo.
+      const fmtDecimals = isCurrency
+        ? (typeof c.decimals === "number" ? c.decimals : 0)
+        : typeof c.decimals === "number"
+          ? c.decimals
+          : undefined;
+      const useFormatted = isCurrency || isPercent || typeof c.decimals === "number";
       return wrap(
         <div>
           <div className={styles.previewNumberRow}>
-            <Input
-              type="number"
-              value={(value as string) ?? ""}
-              onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
-              invalid={invalid || st === "crit"}
-              style={{ maxWidth: 180 }}
-            />
+            {useFormatted ? (
+              <FormattedNumberInput value={value} onChange={onChange} decimals={fmtDecimals} invalid={invalid || st === "crit"} />
+            ) : (
+              <Input
+                type="number"
+                value={(value as string) ?? ""}
+                onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
+                invalid={invalid || st === "crit"}
+                style={{ maxWidth: 180 }}
+              />
+            )}
             {suffix && <span className={styles.previewUnit}>{suffix}</span>}
             {!bare && isTolerance && (
               <span className={styles.previewRange}>

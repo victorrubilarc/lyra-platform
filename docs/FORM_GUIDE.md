@@ -90,8 +90,10 @@ previa es exactamente lo que verá el operador**. No hay tres pantallas que se d
   pequeña y atenuada, alineada a la derecha: **no invade** el formulario.
 - **• Cómo se configura.** Texto de ayuda (placeholder), **Mín. caracteres** y **Máx.
   caracteres** (ambos en el panel del builder), **patrón** (una expresión regular para exigir un
-  formato), y opcionalmente un **formato semántico** (RUT, correo, teléfono, URL — esos tienen
-  ficha propia más abajo). El diseño rechaza poner un mínimo mayor que el máximo.
+  formato), una **máscara de entrada** que formatea al teclear (`#`=dígito, `A`=letra,
+  `*`=alfanumérico, el resto literales; p. ej. `OT-#####` → `OT-04934`), y opcionalmente un
+  **formato semántico** (RUT, correo, teléfono, URL — esos tienen ficha propia más abajo; si hay
+  formato semántico, manda sobre la máscara). El diseño rechaza poner un mínimo mayor que el máximo.
 - **• Qué valida.** Con `minLength=3, maxLength=10`: ✅ `OT-7788` · ❌ `AB` ("mínimo 3
   caracteres") · ❌ 11+ caracteres ("máximo 10 caracteres"). Si hay patrón y no calza →
   "formato inválido".
@@ -119,7 +121,10 @@ previa es exactamente lo que verá el operador**. No hay tres pantallas que se d
 - **• Para qué sirve.** *Planta:* temperatura del descanso del molino (normal 60–75 °C,
   preocupante >80, crítico >90).
 - **• Cómo se ve / se usa.** Casilla numérica con la unidad al lado (`°C`). Si el valor cruza
-  un umbral, el campo se pinta (amarillo/rojo) sin impedir guardar.
+  un umbral, el campo se pinta (amarillo/rojo) sin impedir guardar. **Formateo en vivo:** si el
+  diseñador fija decimales, al **salir del campo** el número se muestra con separador de miles y
+  los decimales regionales (`1.250.000,50`); mientras escribes se edita en plano. (Un número sin
+  decimales configurados —año, folio— no se agrupa, para no mostrar "2.026".)
 - **• Cómo se configura.** Unidad, **decimales**, **rango válido duro** (min/max, fuera de
   esto **rechaza**), y **umbrales** ISA-18.2 que **no rechazan** sino que marcan:
   `warnLow/warnHigh` (amarillo) y `critLow/critHigh` (rojo).
@@ -135,7 +140,8 @@ previa es exactamente lo que verá el operador**. No hay tres pantallas que se d
 ### Porcentaje  *(paleta: «Porcentaje» — es un Número con formato %)*
 - **• Qué es.** Un número acotado a 0–100 que se muestra con `%`.
 - **• Para qué sirve.** *Planta:* % de humedad del mineral, % de avance de tarea.
-- **• Cómo se ve / se usa.** Casilla con sufijo `%`.
+- **• Cómo se ve / se usa.** Casilla con sufijo `%`; al salir del campo muestra los decimales
+  regionales configurados.
 - **• Cómo se configura.** Igual que Número (decimales, umbrales), con `format=percent`.
 - **• Qué valida.** ✅ `0`…`100` · ❌ `120` ("el porcentaje debe estar entre 0 y 100") ·
   ❌ `-5` (idem). Los umbrales y decimales aplican igual que en Número.
@@ -145,7 +151,9 @@ previa es exactamente lo que verá el operador**. No hay tres pantallas que se d
 ### Moneda  *(paleta: «Moneda» — Número con formato moneda)*
 - **• Qué es.** Un número que representa dinero, formateado por **locale** (CLP por defecto).
 - **• Para qué sirve.** *Planta:* costo estimado de un repuesto o de una detención.
-- **• Cómo se ve / se usa.** Casilla con el formato de moneda regional (ej. `$ 1.250.000`).
+- **• Cómo se ve / se usa.** Mientras escribes, número plano; al **salir del campo** se muestra
+  con separador de miles y los decimales configurados (`1.250.000`), con el código de moneda al
+  lado (CLP). Se guarda el número; el formato es solo presentación.
 - **• Cómo se configura.** `format=currency`, código ISO de moneda (`currency`, default `CLP`),
   decimales, umbrales.
 - **• Qué valida.** ✅ número válido (rango/decimales como Número) · ❌ no-número.
@@ -155,7 +163,9 @@ previa es exactamente lo que verá el operador**. No hay tres pantallas que se d
 ### RUT  *(paleta: «RUT» — Texto con formato rut)*
 - **• Qué es.** Texto que debe ser un **RUT chileno válido** (con dígito verificador correcto).
 - **• Para qué sirve.** *Planta:* identificar al responsable o a un contratista.
-- **• Cómo se ve / se usa.** Casilla de texto; la UI lo formatea con puntos y guion.
+- **• Cómo se ve / se usa.** Casilla de texto; **mientras escribes** la UI va poniendo el patrón
+  `12.345.678-5` (puntos de miles + guion del dígito verificador), de forma incremental. Solo
+  conserva dígitos y K; el último caracter es el DV.
 - **• Cómo se configura.** Texto con `format=rut`.
 - **• Qué valida.** ✅ `12.345.678-5` (si el DV calza por módulo 11) · ❌ `12.345.678-9`
   ("RUT inválido (verifique el dígito verificador)"). Acepta con/sin puntos; vacío lo gobierna

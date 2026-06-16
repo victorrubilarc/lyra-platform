@@ -15,6 +15,7 @@ export function FieldPropertiesPanel({
   field,
   canEdit,
   onClose,
+  onCancel,
   onLabel,
   onRequired,
   onWidth,
@@ -26,6 +27,8 @@ export function FieldPropertiesPanel({
   field: EditField | null;
   canEdit: boolean;
   onClose: () => void;
+  /** Revierte los cambios del campo desde que se seleccionó y cierra el panel. */
+  onCancel: () => void;
   onLabel: (label: string) => void;
   onRequired: (required: boolean) => void;
   onWidth: (w: number) => void;
@@ -131,6 +134,17 @@ export function FieldPropertiesPanel({
           </Button>
         </div>
       )}
+
+      <div className={styles.propsFooter}>
+        {canEdit && (
+          <Button variant="secondary" onClick={onCancel}>
+            {t("common.cancel")}
+          </Button>
+        )}
+        <Button variant="primary" onClick={onClose}>
+          {canEdit ? t("common.accept") : t("common.close")}
+        </Button>
+      </div>
     </aside>
   );
 }

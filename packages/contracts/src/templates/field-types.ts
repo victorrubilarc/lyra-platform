@@ -481,6 +481,13 @@ export const textFieldConfigSchema = z
     /** Formato semántico (Ola 1): rut/email/phone/url. Validado por `isValidTextFormat`. */
     format: z.enum(TEXT_FORMATS).optional(),
     /**
+     * Máscara de entrada (formateo en vivo, paso B): patrón con `#`=dígito, `A`=letra,
+     * `*`=alfanumérico; el resto son literales (p. ej. `OT-#####`). Solo formatea la
+     * presentación al teclear; el valor persistido es el texto ya enmascarado. Si hay
+     * `format` semántico (RUT/correo/…), este manda y la máscara se ignora.
+     */
+    mask: z.string().trim().max(40).optional(),
+    /**
      * Escáner QR/código de barras (Ola 3): habilita un botón de captura por cámara
      * que decodifica un código client-side y rellena el valor. NO es un archivo (sin
      * storage): el código queda como el texto del campo. Validación = la del TEXT.

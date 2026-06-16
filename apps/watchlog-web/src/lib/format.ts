@@ -108,3 +108,46 @@ export function formatRut(value: string): string {
 export function formatPercent(value: number, opts?: Intl.NumberFormatOptions): string {
   return new Intl.NumberFormat(locale(), { style: "unit", unit: "percent", unitDisplay: "narrow", ...opts }).format(value);
 }
+
+/**
+ * RUT formateado MIENTRAS se teclea (puntos de miles + guion del DV) de forma
+ * incremental: "123456785" ⇒ "12.345.678-5", "12" ⇒ "1-2". Solo conserva dígitos
+ * y K; el último caracter es el dígito verificador. Pensado para `onChange` (el
+ * caret queda al final, que es como se teclea un RUT). Validez = `isValidRut`.
+ */
+export function formatRutLive(raw: string): string {
+  const clean = raw.replace(/[^0-9kK]/g, "").toUpperCase();
+  if (clean.length <= 1) return clean;
+  const body = clean.slice(0, -1);
+  const dv = clean.slice(-1);
+  const grouped = body.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return `${grouped}-${dv}`;
+}
+
+/**
+ * Aplica una MÁSCARA de entrada a un texto. Tokens: `#` = dígito, `A` = letra,
+ * `*` = alfanumérico; cualquier otro caracter del patrón es un LITERAL que se
+ * inserta automáticamente (p. ej. el guion de "OT-#####"). Se detiene cuando se
+ * acaban los caracteres tecleados; los que no calzan con el token se ignoran.
+ * Ej.: applyMask("OT-#####", "04934") ⇒ "OT-04934".
+ */
+export function applyMask(mask: string, raw: string): string {
+  let out = "";
+  let mi = 0;
+  for (const c of raw) {
+    // Inserta los literales del patrón hasta el próximo token de entrada.
+    while (mi < mask.length && !"#A*".includes(mask[mi]!)) {
+      out += mask[mi]!;
+      mi++;
+    }
+    if (mi >= mask.length) break;
+    const tok = mask[mi]!;
+    const ok = tok === "#" ? /\d/.test(c) : tok === "A" ? /[a-zA-Z]/.test(c) : /[a-zA-Z0-9]/.test(c);
+    if (ok) {
+      out += c;
+      mi++;
+    }
+    // si el caracter no calza el token (p. ej. tecleó un literal ya insertado), se ignora
+  }
+  return out;
+}

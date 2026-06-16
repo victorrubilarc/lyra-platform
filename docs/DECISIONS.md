@@ -4,6 +4,24 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-15 · Form Builder: formateo en vivo, paleta de elementos docked y modal "Ver más"
+
+Continuación del pulido del builder (QA del dueño). **(A) Formateo en vivo:** RUT formatea **mientras se teclea** (no al blur)
+porque el dueño lo pidió así; número/moneda/porcentaje se editan en plano y se formatean **al desenfocar** (evita los saltos de
+cursor de formatear-mientras-tecleas-números); el símbolo de moneda lo da el sufijo (no se duplica); un número simple solo
+agrupa miles si el diseñador fijó `decimals` (un año/folio no se agrupa). **Máscara genérica** (`config.mask` aditivo en TEXT,
+`applyMask`): `#/A/*` + literales; si hay `format` semántico, manda él. **(#4) La paleta de elementos pasó a panel DOCKED a la
+izquierda** (bajo "Diseño") con buscador, reemplazando el popover de la barra; al agregar, el lienzo hace **scroll hasta el
+campo creado** (`scrollToUid`). *Motivo:* el dueño quería la paleta siempre visible y que el editor lo llevara al elemento
+nuevo. **(#5) Modal "Ver más"** con **demo EN VIVO** (reusa `FieldControl`, el mismo render del llenado) + descripción + caso de
+uso + ejemplo; contenido en `field-info.ts` (resumen del FORM_GUIDE), no en i18n, para mantenerlo en un solo lugar editable.
+**Nomenclatura:** se adopta **"elemento"** en la UI (en vez de "objeto") por ser más claro para el usuario no técnico (el doc
+técnico FORM_GUIDE conserva "objeto"). Sin permisos nuevos, sin migración (solo `mask` aditivo en config jsonb). Contracts 239 ·
+API 234. **Diferido (BACKLOG):** máscara aplicada también al valor escaneado por QR; placeholder de ejemplo precargado en la
+demo del modal; homologar "elemento" en el FORM_GUIDE si se quiere.
+
+---
+
 ### 2026-06-15 · Pulidos de UX del Form Builder (mín/máx caract. + contador, hover de info, footer del drawer, fix Enter)
 
 QA en vivo del dueño sobre el builder. Decisiones: **(1)** El contador de caracteres y los inputs Mín./Máx. se exponen en
