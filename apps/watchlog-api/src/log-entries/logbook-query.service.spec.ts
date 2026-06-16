@@ -166,8 +166,11 @@ function makeServices(prismaOver: Record<string, unknown> = {}, scopeOver: Parti
     removePrefix: vi.fn().mockResolvedValue(undefined),
     presignedGetUrl: vi.fn().mockResolvedValue("https://minio.local/x"),
   } as unknown as import("../storage/storage.service").StorageService;
+  const notifications = {
+    emit: vi.fn().mockResolvedValue(undefined),
+  } as unknown as import("../notifications/notification-emitter.service").NotificationEmitterService;
 
-  const entries = new LogEntriesService(prisma, audit, scope, shiftResolver, fiscalResolver, reauth, enc, periods, permissions, settings, storage);
+  const entries = new LogEntriesService(prisma, audit, scope, shiftResolver, fiscalResolver, reauth, enc, periods, permissions, settings, storage, notifications);
   const logbook = new LogbookQueryService(prisma, scope, audit, enc, entries, shiftResolver);
   return { logbook, entries, prisma, audit, scope, shiftResolver };
 }

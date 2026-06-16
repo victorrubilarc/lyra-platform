@@ -10,7 +10,7 @@
 > funcionalidades existentes** aunque su detalle aún esté por redactar (✍️): así nada se
 > olvida; el backfill de lo ya construido se llena de a poco (incremental).
 >
-> Última actualización: **2026-06-14**.
+> Última actualización: **2026-06-16**.
 
 ## Convención de cada sección
 Cada funcionalidad se documenta con estas cuatro partes fijas:
@@ -102,6 +102,11 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 ### 13. Rondas  [Planificador · Operador]
 - ✅ **Programación de rondas** (horario por turno/intervalo/calendario + rol responsable) (§ Rondas ▸ Programación de rondas)
 - ✅ **Mis rondas** (worklist del operador: iniciar/continuar/omitir lo que te toca) (§ Rondas ▸ Mis rondas)
+
+### 14. Notificaciones  [Admin · todos]
+- ✅ **Avisos por correo** (qué se avisa: ronda vencida, SLA, transición, firma pendiente) (§ Notificaciones)
+- ✅ **Mis notificaciones** (activar/desactivar avisos propios) (§ Notificaciones ▸ Mis preferencias)
+- ✅ **Plantillas de mensaje** y **correo saliente** (§ Notificaciones ▸ Plantillas / Correo saliente) [Admin]
 
 ---
 
@@ -488,3 +493,46 @@ aplica, se firman por separado — la sección es la unidad de permiso, llenado 
 - Los **obligatorios** se exigen al **completar** la sección, respetando la lógica condicional.
 - El diseño viaja en una **versión inmutable** al publicar; las entradas en curso siguen con la versión
   con que nacieron.
+
+---
+
+## Notificaciones  [Admin · todos]
+
+**Para qué sirve.** Avisa por **correo electrónico** cuando pasa algo que requiere tu
+atención, sin que tengas que estar mirando la pantalla. Hoy avisa de cuatro cosas:
+una **ronda vencida** (no se inició a tiempo), un **SLA incumplido** (una entrada lleva
+demasiado en un estado del flujo), una **transición de flujo** (una entrada avanzó y te
+toca actuar) y una **firma pendiente** (una entrada espera tu firma electrónica). Solo
+correo (no SMS ni WhatsApp). Es la base sobre la que se construirán los avisos de
+incidencias.
+
+**Cómo se usa.**
+- **Mis preferencias** (todos, desde el menú de tu perfil ▸ «Mis notificaciones», o la
+  pestaña *Mis preferencias* en Notificaciones): un interruptor por tipo de aviso para
+  **activarlo o silenciarlo**. Por defecto recibes todos los que te corresponden.
+- **Correo saliente** (Admin): la **bandeja de salida** lista cada correo que el sistema
+  envió o intentó enviar — a quién, qué evento, asunto, fecha y **estado** (Enviado /
+  Pendiente / Fallido / Suprimido). Puedes **filtrar** por estado o buscar, **abrir** un
+  correo para ver su contenido tal cual salió, y **reintentar** uno que falló.
+- **Plantillas** (Admin): edita el **asunto y el cuerpo** de cada aviso. Los textos usan
+  **variables** entre llaves (p. ej. `{{entry.folio}}`, `{{schedule.name}}`): haz clic en
+  una variable disponible para insertarla. Solo se permiten las variables propias de ese
+  evento; si usas una que no corresponde, el sistema te lo avisa al guardar.
+
+**Quién puede.** **Cualquier usuario** gestiona **sus propias** preferencias (no requiere
+permiso). Para **administrar plantillas** se necesita el permiso *administrar plantillas de
+notificación*; para **ver el correo saliente**, el permiso *ver correo saliente*. Un aviso
+**solo llega a quien tiene acceso** al registro o la ronda en cuestión: nunca se notifica
+algo que el destinatario no podría ver en la aplicación.
+
+**Importante.**
+- Los avisos de **ronda vencida** van al **rol responsable** del horario (no a un equipo;
+  un equipo es un activo, no personas). Si el horario no tiene rol responsable, el aviso por
+  correo solo llega a quienes se **suscribieron** explícitamente (la ronda igual aparece en
+  «Mis rondas» de todos los del área).
+- Si el servidor de correo está caído, **nada se pierde**: los correos quedan en la bandeja
+  como *Pendiente* o *Fallido* y se **reintentan** automáticamente.
+- No se duplican: un mismo suceso genera **un solo correo por persona**, aunque el sistema
+  lo revise varias veces.
+- El **resumen agrupado (digest)**, la **gestión de suscripciones desde la pantalla** y los
+  **recordatorios escalonados** están planificados pero aún no disponibles.

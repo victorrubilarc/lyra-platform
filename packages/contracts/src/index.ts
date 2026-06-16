@@ -56,3 +56,8 @@ export * from "./saved-views/saved-views.js";
 
 // Programación de rondas: horarios + ocurrencias (Fase 2.3)
 export * from "./schedules/schedules.js";
+
+// Notificaciones: motor de avisos por correo (Bloque N)
+export * from "./notifications/events.js";
+export * from "./notifications/render.js";
+export * from "./notifications/notifications.js";

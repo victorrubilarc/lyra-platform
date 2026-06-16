@@ -36,27 +36,27 @@ enum MfaMode {
 }
 
 model User {
-  id           String     @id @default(cuid())
-  email        String     @unique // siempre normalizado a minúsculas
-  displayName  String
+  id                  String     @id @default(cuid())
+  email               String     @unique // siempre normalizado a minúsculas
+  displayName         String
   // Hash Argon2id. Nullable para usuarios solo-OIDC a futuro (sin password local).
-  passwordHash String?
-  status       UserStatus @default(ACTIVE)
-  mfaEnabled   Boolean    @default(false)
+  passwordHash        String?
+  status              UserStatus @default(ACTIVE)
+  mfaEnabled          Boolean    @default(false)
   // Obliga a cambiar la contraseña antes de operar (admin de arranque, reset admin).
-  forcePasswordChange Boolean @default(false)
+  forcePasswordChange Boolean    @default(false)
   // Lockout por fuerza bruta: contador persistente + bloqueo temporal. Redis
   // se usa solo como acelerador opcional de rate-limit, no como fuente de verdad.
-  failedLoginCount Int      @default(0)
-  lockedUntil      DateTime?
+  failedLoginCount    Int        @default(0)
+  lockedUntil         DateTime?
   // Throttle del SEGUNDO factor (TOTP/recovery), separado del lockout de
   // contraseña: una contraseña correcta NO debe reiniciar este contador
   // (NIST 800-63B §5.2.2 / OWASP ASVS §2.2.1).
-  mfaFailedCount   Int       @default(0)
-  mfaLockedUntil   DateTime?
-  lastLoginAt      DateTime?
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  mfaFailedCount      Int        @default(0)
+  mfaLockedUntil      DateTime?
+  lastLoginAt         DateTime?
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
 
   roles           UserRole[]
   scopes          Scope[]
@@ -104,12 +104,12 @@ model Role {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  users       UserRole[]
-  permissions RolePermission[]
-  scopes      Scope[]
-  templateScopes       TemplateScope[]
-  templateSectionRoles TemplateSectionRole[]
-  templateFieldRoles   TemplateFieldRole[]
+  users                   UserRole[]
+  permissions             RolePermission[]
+  scopes                  Scope[]
+  templateScopes          TemplateScope[]
+  templateSectionRoles    TemplateSectionRole[]
+  templateFieldRoles      TemplateFieldRole[]
   workflowTransitionRoles WorkflowTransitionRole[]
   responsibleSchedules    LogSchedule[]
 }
@@ -177,7 +177,7 @@ model Scope {
 // sus roles) significa "sin restricción de plantilla" (ve todas). Set plano: no
 // hay jerarquía de plantillas (sin includeDescendants).
 model TemplateScope {
-  id         String @id @default(cuid())
+  id         String  @id @default(cuid())
   userId     String?
   roleId     String?
   templateId String
@@ -219,14 +219,14 @@ model TemplateNodeAssignment {
 // ===========================================================================
 
 model Session {
-  id        String    @id @default(cuid())
-  userId    String
-  createdAt DateTime  @default(now())
-  expiresAt DateTime
-  lastSeenAt DateTime @default(now())
-  ip        String?
-  userAgent String?
-  revokedAt DateTime?
+  id         String    @id @default(cuid())
+  userId     String
+  createdAt  DateTime  @default(now())
+  expiresAt  DateTime
+  lastSeenAt DateTime  @default(now())
+  ip         String?
+  userAgent  String?
+  revokedAt  DateTime?
 
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   refreshTokens RefreshToken[]
@@ -249,10 +249,10 @@ model RefreshToken {
   revokedAt    DateTime?
   replacedById String?   @unique
 
-  session     Session       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  replacedBy  RefreshToken? @relation("TokenRotation", fields: [replacedById], references: [id])
-  replaces    RefreshToken? @relation("TokenRotation")
+  session    Session       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  replacedBy RefreshToken? @relation("TokenRotation", fields: [replacedById], references: [id])
+  replaces   RefreshToken? @relation("TokenRotation")
 
   @@index([userId])
   @@index([familyId])
@@ -260,14 +260,14 @@ model RefreshToken {
 }
 
 model MfaSecret {
-  id            String    @id @default(cuid())
-  userId        String    @unique
+  id          String    @id @default(cuid())
+  userId      String    @unique
   // Secreto TOTP cifrado en reposo (AES-256-GCM con APP_ENC_KEY).
-  secret        String
-  confirmedAt   DateTime?
-  createdAt     DateTime  @default(now())
+  secret      String
+  confirmedAt DateTime?
+  createdAt   DateTime  @default(now())
 
-  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   recoveryCodes MfaRecoveryCode[]
 }
 
@@ -338,42 +338,42 @@ model OrgLevel {
 }
 
 model OrgNode {
-  id           String    @id @default(cuid())
-  name         String
-  code         String?
+  id                    String    @id @default(cuid())
+  name                  String
+  code                  String?
   /// Descripción de uso o propósito del nodo (planta, área, unidad, etc.)
-  description  String?
+  description           String?
   /// Orden del nodo en informes/reportes, relativo a sus hermanos (asc).
-  reportOrder  Int       @default(0)
+  reportOrder           Int       @default(0)
   /// Código de identificación en sistemas externos (ERP, CMMS, SCADA, etc.)
-  externalCode String?
+  externalCode          String?
   // Calendario operacional asignado directamente a este nodo (Fase 2.3.0). Null =
   // hereda del ancestro más cercano que tenga uno, o el calendario por defecto.
   operationalCalendarId String?
   // Calendario FISCAL asignado directamente a este nodo (Fase 2.7.1.1). Null =
   // hereda del ancestro más cercano que tenga uno, o el calendario fiscal por defecto.
-  fiscalCalendarId String?
-  parentId     String?
-  levelId      String
+  fiscalCalendarId      String?
+  parentId              String?
+  levelId               String
   // Ruta materializada de ancestros incluyéndose: "/<id>/<id>/.../". Permite
   // consultar descendientes con `path LIKE '<prefijo>%'` en una sola query.
-  path         String    @default("")
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  deletedAt    DateTime? // borrado lógico
+  path                  String    @default("")
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  deletedAt             DateTime? // borrado lógico
 
-  level     OrgLevel  @relation(fields: [levelId], references: [id])
-  parent    OrgNode?  @relation("OrgHierarchy", fields: [parentId], references: [id])
-  children  OrgNode[] @relation("OrgHierarchy")
-  scopes    Scope[]
-  equipment Equipment[]
-  externalRefs ExternalReference[]
-  templates Template[]
+  level                   OrgLevel                 @relation(fields: [levelId], references: [id])
+  parent                  OrgNode?                 @relation("OrgHierarchy", fields: [parentId], references: [id])
+  children                OrgNode[]                @relation("OrgHierarchy")
+  scopes                  Scope[]
+  equipment               Equipment[]
+  externalRefs            ExternalReference[]
+  templates               Template[]
   templateNodeAssignments TemplateNodeAssignment[]
-  logEntries LogEntry[]
-  schedules  LogSchedule[]
-  operationalCalendar OperationalCalendar? @relation(fields: [operationalCalendarId], references: [id], onDelete: SetNull)
-  fiscalCalendar      FiscalCalendar?      @relation(fields: [fiscalCalendarId], references: [id], onDelete: SetNull)
+  logEntries              LogEntry[]
+  schedules               LogSchedule[]
+  operationalCalendar     OperationalCalendar?     @relation(fields: [operationalCalendarId], references: [id], onDelete: SetNull)
+  fiscalCalendar          FiscalCalendar?          @relation(fields: [fiscalCalendarId], references: [id], onDelete: SetNull)
 
   @@index([parentId])
   @@index([levelId])
@@ -627,14 +627,14 @@ enum EquipmentMode {
 }
 
 model Template {
-  id               String         @id @default(cuid())
-  name             String
-  description      String?
+  id                String            @id @default(cuid())
+  name              String
+  description       String?
   // Ancla en la estructura (null = global). La visibilidad se filtra por scope ABAC.
-  orgNodeId        String?
-  status           TemplateStatus @default(DRAFT)
+  orgNodeId         String?
+  status            TemplateStatus    @default(DRAFT)
   // Versión publicada "viva". Null mientras solo exista borrador.
-  currentVersionId String?        @unique
+  currentVersionId  String?           @unique
   // --- Ventana de edición (Fase 2.7.2) — GOBERNANZA VIVA en el contenedor -----
   // mutable (patrón SAP OB52 / Odoo lock dates): cambiarla aplica de inmediato a
   // todas las entradas, sin republicar la versión. null = hereda SystemSettings.
@@ -644,26 +644,26 @@ model Template {
   // --- Modo de equipo (Fase 2.8.0.2) — GOBERNANZA del objeto de referencia EAM ----
   // Vive en el contenedor MUTABLE (gobernanza viva, sin republicar). Default OPTIONAL
   // = preserva el comportamiento contextual de 2.8.0.1 para plantillas existentes.
-  equipmentMode     EquipmentMode  @default(OPTIONAL)
+  equipmentMode     EquipmentMode     @default(OPTIONAL)
   // --- Campos de resumen en la grilla de Bitácoras (Fase 2.8.1a) — GOBERNANZA VIVA ---
   // Pool ORDENADO de `key` de campos candidatos a mostrarse como "Resumen" en /bitacoras
   // ("el diseñador ofrece, el usuario dispone"). Keyed por el `key` ESTABLE del campo
   // (el mismo que usa LogEntryValue.fieldKey), no por la versión inmutable: cambiarlo
   // aplica en vivo a todas las entradas sin republicar (PATCH "Guardar configuración").
   // Tope 6 (validado en contrato/backend). Key huérfano (campo eliminado) = se ignora.
-  gridFieldKeys     String[]       @default([])
+  gridFieldKeys     String[]          @default([])
   // Autoría (referencia blanda, sin FK: el usuario pudo borrarse — igual que AuditLog).
-  createdById      String?
-  updatedById      String?
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
-  deletedAt        DateTime? // borrado lógico
+  createdById       String?
+  updatedById       String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  deletedAt         DateTime? // borrado lógico
 
-  orgNode        OrgNode?          @relation(fields: [orgNodeId], references: [id], onDelete: SetNull)
-  versions       TemplateVersion[] @relation("TemplateVersions")
-  currentVersion TemplateVersion?  @relation("TemplateCurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
-  logEntries     LogEntry[]
-  templateScopes TemplateScope[]
+  orgNode         OrgNode?                 @relation(fields: [orgNodeId], references: [id], onDelete: SetNull)
+  versions        TemplateVersion[]        @relation("TemplateVersions")
+  currentVersion  TemplateVersion?         @relation("TemplateCurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  logEntries      LogEntry[]
+  templateScopes  TemplateScope[]
   nodeAssignments TemplateNodeAssignment[]
   schedules       LogSchedule[]
 
@@ -699,12 +699,12 @@ model TemplateVersion {
 
   publishedAt   DateTime?
   publishedById String?
-  createdAt     DateTime              @default(now())
-  updatedAt     DateTime              @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  template  Template          @relation("TemplateVersions", fields: [templateId], references: [id], onDelete: Cascade)
-  currentOf Template?         @relation("TemplateCurrentVersion")
-  sections  TemplateSection[]
+  template                  Template                   @relation("TemplateVersions", fields: [templateId], references: [id], onDelete: Cascade)
+  currentOf                 Template?                  @relation("TemplateCurrentVersion")
+  sections                  TemplateSection[]
   workflowDefinition        WorkflowDefinition?        @relation(fields: [workflowDefinitionId], references: [id], onDelete: Restrict)
   workflowDefinitionVersion WorkflowDefinitionVersion? @relation(fields: [workflowDefinitionVersionId], references: [id], onDelete: Restrict)
   logEntries                LogEntry[]
@@ -745,42 +745,42 @@ model TemplateSection {
 }
 
 model TemplateField {
-  id          String    @id @default(cuid())
-  sectionId   String
-  key         String
+  id           String             @id @default(cuid())
+  sectionId    String
+  key          String
   // Capa 1: presentación/widget.
-  type        FieldType
+  type         FieldType
   // Capa 2: tipo de dato (almacenamiento/validación/reporte). Derivado del `type`
   // en backend al guardar (fuente única deriveDataType en @lyra/contracts).
-  dataType    FieldDataType
+  dataType     FieldDataType
   // Capa 3: rol semántico opcional. null = ninguno. Solo EFFECTIVE_DATE actúa en 2.1.1.
   semanticRole FieldSemanticRole?
-  label       String
-  help        String?
-  required    Boolean   @default(false)
-  order       Int       @default(0)
+  label        String
+  help         String?
+  required     Boolean            @default(false)
+  order        Int                @default(0)
   // Config por tipo (unidad/umbral/opciones/regex…), validada por la unión Zod
   // de @lyra/contracts contra la versión. Patrón JSONB de DATA_MODEL.md.
-  config      Json      @default("{}")
+  config       Json               @default("{}")
   // Visibilidad condicional (estilo `showIf` del prototipo): { fieldKey, equals }.
-  visibleWhen Json?
+  visibleWhen  Json?
   // Campo FORMULADO (Req-7): { expression } (AST seguro de @lyra/contracts). Cuando
   // está presente el campo es READ-ONLY y su valor se DERIVA/estampa al guardar
   // (congela al sellar, GxP). null = campo tecleado normal. Versión INMUTABLE.
-  computed    Json?
+  computed     Json?
   // Ancho del campo en columnas de la grilla de 12 (Fase 2.1.3) — hint de
   // PRESENTACIÓN puro (SAP Fiori / ServiceNow / Bootstrap). 12 = ancho completo
   // (default, cero ruptura), 6 = media, 4 = tercio… Check 1..12 en la migración.
-  colSpan     Int       @default(12)
+  colSpan      Int                @default(12)
   // Geometría EXPLÍCITA en el lienzo de posicionamiento libre (Fase 2.1.7):
   // gridX = columna (0..11), gridY = fila lógica, gridH = alto en filas (el ANCHO
   // es colSpan = w). NULLABLE: null = plantilla legacy ⇒ el editor deriva la
   // geometría del orden + colSpan y la persiste al guardar. No vive en CSS.
-  gridX       Int?
-  gridY       Int?
-  gridH       Int?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  gridX        Int?
+  gridY        Int?
+  gridH        Int?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
 
   section TemplateSection     @relation(fields: [sectionId], references: [id], onDelete: Cascade)
   // Override por campo del permiso de la sección (cuando existe, manda él).
@@ -852,8 +852,8 @@ model WorkflowDefinition {
   updatedAt        DateTime       @updatedAt
   deletedAt        DateTime? // borrado lógico
 
-  versions       WorkflowDefinitionVersion[] @relation("WorkflowVersions")
-  currentVersion WorkflowDefinitionVersion?  @relation("WorkflowCurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  versions         WorkflowDefinitionVersion[] @relation("WorkflowVersions")
+  currentVersion   WorkflowDefinitionVersion?  @relation("WorkflowCurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
   // Versiones de plantilla que referencian este flujo (integridad histórica).
   templateVersions TemplateVersion[]
 
@@ -874,10 +874,10 @@ model WorkflowDefinitionVersion {
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
 
-  definition  WorkflowDefinition   @relation("WorkflowVersions", fields: [workflowDefinitionId], references: [id], onDelete: Cascade)
-  currentOf   WorkflowDefinition?  @relation("WorkflowCurrentVersion")
-  states      WorkflowState[]
-  transitions WorkflowTransition[]
+  definition       WorkflowDefinition   @relation("WorkflowVersions", fields: [workflowDefinitionId], references: [id], onDelete: Cascade)
+  currentOf        WorkflowDefinition?  @relation("WorkflowCurrentVersion")
+  states           WorkflowState[]
+  transitions      WorkflowTransition[]
   // Versiones de plantilla congeladas a esta versión de flujo (no se hard-borra).
   templateVersions TemplateVersion[]
 
@@ -905,9 +905,9 @@ model WorkflowState {
   // (horas hábiles = futuro). Check 1..525600 (365 d) en la migración.
   maxStayMinutes              Int?
 
-  version          WorkflowDefinitionVersion @relation(fields: [workflowDefinitionVersionId], references: [id], onDelete: Cascade)
-  outgoing         WorkflowTransition[]       @relation("TransitionFrom")
-  incoming         WorkflowTransition[]       @relation("TransitionTo")
+  version  WorkflowDefinitionVersion @relation(fields: [workflowDefinitionVersionId], references: [id], onDelete: Cascade)
+  outgoing WorkflowTransition[]      @relation("TransitionFrom")
+  incoming WorkflowTransition[]      @relation("TransitionTo")
 
   @@unique([workflowDefinitionVersionId, key])
   @@index([workflowDefinitionVersionId])
@@ -1020,25 +1020,25 @@ model ReferenceItem {
 // ===========================================================================
 
 model OperationalCalendar {
-  id          String     @id @default(cuid())
+  id                String    @id @default(cuid())
   // Clave estable y única (slug). Para seed idempotente y referencias.
-  key         String     @unique
-  name        String
-  description String?
+  key               String    @unique
+  name              String
+  description       String?
   // Zona horaria IANA (ej. "America/Santiago"). Todo se guarda en UTC.
-  timezone    String
+  timezone          String
   // Exactamente un calendario es el por defecto (single-tenant). Se mantiene en
   // transacción al marcar otro como default.
-  isDefault   Boolean    @default(false)
-  active      Boolean    @default(true)
+  isDefault         Boolean   @default(false)
+  active            Boolean   @default(true)
   // Turno cuyo inicio marca el arranque del día operacional (por código, no FK:
   // los turnos se reemplazan en bloque al guardar). Null = el día arranca a las 00:00.
   // El PERÍODO contable se desacopló a FiscalCalendar en 2.7.1.1 (este calendario
   // solo gobierna turnos + día operacional).
   dayStartShiftCode String?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  deletedAt   DateTime? // borrado lógico
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime? // borrado lógico
 
   shifts        OperationalShift[]
   assignedNodes OrgNode[]
@@ -1052,14 +1052,14 @@ model OperationalCalendar {
 // resolución por ruta que OperationalCalendar). El estándar pone el período a nivel
 // organización (SAP company code / Maximo Organization / NetSuite subsidiaria).
 model FiscalCalendar {
-  id          String  @id @default(cuid())
-  key         String  @unique
-  name        String
-  description String?
+  id                 String     @id @default(cuid())
+  key                String     @unique
+  name               String
+  description        String?
   // TZ IANA para ubicar "hoy" al generar / marcar el período Actual.
-  timezone    String
-  isDefault   Boolean @default(false)
-  active      Boolean @default(true)
+  timezone           String
+  isDefault          Boolean    @default(false)
+  active             Boolean    @default(true)
   // Definición del período contable.
   periodKind         PeriodKind @default(MONTH)
   periodAnchorDay    Int?       @default(1) // MONTH: día civil que abre el mes (1..28)
@@ -1067,10 +1067,10 @@ model FiscalCalendar {
   periodLengthDays   Int? // CUSTOM: largo del ciclo en días operacionales
   periodAnchorDate   String? // CUSTOM: fecha de referencia "YYYY-MM-DD"
   // Rigor estricto Maximo: una fecha SIN período generado se bloquea (opt-in).
-  requirePeriod Boolean @default(false)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  deletedAt   DateTime? // borrado lógico
+  requirePeriod      Boolean    @default(false)
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  deletedAt          DateTime? // borrado lógico
 
   assignedNodes OrgNode[]
   periods       OperationalPeriod[]
@@ -1093,19 +1093,19 @@ model OperationalPeriod {
   periodEnd        String
   status           PeriodStatus @default(OPEN)
   // Cierre vigente.
-  closedById   String?
-  closedAt     DateTime?
-  closeReason  String?
+  closedById       String?
+  closedAt         DateTime?
+  closeReason      String?
   // Bloqueo duro (LOCKED).
-  lockedById   String?
-  lockedAt     DateTime?
-  lockReason   String?
+  lockedById       String?
+  lockedAt         DateTime?
+  lockReason       String?
   // Última reapertura (si la hubo).
-  reopenedById String?
-  reopenedAt   DateTime?
-  reopenReason String?
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  reopenedById     String?
+  reopenedAt       DateTime?
+  reopenReason     String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 
   fiscalCalendar FiscalCalendar @relation(fields: [fiscalCalendarId], references: [id], onDelete: Cascade)
 
@@ -1116,12 +1116,12 @@ model OperationalPeriod {
 // Configuración del sistema (Fase 2.7.1.1 UX). Fila SINGLETON (id fijo "system").
 // Ajustes operativos globales del single-tenant; hoy: exigir MFA para gobernar períodos.
 model SystemSettings {
-  id                     String   @id @default("system")
+  id                           String           @id @default("system")
   // Re-autenticación MFA exigida POR ACCIÓN de gobernanza de período (configurable).
-  requireMfaPeriodClose  Boolean  @default(false)
-  requireMfaPeriodReopen Boolean  @default(false)
-  requireMfaPeriodLock   Boolean  @default(false)
-  requireMfaPeriodUnlock Boolean  @default(false)
+  requireMfaPeriodClose        Boolean          @default(false)
+  requireMfaPeriodReopen       Boolean          @default(false)
+  requireMfaPeriodLock         Boolean          @default(false)
+  requireMfaPeriodUnlock       Boolean          @default(false)
   // --- Ventana de edición GLOBAL (Fase 2.7.2) --------------------------------
   // Fallback para plantillas sin config propia. hours null = sin ventana
   // (comportamiento pre-2.7.2). El ancla siempre tiene valor (fin de la cadena).
@@ -1129,12 +1129,12 @@ model SystemSettings {
   editWindowMinutes            Int?
   // Exigir re-auth con MFA al editar FUERA de ventana (override privilegiado).
   requireMfaEditWindowOverride Boolean          @default(false)
-  updatedById            String?
-  updatedAt              DateTime @updatedAt
+  updatedById                  String?
+  updatedAt                    DateTime         @updatedAt
 }
 
 model OperationalShift {
-  id              String  @id @default(cuid())
+  id              String @id @default(cuid())
   calendarId      String
   // Clave estable del turno (A/B/C…), única dentro del calendario.
   code            String
@@ -1143,7 +1143,7 @@ model OperationalShift {
   startTime       String
   // Duración en minutos (1..1440). Resuelve el cruce de medianoche sin ambigüedad.
   durationMinutes Int
-  sortOrder       Int     @default(0)
+  sortOrder       Int    @default(0)
 
   calendar OperationalCalendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
 
@@ -1175,42 +1175,42 @@ enum RoundOccurrenceStatus {
 // viva: reprogramar/pausar no republica la versión controlada). Apunta a UN nodo
 // (multi-nodo/fan-out por equipo = follow-up).
 model LogSchedule {
-  id          String         @id @default(cuid())
-  name        String?
-  templateId  String
-  orgNodeId   String
+  id                   String         @id @default(cuid())
+  name                 String?
+  templateId           String
+  orgNodeId            String
   // Equipo fijado opcionalmente (EAM). Null = sin equipo / lo elige el operador al
   // iniciar (si la plantilla exige equipo).
-  equipmentId String?
+  equipmentId          String?
   // Rol responsable del worklist "Mis rondas" (2.3.1): el horario es del PUESTO, no de
   // una persona (work center/responsible role de SAP PM/Maximo). Null = sin responsable
   // ⇒ fallback nodo+turno (visible a todos los que alcanzan el nodo). Se lee EN VIVO:
   // reasignar el rol re-enruta las ocurrencias pendientes (no se denormaliza al slot).
-  responsibleRoleId String?
-  recurrenceKind RecurrenceKind
+  responsibleRoleId    String?
+  recurrenceKind       RecurrenceKind
   // Config validada por @lyra/contracts según el kind (shiftCodes / everyMinutes+anchor
   // / times+weekdays+daysOfMonth).
-  recurrenceConfig Json
+  recurrenceConfig     Json
   // Minutos tras scheduledFor dentro de los que la ronda debe completarse (= dueAt).
-  dueWindowMinutes Int
+  dueWindowMinutes     Int
   // Cuántos días hacia adelante materializa el generador idempotente.
-  horizonDays Int @default(2)
-  active      Boolean @default(true)
+  horizonDays          Int            @default(2)
+  active               Boolean        @default(true)
   // Marca de agua: hasta qué instante (UTC) se materializaron ocurrencias. El
   // generador parte de aquí para ser idempotente y barato.
   lastGeneratedThrough DateTime?
   // Autoría (referencia blanda, sin FK dura; igual que Template/AuditLog).
-  createdById String?
-  updatedById String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  deletedAt   DateTime? // borrado lógico
+  createdById          String?
+  updatedById          String?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+  deletedAt            DateTime? // borrado lógico
 
-  template    Template   @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  orgNode     OrgNode    @relation(fields: [orgNodeId], references: [id], onDelete: Cascade)
-  equipment   Equipment? @relation(fields: [equipmentId], references: [id], onDelete: SetNull)
-  responsibleRole Role?  @relation(fields: [responsibleRoleId], references: [id], onDelete: SetNull)
-  occurrences RoundOccurrence[]
+  template        Template          @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  orgNode         OrgNode           @relation(fields: [orgNodeId], references: [id], onDelete: Cascade)
+  equipment       Equipment?        @relation(fields: [equipmentId], references: [id], onDelete: SetNull)
+  responsibleRole Role?             @relation(fields: [responsibleRoleId], references: [id], onDelete: SetNull)
+  occurrences     RoundOccurrence[]
 
   @@index([templateId])
   @@index([orgNodeId])
@@ -1221,29 +1221,29 @@ model LogSchedule {
 // Ocurrencia materializada de un horario: un "slot" liviano (NO es una entrada). El
 // LogEntry se crea al iniciar la ronda y queda enlazado por logEntryId (@unique).
 model RoundOccurrence {
-  id         String  @id @default(cuid())
-  scheduleId String
+  id              String                @id @default(cuid())
+  scheduleId      String
   // Denormalizados del horario (filtro/listado sin join; el horario es mutable pero
   // estos no cambian para una ocurrencia ya generada).
-  templateId String
-  orgNodeId  String
-  equipmentId String?
+  templateId      String
+  orgNodeId       String
+  equipmentId     String?
   // Anclaje y plazo (UTC). vencida = status PENDING && dueAt < now().
-  scheduledFor DateTime
-  dueAt        DateTime
+  scheduledFor    DateTime
+  dueAt           DateTime
   // Dimensiones operacionales estampadas al generar (ShiftResolver del nodo).
   shiftCode       String?
   operationalDate String?
   periodKey       String?
-  status     RoundOccurrenceStatus @default(PENDING)
+  status          RoundOccurrenceStatus @default(PENDING)
   // Entrada que cumplió la ronda (la ocurrencia POSEE el enlace; LogEntry tiene la
   // relación inversa). SetNull si la entrada se borra en duro.
-  logEntryId String? @unique
+  logEntryId      String?               @unique
   // Omisión (SKIPPED): quién/cuándo/por qué (auditado además en AuditLog).
-  skippedById String?
-  skippedAt   DateTime?
-  skipReason  String?
-  generatedAt DateTime @default(now())
+  skippedById     String?
+  skippedAt       DateTime?
+  skipReason      String?
+  generatedAt     DateTime              @default(now())
 
   schedule LogSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
   logEntry LogEntry?   @relation(fields: [logEntryId], references: [id], onDelete: SetNull)
@@ -1411,25 +1411,25 @@ model LogEntry {
 // Sección INSTANCIADA: porta el ESTADO de ejecución que no se puede derivar de la
 // plantilla (completitud, autoría, firma, revisión de concurrencia).
 model LogEntrySection {
-  id          String               @id @default(cuid())
-  logEntryId  String
+  id                String               @id @default(cuid())
+  logEntryId        String
   // Clave estable de la sección dentro de la versión congelada.
-  sectionKey  String
-  state       LogEntrySectionState @default(PENDING)
-  filledById  String?
-  filledAt    DateTime?
+  sectionKey        String
+  state             LogEntrySectionState @default(PENDING)
+  filledById        String?
+  filledAt          DateTime?
   // Firma de completitud de la sección (Part 11), si la sección la exige.
   // Referencia blanda a LogEntrySignature.id (la firma es append-only y cuelga de
   // la entrada por logEntryId+context+sectionKey; este puntero es de conveniencia).
-  signatureId String?
+  signatureId       String?
   // ¿La definición congelada exige firma de completitud? ESTAMPADO al instanciar
   // (Fase 2.6) para que "firmas pendientes" sea un filtro SQL barato
   // (requiresSignature = true AND signatureId IS NULL) sin join a la definición.
-  requiresSignature Boolean @default(false)
+  requiresSignature Boolean              @default(false)
   // Revisión para la concurrencia optimista POR SECCIÓN (check-and-bump).
-  version     Int                  @default(0)
-  createdAt   DateTime             @default(now())
-  updatedAt   DateTime             @updatedAt
+  version           Int                  @default(0)
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
 
   logEntry LogEntry @relation(fields: [logEntryId], references: [id], onDelete: Cascade)
 
@@ -1448,19 +1448,19 @@ enum ThresholdBand {
 // Valor actual de un campo (1 fila por campo). El de un campo de referencia se
 // persiste como `code` estable, NO como label (dimensión de DW / FHIR Coding).
 model LogEntryValue {
-  id          String        @id @default(cuid())
-  logEntryId  String
+  id            String         @id @default(cuid())
+  logEntryId    String
   // Sección a la que pertenece el campo (para la concurrencia por sección).
-  sectionKey  String
-  fieldKey    String
+  sectionKey    String
+  fieldKey      String
   // Tipo de dato copiado (reportabilidad sin re-leer la versión congelada).
-  dataType    FieldDataType
+  dataType      FieldDataType
   // code / code[] / número / booleano / fecha ISO / etc. null = vacío.
-  value       Json?
+  value         Json?
   // Banda de umbral en que cayó el valor al guardarse (null = en rango / no aplica).
   thresholdBand ThresholdBand?
-  updatedById String?
-  updatedAt   DateTime      @updatedAt
+  updatedById   String?
+  updatedAt     DateTime       @updatedAt
 
   logEntry LogEntry @relation(fields: [logEntryId], references: [id], onDelete: Cascade)
 
@@ -1493,7 +1493,7 @@ model LogEntryFieldChange {
 // append-only: trazabilidad ALCOA+ de cómo avanzó el registro entre estados.
 // Las claves (from/to/transition) son las de la VERSIÓN CONGELADA del flujo.
 model LogEntryTransition {
-  id                          String  @id @default(cuid())
+  id                          String   @id @default(cuid())
   logEntryId                  String
   // Versión de flujo congelada bajo la que se ejecutó (integridad histórica).
   workflowDefinitionVersionId String
@@ -1586,4 +1586,134 @@ model SavedView {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, module])
+}
+
+// === Notificaciones (Bloque N) ===============================================
+// Motor de avisos por correo. Cinco entidades, todas con referencias BLANDAS
+// (String indexado, sin FK dura — patrón AuditLog) para que la migración sea
+// 100% ADITIVA: no toca User/Role ni ninguna tabla existente. El catálogo de
+// EVENTOS vive en código (@lyra/contracts NOTIFICATION_EVENTS), no en BD.
+
+enum NotificationChannel {
+  EMAIL
+}
+
+enum NotificationEventStatus {
+  PENDING
+  DISPATCHED
+  FAILED
+}
+
+enum NotificationOutboxStatus {
+  PENDING
+  SENT
+  FAILED
+  SUPPRESSED
+}
+
+enum NotificationMode {
+  IMMEDIATE
+  DIGEST
+  OFF
+}
+
+// Cola transaccional (etapa 1 del transactional outbox): el cambio de dominio (o
+// el sweeper) inserta un evento MÍNIMO (ids en payload) en su MISMA transacción;
+// el dispatcher resuelve destinatarios + renderiza FUERA de la tx (etapa 2). Un
+// crash entre commit y envío no pierde el evento.
+model NotificationEvent {
+  id           String                  @id @default(cuid())
+  eventKey     String
+  // IDs y datos crudos para resolver destinatarios + contexto de render.
+  payload      Json
+  // Dedup de eventos DERIVED (una ronda vencida = UN evento aunque el sweeper la
+  // re-vea cada tick). Null en tx-driven (cada disparo es legítimo; NULLs distintos).
+  dedupeKey    String?                 @unique
+  status       NotificationEventStatus @default(PENDING)
+  attempts     Int                     @default(0)
+  lastError    String?
+  createdAt    DateTime                @default(now())
+  dispatchedAt DateTime?
+
+  @@index([status, createdAt])
+}
+
+// Bandeja de salida (etapa 2) = registro de cada mensaje a CADA destinatario +
+// la "pantalla de correo saliente" (Req-1/Req-5). El cuerpo renderizado se
+// persiste (snapshot) para auditoría.
+model NotificationOutbox {
+  id                String                   @id @default(cuid())
+  eventId           String?
+  eventKey          String
+  channel           NotificationChannel      @default(EMAIL)
+  recipientUserId   String?
+  recipientEmail    String
+  subject           String
+  bodyText          String
+  bodyHtml          String
+  status            NotificationOutboxStatus @default(PENDING)
+  attempts          Int                      @default(0)
+  lastError         String?
+  nextAttemptAt     DateTime?
+  // Dedup por destinatario: p. ej. round.overdue|{occurrenceId}|{userId}.
+  dedupeKey         String?                  @unique
+  relatedEntityType String?
+  relatedEntityId   String?
+  createdAt         DateTime                 @default(now())
+  sentAt            DateTime?
+
+  @@index([status, nextAttemptAt])
+  @@index([eventKey, createdAt])
+  @@index([recipientUserId])
+}
+
+// Plantilla de mensaje (gobernanza viva). Una por (evento, locale, canal). Las de
+// sistema se siembran por defecto; el admin las edita pero no las borra.
+model NotificationTemplate {
+  id          String              @id @default(cuid())
+  eventKey    String
+  locale      String
+  channel     NotificationChannel @default(EMAIL)
+  subject     String
+  bodyText    String
+  bodyHtml    String
+  active      Boolean             @default(true)
+  isSystem    Boolean             @default(false)
+  updatedById String?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@unique([eventKey, locale, channel])
+}
+
+// Suscripción explícita (watcher): usuario XOR rol se suscribe a un evento, con
+// filtro opcional por nodo (incl. descendientes) / plantilla.
+model NotificationSubscription {
+  id                 String   @id @default(cuid())
+  eventKey           String
+  subjectUserId      String?
+  subjectRoleId      String?
+  orgNodeId          String?
+  includeDescendants Boolean  @default(false)
+  templateId         String?
+  enabled            Boolean  @default(true)
+  createdById        String?
+  createdAt          DateTime @default(now())
+
+  @@index([eventKey])
+  @@index([subjectUserId])
+  @@index([subjectRoleId])
+}
+
+// Preferencia personal (ownership): modo de entrega de un evento×canal por usuario.
+model NotificationPreference {
+  id        String              @id @default(cuid())
+  userId    String
+  eventKey  String
+  channel   NotificationChannel @default(EMAIL)
+  mode      NotificationMode    @default(IMMEDIATE)
+  updatedAt DateTime            @updatedAt
+
+  @@unique([userId, eventKey, channel])
+  @@index([userId])
 }

@@ -75,6 +75,7 @@ import { FiscalResolver } from "../fiscal-calendar/fiscal-resolver";
 import { OperationalPeriodService } from "../operational-periods/operational-periods.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { SettingsService } from "../settings/settings.service";
+import { NotificationEmitterService } from "../notifications/notification-emitter.service";
 
 /** Significado por defecto de la firma de completitud de sección (las secciones no
  * portan un campo de significado; las transiciones sí vía `signatureMeaning`). */
@@ -226,6 +227,7 @@ export class LogEntriesService {
     private readonly permissions: PermissionService,
     private readonly settings: SettingsService,
     private readonly storage: StorageService,
+    private readonly notifications: NotificationEmitterService,
   ) {}
 
   // --- Crear (abrir) una entrada ---------------------------------------------
@@ -1627,6 +1629,11 @@ export class LogEntriesService {
     const seal = !entry.sealedAt && fromState.isInitial ? await this.computeSeal(entry, version, valuesByKey) : null;
     // Reconciliación de status: terminal ⇒ SUBMITTED; si no, sigue DRAFT (trabajo en curso).
     const nextStatus = toState.isFinal ? "SUBMITTED" : "DRAFT";
+    // Notificaciones (Bloque N): ¿el estado destino tiene transiciones de salida que
+    // EXIGEN firma? ⇒ alguien debe firmar para avanzar (evento `signature.pending`).
+    const toStateNeedsSignature = wfVersion.transitions.some(
+      (t) => t.fromState.key === toState.key && t.requireSignature,
+    );
 
     await this.prisma.$transaction(async (tx) => {
       // Estampa los formulados recomputados ANTES de la firma/sellado (Req-7): el
@@ -1692,6 +1699,24 @@ export class LogEntriesService {
       // Ronda programada (2.3): la transición que SELLA cumple la ocurrencia ligada.
       if (seal) {
         await tx.roundOccurrence.updateMany({ where: { logEntryId: id, status: "PENDING" }, data: { status: "COMPLETED" } });
+      }
+
+      // Notificaciones (Bloque N) — ETAPA 1 del transactional outbox: se encola el
+      // evento MÍNIMO DENTRO de esta misma tx (atómico con el cambio de estado; un
+      // crash entre commit y envío no lo pierde). La resolución de destinatarios +
+      // render ocurren después, en el dispatcher. `dedupeKey` nulo: cada transición
+      // es un suceso legítimo distinto.
+      await this.notifications.emit(
+        "entry.transition",
+        { entryId: id, fromStateKey: fromState.key, toStateKey: toState.key, transitionKey: transition.key, actorId: userId },
+        { client: tx },
+      );
+      if (toStateNeedsSignature && !toState.isFinal) {
+        await this.notifications.emit(
+          "entry.signature.pending",
+          { entryId: id, stateKey: toState.key },
+          { client: tx },
+        );
       }
     });
 

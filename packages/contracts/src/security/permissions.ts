@@ -475,6 +475,36 @@ export const PERMISSION_CATALOG = [
     group: "schedules",
     description: "Ver y ejecutar las rondas propias (Mis rondas): iniciar, continuar y omitir ocurrencias.",
   },
+
+  // --- Notificaciones (Bloque N) ---
+  // El motor de avisos por correo. Administrar PLANTILLAS de mensaje y la CONFIG de
+  // eventos/suscripciones es de administrador; VER el correo saliente es una pantalla
+  // de auditoría operacional (Req-1/Req-5). Las preferencias PROPIAS no requieren
+  // permiso (dato personal, ownership — patrón SavedView).
+  {
+    key: "module:notifications:view",
+    dimension: "MODULE",
+    group: "notifications",
+    description: "Ver el módulo de notificaciones (plantillas, correo saliente, preferencias).",
+  },
+  {
+    key: "notiftemplate:manage",
+    dimension: "ACTION",
+    group: "notifications",
+    description: "Administrar las plantillas de mensaje de notificación (asunto y cuerpo por evento).",
+  },
+  {
+    key: "notification:view-outbox",
+    dimension: "ACTION",
+    group: "notifications",
+    description: "Ver la bandeja de correo saliente (registro de envíos: a quién, qué, cuándo, estado).",
+  },
+  {
+    key: "notification:admin",
+    dimension: "ACTION",
+    group: "notifications",
+    description: "Administrar suscripciones a eventos de notificación de usuarios y roles.",
+  },
 ] as const satisfies readonly PermissionDef[];
 
 /** Unión literal de todas las claves de permiso conocidas. */

@@ -18,7 +18,7 @@
 | **1** | Seguridad (auth + RBAC/ABAC 4D) · Estructura · Equipos · AuditLog | ✅ | UI de **alcance por nodo** en el árbol de Estructura · **reset por enlace** (variante B) · **federación/SCIM** v2 (diseñado, diferido) · campos de usuario SCIM-alineados. |
 | **2** | Plantillas / Form Builder + Bitácoras | 🔄 | Ver desglose 2.x abajo. |
 | **3** | Orígenes de datos (entrada SCADA/PI/OPC) + **API saliente** (Req-3) + **Webhooks** (Req-4) | ⬜ | Todo. Motor de integración inbound + API M2M por plantilla + webhooks firmados (HMAC, reintentos). |
-| **N** | **Notificaciones** (bloque transversal, SOLO mail) | ⬜ | Motor de notificaciones + plantillas de mensaje + resolución de destinatarios + pantalla de correo saliente (Req-1/Req-5). Fundacional para Fase 4. SMS/WhatsApp **fuera de alcance**. |
+| **N** | **Notificaciones** (bloque transversal, SOLO mail) | ✅ | `feat/notificaciones`: motor transactional-outbox + worker (`@nestjs/schedule`), 4 eventos (ronda vencida/SLA/transición/firma), plantillas configurables + render sin eval, resolución de destinatarios con ABAC, bandeja de salida (Req-1/5), preferencias propias. **Diferido:** digest, UI de suscripciones, escalamiento por tiers, fan-out por nodo del overdue sin rol, canal in-app/SMS. |
 | **4** | Motor de incidencias (kanban + workflow) | ⬜ | Todo. Aquí se cablean las **acciones de reglas** que abren incidencia (2.º corte del motor). |
 | **5** | Cambio de turno + IA (resumen de turno) | ⬜ | Todo. Interfaz `LlmProvider` abstracta. |
 | **6** | Base de conocimiento + Dashboard + **Asistente IA RAG** (Req-6) + insights | ⬜ | Todo. RAG con `pgvector` on-prem + ABAC en el recuperador. Predicción ML real = fase posterior. |

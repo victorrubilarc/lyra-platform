@@ -5,7 +5,13 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-16** (**Fase 2.3.1 — Worklist de rondas ✅** — `feat/rondas-worklist`: separa PLANIFICAR de
+> actualización: **2026-06-16** (**Bloque N — Notificaciones ✅** — `feat/notificaciones`: motor de avisos por CORREO premium,
+> transactional outbox de 2 etapas + worker `@nestjs/schedule` (1.ª infra de cron); 5 entidades aditivas (`NotificationEvent`/
+> `Outbox`/`Template`/`Subscription`/`Preference`); catálogo de eventos en código (4: ronda vencida/SLA/transición/firma) con
+> variables whitelisteadas + render sin eval; emisión IN-TX en `executeTransition`; resolución de destinatarios con ABAC; sweeper
+> que GENERA rondas antes de escanear vencidas; bandeja de salida (Req-1/5) + plantillas configurables + preferencias propias;
+> 4 permisos (cat. **67**); migración aditiva; seed de 4 plantillas. Contracts 255 · API 234 · smoke 17/17. **Siguiente: Fase 4 —
+> Incidencias.** Anterior: **Fase 2.3.1 — Worklist de rondas ✅** — `feat/rondas-worklist`: separa PLANIFICAR de
 > EJECUTAR. Permiso nuevo **`round:execute`** (cat. **63**) gatea ver+ejecutar "Mis rondas"; start/skip se mueven de
 > `schedule:manage` a `round:execute`. **`LogSchedule.responsibleRoleId?`** SINGLE nullable (FK Role SetNull) = rol responsable
 > del worklist, leído EN VIVO (reasignar re-enruta pendientes); `null` = fallback nodo+turno. `GET /schedules/my-rounds`
@@ -192,6 +198,7 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Builder: formateo en vivo + paleta de elementos + modal "Ver más"** (RUT al teclear · número/moneda/porcentaje miles+decimales `FormattedNumberInput` · máscara genérica `config.mask`/`applyMask` · «Decimales» expuesto · footer Aceptar/Cancelar en PROPIEDADES + snapshot · paleta DOCKED `FieldPalette` + scroll `scrollToUid` · modal `FieldInfoModal`+`field-info.ts` con demo en vivo · "objeto"→"elemento") | `feat/builder-formateo-paleta` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Fase 2.3 Programación de rondas** (`LogSchedule`+`RoundOccurrence` + enum `RoundOccurrenceStatus` + migración `…_add_round_scheduling`; `enumerateOccurrences` puro + config por kind + 2 permisos `schedule:view/manage`; módulo API `schedules/` [CRUD/generate/start/skip/occurrences/stats] + hook de cierre en `LogEntriesService` + `ShiftResolver.calendarForNode`; página `/rondas` + `ScheduleDrawer` + badge en `/bitacoras` + menú/i18n; contracts 249 · API 234 · smoke 21/21) | `feat/programacion-rondas` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Fase 2.3.1 Worklist de rondas (separar planificar/ejecutar)** (permiso `round:execute` [cat. 63] + `LogSchedule.responsibleRoleId?` [FK Role SetNull] + migración `…_add_schedule_responsible_role`; `GET /schedules/my-rounds`+`/stats` [responsabilidad EN VIVO por rol ∩ ABAC ∩ turno] + `role-options` + start/skip re-gateados; web `/mis-rondas` [MyRoundsPage] + `/rondas` relabel "Programación de rondas" [monitoreo read-only + selector de rol] + widget Inicio + badge→mis-rondas + nav/i18n; contracts 249 · API 234 · smoke `smoke-mis-rondas.py` 18/18 + `smoke-rondas.py` 21/21) | `feat/rondas-worklist` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
+| **Bloque N Notificaciones (motor de avisos por correo)** (5 entidades `Notification*` + 4 enums + migración `…_add_notifications` [aditiva]; catálogo `NOTIFICATION_EVENTS` [4] + render sin eval + 4 permisos [cat. **67**]; `@nestjs/schedule`; API `notifications/` [emitter in-tx en `executeTransition`, channel/EmailChannel, resolver ABAC, worker sweeper/dispatcher/sender con backoff, service CRUD+bandeja, `POST /run`]; sweeper GENERA rondas antes de escanear vencidas + SLA breaches; seed 4 plantillas; web `/notificaciones` [Correo saliente/Plantillas/Mis preferencias] + `/mis-notificaciones` + nav/topbar/i18n; contracts 255 · API 234 · smoke `smoke-notificaciones.py` 17/17) | `feat/notificaciones` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 
 **Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
@@ -281,6 +288,24 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
       celda · tabla ANIDADA · columnas de la matriz desde el calendario operacional en vivo (ShiftResolver) · pulido fino
       sticky/scroll/táctil en tablet.
 - [ ] **Ola 5 — origen de datos (Fase 3).** Lectura autocompletada desde tag SCADA/PI/OPC (modelar + stub).
+
+### Notificaciones (Bloque N) — deuda diferida (registrada 2026-06-16)
+- [ ] **Digest / batching** (resumen diario/horario por usuario). El modelo ya tiene `NotificationPreference.mode IMMEDIATE|DIGEST|OFF`;
+      el MVP solo entrega IMMEDIATE (DIGEST se trata como entrega inmediata). Falta la ventana de batch + render de resumen + su tick.
+- [ ] **UI de SUSCRIPCIONES** (watchers). El modelo `NotificationSubscription` + endpoints (`GET/POST/DELETE /notifications/subscriptions`,
+      `notification:admin`) + la resolución por suscripción YA existen y se honran; falta la pantalla (pestaña en `/notificaciones`).
+- [ ] **`round.overdue` sin rol responsable → fan-out por NODO para correo.** DECISIÓN CONSCIENTE del MVP: cuando `LogSchedule.responsibleRoleId`
+      es null, el correo se resuelve **solo por suscripciones** (no se hace fan-out automático a todos los que alcanzan el nodo, para evitar
+      tormentas de avisos). El worklist in-app SÍ muestra esas rondas a todos los que alcanzan el nodo. Si se quiere el fan-out por nodo en
+      correo, requiere un reverse-ABAC acotado (quién alcanza el nodo). **A confirmar con el dueño.**
+- [ ] **Escalamiento por TIERS** (recordatorio diario / a un superior si sigue vencida), estilo PagerDuty escalation policy. Hoy = 1 aviso por
+      ocurrencia/breach por destinatario (dedup).
+- [ ] **Smoke en vivo de `entry.transition` / `entry.sla.breached` / `entry.signature.pending`.** Los resolvers están typecheck+wired y comparten
+      el pipeline (dispatcher/sender/render/ABAC/dedup/opt-out) ya probado end-to-end vía `round.overdue` (smoke 17/17). Falta un smoke que
+      siembre una entrada + flujo + transición real y verifique el correo (necesita plantilla publicada con workflow + secciones completas).
+- [ ] **Canal in-app / SMS.** La interfaz `NotificationChannel` ya abstrae el canal (solo `EmailChannel` implementado); `NotificationOutbox.channel`
+      reserva el modelo. Implementar otros canales no toca el motor.
+- [ ] **Escala del worker.** Hoy lote por tick + `@nestjs/schedule`; a escala alta, mover a BullMQ tras la misma interfaz de canal (swap Fase 7).
 
 ### Transversal — Manual de uso (`docs/USER_GUIDE.md`)
 - [ ] **Backfill INCREMENTAL del manual de uso** (decidido 2026-06-14 con el dueño). Existe
@@ -1033,6 +1058,12 @@ implementación esperada:
 
 > Lo construido puede estar "verde en tests" pero no ejercido en condiciones reales.
 
+- [ ] **Notificaciones (Bloque N) — smoke VISUAL en navegador** (se verificó typecheck/lint/build + smoke API 17/17; falta el
+      clic). **`/notificaciones`** (gate `module:notifications:view`): pestaña **Correo saliente** (filtrar por estado/buscar,
+      abrir un correo → vista previa HTML en iframe, reintentar uno FAILED), **Plantillas** (elegir una, insertar variables con
+      los chips, editar asunto/cuerpos, guardar; intentar una variable no permitida → toast de error), **Mis preferencias**
+      (apagar/encender un evento). **`/mis-notificaciones`** desde el menú de perfil (todo usuario). Verificar claro+oscuro, 44px,
+      tokens Lyra. Generar correos reales: dejar una ronda vencer (o usar `POST /notifications/run`) y verlos en MAILPIT (`:8025`).
 - [ ] **Catálogo de objetos · Ola 4 (estructurados) — smoke VISUAL en navegador** (se verificó typecheck/lint/build +
       smoke API round-trip 22/22; falta el clic). Por cada objeto: agregarlo desde la paleta (categoría **Estructurados**),
       configurarlo en el builder (columnas: rótulo/tipo/obligatoria + opciones inline de un SELECT; minRows/maxRows; layout
