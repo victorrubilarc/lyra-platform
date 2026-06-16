@@ -463,7 +463,17 @@ export const PERMISSION_CATALOG = [
     key: "schedule:manage",
     dimension: "ACTION",
     group: "schedules",
-    description: "Crear, editar y eliminar horarios de rondas; generar, omitir e iniciar ocurrencias.",
+    description: "Crear, editar y eliminar horarios de rondas y generar ocurrencias (planificador).",
+  },
+  // Ejecutar una ronda (iniciar/continuar/omitir desde el worklist "Mis rondas") es
+  // distinto de PLANIFICARLA (schedule:manage): el operador ejecuta su lista de trabajo
+  // sin administrar horarios (patrón My Maintenance Tasks/Fiori · Start Center/Maximo).
+  // La instancia es la "ronda" (RoundOccurrence), por eso su propio namespace de recurso.
+  {
+    key: "round:execute",
+    dimension: "ACTION",
+    group: "schedules",
+    description: "Ver y ejecutar las rondas propias (Mis rondas): iniciar, continuar y omitir ocurrencias.",
   },
 ] as const satisfies readonly PermissionDef[];
 

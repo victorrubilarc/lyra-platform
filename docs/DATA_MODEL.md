@@ -292,8 +292,11 @@
   `RecurrenceKind` reusado: NONE/SHIFT/INTERVAL/CALENDAR), `recurrenceConfig` (Json, validado por `@lyra/contracts` según el
   kind: SHIFT `{shiftCodes?}` · INTERVAL `{everyMinutes,anchorTime?}` · CALENDAR `{times,weekdays?,daysOfMonth?}`),
   `dueWindowMinutes` (plazo: `dueAt = scheduledFor + dueWindowMinutes`), `horizonDays` (cuánto materializar adelante, default 2),
-  `active`, **`lastGeneratedThrough`** (marca de agua del generador idempotente), autoría + `deletedAt`. Contenedor MUTABLE:
-  reprogramar/pausar NO republica la versión de la plantilla. *1—N* **RoundOccurrence**.
+  **`responsibleRoleId?` (FK→Role, SetNull; Fase 2.3.1)** = rol responsable del worklist "Mis rondas" (el horario es del PUESTO,
+  work center/responsible role de SAP PM/Maximo); `null` = sin responsable ⇒ fallback nodo+turno. Se lee EN VIVO (reasignar
+  re-enruta las ocurrencias pendientes; NO se denormaliza al slot), `active`, **`lastGeneratedThrough`** (marca de agua del
+  generador idempotente), autoría + `deletedAt`. Contenedor MUTABLE: reprogramar/pausar NO republica la versión de la plantilla.
+  *1—N* **RoundOccurrence**.
 - **RoundOccurrence** *(implementado — Fase 2.3)* — ocurrencia materializada (un "slot" liviano, NO es una entrada):
   `scheduleId` (FK→LogSchedule, Cascade), `templateId`/`orgNodeId`/`equipmentId?` (denormalizados del horario), `scheduledFor`
   (anclaje UTC), `dueAt` (plazo UTC), `shiftCode?`/`operationalDate?`/`periodKey?` (estampados al generar vía `ShiftResolver`/
@@ -306,8 +309,10 @@
   `(horario, [from,to)) → slots`. Idempotente vía `createMany skipDuplicates` + watermark; invocada **lazy** al listar
   ocurrencias y por `POST /schedules/generate`. **Ciclo de vida:** `start` crea la entrada (reusa `LogEntriesService.create`) y
   la liga; al **sellar** (submit/transición) la ocurrencia → COMPLETED; **VOID** del borrador la desliga → PENDING. Permisos
-  `schedule:view`/`schedule:manage` (catálogo 62). ABAC por nodo. Diferido: multi-nodo · fan-out por equipo (Route) · floating ·
-  completion-requirement · cron.
+  `schedule:view`/`schedule:manage` (planificador) + **`round:execute`** (operador: ver+ejecutar "Mis rondas"; catálogo **63**,
+  Fase 2.3.1). ABAC por nodo. **Worklist (2.3.1):** `GET /schedules/my-rounds` acota `PENDING ∩ nodos accesibles ∩ schedule
+  {responsibleRoleId null|∈ roles del usuario}`. Diferido: multi-nodo · fan-out por equipo (Route) · floating ·
+  completion-requirement · cron · rol responsable MULTI.
 
 ### Calendario FISCAL (período contable transversal)
 > **Fase 2.7.1.1 (implementado):** migración `20260611210000_add_fiscal_calendar` + script `db:migrate-fiscal` +

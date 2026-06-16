@@ -1,4 +1,4 @@
-import { BookOpenCheck, CalendarClock, CalendarRange, FilePlus2, GitBranch, LayoutDashboard, Layers, ListChecks, Network, Route, Settings, ShieldCheck, UserCog, type LucideIcon } from "lucide-react";
+import { BookOpenCheck, CalendarClock, CalendarRange, FilePlus2, GitBranch, LayoutDashboard, Layers, ListChecks, ListTodo, Network, Route, Settings, ShieldCheck, UserCog, type LucideIcon } from "lucide-react";
 import type { Permission } from "@lyra/permissions";
 
 /**
@@ -51,6 +51,16 @@ export const ROUTES: readonly NavRoute[] = [
     permission: "module:logbook:view",
     inSidebar: true,
   },
+  // Worklist del OPERADOR (2.3.1): sus rondas para ejecutar. Gateado por el permiso
+  // de ejecución, distinto del de planificación (schedule:view).
+  {
+    path: "/mis-rondas",
+    labelKey: "nav.myRounds",
+    icon: ListTodo,
+    permission: "round:execute",
+    inSidebar: true,
+  },
+  // Admin del PLANIFICADOR: CRUD de horarios (junto al resto de la configuración).
   {
     path: "/rondas",
     labelKey: "nav.rounds",

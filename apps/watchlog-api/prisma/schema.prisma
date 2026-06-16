@@ -111,6 +111,7 @@ model Role {
   templateSectionRoles TemplateSectionRole[]
   templateFieldRoles   TemplateFieldRole[]
   workflowTransitionRoles WorkflowTransitionRole[]
+  responsibleSchedules    LogSchedule[]
 }
 
 model Permission {
@@ -1181,6 +1182,11 @@ model LogSchedule {
   // Equipo fijado opcionalmente (EAM). Null = sin equipo / lo elige el operador al
   // iniciar (si la plantilla exige equipo).
   equipmentId String?
+  // Rol responsable del worklist "Mis rondas" (2.3.1): el horario es del PUESTO, no de
+  // una persona (work center/responsible role de SAP PM/Maximo). Null = sin responsable
+  // ⇒ fallback nodo+turno (visible a todos los que alcanzan el nodo). Se lee EN VIVO:
+  // reasignar el rol re-enruta las ocurrencias pendientes (no se denormaliza al slot).
+  responsibleRoleId String?
   recurrenceKind RecurrenceKind
   // Config validada por @lyra/contracts según el kind (shiftCodes / everyMinutes+anchor
   // / times+weekdays+daysOfMonth).
@@ -1203,10 +1209,12 @@ model LogSchedule {
   template    Template   @relation(fields: [templateId], references: [id], onDelete: Cascade)
   orgNode     OrgNode    @relation(fields: [orgNodeId], references: [id], onDelete: Cascade)
   equipment   Equipment? @relation(fields: [equipmentId], references: [id], onDelete: SetNull)
+  responsibleRole Role?  @relation(fields: [responsibleRoleId], references: [id], onDelete: SetNull)
   occurrences RoundOccurrence[]
 
   @@index([templateId])
   @@index([orgNodeId])
+  @@index([responsibleRoleId])
   @@index([active, deletedAt])
 }
 

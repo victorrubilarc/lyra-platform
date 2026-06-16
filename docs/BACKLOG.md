@@ -5,7 +5,16 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-15** (**Fase 2.3 — Programación de rondas ✅** — `feat/programacion-rondas`: `LogSchedule` (horario
+> actualización: **2026-06-16** (**Fase 2.3.1 — Worklist de rondas ✅** — `feat/rondas-worklist`: separa PLANIFICAR de
+> EJECUTAR. Permiso nuevo **`round:execute`** (cat. **63**) gatea ver+ejecutar "Mis rondas"; start/skip se mueven de
+> `schedule:manage` a `round:execute`. **`LogSchedule.responsibleRoleId?`** SINGLE nullable (FK Role SetNull) = rol responsable
+> del worklist, leído EN VIVO (reasignar re-enruta pendientes); `null` = fallback nodo+turno. `GET /schedules/my-rounds`
+> (+`/stats`) acota `PENDING ∩ nodos accesibles ∩ {responsable null|∈ mis roles}` con toggles overdueOnly/shiftOnly/includeUpcoming;
+> `GET /schedules/role-options` (gate schedule:manage, decoplado de role:read). Web: página `/mis-rondas` (worklist operador) +
+> `/rondas` relabelada "Programación de rondas" (sin ejecución, monitoreo read-only + selector de rol responsable) + widget en
+> Inicio + badge de /bitacoras → mis-rondas. Migración aditiva. Contracts 249 · API 234 · smoke `smoke-mis-rondas.py` 18/18 +
+> `smoke-rondas.py` 21/21. **Siguiente: Notificaciones (correo).** Anterior:
+> **Fase 2.3 — Programación de rondas ✅** — `feat/programacion-rondas`: `LogSchedule` (horario
 > VIVO plantilla×nodo×recurrencia SHIFT/INTERVAL/CALENDAR) + `RoundOccurrence` (ocurrencias materializadas pendiente/cumplida/
 > vencida[derivada]/omitida); la ENTRADA se crea al **iniciar la ronda** (reusa `LogEntriesService.create`, ligada por
 > `logEntryId @unique`); generación lazy idempotente + botón Generar; página `/rondas` (KPIs + iniciar/omitir + horarios) + badge
@@ -182,6 +191,7 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Pulidos de UX del Form Builder** (mín/máx caracteres + contador `CharCounter` en Texto/Párrafo; hover de info en `SectionCanvas`; footer Aceptar/Cancelar en el drawer con revert por snapshot; fix Enter en listas `LinesTextarea`; fix preexistente del spec `logbook-query.service` [storage]; FORM_GUIDE actualizado; contracts 239 · API 234) | `feat/builder-ux-pulidos` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Builder: formateo en vivo + paleta de elementos + modal "Ver más"** (RUT al teclear · número/moneda/porcentaje miles+decimales `FormattedNumberInput` · máscara genérica `config.mask`/`applyMask` · «Decimales» expuesto · footer Aceptar/Cancelar en PROPIEDADES + snapshot · paleta DOCKED `FieldPalette` + scroll `scrollToUid` · modal `FieldInfoModal`+`field-info.ts` con demo en vivo · "objeto"→"elemento") | `feat/builder-formateo-paleta` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Fase 2.3 Programación de rondas** (`LogSchedule`+`RoundOccurrence` + enum `RoundOccurrenceStatus` + migración `…_add_round_scheduling`; `enumerateOccurrences` puro + config por kind + 2 permisos `schedule:view/manage`; módulo API `schedules/` [CRUD/generate/start/skip/occurrences/stats] + hook de cierre en `LogEntriesService` + `ShiftResolver.calendarForNode`; página `/rondas` + `ScheduleDrawer` + badge en `/bitacoras` + menú/i18n; contracts 249 · API 234 · smoke 21/21) | `feat/programacion-rondas` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
+| **Fase 2.3.1 Worklist de rondas (separar planificar/ejecutar)** (permiso `round:execute` [cat. 63] + `LogSchedule.responsibleRoleId?` [FK Role SetNull] + migración `…_add_schedule_responsible_role`; `GET /schedules/my-rounds`+`/stats` [responsabilidad EN VIVO por rol ∩ ABAC ∩ turno] + `role-options` + start/skip re-gateados; web `/mis-rondas` [MyRoundsPage] + `/rondas` relabel "Programación de rondas" [monitoreo read-only + selector de rol] + widget Inicio + badge→mis-rondas + nav/i18n; contracts 249 · API 234 · smoke `smoke-mis-rondas.py` 18/18 + `smoke-rondas.py` 21/21) | `feat/rondas-worklist` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 
 **Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
@@ -606,16 +616,17 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
         notificación de vencidas (→ Notificaciones) · cron `@nestjs/schedule` · picker de plantilla/nodo propio del planificador
         (hoy reusa el de `logentry:create`) · COMPLETED-on-seal sin smoke en vivo (cubierto por el hook + unit; sellar es
         template-dependiente). **Pendiente: smoke VISUAL** (§4).
-  - [ ] **2.3.1 Rondas: separar PLANIFICAR de EJECUTAR (aprobado 2026-06-15, SIGUIENTE sesión, ANTES de Notificaciones).**
-        El MVP dejó UNA pantalla `/rondas` que mezcla crear horarios (planificador) con iniciar/omitir (operador) — el dueño lo
-        encontró poco natural. Estándar (SAP/Maximo/j5): el planificador configura, el operador ve un **worklist acotado a él**.
-        **A entregar:** (1) **"Mis rondas"** = worklist del OPERADOR (default Hoy/Pendientes; solo Iniciar/Continuar/Omitir;
-        widget en Inicio) + **"Programación de rondas"** = admin del PLANIFICADOR (CRUD, junto a Calendarios). (2)
-        **Responsabilidad por ROL** en el horario (`LogSchedule.responsibleRoleId?`, migración aditiva): el worklist filtra por
-        roles del usuario ∩ nodos accesibles ∩ turno; sin rol ⇒ fallback nodo+turno. (3) **Permiso separado**: `schedule:manage`
-        = planificar; **permiso operativo nuevo** = ejecutar (iniciar/omitir), asignable al rol operador. (4) menú/i18n + tests +
-        smoke. Ver DECISIONS 2026-06-15. **Forks a resolver al planificar:** nombre del permiso de ejecución · rol responsable
-        single vs multi · ruta (`/mis-rondas` + `/rondas` admin, o renombrar) · widget de Inicio sí/no.
+  - [x] **2.3.1 Rondas: separar PLANIFICAR de EJECUTAR ✅ (2026-06-16, `feat/rondas-worklist` → `main`).** Permiso nuevo
+        **`round:execute`** (cat. 63) gatea ver+ejecutar **"Mis rondas"** (`/mis-rondas`, worklist del operador con toggles
+        Pendientes/Mi turno/Vencidas/Próximas + Iniciar/Continuar/Omitir); start/skip se MOVIERON de `schedule:manage` a
+        `round:execute`. **`LogSchedule.responsibleRoleId?`** SINGLE nullable (FK Role SetNull) = rol responsable, leído EN VIVO
+        (reasignar re-enruta pendientes); `null` = fallback nodo+turno. `/rondas` relabelada **"Programación de rondas"** (CRUD +
+        monitoreo read-only + selector de rol responsable), widget en Inicio, badge de /bitacoras → mis-rondas. `GET
+        /schedules/my-rounds`+`/stats` (responsabilidad por rol ∩ ABAC ∩ turno) + `role-options` (decoplado de role:read).
+        Migración aditiva. Contracts 249 · API 234 · smoke `smoke-mis-rondas.py` 18/18 + `smoke-rondas.py` 21/21. 4 forks en
+        DECISIONS 2026-06-16. **Pendiente: smoke VISUAL** (§4). **Deuda diferida:** rol responsable MULTI (hoy single);
+        notificar al rol responsable de su ronda vencida (→ Notificaciones); shiftOnly resuelve el turno del calendario por
+        defecto (no per-nodo del usuario).
   - [x] **2.4 Llenado (Nueva entrada) multi-actor** ✅ (2026-06-10). Tablas `LogEntry`/`LogEntrySection`/
         `LogEntryValue`/`LogEntryFieldChange` (aditivas). Secciones editables por estado+rol (dato `TemplateSectionRole`
         + override por campo) × ABAC; validación 100% en servidor (`validateFieldValue` = fuente única reusada en

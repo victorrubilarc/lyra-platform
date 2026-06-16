@@ -1,5 +1,27 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-16 — Fase 2.3.1: Worklist de rondas (separar PLANIFICAR de EJECUTAR) ✅** (`feat/rondas-worklist` → `main`).
+Refinamiento aprobado tras el MVP de 2.3: la pantalla única `/rondas` mezclaba **crear horarios** (planificador) con
+**iniciar/omitir** (operador); el dueño lo halló poco natural. Estándar (SAP PM Maintenance Plan vs *My Maintenance Tasks*/Fiori ·
+Maximo PM vs *Start Center/My Assignments* · j5 schedules vs *shift logbook*): el planificador configura, el OPERADOR ve un
+**worklist acotado a ÉL** y solo ejecuta. **4 forks (DECISIONS 2026-06-16):** (1) **permiso `round:execute`** nuevo (cat. **62→63**,
+grupo `schedules`) gatea ver+ejecutar "Mis rondas"; **start/skip se MOVIERON** de `schedule:manage` a `round:execute`;
+`schedule:view/manage` siguen siendo del planificador. (2) **`LogSchedule.responsibleRoleId String?`** SINGLE nullable (FK Role
+SetNull) — el horario es del PUESTO (work center/responsible role SAP/Maximo). (3) **responsabilidad EN VIVO** (join, no
+denormalizada): reasignar el rol re-enruta las pendientes. (4) **turno = filtro suave conmutable** (default hoy+arrastre vencido,
+no muro duro). **Backend:** `GET /schedules/my-rounds` + `/my-rounds/stats` (gate `round:execute`) con `where = PENDING ∩
+getAccessibleNodeIds ∩ schedule{responsibleRoleId null|∈ misRoles}`, toggles overdueOnly/shiftOnly(`ShiftResolver.resolve(now,null)`)/
+includeUpcoming; `responsibleRoleId` en create/update (valida rol); `GET /schedules/role-options` (gate `schedule:manage`,
+decoplado de `role:read`); start/skip re-gateados. Migración aditiva `20260615220000_add_schedule_responsible_role`. **Web:** página
+nueva **`/mis-rondas`** (`MyRoundsPage`: KPIs propios + toggles Pendientes/Mi turno/Vencidas/Próximas + Iniciar/Continuar/Omitir);
+**`/rondas` relabelada "Programación de rondas"** (`SchedulesPage` sin ejecución: CRUD + KPIs + Generar + monitoreo read-only +
+columna "Responsable" + selector de rol en `ScheduleDrawer`); **widget en Inicio** (`HomePage`, tile launchpad solo con
+`round:execute` y pendientes>0); badge de `/bitacoras` → `my-rounds/stats`/`round:execute`/`/mis-rondas`; nav (Mis rondas en clúster
+operador) + i18n es-CL. Contracts **249** · API **234**. **Smokes en vivo:** `smoke-mis-rondas.py` **18/18** (responsable=mi rol/
+fallback/otro; 403 sin permiso; CRUZADO multiusuario: operador con `round:execute` ve SU rol+fallback y NO el del admin; overdueOnly;
+stats; separación de gates) + `smoke-rondas.py` **21/21** sin regresión. typecheck/lint(0)/build verdes. **Pendiente: smoke VISUAL del
+dueño** (§4). **Siguiente: Notificaciones (correo).**
+
 **2026-06-15 — Fase 2.3: Programación de rondas (`LogSchedule` + `RoundOccurrence`) ✅** (`feat/programacion-rondas` →
 `main`). Recurrencia que ABRE una entrada de bitácora por ocurrencia (estándar SAP PM Maintenance Plan/calls · Maximo PM/WO ·
 j5 schedules · ISA-95 shift handover). **Modelo (fork A del dueño):** entidad **`LogSchedule`** (horario: plantilla×nodo×

@@ -8,6 +8,7 @@ import {
   type CreateLogScheduleRequest,
   type UpdateLogScheduleRequest,
   type OccurrenceQuery,
+  type MyRoundsQuery,
 } from "@lyra/contracts";
 import { z } from "zod";
 import { apiJson, apiVoid } from "../../lib/api-client.js";
@@ -53,6 +54,28 @@ export type OccurrenceStats = z.infer<typeof occurrenceStatsSchema>;
 
 export function fetchOccurrenceStats(): Promise<OccurrenceStats> {
   return apiJson("/schedules/occurrences/stats", occurrenceStatsSchema);
+}
+
+// --- Worklist del operador ("Mis rondas", 2.3.1) ---------------------------
+
+export function fetchMyRounds(q: MyRoundsQuery = {}): Promise<RoundOccurrenceDto[]> {
+  const qs = new URLSearchParams();
+  if (q.overdueOnly) qs.set("overdueOnly", "true");
+  if (q.shiftOnly) qs.set("shiftOnly", "true");
+  if (q.includeUpcoming) qs.set("includeUpcoming", "true");
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return apiJson(`/schedules/my-rounds${suffix}`, z.array(roundOccurrenceSchema));
+}
+
+export function fetchMyRoundsStats(): Promise<OccurrenceStats> {
+  return apiJson("/schedules/my-rounds/stats", occurrenceStatsSchema);
+}
+
+const roleOptionSchema = z.object({ id: z.string(), name: z.string() });
+export type RoleOption = z.infer<typeof roleOptionSchema>;
+
+export function fetchScheduleRoleOptions(): Promise<RoleOption[]> {
+  return apiJson("/schedules/role-options", z.array(roleOptionSchema));
 }
 
 const startResultSchema = z.object({ logEntryId: z.string() });

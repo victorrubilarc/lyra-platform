@@ -28,6 +28,7 @@ import { EntryFillPage } from "../features/log-entries/EntryFillPage.js";
 import { LogbookPage } from "../features/logbook/LogbookPage.js";
 import { EntryViewerPage } from "../features/logbook/EntryViewerPage.js";
 import { SchedulesPage } from "../features/schedules/SchedulesPage.js";
+import { MyRoundsPage } from "../features/schedules/MyRoundsPage.js";
 
 /**
  * Mapa de rutas. `/login` es pública; todo lo demás cuelga de `ProtectedRoute`
@@ -57,6 +58,7 @@ export const router = createBrowserRouter([
           { path: "/nueva-entrada/comenzar/:templateId", element: <EntryFillPage /> },
           { path: "/nueva-entrada/:id", element: <EntryFillPage /> },
           { path: "/bitacoras", element: <LogbookPage /> },
+          { path: "/mis-rondas", element: <MyRoundsPage /> },
           { path: "/rondas", element: <SchedulesPage /> },
           { path: "/bitacoras/:id", element: <EntryViewerPage /> },
           // Ruta de EDICIÓN dedicada de una entrada existente (2.8.2), separada del

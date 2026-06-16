@@ -99,41 +99,47 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 ### 12. Configuración del sistema  [Admin]
 - ✍️ `/configuracion`: MFA por acción, ventana de edición global
 
-### 13. Rondas (programación)  [Planificador/Supervisor]
-- ✅ **Programar rondas** (horario por turno/intervalo/calendario) (§ Rondas ▸ Programar rondas)
-- ✅ **Iniciar y omitir una ronda** (pendientes/vencidas) (§ Rondas ▸ Iniciar y omitir)
+### 13. Rondas  [Planificador · Operador]
+- ✅ **Programación de rondas** (horario por turno/intervalo/calendario + rol responsable) (§ Rondas ▸ Programación de rondas)
+- ✅ **Mis rondas** (worklist del operador: iniciar/continuar/omitir lo que te toca) (§ Rondas ▸ Mis rondas)
 
 ---
 
-## Rondas ▸ Programar rondas  [Planificador/Supervisor]
+## Rondas ▸ Programación de rondas  [Planificador]
 
 **Para qué sirve.** Hace que una bitácora se **abra sola cada vez que toca** — por turno,
 cada cierto tiempo o en días y horas fijas — en lugar de depender de que alguien recuerde
-crearla a mano. Así queda a la vista **qué rondas están pendientes**, cuáles se **vencieron**
-y cuáles se **omitieron** (con su motivo). Es el patrón de rondas de operador / planes de
-mantención de la industria (SAP PM, Maximo, j5).
+crearla a mano. Aquí el **planificador** define y mantiene los horarios; el operador los
+**ejecuta** desde *Mis rondas* (ver la sección siguiente). Así queda a la vista **qué rondas
+están pendientes**, cuáles se **vencieron** y cuáles se **omitieron** (con su motivo). Es el
+patrón de rondas de operador / planes de mantención de la industria (SAP PM, Maximo, j5).
 
 **Cómo se usa.**
-1. Entra a **Rondas** (menú lateral) y aprieta **"Nuevo horario"**.
+1. Entra a **Programación de rondas** (menú lateral) y aprieta **"Nuevo horario"**.
 2. Elige la **plantilla** y el **nodo** de la estructura donde se hará la ronda (y, si
    corresponde, el **equipo**).
-3. Elige la **recurrencia**:
+3. (Opcional) Elige el **rol responsable**: a quién le aparecerá la ronda en *Mis rondas*
+   (p. ej. "Operador de Molienda"). Es responsabilidad del **puesto**, no de una persona, así
+   que sobrevive a los cambios de turno. **Sin rol responsable** la ronda es visible a **todos**
+   los del nodo en su turno.
+4. Elige la **recurrencia**:
    - **Por turno** — una ronda por cada turno del calendario del nodo (opcionalmente solo
      algunos turnos, p. ej. A y B).
    - **Cada cierto tiempo** — cada N minutos/horas (p. ej. cada 6 h), con una hora de anclaje
      opcional.
    - **Días y horas fijas** — a las horas que indiques (p. ej. 08:00 y 20:00), en los días de
      la semana que elijas.
-4. Indica el **plazo para cumplir** (minutos tras la hora programada antes de marcarse
+5. Indica el **plazo para cumplir** (minutos tras la hora programada antes de marcarse
    *vencida*) y el **horizonte** (cuántos días adelante se preparan las rondas). Deja
    **Activo** y guarda.
-5. Las próximas rondas aparecen al toque en la lista. El botón **"Generar"** las refresca a
-   mano (también se preparan solas al abrir la pantalla).
+6. Las próximas rondas aparecen al toque en la lista (monitoreo). El botón **"Generar"** las
+   refresca a mano (también se preparan solas al abrir la pantalla).
 
-**Quién puede.** Ver el programa requiere el permiso **"Ver rondas"** (`schedule:view`); crear
-o editar horarios requiere **"Administrar rondas"** (`schedule:manage`). Es un rol de
-**planificador/supervisor**, distinto del que diseña la plantilla. Cada quien solo ve las
-rondas de los **nodos dentro de su alcance**.
+**Quién puede.** Ver la programación requiere el permiso **"Ver rondas"** (`schedule:view`);
+crear o editar horarios requiere **"Administrar rondas"** (`schedule:manage`). Es un rol de
+**planificador**, distinto del que diseña la plantilla y del operador que las ejecuta. Cada
+quien solo ve las rondas de los **nodos dentro de su alcance**. (Esta pantalla **no ejecuta**
+rondas: la lista de ocurrencias es solo de **monitoreo**.)
 
 **Importante.**
 - Cambiar la frecuencia o pausar un horario **NO** vuelve a publicar la plantilla: la
@@ -142,30 +148,37 @@ rondas de los **nodos dentro de su alcance**.
 - Eliminar un horario **cancela** sus rondas pendientes (las cumplidas quedan).
 - Un horario por turno necesita que el nodo tenga un **calendario operacional** con turnos.
 
-## Rondas ▸ Iniciar y omitir una ronda  [Operador/Supervisor]
+## Rondas ▸ Mis rondas  [Operador]
 
-**Para qué sirve.** Trabajar las rondas que el programa abrió: **registrar** la que toca o,
-si por una razón válida no se hará, **omitirla dejando constancia**.
+**Para qué sirve.** Es tu **lista de trabajo**: las rondas que **a ti te toca ejecutar ahora**
+— ya filtradas por tu turno, tus nodos y tu rol. No administras nada aquí; solo **registras** la
+que corresponde o, si por una razón válida no se hará, la **omites dejando constancia**. Es el
+patrón *My Maintenance Tasks* (Fiori) / *Start Center* (Maximo) / shift logbook (j5).
 
 **Cómo se usa.**
-1. En **Rondas** verás arriba los contadores **Pendientes / Vencidas / De hoy** y la lista de
-   rondas. Usa los filtros **Pendientes · Hoy · Vencidas**.
-2. Aprieta **"Iniciar"** en una ronda: el sistema **crea la entrada de bitácora** ya ligada a
+1. Entra a **Mis rondas** (menú lateral). Verás arriba tus contadores **Pendientes / Vencidas /
+   De hoy** y la lista de lo que te toca. (También aparece un **aviso en la pantalla de inicio**
+   cuando tienes rondas pendientes.)
+2. Filtra con **Pendientes · Mi turno · Vencidas · Próximas**.
+3. Aprieta **"Iniciar"** en una ronda: el sistema **crea la entrada de bitácora** ya ligada a
    esa ronda y te lleva a llenarla (si ya la habías empezado, el botón dice **"Continuar"**).
-3. Al **completar y sellar** la entrada, la ronda queda **Cumplida** automáticamente.
-4. Si una ronda **no se realizará**, aprieta **"Omitir"**, escribe el **motivo** (mínimo 5
+4. Al **completar y sellar** la entrada, la ronda queda **Cumplida** automáticamente.
+5. Si una ronda **no se realizará**, aprieta **"Omitir"**, escribe el **motivo** (mínimo 5
    caracteres) y confirma: queda **Omitida** y auditada.
 
-**Quién puede.** Iniciar y omitir requieren **"Administrar rondas"** (`schedule:manage`).
-Llenar la entrada resultante se rige por los permisos normales de bitácora y el alcance del
-nodo/plantilla.
+**Quién puede.** Requiere el permiso **"Ejecutar rondas"** (`round:execute`), pensado para el
+**operador**: ver y ejecutar *Mis rondas* sin darle administración de horarios. Aparecen las
+rondas cuyo **rol responsable** es uno de tus roles (o las que **no tienen** rol responsable, que
+ve todo el nodo), dentro de tu **alcance** de nodos. Llenar la entrada resultante se rige por los
+permisos normales de bitácora (`logentry:fill`/`view`).
 
 **Importante.**
 - Una ronda **no es** todavía una entrada: es un "pendiente". La entrada real recién se crea
   al **iniciar** (así no se llena la lista de borradores vacíos).
 - **Vencida** = pasó su plazo sin completarse. Sigue **pendiente** (no se cierra sola): puedes
-  completarla tarde u omitirla. En **Bitácoras** aparece un aviso **"N rondas vencidas"** que
-  lleva al programa.
+  completarla tarde u omitirla. Por defecto la lista **incluye las vencidas heredadas** del turno
+  anterior (entrega de turno), no solo las de tu turno actual. En **Bitácoras** aparece un aviso
+  **"N rondas vencidas"** que lleva aquí.
 - Si **anulas** el borrador de una ronda iniciada, la ronda **vuelve a pendiente** y puede
   reiniciarse — no se pierde.
 
