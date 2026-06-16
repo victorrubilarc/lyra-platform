@@ -101,7 +101,13 @@ export function EntryFillPage() {
     orgNodeId?: string | null;
     equipmentId?: string | null;
     deferred?: DeferralInput | null;
+    backTo?: string | null;
+    backLabel?: string | null;
   };
+  // Origen explícito del "Volver" (el caller sabe de dónde viene, p. ej. "Mis rondas"
+  // al iniciar una ronda). Se captura en mount para sobrevivir cambios internos de estado.
+  const [backTo] = useState<string | null>(navState.backTo ?? null);
+  const [backLabel] = useState<string | null>(navState.backLabel ?? null);
   const [composeOrgNodeId] = useState<string | null>(navState.orgNodeId ?? null);
   // Equipo OPCIONAL elegido en el picker (2.8.0.1): viaja por el state y se aplica al materializar.
   const [composeEquipmentId] = useState<string | null>(navState.equipmentId ?? null);
@@ -227,7 +233,7 @@ export function EntryFillPage() {
         onSuccess: () => {
           setVoidOpen(false);
           toast.success(t("logbook.void.done"));
-          navigate("/bitacoras");
+          navigate(backTo ?? "/bitacoras");
         },
         onError: (e) => toast.error(apiErrorText(e, t("logbook.void.error"))),
       },
@@ -481,17 +487,18 @@ export function EntryFillPage() {
 
   return (
     <div className={styles.page}>
-      {/* "Volver": una entrada NUEVA aún sin crear vuelve al picker; editar desde
-          Bitácoras vuelve al visor de esa entrada; el resto, a la grilla. */}
+      {/* "Volver": si el caller indicó un origen explícito (backTo, p. ej. "Mis rondas"
+          al iniciar una ronda) se respeta; si no, una entrada NUEVA aún sin crear vuelve
+          al picker; editar desde Bitácoras vuelve al visor de esa entrada; el resto, a la grilla. */}
       <div className={styles.fillTopBar}>
         <Button
           variant="secondary"
           className={styles.backBtn}
           onClick={() =>
-            navigate(composeActive ? "/nueva-entrada" : editingExisting ? `/bitacoras/${routeId}` : "/bitacoras")
+            navigate(backTo ?? (composeActive ? "/nueva-entrada" : editingExisting ? `/bitacoras/${routeId}` : "/bitacoras"))
           }
         >
-          <ArrowLeft size={15} /> {t("logbook.fill.back")}
+          <ArrowLeft size={15} /> {backLabel ?? t("logbook.fill.back")}
         </Button>
         {canVoid && (
           <Button variant="danger" onClick={() => setVoidOpen(true)}>
