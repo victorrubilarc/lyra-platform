@@ -19,8 +19,10 @@ columna "Responsable" + selector de rol en `ScheduleDrawer`); **widget en Inicio
 `round:execute` y pendientes>0); badge de `/bitacoras` → `my-rounds/stats`/`round:execute`/`/mis-rondas`; nav (Mis rondas en clúster
 operador) + i18n es-CL. Contracts **249** · API **234**. **Smokes en vivo:** `smoke-mis-rondas.py` **18/18** (responsable=mi rol/
 fallback/otro; 403 sin permiso; CRUZADO multiusuario: operador con `round:execute` ve SU rol+fallback y NO el del admin; overdueOnly;
-stats; separación de gates) + `smoke-rondas.py` **21/21** sin regresión. typecheck/lint(0)/build verdes. **Pendiente: smoke VISUAL del
-dueño** (§4). **Siguiente: Notificaciones (correo).**
+stats; separación de gates) + `smoke-rondas.py` **21/21** sin regresión. typecheck/lint(0)/build verdes. **+ Follow-up UX
+(`fix/rondas-volver`):** al iniciar una ronda desde "Mis rondas" el llenado ahora sabe de DÓNDE viene — `EntryFillPage` acepta
+`backTo`/`backLabel` por `location.state` (origen explícito) y el "Volver" (y el redirect tras VOID) regresan a **/mis-rondas**
+("Volver a Mis rondas") en vez de a Bitácoras. **Pendiente: smoke VISUAL del dueño** (§4). **Siguiente: Notificaciones (correo).**
 
 **2026-06-15 — Fase 2.3: Programación de rondas (`LogSchedule` + `RoundOccurrence`) ✅** (`feat/programacion-rondas` →
 `main`). Recurrencia que ABRE una entrada de bitácora por ocurrencia (estándar SAP PM Maintenance Plan/calls · Maximo PM/WO ·

@@ -44,7 +44,8 @@ export function MyRoundsPage() {
   async function onStart(occ: RoundOccurrenceDto) {
     try {
       const r = await start.mutateAsync({ id: occ.id });
-      navigate(`/bitacoras/${r.logEntryId}/editar`);
+      // Pasa el origen para que el "Volver" del llenado regrese a Mis rondas (no a Bitácoras).
+      navigate(`/bitacoras/${r.logEntryId}/editar`, { state: { backTo: "/mis-rondas", backLabel: "Volver a Mis rondas" } });
     } catch (e) {
       toast.error(`No se pudo iniciar la ronda: ${(e as Error).message}`);
     }
