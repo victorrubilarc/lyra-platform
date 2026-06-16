@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { AlertTriangle, Play, Route, SkipForward } from "lucide-react";
-import { Button, Card, Chip, EmptyState, Input, Modal, useToast } from "@lyra/ui";
-import type { MyRoundsQuery, RoundOccurrenceDto } from "@lyra/contracts";
+import { AlertTriangle, Clock, Play, RefreshCw, Route, Search, SkipForward, X } from "lucide-react";
+import { Button, Card, Chip, EmptyState, Input, Modal, Select, useToast } from "@lyra/ui";
+import type { RoundOccurrenceDto } from "@lyra/contracts";
 import { formatDateTime, formatDuration } from "../../lib/format.js";
 import {
   useMyRounds,
@@ -11,28 +11,47 @@ import {
   useStartOccurrence,
 } from "./schedules-queries.js";
 import styles from "./SchedulesPage.module.css";
+import my from "./MyRoundsPage.module.css";
 
-type Filter = "today" | "shift" | "overdue" | "upcoming";
-
-const FILTER_QUERY: Record<Filter, MyRoundsQuery> = {
-  today: {},
-  shift: { shiftOnly: true },
-  overdue: { overdueOnly: true },
-  upcoming: { includeUpcoming: true },
+type Bucket = "overdue" | "today" | "upcoming";
+const BUCKET_ORDER: Bucket[] = ["overdue", "today", "upcoming"];
+const BUCKET_LABEL: Record<Bucket, string> = {
+  overdue: "Vencidas",
+  today: "Pendientes de hoy",
+  upcoming: "Próximas",
 };
+
+function isSameLocalDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+function bucketOf(o: RoundOccurrenceDto, now: Date): Bucket {
+  if (o.overdue) return "overdue";
+  return isSameLocalDay(new Date(o.scheduledFor), now) ? "today" : "upcoming";
+}
+function matchesSearch(o: RoundOccurrenceDto, q: string): boolean {
+  if (!q) return true;
+  const hay = `${o.scheduleName ?? ""} ${o.templateName ?? ""} ${o.equipmentTag ?? ""} ${o.orgNodeName ?? ""}`.toLowerCase();
+  return q.toLowerCase().split(/\s+/).filter(Boolean).every((tok) => hay.includes(tok));
+}
 
 /**
  * "Mis rondas" (2.3.1): worklist del OPERADOR. Acotado en el backend a sus roles ∩
- * nodos accesibles ∩ rol responsable. Solo EJECUCIÓN (iniciar/continuar/omitir);
- * la administración de horarios vive en «Programación de rondas». Patrón My
- * Maintenance Tasks/Fiori · Start Center/Maximo · shift logbook/j5.
+ * nodos accesibles ∩ rol responsable. La UI lo hace ENCONTRABLE: búsqueda, filtros por
+ * equipo/área y agrupación por URGENCIA (Vencidas → Hoy → Próximas) para que el operador
+ * vea de un vistazo qué hacer AHORA. Solo ejecución (iniciar/continuar/omitir).
  */
 export function MyRoundsPage() {
   const navigate = useNavigate();
   const toast = useToast();
 
-  const [filter, setFilter] = useState<Filter>("today");
-  const rounds = useMyRounds(FILTER_QUERY[filter]);
+  // Filtros (todos client-side sobre el worklist propio que devuelve el backend).
+  const [shiftOnly, setShiftOnly] = useState(false);
+  const [showUpcoming, setShowUpcoming] = useState(false);
+  const [search, setSearch] = useState("");
+  const [nodo, setNodo] = useState<string | null>(null);
+  const [equipo, setEquipo] = useState<string | null>(null);
+
+  const rounds = useMyRounds({ shiftOnly, includeUpcoming: showUpcoming });
   const stats = useMyRoundsStats();
 
   const start = useStartOccurrence();
@@ -41,10 +60,57 @@ export function MyRoundsPage() {
   const [skipping, setSkipping] = useState<RoundOccurrenceDto | null>(null);
   const [skipReason, setSkipReason] = useState("");
 
+  const all = useMemo(() => rounds.data ?? [], [rounds.data]);
+
+  // Cascada de filtros: búsqueda → nodo → equipo. Las opciones de cada filtro se
+  // calculan sobre el set ya acotado por los anteriores (sin auto-anularse).
+  const afterSearch = useMemo(() => all.filter((o) => matchesSearch(o, search)), [all, search]);
+
+  const nodos = useMemo(() => {
+    const set = new Map<string, number>();
+    for (const o of afterSearch) {
+      const n = o.orgNodeName ?? "—";
+      set.set(n, (set.get(n) ?? 0) + 1);
+    }
+    return [...set.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  }, [afterSearch]);
+
+  const afterNodo = useMemo(
+    () => (nodo ? afterSearch.filter((o) => (o.orgNodeName ?? "—") === nodo) : afterSearch),
+    [afterSearch, nodo],
+  );
+
+  const equipos = useMemo(() => {
+    const set = new Map<string, number>();
+    for (const o of afterNodo) {
+      if (!o.equipmentTag) continue;
+      set.set(o.equipmentTag, (set.get(o.equipmentTag) ?? 0) + 1);
+    }
+    return [...set.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  }, [afterNodo]);
+
+  const filtered = useMemo(
+    () => (equipo ? afterNodo.filter((o) => o.equipmentTag === equipo) : afterNodo),
+    [afterNodo, equipo],
+  );
+
+  // Agrupación por urgencia, cada grupo ordenado por vencimiento (lo más urgente arriba).
+  const groups = useMemo(() => {
+    const now = new Date();
+    const by: Record<Bucket, RoundOccurrenceDto[]> = { overdue: [], today: [], upcoming: [] };
+    for (const o of filtered) by[bucketOf(o, now)].push(o);
+    for (const b of BUCKET_ORDER) by[b].sort((a, c) => new Date(a.dueAt).getTime() - new Date(c.dueAt).getTime());
+    return by;
+  }, [filtered]);
+
+  const anyFilter = !!search || !!nodo || !!equipo || shiftOnly || showUpcoming;
+  function clearFilters() {
+    setSearch(""); setNodo(null); setEquipo(null); setShiftOnly(false); setShowUpcoming(false);
+  }
+
   async function onStart(occ: RoundOccurrenceDto) {
     try {
       const r = await start.mutateAsync({ id: occ.id });
-      // Pasa el origen para que el "Volver" del llenado regrese a Mis rondas (no a Bitácoras).
       navigate(`/bitacoras/${r.logEntryId}/editar`, { state: { backTo: "/mis-rondas", backLabel: "Volver a Mis rondas" } });
     } catch (e) {
       toast.error(`No se pudo iniciar la ronda: ${(e as Error).message}`);
@@ -63,7 +129,41 @@ export function MyRoundsPage() {
     }
   }
 
-  const list = rounds.data ?? [];
+  function renderOcc(o: RoundOccurrenceDto) {
+    return (
+      <li key={o.id} className={`${styles.occ} ${o.overdue ? styles.occOverdue : ""}`}>
+        <div className={styles.occMain}>
+          <div className={styles.occTitle}>
+            {o.equipmentTag ? <span className={my.tag}>{o.equipmentTag}</span> : null}
+            {o.scheduleName ?? o.templateName ?? "Ronda"}
+            {o.shiftCode ? <Chip label={`Turno ${o.shiftCode}`} variant="default" className={styles.chip} /> : null}
+          </div>
+          <div className={styles.occMeta}>
+            <span>{o.orgNodeName}</span>
+            <span>· Programada: {formatDateTime(o.scheduledFor)}</span>
+            {o.overdue ? (
+              <span className={styles.overdueText}><AlertTriangle size={13} /> Vencida hace {formatDuration(Date.now() - new Date(o.dueAt).getTime())}</span>
+            ) : (
+              <span className={my.dueChip}><Clock size={12} /> Vence {formatDateTime(o.dueAt)}</span>
+            )}
+            {o.logEntryId ? <Chip label="En curso" variant="info" className={styles.chip} /> : null}
+          </div>
+        </div>
+        <div className={styles.occActions}>
+          <Button onClick={() => onStart(o)} disabled={start.isPending}>
+            <Play size={15} /> {o.logEntryId ? "Continuar" : "Iniciar"}
+          </Button>
+          {!o.logEntryId && (
+            <Button variant="secondary" onClick={() => { setSkipping(o); setSkipReason(""); }}>
+              <SkipForward size={15} /> Omitir
+            </Button>
+          )}
+        </div>
+      </li>
+    );
+  }
+
+  const visibleBuckets = BUCKET_ORDER.filter((b) => groups[b].length > 0);
 
   return (
     <div className={styles.page}>
@@ -72,65 +172,109 @@ export function MyRoundsPage() {
           <h1 className={styles.title}>Mis rondas</h1>
           <p className={styles.subtitle}>Las rondas que te toca ejecutar en tu turno. Iníciala para abrir la bitácora.</p>
         </div>
+        <div className={styles.headerActions}>
+          <Button variant="secondary" onClick={() => rounds.refetch()} disabled={rounds.isFetching}>
+            <RefreshCw size={16} /> Actualizar
+          </Button>
+        </div>
       </header>
 
-      {/* KPIs del worklist propio */}
+      {/* KPIs del worklist propio (resumen) */}
       <div className={styles.kpis}>
         <Card className={styles.kpi}><span className={styles.kpiValue}>{stats.data?.pending ?? "—"}</span><span className={styles.kpiLabel}>Pendientes</span></Card>
         <Card className={`${styles.kpi} ${styles.kpiOverdue}`}><span className={styles.kpiValue}>{stats.data?.overdue ?? "—"}</span><span className={styles.kpiLabel}>Vencidas</span></Card>
         <Card className={styles.kpi}><span className={styles.kpiValue}>{stats.data?.today ?? "—"}</span><span className={styles.kpiLabel}>De hoy</span></Card>
       </div>
 
-      <Card className={styles.section}>
-        <div className={styles.sectionHead}>
-          <h2 className={styles.sectionTitle}><Route size={18} /> Rondas para ejecutar</h2>
-          <div className={styles.filters}>
-            <Button variant={filter === "today" ? "primary" : "secondary"} onClick={() => setFilter("today")}>Pendientes</Button>
-            <Button variant={filter === "shift" ? "primary" : "secondary"} onClick={() => setFilter("shift")}>Mi turno</Button>
-            <Button variant={filter === "overdue" ? "primary" : "secondary"} onClick={() => setFilter("overdue")}>Vencidas</Button>
-            <Button variant={filter === "upcoming" ? "primary" : "secondary"} onClick={() => setFilter("upcoming")}>Próximas</Button>
-          </div>
+      {/* Barra de filtros */}
+      <Card className={my.toolbar}>
+        <div className={my.searchWrap}>
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar ronda, equipo o área…"
+            aria-label="Buscar en mis rondas"
+            rightSlot={
+              search ? (
+                <button type="button" className={my.searchClear} onClick={() => setSearch("")} aria-label="Limpiar búsqueda">
+                  <X size={14} />
+                </button>
+              ) : (
+                <Search size={16} aria-hidden="true" />
+              )
+            }
+          />
         </div>
-        {rounds.isLoading ? (
-          <p className={styles.muted}>Cargando…</p>
-        ) : list.length === 0 ? (
-          <EmptyState title="Sin rondas" description="No tienes rondas para ejecutar con este filtro." />
-        ) : (
-          <ul className={styles.occList}>
-            {list.map((o) => (
-              <li key={o.id} className={`${styles.occ} ${o.overdue ? styles.occOverdue : ""}`}>
-                <div className={styles.occMain}>
-                  <div className={styles.occTitle}>
-                    {o.scheduleName ?? o.templateName ?? "Ronda"}
-                    {o.shiftCode ? <Chip label={`Turno ${o.shiftCode}`} variant="default" className={styles.chip} /> : null}
-                    {o.equipmentTag ? <Chip label={o.equipmentTag} variant="default" className={styles.chip} /> : null}
-                  </div>
-                  <div className={styles.occMeta}>
-                    <span>{o.orgNodeName}</span>
-                    <span>· Programada: {formatDateTime(o.scheduledFor)}</span>
-                    {o.overdue ? (
-                      <span className={styles.overdueText}><AlertTriangle size={13} /> Vencida hace {formatDuration(Date.now() - new Date(o.dueAt).getTime())}</span>
-                    ) : (
-                      <span>· Vence: {formatDateTime(o.dueAt)}</span>
-                    )}
-                    {o.logEntryId ? <Chip label="En curso" variant="info" className={styles.chip} /> : null}
-                  </div>
-                </div>
-                <div className={styles.occActions}>
-                  <Button onClick={() => onStart(o)} disabled={start.isPending}>
-                    <Play size={15} /> {o.logEntryId ? "Continuar" : "Iniciar"}
-                  </Button>
-                  {!o.logEntryId && (
-                    <Button variant="secondary" onClick={() => { setSkipping(o); setSkipReason(""); }}>
-                      <SkipForward size={15} /> Omitir
-                    </Button>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
+
+        <div className={my.toggles}>
+          <button type="button" className={`${my.toggle} ${shiftOnly ? my.toggleOn : ""}`} onClick={() => setShiftOnly((v) => !v)}>
+            Mi turno
+          </button>
+          <button type="button" className={`${my.toggle} ${showUpcoming ? my.toggleOn : ""}`} onClick={() => setShowUpcoming((v) => !v)}>
+            Incluir próximas
+          </button>
+          {nodos.length > 1 && (
+            <Select
+              className={my.nodoSelect}
+              value={nodo ?? ""}
+              onChange={(e) => setNodo(e.target.value || null)}
+              aria-label="Filtrar por área"
+            >
+              <option value="">Todas las áreas</option>
+              {nodos.map(([n, c]) => <option key={n} value={n}>{n} ({c})</option>)}
+            </Select>
+          )}
+          {anyFilter && (
+            <button type="button" className={my.clear} onClick={clearFilters}>
+              <X size={14} /> Limpiar
+            </button>
+          )}
+        </div>
       </Card>
+
+      {/* Filtro por equipo (cuando hay varios): chips táctiles */}
+      {equipos.length > 1 && (
+        <div className={my.chipRow}>
+          <button type="button" className={`${my.equipChip} ${!equipo ? my.equipChipOn : ""}`} onClick={() => setEquipo(null)}>
+            Todos <span className={my.equipCount}>{afterNodo.length}</span>
+          </button>
+          {equipos.map(([tag, count]) => (
+            <button
+              key={tag}
+              type="button"
+              className={`${my.equipChip} ${equipo === tag ? my.equipChipOn : ""}`}
+              onClick={() => setEquipo((v) => (v === tag ? null : tag))}
+            >
+              {tag} <span className={my.equipCount}>{count}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Lista agrupada por urgencia */}
+      {rounds.isLoading ? (
+        <Card className={styles.section}><p className={styles.muted}>Cargando…</p></Card>
+      ) : visibleBuckets.length === 0 ? (
+        <Card className={styles.section}>
+          <EmptyState
+            icon={<Route size={28} />}
+            title={anyFilter ? "Sin resultados" : "Sin rondas pendientes"}
+            description={anyFilter ? "Ningún resultado con estos filtros." : "No tienes rondas para ejecutar ahora. ¡Buen trabajo!"}
+            action={anyFilter ? <Button variant="secondary" onClick={clearFilters}>Limpiar filtros</Button> : undefined}
+          />
+        </Card>
+      ) : (
+        visibleBuckets.map((b) => (
+          <section key={b} className={my.group}>
+            <div className={`${my.groupHead} ${my[`bucket_${b}`] ?? ""}`}>
+              <span className={my.groupDot} aria-hidden="true" />
+              <h2 className={my.groupTitle}>{BUCKET_LABEL[b]}</h2>
+              <span className={my.groupCount}>{groups[b].length}</span>
+            </div>
+            <ul className={styles.occList}>{groups[b].map(renderOcc)}</ul>
+          </section>
+        ))
+      )}
 
       <Modal
         open={!!skipping}
