@@ -136,8 +136,11 @@ function makeService(
     presignedGetUrl: vi.fn().mockResolvedValue({ url: "http://minio/presigned", expiresAt: "2026-06-15T00:05:00.000Z" }),
     ...opts.storage,
   } as unknown as StorageService;
+  const notifications = {
+    emit: vi.fn().mockResolvedValue(undefined),
+  } as unknown as import("../notifications/notification-emitter.service").NotificationEmitterService;
   return {
-    service: new LogEntriesService(prisma, audit, scope, shiftResolver, fiscalResolver, reauth, enc, periods, permissions, settings, storage),
+    service: new LogEntriesService(prisma, audit, scope, shiftResolver, fiscalResolver, reauth, enc, periods, permissions, settings, storage, notifications),
     prisma,
     audit,
     shiftResolver,

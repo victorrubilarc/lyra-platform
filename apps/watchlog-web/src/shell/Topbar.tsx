@@ -152,6 +152,9 @@ export function Topbar({ onOpenSearch }: TopbarProps) {
             <MenuItem icon={<UserCog size={16} />} onSelect={() => navigate("/perfil/seguridad")}>
               {t("topbar.mySecurity")}
             </MenuItem>
+            <MenuItem icon={<Bell size={16} />} onSelect={() => navigate("/mis-notificaciones")}>
+              {t("topbar.myNotifications")}
+            </MenuItem>
             <MenuSeparator />
             <MenuItem danger icon={<LogOut size={16} />} onSelect={() => void signOut()}>
               {t("topbar.signOut")}

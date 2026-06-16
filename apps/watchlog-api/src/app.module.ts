@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
+import { ScheduleModule } from "@nestjs/schedule";
 import { LoggerModule } from "nestjs-pino";
 import { validateEnv } from "./config/env.schema";
 import { PrismaModule } from "./prisma/prisma.module";
@@ -24,6 +25,8 @@ import { LogEntriesModule } from "./log-entries/log-entries.module";
 import { SchedulesModule } from "./schedules/schedules.module";
 import { SavedViewsModule } from "./saved-views/saved-views.module";
 import { SecurityModule } from "./security/security.module";
+import { NotificationEmitterModule } from "./notifications/notification-emitter.module";
+import { NotificationsModule } from "./notifications/notifications.module";
 
 @Module({
   imports: [
@@ -34,6 +37,8 @@ import { SecurityModule } from "./security/security.module";
       envFilePath: ["../../.env", ".env"],
       validate: validateEnv,
     }),
+    // Tick del worker de notificaciones (primera infra de cron del proyecto).
+    ScheduleModule.forRoot(),
     LoggerModule.forRoot({
       pinoHttp: {
         level: process.env.LOG_LEVEL ?? "info",
@@ -66,6 +71,8 @@ import { SecurityModule } from "./security/security.module";
     SchedulesModule,
     SavedViewsModule,
     SecurityModule,
+    NotificationEmitterModule,
+    NotificationsModule,
     HealthModule,
   ],
 })

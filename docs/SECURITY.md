@@ -267,6 +267,29 @@ GxP: MHRA Data Integrity 2018 / FDA DI Q&A (corrección tardía justificada + at
 - **Omisión auditada**: `POST /occurrences/:id/skip` exige motivo ≥5 y registra `schedule.occurrence.skipped` (GxP: la ronda no
   realizada queda justificada). `schedule.created/updated/deleted` y `schedule.occurrence.started` también se auditan.
 
+### Notificaciones (Bloque N — motor de avisos por correo)
+- **4 permisos nuevos** (catálogo **63→67**): **`module:notifications:view`** (módulo + sidebar `/notificaciones`),
+  **`notiftemplate:manage`** (administrar plantillas de mensaje), **`notification:view-outbox`** (ver/reintentar el correo
+  saliente), **`notification:admin`** (suscripciones + `POST /notifications/run`). **Las preferencias PROPIAS** (`GET/PUT
+  /notifications/preferences`) y el catálogo de eventos (`GET /notifications/events`) son **solo-autenticado, sin permiso de
+  catálogo** (dato personal, ownership — precedente `SavedView`): cualquier usuario gestiona sus avisos desde `/mis-notificaciones`.
+- **ABAC SOBRE LOS DESTINATARIOS (principio clave)**: la resolución NUNCA notifica algo que el destinatario no podría VER. Todo
+  destinatario candidato (derivado del rol responsable / responsables del estado / suscripción) pasa por **`canAccessNode` ∩
+  `canAccessTemplate`** (los dos ejes ABAC de 2.8) antes de encolar el correo. La ocurrencia/entrada denormaliza `orgNodeId`+
+  `templateId`, así que el filtro aplica incluso antes de que exista una `LogEntry`. Sin esto, un correo podría filtrar el folio,
+  el estado o el contenido de un registro fuera del alcance del receptor.
+- **Render SIN eval**: las plantillas solo sustituyen placeholders `{{var}}` **whitelisteados por el evento** (validado al guardar
+  la plantilla con `unknownPlaceholders`); no hay lógica, bucles ni acceso a propiedades arbitrarias (misma postura que el AST del
+  motor de reglas). Un dato ausente se reemplaza por vacío (nunca se filtra `{{...}}` crudo al correo).
+- **Transactional outbox (durabilidad + atomicidad)**: el evento se inserta en la **MISMA transacción** que el cambio de dominio
+  (`executeTransition`) ⇒ un crash entre commit y envío no pierde el aviso. El SMTP caído degrada con backoff (filas PENDING/FAILED
+  reintentables), nunca rompe el flujo de negocio.
+- **Auditoría**: cada envío registra **`notification.email.sent`** (a quién, qué evento, cuándo); la edición de plantillas
+  (`notification.template.updated`), las suscripciones (`.subscription.created/deleted`) y el reintento (`.email.retried`) también
+  se auditan (append-only). El cuerpo del correo se persiste como snapshot en la bandeja (no se registran tokens/credenciales).
+- **Transporte**: el correo sale **solo desde el backend** (`EmailService` → SMTP/relay del cliente; Mailpit en dev), nunca desde
+  el navegador. La interfaz `NotificationChannel` deja el modelo listo para in-app/SMS futuros sin tocar el motor.
+
 ### Motor de reglas de negocio — expresión SEGURA (Req-7, primer corte)
 - **Sin `eval` ni scripting libre.** Las fórmulas (campos formulados) y las reglas cruzadas se expresan como un **AST
   con LISTA BLANCA de operadores** (tipo JSONLogic) evaluado por un intérprete **PURO** y SÍNCRONO en `@lyra/contracts/

@@ -14,6 +14,7 @@ import { assignReportOrderBySiblings } from "./report-order.js";
 import { DEMO_EQUIPMENT, EQUIPMENT_CATEGORIES } from "./equipment-seed-data.js";
 import { REFERENCE_LISTS } from "./reference-data-seed.js";
 import { DEMO_CALENDAR, DEMO_FISCAL_CALENDAR } from "./operational-calendar-seed.js";
+import { NOTIFICATION_TEMPLATE_SEEDS } from "./notification-templates-seed.js";
 
 const prisma = new PrismaClient();
 
@@ -399,9 +400,30 @@ async function seedOperationalCalendar(): Promise<void> {
   console.log(`✔ Calendario fiscal por defecto asegurado: ${f.key} (${f.periodKind})`);
 }
 
+/**
+ * Plantillas de mensaje por defecto del motor de notificaciones (Bloque N).
+ * Idempotente por la única `(eventKey, locale, channel)`. NO sobrescribe el cuerpo
+ * si el admin ya lo personalizó (solo crea las que falten).
+ */
+async function seedNotificationTemplates(): Promise<void> {
+  let created = 0;
+  for (const t of NOTIFICATION_TEMPLATE_SEEDS) {
+    const existing = await prisma.notificationTemplate.findUnique({
+      where: { eventKey_locale_channel: { eventKey: t.eventKey, locale: t.locale, channel: t.channel } },
+    });
+    if (existing) continue;
+    await prisma.notificationTemplate.create({
+      data: { ...t, active: true, isSystem: true },
+    });
+    created++;
+  }
+  console.log(`✔ Plantillas de notificación: ${created} creadas, ${NOTIFICATION_TEMPLATE_SEEDS.length - created} ya existían`);
+}
+
 async function main(): Promise<void> {
   await seedPermissions();
   await seedAdminRole();
+  await seedNotificationTemplates();
   await seedPasswordPolicy();
   await seedBootstrapAdmin();
   await seedDemoUser();

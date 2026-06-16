@@ -424,6 +424,97 @@ export class SchedulesService {
     return rows.map((r) => r.roleId);
   }
 
+  // --- Notificaciones (Bloque N): rondas vencidas ----------------------------
+
+  /**
+   * Genera ocurrencias de TODOS los horarios activos (system-level, SIN scope de
+   * usuario). Lo usa el SWEEPER de notificaciones ANTES de escanear vencidas: las
+   * ocurrencias se materializan lazy (al listar) + marca de agua, así que sin esto
+   * las rondas que NADIE abrió no existen como filas y se perderían sus avisos.
+   */
+  async generateAllActive(): Promise<number> {
+    const schedules = await this.prisma.logSchedule.findMany({ where: { deletedAt: null, active: true } });
+    let generated = 0;
+    for (const s of schedules) generated += await this.generateForSchedule(s);
+    return generated;
+  }
+
+  /** Ids de ocurrencias VENCIDAS (PENDING && dueAt<now), system-wide, para el sweeper. */
+  async findOverdueOccurrenceIds(limit = 200): Promise<string[]> {
+    const rows = await this.prisma.roundOccurrence.findMany({
+      where: { status: "PENDING", dueAt: { lt: new Date() } },
+      select: { id: true },
+      orderBy: { dueAt: "asc" },
+      take: limit,
+    });
+    return rows.map((r) => r.id);
+  }
+
+  /**
+   * Destinatarios + datos de una ronda vencida para el dispatcher de notificaciones.
+   * Reusa la responsabilidad del worklist (2.3.1): el ROL RESPONSABLE del horario
+   * (∈ roles del usuario), NUNCA el equipo (un activo no expande a personas). Filtra
+   * por ABAC (nodo ∩ plantilla). Sin rol responsable ⇒ sin destinatario DERIVADO (las
+   * suscripciones explícitas lo cubren; el fan-out por nodo para correo = BACKLOG).
+   * Devuelve `null` si la ocurrencia dejó de estar vencida-pendiente (carrera con
+   * iniciar/omitir entre el barrido y el despacho).
+   */
+  async resolveOverdueRecipients(occurrenceId: string): Promise<{
+    userIds: string[];
+    orgNodeId: string;
+    templateId: string;
+    scheduleName: string | null;
+    templateName: string | null;
+    nodeName: string | null;
+    equipmentTag: string | null;
+    scheduledFor: Date;
+    dueAt: Date;
+  } | null> {
+    const occ = await this.prisma.roundOccurrence.findUnique({
+      where: { id: occurrenceId },
+      include: {
+        schedule: {
+          select: {
+            responsibleRoleId: true,
+            name: true,
+            template: { select: { name: true } },
+            orgNode: { select: { name: true } },
+            equipment: { select: { tag: true } },
+          },
+        },
+      },
+    });
+    if (!occ || occ.status !== "PENDING" || occ.dueAt >= new Date()) return null;
+    let userIds: string[] = [];
+    const roleId = occ.schedule?.responsibleRoleId ?? null;
+    if (roleId) {
+      const rows = await this.prisma.userRole.findMany({ where: { roleId }, select: { userId: true } });
+      userIds = await this.filterUsersByAccess([...new Set(rows.map((r) => r.userId))], occ.orgNodeId, occ.templateId);
+    }
+    return {
+      userIds,
+      orgNodeId: occ.orgNodeId,
+      templateId: occ.templateId,
+      scheduleName: occ.schedule?.name ?? null,
+      templateName: occ.schedule?.template?.name ?? null,
+      nodeName: occ.schedule?.orgNode?.name ?? null,
+      equipmentTag: occ.schedule?.equipment?.tag ?? null,
+      scheduledFor: occ.scheduledFor,
+      dueAt: occ.dueAt,
+    };
+  }
+
+  /** Filtra usuarios a los que alcanzan el nodo Y la plantilla (ABAC, ambos ejes). */
+  private async filterUsersByAccess(userIds: string[], orgNodeId: string, templateId: string): Promise<string[]> {
+    const out: string[] = [];
+    for (const uid of userIds) {
+      if ((await this.scope.canAccessNode(uid, orgNodeId)) && (await this.scope.canAccessTemplate(uid, templateId))) {
+        out.push(uid);
+      }
+    }
+    return out;
+  }
+
   // --- Validación / helpers ---------------------------------------------------
 
   private async validateScheduleTarget(

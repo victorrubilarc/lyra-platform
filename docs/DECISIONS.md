@@ -4,6 +4,53 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-16 · Bloque N — Notificaciones (motor de avisos por correo) — 🔵 PLAN APROBADO (forks resueltos con el dueño; en implementación, `feat/notificaciones`)
+
+Motor de notificaciones premium **solo correo** (SMS/WhatsApp fuera de alcance), on-prem, fundacional para Fase 4 y para
+cablear los avisos diferidos de **rondas vencidas** (2.3) y **SLA** (workflow-sla). Reusa el `EmailService` abstracto existente
+como transporte. **Forks resueltos con el dueño + 2 correcciones de correctness de la sesión de Rondas:**
+
+1. **Entrega = Transactional Outbox + worker (NO BullMQ).** *Motivo:* la fila de outbox ES la "bandeja de salida"
+   (Req-1/Req-5) — un solo modelo cubre durabilidad + reintentos + auditoría; el `INSERT` va atómico con el cambio de dominio
+   (BullMQ `add()` no es transaccional con Postgres ⇒ dual-write); degradación elegante si SMTP cae (PENDING/FAILED+backoff).
+   BullMQ queda como swap de escala (Fase 7) tras la misma interfaz `NotificationChannel`. Costo: se suma `@nestjs/schedule`
+   (dep oficial mínima) = **primera infra de cron del proyecto** (tick del dispatcher/sender/sweeper).
+2. **Plantillas de mensaje CONFIGURABLES en DB** (`NotificationTemplate` por evento×locale×canal, asunto+cuerpo text/html),
+   con seed de defaults (funciona out-of-the-box, editable por admin). Render con placeholders `{{var}}` **whitelisteados por
+   evento, SIN eval** (misma postura segura que el motor de reglas/AST). Estándar ServiceNow/Jira.
+3. **Outbox de 2 ETAPAS (corrección #4):** en la tx del dominio (`executeTransition`) se inserta un `NotificationEvent` mínimo
+   (eventKey + payload de ids + dedupeKey); la **resolución de destinatarios + render** ocurren en el dispatcher (tick), NO en la
+   tx (la resolución es pesada y no debe alargar la transición). Un crash entre commit y envío no pierde el evento.
+4. **Eventos del MVP (4, catálogo extensible en CÓDIGO `NOTIFICATION_EVENTS`):** `round.overdue`, `entry.sla.breached`,
+   `entry.transition`, `entry.signature.pending`. Tx-driven (transition/signature) vs DERIVED-driven (overdue/SLA, vía sweeper).
+5. **Destinatarios de `round.overdue` = `LogSchedule.responsibleRoleId` (corrección #1), NO el equipo.** Un equipo
+   (`equipmentId`) es un ACTIVO, no expande a personas. Reusa la lógica del worklist (2.3.1) invertida: usuarios cuyos roles
+   incluyen el `responsibleRoleId` (o fallback nodo+turno si es null), ∩ `scopeFilters` (nodo ∩ plantilla ABAC). La ocurrencia
+   denormaliza `orgNodeId`+`templateId` ⇒ el ABAC aplica aunque aún no exista `LogEntry`.
+6. **El sweeper GENERA antes de escanear (corrección #2).** Las `RoundOccurrence` se materializan lazy (al listar) + watermark;
+   nada corre en `dueAt`. El sweeper invoca el generador idempotente system-level (`generateAllActive`, sin scope de usuario)
+   ANTES de buscar vencidas, o las rondas que nadie abrió no existen como filas y se perderían los avisos.
+7. **Resolución de destinatarios con ABAC obligatorio:** unión de suscripción explícita ∪ rol-derivado ∪ asignación-derivada
+   (roleNames del estado destino para transition; responsibleRole para overdue) → expandir a usuarios → **filtro ABAC**
+   (`getAccessibleNodeIds` + alcance de plantilla) → quitar opt-outs/duplicados. NUNCA se notifica algo que el destinatario no
+   podría ver (sin fuga de alcance de datos).
+8. **Dedup explícito para eventos DERIVED (corrección #5):** una vez por ocurrencia/breach por destinatario —
+   `dedupeKey = round.overdue|{occurrenceId}|{userId}` y `entry.sla.breached|{entryId}|{stateSince}|{userId}` (`NotificationOutbox.dedupeKey`
+   único). Escalamiento por tiers (recordatorio diario) = diferido.
+9. **Preferencias = inmediato + opt-in/out; digest DISEÑADO pero diferido.** `NotificationPreference (userId,eventKey,channel)→mode
+   IMMEDIATE|DIGEST|OFF`; el MVP entrega solo IMMEDIATE + permite opt-out y suscripción (opt-in). Dato PERSONAL ⇒ autorización por
+   **ownership** (patrón `SavedView`), sin permiso RBAC.
+10. **Canal abstracto:** interfaz `NotificationChannel` con solo `EmailChannel` (reusa `EmailService`); `NotificationOutbox.channel`
+    (EMAIL hoy; INAPP/SMS futuros sin tocar el motor).
+11. **4 permisos nuevos (catálogo 63→67):** `module:notifications:view`, `notiftemplate:manage`, `notification:view-outbox`,
+    `notification:admin` (suscripciones/config). *Mis preferencias propias* = ownership, sin permiso.
+
+**Modelo (5 entidades aditivas, sin tocar tablas):** `NotificationEvent` (cola transaccional), `NotificationOutbox` (bandeja +
+registro de envío), `NotificationTemplate` (gobernanza viva), `NotificationSubscription` (watchers), `NotificationPreference`
+(ownership). Catálogo de eventos en código (no tabla). **UI:** Plantillas · Bandeja de salida · Mis notificaciones.
+
+---
+
 ### 2026-06-16 · Fase 2.3.1 — Worklist de rondas (separar PLANIFICAR de EJECUTAR) — ✅ IMPLEMENTADO (`feat/rondas-worklist` → `main`)
 
 Implementación del refinamiento aprobado el 2026-06-15 (diseño abajo). **4 forks resueltos con el dueño antes de codear**

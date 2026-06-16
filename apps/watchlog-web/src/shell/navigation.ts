@@ -1,4 +1,4 @@
-import { BookOpenCheck, CalendarClock, CalendarRange, FilePlus2, GitBranch, LayoutDashboard, Layers, ListChecks, ListTodo, Network, Route, Settings, ShieldCheck, UserCog, type LucideIcon } from "lucide-react";
+import { Bell, BookOpenCheck, CalendarClock, CalendarRange, FilePlus2, GitBranch, LayoutDashboard, Layers, ListChecks, ListTodo, Network, Route, Settings, ShieldCheck, UserCog, type LucideIcon } from "lucide-react";
 import type { Permission } from "@lyra/permissions";
 
 /**
@@ -103,6 +103,14 @@ export const ROUTES: readonly NavRoute[] = [
     permission: "module:security:view",
     inSidebar: true,
   },
+  // Motor de avisos por correo (Bloque N): plantillas + bandeja de salida + preferencias.
+  {
+    path: "/notificaciones",
+    labelKey: "nav.notifications",
+    icon: Bell,
+    permission: "module:notifications:view",
+    inSidebar: true,
+  },
   {
     path: "/configuracion",
     labelKey: "nav.settings",
@@ -111,6 +119,8 @@ export const ROUTES: readonly NavRoute[] = [
     inSidebar: true,
   },
   { path: "/perfil/seguridad", labelKey: "topbar.mySecurity", icon: UserCog },
+  // Preferencias de aviso propias (accesible a todo usuario): vive en el menú de perfil.
+  { path: "/mis-notificaciones", labelKey: "topbar.myNotifications", icon: Bell },
 ] as const;
 
 export function routeByPath(path: string): NavRoute | undefined {

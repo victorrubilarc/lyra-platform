@@ -1,5 +1,40 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-16 — Bloque N: Notificaciones (motor de avisos por correo) ✅** (`feat/notificaciones` → `main`). Motor PREMIUM
+solo-correo (SMS/WhatsApp fuera de alcance), on-prem, fundacional para Fase 4 y para los avisos diferidos de rondas vencidas
+(2.3) y SLA (workflow-sla). Estándar ServiceNow (sys_email + templates) · Jira (notification schemes + watchers) · SAP/Maximo.
+**Arquitectura = Transactional Outbox de 2 ETAPAS + worker** (NO BullMQ — la fila de outbox ES la bandeja Req-1/Req-5; INSERT
+atómico con el cambio de dominio; degradación con backoff si SMTP cae): se suma **`@nestjs/schedule`** = primera infra de cron del
+proyecto. **Modelo (5 entidades aditivas, referencias BLANDAS sin FK — patrón AuditLog, no toca tablas existentes):**
+`NotificationEvent` (cola tx, dedupeKey único para eventos DERIVED), `NotificationOutbox` (bandeja + registro de envío,
+PENDING/SENT/FAILED/SUPPRESSED + backoff + dedupeKey), `NotificationTemplate` (gobernanza viva por evento×locale×canal),
+`NotificationSubscription` (watchers), `NotificationPreference` (ownership). Catálogo de **EVENTOS en CÓDIGO**
+(`@lyra/contracts NOTIFICATION_EVENTS`, 4: `round.overdue`/`entry.sla.breached`/`entry.transition`/`entry.signature.pending`)
+con variables WHITELISTEADAS; **render sin eval** (`renderTemplate`, placeholders `{{...}}`, misma postura que el motor de
+reglas). **Contratos:** enums + schemas (template/subscription/preference/outbox) + render puro testeado + **4 permisos**
+(`module:notifications:view`, `notiftemplate:manage`, `notification:view-outbox`, `notification:admin`; catálogo **63→67**;
+*mis preferencias* = ownership, sin permiso). **API `notifications/`:** `NotificationEmitterService` (etapa 1, @Global Prisma-only,
+inyectado en `executeTransition` para emitir DENTRO de la tx — corrección de correctness #4: no se pierde el evento ante un crash
+post-commit), `NotificationChannel`+`EmailChannel` (reusa `EmailService`), `NotificationResolverService` (etapa 2: resuelve
+destinatarios + render, **ABAC obligatorio** `canAccessNode`∩`canAccessTemplate` — nunca avisa lo que el destinatario no podría
+ver), `NotificationWorkerService` (3 `@Cron`: **sweeper** [GENERA rondas primero — corrección #2 — luego escanea vencidas + SLA
+breaches vía raw query espejo de `delayedEntryIds`], **dispatcher**, **sender** con backoff), `NotificationsService` (CRUD
+plantillas/suscripciones + preferencias propias + bandeja), controller (`/notifications/*` + `POST /run` para ops/smoke).
+**Destinatarios de `round.overdue` = `LogSchedule.responsibleRoleId`** (NO el equipo — corrección #1; un activo no expande a
+personas), reusa la lógica del worklist 2.3.1; **dedup** una vez por ocurrencia/breach por destinatario (#5). **Migración aditiva**
+`20260616120000_add_notifications` (5 tablas + 4 enums; se quitó del diff un `DROP INDEX` AJENO de otra rama). **Seed** de 4
+plantillas default (es-CL, HTML branded; idempotente). **Web** (`features/notifications/`): página `/notificaciones` (sidebar,
+`module:notifications:view`, pestañas **Correo saliente** [filtros + reintento + vista previa HTML en iframe], **Plantillas**
+[editor con chips de variables + validación de whitelist], **Mis preferencias**) + `/mis-notificaciones` (perfil, todo usuario) +
+ítem de menú + i18n es-CL + tokens Lyra. **Suscripciones = API+modelo listos, UI diferida.** Tests: **contracts 255** (+6 render) ·
+API **234** (specs de log-entries actualizados al 12.º arg `notifications`). **Smoke en vivo `scripts/smoke-notificaciones.py`
+17/17** (catálogo+plantillas; whitelist 400/200; round.overdue end-to-end → bandeja SENT + MAILPIT renderizado sin `{{}}` a los
+N destinatarios del rol responsable; dedup estable tras re-correr; opt-out suprime; gates 403 no-admin; crea y LIMPIA por ID).
+typecheck/lint(0)/build verdes. **Pendiente: smoke VISUAL del dueño** (§4). **Deuda diferida (BACKLOG):** digest/batching ·
+UI de suscripciones · escalamiento por tiers · fan-out por nodo para correo cuando `responsibleRoleId` es null (hoy
+subscriptions-only) · smoke en vivo de transition/SLA/signature (resolvers typecheck+wired; el end-to-end se cubrió vía overdue) ·
+canal in-app/SMS. **Siguiente: Fase 4 — Incidencias** (arranca con la cañería de notificaciones lista).
+
 **2026-06-16 — Fase 2.3.1: Worklist de rondas (separar PLANIFICAR de EJECUTAR) ✅** (`feat/rondas-worklist` → `main`).
 Refinamiento aprobado tras el MVP de 2.3: la pantalla única `/rondas` mezclaba **crear horarios** (planificador) con
 **iniciar/omitir** (operador); el dueño lo halló poco natural. Estándar (SAP PM Maintenance Plan vs *My Maintenance Tasks*/Fiori ·
