@@ -4,10 +4,12 @@ import {
   createLogScheduleRequestSchema,
   updateLogScheduleRequestSchema,
   occurrenceQuerySchema,
+  myRoundsQuerySchema,
   skipOccurrenceRequestSchema,
   type CreateLogScheduleRequest,
   type UpdateLogScheduleRequest,
   type OccurrenceQuery,
+  type MyRoundsQuery,
   type SkipOccurrenceRequest,
 } from "@lyra/contracts";
 import type { AuditContext } from "../audit/audit.service";
@@ -42,6 +44,32 @@ export class SchedulesController {
   @RequirePermission("schedule:view")
   occurrenceStats(@CurrentUser() user: RequestUser) {
     return this.schedules.occurrenceStats(user.id);
+  }
+
+  // --- Worklist del operador ("Mis rondas", 2.3.1) ---------------------------
+  // Acotado al usuario: roles ∩ nodos accesibles ∩ rol responsable (o fallback).
+  // Gateado por el permiso de EJECUCIÓN, no por el de planificación.
+
+  @Get("my-rounds")
+  @RequirePermission("round:execute")
+  myRounds(
+    @Query(new ZodValidationPipe(myRoundsQuerySchema)) q: MyRoundsQuery,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.schedules.listMyRounds(user.id, q);
+  }
+
+  @Get("my-rounds/stats")
+  @RequirePermission("round:execute")
+  myRoundsStats(@CurrentUser() user: RequestUser) {
+    return this.schedules.myRoundsStats(user.id);
+  }
+
+  /** Roles para el selector de "rol responsable" del planificador (decoplado de role:read). */
+  @Get("role-options")
+  @RequirePermission("schedule:manage")
+  roleOptions() {
+    return this.schedules.roleOptions();
   }
 
   @Get(":id")
@@ -88,7 +116,7 @@ export class SchedulesController {
   // --- Ocurrencias -----------------------------------------------------------
 
   @Post("occurrences/:id/start")
-  @RequirePermission("schedule:manage")
+  @RequirePermission("round:execute")
   start(
     @Param("id") id: string,
     @Body() body: { equipmentId?: string | null },
@@ -99,7 +127,7 @@ export class SchedulesController {
   }
 
   @Post("occurrences/:id/skip")
-  @RequirePermission("schedule:manage")
+  @RequirePermission("round:execute")
   skip(
     @Param("id") id: string,
     @Body(new ZodValidationPipe(skipOccurrenceRequestSchema)) dto: SkipOccurrenceRequest,

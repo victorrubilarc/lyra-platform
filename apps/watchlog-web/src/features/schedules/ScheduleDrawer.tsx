@@ -10,7 +10,7 @@ import type {
 import { SCHEDULABLE_RECURRENCE_KINDS } from "@lyra/contracts";
 import { useAvailableTemplates } from "../log-entries/log-entries-queries.js";
 import { fetchTemplateEligibleNodes } from "../log-entries/log-entries-api.js";
-import { useCreateSchedule, useUpdateSchedule } from "./schedules-queries.js";
+import { useCreateSchedule, useScheduleRoleOptions, useUpdateSchedule } from "./schedules-queries.js";
 
 const WEEKDAYS = [
   { v: 1, l: "Lun" },
@@ -41,11 +41,13 @@ export function ScheduleDrawer({ open, schedule, onClose }: Props) {
   const create = useCreateSchedule();
   const update = useUpdateSchedule();
   const templates = useAvailableTemplates();
+  const roles = useScheduleRoleOptions(open);
 
   const [name, setName] = useState("");
   const [templateId, setTemplateId] = useState<string | null>(null);
   const [orgNodeId, setOrgNodeId] = useState<string | null>(null);
   const [equipmentId, setEquipmentId] = useState<string | null>(null);
+  const [responsibleRoleId, setResponsibleRoleId] = useState<string | null>(null);
   const [kind, setKind] = useState<Exclude<RecurrenceKind, "NONE">>("SHIFT");
   const [shiftCodes, setShiftCodes] = useState("");
   const [everyMinutes, setEveryMinutes] = useState(360);
@@ -72,6 +74,7 @@ export function ScheduleDrawer({ open, schedule, onClose }: Props) {
       setTemplateId(schedule.templateId);
       setOrgNodeId(schedule.orgNodeId);
       setEquipmentId(schedule.equipmentId);
+      setResponsibleRoleId(schedule.responsibleRoleId);
       setKind((schedule.recurrenceKind === "NONE" ? "SHIFT" : schedule.recurrenceKind) as Exclude<RecurrenceKind, "NONE">);
       setShiftCodes(Array.isArray(c.shiftCodes) ? (c.shiftCodes as string[]).join(", ") : "");
       setEveryMinutes(typeof c.everyMinutes === "number" ? c.everyMinutes : 360);
@@ -82,7 +85,7 @@ export function ScheduleDrawer({ open, schedule, onClose }: Props) {
       setHorizonDays(schedule.horizonDays);
       setActive(schedule.active);
     } else {
-      setName(""); setTemplateId(null); setOrgNodeId(null); setEquipmentId(null);
+      setName(""); setTemplateId(null); setOrgNodeId(null); setEquipmentId(null); setResponsibleRoleId(null);
       setKind("SHIFT"); setShiftCodes(""); setEveryMinutes(360); setAnchorTime("");
       setTimes("08:00"); setWeekdays([]); setDueWindowMinutes(720); setHorizonDays(2); setActive(true);
     }
@@ -112,6 +115,7 @@ export function ScheduleDrawer({ open, schedule, onClose }: Props) {
         const dto: UpdateLogScheduleRequest = {
           name: name.trim() || null,
           equipmentId,
+          responsibleRoleId,
           recurrenceKind: kind,
           recurrenceConfig,
           dueWindowMinutes,
@@ -126,6 +130,7 @@ export function ScheduleDrawer({ open, schedule, onClose }: Props) {
           templateId: templateId!,
           orgNodeId: orgNodeId!,
           equipmentId,
+          responsibleRoleId,
           recurrenceKind: kind,
           recurrenceConfig,
           dueWindowMinutes,
@@ -196,6 +201,17 @@ export function ScheduleDrawer({ open, schedule, onClose }: Props) {
             )}
           </FormField>
         )}
+
+        <FormField label="Rol responsable (opcional)" hint="Quién ejecuta la ronda en su worklist «Mis rondas». Vacío = visible a todos los del nodo en el turno.">
+          {() => (
+            <Combobox
+              options={(roles.data ?? []).map((r) => ({ value: r.id, label: r.name }))}
+              value={responsibleRoleId}
+              onChange={setResponsibleRoleId}
+              placeholder="Sin rol responsable"
+            />
+          )}
+        </FormField>
 
         <FormField label="Recurrencia" required>
           {({ id }) => (

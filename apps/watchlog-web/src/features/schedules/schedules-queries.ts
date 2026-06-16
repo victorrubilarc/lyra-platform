@@ -1,10 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { CreateLogScheduleRequest, UpdateLogScheduleRequest, OccurrenceQuery } from "@lyra/contracts";
+import type { CreateLogScheduleRequest, UpdateLogScheduleRequest, OccurrenceQuery, MyRoundsQuery } from "@lyra/contracts";
 import {
   createSchedule,
   deleteSchedule,
+  fetchMyRounds,
+  fetchMyRoundsStats,
   fetchOccurrenceStats,
   fetchOccurrences,
+  fetchScheduleRoleOptions,
   fetchSchedules,
   generateSchedules,
   skipOccurrence,
@@ -17,6 +20,9 @@ export const SCHEDULE_KEYS = {
   list: () => ["schedules", "list"] as const,
   occurrences: (q: OccurrenceQuery) => ["schedules", "occurrences", q] as const,
   stats: () => ["schedules", "stats"] as const,
+  myRounds: (q: MyRoundsQuery) => ["schedules", "my-rounds", q] as const,
+  myRoundsStats: () => ["schedules", "my-rounds", "stats"] as const,
+  roleOptions: () => ["schedules", "role-options"] as const,
 };
 
 export function useSchedules() {
@@ -29,6 +35,18 @@ export function useOccurrences(q: OccurrenceQuery = {}) {
 
 export function useOccurrenceStats(enabled = true) {
   return useQuery({ queryKey: SCHEDULE_KEYS.stats(), queryFn: fetchOccurrenceStats, enabled });
+}
+
+export function useMyRounds(q: MyRoundsQuery = {}) {
+  return useQuery({ queryKey: SCHEDULE_KEYS.myRounds(q), queryFn: () => fetchMyRounds(q) });
+}
+
+export function useMyRoundsStats(enabled = true) {
+  return useQuery({ queryKey: SCHEDULE_KEYS.myRoundsStats(), queryFn: fetchMyRoundsStats, enabled });
+}
+
+export function useScheduleRoleOptions(enabled = true) {
+  return useQuery({ queryKey: SCHEDULE_KEYS.roleOptions(), queryFn: fetchScheduleRoleOptions, enabled });
 }
 
 function invalidateAll(qc: ReturnType<typeof useQueryClient>): void {

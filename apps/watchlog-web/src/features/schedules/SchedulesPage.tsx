@@ -1,8 +1,7 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { AlertTriangle, CalendarClock, Play, Plus, RefreshCw, SkipForward, Trash2 } from "lucide-react";
-import { Button, Card, Chip, EmptyState, Input, Modal, Table, useToast, type TableColumn } from "@lyra/ui";
-import type { LogScheduleDto, OccurrenceQuery, RoundOccurrenceDto } from "@lyra/contracts";
+import { AlertTriangle, CalendarClock, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { Button, Card, Chip, EmptyState, Table, useToast, type TableColumn } from "@lyra/ui";
+import type { LogScheduleDto, OccurrenceQuery } from "@lyra/contracts";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { formatDateTime, formatDuration } from "../../lib/format.js";
 import {
@@ -11,8 +10,6 @@ import {
   useOccurrences,
   useOccurrenceStats,
   useSchedules,
-  useSkipOccurrence,
-  useStartOccurrence,
 } from "./schedules-queries.js";
 import { ScheduleDrawer } from "./ScheduleDrawer.js";
 import styles from "./SchedulesPage.module.css";
@@ -26,11 +23,14 @@ const KIND_LABEL: Record<string, string> = {
 
 type OccFilter = "all" | "overdue" | "today";
 
-/** Programa de rondas: ocurrencias pendientes/vencidas + gestión de horarios. */
+/**
+ * Programación de rondas (PLANIFICADOR, 2.3.1): CRUD de horarios + monitoreo
+ * read-only de las ocurrencias. La EJECUCIÓN (iniciar/omitir) vive en el worklist
+ * del operador "Mis rondas" (/mis-rondas), gateado por `round:execute`.
+ */
 export function SchedulesPage() {
   const { can } = usePermissions();
   const manage = can("schedule:manage");
-  const navigate = useNavigate();
   const toast = useToast();
 
   const [filter, setFilter] = useState<OccFilter>("all");
@@ -40,35 +40,10 @@ export function SchedulesPage() {
   const schedules = useSchedules();
 
   const generate = useGenerateSchedules();
-  const start = useStartOccurrence();
-  const skip = useSkipOccurrence();
   const removeSchedule = useDeleteSchedule();
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<LogScheduleDto | null>(null);
-  const [skipping, setSkipping] = useState<RoundOccurrenceDto | null>(null);
-  const [skipReason, setSkipReason] = useState("");
-
-  async function onStart(occ: RoundOccurrenceDto) {
-    try {
-      const r = await start.mutateAsync({ id: occ.id });
-      navigate(`/bitacoras/${r.logEntryId}/editar`);
-    } catch (e) {
-      toast.error(`No se pudo iniciar la ronda: ${(e as Error).message}`);
-    }
-  }
-
-  async function confirmSkip() {
-    if (!skipping || skipReason.trim().length < 5) return;
-    try {
-      await skip.mutateAsync({ id: skipping.id, reason: skipReason.trim() });
-      toast.success("Ronda omitida");
-      setSkipping(null);
-      setSkipReason("");
-    } catch (e) {
-      toast.error(`No se pudo omitir: ${(e as Error).message}`);
-    }
-  }
 
   async function onGenerate() {
     try {
@@ -93,6 +68,7 @@ export function SchedulesPage() {
     { key: "name", header: "Horario", render: (s) => <span className={styles.strong}>{s.name ?? s.templateName ?? "—"}</span> },
     { key: "template", header: "Plantilla", render: (s) => s.templateName ?? "—" },
     { key: "node", header: "Nodo", render: (s) => <>{s.orgNodeName ?? "—"}{s.equipmentTag ? <span className={styles.muted}> · {s.equipmentTag}</span> : null}</> },
+    { key: "responsible", header: "Responsable", render: (s) => s.responsibleRoleName ? <Chip label={s.responsibleRoleName} variant="info" /> : <span className={styles.muted}>Todos del nodo</span> },
     { key: "kind", header: "Recurrencia", render: (s) => KIND_LABEL[s.recurrenceKind] ?? s.recurrenceKind },
     { key: "pending", header: "Pendientes", render: (s) => (
       <span>{s.pendingCount ?? 0}{(s.overdueCount ?? 0) > 0 ? <Chip label={`${s.overdueCount} vencidas`} variant="error" className={styles.chip} /> : null}</span>
@@ -114,8 +90,8 @@ export function SchedulesPage() {
     <div className={styles.page}>
       <header className={styles.header}>
         <div>
-          <h1 className={styles.title}>Rondas</h1>
-          <p className={styles.subtitle}>Programación de rondas operacionales (turno / intervalo / calendario).</p>
+          <h1 className={styles.title}>Programación de rondas</h1>
+          <p className={styles.subtitle}>Define los horarios de rondas (turno / intervalo / calendario). Los operadores las ejecutan desde «Mis rondas».</p>
         </div>
         <div className={styles.headerActions}>
           {manage && (
@@ -138,10 +114,27 @@ export function SchedulesPage() {
         <Card className={styles.kpi}><span className={styles.kpiValue}>{stats.data?.today ?? "—"}</span><span className={styles.kpiLabel}>De hoy</span></Card>
       </div>
 
-      {/* Ocurrencias */}
+      {/* Horarios */}
       <Card className={styles.section}>
         <div className={styles.sectionHead}>
-          <h2 className={styles.sectionTitle}><CalendarClock size={18} /> Rondas {filter === "overdue" ? "vencidas" : filter === "today" ? "de hoy" : "pendientes"}</h2>
+          <h2 className={styles.sectionTitle}>Horarios programados</h2>
+        </div>
+        {schedules.isLoading ? (
+          <p className={styles.muted}>Cargando…</p>
+        ) : (schedules.data ?? []).length === 0 ? (
+          <EmptyState
+            title="Sin horarios"
+            description={manage ? "Cree un horario para que las rondas se abran automáticamente." : "No hay horarios de ronda configurados."}
+          />
+        ) : (
+          <Table data={schedules.data ?? []} columns={scheduleColumns} rowKey={(s) => s.id} />
+        )}
+      </Card>
+
+      {/* Monitoreo read-only de ocurrencias (la ejecución vive en "Mis rondas") */}
+      <Card className={styles.section}>
+        <div className={styles.sectionHead}>
+          <h2 className={styles.sectionTitle}><CalendarClock size={18} /> Ocurrencias {filter === "overdue" ? "vencidas" : filter === "today" ? "de hoy" : "pendientes"}</h2>
           <div className={styles.filters}>
             <Button variant={filter === "all" ? "primary" : "secondary"} onClick={() => setFilter("all")}>Pendientes</Button>
             <Button variant={filter === "today" ? "primary" : "secondary"} onClick={() => setFilter("today")}>Hoy</Button>
@@ -151,7 +144,7 @@ export function SchedulesPage() {
         {occurrences.isLoading ? (
           <p className={styles.muted}>Cargando…</p>
         ) : (occurrences.data ?? []).length === 0 ? (
-          <EmptyState title="Sin rondas" description="No hay rondas pendientes para este filtro." />
+          <EmptyState title="Sin rondas" description="No hay ocurrencias para este filtro." />
         ) : (
           <ul className={styles.occList}>
             {(occurrences.data ?? []).map((o) => (
@@ -173,57 +166,13 @@ export function SchedulesPage() {
                     {o.logEntryId ? <Chip label="En curso" variant="info" className={styles.chip} /> : null}
                   </div>
                 </div>
-                {manage && (
-                  <div className={styles.occActions}>
-                    <Button onClick={() => onStart(o)} disabled={start.isPending}>
-                      <Play size={15} /> {o.logEntryId ? "Continuar" : "Iniciar"}
-                    </Button>
-                    {!o.logEntryId && (
-                      <Button variant="secondary" onClick={() => { setSkipping(o); setSkipReason(""); }}>
-                        <SkipForward size={15} /> Omitir
-                      </Button>
-                    )}
-                  </div>
-                )}
               </li>
             ))}
           </ul>
         )}
       </Card>
 
-      {/* Horarios */}
-      <Card className={styles.section}>
-        <div className={styles.sectionHead}>
-          <h2 className={styles.sectionTitle}>Horarios programados</h2>
-        </div>
-        {schedules.isLoading ? (
-          <p className={styles.muted}>Cargando…</p>
-        ) : (schedules.data ?? []).length === 0 ? (
-          <EmptyState
-            title="Sin horarios"
-            description={manage ? "Cree un horario para que las rondas se abran automáticamente." : "No hay horarios de ronda configurados."}
-          />
-        ) : (
-          <Table data={schedules.data ?? []} columns={scheduleColumns} rowKey={(s) => s.id} />
-        )}
-      </Card>
-
       <ScheduleDrawer open={drawerOpen} schedule={editing} onClose={() => setDrawerOpen(false)} />
-
-      <Modal
-        open={!!skipping}
-        onClose={() => setSkipping(null)}
-        title="Omitir ronda"
-        footer={
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-            <Button variant="secondary" onClick={() => setSkipping(null)}>Cancelar</Button>
-            <Button variant="danger" onClick={confirmSkip} disabled={skipReason.trim().length < 5 || skip.isPending}>Omitir</Button>
-          </div>
-        }
-      >
-        <p className={styles.muted}>Indique el motivo (queda auditado). La ronda no se realizará.</p>
-        <Input value={skipReason} onChange={(e) => setSkipReason(e.target.value)} placeholder="Motivo de la omisión…" autoFocus />
-      </Modal>
     </div>
   );
 }

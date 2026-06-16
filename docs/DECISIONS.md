@@ -4,6 +4,44 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-16 · Fase 2.3.1 — Worklist de rondas (separar PLANIFICAR de EJECUTAR) — ✅ IMPLEMENTADO (`feat/rondas-worklist` → `main`)
+
+Implementación del refinamiento aprobado el 2026-06-15 (diseño abajo). **4 forks resueltos con el dueño antes de codear**
+(recomendación aceptada en los 4):
+
+1. **Permiso de ejecución = `round:execute`** (no `schedule:execute`). *Motivo:* el operador actúa sobre la **ronda**
+   (`RoundOccurrence`), no sobre el horario; namespace propio de recurso, como `logentry:*` (instancia) vs `template:*`
+   (definición). Gatea **ver + ejecutar** "Mis rondas" (un solo permiso, patrón My Maintenance Tasks/Fiori — sin un 4.º
+   `round:view`). `schedule:view` (ver el planificador) y `schedule:manage` (CRUD horarios + Generar) quedan como estaban;
+   **start/skip se MOVIERON** de `schedule:manage` a `round:execute`. Catálogo **62→63** (grupo `schedules`). El operador además
+   necesita `logentry:fill`/`logentry:view` (config de rol) para LLENAR la entrada creada al iniciar.
+2. **Rol responsable SINGLE** = `LogSchedule.responsibleRoleId String?` nullable (FK `Role`, `onDelete: SetNull`). *Motivo:*
+   estándar SAP PM/Maximo (responsable único por plan); migración aditiva trivial; el fallback `null` cubre "todos del área". A
+   join multi-rol = aditivo si surge (BACKLOG).
+3. **Responsabilidad EN VIVO (join), no denormalizada al slot.** A diferencia de las dimensiones de tiempo
+   (`shiftCode`/`operationalDate`, que no deben cambiar), la responsabilidad es una **asignación** que legítimamente cambia:
+   reasignar el rol del horario **re-enruta las pendientes** al worklist correcto de inmediato. Además evita una columna +
+   backfill en `RoundOccurrence`. El worklist filtra `schedule: { OR: [{responsibleRoleId: null}, {responsibleRoleId: {in: misRoles}}] }`.
+4. **Filtro de turno = suave conmutable** (no muro duro). Default del worklist = `PENDING ∩ nodos accesibles ∩ responsabilidad ∩
+   hoy+arrastre vencido` (no oculta lo heredado del turno anterior — entrega ISA-95); toggles **Mi turno** (`shiftCode` =
+   `ShiftResolver.resolve(now,null)`, espejo de `myShiftFilter`), **Vencidas** (`dueAt<now`), **Próximas** (`includeUpcoming`).
+
+**Rutas/superficies (recomendaciones aceptadas):** operador en **`/mis-rondas`** (nuevo, gate `round:execute`, clúster operador
+tras Bitácoras); planificador **se queda en `/rondas`** relabel **"Programación de rondas"** (gate `schedule:view`), sin acciones
+de ejecución (queda CRUD + KPIs + Generar + **monitoreo read-only** de ocurrencias). **Widget en Inicio** (`/`, solo con
+`round:execute` y si hay pendientes: "Tienes N rondas pendientes · M vencidas" → `/mis-rondas`, tile estilo Fiori Launchpad). El
+**badge de `/bitacoras`** pasó de `schedule:view`/`occurrenceStats`/`→/rondas` a **`round:execute`/`my-rounds/stats`/`→/mis-rondas`**
+(es preocupación del operador). **Endpoint propio** `GET /schedules/role-options` (gate `schedule:manage`) para el selector de rol
+responsable, **decoplado de `role:read`** (el planificador no necesita el módulo de seguridad). **API:** `GET /schedules/my-rounds`
++ `/my-rounds/stats` (gate `round:execute`), `responsibleRoleId` en create/update (valida que el rol exista). Migración aditiva
+`20260615220000_add_schedule_responsible_role`. Contracts **249** · API **234** (sin specs nuevos: el scoping ABAC×rol se prueba
+en vivo). **Smoke `smoke-mis-rondas.py` 18/18** (responsable=mi rol/fallback/otro rol; 403 sin permiso; CRUZADO: tras conceder
+`round:execute` al rol operador, su worklist trae SU rol + fallback y NO el del admin; overdueOnly; stats; separación de gates) +
+`smoke-rondas.py` **21/21** sin regresión. typecheck/lint(0)/build verdes. **Pendiente: smoke VISUAL del dueño** (BACKLOG §4).
+**Siguiente: Notificaciones (correo).**
+
+---
+
 ### 2026-06-15 · Fase 2.3.1 — Separar PLANIFICAR de EJECUTAR rondas (decisión de diseño; implementación = sesión propia)
 
 Feedback del dueño tras ver el MVP de rondas: una sola pantalla `/rondas` que mezcla **crear horarios** (planificador)

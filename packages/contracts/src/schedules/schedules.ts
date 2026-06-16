@@ -85,6 +85,14 @@ export const logScheduleSchema = z.object({
   orgNodeName: z.string().optional(),
   equipmentId: z.string().nullable(),
   equipmentTag: z.string().nullable().optional(),
+  /**
+   * Rol responsable de ejecutar la ronda (gobierna el worklist "Mis rondas", 2.3.1):
+   * el horario es del PUESTO, no de una persona (patrón work center/responsible role
+   * de SAP PM / Maximo). `null` = sin rol responsable ⇒ fallback nodo+turno (visible a
+   * todos los que alcanzan el nodo).
+   */
+  responsibleRoleId: z.string().nullable(),
+  responsibleRoleName: z.string().nullable().optional(),
   recurrenceKind: recurrenceKindSchema,
   recurrenceConfig: z.record(z.unknown()),
   /** Minutos tras `scheduledFor` dentro de los que la ronda debe completarse (dueAt). */
@@ -105,6 +113,8 @@ export type LogScheduleDto = z.infer<typeof logScheduleSchema>;
 const logScheduleBodyShape = {
   name: z.string().trim().min(1).max(120).nullable().optional(),
   equipmentId: z.string().trim().min(1).nullable().optional(),
+  /** Rol responsable del worklist (2.3.1). `null` = sin responsable (fallback nodo+turno). */
+  responsibleRoleId: z.string().trim().min(1).nullable().optional(),
   recurrenceKind: recurrenceKindSchema,
   recurrenceConfig: z.record(z.unknown()),
   dueWindowMinutes: z.number().int().min(5).max(525_600), // 5 min .. 1 año
@@ -187,6 +197,22 @@ export const occurrenceQuerySchema = z.object({
   scheduleId: z.string().trim().min(1).optional(),
 });
 export type OccurrenceQuery = z.infer<typeof occurrenceQuerySchema>;
+
+/**
+ * Filtros del worklist del OPERADOR ("Mis rondas", 2.3.1). El backend ya acota a
+ * `status=PENDING ∩ nodos accesibles ∩ (rol responsable ∈ mis roles | sin responsable)`;
+ * estos toggles refinan la vista. Default (sin flags) = pendientes de HOY + arrastre
+ * vencido (no oculta lo heredado del turno anterior — entrega de turno ISA-95).
+ */
+export const myRoundsQuerySchema = z.object({
+  /** Solo vencidas (PENDING && now > dueAt). */
+  overdueOnly: z.coerce.boolean().optional(),
+  /** Solo las del turno vigente del usuario (shiftCode = turno resuelto ahora). */
+  shiftOnly: z.coerce.boolean().optional(),
+  /** Incluir futuras más allá de hoy (default: solo hoy + vencidas). */
+  includeUpcoming: z.coerce.boolean().optional(),
+});
+export type MyRoundsQuery = z.infer<typeof myRoundsQuerySchema>;
 
 /** Omitir una ocurrencia: motivo obligatorio auditado (GxP). */
 export const skipOccurrenceRequestSchema = z.object({

@@ -242,15 +242,22 @@ GxP: MHRA Data Integrity 2018 / FDA DI Q&A (corrección tardía justificada + at
 - **Sin permisos nuevos** (catálogo **60**): `logentry:fill`/`logentry:view` + ABAC ya gobiernan llenar/leer; el alcance de
   la entrada autoriza ver su evidencia.
 
-### Programación de rondas (Fase 2.3) — `LogSchedule` + `RoundOccurrence`
-- **2 permisos nuevos** (catálogo **60→62**): **`schedule:view`** (ver el programa de rondas + ocurrencias; también gatea la
-  pantalla `/rondas`) y **`schedule:manage`** (crear/editar/eliminar horarios; generar/iniciar/omitir ocurrencias). *Motivo:*
-  el **planificador** es un rol distinto del diseñador de la plantilla (patrón maintenance planner de SAP PM / Maximo); por eso
-  NO se reusó `template:edit`. **Llenar** la entrada que abre una ronda reusa `logentry:create` (todas sus guardas ABAC/EAM).
-- **ABAC por nodo**: el listado de horarios/ocurrencias se filtra por los nodos accesibles del usuario (`getAccessibleNodeIds`,
-  `null`=sin restricción); crear/iniciar valida `canAccessNode` + que el nodo pertenezca al alcance de la plantilla + equipo del
-  nodo. **Iniciar una ronda** delega en `LogEntriesService.create`, que re-aplica los dos ejes ABAC (nodo + plantilla) y la
-  gobernanza de equipo (`EquipmentMode`) en el backend — el front solo ofrece.
+### Programación de rondas (Fase 2.3 → 2.3.1) — `LogSchedule` + `RoundOccurrence`
+- **3 permisos** (catálogo **60→63**). PLANIFICADOR: **`schedule:view`** (ver "Programación de rondas" + ocurrencias; gatea
+  `/rondas`) y **`schedule:manage`** (CRUD horarios + generar). OPERADOR (Fase 2.3.1): **`round:execute`** = ver + ejecutar
+  **"Mis rondas"** (`/mis-rondas`): **iniciar/continuar/omitir** ocurrencias. *Motivo del split:* ejecutar una ronda ≠
+  administrar horarios (patrón *My Maintenance Tasks*/Fiori · *Start Center*/Maximo); el operador ejecuta su worklist sin tener
+  administración. La instancia es la **ronda** (`RoundOccurrence`), por eso namespace de recurso propio (como `logentry:*` vs
+  `template:*`). **start/skip se MOVIERON** de `schedule:manage` a `round:execute`. **Llenar** la entrada que abre la ronda
+  reusa `logentry:fill`/`logentry:view` + las guardas ABAC/EAM. El selector de rol responsable del planificador usa un endpoint
+  propio `GET /schedules/role-options` (gate `schedule:manage`), **decoplado de `role:read`** (el planificador no necesita el
+  módulo de seguridad).
+- **ABAC por nodo + responsabilidad por ROL (worklist, 2.3.1)**: los listados se filtran por `getAccessibleNodeIds`
+  (`null`=sin restricción). El worklist del operador (`GET /schedules/my-rounds`) además acota por **rol responsable**:
+  `schedule.responsibleRoleId ∈ roles del usuario`, dejando pasar los horarios SIN responsable (`null` = fallback, visible a
+  todos los del nodo). La responsabilidad se lee EN VIVO del horario (reasignar re-enruta las pendientes). Crear/iniciar valida
+  `canAccessNode` + alcance de plantilla + equipo del nodo. **Iniciar una ronda** delega en `LogEntriesService.create`, que
+  re-aplica los dos ejes ABAC (nodo + plantilla) y la gobernanza de equipo (`EquipmentMode`) en el backend — el front solo ofrece.
 - **Omisión auditada**: `POST /occurrences/:id/skip` exige motivo ≥5 y registra `schedule.occurrence.skipped` (GxP: la ronda no
   realizada queda justificada). `schedule.created/updated/deleted` y `schedule.occurrence.started` también se auditan.
 

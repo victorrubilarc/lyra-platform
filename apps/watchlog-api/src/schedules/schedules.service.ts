@@ -7,6 +7,7 @@ import {
   type LogScheduleDto,
   type RoundOccurrenceDto,
   type OccurrenceQuery,
+  type MyRoundsQuery,
   type SkipOccurrenceRequest,
   type RecurrenceKind,
 } from "@lyra/contracts";
@@ -21,12 +22,14 @@ const scheduleInclude = {
   template: { select: { name: true } },
   orgNode: { select: { name: true } },
   equipment: { select: { tag: true } },
+  responsibleRole: { select: { name: true } },
 } satisfies Prisma.LogScheduleInclude;
 
 type ScheduleRow = LogSchedule & {
   template: { name: string } | null;
   orgNode: { name: string } | null;
   equipment: { tag: string | null } | null;
+  responsibleRole: { name: string } | null;
 };
 
 // RoundOccurrence denormaliza templateId/orgNodeId/equipmentId (sin relación propia):
@@ -107,12 +110,14 @@ export class SchedulesService {
 
   async create(userId: string, dto: CreateLogScheduleRequest, ctx: AuditContext): Promise<LogScheduleDto> {
     await this.validateScheduleTarget(userId, dto.templateId, dto.orgNodeId, dto.equipmentId ?? null, dto.recurrenceKind, dto.recurrenceConfig);
+    await this.assertResponsibleRoleExists(dto.responsibleRoleId ?? null);
     const row = await this.prisma.logSchedule.create({
       data: {
         name: dto.name ?? null,
         templateId: dto.templateId,
         orgNodeId: dto.orgNodeId,
         equipmentId: dto.equipmentId ?? null,
+        responsibleRoleId: dto.responsibleRoleId ?? null,
         recurrenceKind: dto.recurrenceKind,
         recurrenceConfig: dto.recurrenceConfig as Prisma.InputJsonValue,
         dueWindowMinutes: dto.dueWindowMinutes,
@@ -134,6 +139,7 @@ export class SchedulesService {
     await this.assertNodeAccess(userId, before.orgNodeId);
     await this.validateRecurrence(before.orgNodeId, dto.recurrenceKind, dto.recurrenceConfig);
     if (dto.equipmentId) await this.logEntriesEquipmentCheck(dto.equipmentId, before.orgNodeId);
+    if (dto.responsibleRoleId) await this.assertResponsibleRoleExists(dto.responsibleRoleId);
 
     // Si cambia la definición de recurrencia o se reactiva/cambia ventana/horizonte,
     // se regeneran las ocurrencias FUTURAS: se borran las PENDIENTES aún no iniciadas
@@ -149,6 +155,7 @@ export class SchedulesService {
       data: {
         name: dto.name === undefined ? undefined : dto.name,
         equipmentId: dto.equipmentId === undefined ? undefined : dto.equipmentId,
+        responsibleRoleId: dto.responsibleRoleId === undefined ? undefined : dto.responsibleRoleId,
         recurrenceKind: dto.recurrenceKind,
         recurrenceConfig: dto.recurrenceConfig as Prisma.InputJsonValue,
         dueWindowMinutes: dto.dueWindowMinutes,
@@ -181,6 +188,11 @@ export class SchedulesService {
       });
     });
     await this.audit.record({ ...ctx, action: "schedule.deleted", entityType: "LogSchedule", entityId: id, before: this.auditSnapshot(row) });
+  }
+
+  /** Roles (id+nombre) para el selector de rol responsable del planificador. */
+  async roleOptions(): Promise<Array<{ id: string; name: string }>> {
+    return this.prisma.role.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } });
   }
 
   // --- Generación idempotente -------------------------------------------------
@@ -330,6 +342,82 @@ export class SchedulesService {
     return this.toOccurrenceDto(row, new Date());
   }
 
+  // --- Worklist del operador ("Mis rondas", 2.3.1) ---------------------------
+
+  /**
+   * Worklist del OPERADOR: ocurrencias PENDING que son SUYAS. "Suyas" =
+   * (nodos accesibles, ABAC) ∩ (rol responsable del horario ∈ sus roles, o el
+   * horario no declara responsable ⇒ fallback nodo+turno). La responsabilidad se
+   * lee EN VIVO del horario (no se denormaliza), así reasignar el rol re-enruta las
+   * pendientes. Default = HOY + arrastre vencido (no oculta lo heredado del turno
+   * anterior); toggles refinan a vencidas / mi turno / incluir futuras. Genera lazy.
+   */
+  async listMyRounds(userId: string, q: MyRoundsQuery): Promise<RoundOccurrenceDto[]> {
+    await this.generateAll(userId);
+    const where = await this.myRoundsWhere(userId, q);
+    if (where === null) return []; // sin roles ni acceso ⇒ nada que ejecutar
+    const rows = await this.prisma.roundOccurrence.findMany({
+      where,
+      include: occurrenceInclude,
+      orderBy: [{ dueAt: "asc" }, { scheduledFor: "asc" }],
+      take: 500,
+    });
+    return rows.map((r) => this.toOccurrenceDto(r, new Date()));
+  }
+
+  /** Conteos del worklist propio (badge de /bitacoras + widget de Inicio). */
+  async myRoundsStats(userId: string): Promise<{ pending: number; overdue: number; today: number }> {
+    await this.generateAll(userId);
+    const base = await this.myRoundsWhere(userId, {});
+    if (base === null) return { pending: 0, overdue: 0, today: 0 };
+    const now = new Date();
+    // `base` ya acota a hoy+vencidas; para "pending" total quitamos la cota temporal.
+    const { scheduledFor: _omit, ...baseNoDate } = base;
+    const [pending, overdue, today] = await Promise.all([
+      this.prisma.roundOccurrence.count({ where: baseNoDate }),
+      this.prisma.roundOccurrence.count({ where: { ...baseNoDate, dueAt: { lt: now } } }),
+      this.prisma.roundOccurrence.count({
+        where: { ...baseNoDate, scheduledFor: { gte: startOfUtcDay(now), lt: endOfUtcDay(now) } },
+      }),
+    ]);
+    return { pending, overdue, today };
+  }
+
+  /**
+   * Construye el `where` del worklist propio. Devuelve `null` si el usuario no puede
+   * ver NINGUNA ronda (sin nodos accesibles distintos de "todos" sería null-set; aquí
+   * `null` señala "lista vacía sin consultar"). El filtro de responsabilidad combina
+   * el rol responsable con sus roles, dejando pasar los horarios SIN responsable.
+   */
+  private async myRoundsWhere(userId: string, q: MyRoundsQuery): Promise<Prisma.RoundOccurrenceWhereInput | null> {
+    const nodeIds = await this.scope.getAccessibleNodeIds(userId);
+    if (nodeIds && nodeIds.size === 0) return null; // no alcanza ningún nodo
+    const roleIds = await this.getUserRoleIds(userId);
+    const now = new Date();
+    const where: Prisma.RoundOccurrenceWhereInput = {
+      status: "PENDING",
+      ...(nodeIds ? { orgNodeId: { in: [...nodeIds] } } : {}),
+      // Responsabilidad por ROL (o fallback nodo+turno si el horario no declara rol).
+      schedule: {
+        deletedAt: null,
+        OR: [{ responsibleRoleId: null }, ...(roleIds.length > 0 ? [{ responsibleRoleId: { in: roleIds } }] : [])],
+      },
+    };
+    if (q.overdueOnly) where.dueAt = { lt: now };
+    else if (!q.includeUpcoming) where.scheduledFor = { lt: endOfUtcDay(now) }; // hoy + arrastre vencido
+    if (q.shiftOnly) {
+      const res = await this.shiftResolver.resolve(now, null);
+      where.shiftCode = res?.shiftCode ?? " "; // sin turno vigente ⇒ no calza ninguno
+    }
+    return where;
+  }
+
+  /** Ids de roles del usuario (para el filtro de responsabilidad del worklist). */
+  private async getUserRoleIds(userId: string): Promise<string[]> {
+    const rows = await this.prisma.userRole.findMany({ where: { userId }, select: { roleId: true } });
+    return rows.map((r) => r.roleId);
+  }
+
   // --- Validación / helpers ---------------------------------------------------
 
   private async validateScheduleTarget(
@@ -387,6 +475,13 @@ export class SchedulesService {
     if (eq.orgNodeId !== orgNodeId) throw new BadRequestException("El equipo no pertenece al nodo del horario");
   }
 
+  /** El rol responsable, si se indica, debe existir. */
+  private async assertResponsibleRoleExists(roleId: string | null): Promise<void> {
+    if (!roleId) return;
+    const role = await this.prisma.role.findUnique({ where: { id: roleId }, select: { id: true } });
+    if (!role) throw new BadRequestException("El rol responsable indicado no existe");
+  }
+
   private async assertNodeAccess(userId: string, orgNodeId: string): Promise<void> {
     if (!(await this.scope.canAccessNode(userId, orgNodeId))) {
       throw new ForbiddenException("El nodo indicado está fuera de su alcance");
@@ -409,6 +504,8 @@ export class SchedulesService {
       orgNodeName: row.orgNode?.name,
       equipmentId: row.equipmentId,
       equipmentTag: row.equipment?.tag ?? null,
+      responsibleRoleId: row.responsibleRoleId,
+      responsibleRoleName: row.responsibleRole?.name ?? null,
       recurrenceKind: row.recurrenceKind,
       recurrenceConfig: (row.recurrenceConfig as Record<string, unknown>) ?? {},
       dueWindowMinutes: row.dueWindowMinutes,
@@ -455,6 +552,7 @@ export class SchedulesService {
       templateId: row.templateId,
       orgNodeId: row.orgNodeId,
       equipmentId: row.equipmentId,
+      responsibleRoleId: row.responsibleRoleId,
       recurrenceKind: row.recurrenceKind,
       recurrenceConfig: row.recurrenceConfig as Prisma.InputJsonValue,
       dueWindowMinutes: row.dueWindowMinutes,
