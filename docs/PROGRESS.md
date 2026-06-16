@@ -1,5 +1,21 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-15 — Form Builder: formateo en vivo + paleta de elementos + modal "Ver más" (Olas 1–2 de pulido) ✅**
+(`feat/builder-formateo-paleta` → `main`). Continuación del pulido del builder (QA en vivo del dueño), todo frontend salvo un
+campo de config aditivo. **(A) Formateo EN VIVO de campos:** RUT que pone puntos+guion **mientras se teclea**
+(`formatRutLive` en `lib/format`); **número/moneda/porcentaje** con `FormattedNumberInput` (al desenfocar muestra miles +
+decimales regionales `Intl.NumberFormat`, al enfocar se edita en plano; persiste el número); **máscara de entrada genérica**
+(`applyMask`, `#`=dígito/`A`=letra/`*`=alfanum/literales, p. ej. `OT-#####`) en TEXT (`config.mask` aditivo en contrato; si hay
+`format` semántico, manda él); se **expuso «Decimales»** en el panel avanzado de NUMBER (faltaba el input). **(#3) Footer
+Aceptar/Cancelar en el panel de PROPIEDADES** (espejo del drawer; Cancelar revierte vía snapshot del `EditState` al seleccionar
+el campo). **(Ola 2 · #4) Paleta de elementos DOCKED** a la izquierda bajo el riel "Diseño" (`FieldPalette`: buscador +
+categorías; reemplaza el popover de la barra); al hacer clic se agrega al final y el lienzo hace **scroll hasta el campo**
+(`scrollToUid` en `SectionCanvas` + `data-fuid`). **(Ola 2 · #5) Modal "Ver más"** (`FieldInfoModal` + `field-info.ts`):
+**demo EN VIVO** del elemento (mismo `FieldControl`, interactivo) + descripción + **caso de uso** + ejemplo + botones «Agregar al
+formulario»/«Cerrar». **Nomenclatura UI:** "objeto" → **"elemento"**. **UX:** columna izquierda 244→280px y lista con la misma
+separación a ambos lados (scrollbar a ras). Tests: contracts **239** · API **234**; typecheck/lint(0)/build verdes. **Pendiente:
+smoke VISUAL del dueño** (lo hará en paralelo). **Siguiente: Fase 2.3 — Programación de rondas (`LogPeriod`).**
+
 **2026-06-15 — Pulidos de UX del Form Builder (QA en vivo del dueño) ✅** (`feat/builder-ux-pulidos` → `main`). Cuatro
 mejoras pedidas tras probar el builder, todas sobre el render/edición ÚNICOS (sin tocar el modelo de datos salvo un campo de
 config aditivo). **(1) Mín./Máx. caracteres en Texto corto y Párrafo + contador en vivo:** TEXT ya tenía `minLength/maxLength`

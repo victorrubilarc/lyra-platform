@@ -5,11 +5,16 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-15** (**Pulidos de UX del Form Builder ✅** — `feat/builder-ux-pulidos`: mín/máx caracteres +
+> actualización: **2026-06-15** (**Builder: formateo en vivo + paleta de elementos + modal "Ver más" ✅** —
+> `feat/builder-formateo-paleta`: RUT al teclear · número/moneda/porcentaje con miles+decimales (`FormattedNumberInput`) ·
+> máscara genérica `OT-#####` (`config.mask`) · «Decimales» expuesto · footer Aceptar/Cancelar en PROPIEDADES · paleta DOCKED a
+> la izquierda con buscador + scroll al campo creado · modal "Ver más" con demo en vivo + caso de uso · "objeto"→"elemento".
+> Contracts 239 · API 234. **Siguiente: Fase 2.3 — Programación de rondas.** Anterior:
+> **Pulidos de UX del Form Builder ✅** — `feat/builder-ux-pulidos`: mín/máx caracteres +
 > contador en vivo en Texto/Párrafo; hover de info en el lienzo (`SectionCanvas`); footer Aceptar/Cancelar en el drawer
 > avanzado [Cancelar = revierte por snapshot]; fix del Enter al crear ítems de lista [`LinesTextarea` conserva texto crudo];
 > + fix preexistente del spec `logbook-query.service` [faltaba `storage` en el constructor]. Doc VIVO `FORM_GUIDE.md`
-> actualizado. Contracts 239 · API 234. **Siguiente: formateo en vivo (A)** RUT/número/moneda. Anterior:
+> actualizado. Contracts 239 · API 234. Anterior:
 > **Catálogo de objetos premium · Ola 4 ✅** — `feat/objetos-ola4`: objetos ESTRUCTURADOS /
 > repetibles, sin infra. Dos `FieldType` nuevos: `TABLE` (tabla repetible `layout=table` + grupo repetible `layout=cards`,
 > valor `Array<Record<colKey,escalar>>`, filas dinámicas) y `MATRIX` (parámetro×turno, filas/columnas FIJAS + celda
@@ -169,6 +174,7 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Catálogo de objetos premium · Ola 4** (+`TABLE`/`MATRIX` FieldType + `TABLE`/`MATRIX` dataType + migración `…_add_ola4_field_types` ALTER enum; `tableFieldConfigSchema`/`matrixFieldConfigSchema` con columnas/ejes = sub-campos escalares; `validateFieldValue` casos TABLE/MATRIX POR CELDA + `requiredFieldError`/`countCompleteTableRows`/`isEmptyMatrixValue`; opacos a resumen/reglas; `RepeatableControl`/`MatrixControl` recursivos sobre `FieldControl` modo `bare` + `TableConfigEditor`/`MatrixConfigEditor` + paleta "Estructurados"; contracts 230 · API 234 · smoke 22/22) | `feat/objetos-ola4` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **FORM_GUIDE.md — mapa de capacidades del formulario (doc VIVO)** (catálogo de objetos + transversales en lenguaje simple, 7 partes por objeto; regla de doc vivo en §0.3 + cierre de CLAUDE.md + memoria) | `docs/form-guide` → `main` | ✅ fusionado y publicado en `origin/main` (`9421959`) | ninguna |
 | **Pulidos de UX del Form Builder** (mín/máx caracteres + contador `CharCounter` en Texto/Párrafo; hover de info en `SectionCanvas`; footer Aceptar/Cancelar en el drawer con revert por snapshot; fix Enter en listas `LinesTextarea`; fix preexistente del spec `logbook-query.service` [storage]; FORM_GUIDE actualizado; contracts 239 · API 234) | `feat/builder-ux-pulidos` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
+| **Builder: formateo en vivo + paleta de elementos + modal "Ver más"** (RUT al teclear · número/moneda/porcentaje miles+decimales `FormattedNumberInput` · máscara genérica `config.mask`/`applyMask` · «Decimales» expuesto · footer Aceptar/Cancelar en PROPIEDADES + snapshot · paleta DOCKED `FieldPalette` + scroll `scrollToUid` · modal `FieldInfoModal`+`field-info.ts` con demo en vivo · "objeto"→"elemento") | `feat/builder-formateo-paleta` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 
 **Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
@@ -180,15 +186,14 @@ nunca queda más de una sesión atrás.
 
 ## 2. Pendiente por HACER (módulos / submódulos)
 
-### Form Builder — FORMATEO EN VIVO de campos (acordado con el dueño 2026-06-15) — SIGUIENTE
-- [ ] **A · Quick wins (reusan `lib/format.ts`):** **(a) RUT** chileno con puntos+guion automáticos al teclear/blur
-      (`format=rut`; guarda canónico, muestra `12.345.678-5`). **(b) Número/Moneda** con separador de **miles** + **decimales**
-      configurables (ya hay `decimals`/`currency`) vía `Intl.NumberFormat` regional (guarda número, muestra formateado).
-      Estándar: máscaras de entrada SAP Fiori / ServiceNow / Maximo field formats. **EMPEZAR POR AQUÍ.**
-- [ ] **B · Máscara de texto genérica (diferido):** plantilla tipo `OT-#####` (`#`=dígito) en el config del TEXT que formatea
-      al teclear. Más costoso (motor de máscara); decidir tras A.
+### Form Builder — FORMATEO EN VIVO de campos (acordado con el dueño 2026-06-15)
+- [x] **A · Quick wins ✅** (`feat/builder-formateo-paleta`): RUT al teclear (`formatRutLive`); número/moneda/porcentaje con
+      miles+decimales (`FormattedNumberInput` + `Intl.NumberFormat`); «Decimales» expuesto en NUMBER.
+- [x] **B · Máscara de texto genérica ✅** (`config.mask` + `applyMask`: `#/A/*`+literales, p. ej. `OT-#####`). *Diferido:*
+      aplicar la máscara también al valor que llega del escáner QR.
 - [ ] **Deuda de limpieza:** borrar `BuilderFieldCard.tsx` + `BuilderFieldOverlay` (CÓDIGO MUERTO de la era dnd-kit 2.1.6; el
       lienzo real es `SectionCanvas` desde 2.1.7). No lo importa nadie. Quitarlo evita volver a editar el componente equivocado.
+- [ ] **Pulido del modal "Ver más" (diferido):** placeholder/valor de ejemplo precargado en la demo en vivo del elemento.
 
 ### Form Builder — CATÁLOGO DE OBJETOS PREMIUM (olas 1–5) — acordado con el dueño (2026-06-15)
 El set actual (NUMBER, TEXT, TEXTAREA, SELECT, MULTISELECT, BOOLEAN, DATE, DATETIME, SEVERITY,

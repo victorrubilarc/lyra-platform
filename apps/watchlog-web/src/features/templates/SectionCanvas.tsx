@@ -139,6 +139,8 @@ interface SectionCanvasProps {
   canEdit: boolean;
   showGrid: boolean;
   selectedFUid: string | null;
+  /** uid del campo recién agregado desde la paleta: el lienzo hace scroll hasta él. */
+  scrollToUid?: string | null;
   onSelectField: (fUid: string) => void;
   onLabel: (fUid: string, label: string) => void;
   onGeometryChange: (geom: CanvasGeometry[]) => void;
@@ -150,6 +152,7 @@ export function SectionCanvas({
   canEdit,
   showGrid,
   selectedFUid,
+  scrollToUid,
   onSelectField,
   onLabel,
   onGeometryChange,
@@ -157,6 +160,15 @@ export function SectionCanvas({
 }: SectionCanvasProps) {
   const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
+
+  // Scroll hasta el campo recién agregado desde la paleta (Ola 2 · #4): solo si ESTA
+  // sección lo contiene (cada sección tiene su propio lienzo).
+  useEffect(() => {
+    if (!scrollToUid || !fields.some((f) => f.uid === scrollToUid)) return;
+    const el = ref.current?.querySelector<HTMLElement>(`[data-fuid="${scrollToUid}"]`);
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scrollToUid]);
   const fieldsRef = useRef(fields);
   fieldsRef.current = fields;
   const [active, setActive] = useState<Active | null>(null);
@@ -295,6 +307,7 @@ export function SectionCanvas({
         return (
           <div
             key={f.uid}
+            data-fuid={f.uid}
             className={`${styles.canvasCell}${dragging ? " " + styles.canvasCellDragging : ""}${sel ? " " + styles.canvasCellSelected : ""}`}
             style={cellStyle(g)}
             onPointerDown={(e) => begin(e, f.uid, "move")}

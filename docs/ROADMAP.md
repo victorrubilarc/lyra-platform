@@ -4,7 +4,10 @@
 > se actualiza al **cerrar cada sesión** (junto a `PROGRESS.md` y `BACKLOG.md`). El detalle
 > fino de cada pendiente vive en `BACKLOG.md`; aquí está el resumen scaneable.
 >
-> Última actualización: **2026-06-15**. Leyenda: ✅ hecho · 🔄 en curso/parcial · ⬜ pendiente.
+> Última actualización: **2026-06-15** (pulido del Form Builder: contador mín/máx + hover de info + footer Aceptar/Cancelar +
+> fix Enter en listas; **formateo en vivo** RUT/número/moneda + máscara genérica; **paleta de elementos docked** + scroll al
+> campo creado; **modal "Ver más"** con demo en vivo + caso de uso; "objeto"→"elemento". Siguiente: **Fase 2.3**). Leyenda:
+> ✅ hecho · 🔄 en curso/parcial · ⬜ pendiente.
 
 ## Resumen por fase
 

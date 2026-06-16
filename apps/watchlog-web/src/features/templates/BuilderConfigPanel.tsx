@@ -603,6 +603,18 @@ export function BuilderConfigPanel({
                 </Select>
               )}
             </FormField>
+            {/* Máscara de entrada (formateo en vivo): formatea al teclear. Si hay formato
+                semántico (RUT/correo/…) este manda y la máscara se ignora. */}
+            <FormField label={t("templates.builder.textMask")} hint={t("templates.builder.textMaskHint")}>
+              {({ id }) => (
+                <Input
+                  id={id}
+                  value={(field.config.mask as string) ?? ""}
+                  onChange={(e) => setConfig("mask", e.target.value || undefined)}
+                  placeholder="OT-#####"
+                />
+              )}
+            </FormField>
             {/* Largo de caracteres (min/max): se valida en backend y se muestra un contador en el render. */}
             <div className={styles.twoCol}>
               {numberConfigField(field.config, "minLength", t("templates.builder.minLength"), setConfig)}
@@ -677,6 +689,8 @@ export function BuilderConfigPanel({
                 )}
               </FormField>
             )}
+            {/* Decimales (formateo en vivo): nº de decimales a mostrar (miles regional). Moneda CLP = 0. */}
+            {numberConfigField(field.config, "decimals", t("templates.builder.decimals"), setConfig)}
             <div className={styles.twoCol}>
               {numberConfigField(field.config, "min", t("templates.builder.min"), setConfig)}
               {numberConfigField(field.config, "max", t("templates.builder.max"), setConfig)}

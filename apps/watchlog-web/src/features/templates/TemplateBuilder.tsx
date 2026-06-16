@@ -49,6 +49,8 @@ import {
   type EditState,
 } from "./builder-model.js";
 import { AddFieldPopover } from "./AddFieldPopover.js";
+import { FieldPalette } from "./FieldPalette.js";
+import { FieldInfoModal } from "./FieldInfoModal.js";
 import { BuilderConfigPanel } from "./BuilderConfigPanel.js";
 import { FieldControl } from "./FieldControl.js";
 import { FieldGrid } from "./FieldGrid.js";
@@ -94,6 +96,10 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
   // Drawer de configuración AVANZADA (umbral/opciones/condicional/fórmula/roles): se abre
   // con "Opciones avanzadas" del panel de propiedades o de la sección.
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // Modal "Ver más" de un objeto de la paleta (Ola 2 · #5) + último campo agregado
+  // desde la paleta (Ola 2 · #4: el lienzo hace scroll hasta él).
+  const [infoPreset, setInfoPreset] = useState<string | null>(null);
+  const [justAddedUid, setJustAddedUid] = useState<string | null>(null);
   // Una versión PUBLICADA es de solo lectura; "Editar" entra a modo borrador para
   // tocar la definición (al guardar, el backend CLONA un nuevo borrador). Las
   // ediciones de DEFINICIÓN (secciones/campos/flujo/reglas) se habilitan con esto;
@@ -138,6 +144,20 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
   const cancelDrawer = () => {
     if (drawerSnapshot.current) patchState(drawerSnapshot.current);
     setDrawerOpen(false);
+  };
+
+  // Snapshot del estado al CAMBIAR el campo seleccionado: el panel de propiedades
+  // "Cancelar" revierte lo editado de ese campo desde que se seleccionó; "Aceptar"
+  // cierra (deselecciona) conservando.
+  const fieldSnapshot = useRef<EditState | null>(null);
+  useEffect(() => {
+    fieldSnapshot.current = state;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected?.f]);
+  const acceptFieldProps = () => selectedSection && setSelected({ s: selectedSection.uid });
+  const cancelFieldProps = () => {
+    if (fieldSnapshot.current) patchState(fieldSnapshot.current);
+    if (selectedSection) setSelected({ s: selectedSection.uid });
   };
 
   const booleanFields = useMemo(
@@ -250,6 +270,7 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
     sections = sections.map((s) => (s.uid === sUid ? { ...s, fields: [...s.fields, field] } : s));
     patchState({ ...state, sections });
     setSelected({ s: sUid, f: field.uid });
+    setJustAddedUid(field.uid); // el lienzo hace scroll hasta el campo recién creado
   }
 
   /**
@@ -454,34 +475,41 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
         </div>
       </div>
 
-      {/* Cuerpo: riel vertical premium (Configuración / Diseño) + contenido de la sección. */}
+      {/* Cuerpo: columna izquierda (riel Configuración/Diseño + paleta docked) + contenido. */}
       <div className={styles.builderShell}>
-        <nav className={styles.rail} aria-label={t("templates.builder.viewSwitch")}>
-          <button
-            type="button"
-            className={view === "config" ? styles.railItemActive : styles.railItem}
-            aria-current={view === "config"}
-            onClick={() => setView("config")}
-          >
-            <span className={styles.railIcon}><SlidersHorizontal size={18} /></span>
-            <span className={styles.railText}>
-              <span className={styles.railTitle}>{t("templates.builder.viewConfig")}</span>
-              <span className={styles.railDesc}>{t("templates.builder.viewConfigDesc")}</span>
-            </span>
-          </button>
-          <button
-            type="button"
-            className={view === "design" ? styles.railItemActive : styles.railItem}
-            aria-current={view === "design"}
-            onClick={() => setView("design")}
-          >
-            <span className={styles.railIcon}><LayoutPanelLeft size={18} /></span>
-            <span className={styles.railText}>
-              <span className={styles.railTitle}>{t("templates.builder.viewDesign")}</span>
-              <span className={styles.railDesc}>{t("templates.builder.viewDesignDesc")}</span>
-            </span>
-          </button>
-        </nav>
+        <div className={styles.builderSide}>
+          <nav className={styles.rail} aria-label={t("templates.builder.viewSwitch")}>
+            <button
+              type="button"
+              className={view === "config" ? styles.railItemActive : styles.railItem}
+              aria-current={view === "config"}
+              onClick={() => setView("config")}
+            >
+              <span className={styles.railIcon}><SlidersHorizontal size={18} /></span>
+              <span className={styles.railText}>
+                <span className={styles.railTitle}>{t("templates.builder.viewConfig")}</span>
+                <span className={styles.railDesc}>{t("templates.builder.viewConfigDesc")}</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              className={view === "design" ? styles.railItemActive : styles.railItem}
+              aria-current={view === "design"}
+              onClick={() => setView("design")}
+            >
+              <span className={styles.railIcon}><LayoutPanelLeft size={18} /></span>
+              <span className={styles.railText}>
+                <span className={styles.railTitle}>{t("templates.builder.viewDesign")}</span>
+                <span className={styles.railDesc}>{t("templates.builder.viewDesignDesc")}</span>
+              </span>
+            </button>
+          </nav>
+
+          {/* Paleta de objetos SIEMPRE visible bajo "Diseño" (Ola 2 · #4). */}
+          {view === "design" && designTab === "editor" && (
+            <FieldPalette canEdit={editable} onPick={(id) => addFieldAt(id)} onShowInfo={(id) => setInfoPreset(id)} />
+          )}
+        </div>
 
         <div className={styles.builderContent}>
           {view === "config" ? (
@@ -563,7 +591,6 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
                           <button type="button" className={device === "mobile" ? styles.deviceOn : styles.deviceBtn} onClick={() => setDevice("mobile")} title={t("templates.builder.deviceMobile")}><Smartphone size={15} /></button>
                         </div>
                         <button type="button" className={showGrid ? styles.toolOn : styles.toolBtn} onClick={() => setShowGrid((v) => !v)} title={t("templates.builder.toggleGrid")} aria-pressed={showGrid}><Grid3x3 size={15} /></button>
-                        {state.sections.length > 0 && <AddFieldPopover canEdit={editable} variant="bar" onPick={(type) => addFieldAt(type)} />}
                         <button type="button" className={styles.addSectionBtn} onClick={addSection} disabled={!editable}>
                           <FilePlus2 size={15} /> {t("templates.builder.addSection")}
                         </button>
@@ -622,6 +649,7 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
                                   canEdit={editable}
                                   showGrid={showGrid}
                                   selectedFUid={selected?.s === s.uid ? selected.f ?? null : null}
+                                  scrollToUid={justAddedUid}
                                   onSelectField={(fUid) => setSelected({ s: s.uid, f: fUid })}
                                   onLabel={(fUid, label) => updateField(s.uid, fUid, { label })}
                                   onGeometryChange={(geom) => updateFieldGeometry(s.uid, geom)}
@@ -654,7 +682,8 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
                     <FieldPropertiesPanel
                       field={selectedField}
                       canEdit={editable}
-                      onClose={() => setSelected({ s: selectedSection.uid })}
+                      onClose={acceptFieldProps}
+                      onCancel={cancelFieldProps}
                       onLabel={(label) => updateField(selectedSection.uid, selectedField.uid, { label })}
                       onRequired={(required) => updateField(selectedSection.uid, selectedField.uid, { required })}
                       onWidth={(w) => {
@@ -706,6 +735,14 @@ export function TemplateBuilder({ detail }: { detail: TemplateDetail }) {
           onUpdateField={(patch) => selectedField && selectedSection && updateField(selectedSection.uid, selectedField.uid, patch)}
         />
       </Drawer>
+
+      {/* "Ver más" de un objeto de la paleta (Ola 2 · #5). */}
+      <FieldInfoModal
+        presetId={infoPreset}
+        canEdit={editable}
+        onAdd={(id) => addFieldAt(id)}
+        onClose={() => setInfoPreset(null)}
+      />
 
       <Modal
         open={publishOpen}
