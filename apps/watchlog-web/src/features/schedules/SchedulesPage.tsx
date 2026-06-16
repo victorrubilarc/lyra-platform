@@ -1,49 +1,129 @@
-import { useState } from "react";
-import { AlertTriangle, CalendarClock, Plus, RefreshCw, Trash2 } from "lucide-react";
-import { Button, Card, Chip, EmptyState, Table, useToast, type TableColumn } from "@lyra/ui";
-import type { LogScheduleDto, OccurrenceQuery } from "@lyra/contracts";
+import { useMemo, useState } from "react";
+import {
+  AlertTriangle, CalendarClock, CalendarDays, ChevronDown, ChevronRight, Clock, Plus, RefreshCw,
+  Repeat, Search, Trash2, X,
+} from "lucide-react";
+import { Button, Card, Chip, EmptyState, Input, Select, Table, Toggle, useToast, type TableColumn } from "@lyra/ui";
+import type { LogScheduleDto, OccurrenceQuery, UpdateLogScheduleRequest } from "@lyra/contracts";
 import { usePermissions } from "../../auth/use-permissions.js";
-import { formatDateTime, formatDuration } from "../../lib/format.js";
+import { formatDate, formatDateTime, formatDuration, formatTime } from "../../lib/format.js";
 import {
   useDeleteSchedule,
   useGenerateSchedules,
   useOccurrences,
   useOccurrenceStats,
   useSchedules,
+  useUpdateSchedule,
 } from "./schedules-queries.js";
 import { ScheduleDrawer } from "./ScheduleDrawer.js";
 import styles from "./SchedulesPage.module.css";
+import bar from "./MyRoundsPage.module.css";
 
-const KIND_LABEL: Record<string, string> = {
-  SHIFT: "Por turno",
-  INTERVAL: "Intervalo",
-  CALENDAR: "Calendario",
-  NONE: "—",
-};
+const WD = ["", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+const HM: Intl.DateTimeFormatOptions = { timeStyle: undefined, hour: "2-digit", minute: "2-digit", hourCycle: "h23" };
+
+function weekdaysLabel(days: number[]): string {
+  const k = [...days].sort((a, b) => a - b).join(",");
+  if (k === "1,2,3,4,5") return "Lun a Vie";
+  if (k === "6,7") return "Fin de semana";
+  return [...days].sort((a, b) => a - b).map((d) => WD[d]).join(", ");
+}
+
+/** Frecuencia en lenguaje humano (lo que el planificador necesita reconocer de un vistazo). */
+function describeRecurrence(s: LogScheduleDto): string {
+  const c = (s.recurrenceConfig ?? {}) as Record<string, unknown>;
+  if (s.recurrenceKind === "SHIFT") {
+    const codes = Array.isArray(c.shiftCodes) ? (c.shiftCodes as string[]) : [];
+    return codes.length ? `Turnos ${codes.join(", ")}` : "Cada turno";
+  }
+  if (s.recurrenceKind === "INTERVAL") {
+    const m = Number(c.everyMinutes) || 0;
+    const every = m % 60 === 0 ? `${m / 60} h` : `${m} min`;
+    return `Cada ${every}${c.anchorTime ? ` · desde ${c.anchorTime}` : ""}`;
+  }
+  if (s.recurrenceKind === "CALENDAR") {
+    const times = Array.isArray(c.times) ? (c.times as string[]).join(", ") : "";
+    const wd = Array.isArray(c.weekdays) && (c.weekdays as number[]).length ? ` · ${weekdaysLabel(c.weekdays as number[])}` : "";
+    return `${times}${wd}` || "Días y horas fijas";
+  }
+  return "—";
+}
+
+/** Próxima ronda relativa al día (Hoy / Mañana / fecha), con realce si está atrasada. */
+function NextCell({ iso }: { iso: string | null | undefined }) {
+  if (!iso) return <span className={styles.muted}>—</span>;
+  const d = new Date(iso);
+  const now = new Date();
+  const tomorrow = new Date(now); tomorrow.setDate(now.getDate() + 1);
+  const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
+  const past = d.getTime() < now.getTime();
+  const day = sameDay(d, now) ? "Hoy" : sameDay(d, tomorrow) ? "Mañana" : formatDate(d, { dateStyle: undefined, day: "2-digit", month: "short" });
+  return <span className={`${styles.next} ${past ? styles.nextPast : ""}`}>{day} {formatTime(d, HM)}</span>;
+}
 
 type OccFilter = "all" | "overdue" | "today";
 
 /**
- * Programación de rondas (PLANIFICADOR, 2.3.1): CRUD de horarios + monitoreo
- * read-only de las ocurrencias. La EJECUCIÓN (iniciar/omitir) vive en el worklist
- * del operador "Mis rondas" (/mis-rondas), gateado por `round:execute`.
+ * Programación de rondas (PLANIFICADOR): list report estilo SAP PM (IP10/IP24) /
+ * IBM Maximo (PM) / Fiori "Manage Maintenance Plans" — filter bar (búsqueda + estado
+ * + recurrencia + área), KPIs de salud, frecuencia legible, "próxima ronda" (next call
+ * date) y pausar/activar en línea. La EJECUCIÓN vive en "Mis rondas" (operador).
  */
 export function SchedulesPage() {
   const { can } = usePermissions();
   const manage = can("schedule:manage");
   const toast = useToast();
 
-  const [filter, setFilter] = useState<OccFilter>("all");
-  const q: OccurrenceQuery = filter === "overdue" ? { overdueOnly: true } : filter === "today" ? { todayOnly: true } : { status: "PENDING" };
-  const occurrences = useOccurrences(q);
-  const stats = useOccurrenceStats();
   const schedules = useSchedules();
-
+  const stats = useOccurrenceStats();
   const generate = useGenerateSchedules();
   const removeSchedule = useDeleteSchedule();
+  const update = useUpdateSchedule();
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<LogScheduleDto | null>(null);
+
+  // Filter bar (client-side sobre la lista de horarios).
+  const [search, setSearch] = useState("");
+  const [estado, setEstado] = useState<"all" | "active" | "paused">("all");
+  const [kind, setKind] = useState<string>("all");
+  const [area, setArea] = useState<string>("");
+
+  // Monitoreo de ocurrencias (plegable; solo se carga al expandir).
+  const [showOcc, setShowOcc] = useState(false);
+  const [occFilter, setOccFilter] = useState<OccFilter>("all");
+  const occQuery: OccurrenceQuery = occFilter === "overdue" ? { overdueOnly: true } : occFilter === "today" ? { todayOnly: true } : { status: "PENDING" };
+  const occurrences = useOccurrences(occQuery, showOcc);
+
+  const allSchedules = useMemo(() => schedules.data ?? [], [schedules.data]);
+  const areas = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of allSchedules) if (s.orgNodeName) set.add(s.orgNodeName);
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }, [allSchedules]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return allSchedules.filter((s) => {
+      if (estado === "active" && !s.active) return false;
+      if (estado === "paused" && s.active) return false;
+      if (kind !== "all" && s.recurrenceKind !== kind) return false;
+      if (area && s.orgNodeName !== area) return false;
+      if (q) {
+        const hay = `${s.name ?? ""} ${s.templateName ?? ""} ${s.orgNodeName ?? ""} ${s.equipmentTag ?? ""} ${s.responsibleRoleName ?? ""}`.toLowerCase();
+        if (!q.split(/\s+/).every((t) => hay.includes(t))) return false;
+      }
+      return true;
+    });
+  }, [allSchedules, search, estado, kind, area]);
+
+  const kpi = useMemo(() => ({
+    active: allSchedules.filter((s) => s.active).length,
+    paused: allSchedules.filter((s) => !s.active).length,
+  }), [allSchedules]);
+
+  const anyFilter = !!search || estado !== "all" || kind !== "all" || !!area;
+  function clearFilters() { setSearch(""); setEstado("all"); setKind("all"); setArea(""); }
 
   async function onGenerate() {
     try {
@@ -64,16 +144,51 @@ export function SchedulesPage() {
     }
   }
 
+  async function onToggleActive(s: LogScheduleDto) {
+    const dto: UpdateLogScheduleRequest = {
+      name: s.name,
+      equipmentId: s.equipmentId,
+      responsibleRoleId: s.responsibleRoleId,
+      recurrenceKind: s.recurrenceKind,
+      recurrenceConfig: s.recurrenceConfig,
+      dueWindowMinutes: s.dueWindowMinutes,
+      horizonDays: s.horizonDays,
+      active: !s.active,
+    };
+    try {
+      await update.mutateAsync({ id: s.id, dto });
+      toast.success(s.active ? "Horario pausado" : "Horario activado");
+    } catch (e) {
+      toast.error(`No se pudo cambiar el estado: ${(e as Error).message}`);
+    }
+  }
+
+  const KIND_ICON: Record<string, typeof Repeat> = { SHIFT: Repeat, INTERVAL: Clock, CALENDAR: CalendarDays };
+
   const scheduleColumns: TableColumn<LogScheduleDto>[] = [
     { key: "name", header: "Horario", render: (s) => <span className={styles.strong}>{s.name ?? s.templateName ?? "—"}</span> },
     { key: "template", header: "Plantilla", render: (s) => s.templateName ?? "—" },
     { key: "node", header: "Nodo", render: (s) => <>{s.orgNodeName ?? "—"}{s.equipmentTag ? <span className={styles.muted}> · {s.equipmentTag}</span> : null}</> },
     { key: "responsible", header: "Responsable", render: (s) => s.responsibleRoleName ? <Chip label={s.responsibleRoleName} variant="info" /> : <span className={styles.muted}>Todos del nodo</span> },
-    { key: "kind", header: "Recurrencia", render: (s) => KIND_LABEL[s.recurrenceKind] ?? s.recurrenceKind },
-    { key: "pending", header: "Pendientes", render: (s) => (
-      <span>{s.pendingCount ?? 0}{(s.overdueCount ?? 0) > 0 ? <Chip label={`${s.overdueCount} vencidas`} variant="error" className={styles.chip} /> : null}</span>
-    ) },
-    { key: "active", header: "Estado", render: (s) => <Chip label={s.active ? "Activo" : "Pausado"} variant={s.active ? "success" : "default"} /> },
+    {
+      key: "freq", header: "Frecuencia", render: (s) => {
+        const Icon = KIND_ICON[s.recurrenceKind] ?? Repeat;
+        return <span className={styles.freq}><span className={styles.freqIcon}><Icon size={14} /></span>{describeRecurrence(s)}</span>;
+      },
+    },
+    { key: "next", header: "Próxima ronda", render: (s) => <NextCell iso={s.nextOccurrenceAt} /> },
+    {
+      key: "pending", header: "Pendientes", render: (s) => (
+        <span>{s.pendingCount ?? 0}{(s.overdueCount ?? 0) > 0 ? <Chip label={`${s.overdueCount} vencidas`} variant="error" className={styles.chip} /> : null}</span>
+      ),
+    },
+    {
+      key: "active", header: "Estado", render: (s) => (
+        manage
+          ? <span className={styles.freq}><Toggle checked={s.active} onChange={() => onToggleActive(s)} /><span className={styles.muted}>{s.active ? "Activo" : "Pausado"}</span></span>
+          : <Chip label={s.active ? "Activo" : "Pausado"} variant={s.active ? "success" : "default"} />
+      ),
+    },
     ...(manage ? [{
       key: "actions",
       header: "",
@@ -94,6 +209,9 @@ export function SchedulesPage() {
           <p className={styles.subtitle}>Define los horarios de rondas (turno / intervalo / calendario). Los operadores las ejecutan desde «Mis rondas».</p>
         </div>
         <div className={styles.headerActions}>
+          <Button variant="secondary" onClick={() => schedules.refetch()} disabled={schedules.isFetching}>
+            <RefreshCw size={16} /> Actualizar
+          </Button>
           {manage && (
             <Button variant="secondary" onClick={onGenerate} disabled={generate.isPending}>
               <RefreshCw size={16} /> Generar
@@ -107,68 +225,115 @@ export function SchedulesPage() {
         </div>
       </header>
 
-      {/* KPIs */}
-      <div className={styles.kpis}>
-        <Card className={styles.kpi}><span className={styles.kpiValue}>{stats.data?.pending ?? "—"}</span><span className={styles.kpiLabel}>Pendientes</span></Card>
-        <Card className={`${styles.kpi} ${styles.kpiOverdue}`}><span className={styles.kpiValue}>{stats.data?.overdue ?? "—"}</span><span className={styles.kpiLabel}>Vencidas</span></Card>
-        <Card className={styles.kpi}><span className={styles.kpiValue}>{stats.data?.today ?? "—"}</span><span className={styles.kpiLabel}>De hoy</span></Card>
+      {/* KPIs de salud */}
+      <div className={styles.kpis4}>
+        <Card className={styles.kpi}><span className={styles.kpiValue}>{kpi.active}</span><span className={styles.kpiLabel}>Horarios activos</span></Card>
+        <Card className={styles.kpi}><span className={styles.kpiValue}>{kpi.paused}</span><span className={styles.kpiLabel}>Pausados</span></Card>
+        <Card className={styles.kpi}><span className={styles.kpiValue}>{stats.data?.pending ?? "—"}</span><span className={styles.kpiLabel}>Rondas pendientes</span></Card>
+        <Card className={`${styles.kpi} ${styles.kpiOverdue}`}><span className={styles.kpiValue}>{stats.data?.overdue ?? "—"}</span><span className={styles.kpiLabel}>Rondas vencidas</span></Card>
       </div>
 
-      {/* Horarios */}
+      {/* Filter bar */}
+      <Card className={bar.toolbar}>
+        <div className={bar.searchWrap}>
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar horario, plantilla, área, equipo o responsable…"
+            aria-label="Buscar horarios"
+            rightSlot={search ? (
+              <button type="button" className={bar.searchClear} onClick={() => setSearch("")} aria-label="Limpiar búsqueda"><X size={14} /></button>
+            ) : <Search size={16} aria-hidden="true" />}
+          />
+        </div>
+        <div className={bar.toggles}>
+          <Select className={bar.nodoSelect} value={estado} onChange={(e) => setEstado(e.target.value as typeof estado)} aria-label="Estado">
+            <option value="all">Todos los estados</option>
+            <option value="active">Solo activos</option>
+            <option value="paused">Solo pausados</option>
+          </Select>
+          <Select className={bar.nodoSelect} value={kind} onChange={(e) => setKind(e.target.value)} aria-label="Recurrencia">
+            <option value="all">Toda recurrencia</option>
+            <option value="SHIFT">Por turno</option>
+            <option value="INTERVAL">Intervalo</option>
+            <option value="CALENDAR">Calendario</option>
+          </Select>
+          {areas.length > 1 && (
+            <Select className={bar.nodoSelect} value={area} onChange={(e) => setArea(e.target.value)} aria-label="Área">
+              <option value="">Todas las áreas</option>
+              {areas.map((a) => <option key={a} value={a}>{a}</option>)}
+            </Select>
+          )}
+          {anyFilter && (
+            <button type="button" className={bar.clear} onClick={clearFilters}><X size={14} /> Limpiar</button>
+          )}
+        </div>
+      </Card>
+
+      {/* Tabla de horarios */}
       <Card className={styles.section}>
         <div className={styles.sectionHead}>
-          <h2 className={styles.sectionTitle}>Horarios programados</h2>
+          <h2 className={styles.sectionTitle}><CalendarClock size={18} /> Horarios {anyFilter ? `(${filtered.length} de ${allSchedules.length})` : `(${allSchedules.length})`}</h2>
         </div>
         {schedules.isLoading ? (
           <p className={styles.muted}>Cargando…</p>
-        ) : (schedules.data ?? []).length === 0 ? (
+        ) : allSchedules.length === 0 ? (
           <EmptyState
+            icon={<CalendarClock size={28} />}
             title="Sin horarios"
             description={manage ? "Cree un horario para que las rondas se abran automáticamente." : "No hay horarios de ronda configurados."}
           />
+        ) : filtered.length === 0 ? (
+          <EmptyState title="Sin resultados" description="Ningún horario con estos filtros." action={<Button variant="secondary" onClick={clearFilters}>Limpiar filtros</Button>} />
         ) : (
-          <Table data={schedules.data ?? []} columns={scheduleColumns} rowKey={(s) => s.id} />
+          <Table data={filtered} columns={scheduleColumns} rowKey={(s) => s.id} />
         )}
       </Card>
 
-      {/* Monitoreo read-only de ocurrencias (la ejecución vive en "Mis rondas") */}
+      {/* Monitoreo de ocurrencias (plegable; la ejecución vive en "Mis rondas") */}
       <Card className={styles.section}>
-        <div className={styles.sectionHead}>
-          <h2 className={styles.sectionTitle}><CalendarClock size={18} /> Ocurrencias {filter === "overdue" ? "vencidas" : filter === "today" ? "de hoy" : "pendientes"}</h2>
-          <div className={styles.filters}>
-            <Button variant={filter === "all" ? "primary" : "secondary"} onClick={() => setFilter("all")}>Pendientes</Button>
-            <Button variant={filter === "today" ? "primary" : "secondary"} onClick={() => setFilter("today")}>Hoy</Button>
-            <Button variant={filter === "overdue" ? "primary" : "secondary"} onClick={() => setFilter("overdue")}>Vencidas</Button>
-          </div>
-        </div>
-        {occurrences.isLoading ? (
-          <p className={styles.muted}>Cargando…</p>
-        ) : (occurrences.data ?? []).length === 0 ? (
-          <EmptyState title="Sin rondas" description="No hay ocurrencias para este filtro." />
-        ) : (
-          <ul className={styles.occList}>
-            {(occurrences.data ?? []).map((o) => (
-              <li key={o.id} className={`${styles.occ} ${o.overdue ? styles.occOverdue : ""}`}>
-                <div className={styles.occMain}>
-                  <div className={styles.occTitle}>
-                    {o.scheduleName ?? o.templateName ?? "Ronda"}
-                    {o.shiftCode ? <Chip label={`Turno ${o.shiftCode}`} variant="default" className={styles.chip} /> : null}
-                    {o.equipmentTag ? <Chip label={o.equipmentTag} variant="default" className={styles.chip} /> : null}
-                  </div>
-                  <div className={styles.occMeta}>
-                    <span>{o.orgNodeName}</span>
-                    <span>· Programada: {formatDateTime(o.scheduledFor)}</span>
-                    {o.overdue ? (
-                      <span className={styles.overdueText}><AlertTriangle size={13} /> Vencida hace {formatDuration(Date.now() - new Date(o.dueAt).getTime())}</span>
-                    ) : (
-                      <span>· Vence: {formatDateTime(o.dueAt)}</span>
-                    )}
-                    {o.logEntryId ? <Chip label="En curso" variant="info" className={styles.chip} /> : null}
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
+        <button type="button" className={styles.collapseToggle} onClick={() => setShowOcc((v) => !v)} aria-expanded={showOcc}>
+          {showOcc ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+          <CalendarClock size={18} /> Ocurrencias generadas (monitoreo)
+          <span className={styles.collapseCount}>{showOcc ? "" : "ver"}</span>
+        </button>
+        {showOcc && (
+          <>
+            <div className={styles.filters}>
+              <Button variant={occFilter === "all" ? "primary" : "secondary"} onClick={() => setOccFilter("all")}>Pendientes</Button>
+              <Button variant={occFilter === "today" ? "primary" : "secondary"} onClick={() => setOccFilter("today")}>Hoy</Button>
+              <Button variant={occFilter === "overdue" ? "primary" : "secondary"} onClick={() => setOccFilter("overdue")}>Vencidas</Button>
+            </div>
+            {occurrences.isLoading ? (
+              <p className={styles.muted}>Cargando…</p>
+            ) : (occurrences.data ?? []).length === 0 ? (
+              <EmptyState title="Sin rondas" description="No hay ocurrencias para este filtro." />
+            ) : (
+              <ul className={styles.occList}>
+                {(occurrences.data ?? []).map((o) => (
+                  <li key={o.id} className={`${styles.occ} ${o.overdue ? styles.occOverdue : ""}`}>
+                    <div className={styles.occMain}>
+                      <div className={styles.occTitle}>
+                        {o.scheduleName ?? o.templateName ?? "Ronda"}
+                        {o.shiftCode ? <Chip label={`Turno ${o.shiftCode}`} variant="default" className={styles.chip} /> : null}
+                        {o.equipmentTag ? <Chip label={o.equipmentTag} variant="default" className={styles.chip} /> : null}
+                      </div>
+                      <div className={styles.occMeta}>
+                        <span>{o.orgNodeName}</span>
+                        <span>· Programada: {formatDateTime(o.scheduledFor)}</span>
+                        {o.overdue ? (
+                          <span className={styles.overdueText}><AlertTriangle size={13} /> Vencida hace {formatDuration(Date.now() - new Date(o.dueAt).getTime())}</span>
+                        ) : (
+                          <span>· Vence: {formatDateTime(o.dueAt)}</span>
+                        )}
+                        {o.logEntryId ? <Chip label="En curso" variant="info" className={styles.chip} /> : null}
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
         )}
       </Card>
 
