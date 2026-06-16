@@ -637,6 +637,15 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
           (categoría/tag/lista) · una entrada por equipo (recomendado, trazabilidad EAM/ISO 14224) vs una entrada con
           sub-secciones por equipo · migración (`LogSchedule` gana el criterio de equipos o tabla puente). **Workaround actual:**
           `scripts/seed-demo-estanques.py` (1 horario por estanque).
+    - [ ] **RONDAS · ESCALABILIDAD del planificador a millones de ocurrencias (detectado 2026-06-16).** Hoy es MVP client-side:
+          **(a)** `GET /schedules` devuelve TODOS los horarios sin paginar (OK a cientos; pesado a miles en multi-sitio) —
+          falta paginación/orden/búsqueda server-side. **(b)** La grilla de **Ocurrencias** carga `take: 500` y pagina/busca/ordena
+          en el CLIENTE ⇒ con millones de `RoundOccurrence` **solo se ven las primeras 500**. **(c)** Los filtros (equipo/área/
+          bitácoras) se derivan de los datos cargados ⇒ con paginación server-side quedarían incompletos. **A construir (patrón ya
+          probado en Bitácoras `LogbookQueryService`):** keyset/cursor + filtros + orden + búsqueda **server-side** para ocurrencias
+          (y horarios al crecer); **endpoint de FACETAS** para poblar los dropdowns completos (como `/log-entries/facets`); el
+          selector de EQUIPO como **value-help con typeahead server-side** sobre el catálogo de equipos en alcance (no derivado de la
+          página). Mientras el volumen sea bajo (config + demos) el MVP basta; agendar antes de un cliente con alto volumen.
   - [x] **2.4 Llenado (Nueva entrada) multi-actor** ✅ (2026-06-10). Tablas `LogEntry`/`LogEntrySection`/
         `LogEntryValue`/`LogEntryFieldChange` (aditivas). Secciones editables por estado+rol (dato `TemplateSectionRole`
         + override por campo) × ABAC; validación 100% en servidor (`validateFieldValue` = fuente única reusada en
