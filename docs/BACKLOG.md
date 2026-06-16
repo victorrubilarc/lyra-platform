@@ -627,6 +627,16 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
         DECISIONS 2026-06-16. **Pendiente: smoke VISUAL** (§4). **Deuda diferida:** rol responsable MULTI (hoy single);
         notificar al rol responsable de su ronda vencida (→ Notificaciones); shiftOnly resuelve el turno del calendario por
         defecto (no per-nodo del usuario).
+    - [ ] **RONDAS · Route (fan-out por EQUIPO) — pendiente prioritario (pedido 2026-06-16).** Hoy un `LogSchedule` apunta a
+          **UN** nodo y opcionalmente **UN** equipo ⇒ para abrir una ronda por activo hay que crear **un horario por equipo**
+          (funciona, pero N horarios que mantener). **A construir:** un horario que cubra **varios equipos** de un nodo (todos /
+          por categoría / lista) y, en cada ocurrencia, haga **fan-out** = abrir **una `RoundOccurrence` por equipo** (cada una
+          con su `equipmentId`, su entrada y su firma). Patrón *Route/Operator Round* de SAP PM (route + measurement points) /
+          Maximo (route + asset list) / j5. **Caso de uso real:** 5 estanques de combustible (equipos) chequeados cada hora ⇒ con
+          Route = 1 horario → 5 rondas/hora automáticamente, en vez de 5 horarios. Decidir al planificar: selección de equipos
+          (categoría/tag/lista) · una entrada por equipo (recomendado, trazabilidad EAM/ISO 14224) vs una entrada con
+          sub-secciones por equipo · migración (`LogSchedule` gana el criterio de equipos o tabla puente). **Workaround actual:**
+          `scripts/seed-demo-estanques.py` (1 horario por estanque).
   - [x] **2.4 Llenado (Nueva entrada) multi-actor** ✅ (2026-06-10). Tablas `LogEntry`/`LogEntrySection`/
         `LogEntryValue`/`LogEntryFieldChange` (aditivas). Secciones editables por estado+rol (dato `TemplateSectionRole`
         + override por campo) × ABAC; validación 100% en servidor (`validateFieldValue` = fuente única reusada en
