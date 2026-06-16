@@ -1,0 +1,38 @@
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 6px 2px;
+}
+.range {
+  font-size: 0.84rem;
+  color: var(--color-text-secondary);
+}
+.range strong {
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.size {
+  min-height: 38px;
+  width: 150px;
+}
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.page {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--color-text);
+  min-width: 84px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}

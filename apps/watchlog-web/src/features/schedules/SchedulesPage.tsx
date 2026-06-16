@@ -1,21 +1,22 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  BarChart3, BookOpen, CalendarClock, CalendarDays, Clock, ListChecks, Plus, RefreshCw, Repeat,
+  BarChart3, BookOpen, CalendarClock, CalendarDays, Clock, FileText, ListChecks, Plus, RefreshCw, Repeat,
   Search, Trash2, X,
 } from "lucide-react";
 import {
-  Button, Card, Chip, EmptyState, Input, Select, Table, Toggle, useToast,
+  Button, Card, Chip, EmptyState, Input, Select, Table, Toggle, Tooltip, useToast,
   type TableColumn, type TableSort,
 } from "@lyra/ui";
 import type { LogScheduleDto, OccurrenceQuery, RoundOccurrenceDto, UpdateLogScheduleRequest } from "@lyra/contracts";
 import { usePermissions } from "../../auth/use-permissions.js";
-import { formatDate, formatTime } from "../../lib/format.js";
+import { formatDate, formatDuration, formatTime } from "../../lib/format.js";
 import {
   useDeleteSchedule, useGenerateSchedules, useOccurrences, useSchedules, useUpdateSchedule,
 } from "./schedules-queries.js";
 import { ScheduleDrawer } from "./ScheduleDrawer.js";
 import { TemplateFilterModal, type TemplateOption } from "./TemplateFilterModal.js";
 import { MiniBars, type BarItem } from "./MiniBars.js";
+import { GridPager } from "./GridPager.js";
 import styles from "./SchedulesPage.module.css";
 import bar from "./MyRoundsPage.module.css";
 
@@ -68,6 +69,7 @@ const SCHED_SORT: Record<string, (s: LogScheduleDto) => string | number> = {
   node: (s) => (s.orgNodeName ?? "").toLowerCase(),
   responsible: (s) => (s.responsibleRoleName ?? "~").toLowerCase(),
   freq: (s) => s.recurrenceKind,
+  plazo: (s) => s.dueWindowMinutes,
   next: (s) => (s.nextOccurrenceAt ? new Date(s.nextOccurrenceAt).getTime() : Number.MAX_SAFE_INTEGER),
   pending: (s) => s.pendingCount ?? 0,
   active: (s) => (s.active ? 1 : 0),
@@ -75,10 +77,12 @@ const SCHED_SORT: Record<string, (s: LogScheduleDto) => string | number> = {
 const OCC_SORT: Record<string, (o: RoundOccurrenceDto) => string | number> = {
   when: (o) => new Date(o.scheduledFor).getTime(),
   round: (o) => (o.scheduleName ?? o.templateName ?? "").toLowerCase(),
+  template: (o) => (o.templateName ?? "").toLowerCase(),
   equip: (o) => (o.equipmentTag ?? "~").toLowerCase(),
   node: (o) => (o.orgNodeName ?? "").toLowerCase(),
   shift: (o) => o.shiftCode ?? "~",
   status: (o) => (o.overdue ? 0 : o.logEntryId ? 1 : 2),
+  entry: (o) => o.entryNumber ?? Number.MAX_SAFE_INTEGER,
   due: (o) => new Date(o.dueAt).getTime(),
 };
 function sortRows<T>(rows: T[], acc: Record<string, (r: T) => string | number>, sort: TableSort): T[] {
@@ -119,6 +123,7 @@ export function SchedulesPage() {
   const [estado, setEstado] = useState<"all" | "active" | "paused">("all");
   const [kind, setKind] = useState<string>("all");
   const [area, setArea] = useState<string>("");
+  const [equipo, setEquipo] = useState<string>("");
   const [tplFilter, setTplFilter] = useState<Set<string>>(new Set());
   const [tplModalOpen, setTplModalOpen] = useState(false);
 
@@ -126,6 +131,10 @@ export function SchedulesPage() {
   const [schedSort, setSchedSort] = useState<TableSort>({ key: "next", direction: "asc" });
   const [occSort, setOccSort] = useState<TableSort>({ key: "due", direction: "asc" });
   const [occFilter, setOccFilter] = useState<OccFilter>("all");
+  const [schedPage, setSchedPage] = useState(0);
+  const [schedSize, setSchedSize] = useState(25);
+  const [occPage, setOccPage] = useState(0);
+  const [occSize, setOccSize] = useState(25);
 
   const occQuery: OccurrenceQuery = occFilter === "overdue" ? { overdueOnly: true } : occFilter === "today" ? { todayOnly: true } : { status: "PENDING" };
   const occurrences = useOccurrences(occQuery, tab === "ocurrencias");
@@ -145,7 +154,8 @@ export function SchedulesPage() {
     return [...m.entries()].map(([id, v]) => ({ id, name: v.name, count: v.count })).sort((a, b) => a.name.localeCompare(b.name));
   }, [allSchedules]);
 
-  const filtered = useMemo(() => {
+  // Base = todos los filtros EXCEPTO equipo (para que las opciones de equipo cascadeen).
+  const baseFiltered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return allSchedules.filter((s) => {
       if (estado === "active" && !s.active) return false;
@@ -160,6 +170,18 @@ export function SchedulesPage() {
       return true;
     });
   }, [allSchedules, search, estado, kind, area, tplFilter]);
+
+  // Equipos disponibles EN CONTEXTO con su nodo (cascadea con el área y demás filtros).
+  const equipoOptions = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const s of baseFiltered) if (s.equipmentTag) m.set(s.equipmentTag, s.orgNodeName ?? "—");
+    return [...m.entries()].map(([tag, node]) => ({ tag, node })).sort((a, b) => a.tag.localeCompare(b.tag));
+  }, [baseFiltered]);
+
+  const filtered = useMemo(
+    () => (equipo ? baseFiltered.filter((s) => s.equipmentTag === equipo) : baseFiltered),
+    [baseFiltered, equipo],
+  );
 
   const filteredIds = useMemo(() => new Set(filtered.map((s) => s.id)), [filtered]);
 
@@ -196,8 +218,21 @@ export function SchedulesPage() {
     return { areaBars, kindBars, compliance };
   }, [filtered, kpi.pending, kpi.overdue]);
 
-  const anyFilter = !!search || estado !== "all" || kind !== "all" || !!area || tplFilter.size > 0;
-  function clearFilters() { setSearch(""); setEstado("all"); setKind("all"); setArea(""); setTplFilter(new Set()); }
+  const anyFilter = !!search || estado !== "all" || kind !== "all" || !!area || !!equipo || tplFilter.size > 0;
+  function clearFilters() { setSearch(""); setEstado("all"); setKind("all"); setArea(""); setEquipo(""); setTplFilter(new Set()); }
+
+  // Orden (controlado) + paginación (propia, arriba y abajo) de cada grilla.
+  const schedSorted = useMemo(() => sortRows(filtered, SCHED_SORT, schedSort), [filtered, schedSort]);
+  const schedPages = Math.max(1, Math.ceil(schedSorted.length / schedSize));
+  const schedPageSafe = Math.min(schedPage, schedPages - 1);
+  const schedSlice = schedSorted.slice(schedPageSafe * schedSize, schedPageSafe * schedSize + schedSize);
+  useEffect(() => { setSchedPage(0); }, [filtered, schedSort, schedSize]);
+
+  const occSorted = useMemo(() => sortRows(occVisible, OCC_SORT, occSort), [occVisible, occSort]);
+  const occPages = Math.max(1, Math.ceil(occSorted.length / occSize));
+  const occPageSafe = Math.min(occPage, occPages - 1);
+  const occSlice = occSorted.slice(occPageSafe * occSize, occPageSafe * occSize + occSize);
+  useEffect(() => { setOccPage(0); }, [occVisible, occSort, occSize, occFilter]);
 
   async function onGenerate() {
     try { const r = await generate.mutateAsync(undefined); toast.success(`Generación lista (${r.generated} nuevas)`); }
@@ -224,6 +259,7 @@ export function SchedulesPage() {
     { key: "node", header: "Nodo", sortable: true, render: (s) => <>{s.orgNodeName ?? "—"}{s.equipmentTag ? <span className={styles.muted}> · {s.equipmentTag}</span> : null}</> },
     { key: "responsible", header: "Responsable", sortable: true, render: (s) => s.responsibleRoleName ? <Chip label={s.responsibleRoleName} variant="info" /> : <span className={styles.muted}>Todos del nodo</span> },
     { key: "freq", header: "Frecuencia", sortable: true, render: (s) => { const Icon = KIND_ICON[s.recurrenceKind] ?? Repeat; return <span className={styles.freq}><span className={styles.freqIcon}><Icon size={14} /></span>{describeRecurrence(s)}</span>; } },
+    { key: "plazo", header: "Plazo", sortable: true, align: "right", render: (s) => <span className={styles.muted}>{formatDuration(s.dueWindowMinutes * 60000)}</span> },
     { key: "next", header: "Próxima ronda", sortable: true, render: (s) => <NextCell iso={s.nextOccurrenceAt} /> },
     { key: "pending", header: "Pendientes", sortable: true, align: "right", render: (s) => <span>{s.pendingCount ?? 0}{(s.overdueCount ?? 0) > 0 ? <Chip label={`${s.overdueCount} venc.`} variant="error" className={styles.chip} /> : null}</span> },
     { key: "active", header: "Estado", sortable: true, render: (s) => manage
@@ -242,10 +278,12 @@ export function SchedulesPage() {
   const occColumns: TableColumn<RoundOccurrenceDto>[] = [
     { key: "when", header: "Programada", sortable: true, render: (o) => <span className={styles.next}>{formatDate(o.scheduledFor, DM)} {formatTime(o.scheduledFor, HM)}</span> },
     { key: "round", header: "Ronda", sortable: true, render: (o) => <span className={styles.strong}>{o.scheduleName ?? o.templateName ?? "Ronda"}</span> },
+    { key: "template", header: "Plantilla", sortable: true, render: (o) => <span className={styles.muted}>{o.templateName ?? "—"}</span> },
     { key: "equip", header: "Equipo", sortable: true, render: (o) => o.equipmentTag ?? "—" },
     { key: "node", header: "Nodo", sortable: true, render: (o) => o.orgNodeName ?? "—" },
     { key: "shift", header: "Turno", sortable: true, render: (o) => o.shiftCode ?? "—" },
     { key: "status", header: "Estado", sortable: true, render: (o) => o.overdue ? <Chip label="Vencida" variant="error" /> : o.logEntryId ? <Chip label="En curso" variant="info" /> : <Chip label="Pendiente" variant="default" /> },
+    { key: "entry", header: "Entrada", sortable: true, render: (o) => o.entryNumber != null ? <span className={styles.freq}><FileText size={13} /> N.º {o.entryNumber}</span> : <span className={styles.muted}>—</span> },
     { key: "due", header: "Vence", sortable: true, align: "right", render: (o) => <span className={`${styles.next} ${o.overdue ? styles.nextPast : ""}`}>{formatDate(o.dueAt, DM)} {formatTime(o.dueAt, HM)}</span> },
   ];
 
@@ -272,9 +310,14 @@ export function SchedulesPage() {
           <p className={styles.subtitle}>Define los horarios de rondas (turno / intervalo / calendario). Los operadores las ejecutan desde «Mis rondas».</p>
         </div>
         <div className={styles.headerActions}>
-          <Button variant="secondary" onClick={() => schedules.refetch()} disabled={schedules.isFetching}><RefreshCw size={16} /> Actualizar</Button>
-          {manage && <Button variant="secondary" onClick={onGenerate} disabled={generate.isPending}><RefreshCw size={16} /> Generar</Button>}
-          {manage && <Button onClick={() => { setEditing(null); setDrawerOpen(true); }}><Plus size={16} /> Nuevo horario</Button>}
+          <Tooltip label="Recargar los horarios desde el servidor">
+            <Button variant="secondary" onClick={() => schedules.refetch()} disabled={schedules.isFetching}><RefreshCw size={16} /> Actualizar</Button>
+          </Tooltip>
+          {manage && (
+            <Tooltip label="Crear un horario de ronda (plantilla · nodo · frecuencia)">
+              <Button onClick={() => { setEditing(null); setDrawerOpen(true); }}><Plus size={16} /> Nuevo horario</Button>
+            </Tooltip>
+          )}
         </div>
       </header>
 
@@ -316,6 +359,12 @@ export function SchedulesPage() {
             {areas.map((a) => <option key={a} value={a}>{a}</option>)}
           </Select>
         )}
+        {equipoOptions.length > 0 && (
+          <Select className={styles.filterSelect} value={equipo} onChange={(e) => setEquipo(e.target.value)} aria-label="Equipo">
+            <option value="">Todos los equipos</option>
+            {equipoOptions.map((e) => <option key={e.tag} value={e.tag}>{e.tag} · {e.node}</option>)}
+          </Select>
+        )}
         {templateOptions.length > 1 && (
           <button type="button" className={`${styles.filterBtn} ${tplFilter.size > 0 ? styles.filterBtnOn : ""}`} onClick={() => setTplModalOpen(true)}>
             <BookOpen size={16} /> Bitácoras{tplFilter.size > 0 ? ` · ${tplFilter.size}` : ""}
@@ -353,40 +402,53 @@ export function SchedulesPage() {
 
       {tab === "horarios" && (
         <Card className={styles.section}>
+          {schedSorted.length > 0 && (
+            <GridPager page={schedPageSafe} pages={schedPages} total={schedSorted.length} pageSize={schedSize} unit="horarios" onPage={setSchedPage} onPageSize={setSchedSize} />
+          )}
           <Table
-            data={sortRows(filtered, SCHED_SORT, schedSort)}
+            data={schedSlice}
             columns={scheduleColumns}
             rowKey={(s) => s.id}
             loading={schedules.isLoading}
             sort={schedSort}
             onSort={(key, direction) => setSchedSort({ key, direction })}
             emptyState={schedEmpty}
-            paginated
-            defaultPageSize={25}
-            pageSizeOptions={[25, 50, 100]}
           />
+          {schedSorted.length > 0 && (
+            <GridPager page={schedPageSafe} pages={schedPages} total={schedSorted.length} pageSize={schedSize} unit="horarios" onPage={setSchedPage} onPageSize={setSchedSize} />
+          )}
         </Card>
       )}
 
       {tab === "ocurrencias" && (
         <Card className={styles.section}>
-          <div className={styles.filters}>
-            <Button variant={occFilter === "all" ? "primary" : "secondary"} onClick={() => setOccFilter("all")}>Pendientes</Button>
-            <Button variant={occFilter === "today" ? "primary" : "secondary"} onClick={() => setOccFilter("today")}>Hoy</Button>
-            <Button variant={occFilter === "overdue" ? "primary" : "secondary"} onClick={() => setOccFilter("overdue")}>Vencidas</Button>
+          <div className={styles.occHead}>
+            <div className={styles.filters}>
+              <Button variant={occFilter === "all" ? "primary" : "secondary"} onClick={() => setOccFilter("all")}>Pendientes</Button>
+              <Button variant={occFilter === "today" ? "primary" : "secondary"} onClick={() => setOccFilter("today")}>Hoy</Button>
+              <Button variant={occFilter === "overdue" ? "primary" : "secondary"} onClick={() => setOccFilter("overdue")}>Vencidas</Button>
+            </div>
+            {manage && (
+              <Tooltip label="Prepara (materializa) las próximas rondas ahora. Normalmente se generan solas al abrir la pantalla.">
+                <Button variant="secondary" onClick={onGenerate} disabled={generate.isPending}><RefreshCw size={16} /> Generar rondas</Button>
+              </Tooltip>
+            )}
           </div>
+          {occSorted.length > 0 && (
+            <GridPager page={occPageSafe} pages={occPages} total={occSorted.length} pageSize={occSize} unit="rondas" onPage={setOccPage} onPageSize={setOccSize} />
+          )}
           <Table
-            data={sortRows(occVisible, OCC_SORT, occSort)}
+            data={occSlice}
             columns={occColumns}
             rowKey={(o) => o.id}
             loading={occurrences.isLoading}
             sort={occSort}
             onSort={(key, direction) => setOccSort({ key, direction })}
             emptyState={<EmptyState icon={<CalendarClock size={28} />} title="Sin ocurrencias" description={anyFilter ? "Ninguna ocurrencia de los horarios filtrados." : "No hay ocurrencias para este filtro."} />}
-            paginated
-            defaultPageSize={25}
-            pageSizeOptions={[25, 50, 100]}
           />
+          {occSorted.length > 0 && (
+            <GridPager page={occPageSafe} pages={occPages} total={occSorted.length} pageSize={occSize} unit="rondas" onPage={setOccPage} onPageSize={setOccSize} />
+          )}
         </Card>
       )}
 
