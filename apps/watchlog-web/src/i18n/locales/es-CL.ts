@@ -40,6 +40,7 @@ export const esCL = {
     templates: "Plantillas",
     newEntry: "Nueva entrada",
     logbook: "Bitácoras",
+    rounds: "Rondas",
     workflows: "Flujos",
     referenceData: "Datos de referencia",
     opsCalendar: "Calendario operacional",

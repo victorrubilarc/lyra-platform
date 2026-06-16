@@ -242,6 +242,18 @@ GxP: MHRA Data Integrity 2018 / FDA DI Q&A (corrección tardía justificada + at
 - **Sin permisos nuevos** (catálogo **60**): `logentry:fill`/`logentry:view` + ABAC ya gobiernan llenar/leer; el alcance de
   la entrada autoriza ver su evidencia.
 
+### Programación de rondas (Fase 2.3) — `LogSchedule` + `RoundOccurrence`
+- **2 permisos nuevos** (catálogo **60→62**): **`schedule:view`** (ver el programa de rondas + ocurrencias; también gatea la
+  pantalla `/rondas`) y **`schedule:manage`** (crear/editar/eliminar horarios; generar/iniciar/omitir ocurrencias). *Motivo:*
+  el **planificador** es un rol distinto del diseñador de la plantilla (patrón maintenance planner de SAP PM / Maximo); por eso
+  NO se reusó `template:edit`. **Llenar** la entrada que abre una ronda reusa `logentry:create` (todas sus guardas ABAC/EAM).
+- **ABAC por nodo**: el listado de horarios/ocurrencias se filtra por los nodos accesibles del usuario (`getAccessibleNodeIds`,
+  `null`=sin restricción); crear/iniciar valida `canAccessNode` + que el nodo pertenezca al alcance de la plantilla + equipo del
+  nodo. **Iniciar una ronda** delega en `LogEntriesService.create`, que re-aplica los dos ejes ABAC (nodo + plantilla) y la
+  gobernanza de equipo (`EquipmentMode`) en el backend — el front solo ofrece.
+- **Omisión auditada**: `POST /occurrences/:id/skip` exige motivo ≥5 y registra `schedule.occurrence.skipped` (GxP: la ronda no
+  realizada queda justificada). `schedule.created/updated/deleted` y `schedule.occurrence.started` también se auditan.
+
 ### Motor de reglas de negocio — expresión SEGURA (Req-7, primer corte)
 - **Sin `eval` ni scripting libre.** Las fórmulas (campos formulados) y las reglas cruzadas se expresan como un **AST
   con LISTA BLANCA de operadores** (tipo JSONLogic) evaluado por un intérprete **PURO** y SÍNCRONO en `@lyra/contracts/

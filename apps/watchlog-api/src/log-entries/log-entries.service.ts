@@ -1038,6 +1038,8 @@ export class LogEntriesService {
         where: { id },
         data: { status: "SUBMITTED", sealedAt, ...seal, updatedById: userId },
       });
+      // Ronda programada (2.3): si esta entrada cumple una ocurrencia, márcala CUMPLIDA.
+      await tx.roundOccurrence.updateMany({ where: { logEntryId: id, status: "PENDING" }, data: { status: "COMPLETED" } });
     });
     if (windowOverride) {
       await this.auditEditWindowOverride(ctx, id, "submitted", windowOverride);
@@ -1196,6 +1198,12 @@ export class LogEntriesService {
         voidedById: userId,
         updatedById: userId,
       },
+    });
+    // Ronda programada (2.3): anular el borrador de una ronda la DESLIGA y la deja
+    // de nuevo PENDIENTE (se puede reiniciar). La ocurrencia no se pierde.
+    await this.prisma.roundOccurrence.updateMany({
+      where: { logEntryId: id },
+      data: { status: "PENDING", logEntryId: null },
     });
     await this.audit.record({
       ...ctx,
@@ -1681,6 +1689,10 @@ export class LogEntriesService {
           ...(seal ? { sealedAt: now, ...seal } : {}),
         },
       });
+      // Ronda programada (2.3): la transición que SELLA cumple la ocurrencia ligada.
+      if (seal) {
+        await tx.roundOccurrence.updateMany({ where: { logEntryId: id, status: "PENDING" }, data: { status: "COMPLETED" } });
+      }
     });
 
     await this.audit.record({

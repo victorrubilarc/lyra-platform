@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { resolveShift, type ShiftResolution } from "@lyra/contracts";
+import { resolveShift, type ShiftResolution, type ShiftResolverCalendar } from "@lyra/contracts";
 import { PrismaService } from "../prisma/prisma.service";
 import { toResolverCalendar } from "./operational-calendar.service";
 
@@ -35,6 +35,13 @@ export abstract class ShiftResolver {
    * periodKey), así que la guarda necesita saber qué calendario resolvió la fecha.
    */
   abstract resolveWithCalendar(at: Date, orgNodeId?: string | null): Promise<ShiftResolutionWithCalendar | null>;
+
+  /**
+   * Calendario (TZ + turnos + ancla) que APLICA a un nodo (asignado o heredado por la
+   * ruta; si no, el por defecto). null si no hay ninguno configurado. Lo usa la
+   * generación de rondas (2.3): SHIFT necesita los turnos; INTERVAL/CALENDAR la TZ.
+   */
+  abstract calendarForNode(orgNodeId?: string | null): Promise<ShiftResolverCalendar | null>;
 }
 
 @Injectable()
@@ -57,6 +64,16 @@ export class ShiftResolverService extends ShiftResolver {
     });
     if (!cal) return null;
     return { calendarId: cal.id, resolution: resolveShift(at, toResolverCalendar(cal)) };
+  }
+
+  async calendarForNode(orgNodeId?: string | null): Promise<ShiftResolverCalendar | null> {
+    const calendarId = await this.calendarIdForNode(orgNodeId);
+    if (!calendarId) return null;
+    const cal = await this.prisma.operationalCalendar.findFirst({
+      where: { id: calendarId, deletedAt: null, active: true },
+      include: { shifts: true },
+    });
+    return cal ? toResolverCalendar(cal) : null;
   }
 
   /**

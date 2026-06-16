@@ -58,3 +58,51 @@ export function isValidTimezone(tz: string): boolean {
     return false;
   }
 }
+
+/** Partes de hora de pared local de un instante en una TZ (vía Intl, sin deps). */
+function localPartsInTz(at: Date, tz: string): { year: number; month: number; day: number; hour: number; minute: number; second: number } {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(at);
+  const get = (type: string): number => Number(parts.find((p) => p.type === type)?.value ?? "0");
+  let hour = get("hour");
+  if (hour === 24) hour = 0; // algunos ICU emiten "24" para la medianoche
+  return { year: get("year"), month: get("month"), day: get("day"), hour, minute: get("minute"), second: get("second") };
+}
+
+/** Fecha local "YYYY-MM-DD" de un instante UTC en una TZ dada. */
+export function localDateInTz(at: Date, tz: string): string {
+  const p = localPartsInTz(at, tz);
+  return `${String(p.year).padStart(4, "0")}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}`;
+}
+
+/** Offset (ms) de la TZ en un instante: (hora de pared interpretada como UTC) − instante. */
+function tzOffsetMs(at: Date, tz: string): number {
+  const p = localPartsInTz(at, tz);
+  const wallAsUtc = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
+  return wallAsUtc - at.getTime();
+}
+
+/**
+ * Convierte una hora de PARED local ("YYYY-MM-DD" + "HH:MM") en una TZ al instante
+ * UTC correspondiente. Inverso de `localDateInTz`/`resolveShift`. Resuelve DST con el
+ * algoritmo estándar de doble-offset (corrige el salto de hora de los cambios de hora).
+ * Sin dependencias salvo `Intl`. En el "agujero" del cambio de hora de primavera el
+ * resultado puede caer en la hora siguiente (comportamiento aceptable y determinista).
+ */
+export function zonedTimeToUtc(date: string, time: string, tz: string): Date {
+  const [y, m, d] = date.split("-").map(Number);
+  const [h, min] = time.split(":").map(Number);
+  const asUtc = Date.UTC(y!, m! - 1, d!, h!, min!);
+  const off1 = tzOffsetMs(new Date(asUtc), tz);
+  const guess = new Date(asUtc - off1);
+  const off2 = tzOffsetMs(guess, tz);
+  return off2 === off1 ? guess : new Date(asUtc - off2);
+}

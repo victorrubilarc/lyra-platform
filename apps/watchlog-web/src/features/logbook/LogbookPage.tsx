@@ -60,6 +60,7 @@ import {
   toViewConfig,
   type LogbookDensity,
 } from "./logbook-views.js";
+import { useOccurrenceStats } from "../schedules/schedules-queries.js";
 import { ColumnsDrawer, type ManagedColumnView } from "./ColumnsDrawer.js";
 import { ViewBar } from "./ViewBar.js";
 import { FlowModal } from "./FlowModal.js";
@@ -229,6 +230,8 @@ export function LogbookPage() {
   const toast = useToast();
   const navigate = useNavigate();
   const { can } = usePermissions();
+  // Badge de rondas vencidas (Fase 2.3): atajo a /rondas sin salir de Bitácoras.
+  const roundStats = useOccurrenceStats(can("schedule:view"));
   const { session } = useAuth();
   const userId = session?.user.id ?? null;
   const [searchParams, setSearchParams] = useSearchParams();
@@ -782,6 +785,11 @@ export function LogbookPage() {
             {t("logbook.list.title")} <span className={styles.accent}>{t("logbook.list.titleAccent")}</span>
           </h1>
           <p className={styles.subtitle}>{t("logbook.list.subtitle")}</p>
+          {can("schedule:view") && (roundStats.data?.overdue ?? 0) > 0 && (
+            <button type="button" className={styles.roundsAlert} onClick={() => navigate("/rondas")}>
+              <AlarmClock size={14} /> {roundStats.data!.overdue} ronda{roundStats.data!.overdue === 1 ? "" : "s"} vencida{roundStats.data!.overdue === 1 ? "" : "s"} — ver programa
+            </button>
+          )}
         </div>
         <div className={styles.headerActions}>
           <ViewBar

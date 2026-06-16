@@ -77,6 +77,7 @@ function makeService(
     logEntry: { update: vi.fn().mockResolvedValue({}), create: vi.fn().mockResolvedValue({ id: "e1" }) },
     logEntryTransition: { create: vi.fn().mockResolvedValue({ id: "tr1" }) },
     logEntrySignature: { create: vi.fn().mockResolvedValue({ id: "sig1" }) },
+    roundOccurrence: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
   };
   const prisma = {
     template: { findFirst: vi.fn(), findUnique: vi.fn().mockResolvedValue({ name: "Plantilla" }) },
@@ -94,6 +95,7 @@ function makeService(
     userRole: { findMany: vi.fn().mockResolvedValue([]) },
     role: { findMany: vi.fn().mockResolvedValue([]) },
     user: { findMany: vi.fn().mockResolvedValue([]) },
+    roundOccurrence: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
     $transaction: vi.fn().mockImplementation((arg) => (Array.isArray(arg) ? Promise.all(arg) : arg(tx))),
     ...prismaOver,
   } as unknown as PrismaService;

@@ -5,11 +5,17 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-15** (**Builder: formateo en vivo + paleta de elementos + modal "Ver más" ✅** —
+> actualización: **2026-06-15** (**Fase 2.3 — Programación de rondas ✅** — `feat/programacion-rondas`: `LogSchedule` (horario
+> VIVO plantilla×nodo×recurrencia SHIFT/INTERVAL/CALENDAR) + `RoundOccurrence` (ocurrencias materializadas pendiente/cumplida/
+> vencida[derivada]/omitida); la ENTRADA se crea al **iniciar la ronda** (reusa `LogEntriesService.create`, ligada por
+> `logEntryId @unique`); generación lazy idempotente + botón Generar; página `/rondas` (KPIs + iniciar/omitir + horarios) + badge
+> en `/bitacoras`; 2 permisos `schedule:view/manage` (cat. **62**); enumerador PURO testeado; migración aditiva. Contracts 249 ·
+> API 234 · smoke 21/21. **Siguiente: a definir con el dueño.** Anterior:
+> **Builder: formateo en vivo + paleta de elementos + modal "Ver más" ✅** —
 > `feat/builder-formateo-paleta`: RUT al teclear · número/moneda/porcentaje con miles+decimales (`FormattedNumberInput`) ·
 > máscara genérica `OT-#####` (`config.mask`) · «Decimales» expuesto · footer Aceptar/Cancelar en PROPIEDADES · paleta DOCKED a
 > la izquierda con buscador + scroll al campo creado · modal "Ver más" con demo en vivo + caso de uso · "objeto"→"elemento".
-> Contracts 239 · API 234. **Siguiente: Fase 2.3 — Programación de rondas.** Anterior:
+> Contracts 239 · API 234. Anterior:
 > **Pulidos de UX del Form Builder ✅** — `feat/builder-ux-pulidos`: mín/máx caracteres +
 > contador en vivo en Texto/Párrafo; hover de info en el lienzo (`SectionCanvas`); footer Aceptar/Cancelar en el drawer
 > avanzado [Cancelar = revierte por snapshot]; fix del Enter al crear ítems de lista [`LinesTextarea` conserva texto crudo];
@@ -175,6 +181,7 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **FORM_GUIDE.md — mapa de capacidades del formulario (doc VIVO)** (catálogo de objetos + transversales en lenguaje simple, 7 partes por objeto; regla de doc vivo en §0.3 + cierre de CLAUDE.md + memoria) | `docs/form-guide` → `main` | ✅ fusionado y publicado en `origin/main` (`9421959`) | ninguna |
 | **Pulidos de UX del Form Builder** (mín/máx caracteres + contador `CharCounter` en Texto/Párrafo; hover de info en `SectionCanvas`; footer Aceptar/Cancelar en el drawer con revert por snapshot; fix Enter en listas `LinesTextarea`; fix preexistente del spec `logbook-query.service` [storage]; FORM_GUIDE actualizado; contracts 239 · API 234) | `feat/builder-ux-pulidos` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 | **Builder: formateo en vivo + paleta de elementos + modal "Ver más"** (RUT al teclear · número/moneda/porcentaje miles+decimales `FormattedNumberInput` · máscara genérica `config.mask`/`applyMask` · «Decimales» expuesto · footer Aceptar/Cancelar en PROPIEDADES + snapshot · paleta DOCKED `FieldPalette` + scroll `scrollToUid` · modal `FieldInfoModal`+`field-info.ts` con demo en vivo · "objeto"→"elemento") | `feat/builder-formateo-paleta` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
+| **Fase 2.3 Programación de rondas** (`LogSchedule`+`RoundOccurrence` + enum `RoundOccurrenceStatus` + migración `…_add_round_scheduling`; `enumerateOccurrences` puro + config por kind + 2 permisos `schedule:view/manage`; módulo API `schedules/` [CRUD/generate/start/skip/occurrences/stats] + hook de cierre en `LogEntriesService` + `ShiftResolver.calendarForNode`; página `/rondas` + `ScheduleDrawer` + badge en `/bitacoras` + menú/i18n; contracts 249 · API 234 · smoke 21/21) | `feat/programacion-rondas` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 
 **Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
@@ -588,9 +595,17 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
           (sería un scheduler); **shift definitions con vigencia** (`validFrom`/`validTo`) para re-resolver timestamps
           históricos con la definición de su época (hoy el catálogo es vivo + estampado en `LogEntry` preserva el
           histórico). Ver DECISIONS 2026-06-09 (forks 2 y 5).
-  - [ ] **2.3 Programación de rondas/turnos (`LogPeriod`):** plantilla recurrente (turno/intervalo/calendario,
-        simple, no un scheduler genérico); cada ocurrencia abre/gener​a un `LogEntry` ligado a su periodo. **Se apoya
-        en el `OperationalCalendar` de 2.3.0** (turnos ya definidos). Investigar ISA-95 / shift handover antes de modelar.
+  - [x] **2.3 Programación de rondas ✅ (2026-06-15, `feat/programacion-rondas` → `main`).** Renombrada `LogPeriod` →
+        **`LogSchedule`** (horario) + **`RoundOccurrence`** (ocurrencia) tras objetar el nombre (choca con `OperationalPeriod`).
+        Horario VIVO (plantilla×nodo×recurrencia SHIFT/INTERVAL/CALENDAR, apoyado en `OperationalCalendar`/`ShiftResolver`) que
+        genera ocurrencias materializadas (PENDING/COMPLETED/SKIPPED/CANCELED); la ENTRADA se crea al **iniciar** (reusa
+        `LogEntriesService.create`, ligada por `RoundOccurrence.logEntryId @unique`); generación lazy idempotente + botón Generar,
+        "vencida" DERIVADA. Página `/rondas` + badge en `/bitacoras`. 2 permisos `schedule:view/manage` (cat. 62). Enumerador PURO
+        testeado. Contracts 249 · API 234 · smoke 21/21. **Deuda diferida:** multi-nodo/descendientes · fan-out por equipo (Route) ·
+        anclaje a cierre real (floating) · completion-requirement (no abrir la próxima hasta cerrar la anterior) · escalamiento/
+        notificación de vencidas (→ Notificaciones) · cron `@nestjs/schedule` · picker de plantilla/nodo propio del planificador
+        (hoy reusa el de `logentry:create`) · COMPLETED-on-seal sin smoke en vivo (cubierto por el hook + unit; sellar es
+        template-dependiente). **Pendiente: smoke VISUAL** (§4).
   - [x] **2.4 Llenado (Nueva entrada) multi-actor** ✅ (2026-06-10). Tablas `LogEntry`/`LogEntrySection`/
         `LogEntryValue`/`LogEntryFieldChange` (aditivas). Secciones editables por estado+rol (dato `TemplateSectionRole`
         + override por campo) × ABAC; validación 100% en servidor (`validateFieldValue` = fuente única reusada en

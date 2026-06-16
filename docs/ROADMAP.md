@@ -42,7 +42,7 @@
 | 2.2 Flujos reutilizables (`WorkflowDefinition`) | ✅ | — |
 | 2.x Datos de referencia / Listas | ✅ | Roadmap industrial: jerarquía, cascada, metadata tipada, vigencia, crosswalk (con Fase 3). |
 | 2.3.0 Calendario operacional (turnos + día operacional) | ✅ | 4-4-5, rotación de cuadrillas, vigencia de turnos (diferidos). |
-| 2.3 **Programación de rondas** (`LogPeriod`) | ⬜ | Recurrencia que abre `LogEntry` por ocurrencia (ISA-95 / shift handover). |
+| 2.3 **Programación de rondas** (`LogSchedule` + `RoundOccurrence`) | ✅ | `feat/programacion-rondas`: horario VIVO (plantilla×nodo×recurrencia SHIFT/INTERVAL/CALENDAR) que genera ocurrencias materializadas (PENDING/COMPLETED/SKIPPED/CANCELED); la ENTRADA se crea al **iniciar la ronda** (reusa `LogEntriesService.create`, ligada por `RoundOccurrence.logEntryId @unique`); generación **lazy idempotente** + botón Generar, "vencida" DERIVADA (sin cron); página `/rondas` (KPIs + iniciar/omitir + gestión de horarios) + badge en `/bitacoras`; 2 permisos `schedule:view/manage` (cat. **62**); migración aditiva; enumerador PURO testeado; contracts 249 · API 234 · smoke 21/21. **Diferido:** multi-nodo · fan-out por equipo (Route) · floating · completion-requirement · escalamiento (→ Notificaciones) · cron. Falta smoke visual. |
 | 2.4 Llenado multi-actor | ✅ | Re-seed de borrador al 409 (diferido). |
 | 2.5 Ejecución de flujo + firmas Part 11 | ✅ | Reversa/anulación de transición · completitud configurable por transición (diferidos). |
 | 2.6.0 Bitácoras — núcleo de lectura | ✅ | — |
@@ -59,5 +59,5 @@
 | 2.9.1 **Motor de reglas de negocio (Req-7)** | 🔄 | **Primer corte ✅** (expresión segura + formulados + validación cruzada). **2.º corte:** límites dinámicos · acciones (incidencia→F4 / notificación) · lookups a listas · **DMN** · `visibleWhen` rico. |
 
 ## Pendiente transversal
-- **Smokes VISUALES del dueño** (BACKLOG §4): grilla 2.8.1, diagrama de flujo, SLA/atrasos, **motor de reglas**, **VOID + ruta de edición (2.8.2)**, **catálogo de objetos · Olas 1, 2, 3 y 4** (Ola 3 = adjuntos/evidencia + escáner QR; Ola 4 = tabla/grupo repetible + matriz parámetro×turno).
+- **Smokes VISUALES del dueño** (BACKLOG §4): grilla 2.8.1, diagrama de flujo, SLA/atrasos, **motor de reglas**, **VOID + ruta de edición (2.8.2)**, **catálogo de objetos · Olas 1, 2, 3 y 4** (Ola 3 = adjuntos/evidencia + escáner QR; Ola 4 = tabla/grupo repetible + matriz parámetro×turno), **programación de rondas (`/rondas`: crear horario · generar · iniciar · omitir · badge de vencidas en /bitacoras)**.
 - Mantener este documento al cerrar cada sesión.
