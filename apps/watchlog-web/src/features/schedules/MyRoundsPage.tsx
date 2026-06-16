@@ -21,6 +21,26 @@ const BUCKET_LABEL: Record<Bucket, string> = {
   upcoming: "Próximas",
 };
 
+/**
+ * Horizonte = "qué tan adelante miro". Las VENCIDAS siempre se ven (son urgentes);
+ * esto acota lo que viene. Un horizonte por HORAS deja ver solo lo inminente; "Hoy"
+ * = resto del día; "Todas" = sin tope (incluye próximos días).
+ */
+const HORIZONS: { key: string; label: string; hours: number | null }[] = [
+  { key: "1", label: "Próxima hora", hours: 1 },
+  { key: "4", label: "Próximas 4 horas", hours: 4 },
+  { key: "8", label: "Próximas 8 horas (turno)", hours: 8 },
+  { key: "12", label: "Próximas 12 horas", hours: 12 },
+  { key: "today", label: "Resto de hoy", hours: null },
+  { key: "24", label: "Próximas 24 horas", hours: 24 },
+  { key: "all", label: "Todas (próximos días)", hours: null },
+];
+function endOfTodayTs(): number {
+  const d = new Date();
+  d.setHours(23, 59, 59, 999);
+  return d.getTime();
+}
+
 function isSameLocalDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
@@ -46,12 +66,19 @@ export function MyRoundsPage() {
 
   // Filtros (todos client-side sobre el worklist propio que devuelve el backend).
   const [shiftOnly, setShiftOnly] = useState(false);
-  const [showUpcoming, setShowUpcoming] = useState(false);
+  const [horizon, setHorizon] = useState("today");
   const [search, setSearch] = useState("");
   const [nodo, setNodo] = useState<string | null>(null);
   const [equipo, setEquipo] = useState<string | null>(null);
 
-  const rounds = useMyRounds({ shiftOnly, includeUpcoming: showUpcoming });
+  // Tope superior (timestamp) de lo que se muestra según el horizonte. null = sin tope.
+  // Si la ventana cruza la medianoche, hay que pedir también las próximas (días futuros).
+  const horizonHours = HORIZONS.find((h) => h.key === horizon)?.hours ?? null;
+  const upperBound =
+    horizon === "all" ? null : horizon === "today" ? endOfTodayTs() : Date.now() + (horizonHours ?? 0) * 3_600_000;
+  const needsUpcoming = horizon === "all" || (upperBound !== null && upperBound > endOfTodayTs());
+
+  const rounds = useMyRounds({ shiftOnly, includeUpcoming: needsUpcoming });
   const stats = useMyRoundsStats();
 
   const start = useStartOccurrence();
@@ -89,9 +116,15 @@ export function MyRoundsPage() {
     return [...set.entries()].sort((a, b) => a[0].localeCompare(b[0]));
   }, [afterNodo]);
 
-  const filtered = useMemo(
+  const afterEquipo = useMemo(
     () => (equipo ? afterNodo.filter((o) => o.equipmentTag === equipo) : afterNodo),
     [afterNodo, equipo],
+  );
+
+  // Ventana de horizonte: las VENCIDAS siempre se ven; lo demás se acota al tope.
+  const filtered = useMemo(
+    () => (upperBound === null ? afterEquipo : afterEquipo.filter((o) => o.overdue || new Date(o.scheduledFor).getTime() <= upperBound)),
+    [afterEquipo, upperBound],
   );
 
   // Agrupación por urgencia, cada grupo ordenado por vencimiento (lo más urgente arriba).
@@ -103,9 +136,9 @@ export function MyRoundsPage() {
     return by;
   }, [filtered]);
 
-  const anyFilter = !!search || !!nodo || !!equipo || shiftOnly || showUpcoming;
+  const anyFilter = !!search || !!nodo || !!equipo || shiftOnly || horizon !== "today";
   function clearFilters() {
-    setSearch(""); setNodo(null); setEquipo(null); setShiftOnly(false); setShowUpcoming(false);
+    setSearch(""); setNodo(null); setEquipo(null); setShiftOnly(false); setHorizon("today");
   }
 
   async function onStart(occ: RoundOccurrenceDto) {
@@ -207,11 +240,16 @@ export function MyRoundsPage() {
         </div>
 
         <div className={my.toggles}>
+          <Select
+            className={my.horizonSelect}
+            value={horizon}
+            onChange={(e) => setHorizon(e.target.value)}
+            aria-label="Horizonte de tiempo"
+          >
+            {HORIZONS.map((h) => <option key={h.key} value={h.key}>{h.label}</option>)}
+          </Select>
           <button type="button" className={`${my.toggle} ${shiftOnly ? my.toggleOn : ""}`} onClick={() => setShiftOnly((v) => !v)}>
             Mi turno
-          </button>
-          <button type="button" className={`${my.toggle} ${showUpcoming ? my.toggleOn : ""}`} onClick={() => setShowUpcoming((v) => !v)}>
-            Incluir próximas
           </button>
           {nodos.length > 1 && (
             <Select

@@ -24,9 +24,10 @@ stats; separación de gates) + `smoke-rondas.py` **21/21** sin regresión. typec
 `backTo`/`backLabel` por `location.state` (origen explícito) y el "Volver" (y el redirect tras VOID) regresan a **/mis-rondas**
 ("Volver a Mis rondas") en vez de a Bitácoras. **+ Follow-up UX 2 (`feat/mis-rondas-filtros`):** rediseño de "Mis rondas" para
 operación con muchas rondas (ej. 5 estanques × cada hora) — **búsqueda** (ronda/equipo/área), **filtro por equipo** (chips
-táctiles con conteo), **filtro por área** (select), toggles **Mi turno**/**Incluir próximas**, y sobre todo **agrupación por
-URGENCIA** (Vencidas → Pendientes de hoy → Próximas, con conteo y color por grupo, lo más urgente arriba); tag del equipo
-destacado en cada fila. Todo client-side sobre el worklist (sin tocar API). **+ demo `seed-demo-estanques.py`** (5 estanques como
+táctiles con conteo), **filtro por área** (select), **selector de HORIZONTE de tiempo** (Próxima hora / 4 h / 8 h / 12 h / Hoy /
+24 h / Todas — las vencidas siempre se ven; pide "próximas" al backend solo si la ventana cruza la medianoche), toggle
+**Mi turno**, y sobre todo **agrupación por URGENCIA** (Vencidas → Pendientes de hoy → Próximas, con conteo y color por grupo, lo
+más urgente arriba); tag del equipo destacado en cada fila. Todo client-side sobre el worklist (sin tocar API). **+ demo `seed-demo-estanques.py`** (5 estanques como
 equipos + ronda cada hora + umbrales) y **Route (fan-out por equipo) anotado en BACKLOG**. **Pendiente: smoke VISUAL del dueño**
 (§4). **Siguiente: Notificaciones (correo).**
 
