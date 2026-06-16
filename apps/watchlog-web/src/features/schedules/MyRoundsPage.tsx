@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { AlertTriangle, Clock, Play, RefreshCw, Route, Search, SkipForward, X } from "lucide-react";
 import { Button, Card, Chip, EmptyState, Input, Modal, Select, useToast } from "@lyra/ui";
 import type { RoundOccurrenceDto } from "@lyra/contracts";
-import { formatDateTime, formatDuration } from "../../lib/format.js";
+import { formatDate, formatDuration, formatTime } from "../../lib/format.js";
 import {
   useMyRounds,
   useMyRoundsStats,
@@ -40,6 +40,8 @@ function endOfTodayTs(): number {
   d.setHours(23, 59, 59, 999);
   return d.getTime();
 }
+// Hora en 24h ("14:00"): estándar operacional, más claro que 12h con a.m./p.m.
+const HM: Intl.DateTimeFormatOptions = { timeStyle: undefined, hour: "2-digit", minute: "2-digit", hourCycle: "h23" };
 
 function isSameLocalDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
@@ -163,23 +165,47 @@ export function MyRoundsPage() {
   }
 
   function renderOcc(o: RoundOccurrenceDto) {
+    const now = new Date();
+    const sched = new Date(o.scheduledFor);
+    const dueMs = new Date(o.dueAt).getTime() - now.getTime();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const dayLabel = isSameLocalDay(sched, now)
+      ? null
+      : isSameLocalDay(sched, tomorrow)
+        ? "Mañana"
+        : formatDate(sched, { dateStyle: undefined, weekday: "short", day: "2-digit", month: "short" });
+
+    let relIcon = <Clock size={12} />;
+    let relText: string;
+    let relCls = my.relNormal;
+    if (o.overdue) {
+      relIcon = <AlertTriangle size={12} />;
+      relText = `Vencida hace ${formatDuration(-dueMs)}`;
+      relCls = my.relOverdue;
+    } else if (dueMs <= 3_600_000) {
+      relText = `Vence en ${formatDuration(dueMs)}`;
+      relCls = my.relSoon;
+    } else {
+      relText = `Vence ${formatTime(o.dueAt, HM)}`;
+    }
+
     return (
       <li key={o.id} className={`${styles.occ} ${o.overdue ? styles.occOverdue : ""}`}>
-        <div className={styles.occMain}>
+        <div className={my.timeCell}>
+          {dayLabel && <span className={my.dayLabel}>{dayLabel}</span>}
+          <span className={my.timeBig}>{formatTime(o.scheduledFor, HM)}</span>
+          <span className={`${my.timeRel} ${relCls}`}>{relIcon} {relText}</span>
+        </div>
+        <div className={my.rowBody}>
           <div className={styles.occTitle}>
             {o.equipmentTag ? <span className={my.tag}>{o.equipmentTag}</span> : null}
-            {o.scheduleName ?? o.templateName ?? "Ronda"}
-            {o.shiftCode ? <Chip label={`Turno ${o.shiftCode}`} variant="default" className={styles.chip} /> : null}
+            <span className={my.roundName}>{o.scheduleName ?? o.templateName ?? "Ronda"}</span>
+            {o.logEntryId ? <Chip label="En curso" variant="info" className={styles.chip} /> : null}
           </div>
           <div className={styles.occMeta}>
             <span>{o.orgNodeName}</span>
-            <span>· Programada: {formatDateTime(o.scheduledFor)}</span>
-            {o.overdue ? (
-              <span className={styles.overdueText}><AlertTriangle size={13} /> Vencida hace {formatDuration(Date.now() - new Date(o.dueAt).getTime())}</span>
-            ) : (
-              <span className={my.dueChip}><Clock size={12} /> Vence {formatDateTime(o.dueAt)}</span>
-            )}
-            {o.logEntryId ? <Chip label="En curso" variant="info" className={styles.chip} /> : null}
+            {o.shiftCode ? <span>· Turno {o.shiftCode}</span> : null}
           </div>
         </div>
         <div className={styles.occActions}>

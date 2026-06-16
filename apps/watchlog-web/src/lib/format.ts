@@ -18,6 +18,12 @@ export function formatDateTime(value: string | Date, opts?: Intl.DateTimeFormatO
   return new Intl.DateTimeFormat(locale(), { dateStyle: "medium", timeStyle: "short", ...opts }).format(d);
 }
 
+/** Solo hora regional (p. ej. es-CL: "21:30"). Acepta ISO string o Date. */
+export function formatTime(value: string | Date, opts?: Intl.DateTimeFormatOptions): string {
+  const d = value instanceof Date ? value : new Date(value);
+  return new Intl.DateTimeFormat(locale(), { timeStyle: "short", ...opts }).format(d);
+}
+
 /** Solo fecha, regional (p. ej. es-CL: "12-06-2026"). Acepta ISO string o Date. */
 export function formatDate(value: string | Date, opts?: Intl.DateTimeFormatOptions): string {
   const d = value instanceof Date ? value : new Date(value);
