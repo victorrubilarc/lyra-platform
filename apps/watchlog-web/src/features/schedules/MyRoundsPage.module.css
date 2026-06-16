@@ -1,0 +1,207 @@
+/* Barra de filtros de "Mis rondas" — pensada para terreno/tablet (táctil ≥40px). */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+}
+
+.searchWrap {
+  flex: 1 1 260px;
+  min-width: 200px;
+}
+
+.searchClear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 6px;
+}
+.searchClear:hover {
+  color: var(--color-text);
+}
+
+.toggles {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Toggle pill (Mi turno / Incluir próximas) */
+.toggle {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: var(--radius-full, 999px);
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.12));
+  background: var(--color-surface-1, rgba(255, 255, 255, 0.02));
+  color: var(--color-text-secondary);
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+.toggle:hover {
+  color: var(--color-text);
+  border-color: var(--color-border-active, rgba(99, 102, 241, 0.4));
+}
+.toggleOn {
+  background: rgba(99, 102, 241, 0.16);
+  border-color: var(--color-accent-primary, #6366f1);
+  color: var(--color-accent-primary, #6366f1);
+}
+
+.nodoSelect {
+  min-height: 40px;
+  max-width: 220px;
+}
+
+.clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 8px;
+}
+.clear:hover {
+  color: var(--color-error, #ef4444);
+}
+
+/* Fila de chips de equipo (filtro táctil, scroll horizontal si hay muchos) */
+.chipRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.equipChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: var(--radius-full, 999px);
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.12));
+  background: var(--color-surface-1, rgba(255, 255, 255, 0.02));
+  color: var(--color-text);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+.equipChip:hover {
+  border-color: var(--color-border-active, rgba(99, 102, 241, 0.4));
+}
+.equipChipOn {
+  background: rgba(99, 102, 241, 0.16);
+  border-color: var(--color-accent-primary, #6366f1);
+  color: var(--color-accent-primary, #6366f1);
+}
+.equipCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+.equipChipOn .equipCount {
+  background: rgba(99, 102, 241, 0.25);
+}
+
+/* Grupos por urgencia */
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.groupHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 2px 2px 0;
+}
+.groupDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+.groupTitle {
+  font-family: var(--font-display, "Sora", sans-serif);
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--color-text);
+  margin: 0;
+}
+.groupCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--color-surface-2, rgba(255, 255, 255, 0.06));
+  color: var(--color-text-secondary);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.bucket_overdue .groupDot {
+  background: var(--color-error, #ef4444);
+  box-shadow: 0 0 8px -1px var(--color-error, #ef4444);
+}
+.bucket_overdue .groupTitle { color: var(--color-error, #ef4444); }
+.bucket_overdue .groupCount {
+  background: rgba(239, 68, 68, 0.16);
+  color: var(--color-error, #ef4444);
+}
+.bucket_today .groupDot { background: var(--color-accent-primary, #6366f1); }
+.bucket_today .groupCount {
+  background: rgba(99, 102, 241, 0.16);
+  color: var(--color-accent-primary, #6366f1);
+}
+.bucket_upcoming .groupDot { background: var(--color-text-muted, #6b7280); }
+
+/* Tag del equipo, destacado al frente del título de la ronda */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: 6px;
+  background: var(--color-surface-2, rgba(255, 255, 255, 0.07));
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.1));
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--color-text);
+  letter-spacing: 0.02em;
+}
+
+.dueChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
