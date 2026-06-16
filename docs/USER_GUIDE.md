@@ -139,18 +139,31 @@ patrón de rondas de operador / planes de mantención de la industria (SAP PM, M
 los grandes sistemas de mantención (SAP PM, Maximo, Fiori):
 - **Buscador** por nombre, plantilla, área, equipo o responsable.
 - **Filtros**: estado (activos/pausados), tipo de recurrencia y área.
+- **Selector de bitácoras** (botón "Bitácoras"): abre un modal para elegir **una o varias**
+  bitácoras; las elegidas se muestran como chips y acotan la lista.
 - **KPIs de salud** arriba: horarios activos, pausados, rondas pendientes y vencidas.
 - **Frecuencia legible** por horario ("Cada turno", "Cada 6 h", "08:00, 20:00 · Lun a Vie").
 - **Próxima ronda**: cuándo abre la siguiente ocurrencia de cada horario (se marca en rojo si
   ya está atrasada).
 - **Pausar / activar en un clic** con el interruptor de la columna *Estado* (sin entrar a editar).
-- **Monitoreo de ocurrencias** plegable al final (lo que ya se generó), para no estorbar la vista.
+- **Monitoreo de ocurrencias** plegable al final: una **grilla paginable** (25/50/100 por página)
+  con **su propia búsqueda** (por ronda, equipo o nodo) y columnas Programada/Ronda/Equipo/Nodo/
+  Turno/Estado/Vence — para encontrar cualquier ocurrencia entre cientos.
 
 **Quién puede.** Ver la programación requiere el permiso **"Ver rondas"** (`schedule:view`);
 crear o editar horarios requiere **"Administrar rondas"** (`schedule:manage`). Es un rol de
-**planificador**, distinto del que diseña la plantilla y del operador que las ejecuta. Cada
-quien solo ve las rondas de los **nodos dentro de su alcance**. (Esta pantalla **no ejecuta**
-rondas: la lista de ocurrencias es solo de **monitoreo**.)
+**planificador**, distinto del que diseña la plantilla y del operador que las ejecuta. (Esta
+pantalla **no ejecuta** rondas: la lista de ocurrencias es solo de **monitoreo**.)
+
+**¿Qué bitácoras/áreas ve cada planificador?** (clave en empresas con varias áreas). La pantalla
+respeta el **alcance de datos** del usuario en dos ejes que se combinan:
+- **Por área (nodo):** un planificador asignado a un área (o a una rama de la estructura) solo ve
+  los horarios de **esas** áreas. Áreas distintas quedan **aisladas** entre sí automáticamente.
+- **Por bitácora (plantilla):** si además se le acota a ciertos tipos de bitácora, solo ve **esos**.
+- **Sin alcance asignado** = ve **todo** (pensado para un rol corporativo/transversal).
+
+El alcance se configura en **Seguridad** (por usuario o por rol) y no está fijo en el código. El
+selector de **"Bitácoras"** del filtro solo ofrece las que el planificador tiene disponibles.
 
 **Importante.**
 - Cambiar la frecuencia o pausar un horario **NO** vuelve a publicar la plantilla: la

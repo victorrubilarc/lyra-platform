@@ -252,6 +252,12 @@ GxP: MHRA Data Integrity 2018 / FDA DI Q&A (corrección tardía justificada + at
   reusa `logentry:fill`/`logentry:view` + las guardas ABAC/EAM. El selector de rol responsable del planificador usa un endpoint
   propio `GET /schedules/role-options` (gate `schedule:manage`), **decoplado de `role:read`** (el planificador no necesita el
   módulo de seguridad).
+- **ABAC del PLANIFICADOR = nodo ∩ plantilla (2.3.1 pro)**: `GET /schedules` (y generate/occurrences/stats) filtran por los
+  **dos** ejes de alcance de 2.8 en **AND** (`scopeFilters` = `getAccessibleNodeIds` ∩ `getAccessibleTemplateIds`; `null` en un eje
+  = sin restricción ahí). Consecuencia (importante para empresas multi-área): un planificador acotado a un **área** (scope de nodo)
+  no ve los horarios de otras áreas; uno acotado a ciertas **bitácoras** (scope de plantilla) no ve los demás tipos. Sin scope =
+  ve todo (rol corporativo). Ambos son **DATO** (asignables por usuario o rol en Seguridad), nunca hardcodeados. Las superficies de
+  ejecución y el value-help de bitácoras del planificador heredan automáticamente este alcance.
 - **ABAC por nodo + responsabilidad por ROL (worklist, 2.3.1)**: los listados se filtran por `getAccessibleNodeIds`
   (`null`=sin restricción). El worklist del operador (`GET /schedules/my-rounds`) además acota por **rol responsable**:
   `schedule.responsibleRoleId ∈ roles del usuario`, dejando pasar los horarios SIN responsable (`null` = fallback, visible a

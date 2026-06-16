@@ -36,7 +36,15 @@ estado activo/pausado + recurrencia + área), **KPIs de salud** (horarios activo
 **frecuencia legible** ("Cada turno"/"Cada 6 h"/"08:00, 20:00 · Lun a Vie"), **columna "Próxima ronda"** (= *next call date* de SAP;
 campo nuevo aditivo `LogScheduleDto.nextOccurrenceAt` = `_min(scheduledFor)` de las PENDING, con realce si está atrasada),
 **pausar/activar EN LÍNEA** (toggle que reusa update con el payload del dto), y **monitoreo de ocurrencias plegable** (query
-gateada por expansión). Contracts 249 · API 234. **+ demo `seed-demo-estanques.py`** (5 estanques como
+gateada por expansión). Contracts 249 · API 234. **+ Follow-up UX 4 — INTELIGENCIA + AISLAMIENTO (`feat/programacion-pro`):**
+**(a) Alcance del planificador endurecido** — `GET /schedules`/generate/occurrences/stats ahora filtran por **nodo ∩ plantilla**
+(los dos ejes ABAC de 2.8, en AND, vía `scopeFilters`), no solo por nodo: un planificador de un área NO ve las bitácoras/horarios
+de otra (respuesta a "qué ven en una empresa multi-área"; verificado en vivo 6→5 al acotar a 1 bitácora). **(b) Value help de
+BITÁCORAS** — selector múltiple en modal (`TemplateFilterModal`, patrón F4/Value Help SAP) que ofrece SOLO las bitácoras
+disponibles (las de sus horarios visibles) con búsqueda y conteo; lo elegido se muestra como **chips** removibles y acota la tabla.
+**(c) Ocurrencias = GRILLA paginable** con **búsqueda propia** (ronda/equipo/nodo) + paginación cliente (25/50/100 · rango ·
+prev/next) + columnas Programada/Ronda/Equipo/Nodo/Turno/Estado/Vence — reemplaza la lista plana. Sin permisos nuevos. Contracts 249
+· API 234 · smokes 18/18 + 21/21. **+ demo `seed-demo-estanques.py`** (5 estanques como
 equipos + ronda cada hora + umbrales) y **Route (fan-out por equipo) anotado en BACKLOG**. **Pendiente: smoke VISUAL del dueño**
 (§4). **Siguiente: Notificaciones (correo).**
 
