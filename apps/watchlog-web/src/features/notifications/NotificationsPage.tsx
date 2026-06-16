@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Bell, Inbox, FileText, SlidersHorizontal, RefreshCw, Search, Send, Eye } from "lucide-react";
-import { Button, Card, Input, Modal, Select, Textarea, useToast } from "@lyra/ui";
+import { Bell, Inbox, FileText, SlidersHorizontal, RefreshCw, Search, Send, Eye, ArrowLeft, Monitor, Smartphone, Pencil } from "lucide-react";
+import { Button, Card, Input, Modal, Select, Textarea, Toggle, useToast } from "@lyra/ui";
 import { renderTemplate, sampleContextForEvent, type NotificationOutboxStatus, type NotificationTemplateDto } from "@lyra/contracts";
 import { Can } from "../../auth/Can.js";
 import { usePermissions } from "../../auth/use-permissions.js";
@@ -197,6 +197,9 @@ function OutboxPanel() {
 // --- Plantillas --------------------------------------------------------------
 
 type TplField = "subject" | "bodyText" | "bodyHtml";
+type TplDraft = { subject: string; bodyText: string; bodyHtml: string; active: boolean };
+
+const GROUP_LABEL: Record<string, string> = { schedules: "Rondas", logbook: "Bitácoras" };
 
 function TemplatesPanel() {
   const { t } = useTranslation();
@@ -204,37 +207,124 @@ function TemplatesPanel() {
   const templates = useNotificationTemplates();
   const events = useNotificationEvents();
   const update = useUpdateNotificationTemplate();
-  const [selId, setSelId] = useState<string | null>(null);
+
+  const [selId, setSelId] = useState<string | null>(null); // null = lista (master)
+  const [q, setQ] = useState("");
+  const [group, setGroup] = useState("");
+  const [status, setStatus] = useState("");
 
   const selected = useMemo<NotificationTemplateDto | null>(
-    () => templates.data?.find((x) => x.id === selId) ?? templates.data?.[0] ?? null,
+    () => templates.data?.find((x) => x.id === selId) ?? null,
     [templates.data, selId],
   );
-  const eventDef = events.data?.find((e) => e.key === selected?.eventKey);
 
-  const [draft, setDraft] = useState<{ subject: string; bodyText: string; bodyHtml: string } | null>(null);
-  const current = draft ?? (selected ? { subject: selected.subject, bodyText: selected.bodyText, bodyHtml: selected.bodyHtml } : null);
+  if (templates.isLoading) return <div className={styles.empty}>{t("common.loading")}</div>;
 
-  // Campo enfocado + posición del cursor, para INSERTAR la variable donde corresponde.
+  // === Detalle: editor a pantalla completa ===
+  if (selected) {
+    return <TemplateEditor template={selected} events={events.data ?? []} onBack={() => setSelId(null)} update={update} toast={toast} t={t} />;
+  }
+
+  // === Master: lista administrable ===
+  const eventByKey = new Map((events.data ?? []).map((e) => [e.key, e]));
+  const groups = [...new Set((events.data ?? []).map((e) => e.group))];
+  const rows = (templates.data ?? []).filter((tpl) => {
+    const ev = eventByKey.get(tpl.eventKey);
+    const name = ev ? t(ev.labelKey, ev.key) : tpl.eventKey;
+    if (q && !`${name} ${tpl.eventKey}`.toLowerCase().includes(q.toLowerCase())) return false;
+    if (group && ev?.group !== group) return false;
+    if (status === "active" && !tpl.active) return false;
+    if (status === "inactive" && tpl.active) return false;
+    return true;
+  });
+
+  return (
+    <div className={styles.panel}>
+      <div className={styles.tplToolbar}>
+        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("notifications.templates.search")} rightSlot={<Search size={16} />} />
+        <Select value={group} onChange={(e) => setGroup(e.target.value)}>
+          <option value="">{t("notifications.templates.allGroups")}</option>
+          {groups.map((g) => <option key={g} value={g}>{GROUP_LABEL[g] ?? g}</option>)}
+        </Select>
+        <Select value={status} onChange={(e) => setStatus(e.target.value)}>
+          <option value="">{t("notifications.templates.allStatuses")}</option>
+          <option value="active">{t("notifications.templates.active")}</option>
+          <option value="inactive">{t("notifications.templates.inactive")}</option>
+        </Select>
+        <div className={styles.spacer} />
+        <span className={styles.tplCount}>{t("notifications.templates.count", { count: rows.length })}</span>
+      </div>
+
+      <div className={styles.tplTable}>
+        <div className={styles.tplTableHead}>
+          <span>{t("notifications.templates.colName")}</span>
+          <span className={styles.tplColHide}>{t("notifications.templates.colEvent")}</span>
+          <span className={styles.tplColHide}>{t("notifications.templates.colChannel")}</span>
+          <span className={styles.tplColHide}>{t("notifications.templates.colLocale")}</span>
+          <span className={styles.tplColHide}>{t("notifications.outbox.status")}</span>
+          <span />
+        </div>
+        {rows.length === 0 ? (
+          <div className={styles.empty}>{t("notifications.templates.empty")}</div>
+        ) : (
+          rows.map((tpl) => {
+            const ev = eventByKey.get(tpl.eventKey);
+            return (
+              <div key={tpl.id} className={styles.tplTableRow} onClick={() => setSelId(tpl.id)} role="button" tabIndex={0}>
+                <div className={styles.tplRowName}>
+                  <span className={styles.tplRowTitle}>{ev ? t(ev.labelKey, ev.key) : tpl.eventKey}</span>
+                  <span className={styles.tplRowSub}>{ev ? GROUP_LABEL[ev.group] ?? ev.group : "—"}</span>
+                </div>
+                <span className={`${styles.eventKey} ${styles.tplColHide}`}>{tpl.eventKey}</span>
+                <span className={`${styles.tplRowSub} ${styles.tplColHide}`}>{tpl.channel}</span>
+                <span className={`${styles.tplRowSub} ${styles.tplColHide}`}>{tpl.locale}</span>
+                <span className={styles.tplColHide}>
+                  <span className={`${styles.statusPill} ${tpl.active ? styles.statusActive : styles.statusInactive}`}>
+                    {tpl.active ? t("notifications.templates.active") : t("notifications.templates.inactive")}
+                  </span>
+                </span>
+                <Button variant="secondary" leftIcon={<Pencil size={15} />} onClick={(e) => { e.stopPropagation(); setSelId(tpl.id); }}>
+                  {t("common.edit")}
+                </Button>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TemplateEditor({
+  template, events, onBack, update, toast, t,
+}: {
+  template: NotificationTemplateDto;
+  events: { key: string; labelKey: string; variables: { name: string; description: string; sample: string }[] }[];
+  onBack: () => void;
+  update: ReturnType<typeof useUpdateNotificationTemplate>;
+  toast: ReturnType<typeof useToast>;
+  t: ReturnType<typeof useTranslation>["t"];
+}) {
+  const eventDef = events.find((e) => e.key === template.eventKey);
+  const [draft, setDraft] = useState<TplDraft | null>(null);
+  const current: TplDraft = draft ?? { subject: template.subject, bodyText: template.bodyText, bodyHtml: template.bodyHtml, active: template.active };
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [device, setDevice] = useState<"desktop" | "mobile">("desktop");
+
   const focus = useRef<{ field: TplField; start: number; end: number }>({ field: "subject", start: 0, end: 0 });
   const refs = {
     subject: useRef<HTMLInputElement>(null),
     bodyText: useRef<HTMLTextAreaElement>(null),
     bodyHtml: useRef<HTMLTextAreaElement>(null),
   };
-
   function trackSel(field: TplField, el: HTMLInputElement | HTMLTextAreaElement) {
     focus.current = { field, start: el.selectionStart ?? el.value.length, end: el.selectionEnd ?? el.value.length };
   }
-
   function insertVariable(name: string) {
-    if (!current) return;
     const { field, start, end } = focus.current;
     const token = `{{${name}}}`;
     const val = current[field];
-    const next = val.slice(0, start) + token + val.slice(end);
-    setDraft({ ...current, [field]: next });
-    // Reposiciona el cursor tras el token insertado.
+    setDraft({ ...current, [field]: val.slice(0, start) + token + val.slice(end) });
     requestAnimationFrame(() => {
       const el = refs[field].current;
       if (el) {
@@ -245,121 +335,96 @@ function TemplatesPanel() {
       }
     });
   }
-
   function save() {
-    if (!selected || !current) return;
     update.mutate(
-      { id: selected.id, dto: { ...current } },
+      { id: template.id, dto: { subject: current.subject, bodyText: current.bodyText, bodyHtml: current.bodyHtml, active: current.active } },
       {
-        onSuccess: () => {
-          toast.success(t("notifications.templates.saved"));
-          setDraft(null);
-        },
-        onError: (e) => toast.error(e instanceof Error ? e.message : t("common.error")),
+        onSuccess: () => { toast.success(t("notifications.templates.saved")); setDraft(null); },
+        onError: (e: unknown) => toast.error(e instanceof Error ? e.message : t("common.error")),
       },
     );
   }
 
-  // Vista previa EN VIVO con datos de ejemplo (mismo render del backend, sin eval).
-  const sample = selected ? sampleContextForEvent(selected.eventKey) : {};
-  const previewSubject = current ? renderTemplate(current.subject, sample) : "";
-  const previewHtml = current ? renderTemplate(current.bodyHtml, sample) : "";
-
-  if (templates.isLoading) return <div className={styles.empty}>{t("common.loading")}</div>;
+  const sample = sampleContextForEvent(template.eventKey);
+  const previewSubject = renderTemplate(current.subject, sample);
+  const previewHtml = renderTemplate(current.bodyHtml, sample);
 
   return (
-    <div className={`${styles.panel} ${styles.templateGrid}`}>
-      <div className={styles.tplList}>
-        {(templates.data ?? []).map((tpl) => {
-          const ev = events.data?.find((e) => e.key === tpl.eventKey);
-          const active = (selected?.id ?? null) === tpl.id;
-          return (
-            <button
-              key={tpl.id}
-              type="button"
-              className={active ? `${styles.tplItem} ${styles.tplItemActive}` : styles.tplItem}
-              onClick={() => {
-                setSelId(tpl.id);
-                setDraft(null);
-              }}
-            >
-              <span className={styles.tplName}>{ev ? t(ev.labelKey, ev.key) : tpl.eventKey}</span>
-              <span className={styles.tplMeta}>
-                {tpl.eventKey} · {tpl.locale} · {tpl.active ? t("notifications.templates.active") : t("notifications.templates.inactive")}
-              </span>
-            </button>
-          );
-        })}
+    <div className={styles.panel}>
+      <div className={styles.editorHeader}>
+        <button type="button" className={styles.backBtn} onClick={onBack}><ArrowLeft size={16} /> {t("notifications.templates.back")}</button>
+        <div className={styles.editorTitleWrap}>
+          <span className={styles.editorTitle}>{eventDef ? t(eventDef.labelKey, eventDef.key) : template.eventKey}</span>
+          <span className={styles.editorSubtitle}>{template.eventKey} · {template.locale} · {template.channel}</span>
+        </div>
+        <div className={styles.headerActions}>
+          <label className={styles.activeToggle}>
+            {current.active ? t("notifications.templates.active") : t("notifications.templates.inactive")}
+            <Toggle checked={current.active} onChange={(v) => setDraft({ ...current, active: v })} aria-label={t("notifications.templates.activeToggle")} />
+          </label>
+          <Button variant="secondary" leftIcon={<Eye size={16} />} onClick={() => setPreviewOpen(true)}>{t("notifications.templates.previewBtn")}</Button>
+        </div>
       </div>
 
-      {selected && current && (
-        <div className={styles.editorSplit}>
-          <Card className={styles.editor}>
-            <div className={styles.editorRow}>
-              <span className={styles.label}>{t("notifications.templates.variables")}</span>
-              <span className={styles.insertHint}>{t("notifications.templates.insertHint")}</span>
-              <div className={styles.dict}>
-                {(eventDef?.variables ?? []).map((v) => (
-                  <button key={v.name} type="button" className={styles.dictItem} onClick={() => insertVariable(v.name)}>
-                    <span className={styles.dictName}>{`{{${v.name}}}`}</span>
-                    <span className={styles.dictDesc}>{v.description}</span>
-                    <span className={styles.dictSample}>{t("notifications.templates.egLabel")}: {v.sample}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className={styles.editorRow}>
-              <span className={styles.label}>{t("notifications.templates.subject")}</span>
-              <Input
-                ref={refs.subject}
-                className={styles.mono}
-                value={current.subject}
-                onChange={(e) => setDraft({ ...current, subject: e.target.value })}
-                onSelect={(e) => trackSel("subject", e.currentTarget)}
-                onFocus={(e) => trackSel("subject", e.currentTarget)}
-              />
-            </div>
-            <div className={styles.editorRow}>
-              <span className={styles.label}>{t("notifications.templates.bodyText")}</span>
-              <Textarea
-                ref={refs.bodyText}
-                className={styles.mono}
-                rows={5}
-                value={current.bodyText}
-                onChange={(e) => setDraft({ ...current, bodyText: e.target.value })}
-                onSelect={(e) => trackSel("bodyText", e.currentTarget)}
-                onFocus={(e) => trackSel("bodyText", e.currentTarget)}
-              />
-            </div>
-            <div className={styles.editorRow}>
-              <span className={styles.label}>{t("notifications.templates.bodyHtml")}</span>
-              <Textarea
-                ref={refs.bodyHtml}
-                className={styles.mono}
-                rows={7}
-                value={current.bodyHtml}
-                onChange={(e) => setDraft({ ...current, bodyHtml: e.target.value })}
-                onSelect={(e) => trackSel("bodyHtml", e.currentTarget)}
-                onFocus={(e) => trackSel("bodyHtml", e.currentTarget)}
-              />
-            </div>
-            <div className={styles.editorActions}>
-              <Button variant="primary" onClick={save} loading={update.isPending} disabled={!draft}>
-                {t("common.save")}
-              </Button>
-              <Button variant="secondary" onClick={() => setDraft(null)} disabled={!draft}>
-                {t("common.cancel")}
-              </Button>
-            </div>
-          </Card>
-
-          <div className={styles.previewCard}>
-            <span className={styles.previewLabel}><Eye size={14} /> {t("notifications.templates.preview")}</span>
-            <div className={styles.previewSubject}>{previewSubject || "—"}</div>
-            <iframe title="preview" srcDoc={previewHtml} className={styles.previewFrame} />
+      <div className={styles.editorLayout}>
+        <Card className={styles.editorMain}>
+          <div className={styles.editorRow}>
+            <span className={styles.label}>{t("notifications.templates.subject")}</span>
+            <Input ref={refs.subject} className={styles.mono} value={current.subject}
+              onChange={(e) => setDraft({ ...current, subject: e.target.value })}
+              onSelect={(e) => trackSel("subject", e.currentTarget)} onFocus={(e) => trackSel("subject", e.currentTarget)} />
           </div>
+          <div className={styles.editorRow}>
+            <span className={styles.label}>{t("notifications.templates.bodyText")}</span>
+            <Textarea ref={refs.bodyText} className={styles.mono} rows={6} value={current.bodyText}
+              onChange={(e) => setDraft({ ...current, bodyText: e.target.value })}
+              onSelect={(e) => trackSel("bodyText", e.currentTarget)} onFocus={(e) => trackSel("bodyText", e.currentTarget)} />
+          </div>
+          <div className={styles.editorRow}>
+            <span className={styles.label}>{t("notifications.templates.bodyHtml")}</span>
+            <Textarea ref={refs.bodyHtml} className={styles.mono} rows={12} value={current.bodyHtml}
+              onChange={(e) => setDraft({ ...current, bodyHtml: e.target.value })}
+              onSelect={(e) => trackSel("bodyHtml", e.currentTarget)} onFocus={(e) => trackSel("bodyHtml", e.currentTarget)} />
+          </div>
+          <div className={styles.editorActions}>
+            <Button variant="primary" onClick={save} loading={update.isPending} disabled={!draft}>{t("common.save")}</Button>
+            <Button variant="secondary" onClick={() => setDraft(null)} disabled={!draft}>{t("common.cancel")}</Button>
+            <div className={styles.spacer} />
+            <Button variant="secondary" leftIcon={<Eye size={16} />} onClick={() => setPreviewOpen(true)}>{t("notifications.templates.previewBtn")}</Button>
+          </div>
+        </Card>
+
+        <aside className={styles.editorAside}>
+          <span className={styles.asideTitle}><SlidersHorizontal size={14} /> {t("notifications.templates.variables")}</span>
+          <span className={styles.insertHint}>{t("notifications.templates.insertHint")}</span>
+          <div className={`${styles.dict} ${styles.dictFull}`}>
+            {(eventDef?.variables ?? []).map((v) => (
+              <button key={v.name} type="button" className={styles.dictItem} onClick={() => insertVariable(v.name)}>
+                <span className={styles.dictName}>{`{{${v.name}}}`}</span>
+                <span className={styles.dictDesc}>{v.description}</span>
+                <span className={styles.dictSample}>{t("notifications.templates.egLabel")}: {v.sample}</span>
+              </button>
+            ))}
+          </div>
+        </aside>
+      </div>
+
+      <Modal open={previewOpen} onClose={() => setPreviewOpen(false)} title={t("notifications.templates.preview")} size="xl">
+        <div className={styles.deviceBar}>
+          <button type="button" className={device === "desktop" ? `${styles.deviceBtn} ${styles.deviceBtnActive}` : styles.deviceBtn} onClick={() => setDevice("desktop")}>
+            <Monitor size={15} /> {t("notifications.templates.desktop")}
+          </button>
+          <button type="button" className={device === "mobile" ? `${styles.deviceBtn} ${styles.deviceBtnActive}` : styles.deviceBtn} onClick={() => setDevice("mobile")}>
+            <Smartphone size={15} /> {t("notifications.templates.mobile")}
+          </button>
         </div>
-      )}
+        <div className={styles.previewSubjLine}>
+          <span className={styles.previewSubjLabel}>{t("notifications.templates.subject")}</span>{previewSubject || "—"}
+        </div>
+        <div className={styles.previewStage}>
+          <iframe title="preview" srcDoc={previewHtml} className={styles.previewFrameModal} style={{ width: device === "mobile" ? 380 : 640 }} />
+        </div>
+      </Modal>
     </div>
   );
 }
