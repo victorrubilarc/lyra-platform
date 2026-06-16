@@ -53,6 +53,7 @@ export const esCL = {
       retry: "Reintentar",
       retried: "Reencolado para reenvío.",
       empty: "No hay correos en la bandeja de salida.",
+      unit: "correos",
     },
     templates: {
       variables: "Variables disponibles",
@@ -72,6 +73,7 @@ export const esCL = {
       allStatuses: "Todos los estados",
       count_one: "{{count}} plantilla",
       count_other: "{{count}} plantillas",
+      unit: "plantillas",
       colName: "Plantilla",
       colEvent: "Evento",
       colChannel: "Canal",

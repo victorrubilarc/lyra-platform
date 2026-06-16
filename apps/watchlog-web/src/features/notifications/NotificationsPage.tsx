@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Bell, Inbox, FileText, SlidersHorizontal, RefreshCw, Search, Send, Eye, ArrowLeft, Monitor, Smartphone, Pencil } from "lucide-react";
-import { Button, Card, Input, Modal, Select, Textarea, Toggle, useToast } from "@lyra/ui";
+import { Button, Card, GridPager, Input, Modal, Select, Textarea, Toggle, useToast } from "@lyra/ui";
 import { renderTemplate, sampleContextForEvent, type NotificationOutboxStatus, type NotificationTemplateDto } from "@lyra/contracts";
 import { Can } from "../../auth/Can.js";
 import { usePermissions } from "../../auth/use-permissions.js";
@@ -89,8 +89,26 @@ function OutboxPanel() {
   const [status, setStatus] = useState<NotificationOutboxStatus | "">("");
   const [q, setQ] = useState("");
   const [debounced, setDebounced] = useState("");
-  const list = useNotificationOutbox({ ...(status ? { status } : {}), ...(debounced ? { q: debounced } : {}) });
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(25);
+  const list = useNotificationOutbox({ ...(status ? { status } : {}), ...(debounced ? { q: debounced } : {}), limit: 100 });
   const retry = useRetryNotificationOutbox();
+
+  const items = list.data?.items ?? [];
+  const pages = Math.max(1, Math.ceil(items.length / pageSize));
+  const pageSafe = Math.min(page, pages - 1);
+  const pageItems = items.slice(pageSafe * pageSize, pageSafe * pageSize + pageSize);
+  const pager = (
+    <GridPager
+      page={pageSafe}
+      pages={pages}
+      total={items.length}
+      pageSize={pageSize}
+      unit={t("notifications.outbox.unit")}
+      onPage={setPage}
+      onPageSize={(n) => { setPageSize(n); setPage(0); }}
+    />
+  );
   const [detailId, setDetailId] = useState<string | null>(null);
   const [detailHtml, setDetailHtml] = useState<{ subject: string; html: string } | null>(null);
 
@@ -108,12 +126,13 @@ function OutboxPanel() {
           onSubmit={(e) => {
             e.preventDefault();
             setDebounced(q.trim());
+            setPage(0);
           }}
           style={{ display: "flex", gap: 8 }}
         >
           <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("notifications.outbox.search")} rightSlot={<Search size={16} />} />
         </form>
-        <Select value={status} onChange={(e) => setStatus(e.target.value as NotificationOutboxStatus | "")}>
+        <Select value={status} onChange={(e) => { setStatus(e.target.value as NotificationOutboxStatus | ""); setPage(0); }}>
           <option value="">{t("notifications.outbox.allStatuses")}</option>
           {STATUSES.map((s) => (
             <option key={s} value={s}>
@@ -127,10 +146,12 @@ function OutboxPanel() {
         </Button>
       </div>
 
+      {pager}
+
       <Card>
         {list.isLoading ? (
           <div className={styles.empty}>{t("common.loading")}</div>
-        ) : (list.data?.items.length ?? 0) === 0 ? (
+        ) : items.length === 0 ? (
           <div className={styles.empty}>{t("notifications.outbox.empty")}</div>
         ) : (
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -145,7 +166,7 @@ function OutboxPanel() {
               </tr>
             </thead>
             <tbody>
-              {list.data!.items.map((m) => (
+              {pageItems.map((m) => (
                 <tr key={m.id} style={{ borderTop: "1px solid var(--color-border-subtle)" }}>
                   <td style={{ padding: "10px" }}>{statusBadge(m.status, t(`notifications.status.${m.status}`))}</td>
                   <td style={{ padding: "10px" }}>
@@ -183,6 +204,8 @@ function OutboxPanel() {
         )}
       </Card>
 
+      {items.length > 0 && pager}
+
       <Modal open={detailId !== null} onClose={() => setDetailId(null)} title={detailHtml?.subject ?? t("common.loading")} size="lg">
         {detailHtml ? (
           <iframe title="preview" srcDoc={detailHtml.html} className={styles.preview} style={{ width: "100%", height: 420, border: "none" }} />
@@ -212,6 +235,8 @@ function TemplatesPanel() {
   const [q, setQ] = useState("");
   const [group, setGroup] = useState("");
   const [status, setStatus] = useState("");
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(25);
 
   const selected = useMemo<NotificationTemplateDto | null>(
     () => templates.data?.find((x) => x.id === selId) ?? null,
@@ -238,22 +263,38 @@ function TemplatesPanel() {
     return true;
   });
 
+  const pages = Math.max(1, Math.ceil(rows.length / pageSize));
+  const pageSafe = Math.min(page, pages - 1);
+  const pageRows = rows.slice(pageSafe * pageSize, pageSafe * pageSize + pageSize);
+  const pager = (
+    <GridPager
+      page={pageSafe}
+      pages={pages}
+      total={rows.length}
+      pageSize={pageSize}
+      unit={t("notifications.templates.unit")}
+      onPage={setPage}
+      onPageSize={(n) => { setPageSize(n); setPage(0); }}
+    />
+  );
+
   return (
     <div className={styles.panel}>
       <div className={styles.tplToolbar}>
-        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("notifications.templates.search")} rightSlot={<Search size={16} />} />
-        <Select value={group} onChange={(e) => setGroup(e.target.value)}>
+        <Input value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} placeholder={t("notifications.templates.search")} rightSlot={<Search size={16} />} />
+        <Select value={group} onChange={(e) => { setGroup(e.target.value); setPage(0); }}>
           <option value="">{t("notifications.templates.allGroups")}</option>
           {groups.map((g) => <option key={g} value={g}>{GROUP_LABEL[g] ?? g}</option>)}
         </Select>
-        <Select value={status} onChange={(e) => setStatus(e.target.value)}>
+        <Select value={status} onChange={(e) => { setStatus(e.target.value); setPage(0); }}>
           <option value="">{t("notifications.templates.allStatuses")}</option>
           <option value="active">{t("notifications.templates.active")}</option>
           <option value="inactive">{t("notifications.templates.inactive")}</option>
         </Select>
-        <div className={styles.spacer} />
         <span className={styles.tplCount}>{t("notifications.templates.count", { count: rows.length })}</span>
       </div>
+
+      {pager}
 
       <div className={styles.tplTable}>
         <div className={styles.tplTableHead}>
@@ -264,10 +305,10 @@ function TemplatesPanel() {
           <span className={styles.tplColHide}>{t("notifications.outbox.status")}</span>
           <span />
         </div>
-        {rows.length === 0 ? (
+        {pageRows.length === 0 ? (
           <div className={styles.empty}>{t("notifications.templates.empty")}</div>
         ) : (
-          rows.map((tpl) => {
+          pageRows.map((tpl) => {
             const ev = eventByKey.get(tpl.eventKey);
             return (
               <div key={tpl.id} className={styles.tplTableRow} onClick={() => setSelId(tpl.id)} role="button" tabIndex={0}>
@@ -291,6 +332,8 @@ function TemplatesPanel() {
           })
         )}
       </div>
+
+      {pager}
     </div>
   );
 }
