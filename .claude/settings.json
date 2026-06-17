@@ -324,7 +324,8 @@
       "PowerShell($ok=$false; for \\($i=0; $i -lt 40; $i++\\) { try { $r = Invoke-WebRequest -Uri \"http://localhost:3000/api/health\" -UseBasicParsing -TimeoutSec 3; if \\($r.StatusCode -eq 200\\) { $ok=$true; break } } catch {} ; Start-Sleep -Seconds 2 }; if \\($ok\\) { \"API READY \\($i polls\\)\"; $r.Content } else { \"API NOT READY after $i polls\" })",
       "PowerShell(Set-Location \"g:\\\\Development\\\\BitacorasInteligentes\"; python scripts\\\\smoke-incidencias-capa.py 2>&1 | Out-String | Write-Output; \"SMOKE_EXIT=$LASTEXITCODE\")",
       "PowerShell(Set-Location \"g:\\\\Development\\\\BitacorasInteligentes\"; python scripts\\\\smoke-incidencias.py 2>&1 | Select-Object -Last 4; \"EXIT=$LASTEXITCODE\")",
-      "PowerShell(Set-Location \"g:\\\\Development\\\\BitacorasInteligentes\"; git checkout main; if \\($?\\) { git merge --no-ff feat/incidencias-capa -m \"merge: Fase 4.2a — Acciones CAPA \\(incidencias\\) \\(16c1018\\)\" }; \"MERGE_EXIT=$LASTEXITCODE\")"
+      "PowerShell(Set-Location \"g:\\\\Development\\\\BitacorasInteligentes\"; git checkout main; if \\($?\\) { git merge --no-ff feat/incidencias-capa -m \"merge: Fase 4.2a — Acciones CAPA \\(incidencias\\) \\(16c1018\\)\" }; \"MERGE_EXIT=$LASTEXITCODE\")",
+      "PowerShell(Set-Location \"g:\\\\Development\\\\BitacorasInteligentes\"; git push origin main; \"PUSH_EXIT=$LASTEXITCODE\"; \"--- unpushed count ---\"; git rev-list --count origin/main..main; \"--- status ---\"; git status --short)"
     ],
     "additionalDirectories": [
       "\\tmp"
