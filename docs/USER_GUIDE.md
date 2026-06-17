@@ -672,3 +672,9 @@ respeta tu **alcance por nodo** y queda auditado.
 - Qué genera excepción se configura en el **formulario**: un valor **crítico siempre** la
   genera; una **advertencia** solo si el campo numérico tiene activado «Una advertencia genera
   excepción» (en el builder, junto a los umbrales/tolerancia).
+- **Excepción / incidencia automática por regla.** Una **regla de negocio** (que compara varios
+  campos) puede configurarse para que, **al firmar** el registro, **genere una excepción** o
+  **abra una incidencia** sola — sin que nadie la cree a mano (se elige en el diseñador, sub-pestaña
+  *Reglas*; ver «Plantillas ▸ Reglas»). Estas excepciones llevan el **mensaje de la regla** (no un
+  valor de campo, así que no se "corrigen") y la incidencia automática queda con **origen = Regla**.
+  Aparecen segundos después de firmar (se procesan en segundo plano para no demorar la firma).

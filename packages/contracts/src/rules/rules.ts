@@ -45,6 +45,52 @@ export const ruleSeveritySchema = z.enum(RULE_SEVERITIES);
 export type RuleSeverity = z.infer<typeof ruleSeveritySchema>;
 
 /**
+ * ACCIÓN de una regla al dispararse (Fase 4.1.2). Aditiva y CONGELADA en la versión
+ * (vive en `TemplateVersion.rules`, no migra el esquema). La acción se ejecuta SOLO
+ * al SELLAR la entrada (hecho firme) y de forma DIFERIDA vía outbox (no en el camino
+ * crítico del sello: una automatización no puede impedir que el operador firme).
+ *
+ *  - `none`           = comportamiento histórico (solo bloquea/avisa según severidad).
+ *  - `raiseException` = materializa una `LogEntryException` (triggerKind=RULE) para triage.
+ *  - `openIncident`   = además abre una incidencia (la excepción RULE se convierte y enlaza,
+ *                       proveniencia uniforme: toda incidencia automática tiene su excepción).
+ *
+ * REGLA DE DISEÑO: una regla con acción debe ser `severity=WARN` (no bloqueante): una
+ * regla ERROR impide el sello y la acción —que ocurre al sellar— nunca se ejecutaría.
+ * `validateRulesDesign` lo exige.
+ */
+export const RULE_ACTION_KINDS = ["none", "raiseException", "openIncident"] as const;
+export const ruleActionKindSchema = z.enum(RULE_ACTION_KINDS);
+export type RuleActionKind = z.infer<typeof ruleActionKindSchema>;
+
+export const ruleActionSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("none") }).strict(),
+  z.object({ kind: z.literal("raiseException") }).strict(),
+  z
+    .object({
+      kind: z.literal("openIncident"),
+      /** Tipo de incidencia por defecto (debe existir; el servidor lo valida al publicar). */
+      incidentTypeId: z.string().min(1),
+      /** Categoría por defecto (opcional). */
+      incidentCategoryId: z.string().min(1).nullable().optional(),
+      /** Severidad por defecto de la incidencia (1..5). */
+      severity: z.number().int().min(1).max(5),
+    })
+    .strict(),
+]);
+export type RuleAction = z.infer<typeof ruleActionSchema>;
+
+/** Kind de la acción de una regla (default `none` si ausente). */
+export function ruleActionKind(rule: { action?: RuleAction | null }): RuleActionKind {
+  return rule.action?.kind ?? "none";
+}
+
+/** ¿La regla tiene una acción materializadora (excepción/incidencia)? */
+export function ruleHasAction(rule: { action?: RuleAction | null }): boolean {
+  return ruleActionKind(rule) !== "none";
+}
+
+/**
  * Regla de validación CRUZADA entre campos. `when` es la CONDICIÓN DE DISPARO
  * (cuando evalúa a `true`, la regla se activa y produce su mensaje). Si a `when`
  * le falta un campo referenciado (vacío), evalúa a null ⇒ la regla se OMITE (no
@@ -68,6 +114,8 @@ export const crossRuleSchema = z
     message: z.string().trim().min(1).max(300),
     /** ¿Está activa? Ausente/true = activa; false = desactivada (no se evalúa). */
     enabled: z.boolean().optional(),
+    /** Acción al dispararse al sellar (Fase 4.1.2). Ausente = `none` (solo bloquea/avisa). */
+    action: ruleActionSchema.optional(),
   })
   .strict();
 export type CrossRule = z.infer<typeof crossRuleSchema>;
@@ -192,6 +240,15 @@ export function validateRulesDesign(fields: FieldForRules[], rules: CrossRule[])
   for (const r of rules) {
     const bound = validateExpressionBounds(r.when);
     if (bound) errors.push({ scope: "rule", key: r.key, message: bound });
+    // Fase 4.1.2: una acción (excepción/incidencia) exige severidad WARN. Una regla
+    // ERROR bloquea el sello y su acción —que ocurre al sellar— nunca se ejecutaría.
+    if (ruleHasAction(r) && r.severity !== "WARN") {
+      errors.push({
+        scope: "rule",
+        key: r.key,
+        message: `Una regla con acción (generar excepción / abrir incidencia) debe ser de tipo Advertencia, no Error`,
+      });
+    }
     for (const ref of collectVarRefs(r.when)) {
       if (!allKeys.has(ref)) {
         errors.push({ scope: "rule", key: r.key, message: `Referencia a un campo inexistente: ${ref}` });

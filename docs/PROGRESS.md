@@ -1,5 +1,36 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-16 — Fase 4.1.2: Acción del motor de reglas (diferida vía outbox) ✅** (`feat/incidencias-reglas-accion`). **Cierra la
+Fase 4.1.** Una regla de negocio CRUZADA puede, al dispararse, **materializar una excepción** (`triggerKind=RULE`) o **abrir una
+incidencia** — de forma **asíncrona** (no en el camino crítico del sello), reusando el PATRÓN del outbox del Bloque N pero con tabla
+DEDICADA. **3 forks confirmados con el dueño:** (1B) **tabla propia `RuleActionOutbox`** (no se reusa `NotificationEvent`,
+específico de correo: "crear un objeto de dominio" ≠ "avisar"); (4B) la incidencia automática lleva **`originType=RULE`** (filtrable
+como tal), pasando por una excepción CONVERTED (proveniencia uniforme vía `IncidentExceptionLink`); (6) **una regla con acción debe
+ser WARN** (una ERROR bloquea el sello y su acción —que ocurre al sellar— nunca correría); `validateRulesDesign` + server
+(`assertRuleActionsValid`) lo exigen. **Diferido vía outbox** (fork 3) = desacopla dominios de falla: una automatización NO puede
+bloquear ni revertir el sello del operador. **Atribución de SISTEMA** (fork 5): el worker reusa `IncidentsService.create` con el
+actor que SELLÓ (capturado en la orden; su ABAC ya cubre el nodo) — no se reinventa la creación; la excepción RULE la crea
+`ExceptionGeneratorService.createRuleException` (extiende el generador). **`thresholdType=invalid` sigue diferido** (fork 7).
+**Contratos** (`@lyra/contracts/rules`): `ruleActionSchema` (discriminada `none|raiseException|openIncident{incidentTypeId,
+incidentCategoryId?,severity}`) + `action?` en `crossRuleSchema` (JSONB, congelada en la versión, **sin migración** de reglas) +
+`ruleActionKind`/`ruleHasAction` + `validateRulesDesign` rechaza acción en regla ERROR. **Migración aditiva**
+`20260616220000_add_rule_action_outbox` (tabla `RuleActionOutbox` + enum `RuleActionOutboxStatus` + `LogEntryException.sectionKey/
+fieldKey` → NULLABLE [una excepción de regla no ata un campo único]; se quitó del diff un `DROP INDEX` AJENO; aplicada no-destructiva
+`db execute`+`migrate resolve` por drift previo del 4.1.0). **API:** `RuleActionEmitterService` (@Global, etapa 1, encola DENTRO de
+la tx del sello, `dedupeKey rule:{entryId}:{ruleKey}`) inyectado en `LogEntriesService` (14.º arg; `emitRuleActions` en `submit` y
+`executeTransition` tras `reconcileEntryOnSeal`); `RuleActionWorkerService` (@Cron 30 s + `runOnce`, etapa 2: lee la regla de la
+versión CONGELADA, crea la excepción RULE [idempotente por dedupeKey], abre incidencia + link + CONVERTED, backoff/FAILED) +
+`POST /rule-actions/run` (gate `incident:create`, ops/smoke). La excepción RULE **no ofrece "Corregir"** (sin campo). **Web:**
+selector de **acción** por regla en `RulesEditor` (Ninguna / Generar excepción / Abrir incidencia + tipo/categoría/severidad por
+defecto, severidad forzada WARN con ayuda) + chip de acción en la tabla; la UI de excepciones renderiza la RULE por su `detail`
+(mensaje) y oculta Corregir (fieldType null). **Sin permisos nuevos — catálogo 81.** Tests: **contracts 257** (+2 acción) · **API
+234** (mocks del 14.º arg actualizados). **Smoke `scripts/smoke-reglas-incidencias.py` 21/21** (diseño ERROR+acción 400 · tipo
+inexistente 400 · emisión 2 órdenes al sellar · worker materializa RULE/CONVERTED + incidencia originType RULE + link · idempotencia
+[DONE, sin duplicar] · gate 403). **`smoke-excepciones.py` 39/39** sin regresión. typecheck/lint(0)/build/test verdes. **Pendiente:
+smoke VISUAL del dueño** (selector de acción en el builder; excepción RULE en la bandeja; incidencia automática). **Con 4.1.2, la
+Fase 4.1 queda COMPLETA → siguiente: 4.2 (Investigación + CAPA).** 🔔 Recordatorio: épico de **notificaciones avanzadas** sigue
+pendiente (`docs/prompts/notificaciones-avanzadas.md`).
+
 **2026-06-16 — Fase 4.1.1: Panel de excepciones en la bitácora — UI ✅** (`feat/incidencias-excepciones-ui`). Le pone CARA a la
 capa **Bitácora → Excepción → Incidencia** del 4.1.0 (los endpoints ya existían; esta sesión es FRONTEND + un toque mínimo de
 backend). **4 forks resueltos con el dueño:** panel **inline plegable + drawer** (no modal/muro) · **advertir, no bloquear** al

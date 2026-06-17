@@ -174,8 +174,11 @@ function makeServices(prismaOver: Record<string, unknown> = {}, scopeOver: Parti
     reconcileEntryOnSeal: vi.fn().mockResolvedValue(undefined),
     purgeProvisionalForEntry: vi.fn().mockResolvedValue(undefined),
   } as unknown as import("../exceptions/exception-generator.service").ExceptionGeneratorService;
+  const ruleActions = {
+    emit: vi.fn().mockResolvedValue(undefined),
+  } as unknown as import("../rule-actions/rule-action-emitter.service").RuleActionEmitterService;
 
-  const entries = new LogEntriesService(prisma, audit, scope, shiftResolver, fiscalResolver, reauth, enc, periods, permissions, settings, storage, notifications, exceptionGenerator);
+  const entries = new LogEntriesService(prisma, audit, scope, shiftResolver, fiscalResolver, reauth, enc, periods, permissions, settings, storage, notifications, exceptionGenerator, ruleActions);
   const logbook = new LogbookQueryService(prisma, scope, audit, enc, entries, shiftResolver);
   return { logbook, entries, prisma, audit, scope, shiftResolver };
 }

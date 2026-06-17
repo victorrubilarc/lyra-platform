@@ -649,12 +649,22 @@ previa es exactamente lo que verá el operador**. No hay tres pantallas que se d
   **avisan**.
 - **Cómo se usa.** Cada regla tiene severidad: **ERROR bloquea** completar/enviar/avanzar; **WARN
   informa** sin bloquear. Se pueden **activar/desactivar** y editar con ayuda y ejemplo.
+- **Acción al dispararse (Fase 4.1.2).** Además de avisar, una regla puede **actuar al sellar** la
+  entrada: **Generar una excepción** (entra a la bandeja `/excepciones` para revisión) o **Abrir una
+  incidencia** (con tipo/categoría/severidad por defecto que se eligen en la regla). La acción se
+  ejecuta **de forma diferida** tras firmar (no bloquea ni demora el sello) y solo en reglas de
+  **Advertencia** (al elegir una acción, la severidad se fija en WARN automáticamente: una regla que
+  bloquea nunca llegaría a sellar). La incidencia automática queda con **origen = Regla** y enlazada
+  a su excepción de origen (trazabilidad uniforme). La excepción de regla no tiene un campo único, así
+  que **no ofrece "Corregir"**: muestra el mensaje de la regla.
 - **Ejemplo.** "El concentrado no puede superar al alimentado" → si pasa, ERROR que **impide
-  completar**. O "si suma(tonelaje) > 1000 ⇒ error".
+  completar**. O "si suma(tonelaje) > 1000 ⇒ error". O (WARN + acción) "si Δtemperatura > 15° y
+  vibración alta ⇒ **abrir incidencia** Falla mecánica, severidad 4".
 - **Importante.** El selector de valores evita errores típicos (comparar contra el `code`
-  correcto de una lista, no un texto inventado).
-- **A futuro.** Condiciones por fila de tabla ("si alguna fila…"); acciones (abrir incidencia →
-  Fase 4, notificar); tablas de decisión (DMN).
+  correcto de una lista, no un texto inventado). La acción viaja **congelada en la versión** (cambiarla
+  exige publicar una versión nueva).
+- **A futuro.** Condiciones por fila de tabla ("si alguna fila…"); notificar como acción; tablas de
+  decisión (DMN); `thresholdType=invalid` (validación dura) como excepción.
 
 ### 3.6 Umbrales y "excepciones" (review-by-exception)
 - **Qué es.** Cuando un número (o una celda de tabla/matriz) cruza un umbral, su lectura se
@@ -662,7 +672,10 @@ previa es exactamente lo que verá el operador**. No hay tres pantallas que se d
   con firma pendiente) se marca como **excepción**.
 - **Para qué.** En la grilla de Bitácoras puedes filtrar **"Solo excepciones"** y revisar solo lo
   que se salió de lo normal (revisar por excepción, no leer todo).
-- **A futuro.** Histéresis; severidad propia para riesgo; incidencia automática (Fase 4).
+- **Incidencia/excepción automática (Fase 4.1.2).** Una **regla** WARN puede, al sellar, materializar
+  una excepción de regla o **abrir una incidencia** sola (ver §3.5). Las excepciones de umbral se
+  materializan al guardar/sellar según el campo (crítico siempre; advertencia si se opta).
+- **A futuro.** Histéresis; severidad propia para riesgo.
 
 ### 3.7 Formato regional
 - Fechas, números, moneda y RUT **siempre** se muestran según el **locale** activo (vía

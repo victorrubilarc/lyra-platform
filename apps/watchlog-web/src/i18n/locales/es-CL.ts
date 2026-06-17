@@ -820,6 +820,22 @@ export const esCL = {
       messageHint: "Lo que verá el operador cuando la regla se dispare.",
       messagePlaceholder: "Ej.: La salida no puede superar a la entrada",
       noneFiring: "Ninguna regla se dispara con los valores actuales.",
+      action: "Acción al dispararse",
+      actionHint:
+        "Qué hace la regla, además de avisar, cuando se firma el registro. Las acciones se ejecutan al sellar la entrada (de forma diferida) y solo en reglas de tipo Advertencia.",
+      actionNone: "Ninguna (solo avisar)",
+      actionRaiseException: "Generar una excepción (para revisar)",
+      actionOpenIncident: "Abrir una incidencia",
+      actionForcesWarn: "Una regla con acción debe ser Advertencia: se fijó automáticamente.",
+      incidentType: "Tipo de incidencia",
+      incidentCategory: "Categoría (opcional)",
+      incidentCategoryNone: "Sin categoría",
+      incidentSeverity: "Severidad",
+      incidentTypesEmpty:
+        "No hay tipos de incidencia disponibles (o no tienes permiso para verlos). Defínelos en el módulo de Incidencias.",
+      colAction: "Acción",
+      actionChipException: "Excepción",
+      actionChipIncident: "Incidencia",
     },
   },
   workflows: {

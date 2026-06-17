@@ -104,7 +104,8 @@ function ExceptionDetailBody({
         <h2 className={styles.detailTitle} style={{ margin: 0 }}>{exc.fieldLabel ?? (exc.fieldKey || "Registro manual")}</h2>
       </div>
 
-      {exc.triggerKind === "MANUAL" ? (
+      {exc.triggerKind === "MANUAL" || exc.triggerKind === "RULE" ? (
+        // Manual / Regla: no hay un escalar de campo → muestra el detalle (mensaje de la regla).
         <p className={styles.cardValue}>{exc.detail ?? "—"}</p>
       ) : (
         <div className={styles.bigValue}>
@@ -113,7 +114,7 @@ function ExceptionDetailBody({
         </div>
       )}
       {hint && <div className={styles.cardHint}>Rango esperado: {hint}</div>}
-      {exc.detail && exc.triggerKind !== "MANUAL" && <p className={styles.cardHint}>{exc.detail}</p>}
+      {exc.detail && exc.triggerKind !== "MANUAL" && exc.triggerKind !== "RULE" && <p className={styles.cardHint}>{exc.detail}</p>}
 
       {/* Estado actual + resolución */}
       <div className={styles.cardMeta}>
