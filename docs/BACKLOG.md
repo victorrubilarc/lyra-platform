@@ -5,7 +5,16 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-17** (**Shell: menú lateral en GRUPOS colapsables ✅** — `feat/sidebar-grupos`: el sidebar plano de 16
+> actualización: **2026-06-17** (**Shell: sidebar premium + Favoritos al topbar ✅** — `feat/sidebar-premium`: por feedback del dueño
+> (módulos pequeños / menú estrecho / "que se vea premium"). **(1) Premium del lateral (solo CSS):** ancho 244→**276px**, texto de
+> módulos 13.5→**14.5px**, activo a peso 600, íconos 18→**19px**, encabezados de grupo 10.5→**11px**, más aire. **(2) Favoritos al
+> topbar:** se quita la sección Favoritos del sidebar y se expone como **menú-estrella** en el topbar (`FavoritesMenu`, junto a la
+> campanita; navegar al clic + desfijar desde el `trailing`); **se mantiene la estrella por ítem en el lateral para FIJAR**. Reusa
+> `favorites-store`/`routeByPath`/`Menu` de `@lyra/ui`; sin store nuevo. Solo frontend del shell; sin permisos/rutas/migración.
+> typecheck/lint(0)/build verdes. **PENDIENTE: smoke VISUAL del dueño.** **Nota:** se cierra la deuda menor "Favoritos con encabezado
+> estático" (ya no vive en el lateral); `.navLabel`/`nav.sectionLabel` siguen huérfanos (limpieza trivial en §3). **Siguiente: 4.4.**
+> Anterior:
+> **Shell: menú lateral en GRUPOS colapsables ✅** — `feat/sidebar-grupos`: el sidebar plano de 16
 > ítems con scroll se reorganizó en **grupos con encabezado** (Operación · Diseño y datos · Administración · Favoritos), colapsables
 > con estado persistido (`ui-store.collapsedNavGroups`), **invariante: el grupo del ítem activo siempre visible**; riel colapsado =
 > clústeres de íconos separados por divisores + tooltip. Modelo aditivo: `group` en `NavRoute` + `NAV_GROUPS` + helper `buildNavGroups`;
@@ -1216,8 +1225,8 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
 
 - [ ] **Sidebar: limpieza de huérfanos tras la agrupación (`feat/sidebar-grupos`).** El estilo `.navLabel` (en
       `AppShell.module.css`) y la clave i18n `nav.sectionLabel` ("Módulos") dejaron de usarse al pasar a grupos
-      (`.navGroupLabel` / `nav.groups.*`). Limpieza mecánica trivial. **No urgente** (inertes). Opcional: hacer la sección
-      **Favoritos** también colapsable (hoy encabezado estático, decisión intencional por ser dinámica).
+      (`.navGroupLabel` / `nav.groups.*`). Limpieza mecánica trivial. **No urgente** (inertes). (La deuda "Favoritos colapsable"
+      quedó sin objeto: con `feat/sidebar-premium` Favoritos se movió al menú-estrella del topbar y ya no vive en el lateral.)
 - [ ] **DROP de `Template.orgNodeId` (deprecado tras 2.8.0).** Con `TemplateNodeAssignment` como fuente de verdad de
       la visibilidad por nodo, `Template.orgNodeId` quedó como "nodo primario" DERIVADO (no editable por separado; sin
       drift). Limpieza mecánica pendiente: quitar la columna de la lógica restante (proyección/audit), del contrato

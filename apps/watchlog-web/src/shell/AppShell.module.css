@@ -8,12 +8,12 @@
 
 /* ===================== SIDEBAR ===================== */
 .sidebar {
-  width: 244px;
+  width: 276px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 16px 12px;
+  padding: 18px 16px;
   border-right: 1px solid var(--color-border-subtle);
   background: var(--color-chrome);
   backdrop-filter: blur(20px);
@@ -24,8 +24,8 @@
 }
 
 .sidebarCollapsed {
-  width: 68px;
-  padding: 16px 10px;
+  width: 76px;
+  padding: 18px 12px;
 }
 
 .brand {
@@ -114,7 +114,7 @@
   justify-content: space-between;
   width: 100%;
   gap: 8px;
-  padding: 10px 12px 6px;
+  padding: 14px 12px 6px;
   background: none;
   border: none;
   border-radius: var(--radius-sm);
@@ -128,9 +128,9 @@ button.navGroupHeader:hover {
   color: var(--color-text-secondary);
 }
 .navGroupLabel {
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 .navGroupChevron {
@@ -153,8 +153,8 @@ button.navGroupHeader:hover {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 4px 8px 4px 12px;
-  min-height: 44px;
+  padding: 4px 10px 4px 14px;
+  min-height: 46px;
   border-radius: var(--radius-md);
   color: var(--color-text-secondary);
   border: 1px solid transparent;
@@ -167,7 +167,7 @@ button.navGroupHeader:hover {
 .navMain {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 13px;
   flex: 1;
   min-width: 0;
   background: none;
@@ -175,9 +175,10 @@ button.navGroupHeader:hover {
   padding: 6px 0;
   cursor: pointer;
   color: inherit;
-  font-size: 13.5px;
+  font-size: 14.5px;
   font-weight: 500;
   font-family: var(--font-body);
+  letter-spacing: -0.005em;
   text-align: left;
 }
 .collapsed .navMain {
@@ -192,6 +193,9 @@ button.navGroupHeader:hover {
   color: var(--color-text-primary);
   background: var(--gradient-brand-subtle);
   border-color: var(--color-border-accent);
+}
+.navItemActive .navMain {
+  font-weight: 600;
 }
 .navIcon {
   display: inline-flex;
@@ -370,6 +374,24 @@ button.navGroupHeader:hover {
 .menuMail {
   font-size: 11.5px;
   color: var(--color-text-muted);
+}
+
+/* Estado vacío del menú de favoritos del topbar. */
+.menuEmpty {
+  padding: 6px 12px 10px;
+  max-width: 240px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--color-text-muted);
+}
+/* Estrella para desfijar dentro del menú de favoritos (acción en el trailing). */
+.favMenuUnpin {
+  color: var(--color-warning);
+  cursor: pointer;
+  opacity: 0.85;
+}
+.favMenuUnpin:hover {
+  opacity: 1;
 }
 
 /* ===================== WORKSPACE TABS ===================== */

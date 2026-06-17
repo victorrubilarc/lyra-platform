@@ -6,22 +6,17 @@ import { Tooltip, cx } from "@lyra/ui";
 import { usePermissions } from "../auth/use-permissions.js";
 import { useUIStore } from "./ui-store.js";
 import { useFavoritesStore } from "./favorites-store.js";
-import {
-  SIDEBAR_ROUTES,
-  buildNavGroups,
-  isRouteActive,
-  routeByPath,
-  type NavRoute,
-} from "./navigation.js";
+import { SIDEBAR_ROUTES, buildNavGroups, isRouteActive, type NavRoute } from "./navigation.js";
 import styles from "./AppShell.module.css";
 
 /**
  * Menú lateral colapsable (completo ↔ riel de íconos) organizado en grupos con
- * encabezado (Operación · Diseño y datos · Administración) + Favoritos.
- * Los grupos pliegan/despliegan con estado persistido; el grupo del ítem activo
- * se muestra SIEMPRE (aunque esté plegado). En el riel de íconos no hay
- * encabezados ni plegado: los grupos se separan con divisores sutiles y cada
- * ítem se identifica por tooltip.
+ * encabezado (Operación · Diseño y datos · Administración). Los grupos pliegan/
+ * despliegan con estado persistido; el grupo del ítem activo se muestra SIEMPRE
+ * (aunque esté plegado). En el riel de íconos no hay encabezados ni plegado: los
+ * grupos se separan con divisores sutiles y cada ítem se identifica por tooltip.
+ * Los FAVORITOS se fijan aquí (estrella por ítem) pero se ACCEDEN desde el menú
+ * de favoritos del topbar (`FavoritesMenu`).
  */
 export function Sidebar() {
   const { t } = useTranslation();
@@ -37,9 +32,6 @@ export function Sidebar() {
 
   const visible = SIDEBAR_ROUTES.filter((r) => !r.permission || perms.can(r.permission));
   const groups = buildNavGroups(visible);
-  const favRoutes = favorites
-    .map(routeByPath)
-    .filter((r): r is NavRoute => Boolean(r));
 
   function renderItem(route: NavRoute) {
     const Icon = route.icon;
@@ -51,7 +43,7 @@ export function Sidebar() {
       <div className={cx(styles.navItem, isActive && styles.navItemActive)}>
         <button type="button" className={styles.navMain} onClick={() => navigate(route.path)}>
           <span className={styles.navIcon}>
-            <Icon size={18} aria-hidden="true" />
+            <Icon size={19} aria-hidden="true" />
           </span>
           {!collapsed && (
             <>
@@ -107,12 +99,6 @@ export function Sidebar() {
               {g.routes.map(renderItem)}
             </Fragment>
           ))}
-          {favRoutes.length > 0 && (
-            <>
-              <div className={styles.navDivider} aria-hidden="true" />
-              {favRoutes.map(renderItem)}
-            </>
-          )}
         </div>
       </aside>
     );
@@ -165,15 +151,6 @@ export function Sidebar() {
             </div>
           );
         })}
-
-        {favRoutes.length > 0 && (
-          <div className={styles.navGroup}>
-            <div className={styles.navGroupHeader} role="presentation">
-              <span className={styles.navGroupLabel}>{t("shell.favorites")}</span>
-            </div>
-            {favRoutes.map(renderItem)}
-          </div>
-        )}
       </div>
     </aside>
   );

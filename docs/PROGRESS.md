@@ -1,5 +1,20 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-17 — Shell: sidebar premium + Favoritos al topbar ✅** (`feat/sidebar-premium`). Pulido por feedback del dueño tras la
+agrupación: los módulos se veían pequeños y el menú estrecho; además pidió mover Favoritos a un menú propio en el topbar. **(1)
+Premium del sidebar (solo CSS):** ancho 244→**276px**, texto de módulos 13.5→**14.5px** (+ `letter-spacing` leve), ítem activo a peso
+**600**, íconos 18→**19px**, encabezados de grupo 10.5→**11px**, más aire (padding de ítem 44→46px de alto y encabezado 14px arriba).
+**(2) Favoritos al topbar (`FavoritesMenu`):** se quita la sección Favoritos del sidebar y se expone como **menú-estrella en el
+topbar** (junto a la campanita; reusa el `Menu` de `@lyra/ui`): la estrella se rellena con ≥1 favorito, lista los favoritos (navegar
+al clic) y permite **desfijar** desde el `trailing` (estrella con `stopPropagation`, no navega ni cierra). **Se mantiene la estrella
+por ítem en el sidebar para FIJAR** (modelo "fijo desde el lateral, accedo desde arriba"); reusa `favorites-store`/`routeByPath` sin
+store nuevo. **Archivos:** `AppShell.module.css` (medidas premium + `.menuEmpty`/`.favMenuUnpin`), `FavoritesMenu.tsx` (nuevo),
+`Topbar.tsx` (monta el menú), `Sidebar.tsx` (quita ambos bloques de Favoritos —riel y expandido—, sube ícono a 19, mantiene la
+estrella por ítem). Identidad Lyra (tokens, claro+oscuro, 44px, a11y). **Sin contratos/API/migración; sin permisos nuevos.**
+typecheck/lint(0)/build verdes; dev :5173 con HMR. **Pendiente: smoke VISUAL del dueño** (legibilidad/ancho del lateral en
+claro/oscuro; menú-estrella del topbar: fijar desde el lateral, ver/navegar/desfijar arriba, estado vacío; riel colapsado).
+**Siguiente: 4.4 (SLA de incidencias + escalamiento + aviso de plazo).**
+
 **2026-06-17 — Shell: menú lateral reestructurado en GRUPOS colapsables ✅** (`feat/sidebar-grupos`). El sidebar había crecido a una
 **lista plana de 16 ítems con scrollbar** (poco profesional, no escalaba). Se reorganizó en **grupos con encabezado** (estilo SAP
 Fiori / ServiceNow / Linear) que caben **sin scroll**. **Solo UI del shell; sin tocar permisos, rutas ni gateo.** **4 forks resueltos
