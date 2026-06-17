@@ -200,6 +200,8 @@ button.navGroupHeader:hover {
 .navIcon {
   display: inline-flex;
   flex-shrink: 0;
+  /* Resorte tipo dock para la magnificación en el riel colapsado. */
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 .navText {
   flex: 1;
@@ -216,6 +218,41 @@ button.navGroupHeader:hover {
 }
 .collapsed .navMain {
   padding: 0;
+  justify-content: center;
+}
+
+/* Magnificación tipo dock de macOS: el ícono crece al pasar el mouse/foco.
+   Sin caja de fondo en hover (solo el activo conserva su gradiente) para que el
+   protagonismo lo lleve el ícono que se agranda. */
+.navItemRail:hover,
+.navItemRail:focus-within {
+  background: transparent;
+  color: var(--color-text-primary);
+}
+.navItemRail:hover .navIcon,
+.navItemRail:focus-within .navIcon {
+  transform: scale(1.4);
+}
+.navItemRail.navItemActive:hover,
+.navItemRail.navItemActive:focus-within {
+  background: var(--gradient-brand-subtle);
+}
+
+/* Tooltip del riel renderizado por portal (escapa del overflow del scroll). */
+.railTip {
+  position: fixed;
+  z-index: 200;
+  transform: translateY(-50%);
+  pointer-events: none;
+  background: var(--color-bg-surface-3);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  box-shadow: var(--shadow-modal);
 }
 
 .soonBadge {

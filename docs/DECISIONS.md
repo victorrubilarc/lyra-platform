@@ -4,6 +4,26 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-17 · Shell — Riel colapsado: magnificación tipo dock + tooltip por PORTAL (fix de recorte)
+
+**Contexto:** en el menú colapsado a riel de íconos no se distinguía qué era cada ícono. **Causa raíz:** el `Tooltip` de `@lyra/ui`
+es CSS puro (burbuja `position:absolute` dentro del flujo); como vive dentro de `.sidebarScroll` —que tiene `overflow` para
+scrollear el riel— la burbuja que sale hacia la derecha quedaba **recortada por el overflow** y nunca se veía. El dueño además pidió
+que el ícono **se magnificara al hover, estilo dock de macOS**.
+
+**Decisión:** para el riel se usa un componente propio `RailNavItem` (en `Sidebar.tsx`) que:
+1. **Magnifica el ícono al hover/foco** (`transform: scale(1.4)` con resorte `cubic-bezier(0.34,1.56,0.64,1)`), sin caja de fondo en
+   hover (solo el activo conserva su gradiente) para que el protagonismo lo lleve el ícono.
+2. **Renderiza el tooltip por PORTAL** a `document.body` con `position: fixed` posicionado desde el `getBoundingClientRect()` del
+   botón (a la derecha, centrado vertical). Al ser portal **escapa del `overflow`** del scroll y siempre se ve. (No se tocó el
+   `Tooltip` compartido, que sigue sirviendo donde no hay contenedor con overflow, p. ej. el topbar.)
+
+**Motivo:** el tooltip CSS no puede escapar de un ancestro con `overflow` sin portal; un portal con posición fija calculada es la
+solución estándar y robusta. La magnificación da el feedback "premium" pedido sin librerías. Solo frontend del shell; sin
+contratos/API/migración.
+
+---
+
 ### 2026-06-17 · UI — Drawers laterales más anchos (default 480→540; incidencias 720, excepciones 660)
 
 **Contexto:** el dueño encontró estrechos los paneles laterales (drawers), en particular el **detalle de incidencia** (5 pestañas
