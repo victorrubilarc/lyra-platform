@@ -60,6 +60,48 @@ export interface IncidentCategorySeed {
   sortOrder: number;
 }
 
+// --- Reportabilidad (Fase 4.3) -----------------------------------------------
+// Obligaciones de reporte de EJEMPLO, genéricas y transversales. El cliente las
+// edita/crea desde la UI; los marcos regulatorios concretos por vertical (DS 132,
+// SERNAGEOMIN, ISO 14001, etc.) son CONFIGURACIÓN, NUNCA lógica. `appliesToTypeKeys`
+// se resuelve a ids en el seed; vacío = aplica a TODOS los tipos.
+export interface ReportingObligationSeed {
+  key: string;
+  name: string;
+  description: string;
+  authorityName: string;
+  defaultDueMinutes: number | null;
+  appliesToTypeKeys: string[];
+  minSeverity: number | null;
+  mandatory: boolean;
+  sortOrder: number;
+}
+
+export const REPORTING_OBLIGATIONS: ReportingObligationSeed[] = [
+  {
+    key: "reporte-autoridad-grave",
+    name: "Reporte a la autoridad — evento grave (ejemplo)",
+    description: "Notificación a la autoridad competente para eventos de alta severidad. Plantilla de ejemplo: ajústela a su marco regulatorio.",
+    authorityName: "Autoridad competente",
+    defaultDueMinutes: 1440, // 24 h
+    appliesToTypeKeys: [],
+    minSeverity: 4,
+    mandatory: true,
+    sortOrder: 0,
+  },
+  {
+    key: "notificacion-corporativa-ambiental",
+    name: "Notificación corporativa ambiental (ejemplo)",
+    description: "Aviso interno corporativo para eventos ambientales. Plantilla de ejemplo, no obligatoria.",
+    authorityName: "Gerencia de Medio Ambiente",
+    defaultDueMinutes: 720, // 12 h
+    appliesToTypeKeys: ["medio-ambiente"],
+    minSeverity: null,
+    mandatory: false,
+    sortOrder: 1,
+  },
+];
+
 export const INCIDENT_CATEGORIES: IncidentCategorySeed[] = [
   { key: "seg-accidente-ctp", name: "Accidente con tiempo perdido (CTP)", typeKey: "seguridad", sortOrder: 0 },
   { key: "seg-accidente-stp", name: "Accidente sin tiempo perdido (STP)", typeKey: "seguridad", sortOrder: 1 },

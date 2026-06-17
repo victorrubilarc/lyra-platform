@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Activity, AlertTriangle, ArrowRight, Ban, ClipboardList, GitBranch, Info, MessageSquare, Send, ShieldCheck } from "lucide-react";
+import { Activity, AlertTriangle, ArrowRight, Ban, ClipboardList, FileCheck2, GitBranch, Info, MessageSquare, Send, ShieldCheck } from "lucide-react";
 import type { IncidentAvailableTransition } from "@lyra/contracts";
 import { isInvestigationComplete } from "@lyra/contracts";
 import { Button, Drawer, Input, Modal, Select, Spinner, Textarea, useToast } from "@lyra/ui";
@@ -14,10 +14,12 @@ import {
   useIncidentActions,
   useIncidentDetail,
   useIncidentInvestigation,
+  useIncidentReports,
   useTransitionIncident,
 } from "./incidents-queries.js";
 import { IncidentActionsBlock } from "./IncidentActionsBlock.js";
 import { IncidentInvestigationBlock } from "./IncidentInvestigationBlock.js";
+import { IncidentReportsBlock } from "./IncidentReportsBlock.js";
 import { LIFECYCLE_META, ORIGIN_META, PRIORITY_META, severityColor, severityLabel } from "./incidents-presentation.js";
 import { useExceptions } from "../exceptions/exceptions-queries.js";
 import { THRESHOLD_META, formatExceptionValue } from "../exceptions/exceptions-presentation.js";
@@ -42,13 +44,16 @@ export function IncidentDetailDrawer({ incidentId, onClose }: Props) {
   const [commentText, setCommentText] = useState("");
   const [pending, setPending] = useState<IncidentAvailableTransition | null>(null);
   const [cancelOpen, setCancelOpen] = useState(false);
-  const [tab, setTab] = useState<"resumen" | "acciones" | "investigacion" | "actividad">("resumen");
+  const [tab, setTab] = useState<"resumen" | "acciones" | "investigacion" | "reportes" | "actividad">("resumen");
 
   // Conteos/avisos para los chips de pestaña (cacheados; las dedupea React Query).
   const { data: actionsForTab = [] } = useIncidentActions(incidentId);
   const { data: investigationForTab } = useIncidentInvestigation(incidentId);
+  const { data: reportsForTab = [] } = useIncidentReports(incidentId);
   const pendingMandatory = actionsForTab.filter((a) => a.mandatory && a.status !== "VERIFIED" && a.status !== "CANCELED").length;
   const investigationBlocks = !!inc?.typeRequiresInvestigation && !isInvestigationComplete(investigationForTab);
+  const reportsBlock = reportsForTab.filter((r) => r.mandatory && r.status === "PENDING").length;
+  const reportsOverdue = reportsForTab.some((r) => r.overdue);
 
   const title = inc ? (
     <div className={styles.drawerHead}>
@@ -98,6 +103,11 @@ export function IncidentDetailDrawer({ incidentId, onClose }: Props) {
             <button role="tab" aria-selected={tab === "investigacion"} className={tab === "investigacion" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setTab("investigacion")}>
               <GitBranch size={14} /> Investigación
               {investigationBlocks && <span className={styles.tabDot} title="Investigación pendiente (exigida para cerrar)" />}
+            </button>
+            <button role="tab" aria-selected={tab === "reportes"} className={tab === "reportes" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setTab("reportes")}>
+              <FileCheck2 size={14} /> Reportes
+              {reportsForTab.length > 0 && <span className={styles.tabBadge}>{reportsForTab.length}</span>}
+              {(reportsBlock > 0 || reportsOverdue) && <span className={styles.tabDot} title={reportsBlock > 0 ? "Reporte obligatorio pendiente (bloquea el cierre)" : "Reporte vencido"} />}
             </button>
             <button role="tab" aria-selected={tab === "actividad"} className={tab === "actividad" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setTab("actividad")}>
               <Activity size={14} /> Actividad
@@ -192,6 +202,11 @@ export function IncidentDetailDrawer({ incidentId, onClose }: Props) {
               incidentOpen={inc.lifecycle === "OPEN"}
               canEdit={can("incident:edit")}
             />
+          )}
+
+          {/* Pestaña Reportabilidad (Fase 4.3) */}
+          {tab === "reportes" && can("module:incidents:view") && (
+            <IncidentReportsBlock incidentId={inc.id} incidentOpen={inc.lifecycle === "OPEN"} />
           )}
 
           {tab === "actividad" && (<>

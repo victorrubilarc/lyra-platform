@@ -118,6 +118,8 @@ export const incidentListItemSchema = z.object({
   /** SLA de permanencia: ¿el estado actual está atrasado? (derivado de maxStayMinutes). */
   slaBreached: z.boolean(),
   reportable: z.boolean(),
+  /** Derivado: ¿tiene algún reporte PENDIENTE con el plazo vencido? (Fase 4.3). */
+  reportOverdue: z.boolean(),
   commentCount: z.number().int(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -286,6 +288,8 @@ export const incidentListQuerySchema = z.object({
   overdueOnly: z.coerce.boolean().optional(),
   /** Solo reportables. */
   reportableOnly: z.coerce.boolean().optional(),
+  /** Solo con algún reporte PENDIENTE y vencido (Fase 4.3). */
+  reportOverdueOnly: z.coerce.boolean().optional(),
   /** Solo creadas desde una bitácora/excepción/regla. */
   fromLogbookOnly: z.coerce.boolean().optional(),
   sort: z.enum(["recent", "severity", "priority", "due"]).optional(),
@@ -309,6 +313,8 @@ export const incidentStatsSchema = z.object({
   unassigned: z.number().int(),
   fromLogbook: z.number().int(),
   reportable: z.number().int(),
+  /** Incidencias abiertas con al menos un reporte PENDIENTE vencido (Fase 4.3). */
+  reportOverdue: z.number().int(),
 });
 export type IncidentStats = z.infer<typeof incidentStatsSchema>;
 

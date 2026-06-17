@@ -5,6 +5,7 @@ import {
   deriveLifecycle,
   evaluateSla,
   investigationBlocksClose,
+  reportsBlockingClose,
   type AddIncidentCommentRequest,
   type AssignIncidentRequest,
   type CancelIncidentRequest,
@@ -28,6 +29,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { AuditService, type AuditContext } from "../audit/audit.service";
 import { ScopeService } from "../authz/scope.service";
 import { ReauthService } from "../auth/reauth.service";
+import { IncidentReportsService } from "./incident-reports.service";
 
 /** Formato del folio humano a partir del correlativo. */
 function incidentCode(number: number): string {
@@ -66,6 +68,7 @@ export class IncidentsService {
     private readonly audit: AuditService,
     private readonly scope: ScopeService,
     private readonly reauth: ReauthService,
+    private readonly reports: IncidentReportsService,
   ) {}
 
   // === Listado / KPIs ========================================================
@@ -93,19 +96,21 @@ export class IncidentsService {
 
   async stats(userId: string): Promise<IncidentStats> {
     const base = await this.buildWhere(userId, {});
-    if (base === null) return { open: 0, critical: 0, overdue: 0, unassigned: 0, fromLogbook: 0, reportable: 0 };
+    if (base === null) return { open: 0, critical: 0, overdue: 0, unassigned: 0, fromLogbook: 0, reportable: 0, reportOverdue: 0 };
     const openBase: Prisma.IncidentWhereInput = { ...base, lifecycle: "OPEN" };
-    const [open, critical, unassigned, fromLogbook, reportable, overdueCandidates] = await Promise.all([
+    const [open, critical, unassigned, fromLogbook, reportable, reportOverdue, overdueCandidates] = await Promise.all([
       this.prisma.incident.count({ where: openBase }),
       this.prisma.incident.count({ where: { ...openBase, severity: 5 } }),
       this.prisma.incident.count({ where: { ...openBase, ownerId: null } }),
       this.prisma.incident.count({ where: { ...base, originType: { in: ["LOG_ENTRY", "EXCEPTION", "RULE"] } } }),
       this.prisma.incident.count({ where: { ...openBase, reportable: true } }),
+      // Reporte vencido se DERIVA (reporte PENDIENTE con plazo pasado), sin estado persistido.
+      this.prisma.incident.count({ where: { ...openBase, reports: { some: { status: "PENDING", dueAt: { lt: new Date() } } } } }),
       // SLA de permanencia se DERIVA (estado actual + maxStayMinutes); se cuenta abajo.
       this.prisma.incident.findMany({ where: openBase, include: this.listInclude }),
     ]);
     const overdue = (await this.toListItems(overdueCandidates)).filter((i) => i.slaBreached).length;
-    return { open, critical, overdue, unassigned, fromLogbook, reportable };
+    return { open, critical, overdue, unassigned, fromLogbook, reportable, reportOverdue };
   }
 
   // === Detalle ================================================================
@@ -265,6 +270,12 @@ export class IncidentsService {
       await this.addActivity(row.id, "ASSIGNED", `Responsable asignado: ${(await this.resolveUserNames([dto.ownerId])).get(dto.ownerId) ?? dto.ownerId}`, ctx);
     }
     await this.audit.record({ ...ctx, action: "incident.created", entityType: "Incident", entityId: row.id, after: this.snapshot(row) });
+    // Reportabilidad (Fase 4.3): si la incidencia es reportable (por el flag del tipo
+    // `reportableDefault` o por elección explícita), materializa los reportes de las
+    // obligaciones APLICABLES (por tipo/severidad). Honra `reportableDefault`/`reportable`.
+    if (row.reportable) {
+      await this.reports.materializeForIncident(userId, row.id, ctx);
+    }
     return this.getDetail(userId, row.id);
   }
 
@@ -377,6 +388,9 @@ export class IncidentsService {
       // Guarda de investigación (Fase 4.2b): si el tipo declara `requiresInvestigation`,
       // no se puede cerrar sin una investigación COMPLETED con ≥1 causa raíz.
       await this.assertInvestigationComplete(id, incident.typeId);
+      // Guarda de reportabilidad (Fase 4.3): un reporte de obligación OBLIGATORIA aún
+      // PENDIENTE bloquea el cierre (se resuelve enviándolo o marcándolo "no aplica").
+      await this.assertNoBlockingReports(id);
     }
 
     await this.prisma.$transaction(async (tx) => {
@@ -599,6 +613,7 @@ export class IncidentsService {
       ...(q.currentStateKey ? { currentStateKey: q.currentStateKey } : {}),
       ...(q.unassignedOnly ? { ownerId: null } : {}),
       ...(q.reportableOnly ? { reportable: true } : {}),
+      ...(q.reportOverdueOnly ? { reports: { some: { status: "PENDING", dueAt: { lt: new Date() } } } } : {}),
       ...(q.fromLogbookOnly ? { originType: { in: ["LOG_ENTRY", "EXCEPTION", "RULE"] } } : {}),
       ...(q.mine ? { OR: [{ ownerId: userId }, { reporterId: userId }] } : {}),
     };
@@ -625,6 +640,15 @@ export class IncidentsService {
     for (const vid of versionIds) graphs.set(vid, await this.loadVersionGraph(vid));
     const userNames = await this.resolveUserNames(rows.flatMap((r) => [r.ownerId, r.reporterId]));
     const now = Date.now();
+    // Reporte vencido por fila (Fase 4.3): batched, igual que el resto de lookups.
+    const reportOverdueIds = new Set(
+      (
+        await this.prisma.incidentReport.findMany({
+          where: { incidentId: { in: rows.map((r) => r.id) }, status: "PENDING", dueAt: { lt: new Date(now) } },
+          select: { incidentId: true },
+        })
+      ).map((r) => r.incidentId),
+    );
     return rows.map((r) => {
       const graph = r.workflowDefinitionVersionId ? graphs.get(r.workflowDefinitionVersionId) : undefined;
       const state = graph && r.currentStateKey ? graph.states.get(r.currentStateKey) : undefined;
@@ -659,6 +683,7 @@ export class IncidentsService {
         occurredAt: r.occurredAt?.toISOString() ?? null,
         slaBreached,
         reportable: r.reportable,
+        reportOverdue: reportOverdueIds.has(r.id),
         commentCount: r._count?.comments ?? 0,
         createdAt: r.createdAt.toISOString(),
         updatedAt: r.updatedAt.toISOString(),
@@ -790,6 +815,20 @@ export class IncidentsService {
     if (investigationBlocksClose(requires, inv)) {
       throw new BadRequestException(
         "No se puede cerrar: el tipo de incidencia exige una investigación de causa raíz completada (con al menos una causa raíz).",
+      );
+    }
+  }
+
+  /** Impide cerrar si hay reportes OBLIGATORIOS aún pendientes de envío (Fase 4.3). */
+  private async assertNoBlockingReports(incidentId: string): Promise<void> {
+    const reports = await this.prisma.incidentReport.findMany({
+      where: { incidentId, mandatory: true, status: "PENDING" },
+      select: { mandatory: true, status: true },
+    });
+    const blocking = reportsBlockingClose(reports);
+    if (blocking.length > 0) {
+      throw new BadRequestException(
+        `No se puede cerrar: ${blocking.length} reporte(s) obligatorio(s) sin enviar (envíelos o márquelos como "no aplica").`,
       );
     }
   }

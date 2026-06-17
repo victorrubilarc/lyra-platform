@@ -30,7 +30,7 @@ export function IncidentsPage() {
   const [typeId, setTypeId] = useState("");
   const [severity, setSeverity] = useState("");
   const [priority, setPriority] = useState<IncidentListQuery["priority"] | "">("");
-  const [flag, setFlag] = useState<"" | "mine" | "unassignedOnly" | "overdueOnly" | "reportableOnly" | "fromLogbookOnly">("");
+  const [flag, setFlag] = useState<"" | "mine" | "unassignedOnly" | "overdueOnly" | "reportableOnly" | "reportOverdueOnly" | "fromLogbookOnly">("");
   const [sort, setSort] = useState<IncidentListQuery["sort"]>("recent");
 
   const query: IncidentListQuery = useMemo(() => ({
@@ -84,6 +84,7 @@ export function IncidentsPage() {
           <Kpi label="Sin responsable" value={stats.unassigned} color="#EAB308" onClick={() => { setLifecycle("OPEN"); setFlag("unassignedOnly"); }} />
           <Kpi label="Desde bitácora" value={stats.fromLogbook} color="#06B6D4" onClick={() => { setLifecycle(""); setFlag("fromLogbookOnly"); }} />
           <Kpi label="Reportables" value={stats.reportable} color="#84CC16" onClick={() => { setLifecycle("OPEN"); setFlag("reportableOnly"); }} />
+          <Kpi label="Reporte vencido" value={stats.reportOverdue} color="#EF4444" onClick={() => { setLifecycle("OPEN"); setFlag("reportOverdueOnly"); }} />
         </div>
       )}
 
@@ -117,6 +118,7 @@ export function IncidentsPage() {
           <option value="unassignedOnly">Sin responsable</option>
           <option value="overdueOnly">Vencidas</option>
           <option value="reportableOnly">Reportables</option>
+          <option value="reportOverdueOnly">Reporte vencido</option>
           <option value="fromLogbookOnly">Desde bitácora</option>
         </Select>
         <Select value={sort} onChange={(e) => setSort(e.target.value as IncidentListQuery["sort"])} className={styles.fixedSelSm}>
@@ -149,7 +151,7 @@ export function IncidentsPage() {
                 {items.map((i) => (
                   <tr key={i.id} className={styles.row} onClick={() => openDetail(i.id)}>
                     <td className={styles.mono}>{i.code}</td>
-                    <td className={styles.titleCell}>{i.title}{i.reportable && <span className={styles.reportTag}>Reportable</span>}</td>
+                    <td className={styles.titleCell}>{i.title}{i.reportable && <span className={styles.reportTag}>Reportable</span>}{i.reportOverdue && <span className={styles.overdueTag}>Reporte vencido</span>}</td>
                     <td>{i.typeName}</td>
                     <td><span className={styles.sevDot} style={{ background: severityColor(i.severity) }} title={`Severidad ${i.severity}`} /> {i.severity}</td>
                     <td><span className={styles.priText} style={{ color: PRIORITY_META[i.priority].color }}>{PRIORITY_META[i.priority].label}</span></td>
@@ -231,6 +233,7 @@ function Board({ items, onOpen }: { items: IncidentListItem[]; onOpen: (id: stri
                 <div className={styles.kcardFoot}>
                   <span className={i.ownerName ? "" : styles.muted}>{i.ownerName ? `👤 ${i.ownerName}` : "sin responsable"}</span>
                   {i.slaBreached && <span className={styles.overdueTag}>Vencida</span>}
+                  {i.reportOverdue && <span className={styles.overdueTag}>Reporte vencido</span>}
                 </div>
               </div>
             ))}

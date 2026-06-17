@@ -15,7 +15,7 @@ import { DEMO_EQUIPMENT, EQUIPMENT_CATEGORIES } from "./equipment-seed-data.js";
 import { REFERENCE_LISTS } from "./reference-data-seed.js";
 import { DEMO_CALENDAR, DEMO_FISCAL_CALENDAR } from "./operational-calendar-seed.js";
 import { NOTIFICATION_TEMPLATE_SEEDS } from "./notification-templates-seed.js";
-import { INCIDENT_WORKFLOW, INCIDENT_TYPES, INCIDENT_CATEGORIES } from "./incidents-seed-data.js";
+import { INCIDENT_WORKFLOW, INCIDENT_TYPES, INCIDENT_CATEGORIES, REPORTING_OBLIGATIONS } from "./incidents-seed-data.js";
 
 const prisma = new PrismaClient();
 
@@ -503,7 +503,28 @@ async function seedIncidentCatalog(): Promise<void> {
       update: { name: c.name, typeId, sortOrder: c.sortOrder },
     });
   }
-  console.log(`✔ Catálogo de incidencias sincronizado: ${INCIDENT_TYPES.length} tipos, ${INCIDENT_CATEGORIES.length} categorías`);
+  // Obligaciones de reporte (Fase 4.3): catálogo de ejemplo, idempotente por clave.
+  for (const o of REPORTING_OBLIGATIONS) {
+    const appliesToTypeIds = o.appliesToTypeKeys.map((k) => typeIdByKey.get(k)).filter((x): x is string => !!x);
+    await prisma.reportingObligation.upsert({
+      where: { key: o.key },
+      create: {
+        key: o.key,
+        name: o.name,
+        description: o.description,
+        authorityName: o.authorityName,
+        defaultDueMinutes: o.defaultDueMinutes,
+        appliesToTypeIds,
+        minSeverity: o.minSeverity,
+        mandatory: o.mandatory,
+        sortOrder: o.sortOrder,
+      },
+      update: { name: o.name, description: o.description, authorityName: o.authorityName, defaultDueMinutes: o.defaultDueMinutes, appliesToTypeIds, minSeverity: o.minSeverity, mandatory: o.mandatory, sortOrder: o.sortOrder },
+    });
+  }
+  console.log(
+    `✔ Catálogo de incidencias sincronizado: ${INCIDENT_TYPES.length} tipos, ${INCIDENT_CATEGORIES.length} categorías, ${REPORTING_OBLIGATIONS.length} obligaciones de reporte`,
+  );
 }
 
 async function main(): Promise<void> {

@@ -1,4 +1,4 @@
-import type { IncidentActionKind, IncidentActionStatus, IncidentLifecycle, IncidentOrigin, IncidentPriority } from "@lyra/contracts";
+import type { IncidentActionKind, IncidentActionStatus, IncidentLifecycle, IncidentOrigin, IncidentPriority, IncidentReportStatus } from "@lyra/contracts";
 
 /** Tokens de severidad 1..5 (CLAUDE.md). */
 export const SEVERITY_COLORS = ["#6B7280", "#22C55E", "#84CC16", "#EAB308", "#F97316", "#EF4444"];
@@ -45,6 +45,15 @@ export const ACTION_STATUS_META: Record<IncidentActionStatus, { label: string; c
   DONE: { label: "Realizada", color: "#EAB308" },
   VERIFIED: { label: "Verificada", color: "#22C55E" },
   CANCELED: { label: "Anulada", color: "#6B7280" },
+};
+
+// === Reportabilidad (Fase 4.3) ===============================================
+
+export const REPORT_STATUS_META: Record<IncidentReportStatus, { label: string; color: string }> = {
+  PENDING: { label: "Pendiente", color: "#EAB308" },
+  SUBMITTED: { label: "Enviado", color: "#22C55E" },
+  NOT_APPLICABLE: { label: "No aplica", color: "#9AA3B8" },
+  CANCELED: { label: "Anulado", color: "#6B7280" },
 };
 
 /**

@@ -90,6 +90,17 @@ medio ambiente) la incidencia **no se puede cerrar** sin una investigación comp
 **Beneficio:** dejas de "apagar incendios". Atacas la causa real, lo documentas para auditoría
 (ISO 45001 / ISO 9001) y **reduces la reincidencia** porque cada acción está atada a una causa raíz.
 
+### 📑 Reportes a la autoridad, sin que se te pasen los plazos
+Cuando una incidencia obliga a **avisar a un organismo regulador, una gerencia o un cliente**, la
+plataforma materializa ese **reporte** dentro de la incidencia: a **quién**, con qué **plazo** y en
+qué **estado**. Marcas el envío guardando el **folio** que entrega la autoridad, o lo registras como
+**«no aplica»** con justificación. Los reportes **obligatorios pendientes impiden cerrar** la
+incidencia, y los que pasaron su plazo se marcan **vencidos** (con indicador y filtro propios). Todo
+es **configurable**: defines tus obligaciones por tipo de evento y severidad, sin que el sistema
+imponga un marco regulatorio fijo.
+**Beneficio:** cumples tus obligaciones de **reportabilidad** con trazabilidad y sin depender de la
+memoria de una persona; en una auditoría muestras qué se reportó, a quién, cuándo y con qué folio.
+
 ### 🔗 De la bitácora a la acción (sin saltos manuales)
 Cuando un dato de una bitácora se sale de umbral, el sistema puede generar una **excepción
 operacional** revisable y, si amerita, convertirla en **incidencia** — conservando el **valor
@@ -236,6 +247,11 @@ Preséntalo como evolución, no como funcionalidad actual:
 
 > Una línea por hito, en lenguaje de cliente. Lo más reciente arriba.
 
+- **2026-06-17** — **Reportabilidad configurable:** las incidencias pueden gatillar **reportes a
+  autoridades u obligaciones** con plazo, estado y **folio de envío**; los reportes obligatorios
+  pendientes impiden cerrar y los vencidos se marcan solos. Defines tus obligaciones por tipo y
+  severidad (sin marco regulatorio impuesto). *(Argumento de venta: cumples plazos de reportabilidad
+  con trazabilidad de auditoría; nada depende de la memoria de una persona.)*
 - **2026-06-17** — Las incidencias importantes ahora exigen **investigación de causa raíz (5
   Porqués)** antes de cerrarse: se llega a la causa de fondo y cada acción correctiva queda atada a
   ella. *(Argumento de venta: dejas de apagar incendios; menos reincidencia; evidencia ISO 45001/9001.)*

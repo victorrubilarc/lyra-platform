@@ -74,3 +74,6 @@ export * from "./incidents/actions.js";
 
 // Investigación de causa raíz de incidencias (Fase 4.2b)
 export * from "./incidents/investigation.js";
+
+// Reportabilidad configurable de incidencias (Fase 4.3)
+export * from "./incidents/reporting.js";
