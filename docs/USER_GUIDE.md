@@ -112,6 +112,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 ### 15. Incidencias  [todos los roles operativos]
 - ✅ **Reportar y gestionar incidencias** (lista + tablero kanban + detalle con flujo) (§ Incidencias)
 - ✅ **Crear desde una bitácora** (botón "Reportar incidencia" en el visor de la entrada) (§ Incidencias ▸ Desde una bitácora)
+- ✅ **Administrar los catálogos** (tipos y categorías de incidencia) (§ Incidencias ▸ Catálogos) [solo administrador]
 
 ### 16. Excepciones operacionales  [Supervisor · Operador con triage]
 - ✅ **Revisar y triar excepciones** (panel en la bitácora + bandeja global; corregir/reconocer/convertir/asociar/descartar) (§ Excepciones operacionales)
@@ -631,6 +632,39 @@ categorías: `incidentcatalog:manage`. Todo se verifica en el servidor y respeta
 - Las incidencias se pueden originar **manualmente**, **desde una bitácora** o **desde una
   excepción operacional** (ver más abajo); la apertura **automática por reglas** llega en una
   fase siguiente.
+
+### Catálogos de incidencias (tipos y categorías)
+
+**Para qué sirve.** Los **tipos** (p. ej. Seguridad, Equipos, Medio ambiente) y las
+**categorías** (p. ej. Cuasi-accidente, Derrame) son las listas que eliges al reportar una
+incidencia. Este mantenedor te deja crearlas y ajustarlas **sin tocar la base de datos**: un
+tipo define su **flujo por defecto**, su **color**, y si las incidencias de ese tipo
+**requieren investigación / CAPA / son reportables** por defecto.
+
+**Cómo se usa.**
+- Entra a **Incidencias** y pulsa **«Catálogos»** (arriba a la derecha; solo visible para
+  administradores). También llegas por `/incidencias/catalogos`.
+- Cambia entre las pestañas **Tipos** y **Categorías**. Cada una tiene **buscador**, filtro
+  **Activos/Inactivos** y **orden**, con paginación arriba y abajo.
+- **Nuevo / Editar:** completa el formulario. La **clave** (key) identifica al elemento y solo
+  se define al crear (no se puede cambiar después). En un **tipo** eliges además el flujo por
+  defecto (de los flujos **publicados**; vacío = el flujo global de incidencias), el color del
+  chip y los interruptores de comportamiento. En una **categoría** eliges a qué **tipo**
+  pertenece, o la dejas **transversal** (disponible para todos los tipos).
+- **Activar / desactivar:** el interruptor de cada fila retira el elemento de los desplegables
+  del alta **sin borrarlo**. Las incidencias antiguas que ya lo usaban lo siguen mostrando.
+
+**Quién puede.** Administrar los catálogos exige `incidentcatalog:manage`. El resto de los
+usuarios no ve el botón ni la pantalla (y el servidor lo rechaza igual). Ver las incidencias y
+sus tipos/categorías ya viene con `incident:view`.
+
+**Importante.**
+- **No hay borrado:** un tipo/categoría referenciado por incidencias no se elimina, se
+  **desactiva**. Así se preserva la trazabilidad histórica.
+- La **clave es la identidad**: si intentas crear una con una clave que ya existe, el sistema
+  lo impide (no la sobrescribe).
+- El **flujo por defecto debe estar publicado**: un borrador de flujo no se puede usar porque
+  la incidencia congela el flujo al crearse.
 
 ---
 

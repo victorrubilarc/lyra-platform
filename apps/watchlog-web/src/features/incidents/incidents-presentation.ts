@@ -30,3 +30,19 @@ export const ORIGIN_META: Record<IncidentOrigin, { label: string }> = {
   EXCEPTION: { label: "Excepción" },
   RULE: { label: "Regla" },
 };
+
+/**
+ * Paleta acotada para el color del chip de un TIPO de incidencia. Son los valores
+ * canónicos de los tokens del DS (CLAUDE.md): acentos + severidades. El modelo
+ * persiste el hex; aquí ofrecemos solo la paleta de marca (sin hex libre).
+ */
+export const CATALOG_COLOR_SWATCHES: ReadonlyArray<{ value: string; label: string }> = [
+  { value: "#6366F1", label: "Índigo (acento)" },
+  { value: "#06B6D4", label: "Cian (info)" },
+  { value: "#22C55E", label: "Verde (sev. 1)" },
+  { value: "#84CC16", label: "Lima (sev. 2)" },
+  { value: "#EAB308", label: "Ámbar (sev. 3)" },
+  { value: "#F97316", label: "Naranjo (sev. 4)" },
+  { value: "#EF4444", label: "Rojo (sev. 5)" },
+  { value: "#6B7280", label: "Gris (neutro)" },
+];

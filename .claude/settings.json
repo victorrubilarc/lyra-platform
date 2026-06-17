@@ -296,7 +296,9 @@
       "PowerShell($procs = Get-CimInstance Win32_Process -Filter \"Name='node.exe'\" | Where-Object { $_.CommandLine -match 'watchlog-api' }; $procs | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }; Start-Sleep -Milliseconds 800; \"stopped \" + \\($procs.Count\\) + \" api proc\\(s\\)\")",
       "Bash(curl -s -o /dev/null -w \"web:%{http_code}\\\\n\" http://localhost:5173)",
       "Bash(sed -n '/upsertIncidentTypeRequestSchema = z.object/,/}\\);/p' packages/contracts/src/incidents/incidents.ts)",
-      "Bash(sed -n '/upsertIncidentCategoryRequestSchema = z.object/,/}\\);/p' packages/contracts/src/incidents/incidents.ts)"
+      "Bash(sed -n '/upsertIncidentCategoryRequestSchema = z.object/,/}\\);/p' packages/contracts/src/incidents/incidents.ts)",
+      "Bash(curl -s -o /dev/null -w \"API /api health: %{http_code}\\\\n\" http://localhost:3000/api/health)",
+      "Bash(python scripts/smoke-catalogos-incidencias.py)"
     ],
     "additionalDirectories": [
       "\\tmp"

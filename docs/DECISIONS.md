@@ -4,6 +4,33 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-17 · Incidencias — mantenedor de catálogos (Tipos + Categorías) [UI] — ✅ IMPLEMENTADO
+
+Le pone pantalla a `IncidentType`/`IncidentCategory` (ya configurables en backend). Forks resueltos con el dueño:
+- **Ubicación = ruta propia `/incidencias/catalogos`** (no pestaña en `/incidencias` ni sección en `/configuracion`). Motivo:
+  gate independiente (`incidentcatalog:manage` ≠ `module:incidents:view` del operador), cohesión con el módulo, y sigue el patrón
+  de mantenedores con ruta propia (Flujos, Datos de referencia). **No se agrega al sidebar:** el sidebar resalta por `startsWith`,
+  así que un ítem de sub-ruta doble-resaltaría el padre `/incidencias` (mismo motivo por el que `/seguridad/*` no está en el
+  sidebar). El acceso es un **botón "Catálogos" en el header de `/incidencias`** (gateado), y la ruta se registra en `navigation.ts`
+  con `inSidebar:false` solo para resolver título/pestaña/breadcrumb.
+- **`key` editable solo al crear** (read-only en edición). Es la identidad del upsert por key: cambiarla crearía una fila nueva y
+  dejaría huérfana la anterior (rompe trazabilidad de incidencias que la referencian).
+- **Solo desactivar, sin borrado físico.** Un tipo/categoría está referenciado por incidencias históricas. Desactivar (`active=false`)
+  lo retira de los desplegables del alta pero lo preserva en las incidencias que ya lo usan. **No** se bloquea desactivar un tipo con
+  incidencias abiertas (desactivar = retirar a futuro; bloquearlo sería sobre-ingeniería).
+- **Colisión de key al crear = guarda cliente + server.** El endpoint es upsert por key (el server no distingue crear de actualizar).
+  La UI bloquea crear una key ya usada (tiene la lista completa incl. inactivos) **y** el backend devuelve **409** cuando se pide
+  `?create=true` sobre una key existente. Defensa en profundidad, server-authoritative. (No se tocó el contrato: la señal viaja por
+  query string, no por el body upsert.)
+- **Guarda nueva: el flujo por defecto debe estar PUBLICADO** (no solo existir). Se congela al crear una incidencia del tipo; un
+  borrador no se puede congelar. El selector solo ofrece publicados; el server lo exige (status PUBLISHED + currentVersionId).
+- **Color del tipo = paleta acotada de tokens del DS** (swatches: acentos + severidades), sin campo hex libre. CLAUDE.md prohíbe
+  valores en duro; el modelo persiste el hex del token elegido (misma convención que el seed). `CATALOG_COLOR_SWATCHES` centralizado.
+
+Sin permisos nuevos (cat. 81), sin migración, sin cambios de contrato. Smoke `smoke-catalogos-incidencias.py` 16/16 + `smoke-incidencias.py` 30/30.
+
+---
+
 ### 2026-06-16 · Incidencias — equipo/activo + fecha del evento en el alta (mínimo ISO 14224) — ✅ IMPLEMENTADO
 
 Follow-up de QA: el modal de alta no exponía el equipo ni la fecha de ocurrencia. Decisiones:

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
-import { AlertTriangle, LayoutGrid, List, Plus, Search } from "lucide-react";
+import { Link, useSearchParams } from "react-router-dom";
+import { AlertTriangle, LayoutGrid, List, Plus, Search, Tags } from "lucide-react";
 import type { IncidentListItem, IncidentListQuery } from "@lyra/contracts";
 import { Button, Card, EmptyState, GridPager, Input, Select, Spinner } from "@lyra/ui";
 import { usePermissions } from "../../auth/use-permissions.js";
@@ -63,9 +63,16 @@ export function IncidentsPage() {
           <h1 className={styles.h1}>Incidencias</h1>
           <p className={styles.sub}>Gestión de incidencias operacionales y HSE.</p>
         </div>
-        {can("incident:create") && (
-          <Button variant="primary" leftIcon={<Plus size={16} />} onClick={() => setCreateOpen(true)}>Reportar incidencia</Button>
-        )}
+        <div className={styles.headerActions}>
+          {can("incidentcatalog:manage") && (
+            <Link to="/incidencias/catalogos">
+              <Button variant="secondary" leftIcon={<Tags size={16} />}>Catálogos</Button>
+            </Link>
+          )}
+          {can("incident:create") && (
+            <Button variant="primary" leftIcon={<Plus size={16} />} onClick={() => setCreateOpen(true)}>Reportar incidencia</Button>
+          )}
+        </div>
       </header>
 
       {/* KPIs */}

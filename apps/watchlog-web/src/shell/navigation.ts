@@ -1,4 +1,4 @@
-import { AlertOctagon, AlertTriangle, Bell, BookOpenCheck, CalendarClock, CalendarRange, FilePlus2, GitBranch, LayoutDashboard, Layers, ListChecks, ListTodo, Network, Route, Settings, ShieldCheck, UserCog, type LucideIcon } from "lucide-react";
+import { AlertOctagon, AlertTriangle, Bell, BookOpenCheck, CalendarClock, CalendarRange, FilePlus2, GitBranch, LayoutDashboard, Layers, ListChecks, ListTodo, Network, Route, Settings, ShieldCheck, Tags, UserCog, type LucideIcon } from "lucide-react";
 import type { Permission } from "@lyra/permissions";
 
 /**
@@ -84,6 +84,17 @@ export const ROUTES: readonly NavRoute[] = [
     icon: AlertOctagon,
     permission: "module:incidents:view",
     inSidebar: true,
+  },
+  // Mantenedor de catálogos (tipos/categorías) del módulo de incidencias.
+  // Sub-ruta de /incidencias: NO va en el sidebar (evita doble-resaltado del
+  // padre, igual que /seguridad/*); se accede por el botón del header de
+  // /incidencias. Registrada para resolver título/pestaña/breadcrumb.
+  {
+    path: "/incidencias/catalogos",
+    labelKey: "nav.incidentCatalogs",
+    icon: Tags,
+    permission: "incidentcatalog:manage",
+    inSidebar: false,
   },
   {
     path: "/flujos",
