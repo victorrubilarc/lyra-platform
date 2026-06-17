@@ -4,6 +4,31 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-17 · Llenado — guard de regresión de permisos por sección/campo — ✅ IMPLEMENTADO
+
+**Incidente:** el dueño reportó que en *Bitácora de Turno — Demo Completa* la autorización por sección/campo no se aplicaba
+(cualquiera podía llenar). **Diagnóstico (verificado en vivo):** el backend (`saveSection` + `versionInclude` con `roles`) y la
+guarda `sectionBlockedReasonFor` estaban **intactos y funcionando** (probado: un usuario solo-Administrador recibe 403 en
+secciones gateadas de la versión vigente v12). La causa REAL fue **datos**: durante las reescrituras del Form Builder (Fase
+2.1.x), el round-trip detalle→modelo→payload **dejó de propagar los `roleIds` de SECCIÓN** al guardar/publicar (los de CAMPO
+sobrevivieron). Las versiones **v3–v11** de esa plantilla se publicaron con 0 roles de sección; como cada entrada CONGELA su
+versión, las entradas creadas sobre ellas quedaron sin gate de sección. v1/v2/v12 sí los tienen (v12 = roles re-asignados con el
+builder ya corregido). **Nadie lo notó porque NO había test del round-trip.**
+
+**Decisión — defensa en profundidad en CI (`pnpm test`), no guardas de runtime** (un check que bloquee publicar "una sección que
+antes tenía roles y ahora no" daría falsos positivos al quitar roles legítimamente):
+- **Frontend** `builder-model.spec.ts`: afirma que `detailToEditState`→`editStateToDraftRequest` conserva `roleIds` de sección y
+  de campo (la superficie EXACTA que regresó). Primeros tests del paquete web.
+- **Backend** `templates.service.spec.ts`: afirma que `saveDraft` mapea `roleIds` → `roles: { create: [...] }` en sección y campo.
+- **Smoke en vivo** `scripts/smoke-permisos-seccion.py` 10/10: crea plantilla con rol de sección + override de campo, publica,
+  verifica el round-trip de la versión publicada, crea entrada y comprueba el comportamiento (usuario sin rol → 403; con rol →
+  200; override de campo → 403).
+
+**Entradas legacy (v3–v11):** NO se corrigen mutando versiones inmutables (rompería la integridad GxP, y es a propósito). Para la
+demo, lo prolijo es recrear esas entradas sobre v12. Anotado en BACKLOG.
+
+---
+
 ### 2026-06-17 · Incidencias — Fase 4.2b (Investigación de causa raíz · 5 Porqués) — ✅ IMPLEMENTADO
 
 Investigación de causa raíz configurable y transversal, honrando el flag `IncidentType.requiresInvestigation` (igual que
