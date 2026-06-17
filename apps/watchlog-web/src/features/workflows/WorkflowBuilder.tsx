@@ -70,6 +70,20 @@ export function WorkflowBuilder({ detail }: { detail: WorkflowDetail }) {
     });
   }
 
+  // Los estados existentes también arrancan PLEGADOS (vista compacta); los nuevos
+  // quedan expandidos (su uid ∉ del set).
+  const [collapsedStates, setCollapsedStates] = useState<Set<string>>(
+    () => new Set(wf.states.map((s) => s.uid)),
+  );
+  function toggleStateCollapse(uid: string) {
+    setCollapsedStates((prev) => {
+      const next = new Set(prev);
+      if (next.has(uid)) next.delete(uid);
+      else next.add(uid);
+      return next;
+    });
+  }
+
   const save = useSaveWorkflowDraft();
   const publish = usePublishWorkflow();
   const rolesQuery = useQuery({ queryKey: ["workflows", "roles"], queryFn: fetchRoles, retry: false });
@@ -435,12 +449,38 @@ export function WorkflowBuilder({ detail }: { detail: WorkflowDetail }) {
           {wf.states.length === 0 ? (
             <div className={styles.empty}>{t("workflows.builder.noStates")}</div>
           ) : (
-            wf.states.map((s, idx) => (
+            wf.states.map((s, idx) => {
+              const open = !collapsedStates.has(s.uid);
+              return (
               <div key={s.uid} className={styles.itemCard}>
-                <div className={styles.itemHeader}>
-                  <span className={styles.indexBadge}>{idx + 1}</span>
-                  <span className={styles.itemHeaderTitle}>{t("workflows.builder.stateN", { n: idx + 1 })}</span>
+                <div className={cx(styles.collapsibleHeader, open && styles.headerOpen)}>
+                  <button
+                    type="button"
+                    className={styles.headerToggle}
+                    onClick={() => toggleStateCollapse(s.uid)}
+                    aria-expanded={open}
+                    aria-label={t(open ? "workflows.builder.collapse" : "workflows.builder.expand")}
+                  >
+                    {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                    <span className={styles.indexBadge}>{idx + 1}</span>
+                    {open ? (
+                      <span className={styles.itemHeaderTitle}>{t("workflows.builder.stateN", { n: idx + 1 })}</span>
+                    ) : (
+                      <span className={styles.collapsedSummary}>
+                        <span className={styles.swatch} style={{ background: swatchCss(s.color) }} aria-hidden />
+                        <span className={styles.collapsedLabel}>{s.name || t("workflows.builder.stateN", { n: idx + 1 })}</span>
+                        <span className={styles.collapsedFlow}>{s.key}</span>
+                        {s.isInitial && <span className={styles.miniTag}>{t("workflows.builder.isInitial")}</span>}
+                        {s.isFinal && <span className={styles.miniTag}>{t("workflows.builder.isFinal")}</span>}
+                        {s.maxStayMinutes != null && <span className={styles.miniTag}>SLA</span>}
+                      </span>
+                    )}
+                  </button>
+                  <button type="button" className={styles.iconBtnDanger} onClick={() => deleteState(s.uid)} disabled={!canEdit} aria-label={t("common.delete")}>
+                    <Trash2 size={14} />
+                  </button>
                 </div>
+                {open && (<>
                 <div className={styles.itemTop}>
                   <Input
                     value={s.name}
@@ -457,9 +497,6 @@ export function WorkflowBuilder({ detail }: { detail: WorkflowDetail }) {
                     title={t("workflows.builder.stateKeyHint")}
                     spellCheck={false}
                   />
-                  <button type="button" className={styles.iconBtnDanger} onClick={() => deleteState(s.uid)} disabled={!canEdit} aria-label={t("common.delete")}>
-                    <Trash2 size={14} />
-                  </button>
                 </div>
                 <div className={styles.itemFlags}>
                   <label className={styles.flag}>
@@ -521,8 +558,10 @@ export function WorkflowBuilder({ detail }: { detail: WorkflowDetail }) {
                     />
                   </div>
                 </div>
+                </>)}
               </div>
-            ))
+              );
+            })
           )}
         </Card>
 

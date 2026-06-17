@@ -1,5 +1,19 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-17 — UX del builder de Flujos (3 ajustes por feedback del dueño) ✅** (`feat/builder-flujos-ux`). Pulido del
+`WorkflowBuilder` tras QA visual: **(1) "Copiar destinatarios de otra transición" más descubrible** — el atajo ya existía
+(`TransitionNotifyEditor`) pero vivía al final del editor; ahora va **arriba del bloque de aviso** (lo primero al activar "Notificar").
+Se mantiene **condicional**: solo se muestra si hay OTRA transición con aviso de la cual copiar (decisión del dueño: si no hay fuente,
+no mostrar nada — evita ruido). **(2) Estados colapsables** — paridad con las transiciones (que ya colapsaban): `collapsedStates` (existentes plegados al
+abrir, nuevos expandidos) + cabecera con resumen compacto (swatch · nombre · clave · tags Inicial/Final/SLA); de-clutter del panel
+"se veía muy lleno". **(3) Encabezado sticky de las columnas** — bug real: `.columnHeader` usaba `top: 58px` (alto del topbar) pero
+el scroll vive en `.content` del shell (`overflow-y:auto`) con topbar+pestañas FUERA de ese contenedor ⇒ el sticky se anclaba 58px
+abajo dejando una franja muerta donde se colaba el contenido; corregido a **`top: 0`**. Solo frontend (web + CSS + i18n es-CL),
+sin contratos/API/migración. typecheck/lint(0 errores)/build verdes. **Pendiente: smoke VISUAL del dueño** (copiar arriba/siempre,
+estados que colapsan, encabezado pegado al tope sin franja). **Diferido (BACKLOG):** **copiar destinatarios desde OTRO flujo/plantilla**
+(no solo dentro del mismo flujo) — feature aparte (traer configs congeladas de otros flujos + resolver roles/usuarios que podrían no
+aplicar + ABAC). **Siguiente: 4.4 (SLA/escalamiento + aviso de plazo).**
+
 **2026-06-17 — Notificaciones avanzadas · Fase B: canal IN-APP (la campanita) + tiempo real ✅** (`feat/notif-avanzadas-inapp`).
 **CIERRA EL ÉPICO de notificaciones avanzadas** (A + B). Cada aviso, además del correo, genera una notificación IN-APP por
 destinatario (leído/no leído), visible en la **campanita del Topbar** (badge de no leídas + dropdown navegable + marcar leídas) y
