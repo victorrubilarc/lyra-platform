@@ -70,6 +70,10 @@ export const incidentActionSchema = z.object({
   verifiedByName: z.string().nullable(),
   effectivenessOutcome: incidentActionOutcomeSchema.nullable(),
   verificationNote: z.string().nullable(),
+  /** Causa raíz que esta acción ATIENDE (Fase 4.2b; null = ninguna / contención). */
+  investigationStepId: z.string().nullable(),
+  /** Enunciado de la causa raíz ligada (para mostrar sin re-consultar). */
+  investigationStepLabel: z.string().nullable(),
   canceledAt: z.string().nullable(),
   cancelReason: z.string().nullable(),
   createdAt: z.string(),
@@ -87,6 +91,8 @@ export const createIncidentActionRequestSchema = z.object({
   responsibleId: z.string().min(1).nullable().optional(),
   responsibleRoleId: z.string().min(1).nullable().optional(),
   dueAt: z.string().datetime().nullable().optional(),
+  /** Causa raíz (paso de la investigación) que esta acción atiende. */
+  investigationStepId: z.string().min(1).nullable().optional(),
 });
 export type CreateIncidentActionRequest = z.infer<typeof createIncidentActionRequestSchema>;
 
@@ -98,6 +104,7 @@ export const updateIncidentActionRequestSchema = z.object({
   responsibleId: z.string().min(1).nullable().optional(),
   responsibleRoleId: z.string().min(1).nullable().optional(),
   dueAt: z.string().datetime().nullable().optional(),
+  investigationStepId: z.string().min(1).nullable().optional(),
   /** Cambio de estado entre los NO terminales (OPEN ↔ IN_PROGRESS). */
   status: z.enum(["OPEN", "IN_PROGRESS"]).optional(),
 });

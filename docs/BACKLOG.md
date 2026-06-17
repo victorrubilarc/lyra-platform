@@ -5,7 +5,16 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-17** (**Fase 4.2a — Acciones CAPA ✅** — `feat/incidencias-capa`: tras la **auditoría del módulo de
+> actualización: **2026-06-17** (**Fase 4.2b — Investigación de causa raíz (5 Porqués) ✅** — `feat/incidencias-investigacion`:
+> investigación configurable/transversal honrando `IncidentType.requiresInvestigation`. Modelo dedicado `IncidentInvestigation`
+> (1:1, method FIVE_WHYS, status DRAFT/COMPLETED, problemStatement, rootCauseSummary) + `IncidentInvestigationStep` (porqués
+> ordenados con `isRootCause`); enlace causa raíz↔CAPA (`IncidentAction.investigationStepId`); **bloqueo de cierre configurable**
+> (`assertInvestigationComplete` + helper `investigationBlocksClose`); drawer a **PESTAÑAS** (Resumen/Acciones/Investigación/
+> Actividad); **sin permiso nuevo** [reusa `incident:edit`, cat. **83**]. Migración aditiva `…_add_incident_investigation`.
+> Contracts 271 · API 234 · smoke `smoke-incidencias-investigacion.py` 27/27 + `smoke-incidencias-capa.py` 23/23 +
+> `smoke-incidencias.py` 31/31. **Deuda:** firma Part 11 al completar · evidencia a la investigación · plantillas ICAM/Ishikawa.
+> **Siguiente: 4.3 — Reportabilidad configurable.** Anterior:
+> **Fase 4.2a — Acciones CAPA ✅** — `feat/incidencias-capa`: tras la **auditoría del módulo de
 > Incidencias** (core ya genérico/transversal; brecha P1 = seguimiento real → CAPA), gestión de acciones correctivas/preventivas/
 > inmediatas. Entidad `IncidentAction` (folio ACT-####, mandatory, responsable persona+rol, plazo, status OPEN/IN_PROGRESS/DONE/
 > VERIFIED/CANCELED, **verificación de eficacia** [no eficaz reabre], anulación sin borrado, `evidence` reservado); **bloqueo de
@@ -242,7 +251,9 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 
 | **Fase 4.2a Acciones CAPA** (`IncidentAction` + 3 enums + migración `…_add_incident_actions` aditiva; `@lyra/contracts/incidents/actions` con DTO/requests/enums + helpers `hasOpenMandatoryActions`/`blockingActionsForClose`/`incidentActionCode`; 2 permisos `incident:action:manage`/`:verify` [cat. **83**]; `IncidentActionsService` [CRUD+complete+verify+cancel, ABAC heredada, timeline+auditoría] + 6 endpoints + guarda `assertNoBlockingActions` en `transition`; web `IncidentActionsBlock` + modales + api/queries + meta; contracts 263 · API 234 · smoke `smoke-incidencias-capa.py` 23/23 + `smoke-incidencias.py` 30/30) | `feat/incidencias-capa` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 
-**Estado:** **nada vive solo en local.** `main` = `origin/main`.
+| **Fase 4.2b Investigación de causa raíz (5 Porqués)** (`IncidentInvestigation`+`IncidentInvestigationStep` + 2 enums + columna `IncidentAction.investigationStepId` + migración `…_add_incident_investigation` aditiva; `@lyra/contracts/incidents/investigation` con DTO/requests/enums + helpers `hasRootCause`/`isInvestigationComplete`/`investigationBlocksClose` + 8 specs; `IncidentInvestigationService` [get/upsert/complete/reopen, ABAC heredada, timeline+auditoría] + 4 endpoints [gate `incident:edit`] + guarda `assertInvestigationComplete` en `transition`; detalle expone `typeRequiresInvestigation`/`typeRequiresCapa`; web drawer a PESTAÑAS + `IncidentInvestigationBlock` + selector causa raíz en `IncidentActionsBlock` + api/queries; sin permiso nuevo cat. 83; contracts 271 · API 234 · smoke `smoke-incidencias-investigacion.py` 27/27 + regresión 23/23 + 31/31 + reglas 21/21 + excepciones 39/39) | `feat/incidencias-investigacion` → `main` | ⏳ por fusionar+publicar al cierre | merge a `main` + push |
+
+**Estado:** **nada vive solo en local** (tras publicar 4.2b al cierre). `main` = `origin/main`.
 
 **Convención propuesta (a confirmar):** trabajar cada módulo en rama `feat/<modulo>`;
 al cerrar la sesión → push de la rama + merge a `main` + push de `main`. Así `origin/main`
@@ -252,13 +263,17 @@ nunca queda más de una sesión atrás.
 
 ## 2. Pendiente por HACER (módulos / submódulos)
 
-### Incidencias — Fase 4 (plan por fases; 4.0/4.1/4.2a ✅)
+### Incidencias — Fase 4 (plan por fases; 4.0/4.1/4.2a/4.2b ✅)
 - [ ] **4.2a · Deuda (no bloqueante):** subida de **archivos de evidencia** a la acción (columna `evidence Json?` ya reservada;
       reusará `StorageService` Ola 3, proxied + presigned GET con ABAC) · **picker de rol responsable** en la UI (el modelo/contrato/
       API ya soportan `responsibleRoleId`; falta un endpoint de role-options del módulo + el selector) · **firma Part 11** al verificar
-      eficacia (GxP) · evaluar pasar el `IncidentDetailDrawer` a **pestañas** cuando entren Investigación + evidencia.
-- [ ] **4.2b · Investigación (5 Porqués)** configurable por tipo/severidad (honra `requiresInvestigation`). **← siguiente.**
-- [ ] **4.3 · Reportabilidad configurable** (autoridad/plazo; genérico, no solo HSE Chile) — §14 de la auditoría.
+      eficacia (GxP). *(Drawer a pestañas: HECHO en 4.2b.)*
+- [x] **4.2b · Investigación (5 Porqués) ✅** (`feat/incidencias-investigacion`): honra `requiresInvestigation`; modelo dedicado
+      `IncidentInvestigation`+`Step`; enlace causa raíz↔CAPA (`IncidentAction.investigationStepId`); bloqueo de cierre configurable
+      (`assertInvestigationComplete`); drawer a PESTAÑAS; reusa `incident:edit` (sin permiso nuevo); contracts 271 · API 234 · smoke
+      `smoke-incidencias-investigacion.py` 27/27 + regresión 23/23 + 31/31. **Deuda 4.2b:** firma Part 11 al completar la investigación ·
+      adjuntos de evidencia a la investigación · plantillas de método ICAM/Ishikawa (5 Porqués es el MVP).
+- [ ] **4.3 · Reportabilidad configurable** (autoridad/plazo; genérico, no solo HSE Chile) — §14 de la auditoría. **← siguiente.**
 - [ ] **4.4 · SLA/notificaciones/escalamiento** (depende del épico de **notificaciones avanzadas**) + unificar el criterio de
       "vencida" (`dueAt` vs `maxStayMinutes`, hoy desalineados — §21 de la auditoría).
 - [ ] **4.5 · Dashboard/analítica** (MTTR, reincidencia, CAPA vencidas).

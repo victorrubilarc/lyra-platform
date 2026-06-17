@@ -1,5 +1,44 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-17 — Fase 4.2b: Investigación de causa raíz (5 Porqués) + bloqueo de cierre + enlace a CAPA ✅**
+(`feat/incidencias-investigacion`). Cierra la investigación de incidencias, configurable y **transversal** (nada minero/HSE
+hardcodeado), honrando el flag `IncidentType.requiresInvestigation` igual que 4.2a honró `requiresCapa`. Método inicial =
+**5 Porqués** (Toyota/Lean/ISO 45001 §10.2); NO ICAM/TapRooT/Bowtie (sobreingeniería — el enum de método deja la puerta
+abierta a agregarlos sin re-migrar). **Plan aprobado por el dueño; 4 recomendaciones que diferían del default, todas
+aceptadas:** (1) **modelo dedicado, NO JSON** (entidad de primer orden auditable y ligable, como `IncidentAction`); (2)
+**SIN permiso nuevo — reusa `incident:edit`** (no hay segregación de funciones como en CAPA; crear un permiso sería
+parametrizar por parametrizar; cat. se queda en **83**); (3) **drawer a PESTAÑAS** (Resumen · Acciones · Investigación ·
+Actividad); (4) **bloquea el cierre, configurable** (espejo de CAPA). **Modelo:** 2 entidades aditivas
+`IncidentInvestigation` (1:1 con `Incident`, `method` FIVE_WHYS / `status` DRAFT|COMPLETED / `problemStatement` /
+`rootCauseSummary?` / conducido+completado-por) + `IncidentInvestigationStep` (los "porqués" ordenados: `statement`/`answer?`/
+**`isRootCause`**) + 2 enums + columna **`IncidentAction.investigationStepId?`** (FK SetNull = la causa raíz que la acción
+ATIENDE; cierra el lazo problema→causa→acción, ISO 9001 §10.2). **Migración aditiva** `20260617130000_add_incident_investigation`
+(2 tablas + 2 enums + columna + FKs; aplicada `db execute` + `migrate resolve` por el drift del historial; sin BOM).
+**Contratos** (`@lyra/contracts/incidents/investigation`): enums + DTOs + requests (upsert REEMPLAZA la cadena en bloque /
+complete / reopen) + helpers PUROS `hasRootCause`/`isInvestigationComplete`/**`investigationBlocksClose`** (autoritativos
+back↔front) + 8 specs. **API:** `IncidentInvestigationService` (get/upsert[solo DRAFT, reemplaza pasos en tx]/complete[exige
+≥1 causa raíz → COMPLETED]/reopen[COMPLETED→DRAFT]; ABAC heredada del nodo; timeline `INVESTIGATION_*` + auditoría) + 4
+endpoints (`:id/investigation` GET/POST, `.../complete`, `.../reopen`; gate `incident:edit`) + **guarda de cierre**
+`assertInvestigationComplete` en `IncidentsService.transition` (al pasar a FINAL: 400 si el tipo exige investigación y no está
+completa con causa raíz). El detalle ahora expone `typeRequiresInvestigation`/`typeRequiresCapa`. Acciones CAPA: contrato +
+servicio aceptan/validan/resuelven `investigationStepId` (+`investigationStepLabel` en el DTO; el backend valida que el paso
+sea de la MISMA incidencia). **Web:** **drawer a pestañas** (`IncidentDetailDrawer` con chips de conteo/aviso: punto rojo si
+hay obligatorias CAPA sin resolver o investigación pendiente exigida) + **`IncidentInvestigationBlock`** (editor de cadena
+5-Porqués: problema + N porqués con respuesta + marcar causa raíz, agregar/quitar, guardar/completar/reabrir; aviso de bloqueo;
+lectura premium con tag de causa raíz) + selector **"Causa raíz que atiende"** en el modal de acción CAPA (ofrecido solo si la
+investigación tiene causas raíz) + capa `incidents-api`/`-queries` extendida. Identidad Lyra (tokens, Sora/Inter, Lucide,
+claro+oscuro, 44px, a11y con role/tab). Tests: **contracts 271** (+8 investigación) · **API 234** sin regresión;
+typecheck/lint(0)/build verdes. **Smoke en vivo `scripts/smoke-incidencias-investigacion.py` 27/27** (tipo que exige
+investigación: cerrar sin ella → 400 · upsert DRAFT + timeline · completar sin causa raíz → 400 · con causa raíz → COMPLETED ·
+cerrar tras completar → CLOSED · tipo que NO la exige cierra sin investigación · validación problema/paso · reabrir · enlace
+CAPA↔causa raíz + label resuelto + causa de otra incidencia → 400 · `typeRequiresInvestigation` en el detalle · gate 403
+operador) **+ regresión `smoke-incidencias-capa.py` 23/23 + `smoke-incidencias.py` 31/31** (se le sumó el paso de completar la
+investigación que `seguridad` ahora exige para cerrar). **Deuda 4.2b (BACKLOG):** firma Part 11 al completar la investigación ·
+adjuntos de evidencia a la investigación · plantillas de método ICAM/Ishikawa. **Pendiente: smoke VISUAL del dueño** (pestañas
+del drawer, editor 5-Porqués, marcar causa raíz, bloqueo de cierre, selector de causa en CAPA). **Siguiente: 4.3 —
+Reportabilidad configurable.** 🔔 Recordatorio: épico de **notificaciones avanzadas** sigue pendiente
+(`docs/prompts/notificaciones-avanzadas.md`); es dependencia de la futura **4.4 (SLA/escalamiento)**.
+
 **2026-06-17 — Fase 4.2a: Acciones CAPA (correctivas/preventivas) + bloqueo de cierre + verificación de eficacia ✅**
 (`feat/incidencias-capa`). Primera mejora tras la **auditoría del módulo de Incidencias** (sesión de diagnóstico previa: el core ya
 era genérico/transversal, no minero-hardcodeado; la única brecha **P1 funcional** era el seguimiento real → CAPA). Convierte el

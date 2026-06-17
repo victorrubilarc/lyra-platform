@@ -162,6 +162,9 @@ export type IncidentAvailableTransition = z.infer<typeof incidentAvailableTransi
 
 export const incidentDetailSchema = incidentListItemSchema.extend({
   description: z.string().nullable(),
+  /** Flags de comportamiento del TIPO (gobiernan el cierre): exigir investigación / CAPA. */
+  typeRequiresInvestigation: z.boolean(),
+  typeRequiresCapa: z.boolean(),
   potentialSeverity: incidentSeveritySchema.nullable(),
   riskProbability: z.number().int().nullable(),
   riskConsequence: z.number().int().nullable(),

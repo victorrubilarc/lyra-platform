@@ -71,3 +71,6 @@ export * from "./incidents/exceptions.js";
 
 // Acciones CAPA de incidencias (Fase 4.2a)
 export * from "./incidents/actions.js";
+
+// Investigación de causa raíz de incidencias (Fase 4.2b)
+export * from "./incidents/investigation.js";

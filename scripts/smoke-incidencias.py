@@ -156,6 +156,14 @@ def main():
     check("6 comentar sube commentCount", s == 201 or s == 200, str(s))
     check("6 detalle con comentario", s2 == 200 and len(det.get("comments", [])) == 1)
 
+    # 6.5) seguridad EXIGE investigación de causa raíz para cerrar (Fase 4.2b): completarla
+    call("POST", f"/incidents/{inc_id}/investigation", admin, {
+        "problemStatement": "Lectura de temperatura sobre umbral",
+        "steps": [{"statement": "¿Por qué subió la temperatura?", "answer": "Intercambiador sucio", "isRootCause": True}],
+    })
+    s, _ = call("POST", f"/incidents/{inc_id}/investigation/complete", admin, {})
+    check("6.5 investigación completada (exigida por seguridad para cerrar)", s == 200, str(s))
+
     # 7) recorrer el flujo a cierre
     chain = ["a_triage", "asignar", "iniciar", "a_verificacion", "cerrar"]
     last = None

@@ -82,6 +82,14 @@ incidencia **no se puede cerrar** si quedan acciones obligatorias sin resolver.
 **Beneficio:** los problemas **se cierran de verdad** (con evidencia de que la solución funcionó),
 no se "marcan como resueltos". Menos reincidencia.
 
+### 🔍 Investigación de causa raíz (5 Porqués)
+Para los eventos importantes, la plataforma guía la **investigación de causa raíz** con el método
+**5 Porqués**: una cadena de preguntas que llega a la **causa de fondo**, no al síntoma. Esa causa
+**justifica** las acciones correctivas, y en los tipos de incidencia que lo exigen (p. ej. seguridad,
+medio ambiente) la incidencia **no se puede cerrar** sin una investigación completada.
+**Beneficio:** dejas de "apagar incendios". Atacas la causa real, lo documentas para auditoría
+(ISO 45001 / ISO 9001) y **reduces la reincidencia** porque cada acción está atada a una causa raíz.
+
 ### 🔗 De la bitácora a la acción (sin saltos manuales)
 Cuando un dato de una bitácora se sale de umbral, el sistema puede generar una **excepción
 operacional** revisable y, si amerita, convertirla en **incidencia** — conservando el **valor
@@ -228,6 +236,9 @@ Preséntalo como evolución, no como funcionalidad actual:
 
 > Una línea por hito, en lenguaje de cliente. Lo más reciente arriba.
 
+- **2026-06-17** — Las incidencias importantes ahora exigen **investigación de causa raíz (5
+  Porqués)** antes de cerrarse: se llega a la causa de fondo y cada acción correctiva queda atada a
+  ella. *(Argumento de venta: dejas de apagar incendios; menos reincidencia; evidencia ISO 45001/9001.)*
 - **2026-06-17** — Las incidencias ahora se **cierran con acciones correctivas/preventivas
   verificadas** (CAPA): no se puede dar por resuelto un problema si la solución no se ejecutó y, cuando
   corresponde, no se verificó que funcionó. *(Argumento de venta: menos reincidencia, cierre real.)*

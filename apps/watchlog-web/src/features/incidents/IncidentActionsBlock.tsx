@@ -15,6 +15,7 @@ import {
   useCompleteIncidentAction,
   useCreateIncidentAction,
   useIncidentActions,
+  useIncidentInvestigation,
   useUpdateIncidentAction,
   useVerifyIncidentAction,
 } from "./incidents-queries.js";
@@ -99,6 +100,7 @@ export function IncidentActionsBlock({ incidentId, incidentOpen }: Props) {
                   {!a.responsibleName && a.responsibleRoleName && <>Resp.: {a.responsibleRoleName} · </>}
                   {a.dueAt ? <span className={a.overdue ? styles.overdue : ""}>Vence {formatDateTime(a.dueAt)}</span> : "Sin plazo"}
                 </div>
+                {a.investigationStepLabel && <div className={styles.actionNote}>Causa raíz: {a.investigationStepLabel}</div>}
                 {a.completionNote && <div className={styles.actionNote}>Cierre: {a.completionNote}</div>}
                 {a.status === "VERIFIED" && (
                   <div className={styles.actionNote}>
@@ -154,6 +156,8 @@ export function IncidentActionsBlock({ incidentId, incidentOpen }: Props) {
 function ActionFormModal({ incidentId, action, onClose, onDone }: { incidentId: string; action: IncidentActionDto | null; onClose: () => void; onDone: () => void }) {
   const toast = useToast();
   const { data: users = [] } = useAssignableUsers();
+  const { data: investigation } = useIncidentInvestigation(incidentId);
+  const rootCauses = (investigation?.steps ?? []).filter((s) => s.isRootCause);
   const create = useCreateIncidentAction(incidentId);
   const update = useUpdateIncidentAction(incidentId);
   const [kind, setKind] = useState<IncidentActionKind>(action?.kind ?? "CORRECTIVE");
@@ -162,6 +166,7 @@ function ActionFormModal({ incidentId, action, onClose, onDone }: { incidentId: 
   const [mandatory, setMandatory] = useState(action?.mandatory ?? false);
   const [responsibleId, setResponsibleId] = useState(action?.responsibleId ?? "");
   const [dueAt, setDueAt] = useState(action?.dueAt ? action.dueAt.slice(0, 16) : "");
+  const [investigationStepId, setInvestigationStepId] = useState(action?.investigationStepId ?? "");
   const loading = create.isPending || update.isPending;
   const canSave = title.trim().length >= 3;
 
@@ -173,6 +178,7 @@ function ActionFormModal({ incidentId, action, onClose, onDone }: { incidentId: 
       mandatory,
       responsibleId: responsibleId || null,
       dueAt: dueAt ? new Date(dueAt).toISOString() : null,
+      investigationStepId: investigationStepId || null,
     };
     const onError = (e: unknown) => toast.error((e as Error).message || "No se pudo guardar");
     if (action) update.mutate({ actionId: action.id, dto: base }, { onSuccess: onDone, onError });
@@ -207,6 +213,14 @@ function ActionFormModal({ incidentId, action, onClose, onDone }: { incidentId: 
         <label className={styles.field}><span className={styles.fieldLabel}>Plazo (opcional)</span>
           <Input type="datetime-local" value={dueAt} onChange={(e) => setDueAt(e.target.value)} />
         </label>
+        {rootCauses.length > 0 && (
+          <label className={styles.field}><span className={styles.fieldLabel}>Causa raíz que atiende (opcional)</span>
+            <Select value={investigationStepId} onChange={(e) => setInvestigationStepId(e.target.value)}>
+              <option value="">(ninguna)</option>
+              {rootCauses.map((s) => <option key={s.id} value={s.id}>{s.statement}</option>)}
+            </Select>
+          </label>
+        )}
         <label className={styles.checkRow}>
           <input type="checkbox" checked={mandatory} onChange={(e) => setMandatory(e.target.checked)} />
           <span>Obligatoria (bloquea el cierre de la incidencia hasta resolverse)</span>

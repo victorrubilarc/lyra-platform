@@ -112,6 +112,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 ### 15. Incidencias  [todos los roles operativos]
 - ✅ **Reportar y gestionar incidencias** (lista + tablero kanban + detalle con flujo) (§ Incidencias)
 - ✅ **Acciones correctivas y preventivas (CAPA)** (con verificación de eficacia y bloqueo de cierre) (§ Incidencias ▸ Acciones CAPA)
+- ✅ **Investigación de causa raíz (5 Porqués)** (cadena de "porqués", causa raíz que bloquea el cierre, enlace a CAPA) (§ Incidencias ▸ Investigación de causa raíz)
 - ✅ **Crear desde una bitácora** (botón "Reportar incidencia" en el visor de la entrada) (§ Incidencias ▸ Desde una bitácora)
 - ✅ **Administrar los catálogos** (tipos y categorías de incidencia) (§ Incidencias ▸ Catálogos) [solo administrador]
 
@@ -689,6 +690,58 @@ auto-verificarla). Todo respeta tu **alcance por nodo** (heredado de la incidenc
 > En un tipo que **no** exige CAPA (p. ej. *Operacional*), bastaría con **«Completar»** las
 > acciones obligatorias para poder cerrar; la verificación es opcional. Y si al verificar se marca
 > **«No eficaz»**, la acción se **reabre** y vuelve a bloquear el cierre hasta resolverse de verdad.
+
+### Incidencias ▸ Investigación de causa raíz (5 Porqués)
+
+**Para qué sirve.** Para entender **por qué** ocurrió un evento, no solo registrarlo. El método
+**5 Porqués** es una cadena de preguntas: parte del problema y, preguntando "¿por qué?" una y otra
+vez, baja hasta la **causa raíz** (la verdadera, no el síntoma). Esa causa raíz es la que justifica
+las **acciones CAPA**: si no atacas la causa de fondo, el problema vuelve. Algunos **tipos** de
+incidencia (los que el administrador marca como **"requieren investigación"**, p. ej. *Seguridad*,
+*Medio ambiente*) **no se pueden cerrar** sin una investigación completada — así la plataforma
+garantiza que los eventos importantes se analizan de verdad.
+
+**Cómo se usa.** En el detalle de la incidencia, abre la pestaña **«Investigación»**:
+1. Pulsa **«Iniciar investigación»** y escribe el **problema** a explicar (qué pasó).
+2. Agrega los **«¿Por qué?»** uno a uno: en cada paso escribes la pregunta y su respuesta/causa.
+   Lo normal son 3 a 5 niveles (de ahí el nombre), pero pones los que necesites.
+3. Marca **«Es una causa raíz»** en el o los pasos que sean la causa de fondo (puede haber más de
+   una). **Guarda**.
+4. Cuando la cadena esté lista, pulsa **«Completar»**. La plataforma exige **al menos una causa
+   raíz** marcada.
+5. Al crear una **acción CAPA**, podrás elegir en **«Causa raíz que atiende»** cuál de las causas
+   resuelve esa acción — así queda trazado problema → causa → acción.
+6. Si necesitas corregir algo después de completar, usa **«Reabrir»** (vuelve a borrador).
+
+**Quién puede.** Quien tenga permiso de **edición de incidencias** (`incident:edit`) y la incidencia
+esté dentro de su alcance (nodo). Ver la investigación: cualquiera que pueda ver la incidencia.
+
+**Importante.**
+- La investigación es **una sola por incidencia** y solo se edita mientras está en **borrador**
+  (una completada se **reabre** primero).
+- El **bloqueo de cierre** solo aplica a los tipos que **exigen** investigación; en los demás es
+  opcional pero igual de útil para dejar registro.
+- La pestaña **«Investigación»** muestra un **punto de alerta** cuando el tipo la exige y aún está
+  pendiente — el mismo aviso aparece al intentar cerrar.
+
+**Ejemplo paso a paso (incidencia de seguridad).**
+1. Tienes la incidencia *INC-0042 — "Operador expuesto a proyección de fluido"* (tipo *Seguridad*,
+   que **exige investigación**). Avanzas el flujo hasta *En verificación* e intentas **«Cerrar
+   incidencia»** → **bloqueado**: «el tipo exige una investigación de causa raíz completada».
+2. Abres la pestaña **«Investigación»** → **«Iniciar investigación»**. Problema: *"Operador expuesto
+   a proyección de fluido a presión"*.
+3. Agregas los porqués: **1)** ¿Por qué se expuso? → *La línea estaba presurizada al abrir.* **2)**
+   ¿Por qué estaba presurizada? → *No se ejecutó bloqueo y despresurización.* **3)** ¿Por qué no se
+   ejecutó el bloqueo? → *No había procedimiento LOTO exigido* → marcas **«Es una causa raíz»**.
+   **Guardas**.
+4. Pulsas **«Completar»**. La investigación queda *Completada* con su causa raíz.
+5. Vas a la pestaña **«Acciones»**, creas la correctiva *"Implementar procedimiento LOTO"* y en
+   **«Causa raíz que atiende»** eliges *"No había procedimiento LOTO exigido"*.
+6. Ahora **«Cerrar incidencia»** ya no se bloquea por la investigación (si además el tipo exige CAPA,
+   completa/verifica las acciones obligatorias). Todo el análisis queda en el registro.
+
+> El método de hoy es **5 Porqués** (el estándar más usado y el más simple de adoptar). Métodos más
+> elaborados (ICAM, Ishikawa) se podrán agregar como plantillas en el futuro sin cambiar lo ya hecho.
 
 ### Catálogos de incidencias (tipos y categorías)
 

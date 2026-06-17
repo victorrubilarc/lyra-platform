@@ -522,10 +522,32 @@ tabla existente. El catálogo de EVENTOS vive en CÓDIGO (`@lyra/contracts NOTIF
 - **IncidentExceptionLink** *(implementado 4.1.0)* — join AUTORITATIVO excepción↔incidencia con proveniencia (`linkedById?`/
   `linkedAt`); `@@unique(exceptionId)` = N:1 (una incidencia agrupa varias excepciones). FK Cascade desde Incident y
   LogEntryException. Convertir/asociar deja la excepción CONVERTED + `incidentId` + actividad en el timeline de la incidencia.
-- **Diferido (4.1.1+):** acción "abrir incidencia" del motor de reglas vía evento DIFERIDO/outbox (4.1.2) · excepción por CELDA de
-  TABLE/MATRIX · `IncidentInvestigation`/`IncidentRcaAnswer`/`IncidentAction` (CAPA, 4.2) · `IncidentRegulatoryFlag`/clasificación
-  minera/IF-IG (4.3) · adjuntos a nivel de incidencia (MinIO, patrón Ola 3) · registro Part 11 con `payloadHash` para incidencias y
-  para correcciones de excepción (4.2).
+- **IncidentAction** *(implementado 4.2a)* — acción CAPA (correctiva/preventiva/inmediata) de la incidencia (migración
+  `20260617120000_add_incident_actions`). `number` → folio `ACT-####` derivado; `incidentId` (FK Cascade), `kind`
+  (CORRECTIVE/PREVENTIVE/IMMEDIATE), `title`/`description?`, **`mandatory`** (si abierta, BLOQUEA el cierre), responsable
+  persona+rol (`responsibleId?`/`responsibleRoleId?` FK Role SetNull, refs blandas), `dueAt?`, `status` (OPEN/IN_PROGRESS/
+  DONE/VERIFIED/CANCELED). Realización: `completedAt/ById`/`completionNote?`. **Verificación de eficacia:** `verifiedAt/ById`/
+  `effectivenessOutcome` (EFFECTIVE/NOT_EFFECTIVE — NO eficaz reabre a IN_PROGRESS)/`verificationNote?`. Anulación sin borrado
+  (`canceledAt/ById`/`cancelReason?`). `evidence` jsonb **reservado** (subida diferida). **`investigationStepId?` (Fase 4.2b,
+  FK SetNull)** = causa raíz que la acción ATIENDE. La guarda de cierre (`assertNoBlockingActions`) exige verificación solo si
+  el tipo declara `requiresCapa` (`blockingActionsForClose`, autoritativo back↔front). 2 permisos `incident:action:manage`/
+  `:verify` (segregación de funciones; cat. 83).
+- **IncidentInvestigation** *(implementado 4.2b)* — investigación de causa raíz (1:1 con `Incident`, `incidentId @unique`;
+  migración `20260617130000_add_incident_investigation`). `method` (enum `IncidentInvestigationMethod`, MVP `FIVE_WHYS`;
+  extensible a ICAM/TapRooT sin re-migrar), `status` (enum `IncidentInvestigationStatus` DRAFT/COMPLETED), `problemStatement`,
+  `rootCauseSummary?`, `conductedById?`/`completedAt?`/`completedById?` (refs blandas). FK Cascade desde Incident. *1—N*
+  **IncidentInvestigationStep**.
+- **IncidentInvestigationStep** *(implementado 4.2b)* — un "porqué" de la cadena 5-Porqués (ordenado): `order`, `statement`
+  (la pregunta), `answer?`, **`isRootCause`** (el paso terminal marca causa raíz; puede haber varios). FK Cascade desde la
+  investigación; *1—N* `IncidentAction` (las acciones que atienden esa causa). La cadena se REEMPLAZA en bloque al editar
+  (patrón de edición de listas; solo en DRAFT). **Bloqueo de cierre (4.2b):** si el tipo declara `requiresInvestigation`, no se
+  cierra sin una investigación COMPLETED con ≥1 causa raíz (`assertInvestigationComplete` en `transition`; helper puro
+  `investigationBlocksClose` back↔front). **Sin permiso nuevo** (reusa `incident:edit`; cat. se queda en 83). El detalle de la
+  incidencia expone `typeRequiresInvestigation`/`typeRequiresCapa` para los avisos de la UI.
+- **Diferido (4.3+):** `IncidentRegulatoryFlag`/clasificación minera/IF-IG (4.3) · excepción por CELDA de TABLE/MATRIX ·
+  adjuntos a nivel de incidencia (MinIO, patrón Ola 3) · registro Part 11 con `payloadHash` para incidencias y para
+  correcciones de excepción · subida de evidencia a la acción CAPA (columna `evidence` reservada) · firma Part 11 al verificar
+  eficacia y al completar la investigación.
 
 ### Turnos
 - **ShiftPattern** *1—N* **Shift** — régimen configurable.

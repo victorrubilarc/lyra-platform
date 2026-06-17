@@ -4,10 +4,11 @@
 > se actualiza al **cerrar cada sesión** (junto a `PROGRESS.md` y `BACKLOG.md`). El detalle
 > fino de cada pendiente vive en `BACKLOG.md`; aquí está el resumen scaneable.
 >
-> Última actualización: **2026-06-16** (**Fase 2.3.1 — Worklist de rondas**: separa planificar/ejecutar. Permiso `round:execute`
-> (cat. 63) + "Mis rondas" (`/mis-rondas`) operador; `LogSchedule.responsibleRoleId?` rol responsable leído en vivo; `/rondas`
-> relabel "Programación de rondas" + selector de rol + monitoreo read-only; widget en Inicio; badge → mis-rondas. Migración
-> aditiva. Smokes 18/18 + 21/21. Siguiente: **Notificaciones (correo)**). Leyenda:
+> Última actualización: **2026-06-17** (**Fase 4.2b — Investigación de causa raíz (5 Porqués)**: honra
+> `IncidentType.requiresInvestigation`; modelo dedicado `IncidentInvestigation`+`Step`; enlace causa raíz↔CAPA
+> (`IncidentAction.investigationStepId`); bloqueo de cierre configurable (`assertInvestigationComplete`); drawer a PESTAÑAS;
+> sin permiso nuevo [reusa `incident:edit`]. Migración aditiva. Contracts 271 · API 234 · smoke 27/27 + regresión. Siguiente:
+> **4.3 — Reportabilidad configurable**). Leyenda:
 > ✅ hecho · 🔄 en curso/parcial · ⬜ pendiente.
 
 ## Resumen por fase
@@ -19,7 +20,7 @@
 | **2** | Plantillas / Form Builder + Bitácoras | 🔄 | Ver desglose 2.x abajo. |
 | **3** | Orígenes de datos (entrada SCADA/PI/OPC) + **API saliente** (Req-3) + **Webhooks** (Req-4) | ⬜ | Todo. Motor de integración inbound + API M2M por plantilla + webhooks firmados (HMAC, reintentos). |
 | **N** | **Notificaciones** (bloque transversal, SOLO mail) | ✅ | `feat/notificaciones` (motor) + `feat/notif-hardening` (config SMTP en BD editable sin reiniciar [pantalla `/configuracion`, password cifrada, permiso `notification:config`] + editor de plantillas con vista previa/diccionario/`{{entry.summary}}`): transactional-outbox + worker (`@nestjs/schedule`), 4 eventos, plantillas configurables + render sin eval, destinatarios con ABAC, bandeja (Req-1/5), preferencias. **Diferido:** digest, UI de suscripciones, escalamiento por tiers, variables de campo dinámicas `{{field.<key>}}`, fan-out por nodo del overdue sin rol, canal in-app/SMS. |
-| **4** | Motor de incidencias (kanban + workflow) | 🔄 | **4.0 núcleo ✅** + **4.1 excepciones ✅** (4.1.0 backend + 4.1.1 UI + 4.1.2 acción de reglas: `LogEntryException`+panel+bandeja `/excepciones`) + **mantenedor de catálogos UI ✅** + **4.2a Acciones CAPA ✅** (`feat/incidencias-capa`: `IncidentAction` + bloqueo de cierre por acción `mandatory` + verificación de eficacia; 2 permisos [cat. **83**]; smoke 23/23). **Falta: 4.2b** investigación 5-Porqués + firma de cierre · **4.3** reportabilidad configurable (genérica, no solo HSE Chile) · **4.4** SLA+notif+escalamiento (← épico notif-avanzadas) · **4.5** dashboard. **Deuda 4.2a:** subida de evidencia (Storage Ola 3) · picker de rol responsable en UI · firma Part 11 al verificar. |
+| **4** | Motor de incidencias (kanban + workflow) | 🔄 | **4.0 núcleo ✅** + **4.1 excepciones ✅** (4.1.0 backend + 4.1.1 UI + 4.1.2 acción de reglas: `LogEntryException`+panel+bandeja `/excepciones`) + **mantenedor de catálogos UI ✅** + **4.2a Acciones CAPA ✅** (`IncidentAction` + bloqueo de cierre por acción `mandatory` + verificación de eficacia; 2 permisos [cat. **83**]; smoke 23/23) + **4.2b Investigación 5-Porqués ✅** (`feat/incidencias-investigacion`: `IncidentInvestigation`+`Step` honra `requiresInvestigation`; enlace causa raíz↔CAPA; bloqueo de cierre configurable; drawer a pestañas; sin permiso nuevo; smoke 27/27). **Falta: 4.3** reportabilidad configurable (genérica, no solo HSE Chile) · **4.4** SLA+notif+escalamiento (← épico notif-avanzadas) · **4.5** dashboard. **Deuda 4.2:** subida de evidencia (Storage Ola 3) a CAPA/investigación · picker de rol responsable en UI · firma Part 11 al verificar/completar · plantillas ICAM/Ishikawa. |
 | **5** | Cambio de turno + IA (resumen de turno) | ⬜ | Todo. Interfaz `LlmProvider` abstracta. |
 | **6** | Base de conocimiento + Dashboard + **Asistente IA RAG** (Req-6) + insights | ⬜ | Todo. RAG con `pgvector` on-prem + ABAC en el recuperador. Predicción ML real = fase posterior. |
 | **7** | Endurecimiento (backups, observabilidad, exportación, rate-limit, **adjuntos/MinIO**, i18n, offline) | ⬜ | Todo. Nota: **adjuntos (Req-2)** el dueño los quiere adelantar a Fase 2. |

@@ -5,12 +5,14 @@ import type {
   CancelIncidentActionRequest,
   CancelIncidentRequest,
   CompleteIncidentActionRequest,
+  CompleteIncidentInvestigationRequest,
   CreateIncidentActionRequest,
   CreateIncidentRequest,
   IncidentListQuery,
   TransitionIncidentRequest,
   UpdateIncidentActionRequest,
   UpdateIncidentRequest,
+  UpsertIncidentInvestigationRequest,
   UpsertIncidentTypeRequest,
   UpsertIncidentCategoryRequest,
   VerifyIncidentActionRequest,
@@ -31,6 +33,10 @@ import {
   fetchIncidentStats,
   fetchIncidentTypes,
   fetchIncidents,
+  fetchIncidentInvestigation,
+  upsertIncidentInvestigation,
+  completeIncidentInvestigation,
+  reopenIncidentInvestigation,
   transitionIncident,
   updateIncident,
   updateIncidentAction,
@@ -47,6 +53,7 @@ export const INCIDENT_KEYS = {
   types: () => ["incidents", "types"] as const,
   categories: () => ["incidents", "categories"] as const,
   actions: (incidentId: string) => ["incidents", "actions", incidentId] as const,
+  investigation: (incidentId: string) => ["incidents", "investigation", incidentId] as const,
 };
 
 export function useIncidents(q: IncidentListQuery) {
@@ -196,5 +203,47 @@ export function useCancelIncidentAction(incidentId: string) {
   return useMutation({
     mutationFn: ({ actionId, dto }: { actionId: string; dto: CancelIncidentActionRequest }) => cancelIncidentAction(actionId, dto),
     onSuccess: () => invalidateActions(qc, incidentId),
+  });
+}
+
+// --- Investigación de causa raíz (Fase 4.2b) ---------------------------------
+
+export function useIncidentInvestigation(incidentId: string | null) {
+  return useQuery({
+    queryKey: INCIDENT_KEYS.investigation(incidentId ?? ""),
+    queryFn: () => fetchIncidentInvestigation(incidentId!),
+    enabled: !!incidentId,
+  });
+}
+
+/** Tras mutar la investigación: refresca su query + el detalle (cambia el bloqueo de cierre) + acciones (label de causa) + KPIs. */
+function invalidateInvestigation(qc: ReturnType<typeof useQueryClient>, incidentId: string): void {
+  qc.invalidateQueries({ queryKey: INCIDENT_KEYS.investigation(incidentId) });
+  qc.invalidateQueries({ queryKey: INCIDENT_KEYS.detail(incidentId) });
+  qc.invalidateQueries({ queryKey: INCIDENT_KEYS.actions(incidentId) });
+  qc.invalidateQueries({ queryKey: INCIDENT_KEYS.all });
+}
+
+export function useUpsertIncidentInvestigation(incidentId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (dto: UpsertIncidentInvestigationRequest) => upsertIncidentInvestigation(incidentId, dto),
+    onSuccess: () => invalidateInvestigation(qc, incidentId),
+  });
+}
+
+export function useCompleteIncidentInvestigation(incidentId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (dto: CompleteIncidentInvestigationRequest) => completeIncidentInvestigation(incidentId, dto),
+    onSuccess: () => invalidateInvestigation(qc, incidentId),
+  });
+}
+
+export function useReopenIncidentInvestigation(incidentId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => reopenIncidentInvestigation(incidentId),
+    onSuccess: () => invalidateInvestigation(qc, incidentId),
   });
 }
