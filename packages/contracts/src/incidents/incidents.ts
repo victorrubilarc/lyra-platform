@@ -113,6 +113,8 @@ export const incidentListItemSchema = z.object({
   reporterId: z.string().nullable(),
   reporterName: z.string().nullable(),
   dueAt: z.string().nullable(),
+  /** Fecha/hora en que OCURRIÓ el evento (ISO 14224); null = no declarada (usar createdAt). */
+  occurredAt: z.string().nullable(),
   /** SLA de permanencia: ¿el estado actual está atrasado? (derivado de maxStayMinutes). */
   slaBreached: z.boolean(),
   reportable: z.boolean(),
@@ -203,6 +205,8 @@ export const createIncidentRequestSchema = z.object({
   ownerId: z.string().min(1).nullable().optional(),
   reportable: z.boolean().optional(),
   dueAt: z.string().datetime().nullable().optional(),
+  /** Fecha/hora en que ocurrió el evento (ISO 14224); ausente ⇒ se toma el momento de reporte. */
+  occurredAt: z.string().datetime().nullable().optional(),
 });
 export type CreateIncidentRequest = z.infer<typeof createIncidentRequestSchema>;
 
@@ -219,6 +223,7 @@ export const updateIncidentRequestSchema = z.object({
   equipmentId: z.string().min(1).nullable().optional(),
   reportable: z.boolean().optional(),
   dueAt: z.string().datetime().nullable().optional(),
+  occurredAt: z.string().datetime().nullable().optional(),
 });
 export type UpdateIncidentRequest = z.infer<typeof updateIncidentRequestSchema>;
 

@@ -597,8 +597,12 @@ geomecánica, continuidad operacional, cumplimiento). Cada incidencia avanza por
   vencidas, reportables, desde bitácora). Cambia entre **Lista** y **Tablero (kanban)** con
   el botón de la derecha.
 - **Reportar** una incidencia: botón «Reportar incidencia». Completa título, tipo (y
-  categoría), severidad real, potencial de gravedad, prioridad y el nodo/ubicación. Se le
-  asigna un **folio** (INC-####) y arranca en el primer estado del flujo.
+  categoría), severidad real, potencial de gravedad, prioridad, el **nodo/ubicación**, el
+  **equipo/activo** (opcional; el desplegable muestra los equipos de ese nodo) y la **fecha y
+  hora del evento** (cuándo OCURRIÓ; puede ser anterior al reporte — si la dejas vacía se usa
+  el momento del reporte). Se le asigna un **folio** (INC-####) y arranca en el primer estado
+  del flujo. Si reportas **desde una bitácora** con equipo, ese equipo se **hereda** salvo que
+  elijas otro.
 - **Gestionarla**: haz clic en una fila o tarjeta para abrir el **detalle**. Ahí ves el
   flujo (stepper), el **origen**, asignas **responsable**, escribes **comentarios**, ves el
   **timeline** y avanzas de estado con los botones de transición. Al llegar al estado final

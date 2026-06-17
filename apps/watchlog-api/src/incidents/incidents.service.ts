@@ -191,19 +191,24 @@ export class IncidentsService {
       if (!cat || !cat.active) throw new BadRequestException("La categoría no existe o está inactiva");
       if (cat.typeId && cat.typeId !== dto.typeId) throw new BadRequestException("La categoría no pertenece al tipo indicado");
     }
-    if (dto.equipmentId) await this.assertEquipmentInNode(dto.equipmentId, dto.orgNodeId);
     let originLogEntryId: string | null = null;
     let shiftCode: string | null = null;
+    let entryEquipmentId: string | null = null;
     if (dto.originLogEntryId) {
       const entry = await this.prisma.logEntry.findFirst({
         where: { id: dto.originLogEntryId },
-        select: { id: true, orgNodeId: true, shiftCode: true },
+        select: { id: true, orgNodeId: true, shiftCode: true, equipmentId: true },
       });
       if (!entry) throw new BadRequestException("La entrada de bitácora de origen no existe");
       await this.assertNodeAccess(userId, entry.orgNodeId);
       originLogEntryId = entry.id;
       shiftCode = entry.shiftCode;
+      // Hereda el activo de la bitácora de origen si el reporte es del MISMO nodo y no
+      // se eligió uno explícito (ISO 14224: la incidencia conserva el activo del evento).
+      if (entry.orgNodeId === dto.orgNodeId) entryEquipmentId = entry.equipmentId;
     }
+    const equipmentId = dto.equipmentId ?? entryEquipmentId ?? null;
+    if (equipmentId) await this.assertEquipmentInNode(equipmentId, dto.orgNodeId);
     if (dto.ownerId) await this.assertUserExists(dto.ownerId);
 
     // Congela el flujo: el del TIPO (si declara uno) o el flujo global por defecto.
@@ -231,9 +236,10 @@ export class IncidentsService {
         currentStateKey: initial.key,
         currentStateSince: now,
         orgNodeId: dto.orgNodeId,
-        equipmentId: dto.equipmentId ?? null,
+        equipmentId,
         shiftCode,
         originLogEntryId,
+        occurredAt: dto.occurredAt ? new Date(dto.occurredAt) : null,
         reporterId: userId,
         ownerId: dto.ownerId ?? null,
         dueAt: dto.dueAt ? new Date(dto.dueAt) : null,
@@ -279,6 +285,7 @@ export class IncidentsService {
         equipmentId: dto.equipmentId === undefined ? undefined : dto.equipmentId,
         reportable: dto.reportable === undefined ? undefined : dto.reportable,
         dueAt: dto.dueAt === undefined ? undefined : dto.dueAt ? new Date(dto.dueAt) : null,
+        occurredAt: dto.occurredAt === undefined ? undefined : dto.occurredAt ? new Date(dto.occurredAt) : null,
         updatedById: userId,
       },
     });
@@ -498,6 +505,22 @@ export class IncidentsService {
     return users.map((u) => ({ id: u.id, name: u.displayName ?? u.email }));
   }
 
+  /**
+   * Equipos/activos del nodo (ISO 14224: la incidencia se ata a un activo, no solo a
+   * la ubicación) para el selector del alta. ABAC por nodo primero; equipos activos
+   * de ESE nodo. Self-contained en el módulo de incidencias (gate `incident:create`):
+   * no exige `equipment:view` al que reporta.
+   */
+  async equipmentOptions(userId: string, nodeId: string): Promise<Array<{ id: string; name: string; tag: string | null }>> {
+    await this.assertNodeAccess(userId, nodeId); // ABAC
+    const rows = await this.prisma.equipment.findMany({
+      where: { orgNodeId: nodeId, deletedAt: null, active: true },
+      select: { id: true, name: true, tag: true },
+      orderBy: [{ reportOrder: "asc" }, { name: "asc" }],
+    });
+    return rows.map((r) => ({ id: r.id, name: r.name, tag: r.tag }));
+  }
+
   // === Helpers ================================================================
 
   private readonly listInclude = {
@@ -600,6 +623,7 @@ export class IncidentsService {
         reporterId: r.reporterId,
         reporterName: r.reporterId ? userNames.get(r.reporterId) ?? null : null,
         dueAt: r.dueAt?.toISOString() ?? null,
+        occurredAt: r.occurredAt?.toISOString() ?? null,
         slaBreached,
         reportable: r.reportable,
         commentCount: r._count?.comments ?? 0,

@@ -14,6 +14,7 @@ import {
   commentIncident,
   createIncident,
   fetchAssignableUsers,
+  fetchIncidentEquipmentOptions,
   fetchIncidentCategories,
   fetchIncidentDetail,
   fetchIncidentStats,
@@ -54,6 +55,15 @@ export function useIncidentCategories() {
 
 export function useAssignableUsers() {
   return useQuery({ queryKey: ["incidents", "users"], queryFn: fetchAssignableUsers });
+}
+
+/** Equipos/activos del nodo elegido (para el selector del alta). Solo si hay nodo. */
+export function useIncidentEquipmentOptions(nodeId: string | undefined) {
+  return useQuery({
+    queryKey: ["incidents", "equipment-options", nodeId],
+    queryFn: () => fetchIncidentEquipmentOptions(nodeId!),
+    enabled: !!nodeId,
+  });
 }
 
 function invalidate(qc: ReturnType<typeof useQueryClient>): void {

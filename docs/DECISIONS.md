@@ -4,6 +4,22 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-16 · Incidencias — equipo/activo + fecha del evento en el alta (mínimo ISO 14224) — ✅ IMPLEMENTADO
+
+Follow-up de QA: el modal de alta no exponía el equipo ni la fecha de ocurrencia. Decisiones:
+- **Equipo/activo en el alta** (ISO 14224: la incidencia/falla se ata a un ACTIVO, no solo a la ubicación). El modelo y el detalle
+  ya lo soportaban; era brecha de UI. Endpoint **propio del módulo** `GET /incidents/equipment-options` (gate `incident:view`, ABAC
+  por nodo) en vez de reusar `GET /equipment` o el `references/equipment` de bitácoras: evita exigir `equipment:view`/`logentry:view`
+  al que reporta (mismo criterio de auto-suficiencia que el resto del módulo).
+- **Herencia del activo desde la bitácora de origen** cuando el reporte es del mismo nodo y no se eligió otro: una incidencia que
+  nace de una entrada conserva su activo sin recapturarlo. Solo si coincide el nodo (si no, evita un 400 confuso por equipo fuera de nodo).
+- **`occurredAt` (fecha/hora del evento) ≠ `createdAt` (reporte)** — columna nullable nueva. En terreno se reporta tarde; HSE/ISO
+  exigen la fecha del suceso. Null = no declarada (la UI/consumidores caen a `createdAt`). Migración aditiva.
+- **NO entran al alta (se difieren a triage/investigación, BACKLOG):** matriz de riesgo prob×consec, asignar responsable al crear,
+  flag reportable editable, evidencia/adjuntos. Motivo: mantener el alta simple (MVP), esos campos son de gestión posterior.
+
+---
+
 ### 2026-06-16 · Fase 4.1.2 — Acción del motor de reglas (diferida vía outbox): forks — ✅ IMPLEMENTADO
 
 2.º corte del motor de reglas (`feat/incidencias-reglas-accion`). Cierra la Fase 4.1. Una regla cruzada puede, al sellar, generar

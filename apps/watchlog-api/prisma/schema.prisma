@@ -1852,6 +1852,9 @@ model Incident {
   shiftCode       String?
   // Origen desde una entrada de bitácora (ref. blanda; 4.1 agrega excepciones).
   originLogEntryId String?
+  // Fecha/hora en que OCURRIÓ el evento (ISO 14224 / HSE), distinta de `createdAt`
+  // (cuándo se REPORTÓ): en terreno se reporta tarde. Null = no declarada (cae a createdAt).
+  occurredAt      DateTime?
   // --- Personas (ref. blanda + snapshot de nombre en el timeline) ---------------
   reporterId  String?
   ownerId     String?
