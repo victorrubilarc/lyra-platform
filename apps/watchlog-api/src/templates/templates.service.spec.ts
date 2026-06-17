@@ -161,6 +161,53 @@ describe("TemplatesService", () => {
     );
   });
 
+  it("saveDraft PERSISTE los roleIds de sección y el override por campo (guard de regresión v3–v11)", async () => {
+    // Regresión histórica: el round-trip del builder dejó de propagar los roleIds de
+    // SECCIÓN, desactivando la autorización por sección en las versiones publicadas
+    // de ese período. Este test exige que saveDraft los escriba como relación anidada
+    // tanto en la sección (TemplateSectionRole) como en el campo (TemplateFieldRole).
+    const sectionCreate = vi.fn().mockResolvedValue({ id: "sec1" });
+    const fieldCreate = vi.fn().mockResolvedValue({ id: "f1" });
+    const tx = {
+      template: { update: vi.fn().mockResolvedValue({}) },
+      templateVersion: { update: vi.fn().mockResolvedValue({}) },
+      templateSection: { deleteMany: vi.fn().mockResolvedValue({}), create: sectionCreate },
+      templateField: { create: fieldCreate },
+    };
+    const { service } = makeService({
+      template: { findFirst: vi.fn().mockResolvedValue({ id: "t1", name: "X", description: null, orgNodeId: null }) },
+      templateVersion: { findFirst: vi.fn().mockResolvedValue({ id: "v1" }) },
+      role: { count: vi.fn().mockResolvedValue(2) }, // los 2 roles existen
+      $transaction: vi.fn().mockImplementation((arg) => (Array.isArray(arg) ? Promise.all(arg) : arg(tx))),
+    });
+    vi.spyOn(service, "getDetail").mockResolvedValue({ id: "t1" } as never);
+
+    await service.saveDraft(
+      "admin",
+      "t1",
+      {
+        sections: [
+          {
+            key: "lecturas",
+            title: "Lecturas",
+            roleIds: ["role-operador"],
+            fields: [
+              { key: "estado", type: "TEXT", label: "Estado mecánico", roleIds: ["role-mantenedor"] },
+            ],
+          },
+        ],
+      },
+      ctx,
+    );
+
+    expect(sectionCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ key: "lecturas", roles: { create: [{ roleId: "role-operador" }] } }) }),
+    );
+    expect(fieldCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ key: "estado", roles: { create: [{ roleId: "role-mantenedor" }] } }) }),
+    );
+  });
+
   it("listar aplica el alcance ABAC: oculta plantillas de nodos fuera de alcance", async () => {
     const templates = [
       { id: "t1", name: "A", description: null, orgNodeId: "n1", status: "DRAFT", currentVersionId: null, createdAt: new Date(), updatedAt: new Date(), versions: [{ id: "v1", versionNumber: 1, status: "DRAFT" }], nodeAssignments: [{ orgNodeId: "n1", includeDescendants: false, orgNode: { path: "/n1/" } }] },

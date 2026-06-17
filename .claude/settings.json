@@ -336,7 +336,10 @@
       "Bash(pnpm exec *)",
       "Bash(echo \"API launching pid $!\")",
       "Bash(python scripts/smoke-incidencias-investigacion.py)",
-      "Bash(python scripts/smoke-incidencias-capa.py)"
+      "Bash(python scripts/smoke-incidencias-capa.py)",
+      "Bash(curl -sf http://localhost:5173)",
+      "Bash(echo \"web launching pid $!\")",
+      "Bash(python scripts/smoke-permisos-seccion.py)"
     ],
     "additionalDirectories": [
       "\\tmp"

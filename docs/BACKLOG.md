@@ -253,7 +253,9 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 
 | **Fase 4.2b Investigación de causa raíz (5 Porqués)** (`IncidentInvestigation`+`IncidentInvestigationStep` + 2 enums + columna `IncidentAction.investigationStepId` + migración `…_add_incident_investigation` aditiva; `@lyra/contracts/incidents/investigation` con DTO/requests/enums + helpers `hasRootCause`/`isInvestigationComplete`/`investigationBlocksClose` + 8 specs; `IncidentInvestigationService` [get/upsert/complete/reopen, ABAC heredada, timeline+auditoría] + 4 endpoints [gate `incident:edit`] + guarda `assertInvestigationComplete` en `transition`; detalle expone `typeRequiresInvestigation`/`typeRequiresCapa`; web drawer a PESTAÑAS + `IncidentInvestigationBlock` + selector causa raíz en `IncidentActionsBlock` + api/queries; sin permiso nuevo cat. 83; contracts 271 · API 234 · smoke `smoke-incidencias-investigacion.py` 27/27 + regresión 23/23 + 31/31 + reglas 21/21 + excepciones 39/39) | `feat/incidencias-investigacion` → `main` | ✅ fusionado y publicado en `origin/main` (`114b2f1`) | ninguna |
 
-**Estado:** **nada vive solo en local.** `main` = `origin/main`.
+| **Fix: guard de regresión de permisos por sección/campo** (diagnóstico de incidente del dueño: backend INTACTO; causa = el builder dejó de propagar `roleIds` de SECCIÓN en Fase 2.1.x ⇒ versiones v3–v11 publicadas sin gate. 3 guards: web `builder-model.spec.ts` [round-trip detalle→payload], API `templates.service.spec.ts` [saveDraft mapea roles], smoke `smoke-permisos-seccion.py` 10/10 e2e. DECISIONS 2026-06-17. contracts 271 · API 235 · web 3) | `fix/permisos-seccion-guard` → `main` | ⏳ por fusionar+publicar | merge a `main` + push |
+
+**Estado:** **nada vive solo en local** (tras publicar el guard). `main` = `origin/main`.
 
 **Convención propuesta (a confirmar):** trabajar cada módulo en rama `feat/<modulo>`;
 al cerrar la sesión → push de la rama + merge a `main` + push de `main`. Así `origin/main`
@@ -262,6 +264,12 @@ nunca queda más de una sesión atrás.
 ---
 
 ## 2. Pendiente por HACER (módulos / submódulos)
+
+### Datos de demo — entradas legacy sin gate de sección (registrado 2026-06-17)
+- [ ] Las entradas de *Bitácora de Turno — Demo Completa* creadas sobre las versiones **v3–v11** (que se publicaron sin roles de
+      sección por la regresión del builder, ya blindada) **no aplican** la autorización por sección (cada entrada congela su
+      versión inmutable; no se corrige mutando el histórico, es GxP). Para la demo: **recrear** esas entradas sobre la versión
+      vigente (v12, que sí enforce) o anularlas. Las entradas nuevas ya quedan correctas (verificado con `smoke-permisos-seccion.py`).
 
 ### Incidencias — Fase 4 (plan por fases; 4.0/4.1/4.2a/4.2b ✅)
 - [ ] **4.2a · Deuda (no bloqueante):** subida de **archivos de evidencia** a la acción (columna `evidence Json?` ya reservada;
