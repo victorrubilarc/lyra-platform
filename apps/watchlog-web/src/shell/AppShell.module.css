@@ -8,7 +8,7 @@
 
 /* ===================== SIDEBAR ===================== */
 .sidebar {
-  width: 276px;
+  width: 288px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -24,8 +24,8 @@
 }
 
 .sidebarCollapsed {
-  width: 76px;
-  padding: 18px 12px;
+  width: 72px;
+  padding: 14px 10px;
 }
 
 .brand {
@@ -146,7 +146,7 @@ button.navGroupHeader:hover {
 .navDivider {
   height: 1px;
   background: var(--color-border-subtle);
-  margin: 6px 8px;
+  margin: 4px 14px;
 }
 
 .navItem {
@@ -207,9 +207,15 @@ button.navGroupHeader:hover {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Riel colapsado: íconos compactos para que quepan sin scroll en la mayoría de
+   pantallas; el alto táctil pleno (44px+) se reserva al menú expandido. */
 .collapsed .navItem {
   justify-content: center;
-  padding: 10px;
+  padding: 8px;
+  min-height: 42px;
+}
+.collapsed .navMain {
+  padding: 0;
 }
 
 .soonBadge {
@@ -247,11 +253,28 @@ button.navGroupHeader:hover {
 .sidebarScroll {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   gap: 2px;
   margin: 0 -4px;
   padding: 0 4px;
+  /* Scrollbar fina y discreta (premium), no la barra gruesa del sistema. */
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-subtle) transparent;
+}
+.sidebarScroll::-webkit-scrollbar {
+  width: 6px;
+}
+.sidebarScroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebarScroll::-webkit-scrollbar-thumb {
+  background: var(--color-border-subtle);
+  border-radius: 999px;
+}
+.sidebarScroll:hover::-webkit-scrollbar-thumb {
+  background: var(--color-border-accent);
 }
 
 /* ===================== MAIN ===================== */
