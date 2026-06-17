@@ -2,6 +2,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Bell, Check, Languages, LogOut, Monitor, Moon, Rows3, Search, Sun, UserCog } from "lucide-react";
 import { Breadcrumb, Menu, MenuItem, MenuLabel, MenuSeparator, Tooltip, type Crumb } from "@lyra/ui";
+import { NotificationBell } from "./NotificationBell.js";
 import { useAuth } from "../auth/use-auth.js";
 import { useUIStore } from "./ui-store.js";
 import { useThemeStore, type ThemePreference } from "./theme-store.js";
@@ -124,20 +125,7 @@ export function Topbar({ onOpenSearch }: TopbarProps) {
           ))}
         </Menu>
 
-        <Menu
-          ariaLabel={t("topbar.notifications")}
-          minWidth={260}
-          trigger={
-            <span className={styles.iconBtn}>
-              <Bell size={18} aria-hidden="true" />
-            </span>
-          }
-        >
-          <MenuLabel>{t("topbar.notifications")}</MenuLabel>
-          <div style={{ padding: "8px 12px 10px", fontSize: 13, color: "var(--color-text-muted)" }}>
-            {t("topbar.noNotifications")}
-          </div>
-        </Menu>
+        <NotificationBell />
 
         {user && (
           <Menu

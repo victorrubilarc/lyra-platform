@@ -7,12 +7,15 @@ import { EmailConfigService } from "../email/email-config.service";
 import { SchedulesService } from "../schedules/schedules.service";
 import { NotificationEmitterService } from "./notification-emitter.service";
 import { NotificationResolverService } from "./notification-resolver.service";
-import { NotificationChannel } from "./notification-channel";
+import { NotificationChannelRegistry } from "./notification-channel";
+import { NotificationRealtimeService } from "./notification-realtime.service";
 
 /** Tope de reintentos de envío antes de marcar FAILED (backoff exponencial). */
 const MAX_SEND_ATTEMPTS = 5;
 /** Lote por tick (acota la carga; a escala se mueve a una cola dedicada — BACKLOG). */
 const BATCH = 100;
+/** Retención de notificaciones in-app LEÍDAS (la purga diaria borra las más viejas). */
+const INAPP_READ_RETENTION_DAYS = 90;
 
 /**
  * Worker del motor de notificaciones — los tres ticks del transactional outbox:
@@ -39,7 +42,8 @@ export class NotificationWorkerService {
     private readonly schedules: SchedulesService,
     private readonly emitter: NotificationEmitterService,
     private readonly resolver: NotificationResolverService,
-    private readonly channel: NotificationChannel,
+    private readonly channels: NotificationChannelRegistry,
+    private readonly realtime: NotificationRealtimeService,
     private readonly emailConfig: EmailConfigService,
   ) {}
 
@@ -141,7 +145,7 @@ export class NotificationWorkerService {
                 data: {
                   eventId: event.id,
                   eventKey: event.eventKey,
-                  channel: "EMAIL",
+                  channel: m.channel,
                   recipientUserId: m.recipientUserId,
                   recipientEmail: m.recipientEmail,
                   subject: m.subject,
@@ -190,18 +194,27 @@ export class NotificationWorkerService {
         orderBy: { createdAt: "asc" },
         take: BATCH,
       });
-      // Correo DESACTIVADO: no se intenta enviar; los pendientes se marcan SUPPRESSED
-      // (quedan visibles en la bandeja, sin reintentos infinitos).
-      if (rows.length > 0 && !(await this.emailConfig.isEnabled())) {
+      // Correo DESACTIVADO: las filas de CORREO no se intentan; se marcan SUPPRESSED
+      // (quedan visibles, sin reintentos infinitos). Las IN-APP no dependen del SMTP.
+      const emailEnabled = await this.emailConfig.isEnabled();
+      const emailRows = rows.filter((r) => r.channel === "EMAIL");
+      if (!emailEnabled && emailRows.length > 0) {
         await this.prisma.notificationOutbox.updateMany({
-          where: { id: { in: rows.map((r) => r.id) } },
+          where: { id: { in: emailRows.map((r) => r.id) } },
           data: { status: "SUPPRESSED", lastError: "Correo saliente desactivado" },
         });
-        return 0;
       }
+      // Usuarios con entrega in-app este tick → un nudge por usuario al final.
+      const nudgeUserIds = new Set<string>();
       for (const row of rows) {
+        if (row.channel === "EMAIL" && !emailEnabled) continue; // ya marcada SUPPRESSED
+        const channel = this.channels.get(row.channel);
+        if (!channel) {
+          this.logger.warn(`Sin canal registrado para ${row.channel} (fila ${row.id})`);
+          continue;
+        }
         try {
-          await this.channel.send({
+          await channel.send({
             to: row.recipientEmail,
             subject: row.subject,
             bodyText: row.bodyText,
@@ -211,12 +224,17 @@ export class NotificationWorkerService {
             where: { id: row.id },
             data: { status: "SENT", sentAt: new Date(), attempts: { increment: 1 }, lastError: null },
           });
-          await this.audit.record({
-            action: "notification.email.sent",
-            entityType: "NotificationOutbox",
-            entityId: row.id,
-            after: { to: row.recipientEmail, eventKey: row.eventKey },
-          });
+          // El correo se audita (envío externo); la in-app no (la fila es el registro).
+          if (row.channel === "EMAIL") {
+            await this.audit.record({
+              action: "notification.email.sent",
+              entityType: "NotificationOutbox",
+              entityId: row.id,
+              after: { to: row.recipientEmail, eventKey: row.eventKey },
+            });
+          } else if (row.recipientUserId) {
+            nudgeUserIds.add(row.recipientUserId);
+          }
           sent++;
         } catch (err) {
           const attempts = row.attempts + 1;
@@ -234,10 +252,41 @@ export class NotificationWorkerService {
           this.logger.warn(`Fallo al enviar ${row.id} (intento ${attempts}): ${errMsg(err)}`);
         }
       }
+      // Empuja un nudge en tiempo real (SSE) a cada usuario con entrega in-app, con su
+      // contador de no leídas fresco. La campanita reacciona al instante (fallback: poll).
+      for (const uid of nudgeUserIds) {
+        const unread = await this.unreadCountFor(uid);
+        this.realtime.notify(uid, { type: "inbox", unread });
+      }
     } finally {
       this.busy.send = false;
     }
     return sent;
+  }
+
+  /** No leídas in-app de un usuario (apoya el badge del nudge y el endpoint del inbox). */
+  private async unreadCountFor(userId: string): Promise<number> {
+    return this.prisma.notificationOutbox.count({
+      where: { recipientUserId: userId, channel: "INAPP", readAt: null },
+    });
+  }
+
+  // --- 4. Purga de in-app LEÍDAS antiguas ------------------------------------
+
+  /** Borra notificaciones in-app LEÍDAS con más de `INAPP_READ_RETENTION_DAYS` días. */
+  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
+  async purgeReadInApp(): Promise<number> {
+    const cutoff = new Date(Date.now() - INAPP_READ_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+    try {
+      const { count } = await this.prisma.notificationOutbox.deleteMany({
+        where: { channel: "INAPP", readAt: { not: null, lt: cutoff } },
+      });
+      if (count > 0) this.logger.log(`Purgadas ${count} notificaciones in-app leídas (> ${INAPP_READ_RETENTION_DAYS} días)`);
+      return count;
+    } catch (err) {
+      this.logger.error("Fallo en la purga de notificaciones in-app", err instanceof Error ? err.stack : String(err));
+      return 0;
+    }
   }
 }
 

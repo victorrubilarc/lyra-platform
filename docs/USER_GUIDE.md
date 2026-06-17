@@ -105,8 +105,9 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 - ✅ **Mis rondas** (worklist del operador: iniciar/continuar/omitir lo que te toca) (§ Rondas ▸ Mis rondas)
 
 ### 14. Notificaciones  [Admin · todos]
+- ✅ **La campanita** (notificaciones in-app: contador, bandeja, marcar leídas, en tiempo real) (§ Notificaciones ▸ La campanita) [todos]
 - ✅ **Avisos por correo** (qué se avisa: ronda vencida, SLA, transición, firma pendiente) (§ Notificaciones)
-- ✅ **Mis notificaciones** (activar/desactivar avisos propios) (§ Notificaciones ▸ Mis preferencias)
+- ✅ **Mis notificaciones** (activar/desactivar avisos propios, por correo y en la app) (§ Notificaciones ▸ Mis preferencias)
 - ✅ **Plantillas de mensaje** (con vista previa, diccionario de variables, `{{entry.summary}}`) y **correo saliente** (§ Notificaciones ▸ Plantillas / Correo saliente) [Admin]
 - ✅ **Servidor de correo (SMTP)** — configurar el correo saliente (§ Configuración ▸ Servidor de correo) [Admin con `notification:config`]
 - ✅ **Avisos a la medida** (qué transición avisa y a quién + plantillas por bitácora con comodines de campo + comportamiento por defecto) (§ Notificaciones ▸ Avisos a la medida) [Configurador de flujos · Admin de plantillas]
@@ -510,6 +511,62 @@ aplica, se firman por separado — la sección es la unidad de permiso, llenado 
 
 ---
 
+## Notificaciones ▸ La campanita (notificaciones in-app)  [todos]
+
+**Para qué sirve.** Es la **campanita 🔔 de la barra superior**: te avisa **dentro de la
+aplicación** cuando pasa algo que te toca (los mismos sucesos del correo: ronda vencida,
+SLA incumplido, transición de flujo, firma pendiente), sin depender de que abras tu correo.
+Cada aviso llega **a ti** con estado **leído / no leído**, y la campanita muestra un
+**contador de no leídas** que se actualiza **en tiempo real** (apenas ocurre el aviso,
+aparece). Es **tuya**: solo ves tus propias notificaciones.
+
+**Cómo se usa.**
+- **El contador.** Si tienes notificaciones sin leer, la campanita muestra un **número**
+  (hasta «99+»). Aparece solo, sin recargar la página.
+- **El desplegable.** Haz clic en la campanita para ver tus **últimas notificaciones**
+  (asunto + un extracto + hace cuánto). Una notificación **no leída** se marca con un
+  **punto**.
+- **Abrir una.** Haz clic en una notificación: te **lleva directo** a lo que la originó
+  (la **bitácora/entrada**, tus **rondas**, la **incidencia**) y la marca como leída.
+- **Marcar todas como leídas.** Botón en la cabecera del desplegable (vacía el contador).
+- **Ver todas.** El enlace «Ver todas» abre tu bandeja completa en **Mis notificaciones ▸
+  Bandeja**, con filtro **Todas / No leídas**, búsqueda y paginación; ahí también puedes
+  marcar una o todas como leídas.
+- **¿Quieres recibir menos?** En **Mis notificaciones ▸ Mis preferencias** puedes apagar
+  un tipo de aviso **por canal**: columna **En la app** (la campanita) y columna **Correo**,
+  de forma independiente. Por defecto ambos están activados.
+
+**Quién puede.** **Cualquier usuario autenticado**: la campanita y la bandeja son **datos
+propios** (no requieren ningún permiso). Nunca ves las notificaciones de otra persona.
+
+**Importante.**
+- La campanita **no reemplaza al correo**: por defecto recibes **ambos** (puedes silenciar
+  cualquiera de los dos por evento en *Mis preferencias*). Apagar el correo **no** apaga la
+  campanita, y viceversa.
+- Solo recibes avisos de **lo que podrías ver** (mismas reglas de acceso por nodo/plantilla
+  que el correo). Los **destinatarios externos** (correos de contratistas/autoridades) **no**
+  tienen campanita: eso es solo correo.
+- Las notificaciones **leídas** se conservan un tiempo y luego se **limpian automáticamente**
+  (no se acumulan para siempre).
+- El tiempo real usa una conexión ligera del navegador; si tu red la bloquea, la campanita
+  **igual se actualiza** sola cada cierto tiempo (un poco más lento, pero no se pierde nada).
+
+**Caso de uso — paso a paso (un supervisor recibe y atiende un aviso en la campanita).**
+1. Marta (supervisora) está trabajando en otra pantalla de Lyra WatchLog.
+2. Un operador **sella una entrada** que, por el flujo, **avanza a un estado** del que Marta
+   es responsable.
+3. En segundos, la **campanita** de Marta muestra **«1»** (sin que ella recargue).
+4. Marta hace clic en la campanita: ve **«Transición de flujo · Bitácora #1234 → Revisión
+   del supervisor»**, con un punto de no leída.
+5. Hace clic en la notificación: la app la **lleva a la entrada #1234** y la notificación
+   queda **marcada como leída** (el contador baja a 0).
+6. Más tarde quiere repasar lo que llegó hoy: abre el menú de su perfil ▸ **Mis
+   notificaciones**, pestaña **Bandeja**, filtra **No leídas**, y con **«Marcar todas como
+   leídas»** deja su bandeja al día.
+7. Como prefiere no duplicar por correo, entra a **Mis preferencias** y, en la fila
+   *Transición de flujo*, **apaga la columna Correo** dejando **En la app** encendida: desde
+   ahora ese aviso le llega **solo por la campanita**.
+
 ## Notificaciones  [Admin · todos]
 
 **Para qué sirve.** Avisa por **correo electrónico** cuando pasa algo que requiere tu
@@ -522,8 +579,10 @@ incidencias.
 
 **Cómo se usa.**
 - **Mis preferencias** (todos, desde el menú de tu perfil ▸ «Mis notificaciones», o la
-  pestaña *Mis preferencias* en Notificaciones): un interruptor por tipo de aviso para
-  **activarlo o silenciarlo**. Por defecto recibes todos los que te corresponden.
+  pestaña *Mis preferencias* en Notificaciones): un interruptor **por tipo de aviso y por
+  canal** — columna **Correo** y columna **En la app** (la campanita) — para **activarlo o
+  silenciarlo** de forma independiente. Por defecto recibes todos los que te corresponden,
+  por ambos canales.
 - **Correo saliente** (Admin): la **bandeja de salida** lista cada correo que el sistema
   envió o intentó enviar — a quién, qué evento, asunto, fecha y **estado** (Enviado /
   Pendiente / Fallido / Suprimido). Puedes **filtrar** por estado o buscar, **abrir** un

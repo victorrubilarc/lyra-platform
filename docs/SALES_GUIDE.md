@@ -232,7 +232,9 @@ Preséntalo como evolución, no como funcionalidad actual:
 - **Notificaciones a la medida** (disponible): avisos **distintos por cada bitácora y por cada paso del flujo**, a los
   **destinatarios exactos** (roles, responsables, autor, ejecutor, incluso correos de terceros como contratistas o autoridades),
   con el **dato del registro dentro del mensaje** (p. ej. "Temperatura: 78 °C") — **todo configurable desde la aplicación**, sin
-  tocar código. Próximamente, **campanita de avisos dentro de la app**.
+  tocar código. **Y ahora con campanita 🔔 dentro de la app** (disponible): cada aviso aparece también como **notificación in-app**
+  con contador de no leídas, bandeja navegable y **actualización en tiempo real** — el usuario elige recibir cada aviso por **correo,
+  en la app, o ambos**.
 
 ---
 
@@ -250,11 +252,14 @@ Preséntalo como evolución, no como funcionalidad actual:
 
 > Una línea por hito, en lenguaje de cliente. Lo más reciente arriba.
 
+- **2026-06-17** — **Campanita de avisos dentro de la app 🔔 (disponible):** además del correo, cada aviso aparece como
+  **notificación in-app** en la **campanita de la barra superior** — con **contador de no leídas**, **bandeja navegable** (un clic te
+  lleva a la bitácora/incidencia/ronda) y **actualización en tiempo real**. Cada usuario decide recibir cada aviso por **correo, en la
+  app, o ambos**. Cierra el paquete de **notificaciones a la medida**.
 - **2026-06-17** — **Notificaciones a la medida (ahora con pantalla, disponible):** desde la aplicación, **cada paso de un flujo**
   decide si avisa, **con qué mensaje y a quién** (roles, usuarios, autor, ejecutor, roles del estado destino, o correos externos de
   contratistas/autoridades), y cada **bitácora** puede tener **su propia plantilla** con **datos del propio registro** dentro del
-  mensaje (comodines tipo "Temperatura: 78 °C"). Configurable por el equipo del cliente, sin tocar código. *(La "campanita" de
-  avisos dentro de la app llega en la próxima entrega.)*
+  mensaje (comodines tipo "Temperatura: 78 °C"). Configurable por el equipo del cliente, sin tocar código.
 - **2026-06-17** — **Reportabilidad configurable:** las incidencias pueden gatillar **reportes a
   autoridades u obligaciones** con plazo, estado y **folio de envío**; los reportes obligatorios
   pendientes impiden cerrar y los vencidos se marcan solos. Defines tus obligaciones por tipo y

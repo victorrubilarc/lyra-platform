@@ -4,6 +4,42 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-17 · Notificaciones avanzadas · Fase B — canal IN-APP (campanita) + tiempo real (CIERRA EL ÉPICO)
+
+Última fase del épico: cada aviso, además del correo, genera una notificación IN-APP por destinatario, con campanita en el Topbar
+y bandeja en `/mis-notificaciones`, en tiempo real. **4 forks presentados con recomendación; el dueño aceptó las cuatro:**
+
+- **(1) Canal IN-APP ON por defecto** para todos los eventos (opt-out por evento×canal en "Mis preferencias", igual que el correo).
+  Motivo: la campanita es alto valor / bajo costo y debe ser descubrible; el usuario igual puede silenciar por evento. La ausencia
+  de preferencia = recibir (ambos canales ON). `NotificationPreference` ya es por canal; el resolver respeta `mode=OFF` por canal.
+- **(2) Tiempo real = SSE + fallback poll.** `@Sse()` nativo de NestJS, un stream por usuario; payload LIVIANO (`{type:"inbox",
+  unread}`, un "nudge" + contador), el cliente refetchea por el endpoint autenticado (no viaja contenido sensible por el stream);
+  heartbeat ~25 s para sobrevivir proxies. react-query `refetchInterval` (60 s) queda SIEMPRE activo como respaldo (proxies que
+  cortan SSE / navegadores sin soporte). Motivo: instantáneo cuando conecta, robusto cuando no; on-prem sin SaaS. **Auth del SSE:**
+  `EventSource` no manda header `Authorization` ⇒ el access token va por `?access_token=` y se verifica en el handler (ruta
+  `@Public` para saltar el guard global, auth CONFINADA a ese endpoint — no se relaja el guard global). Ver SECURITY.md.
+- **(3) Deep link DERIVADO en el front** (`deepLinkForEntity(relatedEntityType, id)` en `@lyra/contracts`), sin columna nueva en el
+  outbox. Motivo: el outbox ya guarda `relatedEntityType`/`relatedEntityId`; materializar URLs en BD acoplaría el backend a rutas
+  del SPA y exigiría migración. Mapeo: `LogEntry`→`/bitacoras/:id`, `RoundOccurrence`→`/mis-rondas`, `Incident`→`/incidencias`.
+- **(4) Retención = purga diaria de in-app LEÍDAS > 90 días** (`@Cron`, umbral como constante). Motivo: evita crecimiento sin tope
+  del inbox sin añadir todavía un setting (se puede parametrizar luego). Las no leídas y el correo no se purgan en esta fase.
+
+**Otras decisiones de implementación:**
+- **Almacenamiento in-app = extender `NotificationOutbox` con `readAt`** (fork (b) del épico), NO una tabla `NotificationInbox`
+  dedicada. Motivo: el INAPP es "otra entrega del mismo aviso"; reusa outbox/worker/dedup/auditoría. Índice
+  `(recipientUserId, channel, readAt)` para "mis no leídas".
+- **`dedupeKey` incluye el canal** (`evento|eventId|canal|destinatario`). Motivo: un mismo destinatario recibe email E in-app del
+  mismo suceso; sin el canal en la clave, el segundo INSERT chocaría el índice único.
+- **Canales por registro** (`NotificationChannelRegistry` con `EmailChannel` + `InAppChannel`), el worker enruta `row.channel`.
+  `InAppChannel.send` es no-op (la fila ES la notificación). **SUPPRESSED solo aplica a EMAIL** si el correo está apagado (la in-app
+  no depende del SMTP). El nudge SSE lo emite el worker tras marcar SENT (el canal se mantiene puro).
+- **Sin permiso nuevo:** ver/leer MIS notificaciones in-app = **ownership** (patrón SavedView/preferencias). Sin gate de catálogo.
+- **Auditoría:** la in-app NO audita entrega ni lectura (la fila de outbox es el registro inmutable; la lectura es dato propio del
+  dueño). El correo conserva `notification.email.sent`.
+- **Sin plantilla INAPP propia** en esta fase: la in-app reusa el contenido renderizado de la plantilla EMAIL (el enum
+  `NotificationTemplate.channel` deja la puerta abierta a una plantilla INAPP dedicada a futuro).
+- **Deuda anotada:** el bus SSE es in-memory (single-process). Escalar a varias instancias exigirá respaldarlo en Redis pub/sub.
+
 ### 2026-06-17 · Notificaciones avanzadas · Fase A UI — 3 forks de UX + exponer el default de sistema
 
 Construcción de la UI de la Fase A (el backend ya estaba en `main`). **3 forks de UX presentados con recomendación; el dueño

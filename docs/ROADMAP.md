@@ -4,13 +4,17 @@
 > se actualiza al **cerrar cada sesión** (junto a `PROGRESS.md` y `BACKLOG.md`). El detalle
 > fino de cada pendiente vive en `BACKLOG.md`; aquí está el resumen scaneable.
 >
-> Última actualización: **2026-06-17** (**Notificaciones avanzadas · Fase A UI ✅**: editor de aviso POR TRANSICIÓN inline en el
-> builder [toggle + roles/usuarios/checks/correos externos en chips + plantilla + atajo "copiar de otra transición"] + master-detail
-> de plantillas POR BITÁCORA [columna Ámbito + filtro scope + Nueva/Borrar + diccionario de comodines de campo] + pestaña
-> "Notificaciones" en `/configuracion` [toggle de default, expuesto en `GET`/`PATCH /settings`]; 3 forks de UX [inline · pestaña
-> propia · chips] aprobados; sin permiso nuevo, sin migración; contracts 293 · API 247 · smoke 22/22 + regresión 17/17. **Decisión
-> del dueño: el ÉPICO completo (A+B) va PRIMERO y la 4.4 DESPUÉS.** Siguiente: **Fase B** [campanita in-app + SSE], luego
-> **4.4 — SLA/escalamiento**. Anterior: **Notificaciones avanzadas · Fase A BACKEND**: disparo por TRANSICIÓN [config de
+> Última actualización: **2026-06-17** (**Notificaciones avanzadas · Fase B — canal IN-APP (campanita) + tiempo real ✅**:
+> **CIERRA EL ÉPICO** (A+B). Campanita en el Topbar [badge de no leídas + dropdown navegable + marcar leídas] + bandeja en
+> `/mis-notificaciones` + tiempo real **SSE con fallback poll**. 4 forks del dueño: INAPP ON por defecto [opt-out por evento×canal] ·
+> SSE [`@Sse`, token por query, heartbeat, payload = contador] + poll · deep link derivado en el front [`deepLinkForEntity`] · purga
+> diaria de leídas > 90 días. In-app = extender `NotificationOutbox.readAt` [NO tabla dedicada]; resolver multi-canal [`dedupeKey` con
+> canal]; worker enruta por canal [`NotificationChannelRegistry`/`InAppChannel`], SUPPRESSED solo EMAIL, nudge SSE; endpoints inbox
+> [ownership, sin permiso nuevo]; web `NotificationBell`+`InboxPanel`+`useInboxRealtime`+preferencias por canal. Migración aditiva.
+> Contracts 295 · API 247 · web 3 · smoke `smoke-notif-inapp.py` 18/18 + regresión 22/22 + 18/18. **ÉPICO de notificaciones avanzadas
+> COMPLETO → siguiente: 4.4 — SLA/escalamiento + aviso de plazo.** Anterior: **Notificaciones avanzadas · Fase A UI ✅**: editor de
+> aviso POR TRANSICIÓN inline en el builder + master-detail de plantillas POR BITÁCORA + pestaña "Notificaciones" en `/configuracion`;
+> contracts 293 · API 247 · smoke 22/22. Anterior: **Notificaciones avanzadas · Fase A BACKEND**: disparo por TRANSICIÓN [config de
 > destinatarios CONGELADA en la versión] + plantillas POR BITÁCORA [`pickTemplateForScope`] + comodines `{{campo.<key>}}` + defaults
 > de sistema + correos externos gated/auditados; reusa el motor del Bloque N; 2 migraciones aditivas; sin permiso nuevo; contracts
 > 292 · API 247 · smoke 19/19 + regresión. Anterior:
@@ -30,7 +34,7 @@
 | **1** | Seguridad (auth + RBAC/ABAC 4D) · Estructura · Equipos · AuditLog | ✅ | UI de **alcance por nodo** en el árbol de Estructura · **reset por enlace** (variante B) · **federación/SCIM** v2 (diseñado, diferido) · campos de usuario SCIM-alineados. |
 | **2** | Plantillas / Form Builder + Bitácoras | 🔄 | Ver desglose 2.x abajo. |
 | **3** | Orígenes de datos (entrada SCADA/PI/OPC) + **API saliente** (Req-3) + **Webhooks** (Req-4) | ⬜ | Todo. Motor de integración inbound + API M2M por plantilla + webhooks firmados (HMAC, reintentos). |
-| **N** | **Notificaciones** (bloque transversal, SOLO mail) | ✅ | `feat/notificaciones` (motor) + `feat/notif-hardening` (config SMTP en BD editable sin reiniciar [pantalla `/configuracion`, password cifrada, permiso `notification:config`] + editor de plantillas con vista previa/diccionario/`{{entry.summary}}`): transactional-outbox + worker (`@nestjs/schedule`), 4 eventos, plantillas configurables + render sin eval, destinatarios con ABAC, bandeja (Req-1/5), preferencias. **Diferido:** digest, UI de suscripciones, escalamiento por tiers, variables de campo dinámicas `{{field.<key>}}`, fan-out por nodo del overdue sin rol, canal in-app/SMS. |
+| **N** | **Notificaciones** (bloque transversal, SOLO mail) | ✅ | `feat/notificaciones` (motor) + `feat/notif-hardening` (config SMTP en BD editable sin reiniciar [pantalla `/configuracion`, password cifrada, permiso `notification:config`] + editor de plantillas con vista previa/diccionario/`{{entry.summary}}`): transactional-outbox + worker (`@nestjs/schedule`), 4 eventos, plantillas configurables + render sin eval, destinatarios con ABAC, bandeja (Req-1/5), preferencias. **+ Notif. avanzadas A (transición/bitácora/comodines/defaults) + B (canal IN-APP/campanita + SSE) ✅** (épico COMPLETO). **Diferido:** digest, UI de suscripciones, escalamiento por tiers (→4.4), fan-out por nodo del overdue sin rol, SMS, plantilla INAPP propia, SSE multi-instancia (Redis pub/sub). |
 | **4** | Motor de incidencias (kanban + workflow) | 🔄 | **4.0 núcleo ✅** + **4.1 excepciones ✅** (4.1.0 backend + 4.1.1 UI + 4.1.2 acción de reglas: `LogEntryException`+panel+bandeja `/excepciones`) + **mantenedor de catálogos UI ✅** + **4.2a Acciones CAPA ✅** (`IncidentAction` + bloqueo de cierre por acción `mandatory` + verificación de eficacia; 2 permisos [cat. **83**]; smoke 23/23) + **4.2b Investigación 5-Porqués ✅** (`feat/incidencias-investigacion`: `IncidentInvestigation`+`Step` honra `requiresInvestigation`; enlace causa raíz↔CAPA; bloqueo de cierre configurable; drawer a pestañas; sin permiso nuevo; smoke 27/27) + **4.3 Reportabilidad configurable ✅** (`feat/incidencias-reportabilidad`: catálogo `ReportingObligation` + materialización `IncidentReport` honra `reportableDefault`; bloqueo de cierre por reporte `mandatory` pendiente; vencido derivado [KPI/filtro/chip]; pestaña Reportes + sub-pestaña Obligaciones en catálogos; sin permiso nuevo; smoke 31/31). **Falta: 4.4** SLA+notif+escalamiento + aviso de plazo de reporte (← épico notif-avanzadas) + unificar "vencida" (§21) · **4.5** dashboard. **Deuda 4.2/4.3:** subida de evidencia (Storage Ola 3) a CAPA/investigación/reporte · picker de rol responsable en UI · firma Part 11 al verificar/completar/enviar · plantillas ICAM/Ishikawa. |
 | **5** | Cambio de turno + IA (resumen de turno) | ⬜ | Todo. Interfaz `LlmProvider` abstracta. |
 | **6** | Base de conocimiento + Dashboard + **Asistente IA RAG** (Req-6) + insights | ⬜ | Todo. RAG con `pgvector` on-prem + ABAC en el recuperador. Predicción ML real = fase posterior. |

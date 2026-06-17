@@ -24,6 +24,8 @@ const DEFAULT_LOCALE = "es-CL";
 
 /** Un mensaje resuelto y RENDERIZADO, listo para insertar en la bandeja de salida. */
 export interface ResolvedMessage {
+  /** Canal de entrega de esta fila (EMAIL = correo, INAPP = campanita). */
+  channel: "EMAIL" | "INAPP";
   /** null = destinatario EXTERNO (correo sin usuario; salta ABAC y preferencias). */
   recipientUserId: string | null;
   recipientEmail: string;
@@ -134,23 +136,33 @@ export class NotificationResolverService {
     };
 
     const messages: ResolvedMessage[] = [];
-    const pushMessage = (recipientUserId: string | null, email: string, name: string, dedupeKey: string) => {
+    const pushMessage = (
+      channel: "EMAIL" | "INAPP",
+      recipientUserId: string | null,
+      email: string,
+      name: string,
+      recipientKey: string,
+    ) => {
       const context: Record<string, string> = { ...baseContext, "recipient.name": name };
       // Defensa en profundidad: el contexto solo expone variables permitidas de la plantilla.
       for (const key of Object.keys(context)) if (!allowed.has(key)) delete context[key];
       messages.push({
+        channel,
         recipientUserId,
         recipientEmail: email,
         subject: renderTemplate(template.subject, context),
         bodyText: renderTemplate(template.bodyText, context),
         bodyHtml: renderTemplate(template.bodyHtml, context),
-        dedupeKey,
+        // El canal entra en el dedupeKey: un mismo destinatario recibe email E in-app
+        // del mismo suceso sin chocar el índice único.
+        dedupeKey: `${event.eventKey}|${event.id}|${channel}|${recipientKey}`,
         relatedEntityType: resolution.relatedEntityType,
         relatedEntityId: resolution.relatedEntityId,
       });
     };
 
-    // Destinatarios INTERNOS: usuario activo + correo, menos los que optaron por NO recibir.
+    // Destinatarios INTERNOS: usuario activo, menos los que optaron por NO recibir EN ESE
+    // CANAL. EMAIL exige correo; INAPP (la campanita) no. Ambos canales por defecto ON.
     const userIds = [...resolution.userIds];
     if (userIds.length > 0) {
       const [users, optedOut] = await Promise.all([
@@ -159,20 +171,26 @@ export class NotificationResolverService {
           select: { id: true, email: true, displayName: true },
         }),
         this.prisma.notificationPreference.findMany({
-          where: { userId: { in: userIds }, eventKey: event.eventKey, channel: "EMAIL", mode: "OFF" },
-          select: { userId: true },
+          where: { userId: { in: userIds }, eventKey: event.eventKey, mode: "OFF" },
+          select: { userId: true, channel: true },
         }),
       ]);
-      const offSet = new Set(optedOut.map((p) => p.userId));
+      const offEmail = new Set(optedOut.filter((p) => p.channel === "EMAIL").map((p) => p.userId));
+      const offInApp = new Set(optedOut.filter((p) => p.channel === "INAPP").map((p) => p.userId));
       for (const user of users) {
-        if (offSet.has(user.id) || !user.email) continue;
-        pushMessage(user.id, user.email, user.displayName, `${event.eventKey}|${event.id}|${user.id}`);
+        if (user.email && !offEmail.has(user.id)) {
+          pushMessage("EMAIL", user.id, user.email, user.displayName, user.id);
+        }
+        if (!offInApp.has(user.id)) {
+          pushMessage("INAPP", user.id, user.email ?? "", user.displayName, user.id);
+        }
       }
     }
 
     // Destinatarios EXTERNOS: sin usuario, sin ABAC, sin preferencias (gobernanza explícita).
+    // Solo correo (no tienen campanita).
     for (const email of new Set(resolution.externalEmails)) {
-      pushMessage(null, email, email, `${event.eventKey}|${event.id}|ext:${email}`);
+      pushMessage("EMAIL", null, email, email, `ext:${email}`);
     }
 
     return messages;

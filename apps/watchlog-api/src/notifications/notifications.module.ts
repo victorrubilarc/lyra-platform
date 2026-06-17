@@ -4,7 +4,12 @@ import { NotificationsController } from "./notifications.controller";
 import { NotificationsService } from "./notifications.service";
 import { NotificationResolverService } from "./notification-resolver.service";
 import { NotificationWorkerService } from "./notification-worker.service";
-import { NotificationChannel, EmailChannel } from "./notification-channel";
+import { NotificationRealtimeService } from "./notification-realtime.service";
+import {
+  EmailChannel,
+  InAppChannel,
+  NotificationChannelRegistry,
+} from "./notification-channel";
 
 /**
  * Motor de notificaciones (Bloque N). Importa `SchedulesModule` (resolver de
@@ -13,8 +18,9 @@ import { NotificationChannel, EmailChannel } from "./notification-channel";
  * solo emite vía `NotificationEmitterService` (módulo @Global aparte) ⇒ sin ciclos.
  * El emisor + la app registran `ScheduleModule.forRoot()` para el tick del worker.
  *
- * `EmailChannel` se cablea a la abstracción `NotificationChannel` (hoy único canal;
- * in-app/SMS futuros se registran aquí sin tocar el motor).
+ * Los canales (`EmailChannel` + `InAppChannel`) se registran en un
+ * `NotificationChannelRegistry` que el worker usa para enrutar cada fila de bandeja
+ * a su canal. Sumar SMS futuro = registrar otra clase aquí sin tocar el motor.
  */
 @Module({
   imports: [SchedulesModule],
@@ -23,7 +29,15 @@ import { NotificationChannel, EmailChannel } from "./notification-channel";
     NotificationsService,
     NotificationResolverService,
     NotificationWorkerService,
-    { provide: NotificationChannel, useClass: EmailChannel },
+    NotificationRealtimeService,
+    EmailChannel,
+    InAppChannel,
+    {
+      provide: NotificationChannelRegistry,
+      useFactory: (email: EmailChannel, inApp: InAppChannel) =>
+        new NotificationChannelRegistry([email, inApp]),
+      inject: [EmailChannel, InAppChannel],
+    },
   ],
   exports: [NotificationsService],
 })

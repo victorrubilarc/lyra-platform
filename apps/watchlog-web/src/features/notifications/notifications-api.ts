@@ -5,10 +5,15 @@ import {
   notificationPreferenceSchema,
   notificationOutboxItemSchema,
   notificationOutboxDetailSchema,
+  inboxListResponseSchema,
+  inboxUnreadCountSchema,
   createNotificationTemplateRequestSchema,
   updateNotificationTemplateRequestSchema,
   setNotificationPreferenceRequestSchema,
   upsertNotificationSubscriptionRequestSchema,
+  type InboxListQuery,
+  type InboxListResponse,
+  type InboxUnreadCount,
   type NotificationTemplateDto,
   type NotificationTemplateListQuery,
   type CreateNotificationTemplateRequest,
@@ -21,7 +26,8 @@ import {
   type SetNotificationPreferenceRequest,
   type UpsertNotificationSubscriptionRequest,
 } from "@lyra/contracts";
-import { apiJson, apiVoid } from "../../lib/api-client.js";
+import { API_BASE, apiJson, apiVoid } from "../../lib/api-client.js";
+import { getAccessToken } from "../../lib/session-token.js";
 
 // --- Catálogo de eventos (variables disponibles para el editor de plantillas) ---
 const eventDefSchema = z.object({
@@ -122,4 +128,38 @@ export function fetchNotificationOutboxDetail(id: string): Promise<NotificationO
 
 export function retryNotificationOutbox(id: string): Promise<NotificationOutboxItem> {
   return apiJson(`/notifications/outbox/${id}/retry`, notificationOutboxItemSchema, { method: "POST", body: {} });
+}
+
+// --- Bandeja IN-APP (la campanita, ownership) ---
+export function fetchInbox(q: InboxListQuery = {}): Promise<InboxListResponse> {
+  const qs = new URLSearchParams();
+  if (q.unreadOnly) qs.set("unreadOnly", "true");
+  if (q.q) qs.set("q", q.q);
+  if (q.cursor) qs.set("cursor", q.cursor);
+  if (q.limit) qs.set("limit", String(q.limit));
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return apiJson(`/notifications/inbox${suffix}`, inboxListResponseSchema);
+}
+
+export function fetchInboxUnreadCount(): Promise<InboxUnreadCount> {
+  return apiJson("/notifications/inbox/unread-count", inboxUnreadCountSchema);
+}
+
+export function markInboxRead(id: string): Promise<InboxUnreadCount> {
+  return apiJson(`/notifications/inbox/${id}/read`, inboxUnreadCountSchema, { method: "POST", body: {} });
+}
+
+export function markAllInboxRead(): Promise<InboxUnreadCount> {
+  return apiJson("/notifications/inbox/read-all", inboxUnreadCountSchema, { method: "POST", body: {} });
+}
+
+/**
+ * URL del stream SSE de la campanita. `EventSource` no manda headers, así que el
+ * access token viaja por query (auth confinada a ese endpoint en el backend).
+ * Devuelve null si no hay sesión.
+ */
+export function inboxStreamUrl(): string | null {
+  const token = getAccessToken();
+  if (!token) return null;
+  return `${API_BASE}/notifications/inbox/stream?access_token=${encodeURIComponent(token)}`;
 }
