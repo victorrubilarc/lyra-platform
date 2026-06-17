@@ -4,6 +4,29 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-17 · Incidencias — FMEA/RPN + RCA dinámico por riesgo = DIFERIDO (opt-in, solo bajo demanda regulada)
+
+**Contexto:** contraste del módulo de Incidencias contra el estándar de un "RCA/CAPA nativo" (FMEA con gravedad×ocurrencia×detección
+⇒ índice de prioridad de riesgo RPN; "modularidad dinámica" que despliega módulos de investigación profunda al cruzar un umbral de
+riesgo calculado). Hoy tenemos: 5 Porqués (4.2b), CAPA (4.2a), reportabilidad (4.3), severidad eje único 1–5 + `potentialSeverity`, y
+matriz de riesgo `RISK_MATRIX` (ISO 31000) como TIPO DE CAMPO del formulario.
+
+**Decisión (dueño): NO construir FMEA/RPN ni el escalamiento dinámico del RCA por ahora.** Motivos:
+1. **FMEA/RPN es de nicho** (farma/aeroespacial/automoción — IATF 16949, ISO 14971). Para minería/manufactura general/energía, el eje
+   de severidad 1–5 + `potentialSeverity` + `RISK_MATRIX` cubren el grueso del valor sin la pesadez de 3 factores + cálculo de RPN.
+2. **Riesgo de densificar** el sistema y volverlo difícil de usar para empresas pequeñas.
+3. El costo real no es FMEA en sí, sino la **modularidad dinámica por puntaje en caliente** (motor de umbrales + reactividad de UI).
+
+**Por qué la capacidad NO densifica si se difiere bien:** todo el módulo es configurable por `IncidentType`
+(`requiresInvestigation`/`requiresCapa`/`reportableDefault`/`mandatory`). La densidad la produce *obligar* el flujo, no *tenerlo*: una
+empresa chica lo deja apagado. Por eso agregar capacidades no perjudica a quien no las activa — y por eso se difiere sin culpa.
+
+**Cómo entraría a futuro (si un cliente regulado lo exige):** como método de investigación adicional —el enum
+`INCIDENT_INVESTIGATION_METHODS` ya es extensible sin re-migrar— + un tipo de incidencia que lo exija, reutilizando la lógica de
+bloqueo de cierre ya existente. Cero impacto para quien no lo active. Registrado como **Fase 4.6 candidata** en BACKLOG §2.
+
+---
+
 ### 2026-06-17 · Notificaciones avanzadas · Fase B — canal IN-APP (campanita) + tiempo real (CIERRA EL ÉPICO)
 
 Última fase del épico: cada aviso, además del correo, genera una notificación IN-APP por destinatario, con campanita en el Topbar

@@ -519,6 +519,17 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
       asignación/cambio de estado/SLA/crítica/CAPA vencida). **← roza el épico de notificaciones avanzadas** (abajo).
 - [ ] **4.5 — Dashboard e indicadores** (por tipo/estado/severidad/nodo/equipo/turno/origen + tendencias + reincidencias + MTTR + SLA +
       CAPA + IF/IG + heatmap + export).
+- [ ] **4.6 (candidata) — Evaluación de riesgo FMEA/RPN + escalamiento dinámico del RCA → DIFERIDO, opt-in, solo bajo demanda
+      regulada (decisión 2026-06-17).** Origen: contraste con el estándar de un "RCA/CAPA nativo" (FMEA con gravedad×ocurrencia×detección
+      ⇒ RPN; modularidad dinámica que despliega módulos de investigación profunda al cruzar un umbral de riesgo). **Decisión del dueño:
+      NO construir ahora.** Motivos: (1) FMEA/RPN es de NICHO (farma/aeroespacial/automoción — IATF 16949, ISO 14971); para minería/
+      manufactura general/energía el eje único de severidad 1–5 + `potentialSeverity` + la **matriz de riesgo `RISK_MATRIX` (ISO 31000,
+      Ola 2)** ya cubren el grueso. (2) Riesgo de **densificar el sistema** para empresas pequeñas. (3) El verdadero costo es la
+      *modularidad dinámica por puntaje en caliente* (motor de umbrales + reactividad de UI), no FMEA en sí. **Mitigación arquitectónica:
+      la capacidad NO densifica si NO se obliga** — todo el módulo es config por `IncidentType` (`requiresInvestigation`/`requiresCapa`/
+      `reportableDefault`/`mandatory`), así que una empresa chica simplemente lo deja apagado. **Cómo entraría si un cliente regulado lo
+      pide:** método de investigación adicional (el enum `INCIDENT_INVESTIGATION_METHODS` ya es extensible, [investigation.ts:34]) + un
+      tipo de incidencia que lo exija; **cero impacto** para quien no lo active. Reutiliza la lógica de bloqueo de cierre ya existente.
 - [ ] **Deuda fina 4.0:** equipo en el modal de creación (hoy solo en edición; el modelo lo soporta) · `incident:export` (CSV) ·
       facetas/SavedView/peek/multi-sort en la lista (hoy filtros + paginación; el resto de la grilla premium = follow-up) · drag&drop
       en el kanban (hoy clic para abrir + transición por botón con guarda server-side) · resolver id→label de `originLogEntryNumber`
