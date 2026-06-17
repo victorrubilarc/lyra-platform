@@ -37,7 +37,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 - ✍️ Mi seguridad (activar/regenerar/desactivar MFA)
 
 ### 2. El espacio de trabajo  [todos]
-- ✅ **Menú lateral por grupos** (Operación · Diseño y datos · Administración · Favoritos) (§ El espacio de trabajo ▸ Menú lateral)
+- ✅ **Menú lateral por grupos** (Operación · Diseño y datos · Administración) + **Favoritos en el topbar** (§ El espacio de trabajo ▸ Menú lateral)
 - ✍️ Pestañas, búsqueda ⌘K, idioma, densidad, tema claro/oscuro
 
 ### 3. Estructura organizacional  [Configurador/Admin]
@@ -134,18 +134,21 @@ encuentre todo de un vistazo, sin una lista interminable ni scroll. Los grupos s
 trabajo: lo que se usa a diario arriba, lo que se configura en medio, lo de administración abajo.
 
 **Cómo se usa.**
-1. **Grupos.** El menú se divide en tres grupos fijos + tus favoritos:
+1. **Grupos.** El menú se divide en tres grupos fijos:
    - **Operación** (el día a día): Inicio · Bitácoras · Nueva entrada · Mis rondas · Incidencias · Excepciones.
    - **Diseño y datos** (cómo se arma el sistema): Plantillas · Flujos · Datos de referencia · Estructura ·
      Programación de rondas · Calendario operacional · Calendario fiscal.
    - **Administración** (gobierno del sistema): Seguridad · Notificaciones · Configuración.
-   - **Favoritos**: los módulos que fijaste con la estrella (aparece al pasar el mouse sobre un ítem).
 2. **Plegar / desplegar un grupo.** Haz clic en el **encabezado del grupo** (Operación, Diseño y datos…)
    para plegarlo o desplegarlo. El sistema **recuerda** qué grupos dejaste plegados entre sesiones.
    El grupo del módulo en el que estás trabajando **se muestra siempre**, aunque lo tengas plegado.
 3. **Colapsar el menú a íconos.** El botón `‹` arriba del menú lo reduce a un **riel de solo íconos**
    (más espacio para el contenido). En ese modo los grupos se separan con líneas sutiles y cada ícono
    muestra su nombre al pasar el mouse. El botón `›` lo vuelve a expandir.
+4. **Favoritos (accesos rápidos).** Para fijar un módulo, pasa el mouse sobre su ítem en el menú lateral y
+   haz clic en la **estrella**. Tus favoritos se consultan desde el **menú-estrella de la barra superior**
+   (arriba a la derecha, junto a la campanita): ábrelo para **ir** a cualquiera con un clic, o **quítalo**
+   tocando su estrella en la lista. La estrella de la barra aparece rellena cuando tienes al menos uno.
 
 **Quién puede.** Todos los usuarios ven el menú; **cada quien ve solo los módulos para los que tiene
 permiso** (un grupo del que no tienes ningún módulo visible simplemente no aparece). La organización en

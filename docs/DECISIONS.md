@@ -4,6 +4,28 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-17 · Shell — Sidebar premium (más legible/ancho) + Favoritos movidos al topbar
+
+**Contexto:** feedback del dueño sobre el sidebar agrupado recién entregado: los nombres de los módulos se veían pequeños y el menú
+estrecho; pidió que se viera "premium". Además sugirió mover **Favoritos a un menú propio arriba, en el topbar**.
+
+**Decisión:**
+1. **Premium del sidebar (solo CSS/presentación):** ancho 244→**276px**; texto de módulos 13.5→**14.5px** (+ `letter-spacing`
+   leve); ítem activo a peso **600**; íconos de ítem 18→**19px**; encabezados de grupo 10.5→**11px**; más aire vertical (padding de
+   ítem y de encabezado). Sin cambios de estructura ni de tokens (sigue claro/oscuro, 44px+ táctil).
+2. **Favoritos al topbar (`FavoritesMenu`):** se **saca la sección Favoritos del sidebar** y se expone como un **menú-estrella en el
+   topbar** (junto a la campanita), reusando el `Menu` premium de `@lyra/ui`. La estrella se rellena cuando hay ≥1 favorito; el menú
+   lista los favoritos (navegar al hacer clic) y permite **desfijar** desde el `trailing` (estrella con `stopPropagation`, sin navegar
+   ni cerrar). **Se MANTIENE la estrella por ítem en el sidebar para FIJAR** → el modelo es "fijo desde el lateral, accedo desde
+   arriba". Reusa `favorites-store` y `routeByPath` (sin store nuevo).
+
+**Motivo:** (1) un menú lateral con tipografía más grande y más ancho lee mejor en terreno/tablet y se siente premium sin recargar;
+(2) mover Favoritos al topbar libera el lateral de una lista dinámica que competía con los grupos fijos y deja los accesos rápidos
+siempre a un clic, junto al resto de utilidades del topbar (tema, idioma, notificaciones, perfil). Solo frontend del shell; sin
+permisos/rutas/contratos/API/migración.
+
+---
+
 ### 2026-06-17 · Shell — Menú lateral reestructurado en GRUPOS colapsables (Operación · Diseño y datos · Administración · Favoritos)
 
 **Contexto:** el sidebar creció a una lista plana de 16 ítems con scrollbar; se veía poco profesional y no escalaba. Objetivo:
