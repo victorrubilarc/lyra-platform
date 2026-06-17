@@ -2,11 +2,15 @@ import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Put, Query
 import type { FastifyRequest } from "fastify";
 import {
   NOTIFICATION_EVENTS,
+  createNotificationTemplateRequestSchema,
   notificationOutboxQuerySchema,
+  notificationTemplateListQuerySchema,
   setNotificationPreferenceRequestSchema,
   updateNotificationTemplateRequestSchema,
   upsertNotificationSubscriptionRequestSchema,
+  type CreateNotificationTemplateRequest,
   type NotificationOutboxQuery,
+  type NotificationTemplateListQuery,
   type SetNotificationPreferenceRequest,
   type UpdateNotificationTemplateRequest,
   type UpsertNotificationSubscriptionRequest,
@@ -36,8 +40,28 @@ export class NotificationsController {
 
   @Get("templates")
   @RequirePermission("notiftemplate:manage")
-  listTemplates() {
-    return this.notifications.listTemplates().then((templates) => ({ templates }));
+  listTemplates(
+    @Query(new ZodValidationPipe(notificationTemplateListQuerySchema)) query: NotificationTemplateListQuery,
+  ) {
+    return this.notifications.listTemplates(query).then((templates) => ({ templates }));
+  }
+
+  /** Diccionario de comodines `{{campo.<key>}}` de una bitácora (para el editor ad-hoc). */
+  @Get("templates/field-variables")
+  @RequirePermission("notiftemplate:manage")
+  fieldVariables(@Query("templateId") templateId: string) {
+    return this.notifications.fieldVariablesFor(templateId).then((variables) => ({ variables }));
+  }
+
+  /** Crea una plantilla AD-HOC por bitácora (épico notif. avanzadas). */
+  @Post("templates")
+  @RequirePermission("notiftemplate:manage")
+  createTemplate(
+    @Body(new ZodValidationPipe(createNotificationTemplateRequestSchema)) dto: CreateNotificationTemplateRequest,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.notifications.createTemplate(dto, user.id, this.ctx(user, req));
   }
 
   @Patch("templates/:id")
@@ -49,6 +73,14 @@ export class NotificationsController {
     @Req() req: FastifyRequest,
   ) {
     return this.notifications.updateTemplate(id, dto, user.id, this.ctx(user, req));
+  }
+
+  /** Borra una plantilla AD-HOC por bitácora (la genérica/sistema no). */
+  @Delete("templates/:id")
+  @RequirePermission("notiftemplate:manage")
+  @HttpCode(204)
+  async deleteTemplate(@Param("id") id: string, @CurrentUser() user: RequestUser, @Req() req: FastifyRequest) {
+    await this.notifications.deleteTemplate(id, this.ctx(user, req));
   }
 
   // --- Suscripciones (watchers) ----------------------------------------------

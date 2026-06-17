@@ -53,6 +53,19 @@ Keycloak **descartado** para el MVP (complejidad operacional); si un cliente lo 
   El registro criptográfico Part 11 de la corrección queda como deuda 4.2 (igual que las transiciones de incidencia 4.0). Toda acción
   de triage (acknowledge/dismiss/correct/convert/associate/manual) se **audita** (`AuditLog`).
 
+### Notificaciones avanzadas (Fase A) — destinatarios por transición + externos
+- La config de aviso de una transición se **CONGELA en la versión del flujo** (`WorkflowTransition.notifyConfig`) y se gobierna con
+  **`workflow:manage`** (es parte del flujo, igual que roles/firma); las plantillas por bitácora con **`notiftemplate:manage`**.
+  **Sin permisos nuevos** (no hay segregación que lo justifique).
+- **Destinatarios INTERNOS** (roles→usuarios en vivo, usuarios explícitos, autor, ejecutor, roles del estado destino) pasan **SIEMPRE
+  por ABAC** (`canAccessNode` ∩ `canAccessTemplate`): nunca se avisa a alguien lo que no podría ver.
+- **Destinatarios EXTERNOS** (`externalEmails`) **SALTAN ABAC por diseño** (un contratista/autoridad no es usuario del sistema). Es una
+  decisión de gobernanza explícita: la lista es **visible y editable** solo por quien administra el flujo (`workflow:manage`), viaja
+  congelada en la versión (auditable: "qué correos externos avisaba la v3"), y **cada envío se audita** (`notification.email.sent`).
+  Mitiga el riesgo de fuga: el correo lleva solo lo que la plantilla declara (placeholders whitelisteados), no datos arbitrarios.
+- **Comodines `{{campo.<key>}}`** se resuelven desde la versión CONGELADA de la entrada; un campo ausente queda en "" (sin fuga de
+  estructura). El render es seguro (sin eval, whitelist por evento + campos de la bitácora).
+
 ### Datos PERSONALES → autorización por OWNERSHIP (no RBAC)
 - Las preferencias de presentación del propio usuario **no** se gobiernan con permisos del catálogo: se autorizan por **pertenencia** (el recurso es del actor). Patrón aplicado a **`SavedView`** (vistas guardadas de Bitácoras, Fase 2.8.1b): toda consulta/mutación filtra por `userId === session.user.id` (404 si la vista es de otro); el endpoint se gatea además por acceso al módulo (`logentry:view`). No infla el catálogo (sigue en **59**). Inflar RBAC con preferencias de UI sería ruido administrativo; el límite real es la propiedad del dato.
 

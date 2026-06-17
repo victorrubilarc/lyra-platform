@@ -4,7 +4,13 @@
 > se actualiza al **cerrar cada sesión** (junto a `PROGRESS.md` y `BACKLOG.md`). El detalle
 > fino de cada pendiente vive en `BACKLOG.md`; aquí está el resumen scaneable.
 >
-> Última actualización: **2026-06-17** (**Fase 4.3 — Reportabilidad configurable**: catálogo `ReportingObligation`
+> Última actualización: **2026-06-17** (**Notificaciones avanzadas · Fase A BACKEND**: disparo por TRANSICIÓN [config de
+> destinatarios CONGELADA en la versión] + plantillas POR BITÁCORA [`pickTemplateForScope`] + comodines `{{campo.<key>}}` + defaults
+> de sistema + correos externos gated/auditados; reusa el motor del Bloque N; 2 migraciones aditivas; sin permiso nuevo; contracts
+> 292 · API 247 · smoke 19/19 + regresión. **Decisión del dueño: el ÉPICO completo (A+B) va PRIMERO y la 4.4 DESPUÉS.** Siguiente:
+> **Fase A — UI** [editor de aviso en el builder + master-detail de plantillas por bitácora + diccionario de comodines + toggle de
+> defaults], luego **Fase B** [campanita in-app + SSE], luego **4.4 — SLA/escalamiento**. Anterior:
+> **Fase 4.3 — Reportabilidad configurable**: catálogo `ReportingObligation`
 > [autoridad/plazo/aplicabilidad por tipo+severidad/`mandatory`] + materialización `IncidentReport` [N por incidencia, snapshot,
 > status, folio externo]; honra `reportableDefault`; **bloqueo de cierre por reporte obligatorio pendiente**
 > (`reportsBlockingClose`/`assertNoBlockingReports`); **vencido derivado** (KPI/filtro); sin permiso nuevo [cat. 83]. Migración

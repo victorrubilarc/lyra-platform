@@ -1,9 +1,11 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
 import {
   ALL_NOTIFICATION_EVENT_KEYS,
-  allowedVariablesForEvent,
+  allowedVariablesForTemplate,
+  fieldVariableName,
   unknownPlaceholders,
+  type CreateNotificationTemplateRequest,
   type NotificationOutboxItem,
   type NotificationOutboxDetail,
   type NotificationOutboxListResponse,
@@ -11,6 +13,7 @@ import {
   type NotificationPreferenceDto,
   type NotificationSubscriptionDto,
   type NotificationTemplateDto,
+  type NotificationTemplateListQuery,
   type SetNotificationPreferenceRequest,
   type UpdateNotificationTemplateRequest,
   type UpsertNotificationSubscriptionRequest,
@@ -36,11 +39,91 @@ export class NotificationsService {
 
   // --- Plantillas de mensaje -------------------------------------------------
 
-  async listTemplates(): Promise<NotificationTemplateDto[]> {
+  async listTemplates(query: NotificationTemplateListQuery = {}): Promise<NotificationTemplateDto[]> {
+    const where: Prisma.NotificationTemplateWhereInput = {};
+    if (query.eventKey) where.eventKey = query.eventKey;
+    if (query.scope === "generic") where.templateId = null;
+    else if (query.scope === "scoped") where.templateId = { not: null };
+    if (query.templateId) where.templateId = query.templateId;
     const rows = await this.prisma.notificationTemplate.findMany({
-      orderBy: [{ eventKey: "asc" }, { locale: "asc" }],
+      where,
+      orderBy: [{ eventKey: "asc" }, { templateId: "asc" }, { locale: "asc" }],
     });
-    return rows.map(toTemplateDto);
+    // Resuelve el nombre de la bitácora del ámbito (batch) para la columna «Ámbito».
+    const names = await this.templateNamesByIds(rows.map((r) => r.templateId).filter((v): v is string => !!v));
+    let dtos = rows.map((r) => toTemplateDto(r, r.templateId ? (names.get(r.templateId) ?? "(bitácora eliminada)") : null));
+    if (query.q) {
+      const q = query.q.toLowerCase();
+      dtos = dtos.filter(
+        (d) => d.subject.toLowerCase().includes(q) || (d.templateName ?? "").toLowerCase().includes(q),
+      );
+    }
+    return dtos;
+  }
+
+  /** Crea una plantilla AD-HOC atada a una bitácora (épico notif. avanzadas). 409 si ya existe
+   *  una para ese evento/locale/canal/bitácora. Valida la whitelist (incluye `campo.<key>`). */
+  async createTemplate(
+    dto: CreateNotificationTemplateRequest,
+    userId: string,
+    ctx: AuditContext,
+  ): Promise<NotificationTemplateDto> {
+    const logbook = await this.prisma.template.findUnique({
+      where: { id: dto.templateId },
+      select: { id: true, name: true },
+    });
+    if (!logbook) throw new BadRequestException("La bitácora indicada no existe");
+    const channel = dto.channel ?? "EMAIL";
+    const fieldKeys = await this.publishedFieldKeys(dto.templateId);
+    const allowed = allowedVariablesForTemplate(dto.eventKey, fieldKeys);
+    const bad = unknownPlaceholders([dto.subject, dto.bodyText, dto.bodyHtml], allowed);
+    if (bad.length > 0) {
+      throw new BadRequestException(`Variables no permitidas para este evento/bitácora: ${bad.join(", ")}`);
+    }
+    const dup = await this.prisma.notificationTemplate.findFirst({
+      where: { eventKey: dto.eventKey, locale: dto.locale, channel, templateId: dto.templateId },
+      select: { id: true },
+    });
+    if (dup) throw new ConflictException("Ya existe una plantilla para este evento, idioma y bitácora");
+    const row = await this.prisma.notificationTemplate.create({
+      data: {
+        eventKey: dto.eventKey,
+        locale: dto.locale,
+        channel,
+        templateId: dto.templateId,
+        subject: dto.subject,
+        bodyText: dto.bodyText,
+        bodyHtml: dto.bodyHtml,
+        active: dto.active ?? true,
+        isSystem: false,
+        updatedById: userId,
+      },
+    });
+    await this.audit.record({
+      ...ctx,
+      action: "notification.template.created",
+      entityType: "NotificationTemplate",
+      entityId: row.id,
+      after: { eventKey: row.eventKey, templateId: row.templateId, subject: row.subject },
+    });
+    return toTemplateDto(row, logbook.name);
+  }
+
+  /** Borra una plantilla AD-HOC (por bitácora). Las de SISTEMA (genéricas) no se borran. */
+  async deleteTemplate(id: string, ctx: AuditContext): Promise<void> {
+    const row = await this.prisma.notificationTemplate.findUnique({ where: { id } });
+    if (!row) throw new NotFoundException("Plantilla no encontrada");
+    if (row.isSystem || row.templateId === null) {
+      throw new BadRequestException("La plantilla por defecto no se puede eliminar (solo editar)");
+    }
+    await this.prisma.notificationTemplate.delete({ where: { id } });
+    await this.audit.record({
+      ...ctx,
+      action: "notification.template.deleted",
+      entityType: "NotificationTemplate",
+      entityId: id,
+      before: { eventKey: row.eventKey, templateId: row.templateId, subject: row.subject },
+    });
   }
 
   async updateTemplate(
@@ -51,8 +134,9 @@ export class NotificationsService {
   ): Promise<NotificationTemplateDto> {
     const before = await this.prisma.notificationTemplate.findUnique({ where: { id } });
     if (!before) throw new NotFoundException("Plantilla no encontrada");
-    // El cuerpo solo puede referenciar variables que el evento expone (whitelist).
-    const allowed = allowedVariablesForEvent(before.eventKey);
+    // Whitelist: variables del evento + (si es ad-hoc por bitácora) los comodines de campo.
+    const fieldKeys = before.templateId ? await this.publishedFieldKeys(before.templateId) : [];
+    const allowed = allowedVariablesForTemplate(before.eventKey, fieldKeys);
     const bad = unknownPlaceholders([dto.subject, dto.bodyText, dto.bodyHtml], allowed);
     if (bad.length > 0) {
       throw new BadRequestException(`Variables no permitidas para este evento: ${bad.join(", ")}`);
@@ -75,7 +159,44 @@ export class NotificationsService {
       before: { subject: before.subject, active: before.active },
       after: { subject: row.subject, active: row.active },
     });
-    return toTemplateDto(row);
+    const name = row.templateId ? (await this.templateNamesByIds([row.templateId])).get(row.templateId) ?? null : null;
+    return toTemplateDto(row, name);
+  }
+
+  /** Nombres de bitácora (Template) por id, en lote (para la columna «Ámbito»). */
+  private async templateNamesByIds(ids: string[]): Promise<Map<string, string>> {
+    const unique = [...new Set(ids)];
+    if (unique.length === 0) return new Map();
+    const rows = await this.prisma.template.findMany({
+      where: { id: { in: unique } },
+      select: { id: true, name: true },
+    });
+    return new Map(rows.map((r) => [r.id, r.name]));
+  }
+
+  /** Diccionario de comodines `{{campo.<key>}}` de una bitácora (para el editor de plantillas):
+   *  nombre + etiqueta del campo. Vacío si la bitácora no tiene versión publicada. */
+  async fieldVariablesFor(templateId: string): Promise<{ name: string; description: string; sample: string }[]> {
+    const tpl = await this.prisma.template.findUnique({
+      where: { id: templateId },
+      select: { currentVersion: { select: { sections: { select: { fields: { select: { key: true, label: true } } } } } } },
+    });
+    const out: { name: string; description: string; sample: string }[] = [];
+    for (const s of tpl?.currentVersion?.sections ?? []) {
+      for (const f of s.fields) out.push({ name: fieldVariableName(f.key), description: f.label, sample: `[${f.label}]` });
+    }
+    return out;
+  }
+
+  /** Keys de los campos de la versión PUBLICADA de una bitácora (whitelist de `campo.<key>`). */
+  private async publishedFieldKeys(templateId: string): Promise<string[]> {
+    const tpl = await this.prisma.template.findUnique({
+      where: { id: templateId },
+      select: { currentVersion: { select: { sections: { select: { fields: { select: { key: true } } } } } } },
+    });
+    const keys: string[] = [];
+    for (const s of tpl?.currentVersion?.sections ?? []) for (const f of s.fields) keys.push(f.key);
+    return keys;
   }
 
   // --- Suscripciones (watchers) ----------------------------------------------
@@ -291,23 +412,29 @@ export class NotificationsService {
   }
 }
 
-function toTemplateDto(row: {
-  id: string;
-  eventKey: string;
-  locale: string;
-  channel: "EMAIL";
-  subject: string;
-  bodyText: string;
-  bodyHtml: string;
-  active: boolean;
-  isSystem: boolean;
-  updatedAt: Date;
-}): NotificationTemplateDto {
+function toTemplateDto(
+  row: {
+    id: string;
+    eventKey: string;
+    locale: string;
+    channel: "EMAIL";
+    templateId: string | null;
+    subject: string;
+    bodyText: string;
+    bodyHtml: string;
+    active: boolean;
+    isSystem: boolean;
+    updatedAt: Date;
+  },
+  templateName: string | null,
+): NotificationTemplateDto {
   return {
     id: row.id,
     eventKey: row.eventKey,
     locale: row.locale,
     channel: row.channel,
+    templateId: row.templateId,
+    templateName,
     subject: row.subject,
     bodyText: row.bodyText,
     bodyHtml: row.bodyHtml,

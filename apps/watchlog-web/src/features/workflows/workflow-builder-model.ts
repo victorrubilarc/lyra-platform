@@ -1,4 +1,4 @@
-import type { SaveWorkflowDraftRequest, WorkflowDetail } from "@lyra/contracts";
+import type { SaveWorkflowDraftRequest, TransitionNotifyConfig, WorkflowDetail } from "@lyra/contracts";
 
 /**
  * Modelo editable local del builder de flujos (máquina de estados). Las claves
@@ -30,6 +30,9 @@ export interface EditWorkflowTransition {
   signatureMeaning: string | null;
   requireMfa: boolean;
   roleIds: string[];
+  /** Config de notificación de la transición (épico notif. avanzadas). Se PRESERVA en el
+   *  round-trip aunque el editor visual aún no la exponga (evita borrarla al guardar). */
+  notify: TransitionNotifyConfig | null;
 }
 
 export interface EditWorkflow {
@@ -89,6 +92,7 @@ export function detailToEditWorkflow(detail: WorkflowDetail): EditWorkflow {
       signatureMeaning: t.signatureMeaning,
       requireMfa: t.requireMfa,
       roleIds: t.roleIds,
+      notify: t.notify ?? null,
     })),
   };
 }
@@ -123,6 +127,7 @@ export function editWorkflowToDraftRequest(wf: EditWorkflow): SaveWorkflowDraftR
       signatureMeaning: t.signatureMeaning?.trim() ? t.signatureMeaning.trim() : null,
       requireMfa: t.requireMfa,
       roleIds: t.roleIds,
+      notify: t.notify,
     })),
   };
 }

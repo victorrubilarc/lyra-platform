@@ -60,6 +60,7 @@ import {
   resolveEditWindow,
   resolveEffectiveAt,
   thresholdBandFor,
+  transitionNotifyConfigSchema,
   upgradeFieldConfig,
   validateFieldValue,
   type AttachmentFieldConfig,
@@ -2669,6 +2670,11 @@ export class LogEntriesService {
         requireSignature: t.requireSignature,
         signatureMeaning: t.signatureMeaning,
         requireMfa: t.requireMfa,
+        notify: (() => {
+          if (t.notifyConfig == null) return null;
+          const r = transitionNotifyConfigSchema.safeParse(t.notifyConfig);
+          return r.success ? r.data : null;
+        })(),
         roleIds: t.roles.map((r) => r.roleId),
         roleNames: t.roles.map((r) => r.role.name),
       })),

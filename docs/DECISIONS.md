@@ -4,6 +4,52 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-17 · Notificaciones avanzadas (épico) — plan por fases + 7 forks — 🚧 EN CURSO (Fase A)
+
+**Contexto y secuencia (registro honesto):** la sesión arrancó con objetivo **Fase 4.4 (SLA/escalamiento + aviso de plazo)**.
+Recomendé con fundamento un **slice mínimo** para 4.4 (eventos `incident.*` + sweeper + resolvers, reusando el motor) y **diferir el
+épico** de notificaciones avanzadas (es ortogonal: personaliza avisos de bitácoras, no de incidencias; y es multi-fase). El dueño,
+tras una objeción explícita de mi parte (le señalé el choque con la regla "un objetivo por sesión" y que 4.4 no depende del épico),
+**reafirmó construir el épico COMPLETO (Fase A + B) primero y luego la 4.4**. Decisión del dueño, acatada. Para respetar la regla de
+sesión, **esta sesión se acota a Fase A** (cierra sola); **Fase B (campanita/SSE)** y **4.4** quedan como sesiones siguientes (BACKLOG).
+
+**Objetivo del épico:** personalizar los avisos a la medida de cada bitácora/flujo + canal in-app. Estándar de referencia:
+ServiceNow (Notifications con trigger por evento/transición + "who will receive" + email templates), Jira Automation
+(`on transition` → send email con smart values `{{issue.field}}`), SAP PM/Maximo (workflow notifications + roles/listas +
+communication templates con sustitución de campos).
+
+**Fases:** **A (solo email)** = disparo por transición + plantillas por bitácora + comodines `{{campo.<key>}}` + defaults de
+sistema. **B** = canal in-app (campanita) + SSE. Cada una cierra sola.
+
+**Los 7 forks (resueltos con el dueño):**
+- **(a) Destinatarios = EMBEBIDOS en la transición, congelados en la versión del flujo** (regla estructurada: roles / usuarios /
+  autor / ejecutor / roles del estado destino / correos externos; los roles se resuelven a usuarios EN VIVO al enviar). **NO**
+  `DistributionList` reusable. *Motivo:* el flujo ya congela roles/firma como dato en la versión ⇒ el aviso viaja con la versión
+  (reproducible/auditable); una lista reusable es viva (afectaría versiones publicadas), añade entidad + pantalla + permiso nuevo
+  (FLUSHALL) e indirección. **Atajo de UX en el builder:** "copiar la configuración de destinatarios de OTRA transición" (puro
+  frontend, sin costo de modelo) para que administrar varias transiciones no sea burocrático. `DistributionList` → BACKLOG como
+  azúcar futura sobre la misma regla.
+- **(b) In-app = extender `NotificationOutbox` con `readAt`** (Fase B), NO tabla `NotificationInbox` dedicada. Reusa el pipeline de
+  2 etapas + dedup + `relatedEntity`; el canal (`INAPP`) ya namespacea las filas; el sender INAPP marca entregado sin SMTP.
+- **(c) Real-time de la campanita = SSE** (decisión del dueño; mi recomendación era poll por simplicidad on-prem). Se implementará
+  con **fallback a poll** (`react-query refetchInterval`) para robustez si la conexión SSE cae. Fase B.
+- **(d) Correos EXTERNOS = SÍ en Fase A, con gating explícito y auditados** (lista estática por transición, marcada "externa: salta
+  ABAC"). Cubre la necesidad real (contratista/autoridad/on-call). **Variables de campo:** el editor de la plantilla ad-hoc ofrece
+  los campos de la versión **PUBLICADA** de esa bitácora (keys estables); los valores salen de la versión **congelada** de la
+  entrada; campo ausente ⇒ vacío (degradación elegante).
+- **(e) Defaults de sistema = mínimo:** un toggle global en `SystemSettings` "las transiciones sin config notifican a los roles del
+  estado destino (sí/no)", con **default = conducta actual** (no rompe nada).
+- **(f) `entry.transition` = COEXISTE:** sin config explícita en la transición cae al default de sistema (= conducta actual: roles
+  del estado destino); con config, la transición manda. Migración sin sorpresas.
+- **(g) Fases A→B** (ya confirmado).
+
+**Permisos:** config de notificación de transición = `workflow:manage` (es parte del flujo); plantillas por bitácora =
+`notiftemplate:manage`; ver/leer mis in-app = **ownership** (sin permiso, patrón SavedView). **SIN permiso nuevo ⇒ sin FLUSHALL.**
+**Migraciones aditivas:** `WorkflowTransition` (+config de aviso), `NotificationTemplate` (+`templateId`, cambia el unique),
+`NotificationChannel` (+`INAPP`, Fase B), `NotificationOutbox` (+`readAt`, Fase B).
+
+---
+
 ### 2026-06-17 · Incidencias — Fase 4.3 (Reportabilidad configurable) — ✅ IMPLEMENTADO
 
 Que una incidencia pueda gatillar uno o más REPORTES a una autoridad/obligación, con plazo y seguimiento de estado, de forma

@@ -1,5 +1,43 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-17 — Notificaciones avanzadas · Fase A (BACKEND) ✅** (`feat/notif-avanzadas`). Épico de notificaciones avanzadas,
+**Fase A solo-backend** (disparo por TRANSICIÓN + plantillas POR BITÁCORA + comodines de campo + defaults de sistema), sobre el
+motor del Bloque N (outbox + worker + render sin eval) sin reinventarlo. **Contexto (honesto):** la sesión arrancó para 4.4
+(SLA/avisos); recomendé un slice mínimo de 4.4 y diferir este épico; **el dueño, tras mi objeción fundamentada, reafirmó construir
+el épico COMPLETO (A+B) primero y luego 4.4** (DECISIONS 2026-06-17). Para respetar "un objetivo por sesión", **esta sesión entrega
+Fase A backend** (cierra y verifica sola); **la UI de Fase A (editor de aviso en el builder de flujos + master-detail de plantillas
+por bitácora + diccionario de comodines + toggle de defaults), Fase B (campanita in-app + SSE) y 4.4 quedan como sesiones
+siguientes** (BACKLOG). **7 forks resueltos:** (a) destinatarios EMBEBIDOS y CONGELADOS en la versión del flujo (no
+`DistributionList`; atajo "copiar de otra transición" pendiente para la UI); (b) in-app = extender `NotificationOutbox.readAt`
+(Fase B); (c) SSE con fallback a poll (Fase B); (d) correos EXTERNOS sí, gated+auditados; comodines del editor = campos de la versión
+PUBLICADA; (e) defaults de sistema = toggle mínimo (default = conducta actual); (f) `entry.transition` COEXISTE (sin config →
+default; con config → manda); (g) A→B. **Modelo (aditivo):** `WorkflowTransition.notifyConfig Json?` (regla de destinatarios
+CONGELADA en la versión, como roles/firma; migración `20260617150000_add_notif_advanced_phase_a`) + `NotificationTemplate.templateId
+String?` (ámbito por bitácora; null = genérica; unique `(eventKey,locale,channel,templateId)` + índice PARCIAL único para la
+genérica) + `SystemSettings.notifyTransitionDefaultDestinationRoles Boolean @default(true)` (migración
+`20260617150500_add_notify_transition_default`). **Contratos** (`@lyra/contracts`): `transitionNotifyConfigSchema`
+(enabled/templateId/roleIds/userIds/includeAuthor/includeActor/includeDestinationRoles/externalEmails — **todos requeridos, SIN
+`.default()`** para que `z.input===z.output` y no romper la re-inferencia del web; ver DECISIONS/TS2719) + `notify` en
+`workflowTransitionSchema`/`draftTransitionInputSchema` (congelado en saveDraft/clon/mapVersion) + plantillas con `templateId`/
+`templateName` + `createNotificationTemplateRequestSchema` + `notificationTemplateListQuerySchema` (scope generic/scoped) + helper
+PURO `pickTemplateForScope` (específica→genérica) + comodines `{{campo.<key>}}` (`FIELD_VARIABLE_PREFIX`/`fieldVariableName`/
+`isFieldVariable`/`allowedVariablesForTemplate`) + specs (`notif-advanced.spec.ts`; contracts **292**). **API:** `NotificationResolverService`
+reescrito: resuelve destinatarios de `entry.transition` desde la config CONGELADA (roles EN VIVO / usuarios / autor / ejecutor /
+roles del estado destino con ABAC; **externos sin ABAC, auditados, `recipientUserId=null`**); default de sistema cuando no hay
+config; plantilla por ÁMBITO (`pickTemplateForScope`) y **comodines `{{campo.<key>}}` desde la versión CONGELADA** (valor ausente ⇒
+""). `NotificationsService` gana `createTemplate`/`deleteTemplate`/`listTemplates(scope)`/`fieldVariablesFor` + endpoints
+(`POST/DELETE /notifications/templates`, `GET …?scope=`, `GET …/field-variables`) con whitelist que incluye los comodines de campo
+(400 si inválido) y 409 al duplicar; la genérica/sistema NO se borra. **Web (mínimo seguro):** el builder PRESERVA `notify` en el
+round-trip detail→modelo→draft (evita borrarlo al guardar — lección del guard de permisos de sección); **editor visual + master-detail
++ diccionario = UI de la sesión siguiente.** **Permisos:** sin permiso nuevo (config de transición = `workflow:manage`; plantillas =
+`notiftemplate:manage`); **sin FLUSHALL**. Tests: contracts **292** (+9) · API **247** (+6, `notifications.service.spec.ts`);
+typecheck/lint(0)/build verdes. **Smoke `scripts/smoke-notif-avanzadas.py` 19/19** (plantilla scoped + nombre · whitelist comodín
+inexistente 400 · duplicada 409 · field-variables · filtros scope · borrar genérica 400 · config de transición CONGELADA round-trip ·
+resolver runtime: externo + plantilla específica + comodín renderizado · default OFF → 0 destinatarios · gates 403) **+ regresión
+`smoke-notificaciones.py` 17/17** (tras corregir una config SMTP rota de sesión previa: `emailHost` vacío en BD → fallback a `.env`)
+**+ incidencias 32/32 · capa 23/23 · investigación 27/27 · reportabilidad 31/31** sin romper. **Pendiente: smoke VISUAL** (no aplica
+aún: sin UI). **Siguiente: Fase A — UI**, luego **Fase B (campanita in-app + SSE)** y luego **4.4 (SLA/escalamiento)**.
+
 **2026-06-17 — Fase 4.3: Reportabilidad configurable (obligaciones + reportes + bloqueo de cierre + vencido derivado) ✅**
 (`feat/incidencias-reportabilidad`). Cierra §14 de la auditoría del módulo: una incidencia puede gatillar uno o más REPORTES a una
 AUTORIDAD/obligación, con plazo y seguimiento, **configurable y transversal** (nada SERNAGEOMIN/DS 132/HSE-Chile hardcodeado; los

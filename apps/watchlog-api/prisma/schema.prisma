@@ -930,6 +930,11 @@ model WorkflowTransition {
   requireSignature            Boolean @default(false)
   signatureMeaning            String?
   requireMfa                  Boolean @default(false)
+  // Config de NOTIFICACIÓN de la transición (épico notif. avanzadas, Fase A): regla de
+  // destinatarios + plantilla opcional, validada por transitionNotifyConfigSchema. Se
+  // CONGELA con la versión del flujo (como roles/firma). null = sin config explícita ⇒
+  // cae al default de sistema.
+  notifyConfig                Json?
 
   version   WorkflowDefinitionVersion @relation(fields: [workflowDefinitionVersionId], references: [id], onDelete: Cascade)
   fromState WorkflowState             @relation("TransitionFrom", fields: [fromStateId], references: [id], onDelete: Cascade)
@@ -1148,6 +1153,11 @@ model SystemSettings {
   emailFromEmail               String?
   emailConfiguredAt            DateTime?
   emailConfiguredById          String?
+  // --- Notificaciones avanzadas — defaults de sistema (Fase A) ---------------
+  // Conducta de las transiciones SIN config de aviso explícita. true (default) =
+  // reproduce la conducta clásica de `entry.transition` (avisar a los roles del estado
+  // destino); false = no se notifica si la transición no lo configura. No rompe nada.
+  notifyTransitionDefaultDestinationRoles Boolean @default(true)
   updatedById                  String?
   updatedAt                    DateTime         @updatedAt
 }
@@ -1701,6 +1711,11 @@ model NotificationTemplate {
   eventKey    String
   locale      String
   channel     NotificationChannel @default(EMAIL)
+  // ÁMBITO (épico notif. avanzadas, Fase A): null = GENÉRICA (por defecto); con valor =
+  // específica de esa bitácora (Template.id). Resolución: específica → fallback genérica
+  // (pickTemplateForScope). La unicidad de la GENÉRICA (templateId NULL) se garantiza con
+  // un índice único PARCIAL en la migración (Postgres trata los NULL como distintos).
+  templateId  String?
   subject     String
   bodyText    String
   bodyHtml    String
@@ -1710,7 +1725,8 @@ model NotificationTemplate {
   createdAt   DateTime            @default(now())
   updatedAt   DateTime            @updatedAt
 
-  @@unique([eventKey, locale, channel])
+  @@unique([eventKey, locale, channel, templateId])
+  @@index([templateId])
 }
 
 // Suscripción explícita (watcher): usuario XOR rol se suscribe a un evento, con

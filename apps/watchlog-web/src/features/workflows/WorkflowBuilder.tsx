@@ -184,6 +184,7 @@ export function WorkflowBuilder({ detail }: { detail: WorkflowDetail }) {
       signatureMeaning: null,
       requireMfa: false,
       roleIds: [],
+      notify: null,
     };
     patch({ ...wf, transitions: [...wf.transitions, tr] });
   }
@@ -257,6 +258,7 @@ export function WorkflowBuilder({ detail }: { detail: WorkflowDetail }) {
         requireSignature: tr.requireSignature,
         signatureMeaning: tr.signatureMeaning,
         requireMfa: tr.requireMfa,
+        notify: tr.notify ?? null,
         roleIds: tr.roleIds,
         // El builder resuelve los nombres con la prop roleNameOf del diagrama.
         roleNames: [],
