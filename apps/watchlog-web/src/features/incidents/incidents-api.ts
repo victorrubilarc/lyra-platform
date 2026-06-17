@@ -6,6 +6,10 @@ import {
   incidentCategorySchema,
   incidentCommentSchema,
   incidentActionSchema,
+  incidentInvestigationSchema,
+  type CompleteIncidentInvestigationRequest,
+  type IncidentInvestigationDto,
+  type UpsertIncidentInvestigationRequest,
   type AddIncidentCommentRequest,
   type CancelIncidentActionRequest,
   type CompleteIncidentActionRequest,
@@ -147,4 +151,24 @@ export function verifyIncidentAction(actionId: string, dto: VerifyIncidentAction
 
 export function cancelIncidentAction(actionId: string, dto: CancelIncidentActionRequest): Promise<IncidentActionDto> {
   return apiJson(`/incidents/actions/${actionId}/cancel`, incidentActionSchema, { method: "POST", body: dto });
+}
+
+// --- Investigación de causa raíz (Fase 4.2b) ---------------------------------
+
+const investigationNullableSchema = incidentInvestigationSchema.nullable();
+
+export function fetchIncidentInvestigation(incidentId: string): Promise<IncidentInvestigationDto | null> {
+  return apiJson(`/incidents/${incidentId}/investigation`, investigationNullableSchema);
+}
+
+export function upsertIncidentInvestigation(incidentId: string, dto: UpsertIncidentInvestigationRequest): Promise<IncidentInvestigationDto> {
+  return apiJson(`/incidents/${incidentId}/investigation`, incidentInvestigationSchema, { method: "POST", body: dto });
+}
+
+export function completeIncidentInvestigation(incidentId: string, dto: CompleteIncidentInvestigationRequest): Promise<IncidentInvestigationDto> {
+  return apiJson(`/incidents/${incidentId}/investigation/complete`, incidentInvestigationSchema, { method: "POST", body: dto });
+}
+
+export function reopenIncidentInvestigation(incidentId: string): Promise<IncidentInvestigationDto> {
+  return apiJson(`/incidents/${incidentId}/investigation/reopen`, incidentInvestigationSchema, { method: "POST", body: {} });
 }

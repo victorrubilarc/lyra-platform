@@ -6,11 +6,13 @@ import {
   cancelIncidentActionRequestSchema,
   cancelIncidentRequestSchema,
   completeIncidentActionRequestSchema,
+  completeIncidentInvestigationRequestSchema,
   createIncidentActionRequestSchema,
   createIncidentRequestSchema,
   incidentListQuerySchema,
   transitionIncidentRequestSchema,
   updateIncidentActionRequestSchema,
+  upsertIncidentInvestigationRequestSchema,
   updateIncidentRequestSchema,
   upsertIncidentCategoryRequestSchema,
   upsertIncidentTypeRequestSchema,
@@ -20,12 +22,14 @@ import {
   type CancelIncidentActionRequest,
   type CancelIncidentRequest,
   type CompleteIncidentActionRequest,
+  type CompleteIncidentInvestigationRequest,
   type CreateIncidentActionRequest,
   type CreateIncidentRequest,
   type IncidentListQuery,
   type TransitionIncidentRequest,
   type UpdateIncidentActionRequest,
   type UpdateIncidentRequest,
+  type UpsertIncidentInvestigationRequest,
   type UpsertIncidentCategoryRequest,
   type UpsertIncidentTypeRequest,
   type VerifyIncidentActionRequest,
@@ -35,6 +39,7 @@ import type { RequestUser } from "../authz/auth-user";
 import { CurrentUser, RequirePermission } from "../authz/authz.decorators";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { IncidentActionsService } from "./incident-actions.service";
+import { IncidentInvestigationService } from "./incident-investigation.service";
 import { IncidentsService } from "./incidents.service";
 
 @Controller("incidents")
@@ -42,6 +47,7 @@ export class IncidentsController {
   constructor(
     private readonly incidents: IncidentsService,
     private readonly actions: IncidentActionsService,
+    private readonly investigation: IncidentInvestigationService,
   ) {}
 
   // --- Catálogos (antes de :id para no chocar) -------------------------------
@@ -253,6 +259,44 @@ export class IncidentsController {
     @Req() req: FastifyRequest,
   ) {
     return this.actions.cancel(user.id, actionId, dto, this.ctx(user, req));
+  }
+
+  // --- Investigación de causa raíz (Fase 4.2b; gobernada por incident:edit) --
+
+  @Get(":id/investigation")
+  @RequirePermission("incident:view")
+  getInvestigation(@Param("id") id: string, @CurrentUser() user: RequestUser) {
+    return this.investigation.get(user.id, id);
+  }
+
+  @Post(":id/investigation")
+  @RequirePermission("incident:edit")
+  upsertInvestigation(
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(upsertIncidentInvestigationRequestSchema)) dto: UpsertIncidentInvestigationRequest,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.investigation.upsert(user.id, id, dto, this.ctx(user, req));
+  }
+
+  @Post(":id/investigation/complete")
+  @HttpCode(200)
+  @RequirePermission("incident:edit")
+  completeInvestigation(
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(completeIncidentInvestigationRequestSchema)) dto: CompleteIncidentInvestigationRequest,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.investigation.complete(user.id, id, dto, this.ctx(user, req));
+  }
+
+  @Post(":id/investigation/reopen")
+  @HttpCode(200)
+  @RequirePermission("incident:edit")
+  reopenInvestigation(@Param("id") id: string, @CurrentUser() user: RequestUser, @Req() req: FastifyRequest) {
+    return this.investigation.reopen(user.id, id, this.ctx(user, req));
   }
 
   private ctx(user: RequestUser, req: FastifyRequest): AuditContext {

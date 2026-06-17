@@ -1883,6 +1883,7 @@ model Incident {
   transitions IncidentTransition[]
   exceptionLinks IncidentExceptionLink[]
   actions    IncidentAction[]
+  investigation IncidentInvestigation?
 
   @@index([typeId])
   @@index([categoryId])
@@ -2125,6 +2126,9 @@ model IncidentAction {
   canceledById String?
   // --- Evidencia (reservado; descriptores Ola 3 — subida diferida) --------------
   evidence    Json?
+  // Causa raíz que esta acción ATIENDE (Fase 4.2b; ref. blanda, SetNull). Opcional:
+  // las acciones de contención inmediata no nacen de la investigación de causa raíz.
+  investigationStepId String?
   createdById String?
   updatedById String?
   createdAt   DateTime @default(now())
@@ -2132,12 +2136,78 @@ model IncidentAction {
 
   incident Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
   role     Role?    @relation(fields: [responsibleRoleId], references: [id], onDelete: SetNull)
+  investigationStep IncidentInvestigationStep? @relation(fields: [investigationStepId], references: [id], onDelete: SetNull)
 
   @@index([incidentId, createdAt])
   @@index([status])
   @@index([responsibleId])
   @@index([responsibleRoleId])
   @@index([mandatory, status])
+  @@index([investigationStepId])
+}
+
+// === Investigación de causa raíz (Fase 4.2b) ==================================
+
+// Método de investigación. MVP = 5 Porqués (Toyota/Lean/ISO 45001 §10.2). El enum
+// deja la puerta abierta a ICAM/TapRooT como plantillas posteriores sin re-migrar.
+enum IncidentInvestigationMethod {
+  FIVE_WHYS
+}
+
+enum IncidentInvestigationStatus {
+  DRAFT
+  COMPLETED
+}
+
+// Investigación de causa raíz de una incidencia (1:1 lógico). Entidad de primer
+// orden (coherente con IncidentAction/IncidentExceptionLink): auditable, ligable a
+// las acciones CAPA y consultable. Cuando el tipo declara `requiresInvestigation`,
+// debe estar COMPLETED (con ≥1 causa raíz) para cerrar la incidencia. Sin borrado
+// físico (la incidencia no se borra; la investigación vive con ella).
+model IncidentInvestigation {
+  id         String   @id @default(cuid())
+  incidentId String   @unique
+  method     IncidentInvestigationMethod @default(FIVE_WHYS)
+  status     IncidentInvestigationStatus @default(DRAFT)
+  // Enunciado del problema a investigar (el "porqué 0" / problem statement).
+  problemStatement String
+  // Síntesis de la(s) causa(s) raíz (texto narrativo; las causas formales son los
+  // pasos marcados `isRootCause`).
+  rootCauseSummary String?
+  conductedById String? // quién condujo la investigación (ref. blanda)
+  completedAt   DateTime?
+  completedById String?
+  createdById   String?
+  updatedById   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  incident Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  steps    IncidentInvestigationStep[]
+
+  @@index([status])
+}
+
+// Un "porqué" de la cadena 5-Porqués (ordenado). El paso terminal marca la causa
+// raíz (`isRootCause`); puede haber más de uno (causas concurrentes).
+model IncidentInvestigationStep {
+  id              String   @id @default(cuid())
+  investigationId String
+  order           Int
+  // La pregunta "¿por qué?" (enunciado) y su respuesta.
+  statement String
+  answer    String?
+  // ¿Este paso es una causa raíz? (terminal de una rama). Las acciones CAPA pueden
+  // ligarse a una causa raíz.
+  isRootCause Boolean @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  investigation IncidentInvestigation @relation(fields: [investigationId], references: [id], onDelete: Cascade)
+  actions       IncidentAction[]
+
+  @@index([investigationId, order])
+  @@index([isRootCause])
 }
 
 // Transición de flujo EJECUTADA sobre una incidencia (append-only; integridad

@@ -4,6 +4,7 @@ import {
   blockingActionsForClose,
   deriveLifecycle,
   evaluateSla,
+  investigationBlocksClose,
   type AddIncidentCommentRequest,
   type AssignIncidentRequest,
   type CancelIncidentRequest,
@@ -122,6 +123,11 @@ export class IncidentsService {
       ...activities.map((a) => a.actorId),
     ]);
 
+    const typeFlags = await this.prisma.incidentType.findUnique({
+      where: { id: row.typeId },
+      select: { requiresInvestigation: true, requiresCapa: true },
+    });
+
     const states = graph ? [...graph.states.values()].sort((a, b) => a.order - b.order) : [];
     const availableTransitions: IncidentAvailableTransition[] =
       graph && row.currentStateKey && !row.canceledAt
@@ -144,6 +150,8 @@ export class IncidentsService {
     return {
       ...item,
       description: row.description,
+      typeRequiresInvestigation: typeFlags?.requiresInvestigation ?? false,
+      typeRequiresCapa: typeFlags?.requiresCapa ?? false,
       riskProbability: row.riskProbability,
       riskConsequence: row.riskConsequence,
       shiftCode: row.shiftCode,
@@ -364,7 +372,12 @@ export class IncidentsService {
     // OBLIGATORIAS aún abiertas. La verificación de eficacia se EXIGE cuando el tipo
     // declara `requiresCapa` (fork 3): entonces una acción DONE-sin-verificar también
     // bloquea; si no, basta con DONE.
-    if (becomesFinal) await this.assertNoBlockingActions(id, incident.typeId);
+    if (becomesFinal) {
+      await this.assertNoBlockingActions(id, incident.typeId);
+      // Guarda de investigación (Fase 4.2b): si el tipo declara `requiresInvestigation`,
+      // no se puede cerrar sin una investigación COMPLETED con ≥1 causa raíz.
+      await this.assertInvestigationComplete(id, incident.typeId);
+    }
 
     await this.prisma.$transaction(async (tx) => {
       await tx.incidentTransition.create({
@@ -761,6 +774,22 @@ export class IncidentsService {
         requireVerification
           ? `No se puede cerrar: ${blocking.length} acción(es) obligatoria(s) sin completar y verificar.`
           : `No se puede cerrar: ${blocking.length} acción(es) obligatoria(s) sin completar.`,
+      );
+    }
+  }
+
+  /** Impide cerrar si el tipo exige investigación y no está completa (Fase 4.2b). */
+  private async assertInvestigationComplete(incidentId: string, typeId: string): Promise<void> {
+    const type = await this.prisma.incidentType.findUnique({ where: { id: typeId }, select: { requiresInvestigation: true } });
+    const requires = type?.requiresInvestigation ?? false;
+    if (!requires) return;
+    const inv = await this.prisma.incidentInvestigation.findUnique({
+      where: { incidentId },
+      select: { status: true, steps: { select: { isRootCause: true } } },
+    });
+    if (investigationBlocksClose(requires, inv)) {
+      throw new BadRequestException(
+        "No se puede cerrar: el tipo de incidencia exige una investigación de causa raíz completada (con al menos una causa raíz).",
       );
     }
   }

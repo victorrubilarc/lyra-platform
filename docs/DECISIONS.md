@@ -4,6 +4,42 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-17 · Incidencias — Fase 4.2b (Investigación de causa raíz · 5 Porqués) — ✅ IMPLEMENTADO
+
+Investigación de causa raíz configurable y transversal, honrando el flag `IncidentType.requiresInvestigation` (igual que
+4.2a honró `requiresCapa`). Método inicial **5 Porqués** (Toyota/Lean/ISO 45001 §10.2): NO ICAM/TapRooT/Bowtie (sería
+sobreingeniería; el enum de método deja la puerta abierta a agregarlos como plantillas posteriores sin re-migrar). Forks
+resueltos con el dueño (en la recomendación aprobada):
+- **Modelo dedicado, NO JSON.** Dos entidades aditivas `IncidentInvestigation` (1:1 con `Incident`, `method`/`status`
+  DRAFT|COMPLETED/`problemStatement`/`rootCauseSummary`/conducido-por/completado-por) + `IncidentInvestigationStep` (los
+  "porqués" ordenados: `order`/`statement`/`answer`/`isRootCause`). Motivo: coherente con `IncidentAction`/
+  `IncidentExceptionLink` (entidades de primer orden auditables); permite **ligar una causa raíz a una acción CAPA por FK**,
+  auditar por fila y consultar ("incidencias sin investigación cerrada"). Un JSON opaco no daría nada de eso.
+- **Conecta con CAPA:** columna aditiva `IncidentAction.investigationStepId?` (ref. blanda `SetNull`) = la causa raíz que la
+  acción ATIENDE. Opcional (las acciones de contención inmediata no nacen de la investigación). Cierra el lazo
+  problema→causa→acción (ISO 9001 §10.2 / CAPA). El backend valida que el paso pertenezca a la MISMA incidencia.
+- **Bloquea el cierre, configurable (espejo de 4.2a):** si el tipo declara `requiresInvestigation`, no se pasa a estado
+  FINAL sin una investigación **COMPLETED con ≥1 causa raíz** (`assertInvestigationComplete` en `transition`; helper puro
+  autoritativo `investigationBlocksClose` compartido back↔front). Si el tipo no la exige, nunca bloquea (registrable opcional).
+  Se exige una causa raíz FORMAL (paso marcado), no solo texto narrativo: es lo que ata las acciones CAPA.
+- **SIN permiso nuevo — reusa `incident:edit`** (catálogo se queda en **83**). Contraste con 4.2a, que SÍ creó permisos por
+  la segregación de funciones ejecutar≠verificar. En la investigación NO hay esa segregación: documentar la causa raíz es
+  parte de la gestión de la incidencia. Crear `incident:investigation:manage` sería parametrizar por parametrizar
+  (CLAUDE.md). Un futuro gate de aprobación QA de la investigación sí justificaría un permiso (deuda, no MVP).
+- **Drawer a PESTAÑAS:** con Origen+Excepciones+Acciones+Investigación+Comentarios+Timeline el drawer inline era larguísimo
+  (DECISIONS 4.2a ya lo anticipó). Se pasó a **Resumen · Acciones · Investigación · Actividad** (chips de conteo/aviso: punto
+  de alerta cuando hay acciones obligatorias sin resolver o investigación pendiente exigida).
+- **Edición en bloque de la cadena:** el upsert REEMPLAZA los pasos (el cliente envía el estado completo; patrón de edición
+  de listas del proyecto). Solo en DRAFT (una COMPLETED se reabre primero). `complete`/`reopen` como transiciones explícitas.
+  El detalle de la incidencia expone `typeRequiresInvestigation`/`typeRequiresCapa` (para los avisos de la UI).
+
+Migración aditiva `20260617130000_add_incident_investigation` (2 tablas + 2 enums + columna + FKs; aplicada `db execute` +
+`migrate resolve` por el drift del historial). Contracts 271 (+8 helpers) · API 234 sin regresión · smoke
+`smoke-incidencias-investigacion.py` 27/27 + `smoke-incidencias-capa.py` 23/23 + `smoke-incidencias.py` 30/30 sin regresión.
+**Siguiente: 4.3 — Reportabilidad configurable.**
+
+---
+
 ### 2026-06-17 · Incidencias — Auditoría del módulo + Fase 4.2a (Acciones CAPA) — ✅ IMPLEMENTADO
 
 Tras una **auditoría constructiva** del módulo de Incidencias (pedida por el dueño): el core ya es **genérico/transversal** (tipos/

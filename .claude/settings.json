@@ -325,7 +325,18 @@
       "PowerShell(Set-Location \"g:\\\\Development\\\\BitacorasInteligentes\"; python scripts\\\\smoke-incidencias-capa.py 2>&1 | Out-String | Write-Output; \"SMOKE_EXIT=$LASTEXITCODE\")",
       "PowerShell(Set-Location \"g:\\\\Development\\\\BitacorasInteligentes\"; python scripts\\\\smoke-incidencias.py 2>&1 | Select-Object -Last 4; \"EXIT=$LASTEXITCODE\")",
       "PowerShell(Set-Location \"g:\\\\Development\\\\BitacorasInteligentes\"; git checkout main; if \\($?\\) { git merge --no-ff feat/incidencias-capa -m \"merge: Fase 4.2a — Acciones CAPA \\(incidencias\\) \\(16c1018\\)\" }; \"MERGE_EXIT=$LASTEXITCODE\")",
-      "PowerShell(Set-Location \"g:\\\\Development\\\\BitacorasInteligentes\"; git push origin main; \"PUSH_EXIT=$LASTEXITCODE\"; \"--- unpushed count ---\"; git rev-list --count origin/main..main; \"--- status ---\"; git status --short)"
+      "PowerShell(Set-Location \"g:\\\\Development\\\\BitacorasInteligentes\"; git push origin main; \"PUSH_EXIT=$LASTEXITCODE\"; \"--- unpushed count ---\"; git rev-list --count origin/main..main; \"--- status ---\"; git status --short)",
+      "PowerShell(git checkout -b feat/incidencias-investigacion)",
+      "PowerShell($env:PRISMA_HIDE_UPDATE_MESSAGE=\"1\"; pnpm --filter @lyra/watchlog-api exec dotenv -e ../../.env -- prisma db execute --schema prisma/schema.prisma --file prisma/migrations/20260617130000_add_incident_investigation/migration.sql 2>&1 | Select-Object -Last 20)",
+      "PowerShell(docker compose -f g:\\\\Development\\\\BitacorasInteligentes\\\\docker-compose.dev.yml up -d db 2>&1)",
+      "PowerShell(docker compose -f g:\\\\Development\\\\BitacorasInteligentes\\\\docker-compose.dev.yml up -d postgres redis minio 2>&1)",
+      "Bash(pnpm --filter @lyra/watchlog-api start:dev)",
+      "Bash(echo \"API launching, pid $!\")",
+      "Bash(curl -sf http://localhost:3000/api/health)",
+      "Bash(pnpm exec *)",
+      "Bash(echo \"API launching pid $!\")",
+      "Bash(python scripts/smoke-incidencias-investigacion.py)",
+      "Bash(python scripts/smoke-incidencias-capa.py)"
     ],
     "additionalDirectories": [
       "\\tmp"

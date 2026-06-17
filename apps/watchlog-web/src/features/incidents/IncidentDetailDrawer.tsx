@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { AlertTriangle, ArrowRight, Ban, MessageSquare, Send, ShieldCheck } from "lucide-react";
+import { Activity, AlertTriangle, ArrowRight, Ban, ClipboardList, GitBranch, Info, MessageSquare, Send, ShieldCheck } from "lucide-react";
 import type { IncidentAvailableTransition } from "@lyra/contracts";
+import { isInvestigationComplete } from "@lyra/contracts";
 import { Button, Drawer, Input, Modal, Select, Spinner, Textarea, useToast } from "@lyra/ui";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { formatDateTime } from "../../lib/format.js";
@@ -10,10 +11,13 @@ import {
   useAssignableUsers,
   useCancelIncident,
   useCommentIncident,
+  useIncidentActions,
   useIncidentDetail,
+  useIncidentInvestigation,
   useTransitionIncident,
 } from "./incidents-queries.js";
 import { IncidentActionsBlock } from "./IncidentActionsBlock.js";
+import { IncidentInvestigationBlock } from "./IncidentInvestigationBlock.js";
 import { LIFECYCLE_META, ORIGIN_META, PRIORITY_META, severityColor, severityLabel } from "./incidents-presentation.js";
 import { useExceptions } from "../exceptions/exceptions-queries.js";
 import { THRESHOLD_META, formatExceptionValue } from "../exceptions/exceptions-presentation.js";
@@ -38,6 +42,13 @@ export function IncidentDetailDrawer({ incidentId, onClose }: Props) {
   const [commentText, setCommentText] = useState("");
   const [pending, setPending] = useState<IncidentAvailableTransition | null>(null);
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [tab, setTab] = useState<"resumen" | "acciones" | "investigacion" | "actividad">("resumen");
+
+  // Conteos/avisos para los chips de pestaña (cacheados; las dedupea React Query).
+  const { data: actionsForTab = [] } = useIncidentActions(incidentId);
+  const { data: investigationForTab } = useIncidentInvestigation(incidentId);
+  const pendingMandatory = actionsForTab.filter((a) => a.mandatory && a.status !== "VERIFIED" && a.status !== "CANCELED").length;
+  const investigationBlocks = !!inc?.typeRequiresInvestigation && !isInvestigationComplete(investigationForTab);
 
   const title = inc ? (
     <div className={styles.drawerHead}>
@@ -74,6 +85,26 @@ export function IncidentDetailDrawer({ incidentId, onClose }: Props) {
             {inc.potentialSeverity ? ` · potencial ${severityLabel(inc.potentialSeverity)}` : ""}
           </div>
 
+          {/* Pestañas (Fase 4.2b) */}
+          <div className={styles.drawerTabs} role="tablist">
+            <button role="tab" aria-selected={tab === "resumen"} className={tab === "resumen" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setTab("resumen")}>
+              <Info size={14} /> Resumen
+            </button>
+            <button role="tab" aria-selected={tab === "acciones"} className={tab === "acciones" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setTab("acciones")}>
+              <ClipboardList size={14} /> Acciones
+              {actionsForTab.length > 0 && <span className={styles.tabBadge}>{actionsForTab.length}</span>}
+              {pendingMandatory > 0 && <span className={styles.tabDot} title="Acciones obligatorias sin resolver" />}
+            </button>
+            <button role="tab" aria-selected={tab === "investigacion"} className={tab === "investigacion" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setTab("investigacion")}>
+              <GitBranch size={14} /> Investigación
+              {investigationBlocks && <span className={styles.tabDot} title="Investigación pendiente (exigida para cerrar)" />}
+            </button>
+            <button role="tab" aria-selected={tab === "actividad"} className={tab === "actividad" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setTab("actividad")}>
+              <Activity size={14} /> Actividad
+            </button>
+          </div>
+
+          {tab === "resumen" && (<>
           {/* Stepper de estados del flujo */}
           {inc.states.length > 0 && (
             <div className={styles.stepper}>
@@ -140,9 +171,30 @@ export function IncidentDetailDrawer({ incidentId, onClose }: Props) {
             </div>
           )}
 
-          {/* Acciones CAPA (Fase 4.2a) */}
-          {can("module:incidents:view") && <IncidentActionsBlock incidentId={inc.id} incidentOpen={inc.lifecycle === "OPEN"} />}
+          {/* Anular */}
+          {inc.lifecycle !== "CANCELED" && can("incident:cancel") && (
+            <div className={styles.dangerZone}>
+              <Button variant="secondary" leftIcon={<Ban size={15} />} onClick={() => setCancelOpen(true)}>Anular incidencia</Button>
+            </div>
+          )}
+          </>)}
 
+          {/* Pestaña Acciones CAPA (Fase 4.2a) */}
+          {tab === "acciones" && can("module:incidents:view") && (
+            <IncidentActionsBlock incidentId={inc.id} incidentOpen={inc.lifecycle === "OPEN"} />
+          )}
+
+          {/* Pestaña Investigación de causa raíz (Fase 4.2b) */}
+          {tab === "investigacion" && can("module:incidents:view") && (
+            <IncidentInvestigationBlock
+              incidentId={inc.id}
+              requiresInvestigation={inc.typeRequiresInvestigation}
+              incidentOpen={inc.lifecycle === "OPEN"}
+              canEdit={can("incident:edit")}
+            />
+          )}
+
+          {tab === "actividad" && (<>
           {/* Comentarios */}
           <div className={styles.sectionTitle}><MessageSquare size={15} /> Comentarios ({inc.comments.length})</div>
           <div className={styles.comments}>
@@ -168,13 +220,7 @@ export function IncidentDetailDrawer({ incidentId, onClose }: Props) {
               <li key={a.id}><span className={styles.muted}>{formatDateTime(a.occurredAt)}</span> — {a.summary}{a.actorName ? ` · ${a.actorName}` : ""}</li>
             ))}
           </ul>
-
-          {/* Anular */}
-          {inc.lifecycle !== "CANCELED" && can("incident:cancel") && (
-            <div className={styles.dangerZone}>
-              <Button variant="secondary" leftIcon={<Ban size={15} />} onClick={() => setCancelOpen(true)}>Anular incidencia</Button>
-            </div>
-          )}
+          </>)}
         </div>
       )}
 

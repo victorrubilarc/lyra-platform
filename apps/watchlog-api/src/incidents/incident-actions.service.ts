@@ -51,6 +51,7 @@ export class IncidentActionsService {
     if (incident.lifecycle !== "OPEN") throw new BadRequestException("No se pueden agregar acciones a una incidencia cerrada o anulada");
     if (dto.responsibleId) await this.assertUserExists(dto.responsibleId);
     if (dto.responsibleRoleId) await this.assertRoleExists(dto.responsibleRoleId);
+    if (dto.investigationStepId) await this.assertStepBelongsToIncident(dto.investigationStepId, incidentId);
 
     const row = await this.prisma.incidentAction.create({
       data: {
@@ -62,6 +63,7 @@ export class IncidentActionsService {
         responsibleId: dto.responsibleId ?? null,
         responsibleRoleId: dto.responsibleRoleId ?? null,
         dueAt: dto.dueAt ? new Date(dto.dueAt) : null,
+        investigationStepId: dto.investigationStepId ?? null,
         status: "OPEN",
         createdById: userId,
         updatedById: userId,
@@ -86,6 +88,7 @@ export class IncidentActionsService {
     }
     if (dto.responsibleId) await this.assertUserExists(dto.responsibleId);
     if (dto.responsibleRoleId) await this.assertRoleExists(dto.responsibleRoleId);
+    if (dto.investigationStepId) await this.assertStepBelongsToIncident(dto.investigationStepId, before.incidentId);
     // `status` solo conmuta entre los NO terminales (OPEN ↔ IN_PROGRESS).
     const nextStatus: IncidentActionStatus | undefined =
       dto.status === undefined ? undefined : dto.status;
@@ -100,6 +103,7 @@ export class IncidentActionsService {
         responsibleId: dto.responsibleId === undefined ? undefined : dto.responsibleId,
         responsibleRoleId: dto.responsibleRoleId === undefined ? undefined : dto.responsibleRoleId,
         dueAt: dto.dueAt === undefined ? undefined : dto.dueAt ? new Date(dto.dueAt) : null,
+        investigationStepId: dto.investigationStepId === undefined ? undefined : dto.investigationStepId,
         status: nextStatus,
         updatedById: userId,
       },
@@ -209,6 +213,10 @@ export class IncidentActionsService {
     const roleNames = roleIds.length
       ? new Map((await this.prisma.role.findMany({ where: { id: { in: roleIds } }, select: { id: true, name: true } })).map((r) => [r.id, r.name]))
       : new Map<string, string>();
+    const stepIds = [...new Set(rows.map((r) => r.investigationStepId).filter((x): x is string => !!x))];
+    const stepLabels = stepIds.length
+      ? new Map((await this.prisma.incidentInvestigationStep.findMany({ where: { id: { in: stepIds } }, select: { id: true, statement: true } })).map((s) => [s.id, s.statement]))
+      : new Map<string, string>();
     const now = Date.now();
     return rows.map((r) => {
       const open = r.status === "OPEN" || r.status === "IN_PROGRESS";
@@ -236,6 +244,8 @@ export class IncidentActionsService {
         verifiedByName: r.verifiedById ? userNames.get(r.verifiedById) ?? null : null,
         effectivenessOutcome: r.effectivenessOutcome,
         verificationNote: r.verificationNote,
+        investigationStepId: r.investigationStepId,
+        investigationStepLabel: r.investigationStepId ? stepLabels.get(r.investigationStepId) ?? null : null,
         canceledAt: r.canceledAt?.toISOString() ?? null,
         cancelReason: r.cancelReason,
         createdAt: r.createdAt.toISOString(),
@@ -283,6 +293,17 @@ export class IncidentActionsService {
   private async assertRoleExists(roleId: string): Promise<void> {
     const r = await this.prisma.role.findUnique({ where: { id: roleId }, select: { id: true } });
     if (!r) throw new BadRequestException("El rol responsable no existe");
+  }
+
+  /** La causa raíz ligada debe pertenecer a la investigación de ESTA incidencia. */
+  private async assertStepBelongsToIncident(stepId: string, incidentId: string): Promise<void> {
+    const step = await this.prisma.incidentInvestigationStep.findUnique({
+      where: { id: stepId },
+      select: { investigation: { select: { incidentId: true } } },
+    });
+    if (!step || step.investigation.incidentId !== incidentId) {
+      throw new BadRequestException("La causa raíz indicada no pertenece a esta incidencia");
+    }
   }
 
   private snapshot(row: IncidentActionRow): Prisma.InputJsonValue {
