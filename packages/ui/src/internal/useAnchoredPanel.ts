@@ -30,11 +30,20 @@ export function useAnchoredPanel(
     // Espacio REAL disponible para el panel a cada lado del trigger.
     const spaceBelow = vh - r.bottom - margin - gap;
     const spaceAbove = r.top - margin - gap;
-    // Tope absoluto independiente del estado previo: evita que `maxHeight` se
-    // REALIMENTE de un `scrollHeight` ya recortado (lo que encogía el panel a
-    // cada recálculo). Con un tope constante por viewport, la altura converge.
     const absCap = Math.round(vh * 0.7);
-    const natural = panelRef.current?.scrollHeight || absCap;
+    // Altura NATURAL (contenido completo) del panel. Se mide SIN el `maxHeight`
+    // vigente: como la lista interna tiene su PROPIO overflow, el `scrollHeight`
+    // del panel ya restringido = su alto actual, y al borrar el filtro el panel
+    // se quedaba pequeño (no podía RECRECER). Quitar el tope un instante (en
+    // useLayoutEffect, antes de pintar ⇒ sin parpadeo) deja medir el alto real.
+    const el = panelRef.current;
+    let natural = absCap;
+    if (el) {
+      const prevMaxHeight = el.style.maxHeight;
+      el.style.maxHeight = "none";
+      natural = el.scrollHeight;
+      el.style.maxHeight = prevMaxHeight;
+    }
     // Altura deseada acotada al tope (no a la medición previa del panel).
     const wantHeight = Math.min(natural, absCap);
     // Abre hacia arriba si no cabe abajo y arriba hay más espacio.
