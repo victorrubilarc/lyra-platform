@@ -667,6 +667,29 @@ auto-verificarla). Todo respeta tu **alcance por nodo** (heredado de la incidenc
 - *Por ahora:* la **evidencia con archivos** en la acción y el **rol como responsable** desde la
   pantalla llegan en una actualización siguiente (el cierre ya admite notas de texto).
 
+**Caso de uso — falla de equipo en planta (con verificación).**
+1. Una bitácora reporta vibración alta en la bomba P-101 → se abre la incidencia **INC-0042**
+   (tipo *Mantenimiento*; ese tipo está configurado para **exigir CAPA**).
+2. El supervisor abre el detalle y crea **dos acciones**:
+   - *Correctiva* — «Reemplazar rodamiento de P-101», responsable Juan Pérez, plazo mañana,
+     marcada **Obligatoria**.
+   - *Preventiva* — «Agregar P-101 a la ronda de vibraciones semanal», marcada **Obligatoria**.
+3. El equipo trabaja la incidencia y la lleva hasta *En verificación*. Intenta **Cerrar** →
+   el sistema lo **impide**: «No se puede cerrar: 2 acciones obligatorias sin completar».
+4. Juan reemplaza el rodamiento y pulsa **«Completar»** con la nota «Rodamiento SKF cambiado,
+   OT-3391». La acción queda *Realizada*. Hace lo mismo con la preventiva.
+5. Intenta cerrar otra vez → **sigue bloqueado**: como el tipo exige CAPA, las acciones deben
+   **verificarse**, no solo realizarse.
+6. El ingeniero de confiabilidad (que tiene el permiso de **verificar**, distinto del que las
+   ejecutó) abre cada acción, pulsa **«Verificar»** y marca **Eficaz** («vibración en rango tras
+   72 h»). Las acciones quedan *Verificadas*.
+7. Ahora **«Cerrar incidencia»** funciona. Todo el recorrido (quién creó/completó/verificó cada
+   acción y cuándo) queda en el **timeline**.
+
+> En un tipo que **no** exige CAPA (p. ej. *Operacional*), bastaría con **«Completar»** las
+> acciones obligatorias para poder cerrar; la verificación es opcional. Y si al verificar se marca
+> **«No eficaz»**, la acción se **reabre** y vuelve a bloquear el cierre hasta resolverse de verdad.
+
 ### Catálogos de incidencias (tipos y categorías)
 
 **Para qué sirve.** Los **tipos** (p. ej. Seguridad, Equipos, Medio ambiente) y las
