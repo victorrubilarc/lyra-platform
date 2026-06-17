@@ -339,7 +339,15 @@
       "Bash(python scripts/smoke-incidencias-capa.py)",
       "Bash(curl -sf http://localhost:5173)",
       "Bash(echo \"web launching pid $!\")",
-      "Bash(python scripts/smoke-permisos-seccion.py)"
+      "Bash(python scripts/smoke-permisos-seccion.py)",
+      "PowerShell(Get-Process node -ErrorAction SilentlyContinue | Select-Object Id, @{N='Started';E={$_.StartTime}} | Format-Table -AutoSize; Write-Output \"---PORT 3001---\"; \\(Test-NetConnection -ComputerName localhost -Port 3001 -WarningAction SilentlyContinue\\).TcpTestSucceeded)",
+      "PowerShell(foreach \\($p in 3000,4000,8080,5173\\) { $r = \\(Test-NetConnection -ComputerName localhost -Port $p -WarningAction SilentlyContinue\\).TcpTestSucceeded; Write-Output \"$p : $r\" })",
+      "PowerShell(Get-CimInstance Win32_Process -Filter \"Name='node.exe'\" | Select-Object ProcessId, @{N='CL';E={$_.CommandLine.Substring\\(0,[Math]::Min\\(160,$_.CommandLine.Length\\)\\)}} | Format-List)",
+      "Bash(echo \"started, pid $!\")",
+      "PowerShell(\\(Test-NetConnection -ComputerName localhost -Port 3000 -WarningAction SilentlyContinue\\).TcpTestSucceeded)",
+      "Bash(tail -25 /tmp/watchlog-api-dev.log)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/api/health)",
+      "Bash(python scripts/smoke-incidencias-reportabilidad.py)"
     ],
     "additionalDirectories": [
       "\\tmp"

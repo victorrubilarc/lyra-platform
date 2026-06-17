@@ -126,9 +126,9 @@ export function IncidentTypeModal({ open, onClose, type, existingKeys }: Props) 
         </label>
 
         <div className={styles.flags}>
-          <FlagRow label="Requiere investigación" hint="Las incidencias de este tipo exigen investigación (4.2)." checked={requiresInvestigation} onChange={setRequiresInvestigation} />
-          <FlagRow label="Requiere CAPA" hint="Acciones correctivas/preventivas obligatorias (4.3)." checked={requiresCapa} onChange={setRequiresCapa} />
-          <FlagRow label="Reportable por defecto" hint="Marca la incidencia como reportable a la autoridad." checked={reportableDefault} onChange={setReportableDefault} />
+          <FlagRow label="Requiere investigación" hint="Las incidencias de este tipo exigen investigación de causa raíz para cerrar." checked={requiresInvestigation} onChange={setRequiresInvestigation} />
+          <FlagRow label="Requiere CAPA" hint="Acciones correctivas/preventivas obligatorias para cerrar (verificación de eficacia)." checked={requiresCapa} onChange={setRequiresCapa} />
+          <FlagRow label="Reportable por defecto" hint="Al crear la incidencia, materializa los reportes de las obligaciones aplicables (autoridades)." checked={reportableDefault} onChange={setReportableDefault} />
         </div>
       </div>
     </Modal>

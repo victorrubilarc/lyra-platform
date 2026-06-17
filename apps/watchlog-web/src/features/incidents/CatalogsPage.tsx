@@ -1,17 +1,20 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Lock, Pencil, Plus, Search, Tags } from "lucide-react";
-import type { IncidentCategoryDto, IncidentTypeDto } from "@lyra/contracts";
+import type { IncidentCategoryDto, IncidentTypeDto, ReportingObligationDto } from "@lyra/contracts";
 import { Button, Chip, EmptyState, GridPager, Input, Select, Spinner, Toggle, useToast } from "@lyra/ui";
 import { usePermissions } from "../../auth/use-permissions.js";
 import {
   useIncidentCategoriesAdmin,
   useIncidentTypesAdmin,
+  useReportingObligationsAdmin,
   useUpsertIncidentCategory,
   useUpsertIncidentType,
+  useUpsertReportingObligation,
 } from "./incidents-queries.js";
 import { IncidentTypeModal } from "./IncidentTypeModal.js";
 import { IncidentCategoryModal } from "./IncidentCategoryModal.js";
+import { ReportingObligationModal } from "./ReportingObligationModal.js";
 import styles from "./catalogs.module.css";
 
 type ActiveFilter = "all" | "active" | "inactive";
@@ -23,7 +26,7 @@ type ActiveFilter = "all" | "active" | "inactive";
  */
 export function CatalogsPage() {
   const { can } = usePermissions();
-  const [tab, setTab] = useState<"types" | "categories">("types");
+  const [tab, setTab] = useState<"types" | "categories" | "obligations">("types");
 
   if (!can("incidentcatalog:manage")) {
     return (
@@ -39,16 +42,17 @@ export function CatalogsPage() {
         <div>
           <Link to="/incidencias" className={styles.back}><ArrowLeft size={14} /> Volver a incidencias</Link>
           <h1 className={styles.h1}><Tags size={22} /> Catálogos de incidencias</h1>
-          <p className={styles.sub}>Administra los tipos y categorías disponibles al reportar incidencias.</p>
+          <p className={styles.sub}>Administra los tipos, categorías y obligaciones de reporte disponibles al reportar incidencias.</p>
         </div>
       </header>
 
       <div className={styles.tabs} role="tablist">
         <button role="tab" aria-selected={tab === "types"} className={tab === "types" ? styles.tabActive : styles.tab} onClick={() => setTab("types")}>Tipos</button>
         <button role="tab" aria-selected={tab === "categories"} className={tab === "categories" ? styles.tabActive : styles.tab} onClick={() => setTab("categories")}>Categorías</button>
+        <button role="tab" aria-selected={tab === "obligations"} className={tab === "obligations" ? styles.tabActive : styles.tab} onClick={() => setTab("obligations")}>Obligaciones de reporte</button>
       </div>
 
-      {tab === "types" ? <TypesTab /> : <CategoriesTab />}
+      {tab === "types" ? <TypesTab /> : tab === "categories" ? <CategoriesTab /> : <ObligationsTab />}
     </div>
   );
 }
@@ -255,4 +259,96 @@ function CategoriesTab() {
       <IncidentCategoryModal open={open} onClose={() => setOpen(false)} category={editing} types={types} existingKeys={existingKeys} />
     </>
   );
+}
+
+function ObligationsTab() {
+  const toast = useToast();
+  const { data: obligations = [], isLoading } = useReportingObligationsAdmin();
+  const { data: types = [] } = useIncidentTypesAdmin();
+  const upsert = useUpsertReportingObligation();
+  const [editing, setEditing] = useState<ReportingObligationDto | null>(null);
+  const [open, setOpen] = useState(false);
+
+  const { pageRows, total, filterProps, pagerProps } = useCatalogFilter(obligations);
+  const existingKeys = useMemo(() => obligations.map((o) => o.key.toLowerCase()), [obligations]);
+
+  function toggleActive(o: ReportingObligationDto) {
+    upsert.mutate(
+      { dto: {
+        key: o.key, name: o.name, description: o.description, authorityName: o.authorityName,
+        defaultDueMinutes: o.defaultDueMinutes, appliesToTypeIds: o.appliesToTypeIds, minSeverity: o.minSeverity,
+        mandatory: o.mandatory, sortOrder: o.sortOrder, active: !o.active,
+      } },
+      { onSuccess: () => toast.success(o.active ? "Obligación desactivada" : "Obligación activada"), onError: (e) => toast.error((e as Error).message) },
+    );
+  }
+
+  const pager = <GridPager {...pagerProps} />;
+
+  return (
+    <>
+      <div className={styles.toolbar}>
+        <Filters {...filterProps} />
+        <Button variant="primary" leftIcon={<Plus size={16} />} onClick={() => { setEditing(null); setOpen(true); }}>Nueva obligación</Button>
+      </div>
+
+      {isLoading ? <div className={styles.center}><Spinner /></div>
+        : total === 0 ? <EmptyState icon={<Tags size={32} />} title="Sin obligaciones" description="No hay obligaciones de reporte que coincidan con los filtros." />
+        : (
+          <>
+            {pager}
+            <div className={styles.tableCard}>
+              <table className={styles.table}>
+                <thead><tr>
+                  <th>Obligación</th><th>Clave</th><th>Autoridad</th><th>Aplica a</th><th>Plazo</th><th>Comportamiento</th><th>Estado</th><th></th>
+                </tr></thead>
+                <tbody>
+                  {pageRows.map((o) => (
+                    <tr key={o.id} className={o.active ? undefined : styles.inactiveRow}>
+                      <td>
+                        {o.name}
+                        {o.description && <div className={styles.cellDesc}>{o.description}</div>}
+                      </td>
+                      <td><span className={styles.mono}>{o.key}</span></td>
+                      <td>{o.authorityName ?? <span className={styles.muted}>—</span>}</td>
+                      <td>
+                        {o.appliesToTypeNames.length === 0
+                          ? <Chip label="Todos los tipos" variant="default" />
+                          : <span className={styles.cellDesc}>{o.appliesToTypeNames.join(", ")}</span>}
+                        {o.minSeverity != null && <div className={styles.cellDesc}>Severidad ≥ {o.minSeverity}</div>}
+                      </td>
+                      <td>{o.defaultDueMinutes != null ? formatDueMinutes(o.defaultDueMinutes) : <span className={styles.muted}>Sin plazo</span>}</td>
+                      <td>
+                        <div className={styles.flagsCell}>
+                          {o.mandatory ? <Chip label="Obligatorio" variant="warning" /> : <span className={styles.muted}>Informativo</span>}
+                        </div>
+                      </td>
+                      <td>
+                        <span className={styles.toggleCell}>
+                          <Toggle checked={o.active} onChange={() => toggleActive(o)} size="sm" aria-label={o.active ? "Desactivar" : "Activar"} />
+                          <span className={styles.muted}>{o.active ? "Activo" : "Inactivo"}</span>
+                        </span>
+                      </td>
+                      <td className={styles.actionsCell}>
+                        <Button variant="icon" aria-label="Editar" onClick={() => { setEditing(o); setOpen(true); }}><Pencil size={16} /></Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {pager}
+          </>
+        )}
+
+      <ReportingObligationModal open={open} onClose={() => setOpen(false)} obligation={editing} types={types} existingKeys={existingKeys} />
+    </>
+  );
+}
+
+/** Plazo legible a partir de minutos (h / días). */
+function formatDueMinutes(min: number): string {
+  if (min % 1440 === 0) return `${min / 1440} día(s)`;
+  if (min % 60 === 0) return `${min / 60} h`;
+  return `${min} min`;
 }

@@ -4,34 +4,46 @@ import {
   addIncidentCommentRequestSchema,
   assignIncidentRequestSchema,
   cancelIncidentActionRequestSchema,
+  cancelIncidentReportRequestSchema,
   cancelIncidentRequestSchema,
   completeIncidentActionRequestSchema,
   completeIncidentInvestigationRequestSchema,
   createIncidentActionRequestSchema,
+  createIncidentReportRequestSchema,
   createIncidentRequestSchema,
   incidentListQuerySchema,
+  markIncidentReportNotApplicableRequestSchema,
+  submitIncidentReportRequestSchema,
   transitionIncidentRequestSchema,
   updateIncidentActionRequestSchema,
+  updateIncidentReportRequestSchema,
   upsertIncidentInvestigationRequestSchema,
   updateIncidentRequestSchema,
   upsertIncidentCategoryRequestSchema,
   upsertIncidentTypeRequestSchema,
+  upsertReportingObligationRequestSchema,
   verifyIncidentActionRequestSchema,
   type AddIncidentCommentRequest,
   type AssignIncidentRequest,
   type CancelIncidentActionRequest,
+  type CancelIncidentReportRequest,
   type CancelIncidentRequest,
   type CompleteIncidentActionRequest,
   type CompleteIncidentInvestigationRequest,
   type CreateIncidentActionRequest,
+  type CreateIncidentReportRequest,
   type CreateIncidentRequest,
   type IncidentListQuery,
+  type MarkIncidentReportNotApplicableRequest,
+  type SubmitIncidentReportRequest,
   type TransitionIncidentRequest,
   type UpdateIncidentActionRequest,
+  type UpdateIncidentReportRequest,
   type UpdateIncidentRequest,
   type UpsertIncidentInvestigationRequest,
   type UpsertIncidentCategoryRequest,
   type UpsertIncidentTypeRequest,
+  type UpsertReportingObligationRequest,
   type VerifyIncidentActionRequest,
 } from "@lyra/contracts";
 import type { AuditContext } from "../audit/audit.service";
@@ -40,6 +52,7 @@ import { CurrentUser, RequirePermission } from "../authz/authz.decorators";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { IncidentActionsService } from "./incident-actions.service";
 import { IncidentInvestigationService } from "./incident-investigation.service";
+import { IncidentReportsService } from "./incident-reports.service";
 import { IncidentsService } from "./incidents.service";
 
 @Controller("incidents")
@@ -48,6 +61,7 @@ export class IncidentsController {
     private readonly incidents: IncidentsService,
     private readonly actions: IncidentActionsService,
     private readonly investigation: IncidentInvestigationService,
+    private readonly reports: IncidentReportsService,
   ) {}
 
   // --- Catálogos (antes de :id para no chocar) -------------------------------
@@ -84,6 +98,25 @@ export class IncidentsController {
     @Query("create") create?: string,
   ) {
     return this.incidents.upsertCategory(dto, this.ctx(user, req), create === "true");
+  }
+
+  // --- Catálogo de obligaciones de reporte (Fase 4.3) ------------------------
+
+  @Get("obligations")
+  @RequirePermission("incident:view")
+  listObligations(@Query("includeInactive") includeInactive?: string) {
+    return this.reports.listObligations(includeInactive === "true");
+  }
+
+  @Post("obligations")
+  @RequirePermission("incidentcatalog:manage")
+  upsertObligation(
+    @Body(new ZodValidationPipe(upsertReportingObligationRequestSchema)) dto: UpsertReportingObligationRequest,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+    @Query("create") create?: string,
+  ) {
+    return this.reports.upsertObligation(dto, this.ctx(user, req), create === "true");
   }
 
   // --- KPIs ------------------------------------------------------------------
@@ -297,6 +330,80 @@ export class IncidentsController {
   @RequirePermission("incident:edit")
   reopenInvestigation(@Param("id") id: string, @CurrentUser() user: RequestUser, @Req() req: FastifyRequest) {
     return this.investigation.reopen(user.id, id, this.ctx(user, req));
+  }
+
+  // --- Reportabilidad (Fase 4.3; gobernada por incident:edit) ----------------
+
+  @Get(":id/reports")
+  @RequirePermission("incident:view")
+  listReports(@Param("id") id: string, @CurrentUser() user: RequestUser) {
+    return this.reports.list(user.id, id);
+  }
+
+  /** Re-derivar los reportes aplicables (materializa los que falten). */
+  @Post(":id/reports/materialize")
+  @HttpCode(200)
+  @RequirePermission("incident:edit")
+  materializeReports(@Param("id") id: string, @CurrentUser() user: RequestUser, @Req() req: FastifyRequest) {
+    return this.reports.materializeForIncident(user.id, id, this.ctx(user, req));
+  }
+
+  @Post(":id/reports")
+  @RequirePermission("incident:edit")
+  createReport(
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(createIncidentReportRequestSchema)) dto: CreateIncidentReportRequest,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.reports.create(user.id, id, dto, this.ctx(user, req));
+  }
+
+  @Patch("reports/:reportId")
+  @RequirePermission("incident:edit")
+  updateReport(
+    @Param("reportId") reportId: string,
+    @Body(new ZodValidationPipe(updateIncidentReportRequestSchema)) dto: UpdateIncidentReportRequest,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.reports.update(user.id, reportId, dto, this.ctx(user, req));
+  }
+
+  @Post("reports/:reportId/submit")
+  @HttpCode(200)
+  @RequirePermission("incident:edit")
+  submitReport(
+    @Param("reportId") reportId: string,
+    @Body(new ZodValidationPipe(submitIncidentReportRequestSchema)) dto: SubmitIncidentReportRequest,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.reports.submit(user.id, reportId, dto, this.ctx(user, req));
+  }
+
+  @Post("reports/:reportId/not-applicable")
+  @HttpCode(200)
+  @RequirePermission("incident:edit")
+  markReportNotApplicable(
+    @Param("reportId") reportId: string,
+    @Body(new ZodValidationPipe(markIncidentReportNotApplicableRequestSchema)) dto: MarkIncidentReportNotApplicableRequest,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.reports.markNotApplicable(user.id, reportId, dto, this.ctx(user, req));
+  }
+
+  @Post("reports/:reportId/cancel")
+  @HttpCode(200)
+  @RequirePermission("incident:edit")
+  cancelReport(
+    @Param("reportId") reportId: string,
+    @Body(new ZodValidationPipe(cancelIncidentReportRequestSchema)) dto: CancelIncidentReportRequest,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.reports.cancel(user.id, reportId, dto, this.ctx(user, req));
   }
 
   private ctx(user: RequestUser, req: FastifyRequest): AuditContext {

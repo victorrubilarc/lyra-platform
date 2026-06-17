@@ -544,10 +544,32 @@ tabla existente. El catálogo de EVENTOS vive en CÓDIGO (`@lyra/contracts NOTIF
   cierra sin una investigación COMPLETED con ≥1 causa raíz (`assertInvestigationComplete` en `transition`; helper puro
   `investigationBlocksClose` back↔front). **Sin permiso nuevo** (reusa `incident:edit`; cat. se queda en 83). El detalle de la
   incidencia expone `typeRequiresInvestigation`/`typeRequiresCapa` para los avisos de la UI.
-- **Diferido (4.3+):** `IncidentRegulatoryFlag`/clasificación minera/IF-IG (4.3) · excepción por CELDA de TABLE/MATRIX ·
-  adjuntos a nivel de incidencia (MinIO, patrón Ola 3) · registro Part 11 con `payloadHash` para incidencias y para
-  correcciones de excepción · subida de evidencia a la acción CAPA (columna `evidence` reservada) · firma Part 11 al verificar
-  eficacia y al completar la investigación.
+- **ReportingObligation** *(implementado 4.3)* — catálogo CONFIGURABLE de obligaciones de reporte (migración
+  `20260617140000_add_incident_reporting`): `key` único, `name`/`description`, `authorityName?` (a quién se reporta),
+  `defaultDueMinutes?` (plazo por defecto), **`appliesToTypeIds String[]`** (vacío = todos los tipos), `minSeverity?` (null =
+  cualquiera), **`mandatory`** (si está pendiente, bloquea el cierre), `active`/`sortOrder`/`deletedAt`. Espejo de
+  `IncidentType`/`IncidentCategory` (editable por UI, gate `incidentcatalog:manage`). Los marcos regulatorios concretos por
+  vertical (DS 132, SERNAGEOMIN, ISO 14001, etc.) son **seed/dato**, NUNCA lógica. *1—N* **IncidentReport**.
+- **IncidentReport** *(implementado 4.3)* — materialización de un reporte de una incidencia (N por incidencia; espejo de
+  `IncidentAction`). Folio `REP-####` (de `number`). **Snapshot** de la obligación en la materialización (`obligationName`,
+  `authorityName`, **`mandatory`**) para integridad histórica (cambiar el catálogo no altera lo materializado). `status` (enum
+  **`IncidentReportStatus`** PENDING/SUBMITTED/NOT_APPLICABLE/CANCELED), `dueAt?`; evidencia de envío `submittedAt?`/
+  `submittedById?`/`externalFolio?`/`notes?`; anulación sin borrado físico (`canceledAt`/`cancelReason`/`canceledById`);
+  `evidence Json?` reservado (Storage Ola 3). FK Cascade desde Incident, FK Restrict desde ReportingObligation. Índices
+  `(incidentId,createdAt)`, `(status,dueAt)`, `(mandatory,status)`. **Materialización (4.3):** al crear una incidencia
+  reportable (`reportableDefault` del tipo o `reportable` explícito) se crean los reportes de las obligaciones aplicables
+  (helper puro `applicableObligationsFor` por tipo+severidad; idempotente; endpoint `…/reports/materialize` re-deriva).
+  **Bloqueo de cierre (4.3):** un reporte de obligación `mandatory` aún PENDING bloquea el cierre (`assertNoBlockingReports`
+  en `transition`; helper puro `reportsBlockingClose` back↔front; se resuelve con SUBMITTED o NOT_APPLICABLE+motivo).
+  **"Vencido" se DERIVA** (`status=PENDING AND dueAt<now`; `isReportOverdue`), sin estado persistido ni cron — KPI
+  `stats.reportOverdue`, filtro `reportOverdueOnly`, flag `reportOverdue` por fila. **Sin permiso nuevo** (catálogo
+  `incidentcatalog:manage`, reportes `incident:edit`; cat. 83).
+- **Diferido (4.4+):** unificar el criterio de "vencida" del módulo (`Incident.dueAt` vs `WorkflowState.maxStayMinutes`, §21) ·
+  **aviso de plazo de reporte** "por vencer/vencido" (épico de notificaciones avanzadas) · `IncidentRegulatoryFlag`/
+  clasificación minera/IF-IG · excepción por CELDA de TABLE/MATRIX · adjuntos a nivel de incidencia (MinIO, patrón Ola 3) ·
+  registro Part 11 con `payloadHash` para incidencias y para correcciones de excepción · subida de evidencia a la acción CAPA
+  y al **reporte** (columnas `evidence` reservadas) · firma Part 11 al verificar eficacia, al completar la investigación y al
+  enviar un reporte.
 
 ### Turnos
 - **ShiftPattern** *1—N* **Shift** — régimen configurable.

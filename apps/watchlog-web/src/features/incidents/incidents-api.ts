@@ -7,6 +7,16 @@ import {
   incidentCommentSchema,
   incidentActionSchema,
   incidentInvestigationSchema,
+  incidentReportSchema,
+  reportingObligationSchema,
+  type CancelIncidentReportRequest,
+  type CreateIncidentReportRequest,
+  type IncidentReportDto,
+  type MarkIncidentReportNotApplicableRequest,
+  type ReportingObligationDto,
+  type SubmitIncidentReportRequest,
+  type UpdateIncidentReportRequest,
+  type UpsertReportingObligationRequest,
   type CompleteIncidentInvestigationRequest,
   type IncidentInvestigationDto,
   type UpsertIncidentInvestigationRequest,
@@ -52,6 +62,7 @@ function queryString(q: IncidentListQuery): string {
   if (q.unassignedOnly) p.set("unassignedOnly", "true");
   if (q.overdueOnly) p.set("overdueOnly", "true");
   if (q.reportableOnly) p.set("reportableOnly", "true");
+  if (q.reportOverdueOnly) p.set("reportOverdueOnly", "true");
   if (q.fromLogbookOnly) p.set("fromLogbookOnly", "true");
   if (q.sort) p.set("sort", q.sort);
   if (q.page) p.set("page", String(q.page));
@@ -171,4 +182,42 @@ export function completeIncidentInvestigation(incidentId: string, dto: CompleteI
 
 export function reopenIncidentInvestigation(incidentId: string): Promise<IncidentInvestigationDto> {
   return apiJson(`/incidents/${incidentId}/investigation/reopen`, incidentInvestigationSchema, { method: "POST", body: {} });
+}
+
+// --- Reportabilidad (Fase 4.3) -----------------------------------------------
+
+export function fetchReportingObligations(includeInactive = false): Promise<ReportingObligationDto[]> {
+  return apiJson(`/incidents/obligations${includeInactive ? "?includeInactive=true" : ""}`, z.array(reportingObligationSchema));
+}
+
+export function upsertReportingObligation(dto: UpsertReportingObligationRequest, create = false): Promise<ReportingObligationDto> {
+  return apiJson(`/incidents/obligations${create ? "?create=true" : ""}`, reportingObligationSchema, { method: "POST", body: dto });
+}
+
+export function fetchIncidentReports(incidentId: string): Promise<IncidentReportDto[]> {
+  return apiJson(`/incidents/${incidentId}/reports`, z.array(incidentReportSchema));
+}
+
+export function materializeIncidentReports(incidentId: string): Promise<number> {
+  return apiJson(`/incidents/${incidentId}/reports/materialize`, z.number(), { method: "POST", body: {} });
+}
+
+export function createIncidentReport(incidentId: string, dto: CreateIncidentReportRequest): Promise<IncidentReportDto> {
+  return apiJson(`/incidents/${incidentId}/reports`, incidentReportSchema, { method: "POST", body: dto });
+}
+
+export function updateIncidentReport(reportId: string, dto: UpdateIncidentReportRequest): Promise<IncidentReportDto> {
+  return apiJson(`/incidents/reports/${reportId}`, incidentReportSchema, { method: "PATCH", body: dto });
+}
+
+export function submitIncidentReport(reportId: string, dto: SubmitIncidentReportRequest): Promise<IncidentReportDto> {
+  return apiJson(`/incidents/reports/${reportId}/submit`, incidentReportSchema, { method: "POST", body: dto });
+}
+
+export function markIncidentReportNotApplicable(reportId: string, dto: MarkIncidentReportNotApplicableRequest): Promise<IncidentReportDto> {
+  return apiJson(`/incidents/reports/${reportId}/not-applicable`, incidentReportSchema, { method: "POST", body: dto });
+}
+
+export function cancelIncidentReport(reportId: string, dto: CancelIncidentReportRequest): Promise<IncidentReportDto> {
+  return apiJson(`/incidents/reports/${reportId}/cancel`, incidentReportSchema, { method: "POST", body: dto });
 }

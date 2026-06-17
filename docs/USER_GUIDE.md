@@ -113,6 +113,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 - ✅ **Reportar y gestionar incidencias** (lista + tablero kanban + detalle con flujo) (§ Incidencias)
 - ✅ **Acciones correctivas y preventivas (CAPA)** (con verificación de eficacia y bloqueo de cierre) (§ Incidencias ▸ Acciones CAPA)
 - ✅ **Investigación de causa raíz (5 Porqués)** (cadena de "porqués", causa raíz que bloquea el cierre, enlace a CAPA) (§ Incidencias ▸ Investigación de causa raíz)
+- ✅ **Reportabilidad (reportes a autoridades / obligaciones)** (obligaciones configurables, plazo, folio externo, bloqueo de cierre, vencido) (§ Incidencias ▸ Reportabilidad)
 - ✅ **Crear desde una bitácora** (botón "Reportar incidencia" en el visor de la entrada) (§ Incidencias ▸ Desde una bitácora)
 - ✅ **Administrar los catálogos** (tipos y categorías de incidencia) (§ Incidencias ▸ Catálogos) [solo administrador]
 
@@ -691,57 +692,66 @@ auto-verificarla). Todo respeta tu **alcance por nodo** (heredado de la incidenc
 > acciones obligatorias para poder cerrar; la verificación es opcional. Y si al verificar se marca
 > **«No eficaz»**, la acción se **reabre** y vuelve a bloquear el cierre hasta resolverse de verdad.
 
-### Incidencias ▸ Investigación de causa raíz (5 Porqués)
+### Incidencias ▸ Reportabilidad (reportes a autoridades / obligaciones)
 
-**Para qué sirve.** Para entender **por qué** ocurrió un evento, no solo registrarlo. El método
-**5 Porqués** es una cadena de preguntas: parte del problema y, preguntando "¿por qué?" una y otra
-vez, baja hasta la **causa raíz** (la verdadera, no el síntoma). Esa causa raíz es la que justifica
-las **acciones CAPA**: si no atacas la causa de fondo, el problema vuelve. Algunos **tipos** de
-incidencia (los que el administrador marca como **"requieren investigación"**, p. ej. *Seguridad*,
-*Medio ambiente*) **no se pueden cerrar** sin una investigación completada — así la plataforma
-garantiza que los eventos importantes se analizan de verdad.
+**Para qué sirve.** Muchas incidencias obligan a **avisar a una autoridad u obligación** (un
+organismo regulador, una gerencia, un cliente por contrato) dentro de un **plazo**. La
+reportabilidad lleva ese deber dentro de la incidencia: **qué** reportes corresponden, **a
+quién**, con qué **plazo**, en qué **estado** (pendiente / enviado / no aplica), y guarda la
+**evidencia del envío** (el folio que entrega la autoridad). Es **configurable** y **transversal**:
+los marcos concretos de tu industria los defines tú como **obligaciones** (no vienen "cableados").
 
-**Cómo se usa.** En el detalle de la incidencia, abre la pestaña **«Investigación»**:
-1. Pulsa **«Iniciar investigación»** y escribe el **problema** a explicar (qué pasó).
-2. Agrega los **«¿Por qué?»** uno a uno: en cada paso escribes la pregunta y su respuesta/causa.
-   Lo normal son 3 a 5 niveles (de ahí el nombre), pero pones los que necesites.
-3. Marca **«Es una causa raíz»** en el o los pasos que sean la causa de fondo (puede haber más de
-   una). **Guarda**.
-4. Cuando la cadena esté lista, pulsa **«Completar»**. La plataforma exige **al menos una causa
-   raíz** marcada.
-5. Al crear una **acción CAPA**, podrás elegir en **«Causa raíz que atiende»** cuál de las causas
-   resuelve esa acción — así queda trazado problema → causa → acción.
-6. Si necesitas corregir algo después de completar, usa **«Reabrir»** (vuelve a borrador).
+**Cómo se usa.**
+- **Obligaciones (catálogo).** Un administrador define las obligaciones en **Incidencias ▸
+  Catálogos ▸ Obligaciones de reporte**: nombre, **autoridad**, **plazo por defecto**, a **qué
+  tipos** de incidencia aplica (vacío = todos) y desde **qué severidad**, y si es **obligatoria**
+  (las obligatorias bloquean el cierre hasta resolverse).
+- **Se materializan solos.** Cuando creas una incidencia de un **tipo reportable** (o marcada
+  reportable), el sistema **agrega automáticamente** los reportes de las obligaciones que aplican
+  (por tipo y severidad), cada uno con su plazo. En el detalle, pestaña **Reportes**, los ves con
+  su folio (REP-####), autoridad, plazo y estado.
+- **Pestaña Reportes (en el detalle de la incidencia).** Puedes **Re-derivar** (volver a calcular
+  los aplicables si cambió la severidad), **Agregar** uno manualmente, **Marcar enviado**
+  (registras el **folio externo** y la fecha), **No aplica** (con motivo, si tras revisar no
+  corresponde) o **Anular** (con motivo, si se materializó por error). Nada se borra: todo queda
+  en la actividad de la incidencia.
+- **Plazo y "vencido".** Un reporte **pendiente** cuyo plazo ya pasó se muestra en **rojo** como
+  **vencido**. En la lista de incidencias hay un indicador **«Reporte vencido»** clicable y un
+  filtro del mismo nombre, para ubicar de un vistazo lo que está fuera de plazo.
 
-**Quién puede.** Quien tenga permiso de **edición de incidencias** (`incident:edit`) y la incidencia
-esté dentro de su alcance (nodo). Ver la investigación: cualquiera que pueda ver la incidencia.
+**Quién puede.** Ver los reportes: cualquiera con acceso a incidencias (`incident:view`). Gestionar
+los reportes de una incidencia (enviar, marcar no aplica, anular, agregar): quien puede **editar
+incidencias** (`incident:edit`). Administrar el **catálogo de obligaciones**: el administrador de
+catálogos (`incidentcatalog:manage`). El alcance por nodo de la incidencia se aplica siempre.
 
 **Importante.**
-- La investigación es **una sola por incidencia** y solo se edita mientras está en **borrador**
-  (una completada se **reabre** primero).
-- El **bloqueo de cierre** solo aplica a los tipos que **exigen** investigación; en los demás es
-  opcional pero igual de útil para dejar registro.
-- La pestaña **«Investigación»** muestra un **punto de alerta** cuando el tipo la exige y aún está
-  pendiente — el mismo aviso aparece al intentar cerrar.
+- **Una obligación OBLIGATORIA pendiente bloquea el cierre** de la incidencia. Para cerrar, debes
+  **enviar** el reporte (registrando su folio) o marcarlo **«No aplica»** con motivo. Las
+  obligaciones **no obligatorias** solo avisan, no bloquean.
+- **Es configuración, no código.** Los reportes que existen y a quién se envían dependen 100% de
+  las **obligaciones** que definas. Las de ejemplo que vienen sembradas están marcadas «(ejemplo)»:
+  edítalas o créalas según tu marco real.
+- **El aviso de "por vencer / vencido"** (recordatorio por correo) llega en una fase posterior
+  (notificaciones avanzadas); por ahora el plazo y el estado **vencido** se ven en pantalla.
+- **Trazabilidad.** El nombre de la autoridad y la obligatoriedad quedan **fijados** en el reporte
+  al materializarse: cambiar el catálogo después no altera lo ya registrado (integridad histórica).
 
-**Ejemplo paso a paso (incidencia de seguridad).**
-1. Tienes la incidencia *INC-0042 — "Operador expuesto a proyección de fluido"* (tipo *Seguridad*,
-   que **exige investigación**). Avanzas el flujo hasta *En verificación* e intentas **«Cerrar
-   incidencia»** → **bloqueado**: «el tipo exige una investigación de causa raíz completada».
-2. Abres la pestaña **«Investigación»** → **«Iniciar investigación»**. Problema: *"Operador expuesto
-   a proyección de fluido a presión"*.
-3. Agregas los porqués: **1)** ¿Por qué se expuso? → *La línea estaba presurizada al abrir.* **2)**
-   ¿Por qué estaba presurizada? → *No se ejecutó bloqueo y despresurización.* **3)** ¿Por qué no se
-   ejecutó el bloqueo? → *No había procedimiento LOTO exigido* → marcas **«Es una causa raíz»**.
-   **Guardas**.
-4. Pulsas **«Completar»**. La investigación queda *Completada* con su causa raíz.
-5. Vas a la pestaña **«Acciones»**, creas la correctiva *"Implementar procedimiento LOTO"* y en
-   **«Causa raíz que atiende»** eliges *"No había procedimiento LOTO exigido"*.
-6. Ahora **«Cerrar incidencia»** ya no se bloquea por la investigación (si además el tipo exige CAPA,
-   completa/verifica las acciones obligatorias). Todo el análisis queda en el registro.
-
-> El método de hoy es **5 Porqués** (el estándar más usado y el más simple de adoptar). Métodos más
-> elaborados (ICAM, Ishikawa) se podrán agregar como plantillas en el futuro sin cambiar lo ya hecho.
+**Caso de uso paso a paso (evento grave reportable):**
+1. Como administrador, en **Incidencias ▸ Catálogos ▸ Obligaciones de reporte** revisa que exista
+   (o crea) una obligación **«Reporte a la autoridad — evento grave»**: autoridad *Autoridad
+   competente*, plazo **24 h**, aplica a **todos los tipos**, **severidad ≥ 4**, **Obligatoria**.
+2. Un supervisor **reporta una incidencia** de un tipo reportable con **severidad 5**. Al guardarla,
+   en la pestaña **Reportes** aparece ya un reporte **REP-0001** *Pendiente*, plazo dentro de 24 h.
+3. El equipo trabaja la incidencia (acciones, investigación). Al intentar **«Cerrar incidencia»**,
+   el sistema **lo impide**: «1 reporte obligatorio sin enviar».
+4. El responsable presenta el aviso a la autoridad y, en la pestaña Reportes, pulsa **«Marcar
+   enviado»**, anota el **folio FOLIO-2026-123** y la fecha → el reporte queda **Enviado**.
+5. Ahora **«Cerrar incidencia»** ya no se bloquea por reportabilidad (si el tipo además exige CAPA o
+   investigación, esos deberán estar resueltos también). La incidencia cierra con todo su rastro:
+   quién envió el reporte, cuándo y con qué folio.
+6. Si otra incidencia generó un reporte que tras revisar **no corresponde**, en vez de enviarlo se
+   usa **«No aplica»** con un motivo (p. ej. «Evento bajo el umbral reportable»): también desbloquea
+   el cierre y queda auditado.
 
 ### Catálogos de incidencias (tipos y categorías)
 
@@ -754,8 +764,10 @@ tipo define su **flujo por defecto**, su **color**, y si las incidencias de ese 
 **Cómo se usa.**
 - Entra a **Incidencias** y pulsa **«Catálogos»** (arriba a la derecha; solo visible para
   administradores). También llegas por `/incidencias/catalogos`.
-- Cambia entre las pestañas **Tipos** y **Categorías**. Cada una tiene **buscador**, filtro
-  **Activos/Inactivos** y **orden**, con paginación arriba y abajo.
+- Cambia entre las pestañas **Tipos**, **Categorías** y **Obligaciones de reporte**. Cada una
+  tiene **buscador**, filtro **Activos/Inactivos** y **orden**, con paginación arriba y abajo.
+  (La pestaña **Obligaciones de reporte** alimenta la reportabilidad; ver «Incidencias ▸
+  Reportabilidad».)
 - **Nuevo / Editar:** completa el formulario. La **clave** (key) identifica al elemento y solo
   se define al crear (no se puede cambiar después). En un **tipo** eliges además el flujo por
   defecto (de los flujos **publicados**; vacío = el flujo global de incidencias), el color del

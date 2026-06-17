@@ -5,7 +5,19 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-17** (**Fase 4.2b — Investigación de causa raíz (5 Porqués) ✅** — `feat/incidencias-investigacion`:
+> actualización: **2026-06-17** (**Fase 4.3 — Reportabilidad configurable ✅** — `feat/incidencias-reportabilidad`:
+> reportes a autoridades/obligaciones configurables y transversales (nada regulatorio hardcodeado; marcos concretos = seed/catálogo),
+> honrando `IncidentType.reportableDefault`. Catálogo `ReportingObligation` (key/authorityName/defaultDueMinutes/appliesToTypeIds[]/
+> minSeverity/mandatory) + materialización `IncidentReport` (folio REP-####, snapshot obligación, status PENDING/SUBMITTED/
+> NOT_APPLICABLE/CANCELED, dueAt, externalFolio); **bloqueo de cierre por reporte OBLIGATORIO pendiente** (`mandatory` del catálogo;
+> helper `reportsBlockingClose` + guarda `assertNoBlockingReports`); **vencido DERIVADO** (status PENDING + dueAt<now; KPI/filtro/
+> flag de fila); materialización en create si reportable; **sin permiso nuevo** [catálogo `incidentcatalog:manage`, reportes
+> `incident:edit`, cat. **83**]. Migración aditiva `…_add_incident_reporting`. Web: pestaña Reportes en el drawer + sub-pestaña
+> Obligaciones en `/incidencias/catalogos` + KPI/chip "Reporte vencido". Contracts 283 · API 241 · smoke
+> `smoke-incidencias-reportabilidad.py` 31/31 + regresión incidencias 32/32 · capa 23/23 · investigación 27/27 · excepciones 39/39 ·
+> reglas 21/21 · catálogos 16/16. **Deuda:** evidencia de envío (Storage Ola 3) · firma Part 11 al enviar · aviso de plazo (→ 4.4 +
+> notificaciones avanzadas). **Siguiente: 4.4 — SLA/escalamiento + aviso de plazo.** Anterior:
+> **Fase 4.2b — Investigación de causa raíz (5 Porqués) ✅** — `feat/incidencias-investigacion`:
 > investigación configurable/transversal honrando `IncidentType.requiresInvestigation`. Modelo dedicado `IncidentInvestigation`
 > (1:1, method FIVE_WHYS, status DRAFT/COMPLETED, problemStatement, rootCauseSummary) + `IncidentInvestigationStep` (porqués
 > ordenados con `isRootCause`); enlace causa raíz↔CAPA (`IncidentAction.investigationStepId`); **bloqueo de cierre configurable**
@@ -255,6 +267,8 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 
 | **Fix: guard de regresión de permisos por sección/campo** (diagnóstico de incidente del dueño: backend INTACTO; causa = el builder dejó de propagar `roleIds` de SECCIÓN en Fase 2.1.x ⇒ versiones v3–v11 publicadas sin gate. 3 guards: web `builder-model.spec.ts` [round-trip detalle→payload], API `templates.service.spec.ts` [saveDraft mapea roles], smoke `smoke-permisos-seccion.py` 10/10 e2e. DECISIONS 2026-06-17. contracts 271 · API 235 · web 3) | `fix/permisos-seccion-guard` → `main` | ✅ fusionado y publicado en `origin/main` (`debe02c`) | ninguna |
 
+| **Fase 4.3 Reportabilidad configurable** (`ReportingObligation` [catálogo: appliesToTypeIds[]/minSeverity/mandatory/defaultDueMinutes] + `IncidentReport` [folio REP-####, snapshot obligación, status PENDING/SUBMITTED/NOT_APPLICABLE/CANCELED, dueAt, externalFolio] + enum + relación en `Incident` + migración `…_add_incident_reporting`; `@lyra/contracts/incidents/reporting` con DTO/requests/enums + helpers `applicableObligationsFor`/`isReportOverdue`/`reportsBlockingClose`/`incidentReportCode` + 12 specs; `IncidentReportsService` [catálogo upsert+409, materialize idempotente, create+dedup 409, submit/not-applicable/cancel, ABAC, timeline+auditoría] + 11 endpoints + guarda `assertNoBlockingReports` en `transition` + materialización en `create` + KPI `reportOverdue`/filtro `reportOverdueOnly`/flag de fila; seed 2 obligaciones ejemplo; web `IncidentReportsBlock` [pestaña Reportes] + `ReportingObligationModal` [sub-pestaña Obligaciones en catálogos] + KPI/chip; SIN permiso nuevo cat. **83**; contracts 283 · API 241 · smoke `smoke-incidencias-reportabilidad.py` 31/31 + regresión incidencias 32/32 · capa 23/23 · investigación 27/27 · excepciones 39/39 · reglas 21/21 · catálogos 16/16) | `feat/incidencias-reportabilidad` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
+
 **Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
 **Convención propuesta (a confirmar):** trabajar cada módulo en rama `feat/<modulo>`;
@@ -271,7 +285,7 @@ nunca queda más de una sesión atrás.
       versión inmutable; no se corrige mutando el histórico, es GxP). Para la demo: **recrear** esas entradas sobre la versión
       vigente (v12, que sí enforce) o anularlas. Las entradas nuevas ya quedan correctas (verificado con `smoke-permisos-seccion.py`).
 
-### Incidencias — Fase 4 (plan por fases; 4.0/4.1/4.2a/4.2b ✅)
+### Incidencias — Fase 4 (plan por fases; 4.0/4.1/4.2a/4.2b/4.3 ✅)
 - [ ] **4.2a · Deuda (no bloqueante):** subida de **archivos de evidencia** a la acción (columna `evidence Json?` ya reservada;
       reusará `StorageService` Ola 3, proxied + presigned GET con ABAC) · **picker de rol responsable** en la UI (el modelo/contrato/
       API ya soportan `responsibleRoleId`; falta un endpoint de role-options del módulo + el selector) · **firma Part 11** al verificar
@@ -281,9 +295,16 @@ nunca queda más de una sesión atrás.
       (`assertInvestigationComplete`); drawer a PESTAÑAS; reusa `incident:edit` (sin permiso nuevo); contracts 271 · API 234 · smoke
       `smoke-incidencias-investigacion.py` 27/27 + regresión 23/23 + 31/31. **Deuda 4.2b:** firma Part 11 al completar la investigación ·
       adjuntos de evidencia a la investigación · plantillas de método ICAM/Ishikawa (5 Porqués es el MVP).
-- [ ] **4.3 · Reportabilidad configurable** (autoridad/plazo; genérico, no solo HSE Chile) — §14 de la auditoría. **← siguiente.**
+- [x] **4.3 · Reportabilidad configurable ✅** (`feat/incidencias-reportabilidad`) — §14 de la auditoría: catálogo `ReportingObligation`
+      (autoridad/plazo/aplicabilidad por tipo+severidad/`mandatory`) + materialización `IncidentReport` (N por incidencia, snapshot de
+      obligación, status PENDING/SUBMITTED/NOT_APPLICABLE/CANCELED, folio externo); honra `reportableDefault` (materializa al crear si
+      reportable); **bloqueo de cierre por reporte OBLIGATORIO pendiente** (`mandatory` del catálogo; `reportsBlockingClose` +
+      `assertNoBlockingReports`); **vencido DERIVADO** (KPI/filtro/flag); sin permiso nuevo (cat. 83). contracts 283 · API 241 · smoke
+      `smoke-incidencias-reportabilidad.py` 31/31 + regresión sin romper. **Deuda 4.3:** subida de **evidencia del envío** (Storage Ola
+      3; `IncidentReport.evidence Json?` ya reservado) · **firma Part 11** al marcar enviado · **aviso de plazo** "por vencer/vencido"
+      (→ 4.4 + notificaciones avanzadas; el dato/estado ya está, falta el disparo).
 - [ ] **4.4 · SLA/notificaciones/escalamiento** (depende del épico de **notificaciones avanzadas**) + unificar el criterio de
-      "vencida" (`dueAt` vs `maxStayMinutes`, hoy desalineados — §21 de la auditoría).
+      "vencida" (`dueAt` vs `maxStayMinutes`, hoy desalineados — §21 de la auditoría) + **aviso de plazo de los reportes de 4.3**.
 - [ ] **4.5 · Dashboard/analítica** (MTTR, reincidencia, CAPA vencidas).
 - [ ] **Mejoras menores de la auditoría:** campos universales en el alta (medida inmediata, impactos) · dedup entre incidencias ·
       separar seed núcleo neutro vs paquetes verticales por industria (la arquitectura ya lo permite como datos).

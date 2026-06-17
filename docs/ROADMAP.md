@@ -4,11 +4,12 @@
 > se actualiza al **cerrar cada sesión** (junto a `PROGRESS.md` y `BACKLOG.md`). El detalle
 > fino de cada pendiente vive en `BACKLOG.md`; aquí está el resumen scaneable.
 >
-> Última actualización: **2026-06-17** (**Fase 4.2b — Investigación de causa raíz (5 Porqués)**: honra
-> `IncidentType.requiresInvestigation`; modelo dedicado `IncidentInvestigation`+`Step`; enlace causa raíz↔CAPA
-> (`IncidentAction.investigationStepId`); bloqueo de cierre configurable (`assertInvestigationComplete`); drawer a PESTAÑAS;
-> sin permiso nuevo [reusa `incident:edit`]. Migración aditiva. Contracts 271 · API 234 · smoke 27/27 + regresión. Siguiente:
-> **4.3 — Reportabilidad configurable**). Leyenda:
+> Última actualización: **2026-06-17** (**Fase 4.3 — Reportabilidad configurable**: catálogo `ReportingObligation`
+> [autoridad/plazo/aplicabilidad por tipo+severidad/`mandatory`] + materialización `IncidentReport` [N por incidencia, snapshot,
+> status, folio externo]; honra `reportableDefault`; **bloqueo de cierre por reporte obligatorio pendiente**
+> (`reportsBlockingClose`/`assertNoBlockingReports`); **vencido derivado** (KPI/filtro); sin permiso nuevo [cat. 83]. Migración
+> aditiva. Contracts 283 · API 241 · smoke 31/31 + regresión. Siguiente: **4.4 — SLA/escalamiento + aviso de plazo de reporte**
+> [← épico notificaciones avanzadas]). Leyenda:
 > ✅ hecho · 🔄 en curso/parcial · ⬜ pendiente.
 
 ## Resumen por fase
@@ -20,7 +21,7 @@
 | **2** | Plantillas / Form Builder + Bitácoras | 🔄 | Ver desglose 2.x abajo. |
 | **3** | Orígenes de datos (entrada SCADA/PI/OPC) + **API saliente** (Req-3) + **Webhooks** (Req-4) | ⬜ | Todo. Motor de integración inbound + API M2M por plantilla + webhooks firmados (HMAC, reintentos). |
 | **N** | **Notificaciones** (bloque transversal, SOLO mail) | ✅ | `feat/notificaciones` (motor) + `feat/notif-hardening` (config SMTP en BD editable sin reiniciar [pantalla `/configuracion`, password cifrada, permiso `notification:config`] + editor de plantillas con vista previa/diccionario/`{{entry.summary}}`): transactional-outbox + worker (`@nestjs/schedule`), 4 eventos, plantillas configurables + render sin eval, destinatarios con ABAC, bandeja (Req-1/5), preferencias. **Diferido:** digest, UI de suscripciones, escalamiento por tiers, variables de campo dinámicas `{{field.<key>}}`, fan-out por nodo del overdue sin rol, canal in-app/SMS. |
-| **4** | Motor de incidencias (kanban + workflow) | 🔄 | **4.0 núcleo ✅** + **4.1 excepciones ✅** (4.1.0 backend + 4.1.1 UI + 4.1.2 acción de reglas: `LogEntryException`+panel+bandeja `/excepciones`) + **mantenedor de catálogos UI ✅** + **4.2a Acciones CAPA ✅** (`IncidentAction` + bloqueo de cierre por acción `mandatory` + verificación de eficacia; 2 permisos [cat. **83**]; smoke 23/23) + **4.2b Investigación 5-Porqués ✅** (`feat/incidencias-investigacion`: `IncidentInvestigation`+`Step` honra `requiresInvestigation`; enlace causa raíz↔CAPA; bloqueo de cierre configurable; drawer a pestañas; sin permiso nuevo; smoke 27/27). **Falta: 4.3** reportabilidad configurable (genérica, no solo HSE Chile) · **4.4** SLA+notif+escalamiento (← épico notif-avanzadas) · **4.5** dashboard. **Deuda 4.2:** subida de evidencia (Storage Ola 3) a CAPA/investigación · picker de rol responsable en UI · firma Part 11 al verificar/completar · plantillas ICAM/Ishikawa. |
+| **4** | Motor de incidencias (kanban + workflow) | 🔄 | **4.0 núcleo ✅** + **4.1 excepciones ✅** (4.1.0 backend + 4.1.1 UI + 4.1.2 acción de reglas: `LogEntryException`+panel+bandeja `/excepciones`) + **mantenedor de catálogos UI ✅** + **4.2a Acciones CAPA ✅** (`IncidentAction` + bloqueo de cierre por acción `mandatory` + verificación de eficacia; 2 permisos [cat. **83**]; smoke 23/23) + **4.2b Investigación 5-Porqués ✅** (`feat/incidencias-investigacion`: `IncidentInvestigation`+`Step` honra `requiresInvestigation`; enlace causa raíz↔CAPA; bloqueo de cierre configurable; drawer a pestañas; sin permiso nuevo; smoke 27/27) + **4.3 Reportabilidad configurable ✅** (`feat/incidencias-reportabilidad`: catálogo `ReportingObligation` + materialización `IncidentReport` honra `reportableDefault`; bloqueo de cierre por reporte `mandatory` pendiente; vencido derivado [KPI/filtro/chip]; pestaña Reportes + sub-pestaña Obligaciones en catálogos; sin permiso nuevo; smoke 31/31). **Falta: 4.4** SLA+notif+escalamiento + aviso de plazo de reporte (← épico notif-avanzadas) + unificar "vencida" (§21) · **4.5** dashboard. **Deuda 4.2/4.3:** subida de evidencia (Storage Ola 3) a CAPA/investigación/reporte · picker de rol responsable en UI · firma Part 11 al verificar/completar/enviar · plantillas ICAM/Ishikawa. |
 | **5** | Cambio de turno + IA (resumen de turno) | ⬜ | Todo. Interfaz `LlmProvider` abstracta. |
 | **6** | Base de conocimiento + Dashboard + **Asistente IA RAG** (Req-6) + insights | ⬜ | Todo. RAG con `pgvector` on-prem + ABAC en el recuperador. Predicción ML real = fase posterior. |
 | **7** | Endurecimiento (backups, observabilidad, exportación, rate-limit, **adjuntos/MinIO**, i18n, offline) | ⬜ | Todo. Nota: **adjuntos (Req-2)** el dueño los quiere adelantar a Fase 2. |

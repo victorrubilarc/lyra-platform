@@ -1,5 +1,47 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-17 — Fase 4.3: Reportabilidad configurable (obligaciones + reportes + bloqueo de cierre + vencido derivado) ✅**
+(`feat/incidencias-reportabilidad`). Cierra §14 de la auditoría del módulo: una incidencia puede gatillar uno o más REPORTES a una
+AUTORIDAD/obligación, con plazo y seguimiento, **configurable y transversal** (nada SERNAGEOMIN/DS 132/HSE-Chile hardcodeado; los
+marcos concretos son **seed/catálogo** por vertical). Honra el flag `IncidentType.reportableDefault` (hasta hoy inerte), igual que
+4.2a honró `requiresCapa` y 4.2b `requiresInvestigation`. **Plan aprobado por el dueño; 6 forks resueltos en la recomendación:**
+(1) **modelo dedicado** catálogo `ReportingObligation` + materialización `IncidentReport` (N por incidencia), NO algo liviano —
+auditabilidad + consulta "reporte vencido" por índice + multiplicidad; (2) **bloquea el cierre gobernado por
+`ReportingObligation.mandatory`** (el marco regulatorio declara si es vinculante), NO por flag de tipo — el reporte a la autoridad
+y el cierre interno son ciclos de vida distintos; (3) **SIN permiso nuevo** (catálogo `incidentcatalog:manage`, reportes
+`incident:edit`; cat. se queda en **83**, sin gotcha de FLUSHALL); (4) **"vencido" DERIVADO** (`status=PENDING AND dueAt<now`), la
+unificación con `maxStayMinutes` (§21) se difiere a 4.4; (5) **UI** pestaña Reportes + sub-pestaña Obligaciones en catálogos + KPI;
+(6) **aviso de plazo DIFERIDO a 4.4** (épico de notificaciones avanzadas). **Modelo:** 2 entidades aditivas + 1 enum + relación en
+`Incident`. `ReportingObligation` (catálogo configurable: key/name/`authorityName`/`defaultDueMinutes`/`appliesToTypeIds[]` [vacío =
+todos]/`minSeverity?`/`mandatory`/active/sortOrder/deletedAt) + `IncidentReport` (folio `REP-####`, **snapshot** de
+obligationName/authorityName/mandatory para integridad histórica, status PENDING/SUBMITTED/NOT_APPLICABLE/CANCELED, `dueAt`,
+evidencia de envío submittedAt/submittedById/`externalFolio`/notes, anulación sin borrado físico, `evidence` reservado Ola 3).
+**Migración aditiva** `20260617140000_add_incident_reporting` (sin BOM; `db execute` + `migrate resolve` por el drift del historial).
+**Contratos** (`@lyra/contracts/incidents/reporting`): enums + DTOs + requests + helpers PUROS `applicableObligationsFor`/
+`isReportOverdue`/**`reportsBlockingClose`**/`incidentReportCode` (autoritativos back↔front) + 12 specs. **API:**
+`IncidentReportsService` (catálogo upsert con 409 al crear key existente; `materializeForIncident` idempotente; create manual con
+dedup 409; submit/markNotApplicable/cancel; ABAC heredada del nodo; timeline `REPORT_*` + auditoría) + 11 endpoints
+(`/incidents/obligations` GET/POST; `:id/reports` GET/POST, `:id/reports/materialize`, `reports/:id` PATCH/submit/not-applicable/
+cancel; gates `incidentcatalog:manage`/`incident:edit`/`incident:view`) + **guarda de cierre** `assertNoBlockingReports` en
+`transition` (junto a CAPA/investigación) + **materialización en `create`** si la incidencia es reportable + KPI `reportOverdue` en
+stats + filtro `reportOverdueOnly` + flag `reportOverdue` por fila (batched). **Seed:** 2 obligaciones de EJEMPLO genéricas
+idempotentes (sev≥4 mandatory transversal · ambiental no obligatoria). **Web:** capa `incidents-api`/`-queries` extendida +
+**pestaña Reportes** en `IncidentDetailDrawer` (`IncidentReportsBlock`: lista con folio/autoridad/plazo[rojo si vencido]/estado +
+re-derivar + agregar + marcar enviado[folio]/no aplica/anular + aviso de bloqueo) + **sub-pestaña Obligaciones** en `CatalogsPage`
+(`ReportingObligationModal`: aplicabilidad por tipos/severidad + plazo + obligatorio) + **KPI "Reporte vencido"** clicable + chip de
+fila en lista/kanban + meta `REPORT_STATUS_META`. Identidad Lyra (tokens, Sora/Inter, Lucide, claro+oscuro, 44px, a11y).
+**Sin permisos nuevos (cat. 83), sin migrar permisos (Redis sin FLUSHALL).** Tests: **contracts 283** (+12) · **API 241** (+6);
+typecheck/lint(0)/build verdes. **Smoke en vivo `scripts/smoke-incidencias-reportabilidad.py` 31/31** (catálogo + colisión 409 ·
+materialización por tipo/severidad · minSeverity no aplica · bloqueo de cierre con obligatorio pendiente → 400 · enviar[folio] →
+cierra · no aplica desbloquea + motivo corto 400 · materializar idempotente · duplicado 409 · vencido derivado [reporte/listado/
+KPI/filtro] · tipo no reportable no materializa · gates 403 operador) **+ regresión incidencias 32/32 (con paso 6.6 de resolver el
+reporte obligatorio antes de cerrar) · capa 23/23 · investigación 27/27 · excepciones 39/39 · reglas 21/21 · catálogos 16/16** sin
+romper. **Deuda 4.3 (BACKLOG):** subida de evidencia del envío (Storage Ola 3, `evidence` reservado) · firma Part 11 al enviar ·
+recordatorio/aviso de plazo (→ 4.4 + notificaciones avanzadas). **Pendiente: smoke VISUAL del dueño** (pestaña Reportes, modales,
+sub-pestaña Obligaciones, KPI/chip, bloqueo de cierre). **Siguiente: 4.4 — SLA/escalamiento + aviso de plazo de reporte.**
+🔔 Recordatorio: épico de **notificaciones avanzadas** sigue pendiente (`docs/prompts/notificaciones-avanzadas.md`); es dependencia
+de la **4.4** y del aviso de plazo de esta 4.3.
+
 **2026-06-17 — Fase 4.2b: Investigación de causa raíz (5 Porqués) + bloqueo de cierre + enlace a CAPA ✅**
 (`feat/incidencias-investigacion`). Cierra la investigación de incidencias, configurable y **transversal** (nada minero/HSE
 hardcodeado), honrando el flag `IncidentType.requiresInvestigation` igual que 4.2a honró `requiresCapa`. Método inicial =

@@ -1884,6 +1884,7 @@ model Incident {
   exceptionLinks IncidentExceptionLink[]
   actions    IncidentAction[]
   investigation IncidentInvestigation?
+  reports    IncidentReport[]
 
   @@index([typeId])
   @@index([categoryId])
@@ -2228,4 +2229,89 @@ model IncidentTransition {
   incident Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
 
   @@index([incidentId, occurredAt])
+}
+
+// === Reportabilidad configurable (Fase 4.3) ===================================
+
+// Estado del reporte de una incidencia. "Vencido" NO es estado persistido: se
+// DERIVA (status=PENDING AND dueAt < now()), igual que el SLA y las rondas.
+enum IncidentReportStatus {
+  PENDING
+  SUBMITTED
+  NOT_APPLICABLE
+  CANCELED
+}
+
+// Catálogo CONFIGURABLE de obligaciones de reporte (autoridad/obligación a la que
+// se debe reportar una incidencia). Espejo de IncidentType/IncidentCategory:
+// editable por UI (gate incidentcatalog:manage), sin borrado físico. Los marcos
+// regulatorios concretos (DS 132, SERNAGEOMIN, ISO 14001, etc.) son SEED por
+// vertical — JAMÁS hardcodeados en la lógica. La aplicabilidad (a qué tipos y desde
+// qué severidad) y la obligatoriedad (mandatory = bloquea el cierre) son DATO.
+model ReportingObligation {
+  id                String   @id @default(cuid())
+  key               String   @unique // estable, ej. "reporte-autoridad-ambiental"
+  name              String
+  description       String?
+  authorityName     String? // a quién se reporta (informativo)
+  // Plazo por defecto en minutos desde la materialización (null = sin plazo).
+  defaultDueMinutes Int?
+  // Tipos de incidencia a los que aplica. Vacío = TODOS los tipos (transversal).
+  appliesToTypeIds  String[] @default([])
+  // Severidad mínima a la que aplica (null = cualquiera).
+  minSeverity       Int?
+  // ¿Legalmente vinculante? Si sí, su reporte PENDIENTE bloquea el cierre.
+  mandatory         Boolean  @default(false)
+  active            Boolean  @default(true)
+  sortOrder         Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  deletedAt         DateTime?
+
+  reports IncidentReport[]
+
+  @@index([active])
+  @@index([deletedAt])
+}
+
+// Materialización de un reporte de una incidencia (N por incidencia). Espejo de
+// IncidentAction. Congela un SNAPSHOT de la obligación (nombre/autoridad/mandatory)
+// para integridad histórica: cambiar el catálogo después NO altera lo ya
+// materializado (GxP). Sin borrado físico (anulación = CANCELED con motivo).
+model IncidentReport {
+  id            String @id @default(cuid())
+  // Folio humano correlativo; el código "REP-####" se DERIVA en el backend.
+  number        Int    @unique @default(autoincrement())
+  incidentId    String
+  obligationId  String
+  // --- Snapshot de la obligación en la materialización -------------------------
+  obligationName String
+  authorityName  String?
+  mandatory      Boolean @default(false)
+  // --- Estado / plazo (vencido se deriva) --------------------------------------
+  status        IncidentReportStatus @default(PENDING)
+  dueAt         DateTime?
+  // --- Envío (evidencia de cumplimiento) ---------------------------------------
+  submittedAt   DateTime?
+  submittedById String?
+  externalFolio String? // folio/número que entrega la autoridad
+  notes         String?
+  // --- Anulación (sin borrado físico) ------------------------------------------
+  canceledAt    DateTime?
+  cancelReason  String?
+  canceledById  String?
+  // --- Evidencia (reservado; descriptores Ola 3 — subida diferida) -------------
+  evidence      Json?
+  createdById   String?
+  updatedById   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  incident   Incident            @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  obligation ReportingObligation @relation(fields: [obligationId], references: [id], onDelete: Restrict)
+
+  @@index([incidentId, createdAt])
+  @@index([status, dueAt])
+  @@index([obligationId])
+  @@index([mandatory, status])
 }

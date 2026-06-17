@@ -164,6 +164,15 @@ def main():
     s, _ = call("POST", f"/incidents/{inc_id}/investigation/complete", admin, {})
     check("6.5 investigación completada (exigida por seguridad para cerrar)", s == 200, str(s))
 
+    # 6.6) seguridad reportable (sev 4 ≥ minSeverity 4): se materializa un reporte
+    # OBLIGATORIO que también bloquea el cierre (Fase 4.3). Se resuelve enviándolo.
+    s, reps = call("GET", f"/incidents/{inc_id}/reports", admin)
+    for rep in reps:
+        if rep["mandatory"] and rep["status"] == "PENDING":
+            call("POST", f"/incidents/reports/{rep['id']}/submit", admin, {"externalFolio": "SMOKE-NUCLEO"})
+    s, reps = call("GET", f"/incidents/{inc_id}/reports", admin)
+    check("6.6 reportes obligatorios resueltos antes de cerrar", all(r["status"] != "PENDING" for r in reps if r["mandatory"]), str(len(reps)))
+
     # 7) recorrer el flujo a cierre
     chain = ["a_triage", "asignar", "iniciar", "a_verificacion", "cerrar"]
     last = None

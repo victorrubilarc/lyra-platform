@@ -15,6 +15,12 @@ import type {
   UpsertIncidentInvestigationRequest,
   UpsertIncidentTypeRequest,
   UpsertIncidentCategoryRequest,
+  UpsertReportingObligationRequest,
+  CreateIncidentReportRequest,
+  UpdateIncidentReportRequest,
+  SubmitIncidentReportRequest,
+  MarkIncidentReportNotApplicableRequest,
+  CancelIncidentReportRequest,
   VerifyIncidentActionRequest,
 } from "@lyra/contracts";
 import {
@@ -43,6 +49,15 @@ import {
   upsertIncidentType,
   upsertIncidentCategory,
   verifyIncidentAction,
+  fetchReportingObligations,
+  upsertReportingObligation,
+  fetchIncidentReports,
+  materializeIncidentReports,
+  createIncidentReport,
+  updateIncidentReport,
+  submitIncidentReport,
+  markIncidentReportNotApplicable,
+  cancelIncidentReport,
 } from "./incidents-api.js";
 
 export const INCIDENT_KEYS = {
@@ -54,6 +69,8 @@ export const INCIDENT_KEYS = {
   categories: () => ["incidents", "categories"] as const,
   actions: (incidentId: string) => ["incidents", "actions", incidentId] as const,
   investigation: (incidentId: string) => ["incidents", "investigation", incidentId] as const,
+  obligations: () => ["incidents", "obligations"] as const,
+  reports: (incidentId: string) => ["incidents", "reports", incidentId] as const,
 };
 
 export function useIncidents(q: IncidentListQuery) {
@@ -245,5 +262,85 @@ export function useReopenIncidentInvestigation(incidentId: string) {
   return useMutation({
     mutationFn: () => reopenIncidentInvestigation(incidentId),
     onSuccess: () => invalidateInvestigation(qc, incidentId),
+  });
+}
+
+// --- Reportabilidad (Fase 4.3) -----------------------------------------------
+
+/** Catálogo de obligaciones para los desplegables del detalle (solo activas). */
+export function useReportingObligations() {
+  return useQuery({ queryKey: INCIDENT_KEYS.obligations(), queryFn: () => fetchReportingObligations() });
+}
+
+/** Variante para el MANTENEDOR: incluye inactivas (key distinto, no contamina los desplegables). */
+export function useReportingObligationsAdmin() {
+  return useQuery({ queryKey: [...INCIDENT_KEYS.obligations(), "admin"], queryFn: () => fetchReportingObligations(true) });
+}
+
+export function useUpsertReportingObligation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ dto, create }: { dto: UpsertReportingObligationRequest; create?: boolean }) => upsertReportingObligation(dto, create),
+    onSuccess: () => qc.invalidateQueries({ queryKey: INCIDENT_KEYS.obligations() }),
+  });
+}
+
+export function useIncidentReports(incidentId: string | null) {
+  return useQuery({
+    queryKey: INCIDENT_KEYS.reports(incidentId ?? ""),
+    queryFn: () => fetchIncidentReports(incidentId!),
+    enabled: !!incidentId,
+  });
+}
+
+/** Tras mutar un reporte: refresca su lista + el detalle (cambia el bloqueo de cierre) + KPIs/grilla. */
+function invalidateReports(qc: ReturnType<typeof useQueryClient>, incidentId: string): void {
+  qc.invalidateQueries({ queryKey: INCIDENT_KEYS.reports(incidentId) });
+  qc.invalidateQueries({ queryKey: INCIDENT_KEYS.detail(incidentId) });
+  qc.invalidateQueries({ queryKey: INCIDENT_KEYS.all });
+}
+
+export function useMaterializeIncidentReports(incidentId: string) {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: () => materializeIncidentReports(incidentId), onSuccess: () => invalidateReports(qc, incidentId) });
+}
+
+export function useCreateIncidentReport(incidentId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (dto: CreateIncidentReportRequest) => createIncidentReport(incidentId, dto),
+    onSuccess: () => invalidateReports(qc, incidentId),
+  });
+}
+
+export function useUpdateIncidentReport(incidentId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ reportId, dto }: { reportId: string; dto: UpdateIncidentReportRequest }) => updateIncidentReport(reportId, dto),
+    onSuccess: () => invalidateReports(qc, incidentId),
+  });
+}
+
+export function useSubmitIncidentReport(incidentId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ reportId, dto }: { reportId: string; dto: SubmitIncidentReportRequest }) => submitIncidentReport(reportId, dto),
+    onSuccess: () => invalidateReports(qc, incidentId),
+  });
+}
+
+export function useMarkIncidentReportNotApplicable(incidentId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ reportId, dto }: { reportId: string; dto: MarkIncidentReportNotApplicableRequest }) => markIncidentReportNotApplicable(reportId, dto),
+    onSuccess: () => invalidateReports(qc, incidentId),
+  });
+}
+
+export function useCancelIncidentReport(incidentId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ reportId, dto }: { reportId: string; dto: CancelIncidentReportRequest }) => cancelIncidentReport(reportId, dto),
+    onSuccess: () => invalidateReports(qc, incidentId),
   });
 }

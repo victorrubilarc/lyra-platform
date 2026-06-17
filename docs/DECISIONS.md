@@ -4,6 +4,52 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-17 · Incidencias — Fase 4.3 (Reportabilidad configurable) — ✅ IMPLEMENTADO
+
+Que una incidencia pueda gatillar uno o más REPORTES a una autoridad/obligación, con plazo y seguimiento de estado, de forma
+**configurable y transversal** (NADA de SERNAGEOMIN/DS 132/HSE-Chile hardcodeado en la lógica; los marcos concretos son
+CATÁLOGO/seed por vertical). Honra el flag `IncidentType.reportableDefault` (hoy inerte), igual que 4.2a honró `requiresCapa`
+y 4.2b `requiresInvestigation`. Forks resueltos con el dueño (recomendación aprobada):
+
+- **Modelo dedicado (catálogo + materialización), NO algo liviano.** Catálogo **`ReportingObligation`** (espejo de
+  `IncidentType`: key/name/description/`authorityName`/`defaultDueMinutes`/`appliesToTypeIds[]` [vacío = todos]/`minSeverity?`/
+  `mandatory`/`active`/`sortOrder`/`deletedAt`) + materialización **`IncidentReport`** (N por incidencia, espejo de
+  `IncidentAction`: folio `REP-####`, **snapshot** de obligationName/authorityName/mandatory para integridad histórica, `status`,
+  `dueAt`, evidencia de envío `submittedAt`/`submittedById`/`externalFolio`/`notes`, anulación sin borrado físico, `evidence`
+  reservado). Motivo: auditabilidad, multiplicidad real y la consulta "incidencias con reporte vencido" sale de un índice
+  `(status, dueAt)`. Un JSON en `Incident` no daría nada de eso.
+- **BLOQUEA el cierre gobernado por `ReportingObligation.mandatory` (catálogo), NO por un flag de tipo.** Objeción fundamentada:
+  el reporte a la autoridad y el cierre interno son ciclos de vida distintos; bloquear el cierre contra la confirmación externa
+  puede mantener incidencias abiertas o forzar cierres falsos, **pero** tampoco debe poderse "cerrar y olvidar" una obligación
+  legal pendiente. Espejo preciso de CAPA (`mandatory` por acción): el `mandatory` vive en la obligación (el marco regulatorio
+  declara si es vinculante). Al cerrar, un reporte de obligación `mandatory` aún **PENDING bloquea** (400); se resuelve
+  enviándolo (SUBMITTED) o marcándolo **NOT_APPLICABLE** con motivo. Las no obligatorias solo **alertan**. Helper puro
+  autoritativo `reportsBlockingClose` (espejo de `blockingActionsForClose`/`investigationBlocksClose`); guarda
+  `assertNoBlockingReports` en `IncidentsService.transition` junto a las de CAPA/investigación. `reportableDefault` queda como
+  DISPARADOR de materialización (al crear, si la incidencia es reportable, se materializan las obligaciones aplicables por
+  tipo/severidad vía helper puro `applicableObligationsFor`).
+- **SIN permiso nuevo (catálogo se queda en 83).** Aplico la disciplina de 4.2b: permiso solo si hay segregación real (como
+  ejecutar≠verificar en CAPA), que aquí no existe. Catálogo de obligaciones → reusa **`incidentcatalog:manage`** (es otro
+  catálogo); reportes sobre una incidencia → reusa **`incident:edit`**. (Evita el gotcha del FLUSHALL: 0 permisos nuevos.)
+- **"VENCIDO" se DERIVA** (`status=PENDING AND dueAt<now`), sin estado persistido ni cron — espejo del SLA y las rondas
+  (`isReportOverdue`). KPI/filtro/flag de fila derivados (`reportOverdue`/`reportOverdueOnly` en stats/listado). La unificación
+  de "vencida" del módulo (Incident.dueAt vs WorkflowState.maxStayMinutes, §21) se DIFIERE a 4.4 (SLA/escalamiento), para no
+  inflar 4.3.
+- **UI:** pestaña **Reportes** en el `IncidentDetailDrawer` (ya a pestañas) + **sub-pestaña Obligaciones** en
+  `/incidencias/catalogos` (Tipos · Categorías · Obligaciones, no ruta nueva) + KPI clicable **"Reporte vencido"** y chip de fila
+  en `/incidencias`.
+- **NOTIFICACIÓN de plazo DIFERIDA a 4.4:** el dato/estado (`dueAt`/derivación de vencido) queda listo; el AVISO "por
+  vencer/vencido" depende del épico de **notificaciones avanzadas** (pendiente) y se construye en 4.4.
+
+Migración aditiva `20260617140000_add_incident_reporting` (2 tablas + 1 enum + relación en `Incident`; sin BOM; `db execute` +
+`migrate resolve` por el drift del historial). Seed: 2 obligaciones de EJEMPLO genéricas (idempotentes, marcadas "(ejemplo)").
+Blindaje: contracts spec (`reporting.spec.ts`, 12) + API spec (`incident-reports.service.spec.ts`, 6) + smoke en vivo
+`scripts/smoke-incidencias-reportabilidad.py` 31/31 + regresión de incidencias 32/32 · capa 23/23 · investigación 27/27 ·
+excepciones 39/39 · reglas 21/21 · catálogos 16/16. **Siguiente: 4.4 — SLA/escalamiento + aviso de plazo (depende del épico de
+notificaciones avanzadas).**
+
+---
+
 ### 2026-06-17 · Llenado — guard de regresión de permisos por sección/campo — ✅ IMPLEMENTADO
 
 **Incidente:** el dueño reportó que en *Bitácora de Turno — Demo Completa* la autorización por sección/campo no se aplicaba
