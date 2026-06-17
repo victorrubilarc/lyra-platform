@@ -122,6 +122,31 @@ export function TransitionNotifyEditor({
         <div className={styles.body}>
           <p className={styles.hint}>{t("workflows.builder.notify.intro")}</p>
 
+          {/* Atajo: copiar destinatarios de otra transición del mismo flujo (arriba, para
+              que sea lo primero). Solo se muestra si hay alguna otra con aviso configurado. */}
+          {copySources.length > 0 && (
+            <div className={styles.copyRow}>
+              <span className={styles.copyLabel}>
+                <Copy size={13} /> {t("workflows.builder.notify.copyFrom")}
+              </span>
+              <Select
+                value=""
+                disabled={disabled}
+                onChange={(e) => {
+                  if (e.target.value) copyFrom(e.target.value);
+                }}
+                aria-label={t("workflows.builder.notify.copyFrom")}
+              >
+                <option value="">{t("workflows.builder.notify.copyFromPlaceholder")}</option>
+                {copySources.map((c) => (
+                  <option key={c.uid} value={c.uid}>
+                    {c.label}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          )}
+
           {/* Roles */}
           <div className={styles.field}>
             <span className={styles.fieldLabel}>{t("workflows.builder.notify.roles")}</span>
@@ -258,30 +283,6 @@ export function TransitionNotifyEditor({
             </Select>
             <p className={styles.hint}>{t("workflows.builder.notify.templateHint")}</p>
           </div>
-
-          {/* Atajo: copiar destinatarios de otra transición */}
-          {copySources.length > 0 && (
-            <div className={styles.copyRow}>
-              <span className={styles.copyLabel}>
-                <Copy size={13} /> {t("workflows.builder.notify.copyFrom")}
-              </span>
-              <Select
-                value=""
-                disabled={disabled}
-                onChange={(e) => {
-                  if (e.target.value) copyFrom(e.target.value);
-                }}
-                aria-label={t("workflows.builder.notify.copyFrom")}
-              >
-                <option value="">{t("workflows.builder.notify.copyFromPlaceholder")}</option>
-                {copySources.map((c) => (
-                  <option key={c.uid} value={c.uid}>
-                    {c.label}
-                  </option>
-                ))}
-              </Select>
-            </div>
-          )}
         </div>
       )}
     </div>

@@ -207,10 +207,12 @@
   font-size: 14px;
   color: var(--color-text-primary);
   /* Fijo al hacer scroll: el botón "Agregar" no se pierde con listas largas.
-     El offset = alto del topbar de la app (sticky, 58px); el `.tabsBar` no es
-     sticky, así que no se suma. */
+     El scroll vive en `.content` del shell (overflow-y:auto) y el topbar+pestañas
+     quedan FUERA de ese contenedor ⇒ el sticky se ancla al tope del scrollport:
+     `top: 0` (un offset de 58px dejaba una franja muerta donde se colaba el
+     contenido al hacer scroll). */
   position: sticky;
-  top: 58px;
+  top: 0;
   z-index: 3;
   background: var(--color-bg-surface-1);
   margin: calc(-1 * var(--space-4)) calc(-1 * var(--space-4)) var(--space-1);
