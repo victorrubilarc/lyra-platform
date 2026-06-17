@@ -5,7 +5,14 @@ import {
   incidentTypeSchema,
   incidentCategorySchema,
   incidentCommentSchema,
+  incidentActionSchema,
   type AddIncidentCommentRequest,
+  type CancelIncidentActionRequest,
+  type CompleteIncidentActionRequest,
+  type CreateIncidentActionRequest,
+  type IncidentActionDto,
+  type UpdateIncidentActionRequest,
+  type VerifyIncidentActionRequest,
   type AssignIncidentRequest,
   type CancelIncidentRequest,
   type CreateIncidentRequest,
@@ -114,4 +121,30 @@ export function transitionIncident(id: string, dto: TransitionIncidentRequest): 
 
 export function cancelIncident(id: string, dto: CancelIncidentRequest): Promise<IncidentDetail> {
   return apiJson(`/incidents/${id}/cancel`, incidentDetailSchema, { method: "POST", body: dto });
+}
+
+// --- Acciones CAPA (Fase 4.2a) -----------------------------------------------
+
+export function fetchIncidentActions(incidentId: string): Promise<IncidentActionDto[]> {
+  return apiJson(`/incidents/${incidentId}/actions`, z.array(incidentActionSchema));
+}
+
+export function createIncidentAction(incidentId: string, dto: CreateIncidentActionRequest): Promise<IncidentActionDto> {
+  return apiJson(`/incidents/${incidentId}/actions`, incidentActionSchema, { method: "POST", body: dto });
+}
+
+export function updateIncidentAction(actionId: string, dto: UpdateIncidentActionRequest): Promise<IncidentActionDto> {
+  return apiJson(`/incidents/actions/${actionId}`, incidentActionSchema, { method: "PATCH", body: dto });
+}
+
+export function completeIncidentAction(actionId: string, dto: CompleteIncidentActionRequest): Promise<IncidentActionDto> {
+  return apiJson(`/incidents/actions/${actionId}/complete`, incidentActionSchema, { method: "POST", body: dto });
+}
+
+export function verifyIncidentAction(actionId: string, dto: VerifyIncidentActionRequest): Promise<IncidentActionDto> {
+  return apiJson(`/incidents/actions/${actionId}/verify`, incidentActionSchema, { method: "POST", body: dto });
+}
+
+export function cancelIncidentAction(actionId: string, dto: CancelIncidentActionRequest): Promise<IncidentActionDto> {
+  return apiJson(`/incidents/actions/${actionId}/cancel`, incidentActionSchema, { method: "POST", body: dto });
 }

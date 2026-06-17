@@ -104,3 +104,21 @@
 .warn { display: flex; align-items: center; gap: 6px; color: var(--color-warning); font-size: var(--text-body-sm-size); margin: 0; }
 .signBox { background: var(--color-bg-surface-2); border-radius: var(--radius-md); padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
 .signTitle { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: var(--text-body-sm-size); color: var(--color-accent-secondary); }
+
+/* Acciones CAPA (Fase 4.2a) */
+.actionsHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-bottom: var(--space-2); }
+.actionsHead .originTitle { margin-bottom: 0; display: flex; align-items: center; gap: 6px; }
+.actionWarn { display: flex; align-items: center; gap: 6px; color: var(--color-warning); font-size: var(--text-body-sm-size); margin-bottom: var(--space-2); }
+.actionList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.actionCard { background: var(--color-bg-surface-2); border: 1px solid var(--color-border-subtle); border-radius: var(--radius-md); padding: var(--space-2) var(--space-3); display: flex; flex-direction: column; gap: 4px; }
+.actionTop { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.actionKind { font-size: var(--text-caption-size); font-weight: 600; border: 1px solid; border-radius: var(--radius-sm); padding: 1px 6px; }
+.actionStar { color: var(--color-warning); }
+.actionStatus { font-size: var(--text-caption-size); font-weight: 600; margin-left: auto; }
+.actionTitle { font-weight: 600; }
+.actionDesc { font-size: var(--text-body-sm-size); color: var(--color-text-secondary); }
+.actionMeta { font-size: var(--text-caption-size); color: var(--color-text-muted); }
+.actionNote { font-size: var(--text-caption-size); color: var(--color-text-secondary); display: flex; align-items: center; gap: 4px; }
+.actionBtns { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: 4px; }
+.checkRow { display: flex; align-items: flex-start; gap: var(--space-2); font-size: var(--text-body-sm-size); color: var(--color-text-secondary); cursor: pointer; }
+.checkRow input { margin-top: 3px; }

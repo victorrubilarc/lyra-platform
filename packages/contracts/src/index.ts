@@ -68,3 +68,6 @@ export * from "./incidents/incidents.js";
 
 // Excepciones operacionales desde bitácoras (Fase 4.1)
 export * from "./incidents/exceptions.js";
+
+// Acciones CAPA de incidencias (Fase 4.2a)
+export * from "./incidents/actions.js";

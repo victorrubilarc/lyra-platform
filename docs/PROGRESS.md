@@ -1,5 +1,35 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-17 — Fase 4.2a: Acciones CAPA (correctivas/preventivas) + bloqueo de cierre + verificación de eficacia ✅**
+(`feat/incidencias-capa`). Primera mejora tras la **auditoría del módulo de Incidencias** (sesión de diagnóstico previa: el core ya
+era genérico/transversal, no minero-hardcodeado; la única brecha **P1 funcional** era el seguimiento real → CAPA). Convierte el
+módulo de "registro" en "gestión con cierre verificado". **Plan aprobado por el dueño; 4 forks resueltos en la recomendación:**
+(1) **2 permisos nuevos** `incident:action:manage` + `incident:action:verify` (segregación de funciones: quien ejecuta NO
+auto-verifica; cat. **81→83**); (2) **bloqueo por flag `mandatory` por acción** (más fino que "todo el tipo"); (3) **verificación
+configurable** — DONE basta para cerrar, salvo que el TIPO declare `requiresCapa` (entonces exige VERIFIED); (4) **`responsibleRoleId`
+incluido ya** (grupo responsable, §7 P2 de la auditoría) a nivel modelo/contrato/API. **Modelo:** 1 entidad aditiva `IncidentAction`
+(folio `ACT-####`, kind CORRECTIVE/PREVENTIVE/IMMEDIATE, mandatory, responsable persona+rol [refs blandas], dueAt, status OPEN/
+IN_PROGRESS/DONE/VERIFIED/CANCELED, realización + **verificación de eficacia** EFFECTIVE/NOT_EFFECTIVE, anulación sin borrado físico,
+`evidence Json?` **reservado**) + 3 enums + relación en `Incident`/`Role`. **Migración aditiva** `20260617120000_add_incident_actions`
+(se quitó del diff un `DROP INDEX` AJENO; aplicada con `db execute` + `migrate resolve` por el drift previo del historial). **Contratos**
+(`@lyra/contracts/incidents/actions`): DTO + requests + enums + helpers PUROS `hasOpenMandatoryActions`/**`blockingActionsForClose`**
+(autoritativos back↔front) + `incidentActionCode`. **API:** `IncidentActionsService` (CRUD + complete[→DONE] + **verify**[EFICAZ→
+VERIFIED · NO eficaz→reabre IN_PROGRESS] + cancel; ABAC heredada del nodo de la incidencia; timeline `ACTION_*` + auditoría en cada
+mutación) + 6 endpoints en `IncidentsController` (`:id/actions` GET/POST, `actions/:actionId` PATCH, `.../complete|verify|cancel`) +
+**guarda de cierre** `assertNoBlockingActions` en `IncidentsService.transition` (al pasar a estado FINAL: 400 si hay acciones
+obligatorias sin resolver; `requireVerification = type.requiresCapa`). **Web:** **bloque "Acciones correctivas/preventivas"** en
+`IncidentDetailDrawer` (componente nuevo `IncidentActionsBlock` + modales crear/editar/completar/verificar/anular; chips de tipo/estado,
+estrella obligatoria, plazo vencido en rojo, **aviso "N obligatorias sin resolver pueden bloquear el cierre"**, gates por permiso) +
+capa `incidents-api`/`-queries` extendida + meta de presentación. **Sin migrar seeds** (los flags `requiresCapa` ya existían en el
+catálogo). Tests: **contracts 263** (+6 helpers CAPA) · **API 234** sin regresión; typecheck/lint(0)/build verdes. **Smoke en vivo
+`scripts/smoke-incidencias-capa.py` 23/23** (crear/folio/timeline · validación · **bloqueo de cierre con obligatoria abierta → 400 ·
+DONE sin verificar [requiresCapa] → 400 · verificar EFICAZ → cierra · tipo sin requiresCapa: DONE basta · NO eficaz reabre · no
+obligatoria no bloquea · editar/anular · gates 403 operador**) **+ `smoke-incidencias.py` 30/30** sin regresión. **Deuda 4.2a
+(BACKLOG):** subida de archivos de evidencia a la acción (reusará Storage Ola 3; columna `evidence` ya reservada) · picker de
+**rol responsable** en la UI (el dato/API ya lo soportan) · firma Part 11 al verificar. **Pendiente: smoke VISUAL del dueño** (bloque
+de acciones, modales, aviso de bloqueo, intento de cierre bloqueado). **Siguiente: 4.2b — Investigación (5 Porqués).**
+🔔 Recordatorio: épico de **notificaciones avanzadas** sigue pendiente (`docs/prompts/notificaciones-avanzadas.md`).
+
 **2026-06-17 — Incidencias: MANTENEDOR de catálogos (Tipos + Categorías) [UI] ✅** (`feat/incidencias-catalogos-ui`). Le pone
 PANTALLA a los catálogos `IncidentType`/`IncidentCategory`, que ya eran configurables en el backend pero solo se cambiaban por seed
 o API directa. **Mayormente frontend** + una guarda mínima de backend. **2 forks resueltos con el dueño:** ubicación = **ruta propia

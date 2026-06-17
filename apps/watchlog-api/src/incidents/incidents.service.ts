@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
 import {
+  blockingActionsForClose,
   deriveLifecycle,
   evaluateSla,
   type AddIncidentCommentRequest,
@@ -358,6 +359,12 @@ export class IncidentsService {
     const toState = graph.states.get(transition.toKey)!;
     const now = new Date();
     const becomesFinal = toState.isFinal;
+
+    // Guarda CAPA: si la transición CIERRA la incidencia, no puede haber acciones
+    // OBLIGATORIAS aún abiertas. La verificación de eficacia se EXIGE cuando el tipo
+    // declara `requiresCapa` (fork 3): entonces una acción DONE-sin-verificar también
+    // bloquea; si no, basta con DONE.
+    if (becomesFinal) await this.assertNoBlockingActions(id, incident.typeId);
 
     await this.prisma.$transaction(async (tx) => {
       await tx.incidentTransition.create({
@@ -738,6 +745,24 @@ export class IncidentsService {
   private async assertUserExists(userId: string): Promise<void> {
     const u = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
     if (!u) throw new BadRequestException("El usuario indicado no existe");
+  }
+
+  /** Impide cerrar si hay acciones CAPA obligatorias sin resolver (Fase 4.2a). */
+  private async assertNoBlockingActions(incidentId: string, typeId: string): Promise<void> {
+    const type = await this.prisma.incidentType.findUnique({ where: { id: typeId }, select: { requiresCapa: true } });
+    const requireVerification = type?.requiresCapa ?? false;
+    const actions = await this.prisma.incidentAction.findMany({
+      where: { incidentId, mandatory: true, status: { in: ["OPEN", "IN_PROGRESS", "DONE"] } },
+      select: { mandatory: true, status: true },
+    });
+    const blocking = blockingActionsForClose(actions, requireVerification);
+    if (blocking.length > 0) {
+      throw new BadRequestException(
+        requireVerification
+          ? `No se puede cerrar: ${blocking.length} acción(es) obligatoria(s) sin completar y verificar.`
+          : `No se puede cerrar: ${blocking.length} acción(es) obligatoria(s) sin completar.`,
+      );
+    }
   }
 
   private snapshot(row: { title: string; typeId: string; severity: number; priority: string; lifecycle: string; ownerId: string | null }): Prisma.InputJsonValue {

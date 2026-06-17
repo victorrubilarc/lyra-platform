@@ -111,6 +111,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 
 ### 15. Incidencias  [todos los roles operativos]
 - ✅ **Reportar y gestionar incidencias** (lista + tablero kanban + detalle con flujo) (§ Incidencias)
+- ✅ **Acciones correctivas y preventivas (CAPA)** (con verificación de eficacia y bloqueo de cierre) (§ Incidencias ▸ Acciones CAPA)
 - ✅ **Crear desde una bitácora** (botón "Reportar incidencia" en el visor de la entrada) (§ Incidencias ▸ Desde una bitácora)
 - ✅ **Administrar los catálogos** (tipos y categorías de incidencia) (§ Incidencias ▸ Catálogos) [solo administrador]
 
@@ -632,6 +633,39 @@ categorías: `incidentcatalog:manage`. Todo se verifica en el servidor y respeta
 - Las incidencias se pueden originar **manualmente**, **desde una bitácora** o **desde una
   excepción operacional** (ver más abajo); la apertura **automática por reglas** llega en una
   fase siguiente.
+
+### Incidencias ▸ Acciones correctivas y preventivas (CAPA)
+
+**Para qué sirve.** Una incidencia no se cierra "porque sí": se resuelve con **acciones**.
+Aquí registras las **acciones correctivas** (corrigen lo que pasó), **preventivas** (evitan
+que se repita) o **inmediatas** (contención), cada una con responsable, plazo y estado, y
+—si corresponde— su **verificación de eficacia**. Es lo que distingue gestionar una
+incidencia de solo anotarla.
+
+**Cómo se usa.**
+- Abre el detalle de una incidencia: bajo el origen verás **«Acciones correctivas/preventivas»**.
+- **«Nueva acción»**: elige tipo (correctiva/preventiva/inmediata), título, responsable y plazo
+  opcionales, y marca **«Obligatoria»** si esa acción **debe** resolverse antes de poder cerrar
+  la incidencia.
+- A medida que se trabaja: **«Completar»** (con una nota de qué se hizo) la deja *Realizada*.
+- **«Verificar»** (permiso aparte): confirma si la acción fue **eficaz** (se da por cerrada) o
+  **no eficaz** (se **reabre** para retrabajarla).
+- **Editar** o **Anular** (con motivo) mientras siga abierta. Nada se borra.
+- Si intentas **cerrar** la incidencia con acciones obligatorias sin resolver, el sistema lo
+  **impide** y te dice cuántas faltan.
+
+**Quién puede.** Crear/editar/completar/anular acciones: `incident:action:manage`. **Verificar
+eficacia**: `incident:action:verify` (separado a propósito — quien ejecuta una acción no debería
+auto-verificarla). Todo respeta tu **alcance por nodo** (heredado de la incidencia).
+
+**Importante.**
+- Una acción **obligatoria** abierta **bloquea el cierre**. Si el **tipo** de incidencia exige
+  CAPA, además **debe estar verificada** (no basta con "realizada"); si no lo exige, basta con
+  realizarla.
+- Una verificación **«no eficaz»** reabre la acción: una acción que no funcionó sigue pendiente.
+- Las acciones quedan en el **timeline** de la incidencia (quién, qué, cuándo). Sin borrado físico.
+- *Por ahora:* la **evidencia con archivos** en la acción y el **rol como responsable** desde la
+  pantalla llegan en una actualización siguiente (el cierre ya admite notas de texto).
 
 ### Catálogos de incidencias (tipos y categorías)
 

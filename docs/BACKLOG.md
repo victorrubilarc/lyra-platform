@@ -5,7 +5,15 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-17** (**Mantenedor de catálogos de incidencias [UI] ✅** — `feat/incidencias-catalogos-ui`: pantalla
+> actualización: **2026-06-17** (**Fase 4.2a — Acciones CAPA ✅** — `feat/incidencias-capa`: tras la **auditoría del módulo de
+> Incidencias** (core ya genérico/transversal; brecha P1 = seguimiento real → CAPA), gestión de acciones correctivas/preventivas/
+> inmediatas. Entidad `IncidentAction` (folio ACT-####, mandatory, responsable persona+rol, plazo, status OPEN/IN_PROGRESS/DONE/
+> VERIFIED/CANCELED, **verificación de eficacia** [no eficaz reabre], anulación sin borrado, `evidence` reservado); **bloqueo de
+> cierre** por acción `mandatory` (verificación exigida si el tipo `requiresCapa`); 2 permisos `incident:action:manage`/`:verify`
+> [cat. **83**]; bloque "Acciones" en el drawer + modales. Migración aditiva. Contracts 263 · API 234 · smoke
+> `smoke-incidencias-capa.py` 23/23 + `smoke-incidencias.py` 30/30. **Deuda:** subida de evidencia (Storage Ola 3) · picker de rol
+> responsable en UI · firma Part 11 al verificar. **Siguiente: 4.2b — Investigación (5 Porqués).** Anterior:
+> **Mantenedor de catálogos de incidencias [UI] ✅** — `feat/incidencias-catalogos-ui`: pantalla
 > `/incidencias/catalogos` [ruta propia + botón en header de `/incidencias`, gate `incidentcatalog:manage`] con sub-pestañas
 > Tipos/Categorías [buscador+estado+orden en 1 línea, GridPager arriba/abajo, crear/editar modal, toggle activo]; backend mínimo:
 > guarda "flujo por defecto publicado" en `upsertType` + **409** al crear con key existente [`?create=true`, guarda cliente+server];
@@ -232,6 +240,8 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Incidencias: equipo/activo + fecha del evento en el alta** (`GET /incidents/equipment-options` ABAC; `Incident.occurredAt` nullable + migración `…_add_incident_occurred_at`; create() hereda equipo de la bitácora de origen; modal con selector Equipo [cascada nodo] + Fecha del evento; detalle muestra "Ocurrió"; smoke `smoke-incidencias.py` 30/30) | `feat/incidencias-equipo-fecha` → `main` | ✅ fusionado y publicado en `origin/main` (`900ad89`) | ninguna |
 | **Mantenedor de catálogos de incidencias (Tipos + Categorías) [UI]** (web `features/incidents/` [`CatalogsPage` + `IncidentTypeModal`/`IncidentCategoryModal` + `catalogs.module.css`]; `incidents-api`/`-queries` con upserts + `includeInactive` + hooks admin; ruta `/incidencias/catalogos` + botón header [gate `incidentcatalog:manage`, no en sidebar]; backend: guarda "flujo publicado" en `upsertType` + 409 al crear con key existente vía `?create=true`; swatches de color de tokens DS; sin permisos nuevos cat. 81; sin migración; smoke `smoke-catalogos-incidencias.py` 16/16 + `smoke-incidencias.py` 30/30) | `feat/incidencias-catalogos-ui` → `main` | ✅ fusionado y publicado en `origin/main` (`9b0d436`) | ninguna |
 
+| **Fase 4.2a Acciones CAPA** (`IncidentAction` + 3 enums + migración `…_add_incident_actions` aditiva; `@lyra/contracts/incidents/actions` con DTO/requests/enums + helpers `hasOpenMandatoryActions`/`blockingActionsForClose`/`incidentActionCode`; 2 permisos `incident:action:manage`/`:verify` [cat. **83**]; `IncidentActionsService` [CRUD+complete+verify+cancel, ABAC heredada, timeline+auditoría] + 6 endpoints + guarda `assertNoBlockingActions` en `transition`; web `IncidentActionsBlock` + modales + api/queries + meta; contracts 263 · API 234 · smoke `smoke-incidencias-capa.py` 23/23 + `smoke-incidencias.py` 30/30) | `feat/incidencias-capa` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
+
 **Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
 **Convención propuesta (a confirmar):** trabajar cada módulo en rama `feat/<modulo>`;
@@ -241,6 +251,19 @@ nunca queda más de una sesión atrás.
 ---
 
 ## 2. Pendiente por HACER (módulos / submódulos)
+
+### Incidencias — Fase 4 (plan por fases; 4.0/4.1/4.2a ✅)
+- [ ] **4.2a · Deuda (no bloqueante):** subida de **archivos de evidencia** a la acción (columna `evidence Json?` ya reservada;
+      reusará `StorageService` Ola 3, proxied + presigned GET con ABAC) · **picker de rol responsable** en la UI (el modelo/contrato/
+      API ya soportan `responsibleRoleId`; falta un endpoint de role-options del módulo + el selector) · **firma Part 11** al verificar
+      eficacia (GxP) · evaluar pasar el `IncidentDetailDrawer` a **pestañas** cuando entren Investigación + evidencia.
+- [ ] **4.2b · Investigación (5 Porqués)** configurable por tipo/severidad (honra `requiresInvestigation`). **← siguiente.**
+- [ ] **4.3 · Reportabilidad configurable** (autoridad/plazo; genérico, no solo HSE Chile) — §14 de la auditoría.
+- [ ] **4.4 · SLA/notificaciones/escalamiento** (depende del épico de **notificaciones avanzadas**) + unificar el criterio de
+      "vencida" (`dueAt` vs `maxStayMinutes`, hoy desalineados — §21 de la auditoría).
+- [ ] **4.5 · Dashboard/analítica** (MTTR, reincidencia, CAPA vencidas).
+- [ ] **Mejoras menores de la auditoría:** campos universales en el alta (medida inmediata, impactos) · dedup entre incidencias ·
+      separar seed núcleo neutro vs paquetes verticales por industria (la arquitectura ya lo permite como datos).
 
 ### Form Builder — FORMATEO EN VIVO de campos (acordado con el dueño 2026-06-15)
 - [x] **A · Quick wins ✅** (`feat/builder-formateo-paleta`): RUT al teclear (`formatRutLive`); número/moneda/porcentaje con

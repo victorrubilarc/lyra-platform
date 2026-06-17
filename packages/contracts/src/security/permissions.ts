@@ -605,6 +605,25 @@ export const PERMISSION_CATALOG = [
     description:
       "Corregir el valor que originó una excepción, preservando el original con motivo auditado (GxP/ALCOA+).",
   },
+
+  // --- Acciones CAPA de incidencias (Fase 4.2a) ------------------------------
+  // Acciones correctivas/preventivas/inmediatas con responsable, plazo, estado y
+  // VERIFICACIÓN de eficacia. La verificación se separa (segregación de funciones:
+  // quien ejecuta una acción no debería auto-verificarla). El alcance de dato lo
+  // hereda de la incidencia (ABAC por nodo).
+  {
+    key: "incident:action:manage",
+    dimension: "ACTION",
+    group: "incidents",
+    description: "Crear, editar, completar y cancelar acciones correctivas/preventivas de una incidencia.",
+  },
+  {
+    key: "incident:action:verify",
+    dimension: "ACTION",
+    group: "incidents",
+    description:
+      "Verificar la eficacia de una acción CAPA (efectiva / no efectiva) — separado de gestionarla (segregación de funciones).",
+  },
 ] as const satisfies readonly PermissionDef[];
 
 /** Unión literal de todas las claves de permiso conocidas. */
