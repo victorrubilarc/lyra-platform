@@ -8,10 +8,16 @@ interface UIState {
   /** Sidebar colapsado a riel de íconos. */
   sidebarCollapsed: boolean;
   density: Density;
+  /**
+   * Grupos del sidebar plegados (por id de grupo). Solo aplica con el sidebar
+   * expandido; en el riel de íconos no hay plegado. Por defecto todos abiertos.
+   */
+  collapsedNavGroups: Record<string, boolean>;
   toggleSidebar: () => void;
   setSidebarCollapsed: (value: boolean) => void;
   setDensity: (density: Density) => void;
   toggleDensity: () => void;
+  toggleNavGroup: (groupId: string) => void;
 }
 
 /**
@@ -23,11 +29,19 @@ export const useUIStore = create<UIState>()(
     (set) => ({
       sidebarCollapsed: false,
       density: "comfortable",
+      collapsedNavGroups: {},
       toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
       setSidebarCollapsed: (value) => set({ sidebarCollapsed: value }),
       setDensity: (density) => set({ density }),
       toggleDensity: () =>
         set((s) => ({ density: s.density === "comfortable" ? "compact" : "comfortable" })),
+      toggleNavGroup: (groupId) =>
+        set((s) => ({
+          collapsedNavGroups: {
+            ...s.collapsedNavGroups,
+            [groupId]: !s.collapsedNavGroups[groupId],
+          },
+        })),
     }),
     { name: "wl_ui" },
   ),

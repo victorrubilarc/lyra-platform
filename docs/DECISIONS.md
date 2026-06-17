@@ -4,6 +4,36 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-17 · Shell — Menú lateral reestructurado en GRUPOS colapsables (Operación · Diseño y datos · Administración · Favoritos)
+
+**Contexto:** el sidebar creció a una lista plana de 16 ítems con scrollbar; se veía poco profesional y no escalaba. Objetivo:
+agruparlo con encabezados de sección (estilo SAP Fiori / ServiceNow / Linear) para que quepa sin scroll. Solo UI del shell; sin tocar
+permisos, rutas ni gateo.
+
+**Decisión (4 forks resueltos con el dueño):**
+1. **Esquema de grupos (a):** 3 grupos fijos + Favoritos dinámico, en este orden:
+   - **Operación:** Inicio · Bitácoras · Nueva entrada · Mis rondas · Incidencias · Excepciones.
+   - **Diseño y datos:** Plantillas · Flujos · Datos de referencia · Estructura · Programación de rondas · Calendario operacional · Calendario fiscal.
+   - **Administración:** Seguridad · Notificaciones · Configuración.
+   - **Favoritos:** se mantiene (sección dinámica al final, encabezado estático).
+   *Matices ofrecidos y descartados por el dueño:* sacar "Inicio" suelto arriba (patrón Linear); mover "Estructura" a Administración.
+   Se eligió **el esquema tal cual** (Inicio en Operación, Estructura en Diseño y datos).
+2. **Colapsables persistidos (b) [recomendado y aceptado]:** cada grupo pliega/despliega; el estado vive en `ui-store`
+   (`collapsedNavGroups`, persistido en localStorage). **Invariante:** el grupo del ítem activo se muestra SIEMPRE, aunque esté
+   plegado (`open = !collapsed || hasActive`) — nunca se esconde el módulo en el que estás. Encabezados discretos con chevron + `aria-expanded`.
+3. **Riel colapsado (c):** en modo solo-iconos NO hay encabezados ni plegado; los grupos se separan con **divisores sutiles**
+   (`.navDivider`) y cada ítem se identifica por **tooltip** (ya existía `Tooltip side="right"`). Favoritos = un clúster más tras un divisor.
+4. **Modelo (d) [recomendado y aceptado]:** se agrega `group?: NavGroupId` a `NavRoute` + un arreglo ordenado `NAV_GROUPS` (id +
+   labelKey) + helper puro `buildNavGroups(visibleRoutes)` que respeta el orden de `NAV_GROUPS` (grupos) y de `SIDEBAR_ROUTES`
+   (ítems). **`SIDEBAR_ROUTES`, `routeForPath`, `routeByPath` quedan INTACTOS** → command palette (⌘K), pestañas y breadcrumbs no se
+   tocan (leen de `navigation.ts` sin enterarse de los grupos). Un grupo sin ítems visibles por permiso **no se renderiza**.
+
+**Motivo:** un menú agrupado por ciclo de trabajo (operar → diseñar → administrar) es el estándar de los shells enterprise; reduce la
+carga cognitiva, elimina el scroll y se ve profesional. Mantener el modelo aditivo (`group` opcional + helper) evita acoplar el resto
+del shell a los grupos y deja la agrupación como pura presentación. Solo frontend; sin contratos/API/migración.
+
+---
+
 ### 2026-06-17 · Incidencias — FMEA/RPN + RCA dinámico por riesgo = DIFERIDO (opt-in, solo bajo demanda regulada)
 
 **Contexto:** contraste del módulo de Incidencias contra el estándar de un "RCA/CAPA nativo" (FMEA con gravedad×ocurrencia×detección

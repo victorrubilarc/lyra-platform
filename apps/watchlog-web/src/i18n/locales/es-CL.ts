@@ -125,6 +125,11 @@ export const esCL = {
   },
   nav: {
     sectionLabel: "Módulos",
+    groups: {
+      operation: "Operación",
+      design: "Diseño y datos",
+      admin: "Administración",
+    },
     home: "Inicio",
     structure: "Estructura",
     security: "Seguridad",

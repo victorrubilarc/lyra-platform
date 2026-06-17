@@ -1,5 +1,28 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-17 — Shell: menú lateral reestructurado en GRUPOS colapsables ✅** (`feat/sidebar-grupos`). El sidebar había crecido a una
+**lista plana de 16 ítems con scrollbar** (poco profesional, no escalaba). Se reorganizó en **grupos con encabezado** (estilo SAP
+Fiori / ServiceNow / Linear) que caben **sin scroll**. **Solo UI del shell; sin tocar permisos, rutas ni gateo.** **4 forks resueltos
+con el dueño** (DECISIONS 2026-06-17): **(a) esquema** = 3 grupos fijos + Favoritos, tal cual lo propuso el dueño (se le ofrecieron y
+descartó "Inicio suelto arriba" y "Estructura→Administración"): **Operación** (Inicio · Bitácoras · Nueva entrada · Mis rondas ·
+Incidencias · Excepciones) · **Diseño y datos** (Plantillas · Flujos · Datos de referencia · Estructura · Programación de rondas ·
+Calendario operacional · Calendario fiscal) · **Administración** (Seguridad · Notificaciones · Configuración) · **Favoritos**
+(dinámico al final). **(b) colapsables persistidos** — cada grupo pliega/despliega, estado en `ui-store.collapsedNavGroups`
+(localStorage); **invariante: el grupo del ítem activo se muestra SIEMPRE** aunque esté plegado (`open = !collapsed || hasActive`);
+encabezado con chevron + `aria-expanded`. **(c) riel colapsado** (solo-iconos) sin encabezados ni plegado: grupos separados por
+**divisores sutiles** (`.navDivider`) + tooltip por ítem (reusa `Tooltip side="right"`); Favoritos = clúster tras un divisor. **(d)
+modelo aditivo** = `group?: NavGroupId` en `NavRoute` + `NAV_GROUPS` ordenado + helper PURO `buildNavGroups(visibleRoutes)` (respeta
+el orden de `NAV_GROUPS` y de `SIDEBAR_ROUTES`; omite grupos sin ítems visibles por permiso); **`SIDEBAR_ROUTES`/`routeForPath`/
+`routeByPath` INTACTOS** → command palette (⌘K), pestañas y breadcrumbs no se enteran de los grupos. **Archivos:** `navigation.ts`
+(tipos + grupos + asignación `group` a las 16 rutas + helper), `ui-store.ts` (`collapsedNavGroups` + `toggleNavGroup` persistidos),
+`Sidebar.tsx` (render dividido en riel/expandido, grupos colapsables, invariante de activo), `AppShell.module.css` (`.navGroup`/
+`.navGroupHeader`/`.navGroupLabel`/`.navGroupChevron`/`.navDivider`), i18n es-CL (`nav.groups.operation|design|admin`). Identidad
+Lyra (tokens, claro+oscuro, 44px, a11y con `aria-expanded`/teclado). **Sin contratos/API/migración; sin permisos nuevos.**
+typecheck/lint(0 errores)/build verdes; dev server :5173 arriba (HMR). **Pendiente: smoke VISUAL del dueño** (agrupado claro/oscuro,
+colapsado/expandido, grupos que pliegan, activo sin doble-resalte, responsive). **Deuda menor (BACKLOG):** la sección Favoritos quedó
+con encabezado estático (no colapsable) — intencional, es dinámica; el estilo `.navLabel` y la clave `nav.sectionLabel` quedaron
+huérfanos (reemplazados por `.navGroupLabel` / `nav.groups.*`). **Siguiente: 4.4 (SLA de incidencias + escalamiento + aviso de plazo).**
+
 **2026-06-17 — UX del builder de Flujos (3 ajustes por feedback del dueño) ✅** (`feat/builder-flujos-ux`). Pulido del
 `WorkflowBuilder` tras QA visual: **(1) "Copiar destinatarios de otra transición" más descubrible** — el atajo ya existía
 (`TransitionNotifyEditor`) pero vivía al final del editor; ahora va **arriba del bloque de aviso** (lo primero al activar "Notificar").

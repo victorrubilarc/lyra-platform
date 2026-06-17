@@ -10,7 +10,7 @@
 > funcionalidades existentes** aunque su detalle aún esté por redactar (✍️): así nada se
 > olvida; el backfill de lo ya construido se llena de a poco (incremental).
 >
-> Última actualización: **2026-06-16**.
+> Última actualización: **2026-06-17**.
 
 ## Convención de cada sección
 Cada funcionalidad se documenta con estas cuatro partes fijas:
@@ -37,7 +37,8 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 - ✍️ Mi seguridad (activar/regenerar/desactivar MFA)
 
 ### 2. El espacio de trabajo  [todos]
-- ✍️ Barra lateral, pestañas, búsqueda ⌘K, idioma, densidad, tema claro/oscuro
+- ✅ **Menú lateral por grupos** (Operación · Diseño y datos · Administración · Favoritos) (§ El espacio de trabajo ▸ Menú lateral)
+- ✍️ Pestañas, búsqueda ⌘K, idioma, densidad, tema claro/oscuro
 
 ### 3. Estructura organizacional  [Configurador/Admin]
 - ✍️ Árbol de niveles y nodos (crear/editar/mover/orden)
@@ -122,6 +123,40 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 
 ### 16. Excepciones operacionales  [Supervisor · Operador con triage]
 - ✅ **Revisar y triar excepciones** (panel en la bitácora + bandeja global; corregir/reconocer/convertir/asociar/descartar) (§ Excepciones operacionales)
+
+---
+
+## El espacio de trabajo ▸ Menú lateral  [todos]
+
+**Para qué sirve.** El menú lateral izquierdo es el mapa del sistema: lleva a cada módulo. Como
+WatchLog tiene muchos módulos, el menú está **organizado en grupos con encabezado** para que se
+encuentre todo de un vistazo, sin una lista interminable ni scroll. Los grupos siguen el ciclo de
+trabajo: lo que se usa a diario arriba, lo que se configura en medio, lo de administración abajo.
+
+**Cómo se usa.**
+1. **Grupos.** El menú se divide en tres grupos fijos + tus favoritos:
+   - **Operación** (el día a día): Inicio · Bitácoras · Nueva entrada · Mis rondas · Incidencias · Excepciones.
+   - **Diseño y datos** (cómo se arma el sistema): Plantillas · Flujos · Datos de referencia · Estructura ·
+     Programación de rondas · Calendario operacional · Calendario fiscal.
+   - **Administración** (gobierno del sistema): Seguridad · Notificaciones · Configuración.
+   - **Favoritos**: los módulos que fijaste con la estrella (aparece al pasar el mouse sobre un ítem).
+2. **Plegar / desplegar un grupo.** Haz clic en el **encabezado del grupo** (Operación, Diseño y datos…)
+   para plegarlo o desplegarlo. El sistema **recuerda** qué grupos dejaste plegados entre sesiones.
+   El grupo del módulo en el que estás trabajando **se muestra siempre**, aunque lo tengas plegado.
+3. **Colapsar el menú a íconos.** El botón `‹` arriba del menú lo reduce a un **riel de solo íconos**
+   (más espacio para el contenido). En ese modo los grupos se separan con líneas sutiles y cada ícono
+   muestra su nombre al pasar el mouse. El botón `›` lo vuelve a expandir.
+
+**Quién puede.** Todos los usuarios ven el menú; **cada quien ve solo los módulos para los que tiene
+permiso** (un grupo del que no tienes ningún módulo visible simplemente no aparece). La organización en
+grupos, el plegado y el modo riel son **preferencias personales** de tu navegador, no afectan a nadie más.
+
+**Importante.**
+- El menú **oculta** lo que no puedes ver, pero la autorización real la decide siempre el servidor.
+- Plegar un grupo no "apaga" nada: es solo presentación. Los módulos siguen accesibles desde la
+  búsqueda **⌘K / Ctrl+K** y desde Favoritos.
+- Tus favoritos y el estado de los grupos viven en este equipo/navegador; en otro equipo parten del
+  estado por defecto (todos los grupos desplegados).
 
 ---
 
