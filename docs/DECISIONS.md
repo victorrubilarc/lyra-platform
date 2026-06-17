@@ -4,6 +4,36 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-17 · Notificaciones avanzadas · Fase A UI — 3 forks de UX + exponer el default de sistema
+
+Construcción de la UI de la Fase A (el backend ya estaba en `main`). **3 forks de UX presentados con recomendación; el dueño
+aceptó las tres:**
+
+- **(1) Editor de aviso por transición = INLINE en la tarjeta de la transición** (no Drawer). Motivo: la tarjeta de la transición
+  ya es el hogar de toda su config (firma, MFA, roles); un Drawer rompería ese patrón y añadiría un clic. El bloque de aviso se
+  oculta hasta activar el toggle "Notificar", así que no recarga la tarjeta. Componente `TransitionNotifyEditor`.
+- **(2) Default de sistema = pestaña "Notificaciones" PROPIA en `/configuracion`** (no dentro de "Correo saliente"). Motivo: el
+  toggle es gobernanza de NOTIFICACIONES, no configuración SMTP; mezclarlo en la pestaña de correo confundiría conceptos. La
+  pestaña queda lista para crecer (futuros defaults). Visibilidad = `module:settings:view`; el toggle se deshabilita sin
+  `settings:manage` (mismo patrón que Seguridad/Bitácoras).
+- **(3) Correos externos = CHIPS con validación de formato** (no textarea de uno-por-línea). Motivo: feedback inmediato (evita
+  correos malformados), chips removibles, look premium. Banner de advertencia explícito "saltan permisos, se auditan".
+
+**Backend mínimo (no re-arquitectura):** el resolver ya leía `SystemSettings.notifyTransitionDefaultDestinationRoles`, pero la
+columna NO estaba expuesta en el contrato/servicio de settings. Se agregó a `systemSettingsSchema` +
+`updateSystemSettingsRequestSchema` + `SettingsService` (select/defaults/get/auditShape/update), **reusando `GET`/`PATCH /settings`**
+(gate `settings:manage`) — sin endpoint nuevo. Test: sección E del smoke (round-trip + gate 403).
+
+**Atajo "copiar destinatarios de otra transición":** puro frontend (lo pidió el dueño para no hacer burocrático administrar
+varias transiciones). Copia roles/usuarios/3 checks/externos de otra transición del mismo flujo; NO toca `enabled` ni la plantilla.
+
+**Decisión derivada (deuda, BACKLOG):** el picker de USUARIOS del editor consume `/security/users`; un gestor de flujos sin ese
+permiso ve la lista vacía. Se mitigó con `retry:false` (degradación elegante; la autorización real la hace el backend al resolver),
+y se anotó como deuda un endpoint `user-options` decoplado (patrón `role-options` de 2.3.1). No se resuelve ahora para no inflar
+el alcance de la Fase A UI.
+
+---
+
 ### 2026-06-17 · Notificaciones avanzadas (épico) — plan por fases + 7 forks — 🚧 EN CURSO (Fase A)
 
 **Contexto y secuencia (registro honesto):** la sesión arrancó con objetivo **Fase 4.4 (SLA/escalamiento + aviso de plazo)**.

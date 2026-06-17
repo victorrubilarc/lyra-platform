@@ -1,19 +1,23 @@
 import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Bell, Inbox, FileText, SlidersHorizontal, RefreshCw, Search, Send, Eye, ArrowLeft, Monitor, Smartphone, Pencil } from "lucide-react";
-import { Button, Card, GridPager, Input, Modal, Select, Textarea, Toggle, useToast } from "@lyra/ui";
-import { renderTemplate, sampleContextForEvent, type NotificationOutboxStatus, type NotificationTemplateDto } from "@lyra/contracts";
+import { Bell, Inbox, FileText, SlidersHorizontal, RefreshCw, Search, Send, Eye, ArrowLeft, Monitor, Smartphone, Pencil, Plus, Trash2, Tag } from "lucide-react";
+import { Button, Card, FormField, GridPager, Input, Modal, Select, Textarea, Toggle, useToast } from "@lyra/ui";
+import { renderTemplate, sampleContextForEvent, type NotificationEventKey, type NotificationOutboxStatus, type NotificationTemplateDto } from "@lyra/contracts";
 import { Can } from "../../auth/Can.js";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { formatDateTime } from "../../lib/format.js";
+import { useTemplates } from "../templates/templates-queries.js";
 import {
+  useCreateNotificationTemplate,
+  useDeleteNotificationTemplate,
   useNotificationEvents,
+  useNotificationFieldVariables,
   useNotificationOutbox,
   useNotificationTemplates,
   useRetryNotificationOutbox,
   useUpdateNotificationTemplate,
 } from "./notifications-queries.js";
-import { fetchNotificationOutboxDetail } from "./notifications-api.js";
+import { fetchNotificationOutboxDetail, type NotificationEventDefDto } from "./notifications-api.js";
 import { PreferencesPanel } from "./PreferencesPanel.js";
 import styles from "./NotificationsPage.module.css";
 
@@ -230,13 +234,17 @@ function TemplatesPanel() {
   const templates = useNotificationTemplates();
   const events = useNotificationEvents();
   const update = useUpdateNotificationTemplate();
+  const remove = useDeleteNotificationTemplate();
 
   const [selId, setSelId] = useState<string | null>(null); // null = lista (master)
   const [q, setQ] = useState("");
   const [group, setGroup] = useState("");
+  const [scope, setScope] = useState<"" | "generic" | "scoped">("");
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<NotificationTemplateDto | null>(null);
 
   const selected = useMemo<NotificationTemplateDto | null>(
     () => templates.data?.find((x) => x.id === selId) ?? null,
@@ -256,8 +264,11 @@ function TemplatesPanel() {
   const rows = (templates.data ?? []).filter((tpl) => {
     const ev = eventByKey.get(tpl.eventKey);
     const name = ev ? t(ev.labelKey, ev.key) : tpl.eventKey;
-    if (q && !`${name} ${tpl.eventKey}`.toLowerCase().includes(q.toLowerCase())) return false;
+    const scopeName = tpl.templateName ?? "";
+    if (q && !`${name} ${tpl.eventKey} ${scopeName}`.toLowerCase().includes(q.toLowerCase())) return false;
     if (group && ev?.group !== group) return false;
+    if (scope === "generic" && tpl.templateId != null) return false;
+    if (scope === "scoped" && tpl.templateId == null) return false;
     if (status === "active" && !tpl.active) return false;
     if (status === "inactive" && tpl.active) return false;
     return true;
@@ -278,6 +289,14 @@ function TemplatesPanel() {
     />
   );
 
+  function confirmDelete() {
+    if (!pendingDelete) return;
+    remove.mutate(pendingDelete.id, {
+      onSuccess: () => { toast.success(t("notifications.templates.deleted")); setPendingDelete(null); },
+      onError: (e: unknown) => toast.error(e instanceof Error ? e.message : t("common.error")),
+    });
+  }
+
   return (
     <div className={styles.panel}>
       <div className={styles.tplToolbar}>
@@ -286,12 +305,21 @@ function TemplatesPanel() {
           <option value="">{t("notifications.templates.allGroups")}</option>
           {groups.map((g) => <option key={g} value={g}>{GROUP_LABEL[g] ?? g}</option>)}
         </Select>
+        <Select value={scope} onChange={(e) => { setScope(e.target.value as "" | "generic" | "scoped"); setPage(0); }}>
+          <option value="">{t("notifications.templates.allScopes")}</option>
+          <option value="generic">{t("notifications.templates.scopeGeneric")}</option>
+          <option value="scoped">{t("notifications.templates.scopeScoped")}</option>
+        </Select>
         <Select value={status} onChange={(e) => { setStatus(e.target.value); setPage(0); }}>
           <option value="">{t("notifications.templates.allStatuses")}</option>
           <option value="active">{t("notifications.templates.active")}</option>
           <option value="inactive">{t("notifications.templates.inactive")}</option>
         </Select>
         <span className={styles.tplCount}>{t("notifications.templates.count", { count: rows.length })}</span>
+        <div className={styles.spacer} />
+        <Button variant="primary" leftIcon={<Plus size={16} />} onClick={() => setCreateOpen(true)}>
+          {t("notifications.templates.new")}
+        </Button>
       </div>
 
       {pager}
@@ -299,6 +327,7 @@ function TemplatesPanel() {
       <div className={styles.tplTable}>
         <div className={styles.tplTableHead}>
           <span>{t("notifications.templates.colName")}</span>
+          <span>{t("notifications.templates.colScope")}</span>
           <span className={styles.tplColHide}>{t("notifications.templates.colEvent")}</span>
           <span className={styles.tplColHide}>{t("notifications.templates.colChannel")}</span>
           <span className={styles.tplColHide}>{t("notifications.templates.colLocale")}</span>
@@ -310,12 +339,18 @@ function TemplatesPanel() {
         ) : (
           pageRows.map((tpl) => {
             const ev = eventByKey.get(tpl.eventKey);
+            const scoped = tpl.templateId != null;
+            const canDelete = scoped && !tpl.isSystem;
             return (
               <div key={tpl.id} className={styles.tplTableRow} onClick={() => setSelId(tpl.id)} role="button" tabIndex={0}>
                 <div className={styles.tplRowName}>
                   <span className={styles.tplRowTitle}>{ev ? t(ev.labelKey, ev.key) : tpl.eventKey}</span>
                   <span className={styles.tplRowSub}>{ev ? GROUP_LABEL[ev.group] ?? ev.group : "—"}</span>
                 </div>
+                <span className={`${styles.scopePill} ${scoped ? styles.scopeScoped : styles.scopeGeneric}`}>
+                  {scoped ? <Tag size={12} /> : null}
+                  <span>{scoped ? (tpl.templateName ?? t("notifications.templates.scopeScoped")) : t("notifications.templates.scopeGeneric")}</span>
+                </span>
                 <span className={`${styles.eventKey} ${styles.tplColHide}`}>{tpl.eventKey}</span>
                 <span className={`${styles.tplRowSub} ${styles.tplColHide}`}>{tpl.channel}</span>
                 <span className={`${styles.tplRowSub} ${styles.tplColHide}`}>{tpl.locale}</span>
@@ -324,9 +359,22 @@ function TemplatesPanel() {
                     {tpl.active ? t("notifications.templates.active") : t("notifications.templates.inactive")}
                   </span>
                 </span>
-                <Button variant="secondary" leftIcon={<Pencil size={15} />} onClick={(e) => { e.stopPropagation(); setSelId(tpl.id); }}>
-                  {t("common.edit")}
-                </Button>
+                <span className={styles.tplRowActions}>
+                  <Button variant="secondary" leftIcon={<Pencil size={15} />} onClick={(e) => { e.stopPropagation(); setSelId(tpl.id); }}>
+                    {t("common.edit")}
+                  </Button>
+                  {canDelete && (
+                    <button
+                      type="button"
+                      className={styles.tplDeleteBtn}
+                      onClick={(e) => { e.stopPropagation(); setPendingDelete(tpl); }}
+                      aria-label={t("common.delete")}
+                      title={t("common.delete")}
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  )}
+                </span>
               </div>
             );
           })
@@ -334,7 +382,118 @@ function TemplatesPanel() {
       </div>
 
       {pager}
+
+      {createOpen && (
+        <CreateTemplateModal
+          events={events.data ?? []}
+          onClose={() => setCreateOpen(false)}
+          onCreated={(id) => { setCreateOpen(false); setSelId(id); }}
+        />
+      )}
+
+      <Modal
+        open={pendingDelete !== null}
+        onClose={() => setPendingDelete(null)}
+        title={t("notifications.templates.deleteTitle")}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setPendingDelete(null)} disabled={remove.isPending}>{t("common.cancel")}</Button>
+            <Button variant="danger" onClick={confirmDelete} loading={remove.isPending}>{t("common.delete")}</Button>
+          </>
+        }
+      >
+        <p style={{ margin: 0, color: "var(--color-text-secondary)", lineHeight: 1.5 }}>
+          {t("notifications.templates.deleteBody", { name: pendingDelete?.templateName ?? "" })}
+        </p>
+      </Modal>
     </div>
+  );
+}
+
+// --- Crear plantilla ad-hoc (evento + bitácora + idioma) ---------------------
+
+function CreateTemplateModal({
+  events, onClose, onCreated,
+}: {
+  events: NotificationEventDefDto[];
+  onClose: () => void;
+  onCreated: (id: string) => void;
+}) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const create = useCreateNotificationTemplate();
+  const logbooks = useTemplates({});
+
+  const [eventKey, setEventKey] = useState<NotificationEventKey>((events[0]?.key ?? "entry.transition") as NotificationEventKey);
+  const [templateId, setTemplateId] = useState("");
+  const [locale, setLocale] = useState("es-CL");
+
+  const sample = eventKey ? sampleContextForEvent(eventKey) : {};
+  const eventDef = events.find((e) => e.key === eventKey);
+
+  function submit() {
+    if (!eventKey || !templateId) return;
+    // Semilla mínima editable; el usuario refina en el editor (con el diccionario de campos).
+    const subject = eventDef ? `${t(eventDef.labelKey, eventDef.key)}` : eventKey;
+    create.mutate(
+      {
+        eventKey,
+        templateId,
+        locale: locale.trim() || "es-CL",
+        subject: renderTemplate(subject, sample) || eventKey,
+        bodyText: "{{entry.summary}}",
+        bodyHtml: "<p>{{entry.summary}}</p>",
+        active: true,
+      },
+      {
+        onSuccess: (tpl) => { toast.success(t("notifications.templates.created")); onCreated(tpl.id); },
+        onError: (e: unknown) => toast.error(e instanceof Error ? e.message : t("common.error")),
+      },
+    );
+  }
+
+  const canSubmit = Boolean(eventKey && templateId && !create.isPending);
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={t("notifications.templates.newTitle")}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={create.isPending}>{t("common.cancel")}</Button>
+          <Button variant="primary" onClick={submit} loading={create.isPending} disabled={!canSubmit}>{t("common.create")}</Button>
+        </>
+      }
+    >
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+        <p style={{ margin: 0, color: "var(--color-text-secondary)", lineHeight: 1.5, fontSize: "0.86rem" }}>
+          {t("notifications.templates.newHint")}
+        </p>
+        <FormField label={t("notifications.templates.fEvent")}>
+          {({ id }) => (
+            <Select id={id} value={eventKey} onChange={(e) => setEventKey(e.target.value as NotificationEventKey)}>
+              {events.map((ev) => (
+                <option key={ev.key} value={ev.key}>{t(ev.labelKey, ev.key)}</option>
+              ))}
+            </Select>
+          )}
+        </FormField>
+        <FormField label={t("notifications.templates.fLogbook")}>
+          {({ id }) => (
+            <Select id={id} value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
+              <option value="">{t("notifications.templates.fLogbookPlaceholder")}</option>
+              {(logbooks.data ?? []).map((lb) => (
+                <option key={lb.id} value={lb.id}>{lb.name}</option>
+              ))}
+            </Select>
+          )}
+        </FormField>
+        <FormField label={t("notifications.templates.fLocale")}>
+          {({ id }) => <Input id={id} value={locale} onChange={(e) => setLocale(e.target.value)} />}
+        </FormField>
+      </div>
+    </Modal>
   );
 }
 
@@ -349,6 +508,8 @@ function TemplateEditor({
   t: ReturnType<typeof useTranslation>["t"];
 }) {
   const eventDef = events.find((e) => e.key === template.eventKey);
+  // Comodines de campo de la bitácora (solo plantillas scoped): {{campo.<key>}}.
+  const fieldVars = useNotificationFieldVariables(template.templateId);
   const [draft, setDraft] = useState<TplDraft | null>(null);
   const current: TplDraft = draft ?? { subject: template.subject, bodyText: template.bodyText, bodyHtml: template.bodyHtml, active: template.active };
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -449,6 +610,21 @@ function TemplateEditor({
               </button>
             ))}
           </div>
+
+          {/* Comodines de campo de la bitácora (plantilla scoped). */}
+          {template.templateId != null && (fieldVars.data?.length ?? 0) > 0 && (
+            <>
+              <span className={styles.dictGroupLabel}>{t("notifications.templates.fieldVars")}</span>
+              <div className={`${styles.dict} ${styles.dictFull}`}>
+                {(fieldVars.data ?? []).map((v) => (
+                  <button key={v.name} type="button" className={styles.dictItem} onClick={() => insertVariable(v.name)}>
+                    <span className={styles.dictName}>{`{{${v.name}}}`}</span>
+                    <span className={styles.dictDesc}>{v.description}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </aside>
       </div>
 

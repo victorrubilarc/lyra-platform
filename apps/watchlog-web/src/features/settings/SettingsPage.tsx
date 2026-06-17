@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { BookOpenCheck, Lock, Mail, ShieldCheck } from "lucide-react";
+import { Bell, BookOpenCheck, Lock, Mail, ShieldCheck } from "lucide-react";
 import { EmptyState, Select, Skeleton, Toggle, cx, useToast } from "@lyra/ui";
 import type { LucideIcon } from "lucide-react";
 import type { EditWindowAnchor, SystemSettingsDto, UpdateSystemSettingsRequest } from "@lyra/contracts";
@@ -19,7 +19,7 @@ const MFA_ACTIONS: { field: keyof UpdateSystemSettingsRequest; labelKey: string 
   { field: "requireMfaPeriodUnlock", labelKey: "settings.mfa.unlock" },
 ];
 
-type Category = "security" | "logbook" | "email";
+type Category = "security" | "logbook" | "notifications" | "email";
 
 interface CategoryDef {
   id: Category;
@@ -32,6 +32,7 @@ interface CategoryDef {
 const CATEGORIES: CategoryDef[] = [
   { id: "security", labelKey: "settings.cat.security", icon: ShieldCheck },
   { id: "logbook", labelKey: "settings.cat.logbook", icon: BookOpenCheck },
+  { id: "notifications", labelKey: "settings.cat.notifications", icon: Bell },
   { id: "email", labelKey: "settings.cat.email", icon: Mail, permission: "notification:config" },
 ];
 
@@ -176,6 +177,39 @@ export function SettingsPage() {
                       checked={Boolean((data as SystemSettingsDto).requireMfaEditWindowOverride)}
                       disabled={!canManage || update.isPending}
                       onChange={(v) => void toggle("requireMfaEditWindowOverride", v)}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {!canManage && <p className={styles.meta}>{t("settings.readOnly")}</p>}
+            </section>
+          )}
+
+          {tab === "notifications" && (
+            <section className={styles.section}>
+              <header className={styles.sectionHead}>
+                <h2 className={styles.sectionTitle}>
+                  <Bell size={18} /> {t("settings.cat.notifications")}
+                </h2>
+                <p className={styles.sectionDesc}>{t("settings.notifDesc")}</p>
+              </header>
+
+              <div className={styles.settingGroupHead}>
+                <span className={styles.settingLabel}>{t("settings.notifDefaults")}</span>
+                <p className={styles.settingHint}>{t("settings.notifDefaultsHint")}</p>
+              </div>
+
+              {isLoading || !data ? (
+                <Skeleton height={80} width="100%" />
+              ) : (
+                <div className={styles.toggleList}>
+                  <div className={styles.settingRow}>
+                    <span className={styles.toggleLabel}>{t("settings.notifTransitionDefault")}</span>
+                    <Toggle
+                      checked={Boolean((data as SystemSettingsDto).notifyTransitionDefaultDestinationRoles)}
+                      disabled={!canManage || update.isPending}
+                      onChange={(v) => void toggle("notifyTransitionDefaultDestinationRoles", v)}
                     />
                   </div>
                 </div>

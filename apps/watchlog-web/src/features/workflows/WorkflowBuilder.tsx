@@ -7,7 +7,9 @@ import { Button, Card, Checkbox, Chip, cx, FormField, Input, Modal, MultiSelect,
 import { validateWorkflowMachine, type WorkflowDetail, type WorkflowStateDto, type WorkflowTransitionDto } from "@lyra/contracts";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { WorkflowDiagram } from "../logbook/WorkflowDiagram.js";
-import { fetchRoles } from "../security/security-api.js";
+import { fetchRoles, fetchUsers } from "../security/security-api.js";
+import { fetchNotificationTemplates } from "../notifications/notifications-api.js";
+import { TransitionNotifyEditor, notifyRecipientCount, type NotifyCopySource } from "./TransitionNotifyEditor.js";
 import {
   collectStateKeys,
   collectTransitionKeys,
@@ -72,6 +74,17 @@ export function WorkflowBuilder({ detail }: { detail: WorkflowDetail }) {
   const publish = usePublishWorkflow();
   const rolesQuery = useQuery({ queryKey: ["workflows", "roles"], queryFn: fetchRoles, retry: false });
   const roles = rolesQuery.data ?? [];
+  // Pickers del editor de aviso por transición. retry:false: un gestor de flujos sin
+  // permisos de seguridad/plantillas degrada a una lista vacía sin romper (la
+  // autorización real la hace el backend al resolver destinatarios).
+  const usersQuery = useQuery({ queryKey: ["workflows", "notify-users"], queryFn: fetchUsers, retry: false });
+  const notifyUsers = usersQuery.data ?? [];
+  const notifyTemplatesQuery = useQuery({
+    queryKey: ["workflows", "notify-templates"],
+    queryFn: () => fetchNotificationTemplates({ eventKey: "entry.transition" }),
+    retry: false,
+  });
+  const notifyTemplates = notifyTemplatesQuery.data ?? [];
 
   const canEdit = perms.can("workflow:manage");
   const isPublishedView = detail.version.status === "PUBLISHED";
@@ -360,6 +373,7 @@ export function WorkflowBuilder({ detail }: { detail: WorkflowDetail }) {
                   <th>{t("workflows.builder.colSignature")}</th>
                   <th>{t("workflows.builder.colMfa")}</th>
                   <th>{t("workflows.builder.colRoles")}</th>
+                  <th>{t("workflows.builder.colNotify")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -374,6 +388,7 @@ export function WorkflowBuilder({ detail }: { detail: WorkflowDetail }) {
                     <td>{tr.requireSignature ? `✓${tr.signatureMeaning ? ` ${tr.signatureMeaning}` : ""}` : "—"}</td>
                     <td>{tr.requireMfa ? "✓" : "—"}</td>
                     <td>{tr.roleIds.length > 0 ? roleNames(tr.roleIds) : "—"}</td>
+                    <td>{tr.notify?.enabled ? t("workflows.builder.notify.tag", { count: notifyRecipientCount(tr.notify) }) : "—"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -547,6 +562,11 @@ export function WorkflowBuilder({ detail }: { detail: WorkflowDetail }) {
                         {tr.requireSignature && <span className={styles.miniTag}>{t("workflows.builder.tagSignature")}</span>}
                         {tr.requireMfa && <span className={styles.miniTag}>MFA</span>}
                         {tr.roleIds.length > 0 && <span className={styles.miniTag}>{t("workflows.builder.tagRoles", { count: tr.roleIds.length })}</span>}
+                        {tr.notify?.enabled && (
+                          <span className={styles.miniTag}>
+                            {t("workflows.builder.notify.tag", { count: notifyRecipientCount(tr.notify) })}
+                          </span>
+                        )}
                       </span>
                     )}
                   </button>
@@ -642,6 +662,18 @@ export function WorkflowBuilder({ detail }: { detail: WorkflowDetail }) {
                     />
                   )}
                 </div>
+
+                <TransitionNotifyEditor
+                  value={tr.notify}
+                  disabled={!canEdit}
+                  onChange={(notify) => updateTransition(tr.uid, { notify })}
+                  roles={roles.map((r) => ({ id: r.id, name: r.name, key: r.key }))}
+                  users={notifyUsers.map((u) => ({ id: u.id, name: u.displayName, email: u.email }))}
+                  templates={notifyTemplates}
+                  copySources={wf.transitions
+                    .filter((o) => o.uid !== tr.uid && o.notify != null)
+                    .map<NotifyCopySource>((o) => ({ uid: o.uid, label: o.label || o.key, notify: o.notify! }))}
+                />
                 </>)}
               </div>
               );
