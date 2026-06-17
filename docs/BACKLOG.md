@@ -354,6 +354,13 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
       ya tiene `riskProbability/riskConsequence`; hoy solo en update); **asignar responsable** al crear (hoy se asigna después);
       **flag "reportable"** editable en el modal (hoy default por tipo); **evidencia/adjuntos** a nivel incidencia (→ 4.2, MinIO patrón
       Ola 3). Decidir cuáles entran al alta vs. triage/investigación.
+- [ ] **Incidencias — MANTENEDOR de catálogos (tipos + categorías) [UI] — acordado 2026-06-16, SIGUIENTE.** Hoy los catálogos
+      `IncidentType`/`IncidentCategory` son configurables y el **backend ya los administra** (`POST /incidents/types` y `/categories`
+      upsert por `key` con nombre/desc/color/flujo por defecto/flags investigación·CAPA·reportable/activo/orden + categoría→tipo; gate
+      `incidentcatalog:manage`; `GET …?includeInactive=true`), pero **falta la pantalla de administración** (solo se cambian por seed o
+      API directa). Construir el mantenedor (patrón de *Datos de referencia*/*Equipos-categorías*/*Flujos*): tabla con búsqueda/orden +
+      crear/editar/activar-desactivar (sin borrado físico, para no romper incidencias existentes que referencian el catálogo). Sin
+      permisos nuevos (cat. 81). Prompt en `docs/prompts/incidencias-catalogos-mantenedor.md`.
 - [ ] **4.2 — Investigación + CAPA.** `IncidentInvestigation` (5 Porqués + causa inmediata/básica/raíz + lección) + `IncidentAction`
       (CAPA con responsable/plazo/evidencia/**verificación de eficacia**/reapertura); bloqueo de cierre si hay CAPA obligatorias
       abiertas; **registro Part 11 con `payloadHash` para incidencias** (hoy 4.0 exige re-auth pero no persiste la firma criptográfica);
