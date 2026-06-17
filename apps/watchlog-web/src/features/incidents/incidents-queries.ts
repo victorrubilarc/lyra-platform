@@ -2,20 +2,29 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   AddIncidentCommentRequest,
   AssignIncidentRequest,
+  CancelIncidentActionRequest,
   CancelIncidentRequest,
+  CompleteIncidentActionRequest,
+  CreateIncidentActionRequest,
   CreateIncidentRequest,
   IncidentListQuery,
   TransitionIncidentRequest,
+  UpdateIncidentActionRequest,
   UpdateIncidentRequest,
   UpsertIncidentTypeRequest,
   UpsertIncidentCategoryRequest,
+  VerifyIncidentActionRequest,
 } from "@lyra/contracts";
 import {
   assignIncident,
   cancelIncident,
+  cancelIncidentAction,
   commentIncident,
+  completeIncidentAction,
   createIncident,
+  createIncidentAction,
   fetchAssignableUsers,
+  fetchIncidentActions,
   fetchIncidentEquipmentOptions,
   fetchIncidentCategories,
   fetchIncidentDetail,
@@ -24,8 +33,10 @@ import {
   fetchIncidents,
   transitionIncident,
   updateIncident,
+  updateIncidentAction,
   upsertIncidentType,
   upsertIncidentCategory,
+  verifyIncidentAction,
 } from "./incidents-api.js";
 
 export const INCIDENT_KEYS = {
@@ -35,6 +46,7 @@ export const INCIDENT_KEYS = {
   stats: () => ["incidents", "stats"] as const,
   types: () => ["incidents", "types"] as const,
   categories: () => ["incidents", "categories"] as const,
+  actions: (incidentId: string) => ["incidents", "actions", incidentId] as const,
 };
 
 export function useIncidents(q: IncidentListQuery) {
@@ -128,4 +140,61 @@ export function useTransitionIncident() {
 export function useCancelIncident() {
   const qc = useQueryClient();
   return useMutation({ mutationFn: ({ id, dto }: { id: string; dto: CancelIncidentRequest }) => cancelIncident(id, dto), onSuccess: () => invalidate(qc) });
+}
+
+// --- Acciones CAPA (Fase 4.2a) -----------------------------------------------
+
+export function useIncidentActions(incidentId: string | null) {
+  return useQuery({
+    queryKey: INCIDENT_KEYS.actions(incidentId ?? ""),
+    queryFn: () => fetchIncidentActions(incidentId!),
+    enabled: !!incidentId,
+  });
+}
+
+/** Tras mutar una acción: refresca su lista + el detalle (puede cambiar el bloqueo de cierre) + KPIs. */
+function invalidateActions(qc: ReturnType<typeof useQueryClient>, incidentId: string): void {
+  qc.invalidateQueries({ queryKey: INCIDENT_KEYS.actions(incidentId) });
+  qc.invalidateQueries({ queryKey: INCIDENT_KEYS.detail(incidentId) });
+  qc.invalidateQueries({ queryKey: INCIDENT_KEYS.all });
+}
+
+export function useCreateIncidentAction(incidentId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (dto: CreateIncidentActionRequest) => createIncidentAction(incidentId, dto),
+    onSuccess: () => invalidateActions(qc, incidentId),
+  });
+}
+
+export function useUpdateIncidentAction(incidentId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ actionId, dto }: { actionId: string; dto: UpdateIncidentActionRequest }) => updateIncidentAction(actionId, dto),
+    onSuccess: () => invalidateActions(qc, incidentId),
+  });
+}
+
+export function useCompleteIncidentAction(incidentId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ actionId, dto }: { actionId: string; dto: CompleteIncidentActionRequest }) => completeIncidentAction(actionId, dto),
+    onSuccess: () => invalidateActions(qc, incidentId),
+  });
+}
+
+export function useVerifyIncidentAction(incidentId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ actionId, dto }: { actionId: string; dto: VerifyIncidentActionRequest }) => verifyIncidentAction(actionId, dto),
+    onSuccess: () => invalidateActions(qc, incidentId),
+  });
+}
+
+export function useCancelIncidentAction(incidentId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ actionId, dto }: { actionId: string; dto: CancelIncidentActionRequest }) => cancelIncidentAction(actionId, dto),
+    onSuccess: () => invalidateActions(qc, incidentId),
+  });
 }

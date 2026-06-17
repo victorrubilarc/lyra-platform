@@ -13,6 +13,7 @@ import {
   useIncidentDetail,
   useTransitionIncident,
 } from "./incidents-queries.js";
+import { IncidentActionsBlock } from "./IncidentActionsBlock.js";
 import { LIFECYCLE_META, ORIGIN_META, PRIORITY_META, severityColor, severityLabel } from "./incidents-presentation.js";
 import { useExceptions } from "../exceptions/exceptions-queries.js";
 import { THRESHOLD_META, formatExceptionValue } from "../exceptions/exceptions-presentation.js";
@@ -138,6 +139,9 @@ export function IncidentDetailDrawer({ incidentId, onClose }: Props) {
               ))}
             </div>
           )}
+
+          {/* Acciones CAPA (Fase 4.2a) */}
+          {can("module:incidents:view") && <IncidentActionsBlock incidentId={inc.id} incidentOpen={inc.lifecycle === "OPEN"} />}
 
           {/* Comentarios */}
           <div className={styles.sectionTitle}><MessageSquare size={15} /> Comentarios ({inc.comments.length})</div>

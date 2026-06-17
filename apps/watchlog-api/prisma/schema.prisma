@@ -112,6 +112,7 @@ model Role {
   templateFieldRoles      TemplateFieldRole[]
   workflowTransitionRoles WorkflowTransitionRole[]
   responsibleSchedules    LogSchedule[]
+  incidentActions         IncidentAction[]
 }
 
 model Permission {
@@ -1881,6 +1882,7 @@ model Incident {
   activities IncidentActivity[]
   transitions IncidentTransition[]
   exceptionLinks IncidentExceptionLink[]
+  actions    IncidentAction[]
 
   @@index([typeId])
   @@index([categoryId])
@@ -2065,6 +2067,77 @@ model RuleActionOutbox {
   processedAt   DateTime?
 
   @@index([status, createdAt])
+}
+
+// === Acciones CAPA (correctivas / preventivas / inmediatas) (Fase 4.2a) =======
+
+enum IncidentActionKind {
+  CORRECTIVE
+  PREVENTIVE
+  IMMEDIATE
+}
+
+enum IncidentActionStatus {
+  OPEN
+  IN_PROGRESS
+  DONE
+  VERIFIED
+  CANCELED
+}
+
+enum IncidentActionOutcome {
+  EFFECTIVE
+  NOT_EFFECTIVE
+}
+
+// Acción de una incidencia con responsable, plazo, estado y VERIFICACIÓN de
+// eficacia. Una acción `mandatory` aún abierta BLOQUEA el cierre de la incidencia
+// (CAPA: ISO 9001 §10.2 / ISO 45001). Sin borrado físico (anulación = CANCELED con
+// motivo). Refs BLANDAS a usuario/rol (patrón Incident). La evidencia (archivos) se
+// reserva (`evidence` jsonb, descriptores Ola 3) y la subida se difiere a follow-up.
+model IncidentAction {
+  id          String   @id @default(cuid())
+  // Folio humano correlativo; el código "ACT-####" se DERIVA en el backend.
+  number      Int      @unique @default(autoincrement())
+  incidentId  String
+  kind        IncidentActionKind
+  title       String
+  description String?
+  // Si está abierta, bloquea el cierre de la incidencia.
+  mandatory   Boolean  @default(false)
+  // Responsable: persona y/o grupo (rol). Refs blandas.
+  responsibleId     String?
+  responsibleRoleId String?
+  dueAt             DateTime?
+  status            IncidentActionStatus @default(OPEN)
+  // --- Realización --------------------------------------------------------------
+  completedAt    DateTime?
+  completedById  String?
+  completionNote String?
+  // --- Verificación de eficacia (DONE → VERIFIED; permiso separado) -------------
+  verifiedAt           DateTime?
+  verifiedById         String?
+  effectivenessOutcome IncidentActionOutcome?
+  verificationNote     String?
+  // --- Anulación (sin borrado físico) -------------------------------------------
+  canceledAt   DateTime?
+  cancelReason String?
+  canceledById String?
+  // --- Evidencia (reservado; descriptores Ola 3 — subida diferida) --------------
+  evidence    Json?
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  incident Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  role     Role?    @relation(fields: [responsibleRoleId], references: [id], onDelete: SetNull)
+
+  @@index([incidentId, createdAt])
+  @@index([status])
+  @@index([responsibleId])
+  @@index([responsibleRoleId])
+  @@index([mandatory, status])
 }
 
 // Transición de flujo EJECUTADA sobre una incidencia (append-only; integridad

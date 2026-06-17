@@ -4,6 +4,34 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-17 · Incidencias — Auditoría del módulo + Fase 4.2a (Acciones CAPA) — ✅ IMPLEMENTADO
+
+Tras una **auditoría constructiva** del módulo de Incidencias (pedida por el dueño): el core ya es **genérico/transversal** (tipos/
+categorías = datos configurables; severidad 1..5 + ISO 31000; flujo reusado; nada minero hardcodeado — lo minero vive solo en seeds).
+La única brecha **P1 funcional** para "seguimiento real, no solo registro" era la gestión de **acciones (CAPA)**. Rumbo de campos por
+tipo: **Opción C** (core fijo ahora, campos dinámicos por tipo diferidos). Se construyó **4.2a — Acciones CAPA**. Forks resueltos con
+el dueño (en la recomendación):
+- **2 permisos nuevos** (`incident:action:manage`, `incident:action:verify`), no reusar `incident:edit`. Motivo: la gestión de
+  acciones y la **verificación de eficacia** son responsabilidades distintas; segregación de funciones (quien ejecuta una acción no
+  debería auto-verificarla). Cat. **81→83**.
+- **Bloqueo de cierre por flag `mandatory` POR ACCIÓN** (no "toda incidencia del tipo debe tener acciones"). Más fino y explícito: el
+  usuario marca cuáles acciones son condición de cierre.
+- **Verificación de eficacia CONFIGURABLE:** `DONE` basta para cerrar, **salvo** que el tipo declare `requiresCapa` → entonces exige
+  `VERIFIED`. Honra el flag `requiresCapa` que ya existía en el catálogo y no hacía nada. Lógica autoritativa compartida back↔front
+  (`blockingActionsForClose`).
+- **Verificación NO eficaz reabre** la acción a `IN_PROGRESS` (no la deja "verificada"): una acción inefectiva debe re-trabajarse y
+  sigue bloqueando el cierre. La verificación efectiva (`VERIFIED`) es la única que libera.
+- **`responsibleRoleId` (grupo responsable) incluido ya** a nivel modelo/contrato/API (atiende §7 P2 de la auditoría), aunque el
+  **picker de rol en la UI se difiere** (la UI MVP asigna persona). El dato/endpoint ya lo soportan.
+- **Evidencia (archivos) DIFERIDA:** se reserva la columna `evidence Json?` (descriptores Ola 3) pero la subida se posterga a un
+  follow-up que reusará el `StorageService` de Ola 3. Motivo: cerrar 4.2a con el ciclo CAPA correcto y testeado vale más que media
+  cañería MinIO; la narrativa GxP del cierre queda cubierta por las notas de cierre/verificación (texto). Migración única aditiva, sin
+  re-migrar al agregar la subida.
+- **Sin pestañas en el drawer (todavía):** el bloque de Acciones se suma como sección inline (mismo patrón que Origen/Excepciones/
+  Comentarios). Cuando entren Investigación (4.2b) y evidencia, se evaluará pasar el drawer a pestañas.
+
+---
+
 ### 2026-06-17 · Incidencias — mantenedor de catálogos (Tipos + Categorías) [UI] — ✅ IMPLEMENTADO
 
 Le pone pantalla a `IncidentType`/`IncidentCategory` (ya configurables en backend). Forks resueltos con el dueño:

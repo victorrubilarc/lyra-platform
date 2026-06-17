@@ -1,4 +1,4 @@
-import type { IncidentLifecycle, IncidentOrigin, IncidentPriority } from "@lyra/contracts";
+import type { IncidentActionKind, IncidentActionStatus, IncidentLifecycle, IncidentOrigin, IncidentPriority } from "@lyra/contracts";
 
 /** Tokens de severidad 1..5 (CLAUDE.md). */
 export const SEVERITY_COLORS = ["#6B7280", "#22C55E", "#84CC16", "#EAB308", "#F97316", "#EF4444"];
@@ -29,6 +29,22 @@ export const ORIGIN_META: Record<IncidentOrigin, { label: string }> = {
   LOG_ENTRY: { label: "Bitácora" },
   EXCEPTION: { label: "Excepción" },
   RULE: { label: "Regla" },
+};
+
+// === Acciones CAPA (Fase 4.2a) ===============================================
+
+export const ACTION_KIND_META: Record<IncidentActionKind, { label: string; color: string }> = {
+  CORRECTIVE: { label: "Correctiva", color: "#6366F1" },
+  PREVENTIVE: { label: "Preventiva", color: "#06B6D4" },
+  IMMEDIATE: { label: "Inmediata", color: "#F97316" },
+};
+
+export const ACTION_STATUS_META: Record<IncidentActionStatus, { label: string; color: string }> = {
+  OPEN: { label: "Abierta", color: "#9AA3B8" },
+  IN_PROGRESS: { label: "En progreso", color: "#06B6D4" },
+  DONE: { label: "Realizada", color: "#EAB308" },
+  VERIFIED: { label: "Verificada", color: "#22C55E" },
+  CANCELED: { label: "Anulada", color: "#6B7280" },
 };
 
 /**

@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { AuthModule } from "../auth/auth.module";
+import { IncidentActionsService } from "./incident-actions.service";
 import { IncidentsController } from "./incidents.controller";
 import { IncidentsService } from "./incidents.service";
 
@@ -12,7 +13,7 @@ import { IncidentsService } from "./incidents.service";
 @Module({
   imports: [AuthModule],
   controllers: [IncidentsController],
-  providers: [IncidentsService],
-  exports: [IncidentsService],
+  providers: [IncidentsService, IncidentActionsService],
+  exports: [IncidentsService, IncidentActionsService],
 })
 export class IncidentsModule {}

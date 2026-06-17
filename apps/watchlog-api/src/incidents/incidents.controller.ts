@@ -3,32 +3,46 @@ import type { FastifyRequest } from "fastify";
 import {
   addIncidentCommentRequestSchema,
   assignIncidentRequestSchema,
+  cancelIncidentActionRequestSchema,
   cancelIncidentRequestSchema,
+  completeIncidentActionRequestSchema,
+  createIncidentActionRequestSchema,
   createIncidentRequestSchema,
   incidentListQuerySchema,
   transitionIncidentRequestSchema,
+  updateIncidentActionRequestSchema,
   updateIncidentRequestSchema,
   upsertIncidentCategoryRequestSchema,
   upsertIncidentTypeRequestSchema,
+  verifyIncidentActionRequestSchema,
   type AddIncidentCommentRequest,
   type AssignIncidentRequest,
+  type CancelIncidentActionRequest,
   type CancelIncidentRequest,
+  type CompleteIncidentActionRequest,
+  type CreateIncidentActionRequest,
   type CreateIncidentRequest,
   type IncidentListQuery,
   type TransitionIncidentRequest,
+  type UpdateIncidentActionRequest,
   type UpdateIncidentRequest,
   type UpsertIncidentCategoryRequest,
   type UpsertIncidentTypeRequest,
+  type VerifyIncidentActionRequest,
 } from "@lyra/contracts";
 import type { AuditContext } from "../audit/audit.service";
 import type { RequestUser } from "../authz/auth-user";
 import { CurrentUser, RequirePermission } from "../authz/authz.decorators";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
+import { IncidentActionsService } from "./incident-actions.service";
 import { IncidentsService } from "./incidents.service";
 
 @Controller("incidents")
 export class IncidentsController {
-  constructor(private readonly incidents: IncidentsService) {}
+  constructor(
+    private readonly incidents: IncidentsService,
+    private readonly actions: IncidentActionsService,
+  ) {}
 
   // --- Catálogos (antes de :id para no chocar) -------------------------------
 
@@ -173,6 +187,72 @@ export class IncidentsController {
     @Req() req: FastifyRequest,
   ) {
     return this.incidents.cancel(user.id, id, dto, this.ctx(user, req));
+  }
+
+  // --- Acciones CAPA (Fase 4.2a) ---------------------------------------------
+
+  @Get(":id/actions")
+  @RequirePermission("incident:view")
+  listActions(@Param("id") id: string, @CurrentUser() user: RequestUser) {
+    return this.actions.list(user.id, id);
+  }
+
+  @Post(":id/actions")
+  @RequirePermission("incident:action:manage")
+  createAction(
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(createIncidentActionRequestSchema)) dto: CreateIncidentActionRequest,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.actions.create(user.id, id, dto, this.ctx(user, req));
+  }
+
+  @Patch("actions/:actionId")
+  @RequirePermission("incident:action:manage")
+  updateAction(
+    @Param("actionId") actionId: string,
+    @Body(new ZodValidationPipe(updateIncidentActionRequestSchema)) dto: UpdateIncidentActionRequest,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.actions.update(user.id, actionId, dto, this.ctx(user, req));
+  }
+
+  @Post("actions/:actionId/complete")
+  @HttpCode(200)
+  @RequirePermission("incident:action:manage")
+  completeAction(
+    @Param("actionId") actionId: string,
+    @Body(new ZodValidationPipe(completeIncidentActionRequestSchema)) dto: CompleteIncidentActionRequest,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.actions.complete(user.id, actionId, dto, this.ctx(user, req));
+  }
+
+  @Post("actions/:actionId/verify")
+  @HttpCode(200)
+  @RequirePermission("incident:action:verify")
+  verifyAction(
+    @Param("actionId") actionId: string,
+    @Body(new ZodValidationPipe(verifyIncidentActionRequestSchema)) dto: VerifyIncidentActionRequest,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.actions.verify(user.id, actionId, dto, this.ctx(user, req));
+  }
+
+  @Post("actions/:actionId/cancel")
+  @HttpCode(200)
+  @RequirePermission("incident:action:manage")
+  cancelAction(
+    @Param("actionId") actionId: string,
+    @Body(new ZodValidationPipe(cancelIncidentActionRequestSchema)) dto: CancelIncidentActionRequest,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.actions.cancel(user.id, actionId, dto, this.ctx(user, req));
   }
 
   private ctx(user: RequestUser, req: FastifyRequest): AuditContext {
