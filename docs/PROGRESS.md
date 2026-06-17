@@ -1,5 +1,38 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-17 — Notificaciones avanzadas · Fase A (UI) ✅** (`feat/notif-avanzadas-ui`). Le pone PANTALLA al backend de
+Fase A (ya en `main`): editor de aviso POR TRANSICIÓN en el builder de flujos + master-detail de plantillas POR BITÁCORA con
+diccionario de comodines de campo + toggle de defaults de sistema en `/configuracion`. **Mayormente frontend** + el mínimo
+backend para exponer el default. **3 forks de UX resueltos con el dueño (las 3 recomendaciones aceptadas):** (1) el editor de
+aviso vive **INLINE** en la tarjeta de la transición (no drawer; coherente con firma/MFA/roles); (2) el default de sistema va
+en una **pestaña "Notificaciones" propia** en `/configuracion` (no dentro de "Correo saliente"; separa gobernanza de avisos del
+SMTP); (3) los correos externos se editan con **chips validados** (no textarea). **Backend mínimo:** se expone
+`notifyTransitionDefaultDestinationRoles` en `systemSettingsSchema`/`updateSystemSettingsRequestSchema` + `SettingsService`
+(select/defaults/get/auditShape/update) — **sin endpoint nuevo** (reusa `GET`/`PATCH /settings`, gate `module:settings:view`/
+`settings:manage`). **Web:** (a) **`TransitionNotifyEditor`** inline en `WorkflowBuilder` (toggle "Notificar en esta transición"
+→ materializa `notify` desde `EMPTY_TRANSITION_NOTIFY`; `MultiSelect` de roles + usuarios; 3 checks autor/ejecutor/roles del
+estado destino; **correos externos = chips validados con banner "salta permisos, se audita"**; `Select` de plantilla
+[Automática=null + plantillas `entry.transition`]; **atajo "Copiar destinatarios de otra transición"** [puro front, copia
+roles/usuarios/checks/externos]) + chip-resumen "Aviso · N destinatarios" en la cabecera colapsada y columna "Aviso" en la tabla
+resumen; pickers con `retry:false` (un gestor de flujos sin permisos de seguridad/plantillas degrada a lista vacía sin romper —
+la autorización real la hace el backend). (b) **Master-detail de plantillas** (`NotificationsPage`): columna **"Ámbito"** (Por
+defecto / nombre de bitácora) + filtro **scope** (generic/scoped) en la barra de filtros + botón **"Nueva plantilla"** (modal
+evento + bitácora + idioma → `POST` → abre el editor) + **borrar** las ad-hoc (la genérica/sistema no, gate por `isSystem`/
+`templateId`) + en el editor de una plantilla **scoped** el diccionario suma los **comodines de campo** (`GET …/field-variables`)
+con el mismo insert-en-cursor. (c) **Pestaña "Notificaciones"** en `/configuracion` con el toggle "Las transiciones sin
+configuración avisan a los roles del estado destino". **Web API/queries** extendidos: `fetchNotificationTemplates(query)` con
+scope, `createNotificationTemplate`/`deleteNotificationTemplate`, `fetchNotificationFieldVariables` + hooks
+`useCreate/Delete/FieldVariables`. **Identidad Lyra** (tokens, Sora/Inter, Lucide, claro+oscuro, 44px táctil); filtros en una
+línea + GridPager arriba/abajo (ya estaban). **Sin permisos nuevos** (config de transición = `workflow:manage`, plantillas =
+`notiftemplate:manage`, default = `settings:manage`); **sin migración** (la columna ya existía); **sin FLUSHALL**. Tests:
+contracts **293** · API **247** · web **3** · permissions **5**; typecheck/lint(0 errores)/build verdes. **Smoke en vivo
+`scripts/smoke-notif-avanzadas.py` 22/22** (+3 sección E nueva: `GET /settings` expone el default · `PATCH /settings` round-trip ·
+no-admin `PATCH` → 403) **+ regresión `smoke-notificaciones.py` 17/17** sin romper. **Pendiente: smoke VISUAL del dueño** (editor
+inline en el builder, chips de externos, copiar de otra transición, columna Ámbito + Nueva/Borrar plantilla, diccionario de
+comodines de campo, pestaña Notificaciones; claro/oscuro/responsive). **Deuda (BACKLOG):** picker de usuarios depende de
+`/security/users` (un gestor de flujos sin ese permiso ve la lista de usuarios vacía → considerar endpoint `user-options`
+decoplado, patrón `role-options` de 2.3.1). **Siguiente: Fase B — canal in-app (campanita) + SSE**, luego **4.4 (SLA/escalamiento)**.
+
 **2026-06-17 — Notificaciones avanzadas · Fase A (BACKEND) ✅** (`feat/notif-avanzadas`). Épico de notificaciones avanzadas,
 **Fase A solo-backend** (disparo por TRANSICIÓN + plantillas POR BITÁCORA + comodines de campo + defaults de sistema), sobre el
 motor del Bloque N (outbox + worker + render sin eval) sin reinventarlo. **Contexto (honesto):** la sesión arrancó para 4.4

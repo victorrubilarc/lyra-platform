@@ -19,6 +19,7 @@ type SettingsRow = {
   editWindowAnchor: EditWindowAnchor;
   editWindowMinutes: number | null;
   requireMfaEditWindowOverride: boolean;
+  notifyTransitionDefaultDestinationRoles: boolean;
 };
 
 const SETTINGS_SELECT = {
@@ -29,6 +30,7 @@ const SETTINGS_SELECT = {
   editWindowAnchor: true,
   editWindowMinutes: true,
   requireMfaEditWindowOverride: true,
+  notifyTransitionDefaultDestinationRoles: true,
 } as const;
 
 const SETTINGS_DEFAULTS: SettingsRow = {
@@ -39,6 +41,7 @@ const SETTINGS_DEFAULTS: SettingsRow = {
   editWindowAnchor: "RECORDED",
   editWindowMinutes: null,
   requireMfaEditWindowOverride: false,
+  notifyTransitionDefaultDestinationRoles: true,
 };
 
 /**
@@ -68,6 +71,7 @@ export class SettingsService {
       editWindowAnchor: row.editWindowAnchor,
       editWindowMinutes: row.editWindowMinutes,
       requireMfaEditWindowOverride: row.requireMfaEditWindowOverride,
+      notifyTransitionDefaultDestinationRoles: row.notifyTransitionDefaultDestinationRoles,
       updatedAt: row.updatedAt.toISOString(),
       updatedByName,
     };
@@ -137,6 +141,7 @@ export class SettingsService {
       editWindowAnchor: dto.editWindowAnchor,
       editWindowMinutes: dto.editWindowMinutes,
       requireMfaEditWindowOverride: dto.requireMfaEditWindowOverride,
+      notifyTransitionDefaultDestinationRoles: dto.notifyTransitionDefaultDestinationRoles,
     };
   }
 

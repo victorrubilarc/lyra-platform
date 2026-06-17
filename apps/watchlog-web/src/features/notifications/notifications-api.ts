@@ -5,10 +5,13 @@ import {
   notificationPreferenceSchema,
   notificationOutboxItemSchema,
   notificationOutboxDetailSchema,
+  createNotificationTemplateRequestSchema,
   updateNotificationTemplateRequestSchema,
   setNotificationPreferenceRequestSchema,
   upsertNotificationSubscriptionRequestSchema,
   type NotificationTemplateDto,
+  type NotificationTemplateListQuery,
+  type CreateNotificationTemplateRequest,
   type NotificationSubscriptionDto,
   type NotificationPreferenceDto,
   type NotificationOutboxItem,
@@ -36,13 +39,39 @@ export function fetchNotificationEvents(): Promise<NotificationEventDefDto[]> {
 }
 
 // --- Plantillas ---
-export function fetchNotificationTemplates(): Promise<NotificationTemplateDto[]> {
-  return apiJson("/notifications/templates", z.object({ templates: z.array(notificationTemplateSchema) })).then((r) => r.templates);
+export function fetchNotificationTemplates(q: NotificationTemplateListQuery = {}): Promise<NotificationTemplateDto[]> {
+  const qs = new URLSearchParams();
+  if (q.eventKey) qs.set("eventKey", q.eventKey);
+  if (q.scope) qs.set("scope", q.scope);
+  if (q.templateId) qs.set("templateId", q.templateId);
+  if (q.q) qs.set("q", q.q);
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return apiJson(`/notifications/templates${suffix}`, z.object({ templates: z.array(notificationTemplateSchema) })).then((r) => r.templates);
+}
+
+export function createNotificationTemplate(dto: CreateNotificationTemplateRequest): Promise<NotificationTemplateDto> {
+  createNotificationTemplateRequestSchema.parse(dto);
+  return apiJson("/notifications/templates", notificationTemplateSchema, { method: "POST", body: dto });
 }
 
 export function updateNotificationTemplate(id: string, dto: UpdateNotificationTemplateRequest): Promise<NotificationTemplateDto> {
   updateNotificationTemplateRequestSchema.parse(dto);
   return apiJson(`/notifications/templates/${id}`, notificationTemplateSchema, { method: "PATCH", body: dto });
+}
+
+export function deleteNotificationTemplate(id: string): Promise<void> {
+  return apiVoid(`/notifications/templates/${id}`, { method: "DELETE" });
+}
+
+/** Comodines de campo `{{campo.<key>}}` de la bitácora a la que se ata una plantilla ad-hoc. */
+const fieldVariableSchema = z.object({ name: z.string(), description: z.string(), sample: z.string() });
+export type NotificationFieldVariable = z.infer<typeof fieldVariableSchema>;
+
+export function fetchNotificationFieldVariables(templateId: string): Promise<NotificationFieldVariable[]> {
+  return apiJson(
+    `/notifications/templates/field-variables?templateId=${encodeURIComponent(templateId)}`,
+    z.object({ variables: z.array(fieldVariableSchema) }),
+  ).then((r) => r.variables);
 }
 
 // --- Suscripciones ---

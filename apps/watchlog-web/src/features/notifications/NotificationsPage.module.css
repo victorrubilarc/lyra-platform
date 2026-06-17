@@ -378,7 +378,7 @@
 .tplTableHead,
 .tplTableRow {
   display: grid;
-  grid-template-columns: 1.6fr 1.4fr 0.7fr 0.7fr 1fr auto;
+  grid-template-columns: 1.5fr 1fr 1.2fr 0.7fr 0.7fr 0.9fr auto;
   align-items: center;
   gap: var(--space-3);
   padding: 11px 16px;
@@ -444,6 +444,68 @@
   .tplColHide {
     display: none;
   }
+}
+
+/* Ámbito de la plantilla: "Por defecto" (genérica) vs nombre de bitácora (scoped). */
+.scopePill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border-subtle);
+  width: fit-content;
+  max-width: 100%;
+}
+.scopeGeneric {
+  color: var(--color-text-muted);
+}
+.scopeScoped {
+  color: var(--color-accent-secondary);
+  border-color: rgba(6, 182, 212, 0.4);
+  background: rgba(6, 182, 212, 0.1);
+}
+.scopeScoped span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Celda de acciones de la fila (editar + borrar ad-hoc). */
+.tplRowActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.tplDeleteBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--color-border-subtle);
+  background: transparent;
+  color: var(--color-error);
+  border-radius: var(--radius-sm, 8px);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.tplDeleteBtn:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.12);
+}
+.tplDeleteBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+/* Diccionario de comodines de campo (sección extra del aside, plantilla scoped). */
+.dictGroupLabel {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-top: var(--space-3);
 }
 
 /* === Plantillas: editor a pantalla completa (detail) === */

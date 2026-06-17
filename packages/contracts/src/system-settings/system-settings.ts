@@ -33,6 +33,13 @@ export const systemSettingsSchema = z.object({
   editWindowMinutes: editWindowMinutesSchema.nullable(),
   /** Exigir re-auth con MFA al editar FUERA de ventana (override privilegiado). */
   requireMfaEditWindowOverride: z.boolean(),
+  /**
+   * Notificaciones avanzadas (Fase A): cuando una transición de flujo NO declara su propia
+   * configuración de aviso, ¿se avisa a los roles del ESTADO DESTINO (conducta clásica de
+   * `entry.transition`)? `true` = compatibilidad con el comportamiento previo; `false` = una
+   * transición sin config no notifica. Lo lee el `NotificationResolverService`.
+   */
+  notifyTransitionDefaultDestinationRoles: z.boolean(),
   updatedAt: z.string(),
   updatedByName: z.string().nullable(),
 });
@@ -47,6 +54,7 @@ export const updateSystemSettingsRequestSchema = z.object({
   editWindowAnchor: editWindowAnchorSchema.optional(),
   editWindowMinutes: editWindowMinutesSchema.nullable().optional(),
   requireMfaEditWindowOverride: z.boolean().optional(),
+  notifyTransitionDefaultDestinationRoles: z.boolean().optional(),
 });
 export type UpdateSystemSettingsRequest = z.infer<typeof updateSystemSettingsRequestSchema>;
 

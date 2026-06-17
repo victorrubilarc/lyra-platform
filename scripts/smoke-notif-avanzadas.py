@@ -13,6 +13,7 @@ Verifica el épico (Fase A, solo email) sobre el motor existente:
     plantilla ESPECÍFICA de la bitácora con el comodín {{campo.<key>}} renderizado (sin {{ crudo}}.
  D) Default de sistema OFF: una transición SIN config no notifica (0 filas) cuando el toggle está en
     false; se restaura a true.
+ E) Default de sistema expuesto en GET/PATCH /settings (round-trip) + gate settings:manage (no-admin 403).
  Gates: un no-admin recibe 403 en crear/borrar plantillas.
 
 Crea y LIMPIA por ID (psql). API :3000, Mailpit :8025. Clave demo Demo!Pass2026."""
@@ -227,6 +228,21 @@ def main():
         cnt_d = sql(f"SELECT count(*) FROM \"NotificationOutbox\" WHERE \"eventId\"='{ev_d}';")
         check("D1 default OFF + transición sin config → 0 destinatarios", cnt_d == "0", f"count={cnt_d}")
         sql("UPDATE \"SystemSettings\" SET \"notifyTransitionDefaultDestinationRoles\"=true WHERE id='system';")
+
+    # === E. Default de sistema expuesto en el endpoint de settings (round-trip) ==
+    s, r = call("GET", "/settings", tok)
+    has_field = s == 200 and isinstance(r, dict) and "notifyTransitionDefaultDestinationRoles" in r
+    check("E1 GET /settings expone notifyTransitionDefaultDestinationRoles", has_field, f"{s}")
+    if has_field:
+        original = r["notifyTransitionDefaultDestinationRoles"]
+        s, _ = call("PATCH", "/settings", tok, {"notifyTransitionDefaultDestinationRoles": False})
+        _, r2 = call("GET", "/settings", tok)
+        check("E2 PATCH /settings cambia el default (round-trip)", s in (200, 201) and r2.get("notifyTransitionDefaultDestinationRoles") is False, f"{s} v={r2.get('notifyTransitionDefaultDestinationRoles')}")
+        # restaurar
+        call("PATCH", "/settings", tok, {"notifyTransitionDefaultDestinationRoles": original})
+        ntok_e = login(NONADMIN)
+        s, _ = call("PATCH", "/settings", ntok_e, {"notifyTransitionDefaultDestinationRoles": True})
+        check("E3 no-admin: PATCH /settings → 403", s == 403, f"{s}")
 
     # === Gates ================================================================
     ntok = login(NONADMIN)

@@ -98,6 +98,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 
 ### 12. Configuración del sistema  [Admin]
 - ✍️ `/configuracion`: MFA por acción, ventana de edición global
+- ✅ **Notificaciones**: comportamiento por defecto de los avisos de transición (§ Notificaciones ▸ Avisos a la medida)
 
 ### 13. Rondas  [Planificador · Operador]
 - ✅ **Programación de rondas** (horario por turno/intervalo/calendario + rol responsable) (§ Rondas ▸ Programación de rondas)
@@ -108,6 +109,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 - ✅ **Mis notificaciones** (activar/desactivar avisos propios) (§ Notificaciones ▸ Mis preferencias)
 - ✅ **Plantillas de mensaje** (con vista previa, diccionario de variables, `{{entry.summary}}`) y **correo saliente** (§ Notificaciones ▸ Plantillas / Correo saliente) [Admin]
 - ✅ **Servidor de correo (SMTP)** — configurar el correo saliente (§ Configuración ▸ Servidor de correo) [Admin con `notification:config`]
+- ✅ **Avisos a la medida** (qué transición avisa y a quién + plantillas por bitácora con comodines de campo + comportamiento por defecto) (§ Notificaciones ▸ Avisos a la medida) [Configurador de flujos · Admin de plantillas]
 
 ### 15. Incidencias  [todos los roles operativos]
 - ✅ **Reportar y gestionar incidencias** (lista + tablero kanban + detalle con flujo) (§ Incidencias)
@@ -548,6 +550,71 @@ algo que el destinatario no podría ver en la aplicación.
   lo revise varias veces.
 - El **resumen agrupado (digest)**, la **gestión de suscripciones desde la pantalla** y los
   **recordatorios escalonados** están planificados pero aún no disponibles.
+- Para **avisos a la medida** (qué transición avisa, a quién, con qué texto y con datos del
+  propio registro) ve la sección siguiente, **Avisos a la medida**.
+
+---
+
+## Notificaciones ▸ Avisos a la medida  [Configurador de flujos · Admin de plantillas]
+
+**Para qué sirve.** Adapta los avisos a la realidad de **cada bitácora y cada flujo**, en vez
+de mandar siempre el mismo correo a los mismos roles. Tiene tres piezas: (1) decides **en qué
+transición** del flujo se avisa y **a quién**; (2) creas **plantillas de mensaje propias de una
+bitácora** (texto distinto para «Bitácora de Turno» que para «Permiso de Trabajo»); y (3) en esas
+plantillas insertas **datos del propio registro** como comodines (p. ej. el valor de un campo).
+Es el patrón de los grandes (ServiceNow, Jira Automation, SAP/Maximo): aviso disparado por
+transición, con lista de destinatarios y plantilla con sustitución de campos.
+
+**Cómo se usa — configurar el aviso de una transición.**
+1. Entra a **Flujos**, abre el flujo y **edítalo** (si está publicado, "Editar" crea un borrador).
+2. Despliega la **transición** que quieres (p. ej. «Enviar a aprobación»).
+3. Activa **"Notificar en esta transición"**. Se abre el editor de destinatarios:
+   - **Roles** y **Usuarios específicos** — elige de la lista (se avisa a los miembros del rol
+     EN VIVO; reasignar el rol re-enruta los avisos).
+   - **Según la entrada** — marca **Autor de la entrada**, **Quien ejecuta la transición** y/o
+     **Roles del estado destino** (este último es la conducta clásica de aviso por transición).
+   - **Correos externos** — escribe un correo y Enter para agregarlo como **chip**. ⚠️ Ojo: los
+     externos **saltan los permisos y el alcance** (cualquiera en la lista recibe el aviso) y
+     **cada envío queda auditado**.
+   - **Plantilla** — déjala en **Automática** (usa la específica de la bitácora y, si no hay, la
+     genérica) o elige una concreta.
+4. ¿Varias transiciones con los mismos destinatarios? Usa **"Copiar destinatarios de…"** y elige
+   otra transición ya configurada: copia roles, usuarios, marcas y externos de un saque.
+5. **Guarda el borrador** y **Publica**. La regla de destinatarios queda **congelada** en esa
+   versión del flujo (como la firma o los roles): las entradas que ya usan una versión anterior
+   no cambian.
+
+**Cómo se usa — crear una plantilla por bitácora con comodines de campo.**
+1. Entra a **Notificaciones ▸ Plantillas** y aprieta **"Nueva plantilla"**.
+2. Elige el **evento** (p. ej. «Transición de flujo»), la **bitácora** y el **idioma**. Guarda:
+   se abre el editor.
+3. En el editor, redacta **asunto y cuerpo**. A la derecha tienes el **diccionario**: las
+   variables del evento (p. ej. `{{entry.folio}}`), `{{entry.summary}}` y —porque la plantilla
+   está atada a una bitácora— una sección **"Campos de la bitácora"** con un comodín por cada
+   campo (`{{campo.<clave>}}`). Haz clic para **insertarlo donde está el cursor**.
+4. **Guarda**. Desde ahora, los avisos de ese evento **para esa bitácora** usan tu plantilla; el
+   resto sigue con la genérica. En la lista, la columna **Ámbito** muestra «Por defecto»
+   (genérica) o el **nombre de la bitácora** (específica). Puedes **borrar** las específicas; la
+   genérica/del sistema no se borra.
+
+**Cómo se usa — el comportamiento por defecto (Admin).** En **Configuración ▸ Notificaciones**
+hay un interruptor: **"Las transiciones sin configuración avisan a los roles del estado destino"**.
+Activado (por defecto), una transición que **no** definió su aviso se comporta como antes; apagado,
+una transición sin configurar **no** notifica.
+
+**Quién puede.** Configurar el aviso de una transición = permiso de **gestionar flujos**
+(`workflow:manage`). Crear/editar/borrar plantillas = **administrar plantillas de notificación**
+(`notiftemplate:manage`). El interruptor de comportamiento por defecto = **gestionar
+configuración** (`settings:manage`).
+
+**Importante.**
+- Los destinatarios se resuelven **en el servidor respetando permisos**: un rol/usuario solo
+  recibe el aviso si tiene acceso al registro. La **única excepción** son los **correos externos**,
+  que por diseño saltan ese control (por eso van marcados y auditados).
+- Si un **campo** usado como comodín no existe en la versión congelada del registro, el comodín
+  se reemplaza por **vacío** (no rompe el envío).
+- La configuración de la transición **viaja con la versión del flujo**: editar el flujo y
+  republicar afecta a las entradas nuevas; las existentes conservan la regla con que nacieron.
 
 ---
 
