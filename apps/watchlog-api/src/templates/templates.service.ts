@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type {
+  CrossRule,
   CreateTemplateRequest,
   PublishTemplateRequest,
   SaveTemplateDraftRequest,
@@ -429,6 +430,8 @@ export class TemplatesService {
     const workflowBinding = await this.resolveWorkflowBinding(dto);
     // Valida que cada campo con optionSource.referenceList apunte a una lista viva.
     await this.assertReferenceListsExist(dto);
+    // Valida las ACCIONES de las reglas (Fase 4.1.2): severidad WARN + tipo/categoría vivos.
+    await this.assertRuleActionsValid(dto);
 
     const draft = await this.ensureDraft(id);
 
@@ -917,6 +920,54 @@ export class TemplatesService {
       throw new BadRequestException(
         `Lista de referencia inexistente: ${missing.join(", ")}. Créela en Datos de referencia o use opciones en línea.`,
       );
+    }
+  }
+
+  /**
+   * Valida server-side las ACCIONES de las reglas cruzadas (Fase 4.1.2): una regla
+   * con acción debe ser WARN (no bloqueante) y, si abre incidencia, el tipo (y la
+   * categoría, si la trae) deben existir y estar activos. Server-authoritative: el
+   * builder ya lo previene, pero la versión queda CONGELADA y no puede traer una
+   * referencia muerta a la que el worker no pueda atar la incidencia.
+   */
+  private async assertRuleActionsValid(dto: SaveTemplateDraftRequest): Promise<void> {
+    const rules = (dto.rules ?? []) as CrossRule[];
+    const typeIds = new Set<string>();
+    const categoryIds = new Set<string>();
+    for (const rule of rules) {
+      const action = rule.action;
+      if (!action || action.kind === "none") continue;
+      if (rule.severity !== "WARN") {
+        throw new BadRequestException(
+          `La regla "${rule.name || rule.key}" tiene una acción: debe ser de tipo Advertencia, no Error.`,
+        );
+      }
+      if (action.kind === "openIncident") {
+        typeIds.add(action.incidentTypeId);
+        if (action.incidentCategoryId) categoryIds.add(action.incidentCategoryId);
+      }
+    }
+    if (typeIds.size > 0) {
+      const types = await this.prisma.incidentType.findMany({
+        where: { id: { in: [...typeIds] }, deletedAt: null, active: true },
+        select: { id: true },
+      });
+      const found = new Set(types.map((t) => t.id));
+      const missing = [...typeIds].filter((id) => !found.has(id));
+      if (missing.length > 0) {
+        throw new BadRequestException(`Tipo de incidencia inexistente o inactivo en una acción de regla.`);
+      }
+    }
+    if (categoryIds.size > 0) {
+      const cats = await this.prisma.incidentCategory.findMany({
+        where: { id: { in: [...categoryIds] }, deletedAt: null, active: true },
+        select: { id: true },
+      });
+      const found = new Set(cats.map((c) => c.id));
+      const missing = [...categoryIds].filter((id) => !found.has(id));
+      if (missing.length > 0) {
+        throw new BadRequestException(`Categoría de incidencia inexistente o inactiva en una acción de regla.`);
+      }
     }
   }
 }

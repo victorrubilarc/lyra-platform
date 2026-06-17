@@ -144,8 +144,11 @@ function makeService(
     reconcileEntryOnSeal: vi.fn().mockResolvedValue(undefined),
     purgeProvisionalForEntry: vi.fn().mockResolvedValue(undefined),
   } as unknown as import("../exceptions/exception-generator.service").ExceptionGeneratorService;
+  const ruleActions = {
+    emit: vi.fn().mockResolvedValue(undefined),
+  } as unknown as import("../rule-actions/rule-action-emitter.service").RuleActionEmitterService;
   return {
-    service: new LogEntriesService(prisma, audit, scope, shiftResolver, fiscalResolver, reauth, enc, periods, permissions, settings, storage, notifications, exceptionGenerator),
+    service: new LogEntriesService(prisma, audit, scope, shiftResolver, fiscalResolver, reauth, enc, periods, permissions, settings, storage, notifications, exceptionGenerator, ruleActions),
     prisma,
     audit,
     shiftResolver,

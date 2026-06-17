@@ -4,6 +4,40 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-16 · Fase 4.1.2 — Acción del motor de reglas (diferida vía outbox): forks — ✅ IMPLEMENTADO
+
+2.º corte del motor de reglas (`feat/incidencias-reglas-accion`). Cierra la Fase 4.1. Una regla cruzada puede, al sellar, generar
+una excepción RULE o abrir una incidencia. Forks resueltos con el dueño:
+1. **`action` como enum aditivo en `CrossRule`** (`none|raiseException|openIncident`), congelado en `TemplateVersion.rules` (JSONB,
+   sin migración de reglas), NO una entidad nueva. Motivo: lo simple/aditivo; la acción es parte del diseño inmutable, igual que la
+   regla.
+2. **Outbox DEDICADO `RuleActionOutbox`, NO reuso de `NotificationEvent`** (fork 1B — el dueño aceptó la objeción del agente).
+   Motivo: `NotificationEvent`/dispatcher son específicos de CORREO (whitelist de eventos, resolución de destinatarios, render). "Crear
+   un objeto de dominio" ≠ "avisar a alguien": mezclar dos consumidores sobre la misma tabla/columna `status` invita carreras y
+   confunde la máquina de estados. Se reusa el PATRÓN (emit in-tx + worker), no la tabla.
+3. **Acción evaluada SOLO al SELLAR** (firme), no en provisional. Motivo: la excepción de regla es un hecho del registro firme; el
+   WARN en vivo ya da feedback. Evita la tormenta de eventos al guardar por sección.
+4. **Creación DIFERIDA vía worker**, no síncrona como los umbrales (fork 3). Motivo (más fuerte que "crash post-commit"):
+   **desacoplar dominios de falla** — crear una incidencia es pesado (resuelve flujo, congela versión, link, audita); si fallara
+   dentro de la tx del sello haría rollback del sello del operador. Una automatización NO puede bloquear ni revertir el acto firme
+   del operador.
+5. **`openIncident` = excepción RULE → CONVERTED → incidencia** (no incidencia directa), con **`originType=RULE`** (fork 4B — el
+   dueño pidió que la incidencia sea filtrable como "de regla"). Motivo: una sola ruta de proveniencia (toda incidencia automática
+   tiene su excepción de origen vía `IncidentExceptionLink`) y a la vez el origen real visible es la regla.
+6. **Atribución de SISTEMA = el actor que SELLÓ** (capturado en la orden), reusando `IncidentsService.create` (su ABAC ya cubre el
+   nodo: el operador selló ahí) en vez de un principal de sistema con ABAC bypass (fork 5). Motivo: máxima reutilización, sin
+   inventar un usuario de sistema; la regla es server-authoritative (congelada en la versión que el operador usó). La excepción RULE
+   la crea `ExceptionGeneratorService.createRuleException` (extiende el generador, no se reinventa).
+7. **Una regla con acción debe ser `severity=WARN`** (fork 6). Motivo: una regla ERROR bloquea el sello, y la acción ocurre AL
+   sellar ⇒ jamás se ejecutaría. `validateRulesDesign` (contrato) y `assertRuleActionsValid` (server, valida además existencia del
+   tipo/categoría) lo exigen; el builder fuerza WARN al elegir acción.
+8. **`LogEntryException.sectionKey/fieldKey` → NULLABLE** (fork 2). Motivo: una excepción de regla cruzada no ata un campo único; con
+   campo null la UI oculta "Corregir" (la corrección es campo-específica) y muestra el mensaje de la regla (`detail`).
+9. **`thresholdType=invalid` sigue DIFERIDO** (fork 7). Motivo: no lo produce este corte — las acciones van sobre reglas WARN
+   (advisory → `warning`); el tier `invalid` es validación dura que bloquea guardar, y lo que bloquea nunca materializa una excepción.
+
+---
+
 ### 2026-06-16 · Fase 4.1.1 — Panel de excepciones en la bitácora (UI): forks UX — ✅ IMPLEMENTADO
 
 Sesión de FRONTEND sobre la capa 4.1.0 (backend ya en `main`). 4 forks de UX resueltos con el dueño (recomendación aceptada salvo

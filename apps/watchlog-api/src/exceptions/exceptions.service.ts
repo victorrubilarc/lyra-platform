@@ -146,7 +146,13 @@ export class ExceptionsService {
     if (isExceptionResolved(row.status)) {
       throw new BadRequestException("La excepción ya fue resuelta (descartada/convertida/corregida)");
     }
-    const def = await this.loadFieldDef(row.templateVersionId, row.sectionKey, row.fieldKey);
+    // Las excepciones de REGLA cruzada (Fase 4.1.2) no atan un campo único: no hay
+    // un valor que reescribir. La corrección es field-specific (solo umbral/manual).
+    const { sectionKey, fieldKey } = row;
+    if (!sectionKey || !fieldKey) {
+      throw new BadRequestException("Esta excepción (de regla) no está ligada a un campo: no admite corrección de valor");
+    }
+    const def = await this.loadFieldDef(row.templateVersionId, sectionKey, fieldKey);
     if (!def) throw new BadRequestException("No se pudo resolver el campo de la excepción para validar la corrección");
 
     const res = validateFieldValue(def, dto.correctedValue, {});
@@ -160,16 +166,16 @@ export class ExceptionsService {
       // Escribe el nuevo valor en la entrada (re-estampa la banda) y deja huella de
       // cambio por campo con el motivo (patrón GxP del canal normal de edición).
       const existing = await tx.logEntryValue.findUnique({
-        where: { logEntryId_fieldKey: { logEntryId: row.logEntryId, fieldKey: row.fieldKey } },
+        where: { logEntryId_fieldKey: { logEntryId: row.logEntryId, fieldKey } },
       });
       await tx.logEntryValue.update({
-        where: { logEntryId_fieldKey: { logEntryId: row.logEntryId, fieldKey: row.fieldKey } },
+        where: { logEntryId_fieldKey: { logEntryId: row.logEntryId, fieldKey } },
         data: { value: this.toJson(dto.correctedValue), thresholdBand: band, updatedById: userId },
       });
       await tx.logEntryFieldChange.create({
         data: {
           logEntryId: row.logEntryId,
-          fieldKey: row.fieldKey,
+          fieldKey,
           before: this.toJson((existing?.value ?? null) as unknown),
           after: this.toJson(dto.correctedValue),
           reason: dto.reason,
@@ -330,7 +336,7 @@ export class ExceptionsService {
         templateVersionId: entry.templateVersionId,
         sectionKey: dto.sectionKey,
         sectionLabel,
-        fieldKey: dto.fieldKey ?? "",
+        fieldKey: dto.fieldKey ?? null,
         fieldLabel,
         triggerKind: "MANUAL",
         thresholdType: "warning",

@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import {
   effectiveNumberBands,
   thresholdExceptionTrigger,
@@ -102,6 +102,57 @@ export class ExceptionGeneratorService {
     await client.logEntryException.deleteMany({
       where: { logEntryId: entryId, status: { in: ["OPEN", "ACKNOWLEDGED"] } },
     });
+  }
+
+  /**
+   * Materializa una excepción de REGLA cruzada (Fase 4.1.2, triggerKind=RULE). A
+   * diferencia de las de umbral NO ata un campo único (`sectionKey`/`fieldKey` =
+   * null) ni se reconcilia en vivo: se crea al SELLAR (hecho firme), de forma
+   * idempotente por `dedupeKey = rule:{entryId}:{ruleKey}`. La invoca el WORKER
+   * diferido (no el camino crítico del sello). Devuelve el id y si la creó.
+   */
+  async createRuleException(
+    client: PrismaLike,
+    entry: ExceptionEntryContext,
+    rule: { key: string; name?: string | null; message: string; severity: string },
+    triggeredValues: Prisma.InputJsonValue,
+    actorId: string | null,
+  ): Promise<{ id: string; created: boolean }> {
+    const dedupeKey = `rule:${entry.id}:${rule.key}`;
+    const existing = await client.logEntryException.findUnique({ where: { dedupeKey }, select: { id: true } });
+    if (existing) return { id: existing.id, created: false };
+
+    const thresholdType = thresholdTypeForTrigger("RULE", rule.severity);
+    const row = await client.logEntryException.create({
+      data: {
+        logEntryId: entry.id,
+        templateId: entry.templateId,
+        templateVersionId: entry.templateVersionId,
+        sectionKey: null,
+        sectionLabel: null,
+        fieldKey: null,
+        fieldLabel: rule.name?.trim() || rule.key,
+        fieldType: null,
+        unit: null,
+        originalValue: triggeredValues,
+        bandsSnapshot: Prisma.DbNull,
+        triggerKind: "RULE",
+        thresholdType,
+        ruleKey: rule.key,
+        ruleVersionId: entry.templateVersionId,
+        ruleSeverity: rule.severity,
+        detail: rule.message,
+        orgNodeId: entry.orgNodeId,
+        equipmentId: entry.equipmentId,
+        shiftCode: entry.shiftCode,
+        operatorId: entry.operatorId,
+        entrySealedAt: entry.sealedAt,
+        dedupeKey,
+        createdById: actorId,
+      },
+      select: { id: true },
+    });
+    return { id: row.id, created: true };
   }
 
   /** Núcleo: crea / actualiza / retira la excepción de umbral de un campo. */

@@ -30,6 +30,8 @@ import { NotificationsModule } from "./notifications/notifications.module";
 import { IncidentsModule } from "./incidents/incidents.module";
 import { ExceptionGeneratorModule } from "./exceptions/exception-generator.module";
 import { ExceptionsModule } from "./exceptions/exceptions.module";
+import { RuleActionEmitterModule } from "./rule-actions/rule-action-emitter.module";
+import { RuleActionsModule } from "./rule-actions/rule-actions.module";
 
 @Module({
   imports: [
@@ -77,8 +79,10 @@ import { ExceptionsModule } from "./exceptions/exceptions.module";
     NotificationEmitterModule,
     NotificationsModule,
     ExceptionGeneratorModule,
+    RuleActionEmitterModule,
     IncidentsModule,
     ExceptionsModule,
+    RuleActionsModule,
     HealthModule,
   ],
 })

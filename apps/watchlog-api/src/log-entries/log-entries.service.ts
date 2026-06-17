@@ -42,6 +42,7 @@ import {
   acceptMatches,
   availableTransitionsFor,
   canonicalSignaturePayload,
+  collectVarRefs,
   editWindowDeadline,
   effectiveAccept,
   evaluateCrossRules,
@@ -55,6 +56,7 @@ import {
   pruneEmptyTableRows,
   recomputeComputedValues,
   requiredFieldError,
+  ruleHasAction,
   resolveEditWindow,
   resolveEffectiveAt,
   thresholdBandFor,
@@ -76,6 +78,7 @@ import { OperationalPeriodService } from "../operational-periods/operational-per
 import { PrismaService } from "../prisma/prisma.service";
 import { SettingsService } from "../settings/settings.service";
 import { NotificationEmitterService } from "../notifications/notification-emitter.service";
+import { RuleActionEmitterService } from "../rule-actions/rule-action-emitter.service";
 import {
   ExceptionGeneratorService,
   type ExceptionEntryContext,
@@ -234,6 +237,7 @@ export class LogEntriesService {
     private readonly storage: StorageService,
     private readonly notifications: NotificationEmitterService,
     private readonly exceptionGenerator: ExceptionGeneratorService,
+    private readonly ruleActions: RuleActionEmitterService,
   ) {}
 
   // --- Crear (abrir) una entrada ---------------------------------------------
@@ -1070,6 +1074,8 @@ export class LogEntriesService {
         userId,
         sealedAt,
       );
+      // Acciones del motor de reglas (Fase 4.1.2): encola la reacción DIFERIDA al sellar.
+      await this.emitRuleActions(tx, entry, version, valuesByKey, evalNow, userId);
     });
     if (windowOverride) {
       await this.auditEditWindowOverride(ctx, id, "submitted", windowOverride);
@@ -1739,6 +1745,8 @@ export class LogEntriesService {
           userId,
           now,
         );
+        // Acciones del motor de reglas (Fase 4.1.2): encola la reacción DIFERIDA al sellar.
+        await this.emitRuleActions(tx, entry, version, valuesByKey, evalNow, userId);
       }
 
       // Notificaciones (Bloque N) — ETAPA 1 del transactional outbox: se encola el
@@ -2043,6 +2051,45 @@ export class LogEntriesService {
     version: VersionWithGraph,
   ): { key: string; label: string | null; fields: ExceptionFieldDef[] }[] {
     return version.sections.map((s) => ({ key: s.key, label: s.title, fields: this.exceptionFieldsOf(s) }));
+  }
+
+  /**
+   * Encola las ACCIONES de las reglas cruzadas que dispararon, DENTRO de la tx del
+   * SELLO (Fase 4.1.2). Solo reglas activas con `action ≠ none` (que `validateRulesDesign`
+   * garantiza WARN ⇒ no bloquean el sello). La materialización (excepción RULE /
+   * incidencia) la hace el worker DIFERIDO: una automatización no puede bloquear ni
+   * revertir el sello del operador. `dedupeKey rule:{entryId}:{ruleKey}` ⇒ una sola
+   * materialización por (entrada, regla) aunque se re-selle.
+   */
+  private async emitRuleActions(
+    tx: Prisma.TransactionClient,
+    entry: LogEntryRow,
+    version: VersionWithGraph,
+    valuesByKey: Record<string, unknown>,
+    evalNow: Date,
+    userId: string,
+  ): Promise<void> {
+    const rules = this.versionRules(version);
+    const actionRules = rules.filter((r) => ruleHasAction(r) && r.enabled !== false);
+    if (actionRules.length === 0) return;
+    const cross = evaluateCrossRules(rules, valuesByKey, { now: evalNow });
+    const fired = new Set([...cross.errors, ...cross.warnings].map((h) => h.ruleKey));
+    for (const rule of actionRules) {
+      if (!fired.has(rule.key)) continue;
+      // Snapshot GxP de los valores que dispararon la regla (contexto para la excepción).
+      const triggeredValues: Record<string, unknown> = {};
+      for (const k of collectVarRefs(rule.when)) triggeredValues[k] = valuesByKey[k] ?? null;
+      await this.ruleActions.emit(
+        {
+          entryId: entry.id,
+          ruleKey: rule.key,
+          ruleVersionId: entry.templateVersionId,
+          payload: { triggeredValues } as Prisma.InputJsonValue,
+          actorId: userId,
+        },
+        tx,
+      );
+    }
   }
 
   /** Lista plana de campos de la versión para el motor de reglas (key/dataType/computed). */

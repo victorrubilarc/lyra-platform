@@ -59,7 +59,8 @@ export function ExceptionCard({ exc, onOpen, selectable, selected, onToggle, sho
             <span className={styles.linkTag} title={exc.incidentTitle ?? undefined}><Link2 size={11} /> {exc.incidentCode}</span>
           )}
         </div>
-        {exc.triggerKind === "MANUAL" ? (
+        {exc.triggerKind === "MANUAL" || exc.triggerKind === "RULE" ? (
+          // Manual / Regla: el "valor" no es un escalar de un campo → muestra el detalle.
           <div className={styles.cardValue}>{exc.detail ?? "—"}</div>
         ) : (
           <div className={styles.cardValue}>

@@ -64,9 +64,11 @@ export const logEntryExceptionSchema = z.object({
   templateId: z.string().nullable(),
   templateName: z.string().nullable(),
   templateVersionId: z.string().nullable(),
-  sectionKey: z.string(),
+  /** Sección de origen. NULL en excepciones de REGLA cruzada (no atan un campo único). */
+  sectionKey: z.string().nullable(),
   sectionLabel: z.string().nullable(),
-  fieldKey: z.string(),
+  /** Campo de origen. NULL en excepciones de REGLA cruzada (la corrección no aplica). */
+  fieldKey: z.string().nullable(),
   fieldLabel: z.string().nullable(),
   fieldType: z.string().nullable(),
   unit: z.string().nullable(),

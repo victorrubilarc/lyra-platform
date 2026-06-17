@@ -4,6 +4,8 @@ import {
   coerceComputedValue,
   evaluateCrossRules,
   recomputeComputedValues,
+  ruleActionKind,
+  ruleHasAction,
   topoSortComputed,
   validateRulesDesign,
   type CrossRule,
@@ -46,6 +48,39 @@ describe("agregados sobre columnas de tabla (Ola 4)", () => {
     const errs = validateRulesDesign(fields, []);
     expect(errs.some((e) => e.key === "total")).toBe(false);
     expect(errs.some((e) => e.key === "malo" && /no es una tabla/.test(e.message))).toBe(true);
+  });
+});
+
+describe("acción de regla (Fase 4.1.2)", () => {
+  const baseRule = (over: Partial<CrossRule>): CrossRule => ({
+    key: "r1",
+    when: op("gt", v("a"), lit(10)),
+    severity: "WARN",
+    message: "supera el tope",
+    ...over,
+  });
+
+  it("ruleActionKind / ruleHasAction: ausente = none", () => {
+    expect(ruleActionKind(baseRule({}))).toBe("none");
+    expect(ruleHasAction(baseRule({}))).toBe(false);
+    expect(ruleActionKind(baseRule({ action: { kind: "raiseException" } }))).toBe("raiseException");
+    expect(ruleHasAction(baseRule({ action: { kind: "raiseException" } }))).toBe(true);
+    expect(
+      ruleActionKind(baseRule({ action: { kind: "openIncident", incidentTypeId: "t1", severity: 3 } })),
+    ).toBe("openIncident");
+  });
+
+  it("validateRulesDesign: acción exige severidad WARN", () => {
+    const fields: FieldForRules[] = [{ key: "a", dataType: "NUMBER" }];
+    const okWarn = validateRulesDesign(fields, [baseRule({ action: { kind: "raiseException" } })]);
+    expect(okWarn.some((e) => /Advertencia/.test(e.message))).toBe(false);
+    const badError = validateRulesDesign(fields, [
+      baseRule({ severity: "ERROR", action: { kind: "raiseException" } }),
+    ]);
+    expect(badError.some((e) => e.key === "r1" && /Advertencia/.test(e.message))).toBe(true);
+    // Sin acción, ERROR sigue siendo válido.
+    const errorNoAction = validateRulesDesign(fields, [baseRule({ severity: "ERROR" })]);
+    expect(errorNoAction.some((e) => /Advertencia/.test(e.message))).toBe(false);
   });
 });
 

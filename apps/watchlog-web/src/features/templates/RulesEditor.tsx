@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Info, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button, Card, Chip, FormField, Input, Modal, Select, Toggle } from "@lyra/ui";
-import type { CrossRule, Expression, RuleSeverity } from "@lyra/contracts";
+import { ruleActionKind, type CrossRule, type Expression, type RuleAction, type RuleActionKind, type RuleSeverity } from "@lyra/contracts";
+import { useIncidentCategories, useIncidentTypes } from "../incidents/incidents-queries.js";
 import { ExpressionEditor } from "./ExpressionEditor.js";
 import { expressionToInfix, type RuleFieldRef } from "./expression-meta.js";
 import styles from "./TemplateBuilder.module.css";
@@ -42,6 +43,40 @@ export function RulesEditor({
   // index del que se edita (-1 = nuevo, null = modal cerrado) + borrador en edición.
   const [editIdx, setEditIdx] = useState<number | null>(null);
   const [draft, setDraft] = useState<CrossRule | null>(null);
+  // Catálogos para la acción "abrir incidencia" (degradan a vacío sin permiso).
+  const { data: incidentTypes = [] } = useIncidentTypes();
+  const { data: incidentCategories = [] } = useIncidentCategories();
+  const activeTypes = incidentTypes.filter((tp) => tp.active);
+
+  /** Cambia la ACCIÓN del borrador; fija severidad WARN cuando hay acción. */
+  function changeAction(kind: RuleActionKind) {
+    if (!draft) return;
+    if (kind === "none") {
+      setDraft({ ...draft, action: { kind: "none" } });
+      return;
+    }
+    if (kind === "raiseException") {
+      setDraft({ ...draft, severity: "WARN", action: { kind: "raiseException" } });
+      return;
+    }
+    // openIncident: prellena con el primer tipo disponible y severidad media.
+    const prev = draft.action?.kind === "openIncident" ? draft.action : null;
+    setDraft({
+      ...draft,
+      severity: "WARN",
+      action: {
+        kind: "openIncident",
+        incidentTypeId: prev?.incidentTypeId || activeTypes[0]?.id || "",
+        incidentCategoryId: prev?.incidentCategoryId ?? null,
+        severity: prev?.severity ?? 3,
+      },
+    });
+  }
+
+  function patchIncidentAction(patch: Partial<Extract<RuleAction, { kind: "openIncident" }>>) {
+    if (!draft || draft.action?.kind !== "openIncident") return;
+    setDraft({ ...draft, action: { ...draft.action, ...patch } });
+  }
 
   function openNew() {
     setDraft({ key: uniqueKey(rules), name: "", when: DEFAULT_WHEN, severity: "ERROR", message: "", enabled: true });
@@ -57,7 +92,9 @@ export function RulesEditor({
   }
   function saveRule() {
     if (!draft) return;
-    const clean: CrossRule = { ...draft, name: draft.name?.trim() || undefined, message: draft.message.trim() };
+    // `none` no se persiste (ausente = none en el contrato): mantiene la versión limpia.
+    const action = draft.action && draft.action.kind !== "none" ? draft.action : undefined;
+    const clean: CrossRule = { ...draft, name: draft.name?.trim() || undefined, message: draft.message.trim(), action };
     onChange(editIdx === -1 ? [...rules, clean] : rules.map((r, j) => (j === editIdx ? clean : r)));
     closeModal();
   }
@@ -68,7 +105,12 @@ export function RulesEditor({
     onChange(rules.filter((_, j) => j !== i));
   }
 
-  const valid = draft && draft.message.trim().length > 0;
+  const draftAction: RuleActionKind = draft ? ruleActionKind(draft) : "none";
+  const actionValid =
+    !draft ||
+    draft.action?.kind !== "openIncident" ||
+    (!!draft.action.incidentTypeId && draft.action.incidentTypeId.length > 0);
+  const valid = draft && draft.message.trim().length > 0 && actionValid;
 
   return (
     <div className={styles.rulesPanel}>
@@ -117,6 +159,12 @@ export function RulesEditor({
                     <td>
                       <div className={styles.ruleMsg}>{r.message || <span className={styles.ruleNoMsg}>{t("templates.rules.noMessage")}</span>}</div>
                       <div className={styles.ruleCond}>{expressionToInfix(r.when, fields)}</div>
+                      {ruleActionKind(r) === "raiseException" && (
+                        <Chip variant="warning" label={`→ ${t("templates.rules.actionChipException")}`} />
+                      )}
+                      {ruleActionKind(r) === "openIncident" && (
+                        <Chip variant="error" label={`→ ${t("templates.rules.actionChipIncident")}`} />
+                      )}
                     </td>
                     <td>
                       <div className={styles.rowActions}>
@@ -171,15 +219,94 @@ export function RulesEditor({
                   <Input id={id} value={draft.name ?? ""} disabled={!canEdit} placeholder={t("templates.rules.namePlaceholder")} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
                 )}
               </FormField>
-              <FormField label={t("templates.rules.severity")}>
+              <FormField
+                label={t("templates.rules.severity")}
+                hint={draftAction !== "none" ? t("templates.rules.actionForcesWarn") : undefined}
+              >
                 {({ id }) => (
-                  <Select id={id} value={draft.severity} disabled={!canEdit} onChange={(e) => setDraft({ ...draft, severity: e.target.value as RuleSeverity })}>
+                  <Select
+                    id={id}
+                    value={draft.severity}
+                    disabled={!canEdit || draftAction !== "none"}
+                    onChange={(e) => setDraft({ ...draft, severity: e.target.value as RuleSeverity })}
+                  >
                     <option value="ERROR">{t("templates.rules.severityError")}</option>
                     <option value="WARN">{t("templates.rules.severityWarn")}</option>
                   </Select>
                 )}
               </FormField>
             </div>
+
+            {/* Acción al dispararse (Fase 4.1.2) */}
+            <FormField label={t("templates.rules.action")} hint={t("templates.rules.actionHint")}>
+              {({ id }) => (
+                <Select id={id} value={draftAction} disabled={!canEdit} onChange={(e) => changeAction(e.target.value as RuleActionKind)}>
+                  <option value="none">{t("templates.rules.actionNone")}</option>
+                  <option value="raiseException">{t("templates.rules.actionRaiseException")}</option>
+                  <option value="openIncident">{t("templates.rules.actionOpenIncident")}</option>
+                </Select>
+              )}
+            </FormField>
+
+            {draft.action?.kind === "openIncident" && (
+              <div className={styles.ruleFormRow}>
+                <FormField label={t("templates.rules.incidentType")}>
+                  {({ id }) =>
+                    activeTypes.length === 0 ? (
+                      <p className={styles.thresholdHint}>{t("templates.rules.incidentTypesEmpty")}</p>
+                    ) : (
+                      <Select
+                        id={id}
+                        value={draft.action?.kind === "openIncident" ? draft.action.incidentTypeId : ""}
+                        disabled={!canEdit}
+                        onChange={(e) => patchIncidentAction({ incidentTypeId: e.target.value })}
+                      >
+                        {activeTypes.map((tp) => (
+                          <option key={tp.id} value={tp.id}>
+                            {tp.name}
+                          </option>
+                        ))}
+                      </Select>
+                    )
+                  }
+                </FormField>
+                <FormField label={t("templates.rules.incidentSeverity")}>
+                  {({ id }) => (
+                    <Select
+                      id={id}
+                      value={String(draft.action?.kind === "openIncident" ? draft.action.severity : 3)}
+                      disabled={!canEdit}
+                      onChange={(e) => patchIncidentAction({ severity: Number(e.target.value) })}
+                    >
+                      {[1, 2, 3, 4, 5].map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </Select>
+                  )}
+                </FormField>
+                <FormField label={t("templates.rules.incidentCategory")}>
+                  {({ id }) => (
+                    <Select
+                      id={id}
+                      value={(draft.action?.kind === "openIncident" ? draft.action.incidentCategoryId : null) ?? ""}
+                      disabled={!canEdit}
+                      onChange={(e) => patchIncidentAction({ incidentCategoryId: e.target.value || null })}
+                    >
+                      <option value="">{t("templates.rules.incidentCategoryNone")}</option>
+                      {incidentCategories
+                        .filter((c) => c.active && (!c.typeId || (draft.action?.kind === "openIncident" && c.typeId === draft.action.incidentTypeId)))
+                        .map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                    </Select>
+                  )}
+                </FormField>
+              </div>
+            )}
 
             <FormField label={t("templates.rules.message")} hint={t("templates.rules.messageHint")}>
               {({ id }) => (

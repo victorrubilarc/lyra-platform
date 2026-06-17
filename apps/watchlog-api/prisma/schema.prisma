@@ -1622,6 +1622,14 @@ enum NotificationEventStatus {
   FAILED
 }
 
+// Estado de una orden de acción de regla (Fase 4.1.2). DONE = ejecutada (excepción/
+// incidencia creada o ya existente por dedupe); FAILED = agotó reintentos.
+enum RuleActionOutboxStatus {
+  PENDING
+  DONE
+  FAILED
+}
+
 enum NotificationOutboxStatus {
   PENDING
   SENT
@@ -1952,9 +1960,10 @@ model LogEntryException {
   logEntryId        String
   templateId        String?
   templateVersionId String?
-  sectionKey        String
+  // NULL en excepciones de REGLA cruzada (Fase 4.1.2): no atan un campo único.
+  sectionKey        String?
   sectionLabel      String?
-  fieldKey          String
+  fieldKey          String?
   fieldLabel        String?
   fieldType         String?
   unit              String?
@@ -2022,6 +2031,37 @@ model IncidentExceptionLink {
 
   @@unique([exceptionId])
   @@index([incidentId])
+}
+
+// Outbox transaccional DEDICADO para las ACCIONES del motor de reglas (Fase 4.1.2):
+// cuando una regla cruzada con acción dispara al SELLAR una entrada, se encola UNA
+// orden DENTRO de la tx del sello (atómica; no se pierde ante un crash post-commit)
+// y un worker la ejecuta DIFERIDA (crea la excepción RULE / abre la incidencia), de
+// modo que una automatización NO pueda bloquear ni revertir el sello del operador.
+//
+// Tabla PROPIA (no se reusa NotificationEvent, específico de correo): "crear un
+// objeto de dominio" ≠ "avisar a alguien". `dedupeKey` = rule:{entryId}:{ruleKey}
+// garantiza una sola materialización por (entrada, regla) aunque se re-encole.
+model RuleActionOutbox {
+  id            String                 @id @default(cuid())
+  // Refs BLANDAS (patrón AuditLog): la orden sobrevive aunque la entrada se anule.
+  logEntryId    String
+  ruleKey       String
+  // Versión congelada donde vive la regla (TemplateVersion.rules); el worker lee de ahí.
+  ruleVersionId String?
+  // Snapshot de los valores que dispararon la regla (contexto GxP para la excepción).
+  payload       Json
+  status        RuleActionOutboxStatus @default(PENDING)
+  attempts      Int                    @default(0)
+  lastError     String?
+  // Una sola orden por (entrada, regla): idempotencia ante re-sello / re-encolado.
+  dedupeKey     String                 @unique
+  // Quién selló (actor que origina la reacción; para ABAC + auditoría del worker).
+  actorId       String?
+  createdAt     DateTime               @default(now())
+  processedAt   DateTime?
+
+  @@index([status, createdAt])
 }
 
 // Transición de flujo EJECUTADA sobre una incidencia (append-only; integridad
