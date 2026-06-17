@@ -6,7 +6,8 @@
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
 > actualización: **2026-06-17** (**Shell: sidebar premium + Favoritos al topbar ✅** — `feat/sidebar-premium`: por feedback del dueño
-> (módulos pequeños / menú estrecho / "que se vea premium"). **(1) Premium del lateral (solo CSS):** ancho 244→**276px**, texto de
+> (módulos pequeños / menú estrecho / "que se vea premium"). **(1) Premium del lateral (solo CSS):** ancho 244→**288px** + **riel
+> colapsado afinado** (scrollbar fina en vez de la gruesa del sistema, íconos compactos sin scroll horizontal), texto de
 > módulos 13.5→**14.5px**, activo a peso 600, íconos 18→**19px**, encabezados de grupo 10.5→**11px**, más aire. **(2) Favoritos al
 > topbar:** se quita la sección Favoritos del sidebar y se expone como **menú-estrella** en el topbar (`FavoritesMenu`, junto a la
 > campanita; navegar al clic + desfijar desde el `trailing`); **se mantiene la estrella por ítem en el lateral para FIJAR**. Reusa

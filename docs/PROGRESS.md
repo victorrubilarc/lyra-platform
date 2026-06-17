@@ -2,8 +2,11 @@
 
 **2026-06-17 — Shell: sidebar premium + Favoritos al topbar ✅** (`feat/sidebar-premium`). Pulido por feedback del dueño tras la
 agrupación: los módulos se veían pequeños y el menú estrecho; además pidió mover Favoritos a un menú propio en el topbar. **(1)
-Premium del sidebar (solo CSS):** ancho 244→**276px**, texto de módulos 13.5→**14.5px** (+ `letter-spacing` leve), ítem activo a peso
+Premium del sidebar (solo CSS):** ancho 244→**288px**, texto de módulos 13.5→**14.5px** (+ `letter-spacing` leve), ítem activo a peso
 **600**, íconos 18→**19px**, encabezados de grupo 10.5→**11px**, más aire (padding de ítem 44→46px de alto y encabezado 14px arriba).
+**Riel colapsado afinado** (2.º feedback): **scrollbar fina** (`scrollbar-width:thin` + `::-webkit-scrollbar` 6px, no la barra gruesa
+del sistema) + `overflow-x:hidden`, íconos más compactos (riel 72px, ítem min-height 42px) para que quepan sin scroll en la mayoría
+de pantallas.
 **(2) Favoritos al topbar (`FavoritesMenu`):** se quita la sección Favoritos del sidebar y se expone como **menú-estrella en el
 topbar** (junto a la campanita; reusa el `Menu` de `@lyra/ui`): la estrella se rellena con ≥1 favorito, lista los favoritos (navegar
 al clic) y permite **desfijar** desde el `trailing` (estrella con `stopPropagation`, no navega ni cierra). **Se mantiene la estrella

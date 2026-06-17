@@ -10,9 +10,11 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 estrecho; pidió que se viera "premium". Además sugirió mover **Favoritos a un menú propio arriba, en el topbar**.
 
 **Decisión:**
-1. **Premium del sidebar (solo CSS/presentación):** ancho 244→**276px**; texto de módulos 13.5→**14.5px** (+ `letter-spacing`
+1. **Premium del sidebar (solo CSS/presentación):** ancho 244→**288px**; texto de módulos 13.5→**14.5px** (+ `letter-spacing`
    leve); ítem activo a peso **600**; íconos de ítem 18→**19px**; encabezados de grupo 10.5→**11px**; más aire vertical (padding de
-   ítem y de encabezado). Sin cambios de estructura ni de tokens (sigue claro/oscuro, 44px+ táctil).
+   ítem y de encabezado). **Riel colapsado:** scrollbar fina/discreta (`scrollbar-width:thin` + `::-webkit-scrollbar` 6px) en vez de
+   la barra gruesa del sistema + `overflow-x:hidden`; íconos compactos (riel 72px, ítem 42px) para minimizar el scroll. Sin cambios de
+   estructura ni de tokens (sigue claro/oscuro; el alto táctil pleno 44px+ se reserva al menú expandido).
 2. **Favoritos al topbar (`FavoritesMenu`):** se **saca la sección Favoritos del sidebar** y se expone como un **menú-estrella en el
    topbar** (junto a la campanita), reusando el `Menu` premium de `@lyra/ui`. La estrella se rellena cuando hay ≥1 favorito; el menú
    lista los favoritos (navegar al hacer clic) y permite **desfijar** desde el `trailing` (estrella con `stopPropagation`, sin navegar
