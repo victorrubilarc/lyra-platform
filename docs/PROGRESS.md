@@ -1,5 +1,21 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-16 — Incidencias: equipo/activo + fecha del evento en el alta (mínimo ISO 14224) ✅** (`feat/incidencias-equipo-fecha`).
+Follow-up de QA del dueño: el modal "Reportar incidencia" no permitía elegir el **equipo/activo** (el modelo ya lo tenía y el
+detalle ya lo mostraba; era una brecha de UI) ni registraba la **fecha/hora del evento** (solo `createdAt` = cuándo se reportó). Dos
+brechas reales del mínimo estándar (ISO 14224 / HSE: la falla se ata a un activo y tiene fecha de ocurrencia distinta del reporte).
+**Backend:** `GET /incidents/equipment-options?nodeId=` (gate `incident:view`, ABAC por nodo, equipos activos del nodo — self-contained,
+no exige `equipment:view`); `Incident.occurredAt` nullable (migración aditiva `20260616230000_add_incident_occurred_at`) + en
+`createIncidentRequestSchema`/`updateIncidentRequestSchema`/`incidentListItemSchema`; `create()` **hereda el equipo de la bitácora de
+origen** si el reporte es del mismo nodo y no se eligió otro; validación `assertEquipmentInNode` sobre el equipo efectivo. **Web:**
+`CreateIncidentModal` gana selector **Equipo/activo** (cascada del nodo, se limpia al cambiar nodo) + input **Fecha y hora del
+evento** (datetime-local → ISO; vacío = momento del reporte); `IncidentDetailDrawer` muestra "Ocurrió". Sin permisos nuevos
+(catálogo 81). Tests: contracts 257 · API 234 verdes; typecheck/lint(0)/build OK. **Smokes:** `smoke-incidencias.py` **30/30**
+(+equipment-options, alta con activo, equipo de otro nodo→400, occurredAt persistida) · `smoke-reglas-incidencias.py` 21/21 ·
+`smoke-excepciones.py` 39/39. **Deuda anotada (opcional, no mínimo de alta):** matriz de riesgo prob×consec en el alta, asignar
+responsable al crear, flag "reportable" editable en el modal, evidencia/adjuntos a nivel incidencia (→ 4.2/4.3). **Pendiente: smoke
+VISUAL del dueño.**
+
 **2026-06-16 — Fase 4.1.2: Acción del motor de reglas (diferida vía outbox) ✅** (`feat/incidencias-reglas-accion`). **Cierra la
 Fase 4.1.** Una regla de negocio CRUZADA puede, al dispararse, **materializar una excepción** (`triggerKind=RULE`) o **abrir una
 incidencia** — de forma **asíncrona** (no en el camino crítico del sello), reusando el PATRÓN del outbox del Bloque N pero con tabla

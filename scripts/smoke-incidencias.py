@@ -87,12 +87,13 @@ def main():
     s, cats = call("GET", "/incidents/categories", admin)
     check("1 listar categorías", s == 200 and isinstance(cats, list) and len(cats) >= 1, str(s))
 
-    # 2) crear manual
+    # 2) crear manual (con fecha del evento anterior al reporte — ISO 14224)
     s, inc = call("POST", "/incidents", admin, {
         "title": "Smoke — temperatura hidráulica sobre umbral",
         "description": "Lectura 99°C sobre umbral 85°C.",
         "typeId": type_seguridad, "severity": 4, "potentialSeverity": 5,
         "priority": "HIGH", "orgNodeId": node_id, "reportable": True,
+        "occurredAt": "2026-06-15T08:30:00.000Z",
     })
     ok2 = s == 201 or s == 200
     inc_id = inc.get("id") if isinstance(inc, dict) else None
@@ -108,6 +109,29 @@ def main():
     check("2 flujo con 6 estados", states_ok)
     check("2 transición a_triage disponible", trans_ok)
     check("2 timeline con CREATED", created_act)
+    check("2 fecha del evento (occurredAt) persistida", isinstance(inc, dict) and (inc.get("occurredAt") or "").startswith("2026-06-15T08:30"), inc.get("occurredAt") if isinstance(inc, dict) else None)
+
+    # 2b) Equipo / activo (ISO 14224): endpoint de opciones por nodo + alta con equipo
+    s, eqopts = call("GET", f"/incidents/equipment-options?nodeId={node_id}", admin)
+    check("2b equipment-options del nodo → 200 lista", s == 200 and isinstance(eqopts, list), str(s))
+    # Busca algún nodo CON equipos para probar el alta con activo + el rechazo cruzado.
+    eq_node = sql("SELECT \"orgNodeId\" FROM \"Equipment\" WHERE \"deletedAt\" IS NULL AND active=true LIMIT 1;")
+    eq_id = sql("SELECT id FROM \"Equipment\" WHERE \"deletedAt\" IS NULL AND active=true LIMIT 1;")
+    if eq_node and eq_id:
+        s, inc_eq = call("POST", "/incidents", admin, {
+            "title": "Smoke — incidencia con activo", "typeId": type_seguridad, "severity": 3,
+            "orgNodeId": eq_node, "equipmentId": eq_id})
+        if isinstance(inc_eq, dict) and inc_eq.get("id"):
+            CREATED_IDS.append(inc_eq["id"])
+        check("2b alta con equipo → detail trae equipmentTag", s in (200, 201) and isinstance(inc_eq, dict) and bool(inc_eq.get("equipmentTag")), inc_eq.get("equipmentTag") if isinstance(inc_eq, dict) else str(s))
+        # Equipo que NO pertenece al nodo elegido ⇒ 400
+        if eq_node != node_id:
+            s, _ = call("POST", "/incidents", admin, {
+                "title": "Smoke — equipo de otro nodo", "typeId": type_seguridad, "severity": 3,
+                "orgNodeId": node_id, "equipmentId": eq_id})
+            check("2b equipo de otro nodo → 400", s == 400, str(s))
+    else:
+        check("2b (sin equipos en la demo: alta con activo omitida)", True)
 
     # 3) validación
     s, _ = call("POST", "/incidents", admin, {"title": "Severidad inválida", "typeId": type_seguridad, "severity": 9, "orgNodeId": node_id})

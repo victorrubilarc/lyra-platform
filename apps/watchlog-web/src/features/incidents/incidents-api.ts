@@ -74,6 +74,13 @@ export function fetchAssignableUsers(): Promise<IncidentUserOption[]> {
   return apiJson("/incidents/users", z.array(userOptionSchema));
 }
 
+const equipmentOptionSchema = z.object({ id: z.string(), name: z.string(), tag: z.string().nullable() });
+export type IncidentEquipmentOption = z.infer<typeof equipmentOptionSchema>;
+
+export function fetchIncidentEquipmentOptions(nodeId: string): Promise<IncidentEquipmentOption[]> {
+  return apiJson(`/incidents/equipment-options?nodeId=${encodeURIComponent(nodeId)}`, z.array(equipmentOptionSchema));
+}
+
 export function createIncident(dto: CreateIncidentRequest): Promise<IncidentDetail> {
   return apiJson("/incidents", incidentDetailSchema, { method: "POST", body: dto });
 }

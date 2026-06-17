@@ -99,6 +99,7 @@ export function IncidentDetailDrawer({ incidentId, onClose }: Props) {
               <dt>Nodo</dt><dd>{inc.orgNodeName ?? "—"}</dd>
               {inc.equipmentTag && (<><dt>Equipo</dt><dd>{inc.equipmentTag}</dd></>)}
               {inc.shiftCode && (<><dt>Turno</dt><dd>{inc.shiftCode}</dd></>)}
+              {inc.occurredAt && (<><dt>Ocurrió</dt><dd>{formatDateTime(inc.occurredAt)}</dd></>)}
               <dt>Reportada por</dt><dd>{inc.reporterName ?? "—"}</dd>
               {inc.originLogEntryId && (
                 <>

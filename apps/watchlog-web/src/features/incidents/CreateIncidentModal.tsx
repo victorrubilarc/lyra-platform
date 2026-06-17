@@ -3,7 +3,7 @@ import type { CreateIncidentRequest, IncidentPriority } from "@lyra/contracts";
 import { Button, Combobox, Input, Modal, Select, Textarea, useToast } from "@lyra/ui";
 import type { OrgNodeTree } from "@lyra/contracts";
 import { useOrgTree } from "../structure/structure-queries.js";
-import { useCreateIncident, useIncidentCategories, useIncidentTypes } from "./incidents-queries.js";
+import { useCreateIncident, useIncidentCategories, useIncidentEquipmentOptions, useIncidentTypes } from "./incidents-queries.js";
 import { PRIORITY_META, severityLabel } from "./incidents-presentation.js";
 import styles from "./incidents.module.css";
 
@@ -41,14 +41,29 @@ export function CreateIncidentModal({ open, onClose, onCreated, originLogEntryId
   const [potentialSeverity, setPotentialSeverity] = useState("");
   const [priority, setPriority] = useState<IncidentPriority>("MEDIUM");
   const [orgNodeId, setOrgNodeId] = useState(presetNodeId ?? "");
+  const [equipmentId, setEquipmentId] = useState("");
+  const [occurredAt, setOccurredAt] = useState("");
 
   const nodeOptions = useMemo(() => flatten(tree), [tree]);
   const catOptions = useMemo(() => categories.filter((c) => !c.typeId || c.typeId === typeId), [categories, typeId]);
+  const { data: equipment = [] } = useIncidentEquipmentOptions(orgNodeId || undefined);
+  const equipmentOptions = useMemo(
+    () => [
+      { value: "", label: "(sin equipo)" },
+      ...equipment.map((e) => ({ value: e.id, label: e.tag ? `${e.name} · ${e.tag}` : e.name })),
+    ],
+    [equipment],
+  );
 
   const valid = title.trim().length >= 3 && typeId && orgNodeId;
 
+  function changeNode(id: string) {
+    setOrgNodeId(id);
+    setEquipmentId(""); // el equipo depende del nodo: al cambiarlo, se limpia
+  }
+
   function reset() {
-    setTitle(""); setDescription(""); setTypeId(""); setCategoryId(""); setSeverity(3); setPotentialSeverity(""); setPriority("MEDIUM"); setOrgNodeId(presetNodeId ?? "");
+    setTitle(""); setDescription(""); setTypeId(""); setCategoryId(""); setSeverity(3); setPotentialSeverity(""); setPriority("MEDIUM"); setOrgNodeId(presetNodeId ?? ""); setEquipmentId(""); setOccurredAt("");
   }
 
   function submit() {
@@ -62,6 +77,8 @@ export function CreateIncidentModal({ open, onClose, onCreated, originLogEntryId
       potentialSeverity: potentialSeverity ? Number(potentialSeverity) : undefined,
       priority,
       orgNodeId,
+      equipmentId: equipmentId || undefined,
+      occurredAt: occurredAt ? new Date(occurredAt).toISOString() : undefined,
       originLogEntryId: originLogEntryId ?? undefined,
     };
     create.mutate(dto, {
@@ -116,10 +133,25 @@ export function CreateIncidentModal({ open, onClose, onCreated, originLogEntryId
             </Select>
           </label>
         </div>
-        <label className={styles.field}><span className={styles.fieldLabel}>Nodo / ubicación *</span>
-          <Combobox options={nodeOptions} value={orgNodeId} onChange={setOrgNodeId} placeholder="Buscar nodo…" />
+        <div className={styles.formRow}>
+          <label className={styles.field}><span className={styles.fieldLabel}>Nodo / ubicación *</span>
+            <Combobox options={nodeOptions} value={orgNodeId} onChange={changeNode} placeholder="Buscar nodo…" />
+          </label>
+          <label className={styles.field}><span className={styles.fieldLabel}>Equipo / activo</span>
+            <Combobox
+              options={equipmentOptions}
+              value={equipmentId}
+              onChange={setEquipmentId}
+              placeholder={orgNodeId ? "Buscar equipo…" : "Elige un nodo primero"}
+              disabled={!orgNodeId}
+            />
+          </label>
+        </div>
+        <label className={styles.field}><span className={styles.fieldLabel}>Fecha y hora del evento</span>
+          <Input type="datetime-local" value={occurredAt} onChange={(e) => setOccurredAt(e.target.value)} />
+          <span className={styles.muted}>Cuándo OCURRIÓ (puede ser anterior al reporte). Si lo dejas vacío, se usa el momento del reporte.</span>
         </label>
-        {originLogEntryId && <p className={styles.muted}>Se vinculará a la entrada de bitácora de origen.</p>}
+        {originLogEntryId && <p className={styles.muted}>Se vinculará a la entrada de bitácora de origen (hereda su equipo si no eliges otro).</p>}
       </div>
     </Modal>
   );

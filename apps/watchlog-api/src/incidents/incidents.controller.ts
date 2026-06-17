@@ -79,6 +79,13 @@ export class IncidentsController {
     return this.incidents.assignableUsers();
   }
 
+  /** Equipos/activos del nodo para el selector del alta (ABAC por nodo). */
+  @Get("equipment-options")
+  @RequirePermission("incident:view")
+  equipmentOptions(@Query("nodeId") nodeId: string, @CurrentUser() user: RequestUser) {
+    return nodeId ? this.incidents.equipmentOptions(user.id, nodeId) : [];
+  }
+
   // --- Listado / detalle -----------------------------------------------------
 
   @Get()
