@@ -18,6 +18,8 @@ import {
   type IncidentCommentDto,
   type TransitionIncidentRequest,
   type UpdateIncidentRequest,
+  type UpsertIncidentTypeRequest,
+  type UpsertIncidentCategoryRequest,
 } from "@lyra/contracts";
 import { z } from "zod";
 import { apiJson } from "../../lib/api-client.js";
@@ -59,12 +61,21 @@ export function fetchIncidentStats(): Promise<IncidentStats> {
   return apiJson("/incidents/stats", incidentStatsSchema);
 }
 
-export function fetchIncidentTypes(): Promise<IncidentTypeDto[]> {
-  return apiJson("/incidents/types", z.array(incidentTypeSchema));
+export function fetchIncidentTypes(includeInactive = false): Promise<IncidentTypeDto[]> {
+  return apiJson(`/incidents/types${includeInactive ? "?includeInactive=true" : ""}`, z.array(incidentTypeSchema));
 }
 
-export function fetchIncidentCategories(): Promise<IncidentCategoryDto[]> {
-  return apiJson("/incidents/categories", z.array(incidentCategorySchema));
+export function fetchIncidentCategories(includeInactive = false): Promise<IncidentCategoryDto[]> {
+  return apiJson(`/incidents/categories${includeInactive ? "?includeInactive=true" : ""}`, z.array(incidentCategorySchema));
+}
+
+/** Upsert de un tipo de catálogo. `create=true` pide al backend rechazar (409) una key ya usada. */
+export function upsertIncidentType(dto: UpsertIncidentTypeRequest, create = false): Promise<IncidentTypeDto> {
+  return apiJson(`/incidents/types${create ? "?create=true" : ""}`, incidentTypeSchema, { method: "POST", body: dto });
+}
+
+export function upsertIncidentCategory(dto: UpsertIncidentCategoryRequest, create = false): Promise<IncidentCategoryDto> {
+  return apiJson(`/incidents/categories${create ? "?create=true" : ""}`, incidentCategorySchema, { method: "POST", body: dto });
 }
 
 const userOptionSchema = z.object({ id: z.string(), name: z.string() });

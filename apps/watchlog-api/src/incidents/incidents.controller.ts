@@ -50,8 +50,9 @@ export class IncidentsController {
     @Body(new ZodValidationPipe(upsertIncidentTypeRequestSchema)) dto: UpsertIncidentTypeRequest,
     @CurrentUser() user: RequestUser,
     @Req() req: FastifyRequest,
+    @Query("create") create?: string,
   ) {
-    return this.incidents.upsertType(dto, this.ctx(user, req));
+    return this.incidents.upsertType(dto, this.ctx(user, req), create === "true");
   }
 
   @Post("categories")
@@ -60,8 +61,9 @@ export class IncidentsController {
     @Body(new ZodValidationPipe(upsertIncidentCategoryRequestSchema)) dto: UpsertIncidentCategoryRequest,
     @CurrentUser() user: RequestUser,
     @Req() req: FastifyRequest,
+    @Query("create") create?: string,
   ) {
-    return this.incidents.upsertCategory(dto, this.ctx(user, req));
+    return this.incidents.upsertCategory(dto, this.ctx(user, req), create === "true");
   }
 
   // --- KPIs ------------------------------------------------------------------

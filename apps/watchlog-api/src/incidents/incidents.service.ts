@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
 import {
   deriveLifecycle,
@@ -463,10 +463,19 @@ export class IncidentsService {
     }));
   }
 
-  async upsertType(dto: UpsertIncidentTypeRequest, ctx: AuditContext): Promise<IncidentTypeDto> {
+  async upsertType(dto: UpsertIncidentTypeRequest, ctx: AuditContext, failIfExists = false): Promise<IncidentTypeDto> {
+    // Guarda de "crear" (fork colisión de key): el endpoint es upsert por key, así
+    // que el server no distingue crear de actualizar. Cuando la UI declara `create`,
+    // una key ya existente es un conflicto (no se debe sobrescribir en silencio).
+    if (failIfExists) {
+      const existing = await this.prisma.incidentType.findUnique({ where: { key: dto.key } });
+      if (existing) throw new ConflictException(`Ya existe un tipo de incidencia con la clave "${dto.key}".`);
+    }
     if (dto.defaultWorkflowId) {
       const wf = await this.prisma.workflowDefinition.findFirst({ where: { id: dto.defaultWorkflowId, deletedAt: null } });
       if (!wf) throw new BadRequestException("El flujo por defecto indicado no existe");
+      // El flujo se CONGELA al crear una incidencia del tipo: debe estar publicado.
+      if (wf.status !== "PUBLISHED" || !wf.currentVersionId) throw new BadRequestException("El flujo por defecto debe estar publicado");
     }
     const data = {
       name: dto.name,
@@ -484,7 +493,11 @@ export class IncidentsService {
     return (await this.listTypes(true)).find((t) => t.id === row.id)!;
   }
 
-  async upsertCategory(dto: UpsertIncidentCategoryRequest, ctx: AuditContext): Promise<IncidentCategoryDto> {
+  async upsertCategory(dto: UpsertIncidentCategoryRequest, ctx: AuditContext, failIfExists = false): Promise<IncidentCategoryDto> {
+    if (failIfExists) {
+      const existing = await this.prisma.incidentCategory.findUnique({ where: { key: dto.key } });
+      if (existing) throw new ConflictException(`Ya existe una categoría de incidencia con la clave "${dto.key}".`);
+    }
     if (dto.typeId) {
       const t = await this.prisma.incidentType.findFirst({ where: { id: dto.typeId, deletedAt: null } });
       if (!t) throw new BadRequestException("El tipo indicado no existe");

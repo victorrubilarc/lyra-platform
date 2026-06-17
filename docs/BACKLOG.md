@@ -5,7 +5,13 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-16** (**Fase 4.1.1 — Excepciones operacionales [UI] ✅** — `feat/incidencias-excepciones-ui`: panel
+> actualización: **2026-06-17** (**Mantenedor de catálogos de incidencias [UI] ✅** — `feat/incidencias-catalogos-ui`: pantalla
+> `/incidencias/catalogos` [ruta propia + botón en header de `/incidencias`, gate `incidentcatalog:manage`] con sub-pestañas
+> Tipos/Categorías [buscador+estado+orden en 1 línea, GridPager arriba/abajo, crear/editar modal, toggle activo]; backend mínimo:
+> guarda "flujo por defecto publicado" en `upsertType` + **409** al crear con key existente [`?create=true`, guarda cliente+server];
+> swatches de color con tokens del DS; sin permisos nuevos [cat. 81], sin migración. Contracts 257 · API 234 · smoke
+> `smoke-catalogos-incidencias.py` 16/16 + `smoke-incidencias.py` 30/30. **Siguiente: 4.2 — Investigación + CAPA.** Anterior:
+> **Fase 4.1.1 — Excepciones operacionales [UI] ✅** — `feat/incidencias-excepciones-ui`: panel
 > inline plegable de revisión en llenado/visor [resumen + lista accionable + selección múltiple], `ExceptionDetailDrawer` con
 > triage (reconocer/corregir[GxP+reauth]/crear-asociar incidencia/descartar), `ConvertExceptionModal` con dedup, banner "advertir
 > no bloquear" al completar con críticas, **bandeja global `/excepciones`** [KPIs + filtros + GridPager + menú], trazabilidad
@@ -224,6 +230,7 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Fase 4.1.1 Excepciones (UI)** (filtro `incidentId` en `exceptionListQuerySchema`+`buildWhere`; web `features/exceptions/` [api/queries/presentation + `ExceptionCard`/`ExceptionDetailDrawer`/`ConvertExceptionModal`/`ExceptionReviewPanel`/`ExceptionsPage`]; panel inline en EntryFillPage/EntryViewerPage + banner "advertir no bloquear" al completar con críticas; bandeja global `/excepciones` + ruta + nav `nav.exceptions`; trazabilidad en `IncidentDetailDrawer`; toggle `warnRaisesException` en `BuilderConfigPanel` [NUMBER umbral+tolerancia]; i18n es-CL; contracts 255 · API 234 · smoke 39/39 + filtro incidentId live) | `feat/incidencias-excepciones-ui` → `main` | ✅ fusionado y publicado en `origin/main` (`3565749`) | ninguna |
 | **Fase 4.1.2 Acción del motor de reglas (diferida, outbox)** (`action?` en `crossRuleSchema` + `ruleActionSchema` + `ruleActionKind`/`ruleHasAction` + `validateRulesDesign` exige WARN; `assertRuleActionsValid` server; migración `…_add_rule_action_outbox` [tabla `RuleActionOutbox` + enum + `LogEntryException.sectionKey/fieldKey` nullable]; `RuleActionEmitterService` @Global in-tx en submit/executeTransition + `RuleActionWorkerService` @Cron/`runOnce` + `POST /rule-actions/run` [gate `incident:create`]; `ExceptionGeneratorService.createRuleException`; reusa `IncidentsService.create` con originType=RULE + link; UI selector de acción en `RulesEditor` + excepción RULE sin Corregir; contracts 257 · API 234 · smoke `smoke-reglas-incidencias.py` 21/21 + `smoke-excepciones.py` 39/39) | `feat/incidencias-reglas-accion` → `main` | ✅ fusionado y publicado en `origin/main` (`36bdda9`) | ninguna |
 | **Incidencias: equipo/activo + fecha del evento en el alta** (`GET /incidents/equipment-options` ABAC; `Incident.occurredAt` nullable + migración `…_add_incident_occurred_at`; create() hereda equipo de la bitácora de origen; modal con selector Equipo [cascada nodo] + Fecha del evento; detalle muestra "Ocurrió"; smoke `smoke-incidencias.py` 30/30) | `feat/incidencias-equipo-fecha` → `main` | ✅ fusionado y publicado en `origin/main` (`900ad89`) | ninguna |
+| **Mantenedor de catálogos de incidencias (Tipos + Categorías) [UI]** (web `features/incidents/` [`CatalogsPage` + `IncidentTypeModal`/`IncidentCategoryModal` + `catalogs.module.css`]; `incidents-api`/`-queries` con upserts + `includeInactive` + hooks admin; ruta `/incidencias/catalogos` + botón header [gate `incidentcatalog:manage`, no en sidebar]; backend: guarda "flujo publicado" en `upsertType` + 409 al crear con key existente vía `?create=true`; swatches de color de tokens DS; sin permisos nuevos cat. 81; sin migración; smoke `smoke-catalogos-incidencias.py` 16/16 + `smoke-incidencias.py` 30/30) | `feat/incidencias-catalogos-ui` → `main` | ⏳ por publicar | push + merge a `main` |
 
 **Estado:** **nada vive solo en local.** `main` = `origin/main`.
 
@@ -354,13 +361,15 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
       ya tiene `riskProbability/riskConsequence`; hoy solo en update); **asignar responsable** al crear (hoy se asigna después);
       **flag "reportable"** editable en el modal (hoy default por tipo); **evidencia/adjuntos** a nivel incidencia (→ 4.2, MinIO patrón
       Ola 3). Decidir cuáles entran al alta vs. triage/investigación.
-- [ ] **Incidencias — MANTENEDOR de catálogos (tipos + categorías) [UI] — acordado 2026-06-16, SIGUIENTE.** Hoy los catálogos
-      `IncidentType`/`IncidentCategory` son configurables y el **backend ya los administra** (`POST /incidents/types` y `/categories`
-      upsert por `key` con nombre/desc/color/flujo por defecto/flags investigación·CAPA·reportable/activo/orden + categoría→tipo; gate
-      `incidentcatalog:manage`; `GET …?includeInactive=true`), pero **falta la pantalla de administración** (solo se cambian por seed o
-      API directa). Construir el mantenedor (patrón de *Datos de referencia*/*Equipos-categorías*/*Flujos*): tabla con búsqueda/orden +
-      crear/editar/activar-desactivar (sin borrado físico, para no romper incidencias existentes que referencian el catálogo). Sin
-      permisos nuevos (cat. 81). Prompt en `docs/prompts/incidencias-catalogos-mantenedor.md`.
+- [x] **Incidencias — MANTENEDOR de catálogos (tipos + categorías) [UI] ✅ (2026-06-17, `feat/incidencias-catalogos-ui`).** Pantalla
+      `/incidencias/catalogos` (ruta propia; acceso por botón "Catálogos" en el header de `/incidencias`, gate `incidentcatalog:manage`;
+      NO en el sidebar para no doble-resaltar el padre, patrón `/seguridad/*`). Sub-pestañas **Tipos** / **Categorías** con buscador +
+      filtro activo/inactivo + orden (1 línea) + `GridPager` arriba/abajo + crear/editar (modal) + toggle activo/inactivo. **Tipo:**
+      nombre/key(solo crear)/descripción/color(swatches de tokens DS)/flujo publicado/flags investigación·CAPA·reportable/orden.
+      **Categoría:** nombre/key(solo crear)/descripción/tipo(o transversal)/orden. **Backend mínimo:** guarda "flujo por defecto debe
+      estar PUBLICADO" en `upsertType`; **rechazo 409** al crear con key existente (query `?create=true`, guarda cliente+server). Sin
+      permisos nuevos (cat. 81), sin migración. Contracts 257 · API 234 · smoke `smoke-catalogos-incidencias.py` 16/16 +
+      `smoke-incidencias.py` 30/30 (sin regresión); guarda DRAFT verificada en vivo. **Pendiente: smoke VISUAL del dueño.**
 - [ ] **4.2 — Investigación + CAPA.** `IncidentInvestigation` (5 Porqués + causa inmediata/básica/raíz + lección) + `IncidentAction`
       (CAPA con responsable/plazo/evidencia/**verificación de eficacia**/reapertura); bloqueo de cierre si hay CAPA obligatorias
       abiertas; **registro Part 11 con `payloadHash` para incidencias** (hoy 4.0 exige re-auth pero no persiste la firma criptográfica);

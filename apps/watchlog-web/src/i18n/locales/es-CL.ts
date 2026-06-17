@@ -110,6 +110,7 @@ export const esCL = {
     dataSources: "Orígenes de datos",
     incidents: "Incidencias",
     exceptions: "Excepciones",
+    incidentCatalogs: "Catálogos de incidencias",
   },
   shell: {
     brandTagline: "Bitácora operacional",

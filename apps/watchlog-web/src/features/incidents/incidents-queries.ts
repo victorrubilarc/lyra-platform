@@ -7,6 +7,8 @@ import type {
   IncidentListQuery,
   TransitionIncidentRequest,
   UpdateIncidentRequest,
+  UpsertIncidentTypeRequest,
+  UpsertIncidentCategoryRequest,
 } from "@lyra/contracts";
 import {
   assignIncident,
@@ -22,6 +24,8 @@ import {
   fetchIncidents,
   transitionIncident,
   updateIncident,
+  upsertIncidentType,
+  upsertIncidentCategory,
 } from "./incidents-api.js";
 
 export const INCIDENT_KEYS = {
@@ -46,11 +50,37 @@ export function useIncidentStats() {
 }
 
 export function useIncidentTypes() {
-  return useQuery({ queryKey: INCIDENT_KEYS.types(), queryFn: fetchIncidentTypes });
+  return useQuery({ queryKey: INCIDENT_KEYS.types(), queryFn: () => fetchIncidentTypes() });
 }
 
 export function useIncidentCategories() {
-  return useQuery({ queryKey: INCIDENT_KEYS.categories(), queryFn: fetchIncidentCategories });
+  return useQuery({ queryKey: INCIDENT_KEYS.categories(), queryFn: () => fetchIncidentCategories() });
+}
+
+/** Variantes para el MANTENEDOR: incluyen inactivos (key distinto, no contamina los desplegables del alta). */
+export function useIncidentTypesAdmin() {
+  return useQuery({ queryKey: [...INCIDENT_KEYS.types(), "admin"], queryFn: () => fetchIncidentTypes(true) });
+}
+
+export function useIncidentCategoriesAdmin() {
+  return useQuery({ queryKey: [...INCIDENT_KEYS.categories(), "admin"], queryFn: () => fetchIncidentCategories(true) });
+}
+
+export function useUpsertIncidentType() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ dto, create }: { dto: UpsertIncidentTypeRequest; create?: boolean }) => upsertIncidentType(dto, create),
+    // Invalida tanto el caché admin como el de los desplegables (prefijo ["incidents","types"]).
+    onSuccess: () => qc.invalidateQueries({ queryKey: INCIDENT_KEYS.types() }),
+  });
+}
+
+export function useUpsertIncidentCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ dto, create }: { dto: UpsertIncidentCategoryRequest; create?: boolean }) => upsertIncidentCategory(dto, create),
+    onSuccess: () => qc.invalidateQueries({ queryKey: INCIDENT_KEYS.categories() }),
+  });
 }
 
 export function useAssignableUsers() {

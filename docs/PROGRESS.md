@@ -1,5 +1,30 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-17 — Incidencias: MANTENEDOR de catálogos (Tipos + Categorías) [UI] ✅** (`feat/incidencias-catalogos-ui`). Le pone
+PANTALLA a los catálogos `IncidentType`/`IncidentCategory`, que ya eran configurables en el backend pero solo se cambiaban por seed
+o API directa. **Mayormente frontend** + una guarda mínima de backend. **2 forks resueltos con el dueño:** ubicación = **ruta propia
+`/incidencias/catalogos`** (acceso por botón "Catálogos" en el header de `/incidencias`, gate `incidentcatalog:manage`; **NO en el
+sidebar** para no doble-resaltar el padre — el sidebar resalta por `startsWith`, mismo patrón que `/seguridad/*`); colisión de key =
+**guarda cliente + server** (la UI bloquea crear una key ya usada y el backend devuelve **409** con `?create=true`). **Web
+(`features/incidents/`):** `CatalogsPage` (sub-pestañas **Tipos**/**Categorías**, filtros en UNA línea [buscador + activo/inactivo +
+orden], `GridPager` arriba/abajo, filtro/orden/paginación client-side sobre el listado completo, toggle activo/inactivo por fila,
+botón Nuevo) · `IncidentTypeModal` (nombre · key [solo al crear, read-only en edición] · descripción · **color** = swatches de los
+tokens del DS, sin hex libre · **flujo por defecto** = `useWorkflows({status:"PUBLISHED"})` · 3 toggles investigación/CAPA/reportable
+· orden) · `IncidentCategoryModal` (nombre · key · descripción · **tipo** [un tipo o "Transversal"] · orden) · `incidents-api`/
+`-queries` extendidos (`upsertIncidentType`/`upsertIncidentCategory` con `?create`, `fetch…(includeInactive)`, hooks **admin**
+`useIncidentTypesAdmin`/`useIncidentCategoriesAdmin` con queryKey propio para NO contaminar los desplegables del alta [siguen solo
+activos], mutaciones que invalidan el prefijo `["incidents","types"|"categories"]`). `CATALOG_COLOR_SWATCHES` centralizado en
+`incidents-presentation`. **Backend (`incidents/`):** `upsertType`/`upsertCategory` aceptan `failIfExists` (controller `?create=true`)
+→ **409 ConflictException** si la key ya existe; `upsertType` ahora exige que el `defaultWorkflowId` esté **PUBLICADO** (status
+PUBLISHED + currentVersionId), no solo que exista. **Sin permisos nuevos (cat. 81), sin migración, sin cambios de contrato.**
+Identidad Lyra (tokens, Sora/Inter, Lucide, claro+oscuro, 44px, a11y con role/tab). typecheck/lint(0)/build/test (API 234) verdes.
+**Smoke en vivo `scripts/smoke-catalogos-incidencias.py` 16/16** (crear tipo + persiste flags/color/orden · colisión key 409 · editar
+upsert mismo id · flujo inexistente 400 · flujo DRAFT 400 [verificado aparte con un workflow draft real] · desactivar → fuera de
+`/types` pero dentro de `?includeInactive` · categoría transversal + colisión 409 + asociar a tipo + typeId inexistente 400 ·
+categoría inactiva idem · gates 403 operador en GET y POST) **+ `smoke-incidencias.py` 30/30** sin regresión. **Pendiente: smoke
+VISUAL del dueño** (pantalla, modales, swatches, claro/oscuro/responsive). **Siguiente: Fase 4.2 — Investigación + CAPA.**
+🔔 Recordatorio: épico de **notificaciones avanzadas** sigue pendiente (`docs/prompts/notificaciones-avanzadas.md`).
+
 **2026-06-16 — Incidencias: equipo/activo + fecha del evento en el alta (mínimo ISO 14224) ✅** (`feat/incidencias-equipo-fecha`).
 Follow-up de QA del dueño: el modal "Reportar incidencia" no permitía elegir el **equipo/activo** (el modelo ya lo tenía y el
 detalle ya lo mostraba; era una brecha de UI) ni registraba la **fecha/hora del evento** (solo `createdAt` = cuándo se reportó). Dos
