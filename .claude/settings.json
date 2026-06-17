@@ -276,7 +276,15 @@
       "PowerShell(pnpm -w run typecheck; \"TYPECHECK=$LASTEXITCODE\")",
       "PowerShell(pnpm -w run lint; \"LINT=$LASTEXITCODE\")",
       "PowerShell(pnpm -w run build; \"BUILD=$LASTEXITCODE\")",
-      "PowerShell(pnpm -w run test 2>&1 | Select-String -Pattern \"Tests |Test Files|FAIL|passed|failed\" | Select-Object -Last 20; \"TEST=$LASTEXITCODE\")"
+      "PowerShell(pnpm -w run test 2>&1 | Select-String -Pattern \"Tests |Test Files|FAIL|passed|failed\" | Select-Object -Last 20; \"TEST=$LASTEXITCODE\")",
+      "PowerShell($p = Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty OwningProcess; if \\($p\\) { Stop-Process -Id $p -Force; \"dev server detenido \\(PID $p\\)\" } else { \"nada en :3000\" })",
+      "PowerShell(\"--- listeners ---\"; Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Where-Object {$_.LocalPort -in 3000,5173} | Select-Object LocalPort, OwningProcess; \"--- docker ---\"; docker ps --filter \"name=lyra-watchlog-dev\" --format \"{{.Names}} {{.Status}}\")",
+      "PowerShell(pnpm --filter @lyra/watchlog-web dev)",
+      "PowerShell($api=$false; $web=$false; for \\($i=0; $i -lt 50; $i++\\) { if \\(-not $api\\) { try { if \\(\\(Invoke-WebRequest \"http://localhost:3000/api/health\" -UseBasicParsing -TimeoutSec 2\\).StatusCode -eq 200\\) { $api=$true } } catch {} }; if \\(-not $web\\) { try { if \\(\\(Invoke-WebRequest \"http://localhost:5173\" -UseBasicParsing -TimeoutSec 2\\).StatusCode -eq 200\\) { $web=$true } } catch {} }; if \\($api -and $web\\) { break }; Start-Sleep -Milliseconds 1500 }; \"API=$api  WEB=$web\")",
+      "Bash(python scripts/smoke-excepciones.py)",
+      "Bash(→)",
+      "Bash(\" docs/BACKLOG.md)",
+      "Bash(grep -n \"feat/incidencias-excepciones-ui` → `main`\" docs/BACKLOG.md)"
     ],
     "additionalDirectories": [
       "\\tmp"
