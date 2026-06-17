@@ -10,7 +10,7 @@ export interface DrawerProps {
   title?: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
-  /** Ancho del panel (px). Por defecto 480. */
+  /** Ancho del panel (px). Por defecto 540. */
   width?: number;
   side?: "right" | "left";
 }
@@ -19,7 +19,7 @@ export interface DrawerProps {
  * Panel lateral deslizante. Para acciones/detalle sin perder el contexto de la
  * vista actual (clave en el patrón "no salir y entrar" del workspace).
  */
-export function Drawer({ open, onClose, title, children, footer, width = 480, side = "right" }: DrawerProps) {
+export function Drawer({ open, onClose, title, children, footer, width = 540, side = "right" }: DrawerProps) {
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {

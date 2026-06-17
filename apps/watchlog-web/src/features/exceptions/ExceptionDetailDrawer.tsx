@@ -47,7 +47,7 @@ export function ExceptionDetailDrawer({ exceptionId, onClose, onLinked }: Props)
   ) : "Excepción";
 
   return (
-    <Drawer open={!!exceptionId} onClose={onClose} title={title} width={560}>
+    <Drawer open={!!exceptionId} onClose={onClose} title={title} width={660}>
       {isLoading || !exc ? (
         <div className={styles.center}><Spinner /></div>
       ) : (

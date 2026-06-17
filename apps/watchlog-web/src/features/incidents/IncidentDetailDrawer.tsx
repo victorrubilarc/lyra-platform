@@ -79,7 +79,7 @@ export function IncidentDetailDrawer({ incidentId, onClose }: Props) {
   }
 
   return (
-    <Drawer open={!!incidentId} onClose={onClose} title={title} width={560}>
+    <Drawer open={!!incidentId} onClose={onClose} title={title} width={720}>
       {isLoading || !inc ? (
         <div className={styles.center}><Spinner /></div>
       ) : (

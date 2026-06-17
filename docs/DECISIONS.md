@@ -4,6 +4,23 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-17 · UI — Drawers laterales más anchos (default 480→540; incidencias 720, excepciones 660)
+
+**Contexto:** el dueño encontró estrechos los paneles laterales (drawers), en particular el **detalle de incidencia** (5 pestañas
+Resumen/Acciones/Investigación/Reportes/Actividad que desbordaban en horizontal) y la percepción de que **todos** los drawers eran
+angostos. **El "porqué":** cada drawer fija su propio `width` y los valores eran conservadores (default **480**, varios en 500–560);
+no había tope oculto (el `Drawer` admite hasta `max-width: 94vw`).
+
+**Decisión:** subir el **default del componente `Drawer`** (`packages/ui`) de **480→540** (beneficia a todos los que no fijan ancho:
+usuarios, horarios, nodos, columnas, peek, builder…) y ensanchar los **content-rich**: **incidencias 560→720** (para que las 5
+pestañas quepan sin scroll horizontal) y **excepciones 560→660**. Los drawers de formulario simple conservan su ancho propio
+(500–560). Sigue respetando `max-width: 94vw` (responsive en pantallas chicas).
+
+**Motivo:** dar aire a los detalles ricos en contenido sin inflar los formularios simples; el ancho vive en una sola fuente por
+drawer y el default cubre el grueso. Solo frontend; sin contratos/API/migración.
+
+---
+
 ### 2026-06-17 · UI global — Scrollbar fina/premium en TODA la app (no parchar pantalla por pantalla)
 
 **Contexto:** la scrollbar gruesa del sistema se veía mal en el riel colapsado del sidebar y también en la fila de pestañas del drawer
