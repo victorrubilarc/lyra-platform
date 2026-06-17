@@ -259,22 +259,7 @@ button.navGroupHeader:hover {
   gap: 2px;
   margin: 0 -4px;
   padding: 0 4px;
-  /* Scrollbar fina y discreta (premium), no la barra gruesa del sistema. */
-  scrollbar-width: thin;
-  scrollbar-color: var(--color-border-subtle) transparent;
-}
-.sidebarScroll::-webkit-scrollbar {
-  width: 6px;
-}
-.sidebarScroll::-webkit-scrollbar-track {
-  background: transparent;
-}
-.sidebarScroll::-webkit-scrollbar-thumb {
-  background: var(--color-border-subtle);
-  border-radius: 999px;
-}
-.sidebarScroll:hover::-webkit-scrollbar-thumb {
-  background: var(--color-border-accent);
+  /* La scrollbar fina la aporta la regla global (styles/main.css). */
 }
 
 /* ===================== MAIN ===================== */

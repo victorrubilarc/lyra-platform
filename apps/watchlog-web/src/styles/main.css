@@ -6,3 +6,36 @@
 
 /* Tokens del Design System Lyra (define @theme + base). */
 @import "@lyra/ui/tokens.css";
+
+/* ===================================================================
+   Scrollbar premium global (Lyra): fina y discreta en TODA la app, en
+   vez de la barra gruesa del sistema. Usa tokens del DS (se adapta a
+   claro/oscuro). Componentes con riel propio (ej. el sidebar) pueden
+   afinarla aún más con una regla más específica.
+   =================================================================== */
+html {
+  scrollbar-width: thin; /* Firefox + estándar */
+  scrollbar-color: var(--color-border-subtle) transparent;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  /* El borde transparente + background-clip adelgaza visualmente el thumb
+     y lo deja "flotando" con aire alrededor (look premium). */
+  background: var(--color-border-subtle);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-accent);
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}

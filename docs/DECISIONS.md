@@ -4,6 +4,23 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-17 · UI global — Scrollbar fina/premium en TODA la app (no parchar pantalla por pantalla)
+
+**Contexto:** la scrollbar gruesa del sistema se veía mal en el riel colapsado del sidebar y también en la fila de pestañas del drawer
+de incidencias (`.drawerTabs`). Iban dos reportes del dueño del mismo problema; previsiblemente aparece en más pantallas con scroll.
+
+**Decisión:** en vez de estilar la scrollbar caso por caso, se define **una regla GLOBAL** en `apps/watchlog-web/src/styles/main.css`
+(`html { scrollbar-width: thin; scrollbar-color: … }` + `::-webkit-scrollbar`/`-thumb`/`-track`/`-corner`) usando **tokens del DS**
+(`--color-border-subtle` / `--color-border-accent`), por lo que **se adapta a claro/oscuro**. El thumb usa el truco
+`border: 2px solid transparent` + `background-clip: padding-box` para adelgazarlo visualmente y dejarlo "flotando" (look premium). Se
+**eliminó la scrollbar a medida del sidebar** (`.sidebarScroll`) para que herede la global y todo quede uniforme; componentes con riel
+propio pueden afinarla con una regla más específica si hace falta.
+
+**Motivo:** consistencia visual de una sola fuente, sin whack-a-mole por pantalla; arregla el sidebar y las pestañas de incidencias y
+cualquier otro contenedor con scroll de una sola vez. Solo CSS; cero impacto funcional.
+
+---
+
 ### 2026-06-17 · Shell — Sidebar premium (más legible/ancho) + Favoritos movidos al topbar
 
 **Contexto:** feedback del dueño sobre el sidebar agrupado recién entregado: los nombres de los módulos se veían pequeños y el menú
