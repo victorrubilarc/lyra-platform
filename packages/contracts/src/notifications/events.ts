@@ -159,6 +159,35 @@ export function allowedVariablesForEvent(key: string): Set<string> {
   return new Set((def?.variables ?? []).map((v) => v.name));
 }
 
+/**
+ * Prefijo de las VARIABLES DE CAMPO de una bitácora (épico notif. avanzadas, Fase A):
+ * `{{campo.<key>}}`. Solo aplican a plantillas AD-HOC atadas a una bitácora; el editor
+ * ofrece las keys de la versión PUBLICADA y el valor sale de la versión CONGELADA de la
+ * entrada al renderizar (campo ausente ⇒ vacío, degradación elegante).
+ */
+export const FIELD_VARIABLE_PREFIX = "campo.";
+
+/** Nombre de placeholder de un campo de bitácora (ej. `campo.temp_molino`). */
+export function fieldVariableName(fieldKey: string): string {
+  return `${FIELD_VARIABLE_PREFIX}${fieldKey}`;
+}
+
+/** ¿El placeholder es una variable de campo (`campo.<key>`)? */
+export function isFieldVariable(name: string): boolean {
+  return name.startsWith(FIELD_VARIABLE_PREFIX) && name.length > FIELD_VARIABLE_PREFIX.length;
+}
+
+/**
+ * Conjunto de placeholders permitidos para una PLANTILLA: las del evento más, si la
+ * plantilla está atada a una bitácora, las variables de campo `campo.<key>`. `fieldKeys`
+ * vacío ⇒ solo las del evento (genérica). Whitelist del render seguro (sin eval).
+ */
+export function allowedVariablesForTemplate(eventKey: string, fieldKeys: readonly string[] = []): Set<string> {
+  const allowed = allowedVariablesForEvent(eventKey);
+  for (const k of fieldKeys) allowed.add(fieldVariableName(k));
+  return allowed;
+}
+
 /** Contexto de EJEMPLO de un evento (variable → valor de ejemplo), para la vista previa. */
 export function sampleContextForEvent(key: string): Record<string, string> {
   const def = EVENT_BY_KEY.get(key);

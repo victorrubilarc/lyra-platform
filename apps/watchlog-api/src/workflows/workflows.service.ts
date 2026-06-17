@@ -9,7 +9,7 @@ import type {
   WorkflowListQuery,
   WorkflowVersionDto,
 } from "@lyra/contracts";
-import { hasBlockingMachineErrors, validateWorkflowMachine } from "@lyra/contracts";
+import { hasBlockingMachineErrors, transitionNotifyConfigSchema, validateWorkflowMachine } from "@lyra/contracts";
 import { Prisma } from "@prisma/client";
 import { AuditService, type AuditContext } from "../audit/audit.service";
 import { PrismaService } from "../prisma/prisma.service";
@@ -274,6 +274,11 @@ export class WorkflowsService {
       let tOrder = 0;
       for (const t of dto.transitions) {
         tOrder += 1;
+        // Config de notificación: se NORMALIZA con el contrato (rellena defaults) y se
+        // congela como JSON. null/ausente ⇒ SQL NULL (sin config ⇒ default de sistema).
+        const notifyConfig = t.notify
+          ? (transitionNotifyConfigSchema.parse(t.notify) as Prisma.InputJsonValue)
+          : Prisma.DbNull;
         await tx.workflowTransition.create({
           data: {
             workflowDefinitionVersionId: draft.id,
@@ -285,6 +290,7 @@ export class WorkflowsService {
             requireSignature: t.requireSignature ?? false,
             signatureMeaning: t.signatureMeaning ?? null,
             requireMfa: t.requireMfa ?? false,
+            notifyConfig,
             roles: t.roleIds?.length ? { create: t.roleIds.map((roleId) => ({ roleId })) } : undefined,
           },
         });
@@ -410,6 +416,8 @@ export class WorkflowsService {
             requireSignature: t.requireSignature,
             signatureMeaning: t.signatureMeaning,
             requireMfa: t.requireMfa,
+            // Clona la config de notificación congelada (preserva null = sin config).
+            notifyConfig: t.notifyConfig === null ? Prisma.DbNull : (t.notifyConfig as Prisma.InputJsonValue),
             roles: t.roles.length ? { create: t.roles.map((r) => ({ roleId: r.roleId })) } : undefined,
           },
         });
@@ -448,6 +456,13 @@ export class WorkflowsService {
         requireSignature: t.requireSignature,
         signatureMeaning: t.signatureMeaning,
         requireMfa: t.requireMfa,
+        // Config de notificación congelada (épico notif. avanzadas). safeParse defensivo:
+        // un JSON corrupto/obsoleto cae a null (sin config) en vez de romper el detalle.
+        notify: (() => {
+          if (t.notifyConfig == null) return null;
+          const r = transitionNotifyConfigSchema.safeParse(t.notifyConfig);
+          return r.success ? r.data : null;
+        })(),
         roleIds: t.roles.map((r) => r.roleId),
         // El builder resuelve los nombres con su propia lista de roles (roleNameOf);
         // aquí no hace falta resolverlos (el visor sí los recibe, ver log-entries).

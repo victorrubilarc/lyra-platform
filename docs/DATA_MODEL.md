@@ -235,6 +235,11 @@
   `WorkflowState` de la misma versión), `order`, `requireSignature`+`signatureMeaning?` (Part 11 opt-in),
   `requireMfa` (step-up AAL). *N—N* `Role` vía **WorkflowTransitionRole** (roles autorizados a ejecutar la
   transición = **dato**, no clave de catálogo; se honra en ejecución 2.5).
+  **+ `notifyConfig Json?`** *(Notif. avanzadas Fase A, 2026-06-17)* — regla de NOTIFICACIÓN de la transición (validada por
+  `transitionNotifyConfigSchema`: `enabled`/`templateId?`/`roleIds[]`/`userIds[]`/`includeAuthor`/`includeActor`/
+  `includeDestinationRoles`/`externalEmails[]`). Se **CONGELA con la versión** (como roles/firma); el resolver la lee al despachar
+  `entry.transition` (roles→usuarios EN VIVO; externos SALTAN ABAC, auditados). `null` ⇒ default de sistema
+  (`SystemSettings.notifyTransitionDefaultDestinationRoles`, default = avisar a los roles del estado destino).
 - **Validación de la máquina** (`validateWorkflowMachine` en `@lyra/contracts`, fuente única contrato+backend+UI):
   1 inicial exacto, ≥1 final, claves únicas, transiciones con estados existentes, alcanzabilidad desde el inicial,
   sin trampas (todo estado llega a un final). Se exige válida para **publicar**.
@@ -466,9 +471,14 @@ tabla existente. El catálogo de EVENTOS vive en CÓDIGO (`@lyra/contracts NOTIF
   `recipientEmail`, `subject`, `bodyText`/`bodyHtml` (snapshot renderizado), `status` (enum **`NotificationOutboxStatus`**
   PENDING/SENT/FAILED/SUPPRESSED), `attempts`, `lastError?`, `nextAttemptAt?` (backoff), `dedupeKey?` **(@unique** — un mensaje por
   destinatario por suceso), `relatedEntityType?`/`relatedEntityId?`, `sentAt?`.
-- **NotificationTemplate** *(implementado — Bloque N)* — gobernanza VIVA: `@@unique(eventKey, locale, channel)`, `subject`,
+- **NotificationTemplate** *(implementado — Bloque N; ampliado Notif. avanzadas Fase A 2026-06-17)* — gobernanza VIVA: `subject`,
   `bodyText`/`bodyHtml`, `active`, `isSystem` (sembrada por defecto; el admin la edita pero no la borra). Render con placeholders
-  `{{var}}` whitelisteados por el evento (sin eval).
+  `{{var}}` whitelisteados por el evento (sin eval). **+ `templateId String?` = ÁMBITO por bitácora** (null = GENÉRICA/por defecto;
+  con valor = específica de esa `Template`). Unique a **`@@unique(eventKey, locale, channel, templateId)`** + **índice PARCIAL único**
+  para la genérica (`WHERE templateId IS NULL`, porque Postgres trata los NULL como distintos). Resolución específica→genérica con el
+  helper PURO `pickTemplateForScope`. Las ad-hoc (con `templateId`) son borrables; la genérica/sistema no. La plantilla ad-hoc puede
+  usar comodines **`{{campo.<key>}}`** de su bitácora (whitelist `allowedVariablesForTemplate`; valor desde la versión CONGELADA de
+  la entrada al renderizar).
 - **NotificationSubscription** *(implementado — Bloque N)* — watcher: `eventKey`, `subjectUserId?` **XOR** `subjectRoleId?`,
   `orgNodeId?`+`includeDescendants`, `templateId?`, `enabled`. Suma destinatarios (filtrados por ABAC en la resolución).
 - **NotificationPreference** *(implementado — Bloque N)* — DATO PERSONAL (ownership, sin permiso RBAC): `@@unique(userId, eventKey,
@@ -478,7 +488,9 @@ tabla existente. El catálogo de EVENTOS vive en CÓDIGO (`@lyra/contracts NOTIF
   (AES, write-only)**, `emailFromName`, `emailFromEmail`, `emailConfiguredAt` (null = nunca guardado en BD ⇒ `source=env`; el `.env`
   SMTP_* es el fallback), `emailConfiguredById`. La config es "toda BD o toda env" según `emailConfiguredAt`; la contraseña cae al
   env si la BD no tiene. La administra `EmailConfigService` (permiso `notification:config`); el `SmtpEmailService` la resuelve con
-  caché por *firma* del transporte.
+  caché por *firma* del transporte. **+ `notifyTransitionDefaultDestinationRoles Boolean @default(true)`** *(Notif. avanzadas Fase A
+  2026-06-17)* — DEFAULT de sistema para las transiciones SIN config de aviso explícita: `true` (default) reproduce la conducta clásica
+  (avisar a los roles del estado destino); `false` = no notifica si la transición no lo configura. No rompe nada.
 
 ### Orígenes de datos
 - **DataSource** — URL base, tipo de auth, **credencial cifrada en reposo**. *1—N* **DataSourceEndpoint** (path, método, mapeo JSONPath, TTL). Caché en Redis. **Espejo ENTRANTE:** en Fase 3 un endpoint puede **alimentar/materializar** una `ReferenceList` (`source=EXTERNAL`).

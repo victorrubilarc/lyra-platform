@@ -1,7 +1,18 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { NotificationEvent } from "@prisma/client";
-import { allowedVariablesForEvent, notificationEventDef, renderTemplate } from "@lyra/contracts";
+import {
+  FIELD_VARIABLE_PREFIX,
+  allowedVariablesForTemplate,
+  extractPlaceholders,
+  fieldVariableName,
+  isFieldVariable,
+  notificationEventDef,
+  pickTemplateForScope,
+  renderTemplate,
+  transitionNotifyConfigSchema,
+  type TransitionNotifyConfig,
+} from "@lyra/contracts";
 import type { Env } from "../config/env.schema";
 import { PrismaService } from "../prisma/prisma.service";
 import { ScopeService } from "../authz/scope.service";
@@ -13,7 +24,8 @@ const DEFAULT_LOCALE = "es-CL";
 
 /** Un mensaje resuelto y RENDERIZADO, listo para insertar en la bandeja de salida. */
 export interface ResolvedMessage {
-  recipientUserId: string;
+  /** null = destinatario EXTERNO (correo sin usuario; salta ABAC y preferencias). */
+  recipientUserId: string | null;
   recipientEmail: string;
   subject: string;
   bodyText: string;
@@ -27,11 +39,18 @@ export interface ResolvedMessage {
 interface EventResolution {
   /** Usuarios destinatarios DERIVADOS del dominio (ya filtrados por ABAC). */
   userIds: Set<string>;
+  /** Correos EXTERNOS (épico notif. avanzadas): sin ABAC ni preferencias, auditados. */
+  externalEmails: string[];
   /** Contexto de render común a todos los destinatarios (sin `recipient.*`). */
   context: Record<string, string>;
   /** Nodo/plantilla del evento, para filtrar destinatarios de SUSCRIPCIÓN por ABAC. */
   orgNodeId: string | null;
   templateId: string | null;
+  /** Plantilla FORZADA por la config de la transición (id). undefined = resolver por ámbito. */
+  forceTemplateId?: string | null;
+  /** Entrada + versión congelada, para los comodines de campo `{{campo.<key>}}` (si aplica). */
+  fieldEntryId?: string | null;
+  fieldTemplateVersionId?: string | null;
   relatedEntityType: string | null;
   relatedEntityId: string | null;
 }
@@ -85,55 +104,147 @@ export class NotificationResolverService {
     // Suscriptores explícitos (watchers), filtrados por ABAC contra el evento.
     const subUsers = await this.subscriptionRecipients(event.eventKey, resolution.orgNodeId, resolution.templateId);
     for (const uid of subUsers) resolution.userIds.add(uid);
-    if (resolution.userIds.size === 0) return [];
+    if (resolution.userIds.size === 0 && resolution.externalEmails.length === 0) return [];
 
-    const template = await this.prisma.notificationTemplate.findFirst({
-      where: { eventKey: event.eventKey, channel: "EMAIL", locale: DEFAULT_LOCALE, active: true },
-    });
+    // Plantilla: forzada por la transición (id) o resuelta por ÁMBITO (bitácora → genérica).
+    const template = await this.resolveTemplate(event.eventKey, resolution.templateId, resolution.forceTemplateId);
     if (!template) {
       this.logger.warn(`Sin plantilla activa para ${event.eventKey} (${DEFAULT_LOCALE}); no se enviará`);
       return [];
     }
 
-    // Destinatarios: usuario activo + correo, menos los que optaron por NO recibir.
-    const userIds = [...resolution.userIds];
-    const [users, optedOut] = await Promise.all([
-      this.prisma.user.findMany({
-        where: { id: { in: userIds }, status: { not: "DISABLED" } },
-        select: { id: true, email: true, displayName: true },
-      }),
-      this.prisma.notificationPreference.findMany({
-        where: { userId: { in: userIds }, eventKey: event.eventKey, channel: "EMAIL", mode: "OFF" },
-        select: { userId: true },
-      }),
-    ]);
-    const offSet = new Set(optedOut.map((p) => p.userId));
-    const allowed = allowedVariablesForEvent(event.eventKey);
+    // Comodines de campo `{{campo.<key>}}`: solo si la plantilla es ESPECÍFICA de una bitácora
+    // y el evento aporta una entrada. Los valores salen de la versión CONGELADA (ausente ⇒ "").
+    const fieldKeys =
+      template.templateId && resolution.fieldEntryId && resolution.fieldTemplateVersionId
+        ? this.fieldKeysInTemplate([template.subject, template.bodyText, template.bodyHtml])
+        : [];
+    const fieldContext =
+      fieldKeys.length > 0
+        ? await this.buildFieldContext(resolution.fieldEntryId!, resolution.fieldTemplateVersionId!, fieldKeys)
+        : {};
+
+    const allowed = allowedVariablesForTemplate(event.eventKey, fieldKeys);
     const appUrl = this.appUrl();
+    const baseContext: Record<string, string> = {
+      ...resolution.context,
+      ...fieldContext,
+      "app.name": "Lyra WatchLog",
+      "app.url": appUrl,
+    };
 
     const messages: ResolvedMessage[] = [];
-    for (const user of users) {
-      if (offSet.has(user.id) || !user.email) continue;
-      const context: Record<string, string> = {
-        ...resolution.context,
-        "recipient.name": user.displayName,
-        "app.name": "Lyra WatchLog",
-        "app.url": appUrl,
-      };
-      // Defensa en profundidad: el contexto solo expone variables del evento.
+    const pushMessage = (recipientUserId: string | null, email: string, name: string, dedupeKey: string) => {
+      const context: Record<string, string> = { ...baseContext, "recipient.name": name };
+      // Defensa en profundidad: el contexto solo expone variables permitidas de la plantilla.
       for (const key of Object.keys(context)) if (!allowed.has(key)) delete context[key];
       messages.push({
-        recipientUserId: user.id,
-        recipientEmail: user.email,
+        recipientUserId,
+        recipientEmail: email,
         subject: renderTemplate(template.subject, context),
         bodyText: renderTemplate(template.bodyText, context),
         bodyHtml: renderTemplate(template.bodyHtml, context),
-        dedupeKey: `${event.eventKey}|${event.id}|${user.id}`,
+        dedupeKey,
         relatedEntityType: resolution.relatedEntityType,
         relatedEntityId: resolution.relatedEntityId,
       });
+    };
+
+    // Destinatarios INTERNOS: usuario activo + correo, menos los que optaron por NO recibir.
+    const userIds = [...resolution.userIds];
+    if (userIds.length > 0) {
+      const [users, optedOut] = await Promise.all([
+        this.prisma.user.findMany({
+          where: { id: { in: userIds }, status: { not: "DISABLED" } },
+          select: { id: true, email: true, displayName: true },
+        }),
+        this.prisma.notificationPreference.findMany({
+          where: { userId: { in: userIds }, eventKey: event.eventKey, channel: "EMAIL", mode: "OFF" },
+          select: { userId: true },
+        }),
+      ]);
+      const offSet = new Set(optedOut.map((p) => p.userId));
+      for (const user of users) {
+        if (offSet.has(user.id) || !user.email) continue;
+        pushMessage(user.id, user.email, user.displayName, `${event.eventKey}|${event.id}|${user.id}`);
+      }
     }
+
+    // Destinatarios EXTERNOS: sin usuario, sin ABAC, sin preferencias (gobernanza explícita).
+    for (const email of new Set(resolution.externalEmails)) {
+      pushMessage(null, email, email, `${event.eventKey}|${event.id}|ext:${email}`);
+    }
+
     return messages;
+  }
+
+  /**
+   * Resuelve la plantilla a usar: si la transición FORZÓ una (id), esa (activa); si no,
+   * la más ESPECÍFICA por ámbito (bitácora) con fallback a la genérica (pickTemplateForScope).
+   */
+  private async resolveTemplate(
+    eventKey: string,
+    logbookTemplateId: string | null,
+    forceTemplateId?: string | null,
+  ) {
+    if (forceTemplateId) {
+      const forced = await this.prisma.notificationTemplate.findFirst({
+        where: { id: forceTemplateId, eventKey, channel: "EMAIL", active: true },
+      });
+      if (forced) return forced;
+      // La forzada ya no existe/está inactiva ⇒ degrada con elegancia al ámbito.
+    }
+    const scopeOr = logbookTemplateId ? [{ templateId: logbookTemplateId }, { templateId: null }] : [{ templateId: null }];
+    const candidates = await this.prisma.notificationTemplate.findMany({
+      where: { eventKey, channel: "EMAIL", locale: DEFAULT_LOCALE, OR: scopeOr },
+    });
+    return pickTemplateForScope(candidates, logbookTemplateId);
+  }
+
+  /** Keys de campo (`campo.<key>`) referenciadas en los textos de una plantilla. */
+  private fieldKeysInTemplate(texts: readonly string[]): string[] {
+    const keys = new Set<string>();
+    for (const t of texts) {
+      for (const p of extractPlaceholders(t)) {
+        if (isFieldVariable(p)) keys.add(p.slice(FIELD_VARIABLE_PREFIX.length));
+      }
+    }
+    return [...keys];
+  }
+
+  /**
+   * Construye el contexto `{{campo.<key>}}` de una entrada: lee los valores de la versión
+   * CONGELADA, los formatea (reusa el formateo del resumen) y los expone por su prefijo.
+   * Un campo ausente queda en "" (degradación elegante: la plantilla no se rompe).
+   */
+  private async buildFieldContext(
+    entryId: string,
+    templateVersionId: string,
+    fieldKeys: string[],
+  ): Promise<Record<string, string>> {
+    const [version, values] = await Promise.all([
+      this.prisma.templateVersion.findUnique({
+        where: { id: templateVersionId },
+        select: { sections: { select: { fields: { select: { key: true, config: true } } } } },
+      }),
+      this.prisma.logEntryValue.findMany({
+        where: { logEntryId: entryId, fieldKey: { in: fieldKeys } },
+        select: { fieldKey: true, value: true },
+      }),
+    ]);
+    const configByKey = new Map<string, Record<string, unknown>>();
+    for (const s of version?.sections ?? []) {
+      for (const f of s.fields) configByKey.set(f.key, (f.config as Record<string, unknown>) ?? {});
+    }
+    const valueByKey = new Map(values.map((v) => [v.fieldKey, v.value]));
+    const ctx: Record<string, string> = {};
+    for (const key of fieldKeys) {
+      const config = configByKey.get(key) ?? {};
+      const text = formatSummaryScalar(valueByKey.get(key), config);
+      const unit = text !== "" && typeof config.unit === "string" ? ` ${config.unit}` : "";
+      ctx[fieldVariableName(key)] = text === "" ? "" : `${text}${unit}`;
+    }
+    return ctx;
   }
 
   // --- Resolución por evento -------------------------------------------------
@@ -145,6 +256,7 @@ export class NotificationResolverService {
     if (!r) return null;
     return {
       userIds: new Set(r.userIds),
+      externalEmails: [],
       orgNodeId: r.orgNodeId,
       templateId: r.templateId,
       relatedEntityType: "RoundOccurrence",
@@ -174,8 +286,11 @@ export class NotificationResolverService {
     const delayedMin = since ? Math.round((Date.now() - since.getTime()) / 60000) - (state?.maxStayMinutes ?? 0) : 0;
     return {
       userIds: new Set(userIds),
+      externalEmails: [],
       orgNodeId: entry.orgNodeId,
       templateId: entry.templateId,
+      fieldEntryId: entry.id,
+      fieldTemplateVersionId: entry.templateVersionId,
       relatedEntityType: "LogEntry",
       relatedEntityId: entryId,
       context: {
@@ -191,16 +306,45 @@ export class NotificationResolverService {
     const entryId = String(payload.entryId ?? "");
     const toStateKey = String(payload.toStateKey ?? "");
     const fromStateKey = String(payload.fromStateKey ?? "");
+    const transitionKey = payload.transitionKey ? String(payload.transitionKey) : "";
     const actorId = payload.actorId ? String(payload.actorId) : null;
     if (!entryId || !toStateKey) return null;
     const entry = await this.loadEntryForNotification(entryId);
     if (!entry) return null;
-    // Destinatarios = responsables del NUEVO estado, menos quien ejecutó (no auto-aviso).
-    const userIds = await this.stateActorUserIds(entry, toStateKey, { excludeUserId: actorId });
+
+    // Config de aviso CONGELADA en la transición ejecutada (épico notif. avanzadas).
+    const cfg = transitionKey ? (entry.transitions.find((t) => t.key === transitionKey)?.notify ?? null) : null;
+
+    const userIds = new Set<string>();
+    const externalEmails: string[] = [];
+    let forceTemplateId: string | null | undefined;
+
+    if (cfg && cfg.enabled) {
+      // Destinatarios EXPLÍCITOS de la transición (los internos pasan ABAC; externos no).
+      forceTemplateId = cfg.templateId ?? undefined;
+      if (cfg.roleIds.length) for (const u of await this.usersOfRoles(cfg.roleIds, entry)) userIds.add(u);
+      if (cfg.userIds.length) for (const u of await this.filterByAbac(cfg.userIds, entry.orgNodeId, entry.templateId)) userIds.add(u);
+      if (cfg.includeAuthor && entry.createdById)
+        for (const u of await this.filterByAbac([entry.createdById], entry.orgNodeId, entry.templateId)) userIds.add(u);
+      if (cfg.includeActor && actorId)
+        for (const u of await this.filterByAbac([actorId], entry.orgNodeId, entry.templateId)) userIds.add(u);
+      if (cfg.includeDestinationRoles)
+        for (const u of await this.stateActorUserIds(entry, toStateKey, { excludeUserId: actorId })) userIds.add(u);
+      for (const e of cfg.externalEmails) externalEmails.push(e);
+    } else if (await this.transitionDefaultEnabled()) {
+      // DEFAULT de sistema (sin config explícita): conducta clásica = roles del estado destino,
+      // menos quien ejecutó (no auto-aviso).
+      for (const u of await this.stateActorUserIds(entry, toStateKey, { excludeUserId: actorId })) userIds.add(u);
+    }
+
     return {
-      userIds: new Set(userIds),
+      userIds,
+      externalEmails,
       orgNodeId: entry.orgNodeId,
       templateId: entry.templateId,
+      forceTemplateId,
+      fieldEntryId: entry.id,
+      fieldTemplateVersionId: entry.templateVersionId,
       relatedEntityType: "LogEntry",
       relatedEntityId: entryId,
       context: {
@@ -212,6 +356,19 @@ export class NotificationResolverService {
     };
   }
 
+  /** Expande roles a usuarios (en vivo) filtrados por ABAC del nodo/plantilla de la entrada. */
+  private async usersOfRoles(roleIds: string[], entry: LoadedEntry): Promise<string[]> {
+    if (roleIds.length === 0) return [];
+    const rows = await this.prisma.userRole.findMany({ where: { roleId: { in: roleIds } }, select: { userId: true } });
+    return this.filterByAbac([...new Set(rows.map((r) => r.userId))], entry.orgNodeId, entry.templateId);
+  }
+
+  /** Default de sistema: ¿las transiciones SIN config avisan a los roles del estado destino? */
+  private async transitionDefaultEnabled(): Promise<boolean> {
+    const s = await this.prisma.systemSettings.findFirst({ select: { notifyTransitionDefaultDestinationRoles: true } });
+    return s?.notifyTransitionDefaultDestinationRoles ?? true;
+  }
+
   private async resolveSignaturePending(payload: Record<string, unknown>): Promise<EventResolution | null> {
     const entryId = String(payload.entryId ?? "");
     const stateKey = String(payload.stateKey ?? "");
@@ -221,8 +378,11 @@ export class NotificationResolverService {
     const userIds = await this.stateActorUserIds(entry, stateKey, { signatureOnly: true });
     return {
       userIds: new Set(userIds),
+      externalEmails: [],
       orgNodeId: entry.orgNodeId,
       templateId: entry.templateId,
+      fieldEntryId: entry.id,
+      fieldTemplateVersionId: entry.templateVersionId,
       relatedEntityType: "LogEntry",
       relatedEntityId: entryId,
       context: {
@@ -243,6 +403,7 @@ export class NotificationResolverService {
         orgNodeId: true,
         templateId: true,
         templateVersionId: true,
+        createdById: true,
         currentStateKey: true,
         currentStateSince: true,
         status: true,
@@ -262,6 +423,8 @@ export class NotificationResolverService {
       entryNumber: entry.entryNumber,
       orgNodeId: entry.orgNodeId,
       templateId: entry.templateId,
+      templateVersionId: entry.templateVersionId,
+      createdById: entry.createdById,
       currentStateKey: entry.currentStateKey,
       currentStateSince: entry.currentStateSince,
       status: entry.status,
@@ -270,9 +433,11 @@ export class NotificationResolverService {
       summaryText: await this.buildEntrySummary(entry.id, entry.templateVersionId, entry.template?.gridFieldKeys ?? []),
       states: new Map(wf.states.map((s) => [s.key, { name: s.name, maxStayMinutes: s.maxStayMinutes }])),
       transitions: wf.transitions.map((t) => ({
+        key: t.key,
         fromStateKey: t.fromState.key,
         requireSignature: t.requireSignature,
         roleIds: t.roles.map((r) => r.roleId),
+        notify: parseNotifyConfig(t.notifyConfig),
       })),
     };
   }
@@ -423,6 +588,8 @@ interface LoadedEntry {
   entryNumber: number;
   orgNodeId: string;
   templateId: string;
+  templateVersionId: string;
+  createdById: string | null;
   currentStateKey: string | null;
   currentStateSince: Date | null;
   status: string;
@@ -431,7 +598,21 @@ interface LoadedEntry {
   /** `{{entry.summary}}` ya formateado (campos de resumen de la plantilla). */
   summaryText: string;
   states: Map<string, { name: string; maxStayMinutes: number | null }>;
-  transitions: Array<{ fromStateKey: string; requireSignature: boolean; roleIds: string[] }>;
+  transitions: Array<{
+    key: string;
+    fromStateKey: string;
+    requireSignature: boolean;
+    roleIds: string[];
+    /** Config de aviso CONGELADA en la transición (null = sin config explícita). */
+    notify: TransitionNotifyConfig | null;
+  }>;
+}
+
+/** Parsea (defensivo) la config de aviso congelada de una transición. JSON corrupto ⇒ null. */
+function parseNotifyConfig(raw: unknown): TransitionNotifyConfig | null {
+  if (raw == null) return null;
+  const r = transitionNotifyConfigSchema.safeParse(raw);
+  return r.success ? r.data : null;
 }
 
 /**

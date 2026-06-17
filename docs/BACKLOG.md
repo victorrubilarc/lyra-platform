@@ -5,7 +5,16 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-17** (**Fase 4.3 — Reportabilidad configurable ✅** — `feat/incidencias-reportabilidad`:
+> actualización: **2026-06-17** (**Notificaciones avanzadas · Fase A BACKEND ✅** — `feat/notif-avanzadas`: disparo de aviso por
+> TRANSICIÓN (config de destinatarios CONGELADA en la versión del flujo, `WorkflowTransition.notifyConfig`) + plantillas POR BITÁCORA
+> (`NotificationTemplate.templateId`, resolución específica→genérica `pickTemplateForScope`) + comodines `{{campo.<key>}}` desde la
+> versión congelada + defaults de sistema (`SystemSettings.notifyTransitionDefaultDestinationRoles`) + correos EXTERNOS gated/auditados.
+> Reusa el motor del Bloque N. 2 migraciones aditivas. SIN permiso nuevo. Contracts 292 · API 247 · smoke `smoke-notif-avanzadas.py`
+> 19/19 + regresión notificaciones 17/17 · incidencias 32/32 · capa 23/23 · investigación 27/27 · reportabilidad 31/31. **PENDIENTE
+> (sesiones siguientes): Fase A — UI** (editor de aviso por transición en el builder + master-detail de plantillas por bitácora +
+> diccionario de comodines + atajo "copiar de otra transición" + toggle de defaults en `/configuracion`) · **Fase B** (canal
+> in-app/campanita + SSE) · luego **4.4 (SLA/escalamiento + avisos de plazo)**. Anterior:
+> **Fase 4.3 — Reportabilidad configurable ✅** — `feat/incidencias-reportabilidad`:
 > reportes a autoridades/obligaciones configurables y transversales (nada regulatorio hardcodeado; marcos concretos = seed/catálogo),
 > honrando `IncidentType.reportableDefault`. Catálogo `ReportingObligation` (key/authorityName/defaultDueMinutes/appliesToTypeIds[]/
 > minSeverity/mandatory) + materialización `IncidentReport` (folio REP-####, snapshot obligación, status PENDING/SUBMITTED/
@@ -269,7 +278,9 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 
 | **Fase 4.3 Reportabilidad configurable** (`ReportingObligation` [catálogo: appliesToTypeIds[]/minSeverity/mandatory/defaultDueMinutes] + `IncidentReport` [folio REP-####, snapshot obligación, status PENDING/SUBMITTED/NOT_APPLICABLE/CANCELED, dueAt, externalFolio] + enum + relación en `Incident` + migración `…_add_incident_reporting`; `@lyra/contracts/incidents/reporting` con DTO/requests/enums + helpers `applicableObligationsFor`/`isReportOverdue`/`reportsBlockingClose`/`incidentReportCode` + 12 specs; `IncidentReportsService` [catálogo upsert+409, materialize idempotente, create+dedup 409, submit/not-applicable/cancel, ABAC, timeline+auditoría] + 11 endpoints + guarda `assertNoBlockingReports` en `transition` + materialización en `create` + KPI `reportOverdue`/filtro `reportOverdueOnly`/flag de fila; seed 2 obligaciones ejemplo; web `IncidentReportsBlock` [pestaña Reportes] + `ReportingObligationModal` [sub-pestaña Obligaciones en catálogos] + KPI/chip; SIN permiso nuevo cat. **83**; contracts 283 · API 241 · smoke `smoke-incidencias-reportabilidad.py` 31/31 + regresión incidencias 32/32 · capa 23/23 · investigación 27/27 · excepciones 39/39 · reglas 21/21 · catálogos 16/16) | `feat/incidencias-reportabilidad` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 
-**Estado:** **nada vive solo en local.** `main` = `origin/main`.
+| **Notificaciones avanzadas · Fase A BACKEND** (`WorkflowTransition.notifyConfig Json?` [regla de destinatarios CONGELADA en la versión] + `NotificationTemplate.templateId String?` [ámbito por bitácora + índice parcial único genérica] + `SystemSettings.notifyTransitionDefaultDestinationRoles` + 2 migraciones aditivas `…_add_notif_advanced_phase_a`/`…_add_notify_transition_default`; contratos `transitionNotifyConfigSchema` [todos requeridos, sin `.default()`] + `notify` en `workflowTransitionSchema`/`draftTransitionInputSchema` + `pickTemplateForScope` + comodines `{{campo.<key>}}` [`allowedVariablesForTemplate`] + `createNotificationTemplateRequestSchema`/`notificationTemplateListQuerySchema` + `notif-advanced.spec.ts`; `NotificationResolverService` reescrito [destinatarios desde config congelada: roles/usuarios/autor/ejecutor/estado con ABAC + externos sin ABAC auditados + default de sistema; plantilla por ámbito + comodines de versión congelada], `NotificationsService` createTemplate/deleteTemplate/listTemplates(scope)/fieldVariablesFor + endpoints `POST/DELETE /notifications/templates`+`?scope=`+`/field-variables` [whitelist 400, dup 409, genérica no se borra] + `notifications.service.spec.ts`; web builder PRESERVA `notify` en el round-trip [sin UI aún]; SIN permiso nuevo; contracts 292 · API 247 · smoke `smoke-notif-avanzadas.py` 19/19 + regresión notificaciones 17/17 + incidencias/capa/investigación/reportabilidad) | `feat/notif-avanzadas` → `main` | 🚧 pendiente de merge+push al cierre de esta sesión | push de la rama + merge a `main` + push |
+
+**Estado:** `feat/notif-avanzadas` se publica al cierre de esta sesión (merge a `main` + push). El resto: `main` = `origin/main`.
 
 **Convención propuesta (a confirmar):** trabajar cada módulo en rama `feat/<modulo>`;
 al cerrar la sesión → push de la rama + merge a `main` + push de `main`. Así `origin/main`
@@ -278,6 +289,33 @@ nunca queda más de una sesión atrás.
 ---
 
 ## 2. Pendiente por HACER (módulos / submódulos)
+
+### Notificaciones avanzadas — épico (Fase A backend ✅ 2026-06-17; resto pendiente)
+> El dueño pidió el épico COMPLETO (A+B) y LUEGO la 4.4 (DECISIONS 2026-06-17). Fase A BACKEND está hecha y publicada.
+- [ ] **Fase A · UI (sesión siguiente, prioridad):**
+  - [ ] **Editor de aviso por TRANSICIÓN en el builder de flujos** (`WorkflowBuilder`/`TransitionEditor`): toggle "Notificar" +
+        regla de destinatarios (roles [picker], usuarios, autor, ejecutor, roles del estado destino, correos externos) + selector
+        de plantilla opcional. El modelo del builder YA preserva `notify` (passthrough); falta la UI que lo edite. Identidad Lyra,
+        44px, claro/oscuro.
+  - [ ] **Atajo "copiar la configuración de destinatarios de OTRA transición"** (puro frontend; decisión del dueño para que
+        administrar varias transiciones no sea burocrático).
+  - [ ] **Master-detail de plantillas POR BITÁCORA** en `/notificaciones` → Plantillas: botón "Nueva plantilla" (evento + bitácora +
+        idioma), **columna "Ámbito"** (Por defecto / nombre de bitácora), filtros (evento, scope generic/scoped, búsqueda), borrar
+        las ad-hoc (la genérica no). Endpoints listos (`POST/DELETE /notifications/templates`, `GET …?scope=`).
+  - [ ] **Diccionario de comodines de campo** en el editor de una plantilla ad-hoc (consume `GET /notifications/templates/field-variables?templateId=`):
+        insertar `{{campo.<key>}}` en el cursor, junto a las variables del evento y `{{entry.summary}}`.
+  - [ ] **Toggle de defaults de sistema** en `/configuracion` (tab Correo o Notificaciones): "Transiciones sin config notifican a
+        los roles del estado destino" (`SystemSettings.notifyTransitionDefaultDestinationRoles`; endpoint a exponer si no existe).
+  - [ ] **Smoke VISUAL del dueño** de toda la Fase A.
+- [ ] **Fase B · Canal IN-APP (campanita):** enum `NotificationChannel += INAPP` (ALTER aditivo) + `NotificationOutbox.readAt` +
+      sender INAPP (marca entregado sin SMTP) + **campanita en el Topbar** (contador no leídas + dropdown + marcar leídas) +
+      **SSE** (decisión del dueño; con fallback a poll) + preferencias por canal (ya existen). Ownership para "mis in-app".
+- [ ] **Diferido del épico (BACKLOG, no Fase A/B):** `DistributionList` reusable (azúcar sobre la regla embebida, si el reuso duele) ·
+      override de plantilla POR TRANSICIÓN más fino · disparo configurable de `entry.signature.pending` por transición.
+- [ ] **Luego: Fase 4.4 — SLA/escalamiento + avisos de plazo** (incidencias/reportes 4.3/CAPA): eventos `incident.*` + sweeper +
+      resolvers + unificación de "vencida" §21 (dos conceptos: SLA de permanencia vs plazo de resolución `dueAt`) + auto-due
+      `IncidentType.resolutionDueMinutes`. Las 3 sub-decisiones de 4.4 ya quedaron acordadas con el dueño (modelo SLA light · §21
+      desambiguar · 4 eventos `incident.sla.breached`/`incident.report.due`/`incident.overdue`/`incident.action.overdue`).
 
 ### Datos de demo — entradas legacy sin gate de sección (registrado 2026-06-17)
 - [ ] Las entradas de *Bitácora de Turno — Demo Completa* creadas sobre las versiones **v3–v11** (que se publicaron sin roles de

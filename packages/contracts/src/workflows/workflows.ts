@@ -61,6 +61,52 @@ export const workflowStateSchema = z.object({
 });
 export type WorkflowStateDto = z.infer<typeof workflowStateSchema>;
 
+/**
+ * Config de NOTIFICACIÓN de una transición (épico notificaciones avanzadas, Fase A).
+ * Se CONGELA en la versión del flujo (igual que roles/firma): el aviso viaja con la
+ * versión publicada ⇒ reproducible y auditable. Los `roleIds`/`userIds` se expanden a
+ * usuarios EN VIVO al enviar (refs blandas; se omiten los inexistentes/deshabilitados);
+ * los `externalEmails` SALTAN ABAC (gobernanza: lista explícita y auditada).
+ * `enabled=false` (o `notify` nulo) ⇒ la transición cae al DEFAULT de sistema (que por
+ * defecto reproduce la conducta clásica: avisar a los roles del estado destino).
+ */
+// NOTA: todos los campos son REQUERIDOS (sin `.default()`/`.optional()` interno, salvo el
+// puntero `templateId` que es nullable). Esto mantiene `z.input === z.output`: el schema viaja
+// EMBEBIDO en `workflowTransitionSchema` → `workflowVersionSchema` → `logEntryDetailSchema`, y un
+// `ZodDefault` anidado divergiría input/output y rompería la re-inferencia en el web (TS2719). El
+// cliente envía el objeto COMPLETO (la UI lo construye); el backend lo valida con este contrato.
+export const transitionNotifyConfigSchema = z.object({
+  /** Activa el envío explícito configurado para esta transición. */
+  enabled: z.boolean(),
+  /** Plantilla específica (id de NotificationTemplate). null = resolución por bitácora→genérica. */
+  templateId: z.string().nullable(),
+  /** Roles cuyos miembros reciben el aviso (se expanden a usuarios EN VIVO). */
+  roleIds: z.array(z.string()).max(50),
+  /** Usuarios explícitos (ref. blanda; se omite el deshabilitado/inexistente). */
+  userIds: z.array(z.string()).max(100),
+  /** Incluir al AUTOR (creador) de la entrada. */
+  includeAuthor: z.boolean(),
+  /** Incluir a quien EJECUTÓ la transición. */
+  includeActor: z.boolean(),
+  /** Incluir a los roles del ESTADO DESTINO (conducta clásica de `entry.transition`). */
+  includeDestinationRoles: z.boolean(),
+  /** Correos EXTERNOS (sin ABAC; auditados). Cada uno recibe el correo aunque no sea usuario. */
+  externalEmails: z.array(z.string().trim().toLowerCase().email().max(254)).max(50),
+});
+export type TransitionNotifyConfig = z.infer<typeof transitionNotifyConfigSchema>;
+
+/** Config de aviso VACÍA (todos los destinatarios apagados). Útil como base en la UI/tests. */
+export const EMPTY_TRANSITION_NOTIFY: TransitionNotifyConfig = {
+  enabled: false,
+  templateId: null,
+  roleIds: [],
+  userIds: [],
+  includeAuthor: false,
+  includeActor: false,
+  includeDestinationRoles: false,
+  externalEmails: [],
+};
+
 export const workflowTransitionSchema = z.object({
   id: z.string(),
   key: z.string(),
@@ -76,6 +122,8 @@ export const workflowTransitionSchema = z.object({
   signatureMeaning: z.string().nullable(),
   /** Step-up AAL: exige reconfirmar MFA para la transición (2.5). */
   requireMfa: z.boolean(),
+  /** Config de notificación congelada (épico notif. avanzadas). null = sin config explícita. */
+  notify: transitionNotifyConfigSchema.nullable(),
   /** Roles autorizados a ejecutar la transición (autorización = dato). */
   roleIds: z.array(z.string()),
   /** Nombres de esos roles, resueltos en backend (RESPONSABLE por elemento). El
@@ -377,6 +425,8 @@ export const draftTransitionInputSchema = z.object({
   requireSignature: z.boolean().optional(),
   signatureMeaning: z.string().trim().max(120).nullable().optional(),
   requireMfa: z.boolean().optional(),
+  /** Config de notificación de la transición (épico notif. avanzadas). null/omitido = sin config. */
+  notify: transitionNotifyConfigSchema.nullable().optional(),
   roleIds: z.array(z.string()).max(50).optional(),
 });
 export type DraftTransitionInput = z.infer<typeof draftTransitionInputSchema>;

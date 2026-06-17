@@ -42,17 +42,24 @@ export const notificationTemplateSchema = z.object({
   eventKey: z.string(),
   locale: z.string(),
   channel: notificationChannelSchema,
+  /** ÁMBITO (épico notif. avanzadas, Fase A): null = GENÉRICA (por defecto); con valor =
+   *  específica de esa bitácora (plantilla de formulario). Resolución: la específica
+   *  (evento × bitácora) primero; fallback a la genérica. */
+  templateId: z.string().nullable(),
+  /** Nombre de la bitácora del ámbito, resuelto en backend (null = genérica/«Por defecto»). */
+  templateName: z.string().nullable().optional(),
   subject: z.string(),
   bodyText: z.string(),
   bodyHtml: z.string(),
   active: z.boolean(),
-  /** De sistema (sembrada por defecto). El admin puede editarla pero no borrarla. */
+  /** De sistema (sembrada por defecto). El admin puede editarla pero no borrarla. Las ad-hoc
+   *  (por bitácora) NO son de sistema ⇒ se pueden borrar. */
   isSystem: z.boolean(),
   updatedAt: z.string(),
 });
 export type NotificationTemplateDto = z.infer<typeof notificationTemplateSchema>;
 
-/** Editar una plantilla (asunto/cuerpos/activo). El evento/locale/canal no cambian. */
+/** Editar una plantilla (asunto/cuerpos/activo). El evento/locale/canal/ámbito no cambian. */
 export const updateNotificationTemplateRequestSchema = z.object({
   subject: z.string().trim().min(1).max(300),
   bodyText: z.string().trim().min(1).max(20000),
@@ -61,10 +68,54 @@ export const updateNotificationTemplateRequestSchema = z.object({
 });
 export type UpdateNotificationTemplateRequest = z.infer<typeof updateNotificationTemplateRequestSchema>;
 
+/** Crear una plantilla AD-HOC por bitácora (épico notif. avanzadas). El ámbito (`templateId`)
+ *  apunta a una plantilla de formulario; `null` no se permite aquí (la genérica ya existe por
+ *  seed y se edita, no se crea). */
+export const createNotificationTemplateRequestSchema = z.object({
+  eventKey: notificationEventKeySchema,
+  locale: notificationLocaleSchema,
+  channel: notificationChannelSchema.optional(),
+  /** Bitácora (plantilla de formulario) a la que se ata esta plantilla específica. */
+  templateId: z.string().min(1),
+  subject: z.string().trim().min(1).max(300),
+  bodyText: z.string().trim().min(1).max(20000),
+  bodyHtml: z.string().trim().min(1).max(50000),
+  active: z.boolean().optional(),
+});
+export type CreateNotificationTemplateRequest = z.infer<typeof createNotificationTemplateRequestSchema>;
+
+/** Filtros del listado de plantillas (master): por evento y por ámbito. */
+export const notificationTemplateListQuerySchema = z.object({
+  eventKey: z.string().optional(),
+  /** `generic` = solo «Por defecto»; `scoped` = solo por bitácora; omitido = todas. */
+  scope: z.enum(["generic", "scoped"]).optional(),
+  templateId: z.string().optional(),
+  q: z.string().trim().max(200).optional(),
+});
+export type NotificationTemplateListQuery = z.infer<typeof notificationTemplateListQuerySchema>;
+
 export const notificationTemplateListResponseSchema = z.object({
   templates: z.array(notificationTemplateSchema),
 });
 export type NotificationTemplateListResponse = z.infer<typeof notificationTemplateListResponseSchema>;
+
+/**
+ * Precedencia de plantilla (fuente única back↔front): de un conjunto de candidatas del
+ * MISMO evento/locale/canal, elige la ESPECÍFICA de la bitácora (`templateId` coincide)
+ * y, si no hay, la GENÉRICA (`templateId === null`). Solo considera activas. Devuelve
+ * `null` si no hay ninguna aplicable.
+ */
+export function pickTemplateForScope<T extends { templateId: string | null; active: boolean }>(
+  candidates: readonly T[],
+  logbookTemplateId: string | null,
+): T | null {
+  const active = candidates.filter((c) => c.active);
+  if (logbookTemplateId) {
+    const specific = active.find((c) => c.templateId === logbookTemplateId);
+    if (specific) return specific;
+  }
+  return active.find((c) => c.templateId === null) ?? null;
+}
 
 // --- Suscripciones (watchers) ------------------------------------------------
 

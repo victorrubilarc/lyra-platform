@@ -229,7 +229,10 @@ Preséntalo como evolución, no como funcionalidad actual:
 - **Conexión con sistemas de planta** (SCADA / historiadores) para traer lecturas automáticamente.
 - **Dashboards y analítica** (tendencias, reincidencia, tiempos de resolución).
 - **Reportabilidad regulatoria configurable** por industria y país.
-- **Notificaciones avanzadas** (más canales, escalamiento, recordatorios).
+- **Notificaciones a la medida** (en construcción): avisos **distintos por cada bitácora y por cada paso del flujo**, a los
+  **destinatarios exactos** (roles, responsables, incluso correos de terceros como contratistas o autoridades), con el **dato del
+  registro dentro del mensaje** (p. ej. "Temperatura: 78 °C"). Próximamente, **campanita de avisos dentro de la app**. *(El motor ya
+  está construido; la pantalla de configuración llega en la próxima entrega.)*
 
 ---
 
@@ -247,6 +250,11 @@ Preséntalo como evolución, no como funcionalidad actual:
 
 > Una línea por hito, en lenguaje de cliente. Lo más reciente arriba.
 
+- **2026-06-17** — **Notificaciones a la medida (motor, primera entrega):** ya es posible que **cada paso de un flujo** decida si
+  avisa, **con qué mensaje y a quién** (roles, responsables, autor, o correos externos de contratistas/autoridades), y que el correo
+  lleve **datos del propio registro** (comodines tipo "Temperatura: 78 °C"). Cada bitácora puede tener **su propia plantilla**.
+  *(Disponible vía configuración técnica; la pantalla de administración llega en la próxima entrega — preséntalo como "en
+  construcción".)*
 - **2026-06-17** — **Reportabilidad configurable:** las incidencias pueden gatillar **reportes a
   autoridades u obligaciones** con plazo, estado y **folio de envío**; los reportes obligatorios
   pendientes impiden cerrar y los vencidos se marcan solos. Defines tus obligaciones por tipo y
