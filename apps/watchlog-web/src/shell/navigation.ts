@@ -6,6 +6,26 @@ import type { Permission } from "@lyra/permissions";
  * pestañas de trabajo, breadcrumbs y command palette. El label es una CLAVE i18n
  * (se resuelve al renderizar). Los íconos viven aquí (no en stores persistidos).
  */
+/**
+ * Grupos del sidebar (encabezados de sección). El orden de aparición lo fija
+ * `NAV_GROUPS`; la pertenencia de cada ruta la fija `NavRoute.group`. Favoritos
+ * NO es un grupo aquí: es dinámico y lo arma el Sidebar desde el store.
+ */
+export type NavGroupId = "operation" | "design" | "admin";
+
+export interface NavGroup {
+  id: NavGroupId;
+  /** Clave i18n del encabezado del grupo. */
+  labelKey: string;
+}
+
+/** Orden de los grupos en el sidebar (de arriba a abajo). */
+export const NAV_GROUPS: readonly NavGroup[] = [
+  { id: "operation", labelKey: "nav.groups.operation" },
+  { id: "design", labelKey: "nav.groups.design" },
+  { id: "admin", labelKey: "nav.groups.admin" },
+] as const;
+
 export interface NavRoute {
   path: string;
   /** Clave i18n del nombre legible. */
@@ -15,18 +35,21 @@ export interface NavRoute {
   permission?: Permission;
   /** Aparece en la lista de módulos del sidebar. */
   inSidebar?: boolean;
+  /** Grupo del sidebar al que pertenece (solo para rutas `inSidebar`). */
+  group?: NavGroupId;
   /** Módulo aún no construido: muestra badge "Próximamente". */
   soon?: boolean;
 }
 
 export const ROUTES: readonly NavRoute[] = [
-  { path: "/", labelKey: "nav.home", icon: LayoutDashboard, inSidebar: true },
+  { path: "/", labelKey: "nav.home", icon: LayoutDashboard, inSidebar: true, group: "operation" },
   {
     path: "/estructura",
     labelKey: "nav.structure",
     icon: Network,
     permission: "module:structure:view",
     inSidebar: true,
+    group: "design",
   },
   {
     path: "/plantillas",
@@ -34,6 +57,7 @@ export const ROUTES: readonly NavRoute[] = [
     icon: Layers,
     permission: "module:templates:view",
     inSidebar: true,
+    group: "design",
   },
   {
     path: "/nueva-entrada",
@@ -43,6 +67,7 @@ export const ROUTES: readonly NavRoute[] = [
     // no ve este ítem y llega a las entradas por Bitácoras → Editar.
     permission: "logentry:create",
     inSidebar: true,
+    group: "operation",
   },
   {
     path: "/bitacoras",
@@ -50,6 +75,7 @@ export const ROUTES: readonly NavRoute[] = [
     icon: BookOpenCheck,
     permission: "module:logbook:view",
     inSidebar: true,
+    group: "operation",
   },
   // Worklist del OPERADOR (2.3.1): sus rondas para ejecutar. Gateado por el permiso
   // de ejecución, distinto del de planificación (schedule:view).
@@ -59,6 +85,7 @@ export const ROUTES: readonly NavRoute[] = [
     icon: ListTodo,
     permission: "round:execute",
     inSidebar: true,
+    group: "operation",
   },
   // Admin del PLANIFICADOR: CRUD de horarios (junto al resto de la configuración).
   {
@@ -67,6 +94,7 @@ export const ROUTES: readonly NavRoute[] = [
     icon: Route,
     permission: "schedule:view",
     inSidebar: true,
+    group: "design",
   },
   // Incidencias operacionales / HSE (Fase 4): lista + tablero kanban + detalle.
   {
@@ -75,6 +103,7 @@ export const ROUTES: readonly NavRoute[] = [
     icon: AlertTriangle,
     permission: "module:incidents:view",
     inSidebar: true,
+    group: "operation",
   },
   // Excepciones operacionales (Fase 4.1.1): bandeja global de desviaciones de
   // bitácora pendientes de triage. Mismo gate que incidencias.
@@ -84,6 +113,7 @@ export const ROUTES: readonly NavRoute[] = [
     icon: AlertOctagon,
     permission: "module:incidents:view",
     inSidebar: true,
+    group: "operation",
   },
   // Mantenedor de catálogos (tipos/categorías) del módulo de incidencias.
   // Sub-ruta de /incidencias: NO va en el sidebar (evita doble-resaltado del
@@ -109,6 +139,7 @@ export const ROUTES: readonly NavRoute[] = [
     icon: ListChecks,
     permission: "module:referencedata:view",
     inSidebar: true,
+    group: "design",
   },
   {
     path: "/calendario-operacional",
@@ -116,6 +147,7 @@ export const ROUTES: readonly NavRoute[] = [
     icon: CalendarClock,
     permission: "module:opscalendar:view",
     inSidebar: true,
+    group: "design",
   },
   {
     path: "/calendario-fiscal",
@@ -123,6 +155,7 @@ export const ROUTES: readonly NavRoute[] = [
     icon: CalendarRange,
     permission: "module:opscalendar:view",
     inSidebar: true,
+    group: "design",
   },
   {
     path: "/seguridad",
@@ -130,6 +163,7 @@ export const ROUTES: readonly NavRoute[] = [
     icon: ShieldCheck,
     permission: "module:security:view",
     inSidebar: true,
+    group: "admin",
   },
   // Motor de avisos por correo (Bloque N): plantillas + bandeja de salida + preferencias.
   {
@@ -138,6 +172,7 @@ export const ROUTES: readonly NavRoute[] = [
     icon: Bell,
     permission: "module:notifications:view",
     inSidebar: true,
+    group: "admin",
   },
   {
     path: "/configuracion",
@@ -145,6 +180,7 @@ export const ROUTES: readonly NavRoute[] = [
     icon: Settings,
     permission: "module:settings:view",
     inSidebar: true,
+    group: "admin",
   },
   { path: "/perfil/seguridad", labelKey: "topbar.mySecurity", icon: UserCog },
   // Preferencias de aviso propias (accesible a todo usuario): vive en el menú de perfil.
@@ -181,3 +217,23 @@ export function isRouteActive(routePath: string, pathname: string): boolean {
 
 /** Ítems del sidebar (módulos). */
 export const SIDEBAR_ROUTES = ROUTES.filter((r) => r.inSidebar);
+
+/** Un grupo del sidebar ya resuelto con sus rutas (en el orden de `ROUTES`). */
+export interface ResolvedNavGroup {
+  group: NavGroup;
+  routes: NavRoute[];
+}
+
+/**
+ * Arma los grupos del sidebar para un conjunto de rutas YA filtradas por permiso.
+ * Respeta el orden de `NAV_GROUPS` (grupos) y el de `SIDEBAR_ROUTES` (ítems dentro
+ * de cada grupo). Un grupo sin rutas visibles se omite (no se renderiza su
+ * encabezado). Rutas de sidebar sin `group` quedan fuera de los grupos (no debería
+ * ocurrir: el tipado anima a asignarlas, pero el helper no inventa un grupo).
+ */
+export function buildNavGroups(visibleRoutes: readonly NavRoute[]): ResolvedNavGroup[] {
+  return NAV_GROUPS.map((group) => ({
+    group,
+    routes: visibleRoutes.filter((r) => r.group === group.id),
+  })).filter((g) => g.routes.length > 0);
+}

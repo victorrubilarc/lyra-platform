@@ -99,6 +99,56 @@
   padding: 10px 12px 6px;
 }
 
+/* ----- Grupos del sidebar (encabezados colapsables) ----- */
+.navGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.navGroup + .navGroup {
+  margin-top: 4px;
+}
+.navGroupHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 8px;
+  padding: 10px 12px 6px;
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  font-family: var(--font-body);
+}
+button.navGroupHeader {
+  cursor: pointer;
+}
+button.navGroupHeader:hover {
+  color: var(--color-text-secondary);
+}
+.navGroupLabel {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.navGroupChevron {
+  flex-shrink: 0;
+  opacity: 0.7;
+  transition: transform 0.18s ease;
+}
+.navGroupChevronClosed {
+  transform: rotate(-90deg);
+}
+
+/* Divisor sutil entre clústeres de íconos en el riel colapsado. */
+.navDivider {
+  height: 1px;
+  background: var(--color-border-subtle);
+  margin: 6px 8px;
+}
+
 .navItem {
   display: flex;
   align-items: center;

@@ -1,14 +1,28 @@
+import { Fragment } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Boxes, ChevronLeft, ChevronRight, Star } from "lucide-react";
+import { Boxes, ChevronDown, ChevronLeft, ChevronRight, Star } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Tooltip, cx } from "@lyra/ui";
 import { usePermissions } from "../auth/use-permissions.js";
 import { useUIStore } from "./ui-store.js";
 import { useFavoritesStore } from "./favorites-store.js";
-import { SIDEBAR_ROUTES, isRouteActive, routeByPath, type NavRoute } from "./navigation.js";
+import {
+  SIDEBAR_ROUTES,
+  buildNavGroups,
+  isRouteActive,
+  routeByPath,
+  type NavRoute,
+} from "./navigation.js";
 import styles from "./AppShell.module.css";
 
-/** Menú lateral colapsable (completo ↔ riel de íconos) con favoritos. */
+/**
+ * Menú lateral colapsable (completo ↔ riel de íconos) organizado en grupos con
+ * encabezado (Operación · Diseño y datos · Administración) + Favoritos.
+ * Los grupos pliegan/despliegan con estado persistido; el grupo del ítem activo
+ * se muestra SIEMPRE (aunque esté plegado). En el riel de íconos no hay
+ * encabezados ni plegado: los grupos se separan con divisores sutiles y cada
+ * ítem se identifica por tooltip.
+ */
 export function Sidebar() {
   const { t } = useTranslation();
   const perms = usePermissions();
@@ -16,10 +30,13 @@ export function Sidebar() {
   const { pathname } = useLocation();
   const collapsed = useUIStore((s) => s.sidebarCollapsed);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
+  const collapsedNavGroups = useUIStore((s) => s.collapsedNavGroups);
+  const toggleNavGroup = useUIStore((s) => s.toggleNavGroup);
   const favorites = useFavoritesStore((s) => s.favorites);
   const toggleFavorite = useFavoritesStore((s) => s.toggleFavorite);
 
   const visible = SIDEBAR_ROUTES.filter((r) => !r.permission || perms.can(r.permission));
+  const groups = buildNavGroups(visible);
   const favRoutes = favorites
     .map(routeByPath)
     .filter((r): r is NavRoute => Boolean(r));
@@ -65,39 +82,97 @@ export function Sidebar() {
     );
   }
 
+  // ----- Riel colapsado: grupos como clústeres de íconos separados por divisores.
+  if (collapsed) {
+    return (
+      <aside className={cx(styles.sidebar, styles.sidebarCollapsed, styles.collapsed)}>
+        <div className={styles.brand}>
+          <div className={styles.brandLogo}>
+            <Boxes size={19} color="#fff" aria-hidden="true" />
+          </div>
+          <button
+            type="button"
+            className={styles.collapseBtn}
+            onClick={toggleSidebar}
+            aria-label={t("shell.expand")}
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
+
+        <div className={styles.sidebarScroll}>
+          {groups.map((g, i) => (
+            <Fragment key={g.group.id}>
+              {i > 0 && <div className={styles.navDivider} aria-hidden="true" />}
+              {g.routes.map(renderItem)}
+            </Fragment>
+          ))}
+          {favRoutes.length > 0 && (
+            <>
+              <div className={styles.navDivider} aria-hidden="true" />
+              {favRoutes.map(renderItem)}
+            </>
+          )}
+        </div>
+      </aside>
+    );
+  }
+
+  // ----- Sidebar expandido: grupos con encabezado colapsable + Favoritos.
   return (
-    <aside className={cx(styles.sidebar, collapsed && styles.sidebarCollapsed, collapsed && styles.collapsed)}>
+    <aside className={styles.sidebar}>
       <div className={styles.brand}>
         <div className={styles.brandLogo}>
           <Boxes size={19} color="#fff" aria-hidden="true" />
         </div>
-        {!collapsed && (
-          <div className={styles.brandText}>
-            <div className={styles.brandWordmark}>
-              Lyra <span className={styles.brandProduct}>WatchLog</span>
-            </div>
-            <div className={styles.brandTagline}>{t("shell.brandTagline")}</div>
+        <div className={styles.brandText}>
+          <div className={styles.brandWordmark}>
+            Lyra <span className={styles.brandProduct}>WatchLog</span>
           </div>
-        )}
+          <div className={styles.brandTagline}>{t("shell.brandTagline")}</div>
+        </div>
         <button
           type="button"
           className={styles.collapseBtn}
           onClick={toggleSidebar}
-          aria-label={collapsed ? t("shell.expand") : t("shell.collapse")}
+          aria-label={t("shell.collapse")}
         >
-          {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+          <ChevronLeft size={16} />
         </button>
       </div>
 
       <div className={styles.sidebarScroll}>
-        {!collapsed && <div className={styles.navLabel}>{t("nav.sectionLabel")}</div>}
-        {visible.map(renderItem)}
+        {groups.map((g) => {
+          // El grupo del ítem activo se muestra SIEMPRE, aunque esté plegado.
+          const hasActive = g.routes.some((r) => isRouteActive(r.path, pathname));
+          const open = !collapsedNavGroups[g.group.id] || hasActive;
+          return (
+            <div key={g.group.id} className={styles.navGroup}>
+              <button
+                type="button"
+                className={styles.navGroupHeader}
+                onClick={() => toggleNavGroup(g.group.id)}
+                aria-expanded={open}
+              >
+                <span className={styles.navGroupLabel}>{t(g.group.labelKey)}</span>
+                <ChevronDown
+                  size={13}
+                  className={cx(styles.navGroupChevron, !open && styles.navGroupChevronClosed)}
+                  aria-hidden="true"
+                />
+              </button>
+              {open && g.routes.map(renderItem)}
+            </div>
+          );
+        })}
 
         {favRoutes.length > 0 && (
-          <>
-            {!collapsed && <div className={styles.navLabel}>{t("shell.favorites")}</div>}
+          <div className={styles.navGroup}>
+            <div className={styles.navGroupHeader} role="presentation">
+              <span className={styles.navGroupLabel}>{t("shell.favorites")}</span>
+            </div>
             {favRoutes.map(renderItem)}
-          </>
+          </div>
         )}
       </div>
     </aside>
