@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   CreateNotificationTemplateRequest,
+  InboxListQuery,
   NotificationOutboxQuery,
   NotificationTemplateListQuery,
   SetNotificationPreferenceRequest,
@@ -12,12 +13,16 @@ import {
   createNotificationTemplate,
   deleteNotificationSubscription,
   deleteNotificationTemplate,
+  fetchInbox,
+  fetchInboxUnreadCount,
   fetchMyNotificationPreferences,
   fetchNotificationEvents,
   fetchNotificationFieldVariables,
   fetchNotificationOutbox,
   fetchNotificationSubscriptions,
   fetchNotificationTemplates,
+  markAllInboxRead,
+  markInboxRead,
   retryNotificationOutbox,
   setMyNotificationPreference,
   updateNotificationTemplate,
@@ -31,7 +36,44 @@ export const NOTIF_KEYS = {
   subscriptions: () => ["notifications", "subscriptions"] as const,
   preferences: () => ["notifications", "preferences"] as const,
   outbox: (q: NotificationOutboxQuery) => ["notifications", "outbox", q] as const,
+  inbox: (q: InboxListQuery = {}) => ["notifications", "inbox", q] as const,
+  inboxUnread: () => ["notifications", "inbox", "unread"] as const,
 };
+
+/** Fallback de poll del contador de no leídas (SSE lo hace instantáneo cuando conecta). */
+const UNREAD_POLL_MS = 60_000;
+
+/** Contador de no leídas de la campanita (badge). Poll como respaldo del SSE. */
+export function useInboxUnreadCount(enabled = true) {
+  return useQuery({
+    queryKey: NOTIF_KEYS.inboxUnread(),
+    queryFn: fetchInboxUnreadCount,
+    enabled,
+    refetchInterval: UNREAD_POLL_MS,
+    refetchOnWindowFocus: true,
+  });
+}
+
+/** Lista de notificaciones in-app del usuario (campanita / bandeja). */
+export function useInbox(query: InboxListQuery = {}, enabled = true) {
+  return useQuery({ queryKey: NOTIF_KEYS.inbox(query), queryFn: () => fetchInbox(query), enabled });
+}
+
+export function useMarkInboxRead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => markInboxRead(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: NOTIF_KEYS.all }),
+  });
+}
+
+export function useMarkAllInboxRead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => markAllInboxRead(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: NOTIF_KEYS.all }),
+  });
+}
 
 export function useNotificationEvents() {
   return useQuery({ queryKey: NOTIF_KEYS.events(), queryFn: fetchNotificationEvents, staleTime: Infinity });

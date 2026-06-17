@@ -2,10 +2,16 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import type { Prisma } from "@prisma/client";
 import {
   ALL_NOTIFICATION_EVENT_KEYS,
+  NOTIFICATION_CHANNELS,
   allowedVariablesForTemplate,
   fieldVariableName,
   unknownPlaceholders,
   type CreateNotificationTemplateRequest,
+  type InboxItem,
+  type InboxListQuery,
+  type InboxListResponse,
+  type InboxUnreadCount,
+  type NotificationChannel,
   type NotificationOutboxItem,
   type NotificationOutboxDetail,
   type NotificationOutboxListResponse,
@@ -23,6 +29,10 @@ import { AuditService, type AuditContext } from "../audit/audit.service";
 
 /** Página por defecto de la bandeja de salida. */
 const OUTBOX_PAGE = 50;
+/** Página por defecto de la bandeja in-app (la campanita). */
+const INBOX_PAGE = 30;
+/** Largo máximo de la vista previa de texto en la lista del inbox. */
+const INBOX_PREVIEW = 200;
 
 /**
  * Servicio de administración del módulo de notificaciones: plantillas de mensaje
@@ -295,17 +305,22 @@ export class NotificationsService {
 
   // --- Preferencias propias (ownership) --------------------------------------
 
-  /** Preferencias EFECTIVAS del usuario: una por evento (canal EMAIL), default IMMEDIATE. */
+  /** Preferencias EFECTIVAS del usuario: una por evento × canal (EMAIL + INAPP),
+   *  default IMMEDIATE (ambos canales ON por defecto). */
   async listMyPreferences(userId: string): Promise<NotificationPreferenceDto[]> {
-    const stored = await this.prisma.notificationPreference.findMany({
-      where: { userId, channel: "EMAIL" },
-    });
-    const byEvent = new Map(stored.map((p) => [p.eventKey, p.mode]));
-    return ALL_NOTIFICATION_EVENT_KEYS.map((eventKey) => ({
-      eventKey,
-      channel: "EMAIL" as const,
-      mode: (byEvent.get(eventKey) ?? "IMMEDIATE") as NotificationPreferenceDto["mode"],
-    }));
+    const stored = await this.prisma.notificationPreference.findMany({ where: { userId } });
+    const byKey = new Map(stored.map((p) => [`${p.eventKey}|${p.channel}`, p.mode]));
+    const out: NotificationPreferenceDto[] = [];
+    for (const eventKey of ALL_NOTIFICATION_EVENT_KEYS) {
+      for (const channel of NOTIFICATION_CHANNELS) {
+        out.push({
+          eventKey,
+          channel,
+          mode: (byKey.get(`${eventKey}|${channel}`) ?? "IMMEDIATE") as NotificationPreferenceDto["mode"],
+        });
+      }
+    }
+    return out;
   }
 
   async setMyPreference(userId: string, dto: SetNotificationPreferenceRequest): Promise<NotificationPreferenceDto> {
@@ -314,7 +329,72 @@ export class NotificationsService {
       create: { userId, eventKey: dto.eventKey, channel: dto.channel, mode: dto.mode },
       update: { mode: dto.mode },
     });
-    return { eventKey: row.eventKey, channel: "EMAIL", mode: row.mode as NotificationPreferenceDto["mode"] };
+    return {
+      eventKey: row.eventKey,
+      channel: row.channel as NotificationChannel,
+      mode: row.mode as NotificationPreferenceDto["mode"],
+    };
+  }
+
+  // --- Bandeja IN-APP (la campanita, ownership) ------------------------------
+
+  /** Notificaciones in-app del usuario autenticado (paginadas) + contador de no leídas. */
+  async listInbox(userId: string, q: InboxListQuery): Promise<InboxListResponse> {
+    const limit = q.limit ?? INBOX_PAGE;
+    const where: Prisma.NotificationOutboxWhereInput = {
+      recipientUserId: userId,
+      channel: "INAPP",
+      ...(q.unreadOnly ? { readAt: null } : {}),
+      ...(q.q ? { subject: { contains: q.q, mode: "insensitive" } } : {}),
+    };
+    const [rows, unread] = await Promise.all([
+      this.prisma.notificationOutbox.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        take: limit + 1,
+        ...(q.cursor ? { cursor: { id: q.cursor }, skip: 1 } : {}),
+      }),
+      this.unreadCount(userId),
+    ]);
+    const hasMore = rows.length > limit;
+    const page = hasMore ? rows.slice(0, limit) : rows;
+    return {
+      items: page.map(toInboxItem),
+      nextCursor: hasMore ? (page[page.length - 1]?.id ?? null) : null,
+      unread,
+    };
+  }
+
+  async unreadInboxCount(userId: string): Promise<InboxUnreadCount> {
+    return { unread: await this.unreadCount(userId) };
+  }
+
+  /** Marca UNA notificación in-app como leída. Ownership: 404 si no es del usuario. */
+  async markInboxRead(userId: string, id: string): Promise<InboxUnreadCount> {
+    const row = await this.prisma.notificationOutbox.findUnique({ where: { id } });
+    // No se filtra existencia de notificaciones ajenas: 404 uniforme.
+    if (!row || row.channel !== "INAPP" || row.recipientUserId !== userId) {
+      throw new NotFoundException("Notificación no encontrada");
+    }
+    if (!row.readAt) {
+      await this.prisma.notificationOutbox.update({ where: { id }, data: { readAt: new Date() } });
+    }
+    return { unread: await this.unreadCount(userId) };
+  }
+
+  /** Marca TODAS las no leídas del usuario como leídas. */
+  async markAllInboxRead(userId: string): Promise<InboxUnreadCount> {
+    await this.prisma.notificationOutbox.updateMany({
+      where: { recipientUserId: userId, channel: "INAPP", readAt: null },
+      data: { readAt: new Date() },
+    });
+    return { unread: 0 };
+  }
+
+  private async unreadCount(userId: string): Promise<number> {
+    return this.prisma.notificationOutbox.count({
+      where: { recipientUserId: userId, channel: "INAPP", readAt: null },
+    });
   }
 
   // --- Bandeja de salida (correo saliente) -----------------------------------
@@ -375,7 +455,7 @@ export class NotificationsService {
     rows: Array<{
       id: string;
       eventKey: string;
-      channel: "EMAIL";
+      channel: NotificationChannel;
       recipientUserId: string | null;
       recipientEmail: string;
       subject: string;
@@ -412,12 +492,38 @@ export class NotificationsService {
   }
 }
 
+/** Proyecta una fila de outbox INAPP al DTO de bandeja (recorta la vista previa). */
+function toInboxItem(row: {
+  id: string;
+  eventKey: string;
+  subject: string;
+  bodyText: string;
+  relatedEntityType: string | null;
+  relatedEntityId: string | null;
+  createdAt: Date;
+  sentAt: Date | null;
+  readAt: Date | null;
+}): InboxItem {
+  const preview = row.bodyText.replace(/\s+/g, " ").trim().slice(0, INBOX_PREVIEW);
+  return {
+    id: row.id,
+    eventKey: row.eventKey,
+    subject: row.subject,
+    preview,
+    relatedEntityType: row.relatedEntityType,
+    relatedEntityId: row.relatedEntityId,
+    createdAt: row.createdAt.toISOString(),
+    sentAt: row.sentAt?.toISOString() ?? null,
+    readAt: row.readAt?.toISOString() ?? null,
+  };
+}
+
 function toTemplateDto(
   row: {
     id: string;
     eventKey: string;
     locale: string;
-    channel: "EMAIL";
+    channel: NotificationChannel;
     templateId: string | null;
     subject: string;
     bodyText: string;

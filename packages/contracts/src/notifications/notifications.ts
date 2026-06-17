@@ -12,8 +12,9 @@ import { isNotificationEventKey } from "./events.js";
 
 // --- Enumeraciones -----------------------------------------------------------
 
-/** Canales de entrega. EMAIL es el único implementado; el resto reserva el modelo. */
-export const NOTIFICATION_CHANNELS = ["EMAIL"] as const;
+/** Canales de entrega. EMAIL = correo (SMTP/relay); INAPP = la "campanita" (notificación
+ *  in-app por destinatario, leído/no leído). SMS/otros reservan el modelo a futuro. */
+export const NOTIFICATION_CHANNELS = ["EMAIL", "INAPP"] as const;
 export const notificationChannelSchema = z.enum(NOTIFICATION_CHANNELS);
 export type NotificationChannel = z.infer<typeof notificationChannelSchema>;
 
@@ -225,3 +226,66 @@ export const notificationOutboxListResponseSchema = z.object({
   nextCursor: z.string().nullable(),
 });
 export type NotificationOutboxListResponse = z.infer<typeof notificationOutboxListResponseSchema>;
+
+// --- Bandeja IN-APP (la "campanita", ownership) ------------------------------
+//
+// Fase B del épico: una notificación in-app es una fila de `NotificationOutbox`
+// con `channel = INAPP` y `recipientUserId = el dueño`. "Leída" = `readAt` no nulo.
+// Estos DTOs exponen SOLO las del usuario autenticado (nunca las de otro).
+
+export const inboxItemSchema = z.object({
+  id: z.string(),
+  eventKey: z.string(),
+  subject: z.string(),
+  /** Vista previa del cuerpo en texto plano (recortada en backend para la lista). */
+  preview: z.string(),
+  /** Tipo/id de la entidad relacionada (para derivar el deep link en el cliente). */
+  relatedEntityType: z.string().nullable(),
+  relatedEntityId: z.string().nullable(),
+  createdAt: z.string(),
+  /** Momento de entrega (in-app: cuando el worker la marca SENT). */
+  sentAt: z.string().nullable(),
+  /** null = NO leída. */
+  readAt: z.string().nullable(),
+});
+export type InboxItem = z.infer<typeof inboxItemSchema>;
+
+/** Filtros de la bandeja in-app: por estado de lectura + paginación por cursor. */
+export const inboxListQuerySchema = z.object({
+  unreadOnly: z.coerce.boolean().optional(),
+  q: z.string().trim().max(200).optional(),
+  cursor: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+});
+export type InboxListQuery = z.infer<typeof inboxListQuerySchema>;
+
+export const inboxListResponseSchema = z.object({
+  items: z.array(inboxItemSchema),
+  nextCursor: z.string().nullable(),
+  /** Conteo total de NO leídas del usuario (para mantener el badge sincronizado). */
+  unread: z.number().int(),
+});
+export type InboxListResponse = z.infer<typeof inboxListResponseSchema>;
+
+export const inboxUnreadCountSchema = z.object({ unread: z.number().int() });
+export type InboxUnreadCount = z.infer<typeof inboxUnreadCountSchema>;
+
+/**
+ * Deep link de una notificación in-app a partir de la entidad relacionada que el
+ * outbox ya guarda (`relatedEntityType`/`relatedEntityId`). Fuente ÚNICA back↔front
+ * para que la campanita navegue de forma consistente sin materializar URLs en BD.
+ * Devuelve una ruta relativa del SPA, o `null` si la entidad no tiene destino propio.
+ */
+export function deepLinkForEntity(type: string | null, id: string | null): string | null {
+  if (!type || !id) return null;
+  switch (type) {
+    case "LogEntry":
+      return `/bitacoras/${id}`;
+    case "RoundOccurrence":
+      return "/mis-rondas";
+    case "Incident":
+      return `/incidencias?incidentId=${id}`;
+    default:
+      return null;
+  }
+}

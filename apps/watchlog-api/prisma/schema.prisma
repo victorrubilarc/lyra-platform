@@ -1625,6 +1625,9 @@ model SavedView {
 
 enum NotificationChannel {
   EMAIL
+  // Canal in-app (la "campanita", Fase B): la fila de outbox ES el ítem de bandeja
+  // del destinatario; `NotificationOutbox.readAt` marca leído/no leído.
+  INAPP
 }
 
 enum NotificationEventStatus {
@@ -1698,10 +1701,14 @@ model NotificationOutbox {
   relatedEntityId   String?
   createdAt         DateTime                 @default(now())
   sentAt            DateTime?
+  // Canal in-app (Fase B): null = NO leída. Sin uso en EMAIL.
+  readAt            DateTime?
 
   @@index([status, nextAttemptAt])
   @@index([eventKey, createdAt])
   @@index([recipientUserId])
+  // Bandeja/campanita de un usuario: "mis no leídas" y listado por canal baratos.
+  @@index([recipientUserId, channel, readAt])
 }
 
 // Plantilla de mensaje (gobernanza viva). Una por (evento, locale, canal). Las de

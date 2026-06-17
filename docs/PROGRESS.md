@@ -1,5 +1,49 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-17 — Notificaciones avanzadas · Fase B: canal IN-APP (la campanita) + tiempo real ✅** (`feat/notif-avanzadas-inapp`).
+**CIERRA EL ÉPICO de notificaciones avanzadas** (A + B). Cada aviso, además del correo, genera una notificación IN-APP por
+destinatario (leído/no leído), visible en la **campanita del Topbar** (badge de no leídas + dropdown navegable + marcar leídas) y
+en la **bandeja de `/mis-notificaciones`**, actualizada en **tiempo real (SSE con fallback a poll)**. **Reusa el motor del Bloque N**
+(outbox + worker + resolver + `NotificationChannel` abstracto) — NO lo reinventa. **4 forks resueltos por el dueño (las 4
+recomendaciones):** (1) INAPP **ON por defecto** para todos los eventos (opt-out por evento×canal en Mis preferencias, igual que el
+correo); (2) tiempo real = **SSE** (`@Sse` nativo de NestJS, token por `?access_token=`, heartbeat ~25 s, payload liviano = solo el
+contador/nudge) **+ poll de respaldo** (react-query `refetchInterval` 60 s); (3) **deep link DERIVADO en el front**
+(`deepLinkForEntity(relatedEntityType,id)`, sin columna nueva: `LogEntry`→`/bitacoras/:id`, `RoundOccurrence`→`/mis-rondas`,
+`Incident`→`/incidencias`); (4) **purga diaria** de in-app LEÍDAS > 90 días (`@Cron`). Almacenamiento in-app = **extender
+`NotificationOutbox` con `readAt`** (NO tabla dedicada; fork (b) del épico). **SIN permiso nuevo** (ver/leer mis notificaciones =
+**ownership**, patrón SavedView/preferencias). **Modelo (aditivo):** enum `NotificationChannel += INAPP` + `NotificationOutbox.readAt
+DateTime?` (null = no leída) + índice `(recipientUserId, channel, readAt)`; migración `20260617160000_add_notif_inapp_channel`
+(`ALTER TYPE … ADD VALUE` + columna + índice). **Contratos** (`@lyra/contracts`): `NOTIFICATION_CHANNELS += INAPP` + DTOs del inbox
+(`inboxItemSchema`/`inboxListQuerySchema`/`inboxListResponseSchema`/`inboxUnreadCountSchema`) + helper PURO `deepLinkForEntity`
+(isomorfo) + 2 specs. **API:** (a) **canales por registro** — `InAppChannel` (entrega = la propia fila; sin SMTP) + `EmailChannel`
+en un `NotificationChannelRegistry`; el worker enruta cada fila por `row.channel`. (b) **resolver multi-canal** — por destinatario
+INTERNO emite EMAIL (si tiene correo y no optó OFF) **+** INAPP (si no optó OFF); externos solo EMAIL; **`dedupeKey` incluye el canal**
+(`evento|eventId|canal|destinatario`) para que email e in-app coexistan sin chocar el índice único. (c) **worker** — dispatch con
+`m.channel`; sender enruta por canal; **SUPPRESSED solo a las filas EMAIL** si el correo está apagado (las INAPP no dependen del SMTP);
+tras SENT de una INAPP, **empuja un nudge SSE** al destinatario con su contador fresco; **`@Cron` de purga** de leídas > 90 días.
+(d) **`NotificationRealtimeService`** (bus in-memory `Subject` por usuario, multicast a sus pestañas, refcount con limpieza). (e)
+**endpoints del inbox (ownership)**: `GET /notifications/inbox` (cursor + `unreadOnly` + `q`), `/inbox/unread-count`,
+`POST /inbox/:id/read` (404 si no es del usuario), `/inbox/read-all`, y **`GET /inbox/stream` (SSE, `@Public` + verificación manual
+del token de query**, auth confinada a esa ruta). (f) **preferencias por canal** — `listMyPreferences` ahora devuelve EMAIL + INAPP por
+evento; `setMyPreference` respeta el canal. **Auditoría:** la in-app NO genera `notification.*.sent` ni audita lecturas (la fila de
+outbox es el registro inmutable; la lectura es dato propio); el correo conserva su `notification.email.sent`. **Web:** **`NotificationBell`**
+en el Topbar (badge de no leídas + dropdown premium con las 8 recientes, marcar todas, navegar+marcar al click, "ver todas") +
+**`useInboxRealtime`** (`EventSource` → invalida queries; poll de respaldo) + **`InboxPanel`** = bandeja completa en `/mis-notificaciones`
+(pestañas Bandeja/Preferencias; filtros leídas/no-leídas + búsqueda en UNA línea; `GridPager` arriba/abajo; marcar una/todas; navegación
+por deep link) + **`PreferencesPanel`** con **columna INAPP** (opt-out por evento×canal) + `formatRelativeTime` regional en `lib/format`.
+Identidad Lyra (tokens, Sora/Inter, Lucide, glow, claro+oscuro, 44px táctil). **Sin permiso nuevo (sin FLUSHALL).** Tests: contracts
+**295** (+2) · API **247** · web **3**; typecheck/lint(0 errores)/build verdes. **Smoke en vivo `scripts/smoke-notif-inapp.py` 18/18**
+(emisión multi-canal: fila INAPP del admin SENT sin depender del SMTP + coexiste la EMAIL [dedupe por canal] + nace no leída · inbox
+ownership: unread-count sube, GET /inbox la incluye, listado y contador coinciden · marcar leída baja el contador + readAt persiste ·
+read-all → 0 · **ownership: no-admin lee la del admin → 404**, y accede a SU inbox → 200 · **SSE emite el evento inicial con el
+contador** · poll refleja 0 tras read-all) **+ regresión `smoke-notif-avanzadas.py` 22/22 + `smoke-notificaciones.py` 18/18** (se
+actualizó 3b/5b a ser conscientes del canal y se sumó **5c: opt-out de correo NO silencia la campanita**). **Pendiente: smoke VISUAL
+del dueño** (campanita en el Topbar: badge, dropdown, navegación, marcar leídas; bandeja en `/mis-notificaciones`; preferencias con
+columna INAPP; claro/oscuro/responsive; tiempo real con dos pestañas). **Deuda (BACKLOG):** el bus SSE es in-memory (single-process);
+escalar a multi-instancia exigirá Redis pub/sub · plantilla INAPP propia (hoy la in-app reusa el contenido renderizado de la plantilla
+EMAIL) · retención configurable (hoy constante 90 días). **Con la Fase B, el ÉPICO de notificaciones avanzadas queda COMPLETO →
+siguiente: 4.4 (SLA/escalamiento + aviso de plazo).**
+
 **2026-06-17 — Notificaciones avanzadas · Fase A (UI) ✅** (`feat/notif-avanzadas-ui`). Le pone PANTALLA al backend de
 Fase A (ya en `main`): editor de aviso POR TRANSICIÓN en el builder de flujos + master-detail de plantillas POR BITÁCORA con
 diccionario de comodines de campo + toggle de defaults de sistema en `/configuracion`. **Mayormente frontend** + el mínimo

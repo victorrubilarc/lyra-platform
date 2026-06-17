@@ -6,7 +6,7 @@ import {
   fieldVariableName,
   isFieldVariable,
 } from "./events.js";
-import { pickTemplateForScope } from "./notifications.js";
+import { deepLinkForEntity, pickTemplateForScope } from "./notifications.js";
 import { transitionNotifyConfigSchema as wfNotify } from "../workflows/workflows.js";
 
 describe("notificaciones avanzadas — Fase A (contratos)", () => {
@@ -34,6 +34,20 @@ describe("notificaciones avanzadas — Fase A (contratos)", () => {
     it("devuelve null si no hay ninguna aplicable", () => {
       expect(pickTemplateForScope([scoped], "tpl-B")).toBeNull();
       expect(pickTemplateForScope([{ templateId: null, active: false }], null)).toBeNull();
+    });
+  });
+
+  describe("deepLinkForEntity (campanita in-app, Fase B)", () => {
+    it("mapea cada tipo de entidad a su ruta del SPA", () => {
+      expect(deepLinkForEntity("LogEntry", "le1")).toBe("/bitacoras/le1");
+      expect(deepLinkForEntity("RoundOccurrence", "occ1")).toBe("/mis-rondas");
+      expect(deepLinkForEntity("Incident", "inc1")).toBe("/incidencias?incidentId=inc1");
+    });
+
+    it("degrada a null sin tipo/id o tipo desconocido", () => {
+      expect(deepLinkForEntity(null, "x")).toBeNull();
+      expect(deepLinkForEntity("LogEntry", null)).toBeNull();
+      expect(deepLinkForEntity("Otra", "x")).toBeNull();
     });
   });
 

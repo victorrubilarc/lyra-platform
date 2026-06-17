@@ -40,6 +40,32 @@ export function formatLocalDate(isoDate: string, opts?: Intl.DateTimeFormatOptio
   return new Intl.DateTimeFormat(locale(), { dateStyle: "medium", ...opts }).format(new Date(y, m - 1, d));
 }
 
+/**
+ * Tiempo relativo regional ("hace 5 min", "hace 2 h", "ayer"…). Para timestamps
+ * recientes (campanita/feeds); cae a fecha+hora absoluta si supera ~30 días.
+ */
+export function formatRelativeTime(value: string | Date): string {
+  const d = value instanceof Date ? value : new Date(value);
+  const diffMs = d.getTime() - Date.now();
+  const absSec = Math.abs(diffMs) / 1000;
+  const rtf = new Intl.RelativeTimeFormat(locale(), { numeric: "auto" });
+  const steps: [number, Intl.RelativeTimeFormatUnit][] = [
+    [60, "second"],
+    [3600, "minute"],
+    [86400, "hour"],
+    [2592000, "day"],
+  ];
+  if (absSec < 30) return rtf.format(0, "second");
+  for (let i = 0; i < steps.length; i++) {
+    const [limit, unit] = steps[i]!;
+    if (absSec < limit) {
+      const divisor = i === 0 ? 1 : steps[i - 1]![0];
+      return rtf.format(Math.round(diffMs / 1000 / divisor), unit);
+    }
+  }
+  return formatDateTime(d);
+}
+
 /** Número regional (separadores de miles/decimales según la región). */
 export function formatNumber(value: number, opts?: Intl.NumberFormatOptions): string {
   return new Intl.NumberFormat(locale(), opts).format(value);

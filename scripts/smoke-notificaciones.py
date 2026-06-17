@@ -128,8 +128,9 @@ def main():
     time.sleep(0.5)
 
     # El rol responsable = rol admin (lo tienen varios usuarios) ⇒ varios destinatarios.
-    out_status = sql(f"SELECT status FROM \"NotificationOutbox\" WHERE \"relatedEntityId\"='{occ_id}' AND \"recipientUserId\"='{demo_id}';")
-    check("3b bandeja: fila round.overdue para el admin demo = SENT", out_status == "SENT", f"status={out_status!r}")
+    # Fase B: cada destinatario recibe EMAIL e INAPP; aquí se valida la fila de CORREO.
+    out_status = sql(f"SELECT status FROM \"NotificationOutbox\" WHERE \"relatedEntityId\"='{occ_id}' AND \"recipientUserId\"='{demo_id}' AND channel='EMAIL';")
+    check("3b bandeja: fila round.overdue (EMAIL) para el admin demo = SENT", out_status == "SENT", f"status={out_status!r}")
 
     msgs = mail("/api/v1/messages?limit=200").get("messages", [])
     mine = [m for m in msgs if marker in (m.get("Subject") or "")]
@@ -154,8 +155,11 @@ def main():
     sql("INSERT INTO \"RoundOccurrence\" (id,\"scheduleId\",\"templateId\",\"orgNodeId\",\"scheduledFor\",\"dueAt\",status,\"generatedAt\") "
         f"VALUES ('{occ2_id}','{sched_id}','{tpl_id}','{node_id}',now()-interval '3 hours',now()-interval '2 hours','PENDING',now());")
     call("POST", "/notifications/run", tok)
-    cnt_demo = sql(f"SELECT count(*) FROM \"NotificationOutbox\" WHERE \"relatedEntityId\"='{occ2_id}' AND \"recipientUserId\"='{demo_id}';")
-    check("5b opt-out suprime el correo del admin demo (0 filas)", cnt_demo == "0", f"count={cnt_demo}")
+    # Opt-out es POR CANAL (Fase B): silencia el CORREO; la campanita (INAPP) sigue ON.
+    cnt_demo = sql(f"SELECT count(*) FROM \"NotificationOutbox\" WHERE \"relatedEntityId\"='{occ2_id}' AND \"recipientUserId\"='{demo_id}' AND channel='EMAIL';")
+    check("5b opt-out suprime el correo del admin demo (0 filas EMAIL)", cnt_demo == "0", f"count={cnt_demo}")
+    cnt_inapp = sql(f"SELECT count(*) FROM \"NotificationOutbox\" WHERE \"relatedEntityId\"='{occ2_id}' AND \"recipientUserId\"='{demo_id}' AND channel='INAPP';")
+    check("5c opt-out de correo NO silencia la campanita (1 fila INAPP)", cnt_inapp == "1", f"count={cnt_inapp}")
     call("PUT", "/notifications/preferences", tok, {"eventKey": "round.overdue", "channel": "EMAIL", "mode": "IMMEDIATE"})
 
     # === 6. Gates de permiso ===

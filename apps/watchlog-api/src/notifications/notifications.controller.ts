@@ -1,32 +1,60 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Put, Query, Req } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  MessageEvent,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Query,
+  Req,
+  Sse,
+} from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { JwtService } from "@nestjs/jwt";
+import { from, interval, map, merge, switchMap, type Observable } from "rxjs";
 import type { FastifyRequest } from "fastify";
 import {
   NOTIFICATION_EVENTS,
   createNotificationTemplateRequestSchema,
+  inboxListQuerySchema,
   notificationOutboxQuerySchema,
   notificationTemplateListQuerySchema,
   setNotificationPreferenceRequestSchema,
   updateNotificationTemplateRequestSchema,
   upsertNotificationSubscriptionRequestSchema,
   type CreateNotificationTemplateRequest,
+  type InboxListQuery,
   type NotificationOutboxQuery,
   type NotificationTemplateListQuery,
   type SetNotificationPreferenceRequest,
   type UpdateNotificationTemplateRequest,
   type UpsertNotificationSubscriptionRequest,
 } from "@lyra/contracts";
+import type { Env } from "../config/env.schema";
+import type { AccessTokenClaims } from "../authz/auth-user";
 import type { AuditContext } from "../audit/audit.service";
 import type { RequestUser } from "../authz/auth-user";
-import { CurrentUser, RequirePermission } from "../authz/authz.decorators";
+import { CurrentUser, Public, RequirePermission } from "../authz/authz.decorators";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { NotificationsService } from "./notifications.service";
 import { NotificationWorkerService } from "./notification-worker.service";
+import { NotificationRealtimeService } from "./notification-realtime.service";
+
+/** Heartbeat del stream SSE: mantiene viva la conexión tras proxies/timeouts. */
+const SSE_HEARTBEAT_MS = 25_000;
 
 @Controller("notifications")
 export class NotificationsController {
   constructor(
     private readonly notifications: NotificationsService,
     private readonly worker: NotificationWorkerService,
+    private readonly realtime: NotificationRealtimeService,
+    private readonly jwt: JwtService,
+    private readonly config: ConfigService<Env, true>,
   ) {}
 
   /** Catálogo de eventos (claves + variables disponibles). Solo autenticado: lo usa
@@ -121,6 +149,63 @@ export class NotificationsController {
     @CurrentUser() user: RequestUser,
   ) {
     return this.notifications.setMyPreference(user.id, dto);
+  }
+
+  // --- Bandeja IN-APP (la campanita, ownership) ------------------------------
+
+  @Get("inbox")
+  listInbox(
+    @CurrentUser() user: RequestUser,
+    @Query(new ZodValidationPipe(inboxListQuerySchema)) q: InboxListQuery,
+  ) {
+    return this.notifications.listInbox(user.id, q);
+  }
+
+  @Get("inbox/unread-count")
+  unreadCount(@CurrentUser() user: RequestUser) {
+    return this.notifications.unreadInboxCount(user.id);
+  }
+
+  @Post("inbox/:id/read")
+  markRead(@Param("id") id: string, @CurrentUser() user: RequestUser) {
+    return this.notifications.markInboxRead(user.id, id);
+  }
+
+  @Post("inbox/read-all")
+  markAllRead(@CurrentUser() user: RequestUser) {
+    return this.notifications.markAllInboxRead(user.id);
+  }
+
+  /**
+   * Stream SSE de la campanita (un canal por usuario). `EventSource` no puede mandar
+   * el header Authorization, así que el access token viaja por `?access_token=` y se
+   * verifica aquí (ruta @Public para saltar el guard global, auth confinada a este
+   * endpoint). Empuja un nudge liviano `{ type:"inbox", unread }` al entregar una
+   * notificación in-app + un `ping` periódico para mantener viva la conexión.
+   */
+  @Public()
+  @Sse("inbox/stream")
+  stream(@Query("access_token") token: string): Observable<MessageEvent> {
+    return from(this.verifySseToken(token)).pipe(
+      switchMap((userId) =>
+        merge(
+          // Sincroniza el contador al conectar.
+          from(this.notifications.unreadInboxCount(userId)).pipe(
+            map((c) => ({ data: { type: "inbox", unread: c.unread } }) as MessageEvent),
+          ),
+          this.realtime.streamFor(userId).pipe(map((n) => ({ data: n }) as MessageEvent)),
+          interval(SSE_HEARTBEAT_MS).pipe(map(() => ({ type: "ping", data: String(Date.now()) }) as MessageEvent)),
+        ),
+      ),
+    );
+  }
+
+  /** Verifica el access token del SSE (query param). Lanza si es inválido/expirado. */
+  private async verifySseToken(token: string): Promise<string> {
+    const claims = await this.jwt.verifyAsync<AccessTokenClaims>(token, {
+      secret: this.config.get("JWT_ACCESS_SECRET", { infer: true }),
+    });
+    return claims.sub;
   }
 
   // --- Bandeja de salida (correo saliente) -----------------------------------

@@ -66,6 +66,21 @@ Keycloak **descartado** para el MVP (complejidad operacional); si un cliente lo 
 - **Comodines `{{campo.<key>}}`** se resuelven desde la versión CONGELADA de la entrada; un campo ausente queda en "" (sin fuga de
   estructura). El render es seguro (sin eval, whitelist por evento + campos de la bitácora).
 
+### Notificaciones avanzadas (Fase B) — canal in-app (campanita) por OWNERSHIP + auth del stream SSE
+- **Ver/leer MIS notificaciones in-app = ownership** (sin permiso de catálogo, patrón `SavedView`): toda consulta/mutación del inbox
+  filtra por `recipientUserId === session.user.id` (`channel=INAPP`); marcar leída una notificación ajena devuelve **404** (no se
+  filtra la existencia de notificaciones de otro). La in-app reusa el mismo render whitelisteado y los mismos destinatarios resueltos
+  por ABAC del correo: nunca llega a la campanita algo que el usuario no podría ver.
+- **Auth del stream SSE (`GET /notifications/inbox/stream`):** `EventSource` no puede enviar el header `Authorization`, así que el
+  access token viaja por **query param `?access_token=`** y se **verifica con el mismo `JwtService`** en el handler. La ruta es
+  `@Public` SOLO para saltar el guard global (que exige Bearer en header); la autenticación **se hace dentro del endpoint** y queda
+  CONFINADA a esa ruta — el guard global no se relaja para el resto de la API. **Mitigaciones del riesgo de token en URL:** el stream
+  empuja un **payload mínimo** (`{type:"inbox", unread}`, sin contenido sensible — el cliente refetchea por el endpoint con Bearer en
+  header); el access token es de **vida corta** (rotación por refresh httpOnly+CSRF, ver AUTH_FLOW); on-prem el tráfico va por TLS del
+  reverse proxy. (Deuda menor anotada: a futuro se puede emitir un token efímero dedicado al stream.)
+- **La in-app no audita** entrega ni lectura (la fila de `NotificationOutbox` es el registro inmutable; la lectura es dato propio del
+  dueño). El correo conserva su auditoría `notification.email.sent`.
+
 ### Datos PERSONALES → autorización por OWNERSHIP (no RBAC)
 - Las preferencias de presentación del propio usuario **no** se gobiernan con permisos del catálogo: se autorizan por **pertenencia** (el recurso es del actor). Patrón aplicado a **`SavedView`** (vistas guardadas de Bitácoras, Fase 2.8.1b): toda consulta/mutación filtra por `userId === session.user.id` (404 si la vista es de otro); el endpoint se gatea además por acceso al módulo (`logentry:view`). No infla el catálogo (sigue en **59**). Inflar RBAC con preferencias de UI sería ruido administrativo; el límite real es la propiedad del dato.
 

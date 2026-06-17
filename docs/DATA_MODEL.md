@@ -458,7 +458,7 @@
   WARN/CRIT y firma pendiente. El **peek** se sirve con los datos que la fila ya trae (`LogEntryListItem`), sin endpoint nuevo.
   COUNT exacto hoy; a gran escala → rollups/aproximado (Fase 7, §3 del BACKLOG).
 
-### Notificaciones (Bloque N — motor de avisos por correo)
+### Notificaciones (Bloque N — motor de avisos por correo + canal in-app)
 *Cinco entidades ADITIVAS con referencias BLANDAS (String indexado, sin FK dura — patrón AuditLog): la migración NO toca ninguna
 tabla existente. El catálogo de EVENTOS vive en CÓDIGO (`@lyra/contracts NOTIFICATION_EVENTS`), no en BD.*
 - **NotificationEvent** *(implementado — Bloque N)* — cola transaccional (etapa 1 del transactional outbox): `eventKey`,
@@ -466,11 +466,16 @@ tabla existente. El catálogo de EVENTOS vive en CÓDIGO (`@lyra/contracts NOTIF
   ronda vencida / breach de SLA aunque el sweeper la re-descubra), `status` (enum **`NotificationEventStatus`**
   PENDING/DISPATCHED/FAILED), `attempts`, `lastError?`, `dispatchedAt?`. Se inserta DENTRO de la tx del dominio
   (`executeTransition`) o por el sweeper.
-- **NotificationOutbox** *(implementado — Bloque N)* — bandeja de salida + registro de envío (etapa 2; **es la pantalla de correo
-  saliente**, Req-1/Req-5): `eventId?`, `eventKey`, `channel` (enum **`NotificationChannel`** EMAIL), `recipientUserId?`,
+- **NotificationOutbox** *(implementado — Bloque N; ampliado Notif. avanzadas Fase B 2026-06-17)* — bandeja de salida + registro de
+  envío (etapa 2; **es la pantalla de correo saliente** Req-1/Req-5 **y, para `channel=INAPP`, el ítem de la campanita** del
+  destinatario): `eventId?`, `eventKey`, `channel` (enum **`NotificationChannel`** **EMAIL/INAPP**), `recipientUserId?`,
   `recipientEmail`, `subject`, `bodyText`/`bodyHtml` (snapshot renderizado), `status` (enum **`NotificationOutboxStatus`**
   PENDING/SENT/FAILED/SUPPRESSED), `attempts`, `lastError?`, `nextAttemptAt?` (backoff), `dedupeKey?` **(@unique** — un mensaje por
-  destinatario por suceso), `relatedEntityType?`/`relatedEntityId?`, `sentAt?`.
+  destinatario **por canal** por suceso; la clave incluye el canal), `relatedEntityType?`/`relatedEntityId?`, `sentAt?`, **`readAt?`
+  (Fase B; null = no leída, solo INAPP)**. **Índice `(recipientUserId, channel, readAt)`** para "mis no leídas" de la campanita.
+  La in-app NO es una tabla aparte: es una fila de outbox con `channel=INAPP` (`InAppChannel.send` = no-op, la fila es la entrega).
+  El deep link se DERIVA en el front de `relatedEntityType`/`relatedEntityId` (`deepLinkForEntity`, sin columna de URL). Purga diaria
+  (`@Cron`) de filas INAPP LEÍDAS con > 90 días.
 - **NotificationTemplate** *(implementado — Bloque N; ampliado Notif. avanzadas Fase A 2026-06-17)* — gobernanza VIVA: `subject`,
   `bodyText`/`bodyHtml`, `active`, `isSystem` (sembrada por defecto; el admin la edita pero no la borra). Render con placeholders
   `{{var}}` whitelisteados por el evento (sin eval). **+ `templateId String?` = ÁMBITO por bitácora** (null = GENÉRICA/por defecto;
