@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { SchedulesModule } from "../schedules/schedules.module";
+import { IncidentsModule } from "../incidents/incidents.module";
 import { NotificationsController } from "./notifications.controller";
 import { NotificationsService } from "./notifications.service";
 import { NotificationResolverService } from "./notification-resolver.service";
@@ -23,7 +24,7 @@ import {
  * a su canal. Sumar SMS futuro = registrar otra clase aquí sin tocar el motor.
  */
 @Module({
-  imports: [SchedulesModule],
+  imports: [SchedulesModule, IncidentsModule],
   controllers: [NotificationsController],
   providers: [
     NotificationsService,

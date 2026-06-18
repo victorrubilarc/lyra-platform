@@ -30,7 +30,7 @@ export function IncidentsPage() {
   const [typeId, setTypeId] = useState("");
   const [severity, setSeverity] = useState("");
   const [priority, setPriority] = useState<IncidentListQuery["priority"] | "">("");
-  const [flag, setFlag] = useState<"" | "mine" | "unassignedOnly" | "overdueOnly" | "reportableOnly" | "reportOverdueOnly" | "fromLogbookOnly">("");
+  const [flag, setFlag] = useState<"" | "mine" | "unassignedOnly" | "overdueOnly" | "slaBreachedOnly" | "reportableOnly" | "reportOverdueOnly" | "fromLogbookOnly">("");
   const [sort, setSort] = useState<IncidentListQuery["sort"]>("recent");
 
   const query: IncidentListQuery = useMemo(() => ({
@@ -80,7 +80,8 @@ export function IncidentsPage() {
         <div className={styles.kpis}>
           <Kpi label="Abiertas" value={stats.open} color="#6366F1" onClick={() => { setLifecycle("OPEN"); setFlag(""); }} />
           <Kpi label="Críticas" value={stats.critical} color="#EF4444" onClick={() => { setLifecycle("OPEN"); setSeverity("5"); }} />
-          <Kpi label="Vencidas" value={stats.overdue} color="#F97316" onClick={() => { setLifecycle("OPEN"); setFlag("overdueOnly"); }} />
+          <Kpi label="Plazo vencido" value={stats.overdue} color="#F97316" onClick={() => { setLifecycle("OPEN"); setFlag("overdueOnly"); }} />
+          <Kpi label="Permanencia excedida" value={stats.slaBreached} color="#EAB308" onClick={() => { setLifecycle("OPEN"); setFlag("slaBreachedOnly"); }} />
           <Kpi label="Sin responsable" value={stats.unassigned} color="#EAB308" onClick={() => { setLifecycle("OPEN"); setFlag("unassignedOnly"); }} />
           <Kpi label="Desde bitácora" value={stats.fromLogbook} color="#06B6D4" onClick={() => { setLifecycle(""); setFlag("fromLogbookOnly"); }} />
           <Kpi label="Reportables" value={stats.reportable} color="#84CC16" onClick={() => { setLifecycle("OPEN"); setFlag("reportableOnly"); }} />
@@ -116,7 +117,8 @@ export function IncidentsPage() {
           <option value="">Todas</option>
           <option value="mine">Mis incidencias</option>
           <option value="unassignedOnly">Sin responsable</option>
-          <option value="overdueOnly">Vencidas</option>
+          <option value="overdueOnly">Plazo vencido</option>
+          <option value="slaBreachedOnly">Permanencia excedida</option>
           <option value="reportableOnly">Reportables</option>
           <option value="reportOverdueOnly">Reporte vencido</option>
           <option value="fromLogbookOnly">Desde bitácora</option>
@@ -151,11 +153,11 @@ export function IncidentsPage() {
                 {items.map((i) => (
                   <tr key={i.id} className={styles.row} onClick={() => openDetail(i.id)}>
                     <td className={styles.mono}>{i.code}</td>
-                    <td className={styles.titleCell}>{i.title}{i.reportable && <span className={styles.reportTag}>Reportable</span>}{i.reportOverdue && <span className={styles.overdueTag}>Reporte vencido</span>}</td>
+                    <td className={styles.titleCell}>{i.title}{i.resolutionOverdue && <span className={styles.overdueTag}>Plazo vencido</span>}{i.reportable && <span className={styles.reportTag}>Reportable</span>}{i.reportOverdue && <span className={styles.overdueTag}>Reporte vencido</span>}</td>
                     <td>{i.typeName}</td>
                     <td><span className={styles.sevDot} style={{ background: severityColor(i.severity) }} title={`Severidad ${i.severity}`} /> {i.severity}</td>
                     <td><span className={styles.priText} style={{ color: PRIORITY_META[i.priority].color }}>{PRIORITY_META[i.priority].label}</span></td>
-                    <td><span className={styles.stateChip} style={{ color: i.currentStateColor ?? "#9AA3B8" }}>{i.currentStateName ?? LIFECYCLE_META[i.lifecycle].label}</span>{i.slaBreached && <span className={styles.overdueTag}>Vencida</span>}</td>
+                    <td><span className={styles.stateChip} style={{ color: i.currentStateColor ?? "#9AA3B8" }}>{i.currentStateName ?? LIFECYCLE_META[i.lifecycle].label}</span>{i.slaBreached && <span className={styles.overdueTag} title="Lleva demasiado tiempo en este estado">Permanencia</span>}</td>
                     <td>{i.orgNodeName ?? "—"}</td>
                     <td>{i.ownerName ?? <span className={styles.muted}>sin asignar</span>}</td>
                     <td>{ORIGIN_META[i.originType].label}</td>
@@ -232,7 +234,8 @@ function Board({ items, onOpen }: { items: IncidentListItem[]; onOpen: (id: stri
                 <div className={styles.kcardMeta}>{i.orgNodeName ?? "—"}{i.dueAt ? ` · ${formatDate(i.dueAt)}` : ""}</div>
                 <div className={styles.kcardFoot}>
                   <span className={i.ownerName ? "" : styles.muted}>{i.ownerName ? `👤 ${i.ownerName}` : "sin responsable"}</span>
-                  {i.slaBreached && <span className={styles.overdueTag}>Vencida</span>}
+                  {i.resolutionOverdue && <span className={styles.overdueTag}>Plazo vencido</span>}
+                  {i.slaBreached && <span className={styles.overdueTag} title="Lleva demasiado tiempo en este estado">Permanencia</span>}
                   {i.reportOverdue && <span className={styles.overdueTag}>Reporte vencido</span>}
                 </div>
               </div>

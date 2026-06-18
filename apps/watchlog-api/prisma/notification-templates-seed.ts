@@ -140,4 +140,108 @@ export const NOTIFICATION_TEMPLATE_SEEDS: NotificationTemplateSeed[] = [
       { label: "Firmar entrada", url: "{{entry.url}}" },
     ),
   },
+  {
+    eventKey: "incident.sla.breached",
+    locale: "es-CL",
+    channel: "EMAIL",
+    subject: "Permanencia excedida: incidencia {{incident.folio}} en «{{incident.state}}»",
+    bodyText:
+      "Hola {{recipient.name}}:\n\n" +
+      "La incidencia {{incident.folio}} ({{incident.title}}) superó el tiempo máximo de permanencia " +
+      "en el estado «{{incident.state}}» (SLA {{incident.sla}}, atraso {{incident.delayedBy}}).\n\n" +
+      "Tipo: {{incident.type}}\nSeveridad: {{incident.severity}}\nNodo: {{incident.node}}\n" +
+      "Responsable: {{incident.owner}}\n\nRevísela en {{incident.url}}.\n\n— {{app.name}}",
+    bodyHtml: htmlShell(
+      "Permanencia excedida",
+      "La incidencia <strong>{{incident.folio}}</strong> lleva demasiado tiempo en su estado actual.",
+      [
+        ["Incidencia", "{{incident.title}}"],
+        ["Tipo", "{{incident.type}}"],
+        ["Severidad", "{{incident.severity}}"],
+        ["Nodo", "{{incident.node}}"],
+        ["Estado", "{{incident.state}}"],
+        ["SLA", "{{incident.sla}}"],
+        ["Atraso", "{{incident.delayedBy}}"],
+      ],
+      { label: "Abrir incidencia", url: "{{incident.url}}" },
+    ),
+  },
+  {
+    eventKey: "incident.overdue",
+    locale: "es-CL",
+    channel: "EMAIL",
+    subject: "Plazo vencido: incidencia {{incident.folio}}",
+    bodyText:
+      "Hola {{recipient.name}}:\n\n" +
+      "El plazo de resolución de la incidencia {{incident.folio}} ({{incident.title}}) venció " +
+      "el {{incident.dueAt}} y sigue abierta (atraso de {{incident.overdueBy}}).\n\n" +
+      "Tipo: {{incident.type}}\nSeveridad: {{incident.severity}}\nNodo: {{incident.node}}\n" +
+      "Estado: {{incident.state}}\nResponsable: {{incident.owner}}\n\n" +
+      "Resuélvala o reasígnela en {{incident.url}}.\n\n— {{app.name}}",
+    bodyHtml: htmlShell(
+      "Plazo de resolución vencido",
+      "La incidencia <strong>{{incident.folio}}</strong> superó su plazo comprometido y sigue abierta.",
+      [
+        ["Incidencia", "{{incident.title}}"],
+        ["Tipo", "{{incident.type}}"],
+        ["Severidad", "{{incident.severity}}"],
+        ["Nodo", "{{incident.node}}"],
+        ["Estado", "{{incident.state}}"],
+        ["Responsable", "{{incident.owner}}"],
+        ["Plazo", "{{incident.dueAt}}"],
+        ["Atraso", "{{incident.overdueBy}}"],
+      ],
+      { label: "Abrir incidencia", url: "{{incident.url}}" },
+    ),
+  },
+  {
+    eventKey: "incident.action.overdue",
+    locale: "es-CL",
+    channel: "EMAIL",
+    subject: "Acción CAPA vencida: {{action.code}} ({{incident.folio}})",
+    bodyText:
+      "Hola {{recipient.name}}:\n\n" +
+      "La acción {{action.code}} «{{action.title}}» de la incidencia {{incident.folio}} " +
+      "({{incident.title}}) venció su plazo el {{action.dueAt}} (atraso de {{action.overdueBy}}).\n\n" +
+      "Nodo: {{incident.node}}\nResponsable de la incidencia: {{incident.owner}}\n\n" +
+      "Gestiónela en {{incident.url}}.\n\n— {{app.name}}",
+    bodyHtml: htmlShell(
+      "Acción CAPA vencida",
+      "La acción <strong>{{action.code}}</strong> de la incidencia {{incident.folio}} superó su plazo.",
+      [
+        ["Acción", "{{action.title}}"],
+        ["Incidencia", "{{incident.title}}"],
+        ["Nodo", "{{incident.node}}"],
+        ["Plazo", "{{action.dueAt}}"],
+        ["Atraso", "{{action.overdueBy}}"],
+      ],
+      { label: "Abrir incidencia", url: "{{incident.url}}" },
+    ),
+  },
+  {
+    eventKey: "incident.report.due",
+    locale: "es-CL",
+    channel: "EMAIL",
+    subject: "Reporte por vencer: {{report.code}} a {{report.authority}} ({{incident.folio}})",
+    bodyText:
+      "Hola {{recipient.name}}:\n\n" +
+      "El reporte {{report.code}} a {{report.authority}} de la incidencia {{incident.folio}} " +
+      "({{incident.title}}) venció su plazo de envío el {{report.dueAt}} (atraso de {{report.overdueBy}}) " +
+      "y aún no se ha enviado.\n\n" +
+      "Tipo: {{incident.type}}\nNodo: {{incident.node}}\nResponsable: {{incident.owner}}\n\n" +
+      "Regístrelo enviado en {{incident.url}}.\n\n— {{app.name}}",
+    bodyHtml: htmlShell(
+      "Reporte regulatorio por vencer",
+      "El reporte <strong>{{report.code}}</strong> a {{report.authority}} de la incidencia {{incident.folio}} venció su plazo de envío.",
+      [
+        ["Reporte", "{{report.code}}"],
+        ["Autoridad", "{{report.authority}}"],
+        ["Incidencia", "{{incident.title}}"],
+        ["Nodo", "{{incident.node}}"],
+        ["Plazo", "{{report.dueAt}}"],
+        ["Atraso", "{{report.overdueBy}}"],
+      ],
+      { label: "Abrir incidencia", url: "{{incident.url}}" },
+    ),
+  },
 ];

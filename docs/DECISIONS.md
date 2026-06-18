@@ -4,6 +4,48 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-17 · Incidencias 4.4 — SLA de resolución + avisos de plazo + escalamiento (reusa el Bloque N)
+
+**Contexto:** las incidencias guardaban `dueAt` y lo mostraban, pero el KPI/filtro "vencidas" usaba `slaBreached` (permanencia de
+estado por `WorkflowState.maxStayMinutes`), NO `dueAt` — desalineado (auditoría §21). No había aviso al vencer plazos (incidencia,
+CAPA, reporte 4.3) ni escalamiento. El épico de notificaciones avanzadas (correo + campanita INAPP + SSE) ya estaba COMPLETO, así
+que la cañería de avisos existe y se reusa (NO se reinventa el motor).
+
+**Contraste con el estándar:** ITIL/ServiceNow = *time-to-resolution* con breach + escalación; PagerDuty = *escalation policy* de N
+niveles con timeout por nivel; Jira = SLA con calendarios + evento de breach. Para single-tenant on-prem se adopta el modelo
+ServiceNow simplificado ("SLA light"): un plazo de resolución + recordatorio recurrente + **1 nivel** de escalamiento. Se DESCARTAN
+los tiers PagerDuty (sobre-ingeniería; puerta abierta en BACKLOG).
+
+**Decisión (6 forks resueltos con el dueño, todos en la recomendación):**
+- **(a) Escalamiento = re-aviso recurrente (diario) + 1 nivel configurable.** `IncidentType.escalationAfterMinutes Int?` +
+  `escalationRoleId String?` (FK Role SetNull). Cuando una incidencia sigue vencida más allá de `dueAt + escalationAfterMinutes`, el
+  aviso de plazo se manda TAMBIÉN al rol de escalamiento (nivel 1). El recordatorio se repite con bucket diario en el `dedupeKey`.
+- **(b) `dueAt` auto + override + editable con auditoría.** Al crear, `dueAt = createdAt + IncidentType.resolutionDueMinutes` SOLO si
+  no se pasó `dueAt` explícito (el override gana). El reloj arranca en el reporte (`createdAt`), no en `occurredAt`. Editable con
+  `incident:edit` → entrada de timeline `DUE_CHANGED` + auditoría.
+- **(c) Destinatarios.** `incident.sla.breached`/`incident.overdue` → asignado (owner) + usuarios de los roles del estado actual
+  (ABAC) + rol de escalamiento en nivel 1; **sin externos** (los externos son para reportes a la autoridad); fallback a suscripciones
+  si no hay nada (consistente con `round.overdue`). `incident.action.overdue` → responsable/rol de la acción + owner.
+  `incident.report.due` → owner + roles del estado.
+- **(d) Sweeper.** El tick reusa el ÚNICO cron del proyecto (`NotificationWorkerService.sweep()`); la DETECCIÓN vive en incidencias
+  (`IncidentSlaService.findBreaches()`, espejo de `schedules.findOverdueOccurrenceIds()`). Una sola infra de scheduling.
+- **(e) Nombres (cambio de contrato).** Dos conceptos separados: **Permanencia** (`slaBreached`, `maxStayMinutes`) vs **Plazo**
+  (`overdue`/`resolutionOverdue`, `dueAt`). `IncidentStats` parte en `slaBreached` (permanencia) + `overdue` (resolución, antes
+  significaba permanencia); query gana `overdueOnly`; flag de fila `resolutionOverdue`. KPI/filtro mostrados aparte.
+- **(f) Permisos.** SIN permiso nuevo: config SLA en `IncidentType` (`incidentcatalog:manage`), edición de `dueAt` (`incident:edit`),
+  avisos por ownership/preferencias. Catálogo se queda en **83 ⇒ sin FLUSHALL**.
+
+**Eventos nuevos (4, `origin: derived`):** `incident.sla.breached`, `incident.overdue`, `incident.action.overdue`,
+`incident.report.due` (este último salda la deuda de aviso de plazo de 4.3). Cada uno con sus variables whitelisteadas + seed de
+plantilla. La campanita ya navega a la incidencia (`deepLinkForEntity("Incident")→/incidencias?incidentId=`); action/report se ligan
+a su incidencia padre.
+
+**Motivo:** un solo plazo de resolución claro + recordatorio + 1 nivel cubre el grueso de minería/manufactura/energía sin densificar
+el sistema para empresas chicas (todo es config por `IncidentType`, apagable). Reusar el motor del Bloque N evita duplicar
+outbox/worker/resolver/dedup/ABAC. Migración aditiva; rama `feat/incidencias-sla`.
+
+---
+
 ### 2026-06-17 · Shell — Riel colapsado: magnificación tipo dock + tooltip por PORTAL (fix de recorte)
 
 **Contexto:** en el menú colapsado a riel de íconos no se distinguía qué era cada ícono. **Causa raíz:** el `Tooltip` de `@lyra/ui`

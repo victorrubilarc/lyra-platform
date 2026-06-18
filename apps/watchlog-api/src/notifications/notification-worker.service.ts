@@ -5,6 +5,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
 import { EmailConfigService } from "../email/email-config.service";
 import { SchedulesService } from "../schedules/schedules.service";
+import { IncidentSlaService } from "../incidents/incident-sla.service";
 import { NotificationEmitterService } from "./notification-emitter.service";
 import { NotificationResolverService } from "./notification-resolver.service";
 import { NotificationChannelRegistry } from "./notification-channel";
@@ -40,6 +41,7 @@ export class NotificationWorkerService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly schedules: SchedulesService,
+    private readonly incidentSla: IncidentSlaService,
     private readonly emitter: NotificationEmitterService,
     private readonly resolver: NotificationResolverService,
     private readonly channels: NotificationChannelRegistry,
@@ -94,6 +96,15 @@ export class NotificationWorkerService {
           { entryId: b.id, stateKey: b.currentStateKey, currentStateSince: sinceIso },
           { dedupeKey: `entry.sla.breached|${b.id}|${sinceIso}` },
         );
+        emitted++;
+      }
+
+      // Incidencias (Fase 4.4): permanencia de estado / plazo de resolución / acción
+      // CAPA vencida / reporte por vencer. La DETECCIÓN vive en el dominio
+      // (IncidentSlaService); aquí solo se encola cada orden por el motor del Bloque N.
+      const incidentBreaches = await this.incidentSla.findBreaches(BATCH);
+      for (const ib of incidentBreaches) {
+        await this.emitter.emit(ib.eventKey, ib.payload, { dedupeKey: ib.dedupeKey });
         emitted++;
       }
     } catch (err) {

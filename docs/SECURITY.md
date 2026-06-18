@@ -81,6 +81,18 @@ Keycloak **descartado** para el MVP (complejidad operacional); si un cliente lo 
 - **La in-app no audita** entrega ni lectura (la fila de `NotificationOutbox` es el registro inmutable; la lectura es dato propio del
   dueño). El correo conserva su auditoría `notification.email.sent`.
 
+### Incidencias — SLA / avisos de plazo / escalamiento (Fase 4.4)
+- **Sin permisos nuevos** (catálogo se queda en **83**): la config SLA del tipo (`resolutionDueMinutes`/`escalationAfterMinutes`/
+  `escalationRoleId`) se gobierna con **`incidentcatalog:manage`**; editar el `dueAt` de una incidencia con **`incident:edit`** (deja
+  timeline `DUE_CHANGED` + auditoría `incident.updated`); los avisos por **ownership/preferencias** del destinatario.
+- **Los 4 eventos derivados** (`incident.sla.breached`/`incident.overdue`/`incident.action.overdue`/`incident.report.due`) los detecta
+  `IncidentSlaService` (solo-lectura) y los emite el sweeper; los **destinatarios pasan SIEMPRE por ABAC de NODO** (`canAccessNode`):
+  responsable asignado + usuarios de los roles del estado actual + rol de escalamiento (solo si `shouldEscalate`). **No hay externos**
+  (los externos son para los reportes a la autoridad, que se gestionan aparte). Render whitelisteado (sin eval), como el resto del motor.
+- **§21 — dos "vencidas" separadas:** la permanencia (estado) y el plazo de resolución (`dueAt`) son cómputos DERIVADOS sobre el dato ya
+  autorizado; los filtros `overdueOnly`/`slaBreachedOnly` reusan el `where`+ABAC del listado (el id-set de permanencia se intersecta en
+  AND, nunca amplía lo visible), igual que el patrón de "Retrasadas" del Workflow SLA.
+
 ### Datos PERSONALES → autorización por OWNERSHIP (no RBAC)
 - Las preferencias de presentación del propio usuario **no** se gobiernan con permisos del catálogo: se autorizan por **pertenencia** (el recurso es del actor). Patrón aplicado a **`SavedView`** (vistas guardadas de Bitácoras, Fase 2.8.1b): toda consulta/mutación filtra por `userId === session.user.id` (404 si la vista es de otro); el endpoint se gatea además por acceso al módulo (`logentry:view`). No infla el catálogo (sigue en **59**). Inflar RBAC con preferencias de UI sería ruido administrativo; el límite real es la propiedad del dato.
 

@@ -509,7 +509,10 @@ tabla existente. El catálogo de EVENTOS vive en CÓDIGO (`@lyra/contracts NOTIF
 > patrón AuditLog). Ver DECISIONS 2026-06-16.
 - **IncidentType** *(implementado)* — catálogo CONFIGURABLE con **flags de comportamiento**: `key`/`name`/`color`,
   `defaultWorkflowId?` (flujo que se congela al crear; ref. blanda), `requiresInvestigation`/`requiresCapa`/
-  `reportableDefault` (se honran en 4.2/4.3), `active`, `sortOrder`. Seed de 13 tipos.
+  `reportableDefault` (se honran en 4.2/4.3), `active`, `sortOrder`. **SLA light (4.4):** `resolutionDueMinutes?`
+  (minutos desde la creación para auto-fijar `Incident.dueAt`; override explícito gana), `escalationAfterMinutes?` +
+  `escalationRoleId?` (FK Role SetNull) = escalamiento del aviso de plazo al rol superior tras `dueAt + escalationAfterMinutes`
+  (nivel 1; null en cualquiera = sin escalamiento). Seed de 13 tipos. Migración `20260617170000_add_incident_sla`.
 - **IncidentCategory** *(implementado)* — subtipos opcionalmente colgados de un tipo (`typeId?`). Seed de 13.
 - **Incident** *(implementado)* — `number` (folio `INC-####` derivado), `title`/`description`, `typeId`/`categoryId?`,
   `severity` (1..5) + `potentialSeverity?` (MPL), `priority` (LOW/MEDIUM/HIGH/CRITICAL), `riskProbability?`/
@@ -518,7 +521,10 @@ tabla existente. El catálogo de EVENTOS vive en CÓDIGO (`@lyra/contracts NOTIF
   `currentStateKey?` + `currentStateSince` (base del SLA de permanencia, reusa `evaluateSla`/`maxStayMinutes`),
   `orgNodeId` (FK Restrict) / `equipmentId?` (FK SetNull) / `shiftCode?`, `originLogEntryId?` (ref. blanda),
   `reporterId?`/`ownerId?`, `dueAt?`, `reportable`, `closedAt?`/`closedById?`/`closureSummary?`, `canceledAt?`/
-  `cancelReason?`/`canceledById?`.
+  `cancelReason?`/`canceledById?`. **§21 — dos "vencidas" SEPARADAS (4.4):** la **permanencia** de estado se DERIVA de
+  `currentStateSince`+`maxStayMinutes` (`slaBreached`); el **plazo de resolución** se DERIVA de `dueAt<now`+`lifecycle=OPEN`
+  (`resolutionOverdue`). Ambas son derivadas (no columnas de estado), con KPIs/filtros/chips propios; `dueAt` se auto-fija del
+  tipo al crear (`resolutionDueMinutes`) y es editable (timeline `DUE_CHANGED`).
 - **IncidentComment** *(implementado)* — comentario de gestión (autor + snapshot de nombre).
 - **IncidentActivity** *(implementado)* — timeline **append-only**: `kind` (CREATED/ASSIGNED/FIELD_CHANGED/TRANSITION/
   COMMENT/CLOSED/CANCELED) + `summary` + actor + `metadata` jsonb.

@@ -113,6 +113,7 @@ model Role {
   workflowTransitionRoles WorkflowTransitionRole[]
   responsibleSchedules    LogSchedule[]
   incidentActions         IncidentAction[]
+  incidentTypeEscalations IncidentType[]           @relation("IncidentTypeEscalationRole")
 }
 
 model Permission {
@@ -1812,17 +1813,27 @@ model IncidentType {
   requiresInvestigation Boolean  @default(false)
   requiresCapa          Boolean  @default(false)
   reportableDefault     Boolean  @default(false)
+  // --- SLA light (4.4): plazo de resolución + escalamiento ----------------------
+  // Minutos desde la creación para auto-fijar Incident.dueAt (override explícito gana).
+  // null = sin plazo automático.
+  resolutionDueMinutes  Int?
+  // Tras `dueAt + escalationAfterMinutes` aún vencida ⇒ el aviso de plazo escala al
+  // rol de escalamiento (nivel 1). null en cualquiera de los dos = sin escalamiento.
+  escalationAfterMinutes Int?
+  escalationRoleId      String?
   active                Boolean  @default(true)
   sortOrder             Int      @default(0)
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
   deletedAt             DateTime?
 
+  escalationRole Role? @relation("IncidentTypeEscalationRole", fields: [escalationRoleId], references: [id], onDelete: SetNull)
   categories IncidentCategory[]
   incidents  Incident[]
 
   @@index([active])
   @@index([deletedAt])
+  @@index([escalationRoleId])
 }
 
 // Catálogo configurable de CATEGORÍAS (subtipos), opcionalmente colgadas de un tipo.

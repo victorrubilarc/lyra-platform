@@ -66,8 +66,24 @@ const ENTRY_VARIABLES: readonly NotificationVariableDef[] = [
 ] as const;
 
 /**
- * Catálogo de eventos del MVP (4). Crece por fase: incidencias (Fase 4), turnos
- * (Fase 5) añaden sus claves aquí.
+ * Variables compartidas por los eventos ligados a una INCIDENCIA (Fase 4.4 — SLA /
+ * avisos de plazo / escalamiento). La campanita navega a la incidencia vía
+ * `deepLinkForEntity("Incident", id)`.
+ */
+const INCIDENT_VARIABLES: readonly NotificationVariableDef[] = [
+  { name: "incident.folio", description: "Folio de la incidencia.", sample: "INC-0042" },
+  { name: "incident.title", description: "Título de la incidencia.", sample: "Fuga de aceite en bomba 3" },
+  { name: "incident.type", description: "Tipo de incidencia.", sample: "Falla de equipo" },
+  { name: "incident.severity", description: "Severidad (1–5).", sample: "4" },
+  { name: "incident.node", description: "Nodo (área) de la incidencia.", sample: "Planta Concentradora ▸ Molienda" },
+  { name: "incident.state", description: "Estado de flujo actual.", sample: "En progreso" },
+  { name: "incident.owner", description: "Responsable asignado (o «—»).", sample: "Ana Pérez" },
+  { name: "incident.url", description: "Enlace directo a la incidencia.", sample: "https://watchlog.tuempresa.cl/incidencias?incidentId=abc123" },
+] as const;
+
+/**
+ * Catálogo de eventos del MVP (4) + incidencias (4, Fase 4.4). Crece por fase:
+ * turnos (Fase 5) añaden sus claves aquí.
  */
 export const NOTIFICATION_EVENTS = [
   {
@@ -129,6 +145,66 @@ export const NOTIFICATION_EVENTS = [
       ...COMMON_VARIABLES,
       ...ENTRY_VARIABLES,
       { name: "entry.state", description: "Estado que requiere firma.", sample: "Aprobación supervisor" },
+    ],
+  },
+  {
+    key: "incident.sla.breached",
+    group: "incidents",
+    labelKey: "notifications.events.incidentSlaBreached",
+    description:
+      "Una incidencia superó el tiempo máximo de permanencia (SLA) en su estado de flujo. Avisa al responsable y a los roles del estado actual.",
+    origin: "derived",
+    variables: [
+      ...COMMON_VARIABLES,
+      ...INCIDENT_VARIABLES,
+      { name: "incident.sla", description: "SLA del estado.", sample: "8 h" },
+      { name: "incident.delayedBy", description: "Tiempo de atraso sobre el SLA del estado.", sample: "2 h 15 min" },
+    ],
+  },
+  {
+    key: "incident.overdue",
+    group: "incidents",
+    labelKey: "notifications.events.incidentOverdue",
+    description:
+      "El PLAZO de resolución de una incidencia venció (su «dueAt» pasó y sigue abierta). Avisa al responsable y a los roles del estado; si se configuró escalamiento, también al rol superior.",
+    origin: "derived",
+    variables: [
+      ...COMMON_VARIABLES,
+      ...INCIDENT_VARIABLES,
+      { name: "incident.dueAt", description: "Plazo de resolución comprometido.", sample: "16 jun 2026, 18:00" },
+      { name: "incident.overdueBy", description: "Tiempo transcurrido desde el plazo.", sample: "1 d 4 h" },
+    ],
+  },
+  {
+    key: "incident.action.overdue",
+    group: "incidents",
+    labelKey: "notifications.events.incidentActionOverdue",
+    description:
+      "Una acción correctiva/preventiva (CAPA) de una incidencia venció su plazo. Avisa al responsable de la acción y al responsable de la incidencia.",
+    origin: "derived",
+    variables: [
+      ...COMMON_VARIABLES,
+      ...INCIDENT_VARIABLES,
+      { name: "action.code", description: "Folio de la acción CAPA.", sample: "ACT-0007" },
+      { name: "action.title", description: "Título de la acción.", sample: "Reemplazar sello mecánico" },
+      { name: "action.dueAt", description: "Plazo de la acción.", sample: "16 jun 2026, 12:00" },
+      { name: "action.overdueBy", description: "Tiempo transcurrido desde el plazo de la acción.", sample: "6 h" },
+    ],
+  },
+  {
+    key: "incident.report.due",
+    group: "incidents",
+    labelKey: "notifications.events.incidentReportDue",
+    description:
+      "Un reporte regulatorio de una incidencia (obligación) venció su plazo de envío sin haberse enviado. Avisa al responsable de la incidencia y a los roles del estado.",
+    origin: "derived",
+    variables: [
+      ...COMMON_VARIABLES,
+      ...INCIDENT_VARIABLES,
+      { name: "report.code", description: "Folio del reporte.", sample: "REP-0003" },
+      { name: "report.authority", description: "Autoridad / organismo destinatario.", sample: "SERNAGEOMIN" },
+      { name: "report.dueAt", description: "Plazo de envío del reporte.", sample: "16 jun 2026, 20:00" },
+      { name: "report.overdueBy", description: "Tiempo transcurrido desde el plazo del reporte.", sample: "3 h" },
     ],
   },
 ] as const satisfies readonly NotificationEventDef[];

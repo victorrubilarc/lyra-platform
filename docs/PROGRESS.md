@@ -1,5 +1,46 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-17 — Fase 4.4: SLA de incidencias + avisos de plazo + escalamiento ✅** (`feat/incidencias-sla`). Cierra la 4.4 del módulo
+de Incidencias: plazos de resolución claros que AVISAN al vencer (correo + campanita) con escalamiento, reusando el motor del Bloque N
+(outbox+worker+resolver multi-canal) — NO se reinventó. **Salda 3 deudas:** §21 "vencida" desalineada (permanencia vs plazo), aviso de
+plazo de reportes (diferido de 4.3) y vencimiento de acciones CAPA. **Plan aprobado; 6 forks resueltos en la recomendación
+(DECISIONS 2026-06-17):** (a) escalamiento = **re-aviso recurrente diario + 1 nivel** configurable (NO tiers PagerDuty); (b) `dueAt`
+**auto + override + editable** con timeline/auditoría; (c) destinatarios = **asignado + roles del estado (ABAC) + rol de escalamiento**,
+sin externos, fallback a suscripciones; (d) sweeper = **tick en el worker de notificaciones + detección en el dominio**
+(`IncidentSlaService`); (e) nombres = **Permanencia** (estado) vs **Plazo** (resolución); (f) **sin permiso nuevo** (cat. 83, sin
+FLUSHALL). **Modelo (migración aditiva `20260617170000_add_incident_sla`):** `IncidentType += resolutionDueMinutes Int?`,
+`escalationAfterMinutes Int?`, `escalationRoleId String?` (FK Role SetNull) + back-relation. **Contratos** (`@lyra/contracts`): **4
+eventos nuevos** al catálogo del Bloque N (`incident.sla.breached`/`incident.overdue`/`incident.action.overdue`/`incident.report.due`,
+todos `derived`, grupo `incidents`, con variables whitelisteadas) + helpers PUROS `resolutionDueFromType`/`isResolutionOverdue`/
+`escalationThreshold`/`shouldEscalate` + `IncidentTypeDto`/`UpsertIncidentTypeRequest` con los 3 campos SLA (+`escalationRoleName`
+resuelto) + `incidentListItemSchema += resolutionOverdue` + `incidentStatsSchema` partido (`overdue`=plazo + nuevo `slaBreached`=
+permanencia) + query `+slaBreachedOnly` (y `overdueOnly` re-cableado a plazo, antes muerto) + 8 specs (`sla.spec.ts`). **Seed:** 4
+plantillas EMAIL de incidencias (identidad Lyra) + **fix latente del seed** (la unique de `NotificationTemplate` pasó a incluir
+`templateId` en Fase A; el seed seguía usando la clave compuesta vieja → `findFirst` con `templateId:null`). **API:** auto-due en
+`create` (`resolutionDueFromType` si no hay override) · timeline `DUE_CHANGED` + auditoría en `update` · `stats` partido (overdue=plazo
+por columna `dueAt<now`, slaBreached=permanencia derivada in-memory) · `resolutionOverdue` por fila en `toListItems` · `buildWhere`
+cablea `overdueOnly` (where real) y `slaBreachedOnly` (id-set derivado para no romper paginación) · `listTypes`/`upsertType` con los
+campos SLA + validación del rol de escalamiento · **`IncidentSlaService.findBreaches()`** (detección SQL eficiente, espejo de
+`findSlaBreaches`: permanencia por JOIN a `WorkflowState`, plazo/acción/reporte por `dueAt<now`; dedupe diario para el recordatorio,
+por ocupación de estado para la permanencia) exportado e inyectado en `NotificationWorkerService.sweep()` · **4 resolvers** en
+`NotificationResolverService` (destinatarios = owner + roles del estado [transiciones que salen del estado actual] + escalamiento si
+`shouldEscalate`; ABAC por NODO con `filterByNode`; `subscriptionRecipients` ahora hace ABAC node-only sin plantilla). `IncidentsModule`
+exporta `IncidentSlaService`; `NotificationsModule` lo importa (sin ciclo). **Web:** KPIs partidos "Plazo vencido"/"Permanencia
+excedida" + filtros `overdueOnly`/`slaBreachedOnly` + chips de fila/kanban (Plazo vencido vs Permanencia) · campos **SLA + escalamiento**
+en `IncidentTypeModal` (reusa `SlaDurationField`; rol vía `useRoles`, degrada a vacío sin `role:read`) · drawer: "Plazo de resolución"
+con badge "vencido" (corrige el bug §21 que coloreaba con `slaBreached`) + **edición inline del plazo** (gate `incident:edit`, lifecycle
+OPEN) + fila "Permanencia". i18n es-CL (`notifications.events.incident*` + grupo "Incidencias"). **Sin permiso nuevo (cat. 83, sin
+FLUSHALL).** Tests: **contracts 303** (+8) · **API 247** sin regresión; typecheck/lint(0 errores)/build verdes. **Smoke en vivo
+`scripts/smoke-incidencias-sla.py` 25/25** (auto-due + override · §21: resolutionOverdue/slaBreached separados, stats partido, filtros
+overdueOnly/slaBreachedOnly, DUE_CHANGED · sweeper: los 4 eventos emitidos + outbox al responsable · escalamiento DISCRIMINANTE [estado
+inicial sin roles: escalada CON destinatarios vs no-escalada SIN destinatarios] · gates 403 operador) **+ regresión incidencias 32/32 ·
+capa 23/23 · investigación 27/27 · reportabilidad 31/31 · notif-avanzadas 22/22 · notif-inapp 18/18 · notificaciones 18/18** (se
+actualizó el conteo de eventos/plantillas de 4→8). **Pendiente: smoke VISUAL del dueño** (KPIs/filtros partidos, chips, campos SLA en
+el modal de tipo, edición de plazo en el drawer, correo/campanita de los 4 avisos). **Deuda 4.4 (BACKLOG):** picker de rol de
+escalamiento usa `role:read` (un admin de catálogo sin ese permiso ve la lista vacía → endpoint `role-options` decoplado del módulo) ·
+plantilla INAPP propia (hoy reusa la del correo) · escalamiento multi-nivel/tiers (diferido, BACKLOG). **Con 4.4 cerrada → siguiente:
+4.5 (dashboard de incidencias).**
+
 **2026-06-17 — Shell: sidebar premium + Favoritos al topbar ✅** (`feat/sidebar-premium`). Pulido por feedback del dueño tras la
 agrupación: los módulos se veían pequeños y el menú estrecho; además pidió mover Favoritos a un menú propio en el topbar. **(1)
 Premium del sidebar (solo CSS):** ancho 244→**288px**, texto de módulos 13.5→**14.5px** (+ `letter-spacing` leve), ítem activo a peso

@@ -121,6 +121,10 @@ export const esCL = {
       slaBreached: "SLA incumplido",
       transition: "Transición de flujo",
       signaturePending: "Firma pendiente",
+      incidentSlaBreached: "Incidencia: permanencia excedida",
+      incidentOverdue: "Incidencia: plazo vencido",
+      incidentActionOverdue: "Incidencia: acción CAPA vencida",
+      incidentReportDue: "Incidencia: reporte por vencer",
     },
   },
   nav: {

@@ -5,7 +5,9 @@ import {
   deriveLifecycle,
   evaluateSla,
   investigationBlocksClose,
+  isResolutionOverdue,
   reportsBlockingClose,
+  resolutionDueFromType,
   type AddIncidentCommentRequest,
   type AssignIncidentRequest,
   type CancelIncidentRequest,
@@ -96,21 +98,24 @@ export class IncidentsService {
 
   async stats(userId: string): Promise<IncidentStats> {
     const base = await this.buildWhere(userId, {});
-    if (base === null) return { open: 0, critical: 0, overdue: 0, unassigned: 0, fromLogbook: 0, reportable: 0, reportOverdue: 0 };
+    if (base === null)
+      return { open: 0, critical: 0, overdue: 0, slaBreached: 0, unassigned: 0, fromLogbook: 0, reportable: 0, reportOverdue: 0 };
     const openBase: Prisma.IncidentWhereInput = { ...base, lifecycle: "OPEN" };
-    const [open, critical, unassigned, fromLogbook, reportable, reportOverdue, overdueCandidates] = await Promise.all([
+    const [open, critical, overdue, unassigned, fromLogbook, reportable, reportOverdue, slaCandidates] = await Promise.all([
       this.prisma.incident.count({ where: openBase }),
       this.prisma.incident.count({ where: { ...openBase, severity: 5 } }),
+      // PLAZO de resolución vencido se DERIVA por columna (dueAt < ahora). 4.4 §21.
+      this.prisma.incident.count({ where: { ...openBase, dueAt: { lt: new Date() } } }),
       this.prisma.incident.count({ where: { ...openBase, ownerId: null } }),
       this.prisma.incident.count({ where: { ...base, originType: { in: ["LOG_ENTRY", "EXCEPTION", "RULE"] } } }),
       this.prisma.incident.count({ where: { ...openBase, reportable: true } }),
       // Reporte vencido se DERIVA (reporte PENDIENTE con plazo pasado), sin estado persistido.
       this.prisma.incident.count({ where: { ...openBase, reports: { some: { status: "PENDING", dueAt: { lt: new Date() } } } } }),
-      // SLA de permanencia se DERIVA (estado actual + maxStayMinutes); se cuenta abajo.
+      // PERMANENCIA de estado se DERIVA (estado actual + maxStayMinutes); se cuenta abajo.
       this.prisma.incident.findMany({ where: openBase, include: this.listInclude }),
     ]);
-    const overdue = (await this.toListItems(overdueCandidates)).filter((i) => i.slaBreached).length;
-    return { open, critical, overdue, unassigned, fromLogbook, reportable, reportOverdue };
+    const slaBreached = (await this.toListItems(slaCandidates)).filter((i) => i.slaBreached).length;
+    return { open, critical, overdue, slaBreached, unassigned, fromLogbook, reportable, reportOverdue };
   }
 
   // === Detalle ================================================================
@@ -256,7 +261,9 @@ export class IncidentsService {
         occurredAt: dto.occurredAt ? new Date(dto.occurredAt) : null,
         reporterId: userId,
         ownerId: dto.ownerId ?? null,
-        dueAt: dto.dueAt ? new Date(dto.dueAt) : null,
+        // Plazo de resolución (4.4): el override explícito gana; si no, se AUTO-fija
+        // desde el SLA del tipo (createdAt + resolutionDueMinutes). null = sin plazo.
+        dueAt: dto.dueAt ? new Date(dto.dueAt) : resolutionDueFromType(now.getTime(), type.resolutionDueMinutes),
         reportable: dto.reportable ?? type.reportableDefault,
         createdById: userId,
         updatedById: userId,
@@ -309,11 +316,19 @@ export class IncidentsService {
         updatedById: userId,
       },
     });
-    // Huella de cambios relevantes en el timeline (severidad/prioridad).
+    // Huella de cambios relevantes en el timeline (severidad/prioridad/plazo).
     const changes: string[] = [];
     if (dto.severity !== undefined && dto.severity !== before.severity) changes.push(`Severidad ${before.severity} → ${dto.severity}`);
     if (dto.priority !== undefined && dto.priority !== before.priority) changes.push(`Prioridad ${before.priority} → ${dto.priority}`);
     for (const summary of changes) await this.addActivity(id, "FIELD_CHANGED", summary, ctx);
+    // Cambio del PLAZO de resolución (4.4): entrada propia DUE_CHANGED (auditable).
+    if (dto.dueAt !== undefined && (before.dueAt?.getTime() ?? null) !== (row.dueAt?.getTime() ?? null)) {
+      const fmt = (d: Date | null) => (d ? d.toLocaleString("es-CL") : "sin plazo");
+      await this.addActivity(id, "DUE_CHANGED", `Plazo de resolución: ${fmt(before.dueAt)} → ${fmt(row.dueAt)}`, ctx, {
+        from: before.dueAt?.toISOString() ?? null,
+        to: row.dueAt?.toISOString() ?? null,
+      });
+    }
     await this.audit.record({ ...ctx, action: "incident.updated", entityType: "Incident", entityId: id, before: this.snapshot(before), after: this.snapshot(row) });
     return this.getDetail(userId, id);
   }
@@ -465,6 +480,10 @@ export class IncidentsService {
     const wfNames = wfIds.length
       ? new Map((await this.prisma.workflowDefinition.findMany({ where: { id: { in: wfIds } }, select: { id: true, name: true } })).map((w) => [w.id, w.name]))
       : new Map<string, string>();
+    const roleIds = rows.map((r) => r.escalationRoleId).filter((x): x is string => !!x);
+    const roleNames = roleIds.length
+      ? new Map((await this.prisma.role.findMany({ where: { id: { in: roleIds } }, select: { id: true, name: true } })).map((x) => [x.id, x.name]))
+      : new Map<string, string>();
     return rows.map((r) => ({
       id: r.id,
       key: r.key,
@@ -476,6 +495,10 @@ export class IncidentsService {
       requiresInvestigation: r.requiresInvestigation,
       requiresCapa: r.requiresCapa,
       reportableDefault: r.reportableDefault,
+      resolutionDueMinutes: r.resolutionDueMinutes,
+      escalationAfterMinutes: r.escalationAfterMinutes,
+      escalationRoleId: r.escalationRoleId,
+      escalationRoleName: r.escalationRoleId ? roleNames.get(r.escalationRoleId) ?? null : null,
       active: r.active,
       sortOrder: r.sortOrder,
     }));
@@ -511,6 +534,11 @@ export class IncidentsService {
       // El flujo se CONGELA al crear una incidencia del tipo: debe estar publicado.
       if (wf.status !== "PUBLISHED" || !wf.currentVersionId) throw new BadRequestException("El flujo por defecto debe estar publicado");
     }
+    // Escalamiento (4.4): el rol de escalamiento debe existir si se indica.
+    if (dto.escalationRoleId) {
+      const role = await this.prisma.role.findUnique({ where: { id: dto.escalationRoleId }, select: { id: true } });
+      if (!role) throw new BadRequestException("El rol de escalamiento indicado no existe");
+    }
     const data = {
       name: dto.name,
       description: dto.description ?? null,
@@ -519,6 +547,9 @@ export class IncidentsService {
       requiresInvestigation: dto.requiresInvestigation ?? false,
       requiresCapa: dto.requiresCapa ?? false,
       reportableDefault: dto.reportableDefault ?? false,
+      resolutionDueMinutes: dto.resolutionDueMinutes ?? null,
+      escalationAfterMinutes: dto.escalationAfterMinutes ?? null,
+      escalationRoleId: dto.escalationRoleId ?? null,
       active: dto.active ?? true,
       sortOrder: dto.sortOrder ?? 0,
     };
@@ -612,6 +643,8 @@ export class IncidentsService {
       ...(q.ownerId ? { ownerId: q.ownerId } : {}),
       ...(q.currentStateKey ? { currentStateKey: q.currentStateKey } : {}),
       ...(q.unassignedOnly ? { ownerId: null } : {}),
+      // PLAZO de resolución vencido (4.4 §21): columna dueAt < ahora, solo abiertas.
+      ...(q.overdueOnly ? { lifecycle: "OPEN", dueAt: { lt: new Date() } } : {}),
       ...(q.reportableOnly ? { reportable: true } : {}),
       ...(q.reportOverdueOnly ? { reports: { some: { status: "PENDING", dueAt: { lt: new Date() } } } } : {}),
       ...(q.fromLogbookOnly ? { originType: { in: ["LOG_ENTRY", "EXCEPTION", "RULE"] } } : {}),
@@ -629,6 +662,18 @@ export class IncidentsService {
           ],
         },
       ];
+    }
+    // PERMANENCIA de estado excedida (4.4 §21): es DERIVADA (estado actual +
+    // maxStayMinutes), no expresable como un WHERE de columna. Se materializa el
+    // conjunto de ids incumplidos sobre las ABIERTAS que ya pasan el resto del filtro
+    // y se restringe por `id IN (...)` para no romper la paginación.
+    if (q.slaBreachedOnly) {
+      const open = await this.prisma.incident.findMany({
+        where: { ...where, lifecycle: "OPEN" },
+        include: this.listInclude,
+      });
+      const breachedIds = (await this.toListItems(open)).filter((i) => i.slaBreached).map((i) => i.id);
+      where.id = { in: breachedIds };
     }
     return where;
   }
@@ -654,6 +699,7 @@ export class IncidentsService {
       const state = graph && r.currentStateKey ? graph.states.get(r.currentStateKey) : undefined;
       const slaBreached =
         r.lifecycle === "OPEN" && !!state && evaluateSla(r.currentStateSince.getTime(), state.maxStayMinutes, now).status === "breached";
+      const lifecycle = deriveLifecycle({ canceledAt: r.canceledAt, currentStateIsFinal: state?.isFinal ?? false });
       return {
         id: r.id,
         code: incidentCode(r.number),
@@ -667,7 +713,7 @@ export class IncidentsService {
         potentialSeverity: r.potentialSeverity,
         priority: r.priority,
         originType: r.originType,
-        lifecycle: deriveLifecycle({ canceledAt: r.canceledAt, currentStateIsFinal: state?.isFinal ?? false }),
+        lifecycle,
         currentStateKey: r.currentStateKey,
         currentStateName: state?.name ?? null,
         currentStateColor: state?.color ?? null,
@@ -682,6 +728,7 @@ export class IncidentsService {
         dueAt: r.dueAt?.toISOString() ?? null,
         occurredAt: r.occurredAt?.toISOString() ?? null,
         slaBreached,
+        resolutionOverdue: isResolutionOverdue(r.dueAt, lifecycle, now),
         reportable: r.reportable,
         reportOverdue: reportOverdueIds.has(r.id),
         commentCount: r._count?.comments ?? 0,

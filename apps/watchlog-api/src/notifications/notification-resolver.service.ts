@@ -6,10 +6,13 @@ import {
   allowedVariablesForTemplate,
   extractPlaceholders,
   fieldVariableName,
+  incidentActionCode,
+  incidentReportCode,
   isFieldVariable,
   notificationEventDef,
   pickTemplateForScope,
   renderTemplate,
+  shouldEscalate,
   transitionNotifyConfigSchema,
   type TransitionNotifyConfig,
 } from "@lyra/contracts";
@@ -97,6 +100,18 @@ export class NotificationResolverService {
         break;
       case "entry.signature.pending":
         resolution = await this.resolveSignaturePending(payload);
+        break;
+      case "incident.sla.breached":
+        resolution = await this.resolveIncidentSlaBreached(payload);
+        break;
+      case "incident.overdue":
+        resolution = await this.resolveIncidentOverdue(payload);
+        break;
+      case "incident.action.overdue":
+        resolution = await this.resolveIncidentActionOverdue(payload);
+        break;
+      case "incident.report.due":
+        resolution = await this.resolveIncidentReportDue(payload);
         break;
       default:
         resolution = null;
@@ -410,6 +425,226 @@ export class NotificationResolverService {
     };
   }
 
+  // --- Resolvers de INCIDENCIAS (Fase 4.4) -----------------------------------
+
+  /** Permanencia de estado excedida: avisa al responsable + roles del estado actual. */
+  private async resolveIncidentSlaBreached(payload: Record<string, unknown>): Promise<EventResolution | null> {
+    const incidentId = String(payload.incidentId ?? "");
+    const stateKey = String(payload.stateKey ?? "");
+    if (!incidentId) return null;
+    const inc = await this.loadIncidentForNotification(incidentId);
+    if (!inc || inc.lifecycle !== "OPEN") return null;
+    if (stateKey && inc.currentStateKey !== stateKey) return null; // ya avanzó de estado
+    const userIds = await this.incidentRecipients(inc, { includeStateRoles: true });
+    const since = inc.currentStateSince ?? new Date();
+    const delayedMin = Math.round((Date.now() - since.getTime()) / 60000) - (inc.currentStateMaxStay ?? 0);
+    return {
+      ...this.baseIncidentResolution(inc, incidentId, userIds),
+      context: {
+        ...this.incidentContext(inc),
+        "incident.sla": this.formatDuration(inc.currentStateMaxStay ?? 0),
+        "incident.delayedBy": this.formatDuration(Math.max(0, delayedMin)),
+      },
+    };
+  }
+
+  /** Plazo de resolución vencido: responsable + roles del estado + (si aplica) escalamiento. */
+  private async resolveIncidentOverdue(payload: Record<string, unknown>): Promise<EventResolution | null> {
+    const incidentId = String(payload.incidentId ?? "");
+    if (!incidentId) return null;
+    const inc = await this.loadIncidentForNotification(incidentId);
+    if (!inc || inc.lifecycle !== "OPEN" || !inc.dueAt || inc.dueAt.getTime() >= Date.now()) return null;
+    const escalate = shouldEscalate(inc.dueAt, inc.escalationAfterMinutes, Date.now());
+    const userIds = await this.incidentRecipients(inc, {
+      includeStateRoles: true,
+      escalationRoleId: escalate ? inc.escalationRoleId : null,
+    });
+    const overdueBy = Math.round((Date.now() - inc.dueAt.getTime()) / 60000);
+    return {
+      ...this.baseIncidentResolution(inc, incidentId, userIds),
+      context: {
+        ...this.incidentContext(inc),
+        "incident.dueAt": this.formatDateTime(inc.dueAt),
+        "incident.overdueBy": this.formatDuration(overdueBy),
+      },
+    };
+  }
+
+  /** Acción CAPA vencida: responsable de la acción (persona+rol) + responsable de la incidencia. */
+  private async resolveIncidentActionOverdue(payload: Record<string, unknown>): Promise<EventResolution | null> {
+    const incidentId = String(payload.incidentId ?? "");
+    const actionId = String(payload.actionId ?? "");
+    if (!incidentId || !actionId) return null;
+    const inc = await this.loadIncidentForNotification(incidentId);
+    if (!inc || inc.lifecycle !== "OPEN") return null;
+    const action = await this.prisma.incidentAction.findUnique({
+      where: { id: actionId },
+      select: { id: true, number: true, title: true, dueAt: true, status: true, responsibleId: true, responsibleRoleId: true },
+    });
+    if (!action || !action.dueAt || !["OPEN", "IN_PROGRESS"].includes(action.status)) return null;
+    const candidates = new Set<string>();
+    if (action.responsibleId) candidates.add(action.responsibleId);
+    if (action.responsibleRoleId) for (const u of await this.usersOfRoleIds([action.responsibleRoleId])) candidates.add(u);
+    if (inc.ownerId) candidates.add(inc.ownerId);
+    const userIds = new Set(await this.filterByNode([...candidates], inc.orgNodeId));
+    const overdueBy = Math.round((Date.now() - action.dueAt.getTime()) / 60000);
+    return {
+      ...this.baseIncidentResolution(inc, incidentId, userIds),
+      context: {
+        ...this.incidentContext(inc),
+        "action.code": incidentActionCode(action.number),
+        "action.title": action.title,
+        "action.dueAt": this.formatDateTime(action.dueAt),
+        "action.overdueBy": this.formatDuration(overdueBy),
+      },
+    };
+  }
+
+  /** Reporte regulatorio por vencer: responsable de la incidencia + roles del estado. */
+  private async resolveIncidentReportDue(payload: Record<string, unknown>): Promise<EventResolution | null> {
+    const incidentId = String(payload.incidentId ?? "");
+    const reportId = String(payload.reportId ?? "");
+    if (!incidentId || !reportId) return null;
+    const inc = await this.loadIncidentForNotification(incidentId);
+    if (!inc || inc.lifecycle !== "OPEN") return null;
+    const report = await this.prisma.incidentReport.findUnique({
+      where: { id: reportId },
+      select: { id: true, number: true, authorityName: true, dueAt: true, status: true },
+    });
+    if (!report || !report.dueAt || report.status !== "PENDING") return null;
+    const userIds = await this.incidentRecipients(inc, { includeStateRoles: true });
+    const overdueBy = Math.round((Date.now() - report.dueAt.getTime()) / 60000);
+    return {
+      ...this.baseIncidentResolution(inc, incidentId, userIds),
+      context: {
+        ...this.incidentContext(inc),
+        "report.code": incidentReportCode(report.number),
+        "report.authority": report.authorityName ?? "—",
+        "report.dueAt": this.formatDateTime(report.dueAt),
+        "report.overdueBy": this.formatDuration(overdueBy),
+      },
+    };
+  }
+
+  /** Parte común de la EventResolution de una incidencia (orgNode, related, sin templateId/campos). */
+  private baseIncidentResolution(inc: LoadedIncident, incidentId: string, userIds: Set<string>): EventResolution {
+    return {
+      userIds,
+      externalEmails: [],
+      orgNodeId: inc.orgNodeId,
+      templateId: null,
+      relatedEntityType: "Incident",
+      relatedEntityId: incidentId,
+      context: {},
+    };
+  }
+
+  /**
+   * Destinatarios de una incidencia: responsable asignado + (opcional) usuarios de los
+   * roles autorizados a actuar desde el estado actual + (opcional) rol de escalamiento.
+   * Todo filtrado por ABAC de NODO (las incidencias no se restringen por plantilla).
+   */
+  private async incidentRecipients(
+    inc: LoadedIncident,
+    opts: { includeStateRoles?: boolean; escalationRoleId?: string | null },
+  ): Promise<Set<string>> {
+    const candidates = new Set<string>();
+    if (inc.ownerId) candidates.add(inc.ownerId);
+    if (opts.includeStateRoles && inc.currentStateKey) {
+      const roleIds = new Set<string>();
+      for (const t of inc.transitions) if (t.fromStateKey === inc.currentStateKey) for (const rid of t.roleIds) roleIds.add(rid);
+      for (const u of await this.usersOfRoleIds([...roleIds])) candidates.add(u);
+    }
+    if (opts.escalationRoleId) for (const u of await this.usersOfRoleIds([opts.escalationRoleId])) candidates.add(u);
+    return new Set(await this.filterByNode([...candidates], inc.orgNodeId));
+  }
+
+  /** Expande roles a usuarios (sin ABAC; el llamador filtra por nodo). */
+  private async usersOfRoleIds(roleIds: string[]): Promise<string[]> {
+    if (roleIds.length === 0) return [];
+    const rows = await this.prisma.userRole.findMany({ where: { roleId: { in: roleIds } }, select: { userId: true } });
+    return [...new Set(rows.map((r) => r.userId))];
+  }
+
+  /** Filtra usuarios por ABAC de NODO (incidencias no usan plantilla). */
+  private async filterByNode(userIds: string[], orgNodeId: string): Promise<string[]> {
+    const out: string[] = [];
+    for (const uid of userIds) if (await this.scope.canAccessNode(uid, orgNodeId)) out.push(uid);
+    return out;
+  }
+
+  private incidentContext(inc: LoadedIncident): Record<string, string> {
+    return {
+      "incident.folio": `INC-${String(inc.number).padStart(4, "0")}`,
+      "incident.title": inc.title,
+      "incident.type": inc.typeName ?? "—",
+      "incident.severity": String(inc.severity),
+      "incident.node": inc.nodeName ?? "—",
+      "incident.state": inc.currentStateName ?? "—",
+      "incident.owner": inc.ownerName ?? "—",
+      "incident.url": `${this.appUrl()}/incidencias?incidentId=${inc.id}`,
+    };
+  }
+
+  /** Carga una incidencia + su versión de flujo congelada (estados + roles de transición). */
+  private async loadIncidentForNotification(incidentId: string): Promise<LoadedIncident | null> {
+    const inc = await this.prisma.incident.findUnique({
+      where: { id: incidentId },
+      select: {
+        id: true,
+        number: true,
+        title: true,
+        severity: true,
+        orgNodeId: true,
+        ownerId: true,
+        lifecycle: true,
+        dueAt: true,
+        currentStateKey: true,
+        currentStateSince: true,
+        workflowDefinitionVersionId: true,
+        type: { select: { name: true, escalationAfterMinutes: true, escalationRoleId: true } },
+        orgNode: { select: { name: true } },
+      },
+    });
+    if (!inc) return null;
+    let currentStateName: string | null = null;
+    let currentStateMaxStay: number | null = null;
+    let transitions: Array<{ fromStateKey: string; roleIds: string[] }> = [];
+    if (inc.workflowDefinitionVersionId) {
+      const wf = await this.prisma.workflowDefinitionVersion.findUnique({
+        where: { id: inc.workflowDefinitionVersionId },
+        include: workflowVersionInclude,
+      });
+      if (wf) {
+        const state = wf.states.find((s) => s.key === inc.currentStateKey);
+        currentStateName = state?.name ?? null;
+        currentStateMaxStay = state?.maxStayMinutes ?? null;
+        transitions = wf.transitions.map((t) => ({ fromStateKey: t.fromState.key, roleIds: t.roles.map((r) => r.roleId) }));
+      }
+    }
+    const ownerName = inc.ownerId ? await this.userName(inc.ownerId) : null;
+    return {
+      id: inc.id,
+      number: inc.number,
+      title: inc.title,
+      severity: inc.severity,
+      typeName: inc.type?.name ?? null,
+      orgNodeId: inc.orgNodeId,
+      nodeName: inc.orgNode?.name ?? null,
+      ownerId: inc.ownerId,
+      ownerName,
+      lifecycle: inc.lifecycle,
+      dueAt: inc.dueAt,
+      currentStateKey: inc.currentStateKey,
+      currentStateName,
+      currentStateSince: inc.currentStateSince,
+      currentStateMaxStay,
+      escalationAfterMinutes: inc.type?.escalationAfterMinutes ?? null,
+      escalationRoleId: inc.type?.escalationRoleId ?? null,
+      transitions,
+    };
+  }
+
   // --- Helpers de entrada / workflow -----------------------------------------
 
   private async loadEntryForNotification(entryId: string): Promise<LoadedEntry | null> {
@@ -544,7 +779,9 @@ export class NotificationResolverService {
         for (const r of rows) userIds.add(r.userId);
       }
     }
-    if (!orgNodeId || !templateId) return [...userIds];
+    if (!orgNodeId) return [...userIds];
+    // Incidencias no tienen plantilla: ABAC solo por nodo. Resto: nodo ∩ plantilla.
+    if (!templateId) return this.filterByNode([...userIds], orgNodeId);
     return this.filterByAbac([...userIds], orgNodeId, templateId);
   }
 
@@ -624,6 +861,28 @@ interface LoadedEntry {
     /** Config de aviso CONGELADA en la transición (null = sin config explícita). */
     notify: TransitionNotifyConfig | null;
   }>;
+}
+
+/** Incidencia normalizada para resolver destinatarios + contexto de notificación (4.4). */
+interface LoadedIncident {
+  id: string;
+  number: number;
+  title: string;
+  severity: number;
+  typeName: string | null;
+  orgNodeId: string;
+  nodeName: string | null;
+  ownerId: string | null;
+  ownerName: string | null;
+  lifecycle: string;
+  dueAt: Date | null;
+  currentStateKey: string | null;
+  currentStateName: string | null;
+  currentStateSince: Date | null;
+  currentStateMaxStay: number | null;
+  escalationAfterMinutes: number | null;
+  escalationRoleId: string | null;
+  transitions: Array<{ fromStateKey: string; roleIds: string[] }>;
 }
 
 /** Parsea (defensivo) la config de aviso congelada de una transición. JSON corrupto ⇒ null. */

@@ -66,6 +66,13 @@ export const incidentTypeSchema = z.object({
   requiresInvestigation: z.boolean(),
   requiresCapa: z.boolean(),
   reportableDefault: z.boolean(),
+  /** SLA light (4.4): minutos desde la creación para auto-fijar el plazo de resolución (null = sin plazo). */
+  resolutionDueMinutes: z.number().int().nullable(),
+  /** Escalamiento (4.4): minutos extra tras el plazo vencido para escalar el aviso (null = sin escalamiento). */
+  escalationAfterMinutes: z.number().int().nullable(),
+  /** Escalamiento (4.4): rol al que escala el aviso de plazo en el nivel 1 (null = sin escalamiento). */
+  escalationRoleId: z.string().nullable(),
+  escalationRoleName: z.string().nullable(),
   active: z.boolean(),
   sortOrder: z.number().int(),
 });
@@ -115,8 +122,10 @@ export const incidentListItemSchema = z.object({
   dueAt: z.string().nullable(),
   /** Fecha/hora en que OCURRIÓ el evento (ISO 14224); null = no declarada (usar createdAt). */
   occurredAt: z.string().nullable(),
-  /** SLA de permanencia: ¿el estado actual está atrasado? (derivado de maxStayMinutes). */
+  /** SLA de PERMANENCIA: ¿el estado actual está atrasado? (derivado de maxStayMinutes). */
   slaBreached: z.boolean(),
+  /** PLAZO de resolución vencido (derivado: lifecycle OPEN + dueAt < ahora). Distinto de slaBreached (4.4 §21). */
+  resolutionOverdue: z.boolean(),
   reportable: z.boolean(),
   /** Derivado: ¿tiene algún reporte PENDIENTE con el plazo vencido? (Fase 4.3). */
   reportOverdue: z.boolean(),
@@ -284,8 +293,10 @@ export const incidentListQuerySchema = z.object({
   mine: z.coerce.boolean().optional(),
   /** Solo sin responsable. */
   unassignedOnly: z.coerce.boolean().optional(),
-  /** Solo atrasadas (SLA de permanencia incumplido). */
+  /** Solo con el PLAZO de resolución vencido (lifecycle OPEN + dueAt < ahora). 4.4 §21. */
   overdueOnly: z.coerce.boolean().optional(),
+  /** Solo con la PERMANENCIA de estado excedida (SLA de maxStayMinutes; derivado). 4.4 §21. */
+  slaBreachedOnly: z.coerce.boolean().optional(),
   /** Solo reportables. */
   reportableOnly: z.coerce.boolean().optional(),
   /** Solo con algún reporte PENDIENTE y vencido (Fase 4.3). */
@@ -309,7 +320,10 @@ export type IncidentListResponse = z.infer<typeof incidentListResponseSchema>;
 export const incidentStatsSchema = z.object({
   open: z.number().int(),
   critical: z.number().int(),
+  /** Abiertas con el PLAZO de resolución vencido (dueAt < ahora). 4.4 §21 (antes = permanencia). */
   overdue: z.number().int(),
+  /** Abiertas con la PERMANENCIA de estado excedida (SLA de maxStayMinutes). 4.4 §21. */
+  slaBreached: z.number().int(),
   unassigned: z.number().int(),
   fromLogbook: z.number().int(),
   reportable: z.number().int(),
@@ -329,6 +343,12 @@ export const upsertIncidentTypeRequestSchema = z.object({
   requiresInvestigation: z.boolean().optional(),
   requiresCapa: z.boolean().optional(),
   reportableDefault: z.boolean().optional(),
+  /** SLA light (4.4): plazo de resolución en minutos (null = sin plazo automático). */
+  resolutionDueMinutes: z.number().int().min(1).max(525600).nullable().optional(),
+  /** Escalamiento (4.4): minutos tras el plazo vencido para escalar (null = sin escalamiento). */
+  escalationAfterMinutes: z.number().int().min(1).max(525600).nullable().optional(),
+  /** Escalamiento (4.4): rol al que escala el aviso de plazo (null = sin escalamiento). */
+  escalationRoleId: z.string().min(1).nullable().optional(),
   active: z.boolean().optional(),
   sortOrder: z.number().int().min(0).max(9999).optional(),
 });
@@ -348,4 +368,43 @@ export type UpsertIncidentCategoryRequest = z.infer<typeof upsertIncidentCategor
 export function deriveLifecycle(opts: { canceledAt: Date | null; currentStateIsFinal: boolean }): IncidentLifecycle {
   if (opts.canceledAt) return "CANCELED";
   return opts.currentStateIsFinal ? "CLOSED" : "OPEN";
+}
+
+// === SLA light (4.4): plazo de resolución + escalamiento (helpers PUROS) ======
+// Autoritativos back↔front. El "plazo de resolución" (dueAt) es un concepto DISTINTO
+// de la "permanencia de estado" (maxStayMinutes/evaluateSla); ver auditoría §21.
+
+/**
+ * Auto-fija el plazo de resolución a partir de la creación y el SLA del tipo.
+ * Devuelve `null` si el tipo no declara `resolutionDueMinutes` (sin plazo automático).
+ * El override explícito del usuario tiene prioridad y se aplica FUERA de este helper.
+ */
+export function resolutionDueFromType(createdAtMs: number, resolutionDueMinutes: number | null | undefined): Date | null {
+  if (resolutionDueMinutes == null || resolutionDueMinutes <= 0) return null;
+  return new Date(createdAtMs + resolutionDueMinutes * 60_000);
+}
+
+/** ¿El PLAZO de resolución está vencido? (incidencia abierta + dueAt en el pasado). */
+export function isResolutionOverdue(dueAt: Date | null | undefined, lifecycle: IncidentLifecycle, nowMs: number): boolean {
+  return lifecycle === "OPEN" && dueAt != null && dueAt.getTime() < nowMs;
+}
+
+/**
+ * Umbral de ESCALAMIENTO de nivel 1: momento a partir del cual el aviso de plazo
+ * también va al rol de escalamiento. Devuelve `null` si falta `dueAt` o el tipo no
+ * configura `escalationAfterMinutes` (sin escalamiento).
+ */
+export function escalationThreshold(dueAt: Date | null | undefined, escalationAfterMinutes: number | null | undefined): Date | null {
+  if (!dueAt || escalationAfterMinutes == null || escalationAfterMinutes <= 0) return null;
+  return new Date(dueAt.getTime() + escalationAfterMinutes * 60_000);
+}
+
+/** ¿Corresponde escalar (nivel 1) el aviso de plazo de esta incidencia AHORA? */
+export function shouldEscalate(
+  dueAt: Date | null | undefined,
+  escalationAfterMinutes: number | null | undefined,
+  nowMs: number,
+): boolean {
+  const threshold = escalationThreshold(dueAt, escalationAfterMinutes);
+  return threshold != null && threshold.getTime() <= nowMs;
 }

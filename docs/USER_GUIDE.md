@@ -118,6 +118,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 - ✅ **Acciones correctivas y preventivas (CAPA)** (con verificación de eficacia y bloqueo de cierre) (§ Incidencias ▸ Acciones CAPA)
 - ✅ **Investigación de causa raíz (5 Porqués)** (cadena de "porqués", causa raíz que bloquea el cierre, enlace a CAPA) (§ Incidencias ▸ Investigación de causa raíz)
 - ✅ **Reportabilidad (reportes a autoridades / obligaciones)** (obligaciones configurables, plazo, folio externo, bloqueo de cierre, vencido) (§ Incidencias ▸ Reportabilidad)
+- ✅ **Plazos (SLA), avisos de vencimiento y escalamiento** (plazo de resolución automático por tipo, avisos por correo y campanita, escalamiento a un superior) (§ Incidencias ▸ Plazos y avisos (SLA))
 - ✅ **Crear desde una bitácora** (botón "Reportar incidencia" en el visor de la entrada) (§ Incidencias ▸ Desde una bitácora)
 - ✅ **Administrar los catálogos** (tipos y categorías de incidencia) (§ Incidencias ▸ Catálogos) [solo administrador]
 
@@ -951,6 +952,53 @@ sus tipos/categorías ya viene con `incident:view`.
   lo impide (no la sobrescribe).
 - El **flujo por defecto debe estar publicado**: un borrador de flujo no se puede usar porque
   la incidencia congela el flujo al crearse.
+- En un **tipo** puedes configurar además el **plazo de resolución (SLA)** y el **escalamiento**
+  (ver «Incidencias ▸ Plazos y avisos (SLA)»).
+
+---
+
+### Incidencias ▸ Plazos y avisos (SLA)
+
+**Para qué sirve.** Que cada incidencia tenga un **plazo de resolución claro** y que el sistema
+**avise solo** cuando algo se está pasando de tiempo, por **correo y por la campanita**, sin que
+nadie tenga que estar revisando. Cubre cuatro vencimientos:
+- **Plazo de la incidencia** — la incidencia sigue abierta después de su fecha comprometida.
+- **Permanencia en un estado** — lleva demasiado tiempo en el mismo paso del flujo (SLA de estado).
+- **Acción CAPA vencida** — una acción correctiva/preventiva pasó su plazo.
+- **Reporte por vencer** — un reporte a una autoridad no se ha enviado y venció su plazo.
+
+**Cómo se usa.**
+- **Definir el plazo automático (administrador).** En **Incidencias ▸ Catálogos ▸ Tipos**, al
+  crear o editar un tipo, indica el **«Plazo de resolución (SLA)»** (en minutos, horas o días).
+  Desde entonces, cada incidencia nueva de ese tipo nace con su **fecha de plazo calculada**
+  (momento de creación + ese tiempo). Vacío = sin plazo automático.
+- **Ajustar el plazo de una incidencia.** En el detalle de la incidencia, pestaña **Resumen**,
+  el **«Plazo de resolución»** se puede **editar** (botón *Editar*). El cambio queda registrado
+  en la actividad de la incidencia. Un plazo puesto a mano **manda** sobre el automático.
+- **Configurar el escalamiento (administrador).** En el mismo tipo, define **«Escalar tras el
+  plazo»** (cuánto tiempo después de vencido) y el **«Rol de escalamiento»** (a quién avisar
+  además). Si una incidencia sigue vencida pasado ese tiempo, el aviso de plazo va **también**
+  a ese rol superior.
+- **Recibir los avisos.** Llegan por **correo** y por la **campanita** del topbar (según tus
+  preferencias en *Mis notificaciones*). El aviso de plazo se **repite a diario** mientras la
+  incidencia siga vencida; el de permanencia se manda una vez por cada vez que entra al estado.
+- **Encontrar lo vencido.** En **Incidencias**, los recuadros (KPI) **«Plazo vencido»** y
+  **«Permanencia excedida»** son clicables y filtran la lista; también están en el filtro
+  desplegable. En la lista y el tablero, cada incidencia muestra una etiqueta **«Plazo vencido»**
+  y/o **«Permanencia»** cuando corresponde.
+
+**Quién puede.** Configurar el plazo/escalamiento de un tipo exige permiso de **catálogos de
+incidencias**; **editar el plazo** de una incidencia exige permiso de **edición de incidencias**.
+Los avisos llegan a quien corresponde según su rol y lo que puede ver (nunca se avisa de algo
+fuera de su alcance). Recibir avisos no exige permiso especial: se ajusta en *Mis notificaciones*.
+
+**Importante.**
+- **«Plazo vencido» y «Permanencia excedida» son cosas distintas:** el primero es la fecha de
+  resolución comprometida (el plazo de la incidencia); el segundo es llevar demasiado tiempo en
+  un mismo estado del flujo. Se muestran y se filtran por separado.
+- El plazo automático usa la **fecha de creación** (cuándo se reportó), no la fecha del evento.
+- El escalamiento es a **un nivel** (un rol superior). Avisa **además** del responsable, no en
+  vez de él.
 
 ---
 

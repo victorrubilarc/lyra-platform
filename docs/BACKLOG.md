@@ -5,7 +5,18 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-17** (**Shell: sidebar premium + Favoritos al topbar ✅** — `feat/sidebar-premium`: por feedback del dueño
+> actualización: **2026-06-17** (**Fase 4.4 — SLA de incidencias + avisos de plazo + escalamiento ✅** — `feat/incidencias-sla`:
+> plazos de resolución que AVISAN al vencer (correo + campanita) con escalamiento, reusando el motor del Bloque N. SLA light
+> (`IncidentType.resolutionDueMinutes` → auto-`dueAt` + override editable con auditoría `DUE_CHANGED`); **4 eventos derivados**
+> (`incident.sla.breached`/`incident.overdue`/`incident.action.overdue`/`incident.report.due`) detectados por `IncidentSlaService` y
+> barridos en `NotificationWorkerService.sweep()`; **escalamiento re-aviso diario + 1 nivel** (`escalationAfterMinutes`/`escalationRoleId`);
+> **§21 desambiguado** (Permanencia [maxStayMinutes] vs Plazo [dueAt] — KPIs/filtros/chips/stats aparte); destinatarios = asignado +
+> roles del estado + escalamiento, ABAC por nodo. Migración aditiva `…_add_incident_sla`. **Sin permiso nuevo (cat. 83, sin FLUSHALL).**
+> Contracts 303 · API 247 · smoke `smoke-incidencias-sla.py` 25/25 + regresión incidencias 32/32 · capa 23/23 · investigación 27/27 ·
+> reportabilidad 31/31 · notif-avanzadas 22/22 · notif-inapp 18/18 · notificaciones 18/18. **Salda el aviso de plazo de reportes 4.3 y
+> CAPA.** **PENDIENTE: smoke VISUAL del dueño.** **Deuda:** picker de rol de escalamiento usa `role:read` (→ `role-options` decoplado) ·
+> plantilla INAPP propia · escalamiento multi-nivel/tiers (diferido). **Siguiente: 4.5 (dashboard de incidencias).** Anterior:
+> **Shell: sidebar premium + Favoritos al topbar ✅** — `feat/sidebar-premium`: por feedback del dueño
 > (módulos pequeños / menú estrecho / "que se vea premium"). **(1) Premium del lateral (solo CSS):** ancho 244→**288px** + **riel
 > colapsado afinado** (scrollbar fina en vez de la gruesa del sistema, íconos compactos sin scroll horizontal), texto de
 > módulos 13.5→**14.5px**, activo a peso 600, íconos 18→**19px**, encabezados de grupo 10.5→**11px**, más aire. **(2) Favoritos al
@@ -392,8 +403,12 @@ nunca queda más de una sesión atrás.
       `smoke-incidencias-reportabilidad.py` 31/31 + regresión sin romper. **Deuda 4.3:** subida de **evidencia del envío** (Storage Ola
       3; `IncidentReport.evidence Json?` ya reservado) · **firma Part 11** al marcar enviado · **aviso de plazo** "por vencer/vencido"
       (→ 4.4 + notificaciones avanzadas; el dato/estado ya está, falta el disparo).
-- [ ] **4.4 · SLA/notificaciones/escalamiento** (depende del épico de **notificaciones avanzadas**) + unificar el criterio de
-      "vencida" (`dueAt` vs `maxStayMinutes`, hoy desalineados — §21 de la auditoría) + **aviso de plazo de los reportes de 4.3**.
+- [x] **4.4 · SLA/notificaciones/escalamiento ✅** (`feat/incidencias-sla`): SLA light (`IncidentType.resolutionDueMinutes` →
+      auto-`dueAt` + override editable con auditoría) + 4 eventos derivados del Bloque N + sweeper en el worker + escalamiento
+      (re-aviso diario + 1 nivel `escalationAfterMinutes`/`escalationRoleId`) + **§21 desambiguado** (Permanencia vs Plazo, stats/
+      filtros/KPIs aparte) + **aviso de plazo de reportes 4.3 y CAPA saldado**. Sin permiso nuevo (cat. 83). Contracts 303 · API 247 ·
+      smoke `smoke-incidencias-sla.py` 25/25 + regresión. **Deuda 4.4:** rol de escalamiento usa `role:read` (→ `role-options`
+      decoplado) · plantilla INAPP propia · escalamiento multi-nivel/tiers (diferido, ver §"Escalamiento por TIERS"). **Pendiente: smoke VISUAL.**
 - [ ] **4.5 · Dashboard/analítica** (MTTR, reincidencia, CAPA vencidas).
 - [ ] **Mejoras menores de la auditoría:** campos universales en el alta (medida inmediata, impactos) · dedup entre incidencias ·
       separar seed núcleo neutro vs paquetes verticales por industria (la arquitectura ya lo permite como datos).
@@ -533,8 +548,11 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
 - [ ] **4.3 — HSE Chile / minería.** Clasificación (near-miss/CTP/STP/enf. profesional/ambiental/derrame/daño) + potencial de gravedad
       fino + flags reportables (SERNAGEOMIN/mutualidad) + DIAT/DIEP (registro/adjunto) + **IF/IG** (requiere fuente de **HH trabajadas**,
       que HOY no existe) + ICAM como plantilla de investigación (evaluar reuso del form-builder).
-- [ ] **4.4 — SLA + Notificaciones + Escalamiento.** SLA por estado/tipo/severidad + escalamiento + integración Bloque N (creación/
-      asignación/cambio de estado/SLA/crítica/CAPA vencida). **← roza el épico de notificaciones avanzadas** (abajo).
+- [x] **4.4 — SLA + Notificaciones + Escalamiento ✅** (`feat/incidencias-sla`). SLA light de resolución (auto-`dueAt` desde el tipo +
+      override editable con auditoría `DUE_CHANGED`); 4 eventos derivados del Bloque N (`incident.sla.breached`/`incident.overdue`/
+      `incident.action.overdue`/`incident.report.due`) detectados por `IncidentSlaService` y emitidos por el sweeper del worker (correo +
+      campanita); escalamiento = re-aviso diario + 1 nivel configurable; §21 desambiguado (Permanencia vs Plazo). Sin permiso nuevo.
+      Smoke `smoke-incidencias-sla.py` 25/25.
 - [ ] **4.5 — Dashboard e indicadores** (por tipo/estado/severidad/nodo/equipo/turno/origen + tendencias + reincidencias + MTTR + SLA +
       CAPA + IF/IG + heatmap + export).
 - [ ] **4.6 (candidata) — Evaluación de riesgo FMEA/RPN + escalamiento dinámico del RCA → DIFERIDO, opt-in, solo bajo demanda
@@ -571,8 +589,14 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
       es null, el correo se resuelve **solo por suscripciones** (no se hace fan-out automático a todos los que alcanzan el nodo, para evitar
       tormentas de avisos). El worklist in-app SÍ muestra esas rondas a todos los que alcanzan el nodo. Si se quiere el fan-out por nodo en
       correo, requiere un reverse-ABAC acotado (quién alcanza el nodo). **A confirmar con el dueño.**
-- [ ] **Escalamiento por TIERS** (recordatorio diario / a un superior si sigue vencida), estilo PagerDuty escalation policy. Hoy = 1 aviso por
-      ocurrencia/breach por destinatario (dedup).
+- [~] **Escalamiento por TIERS** (estilo PagerDuty escalation policy, N niveles con timeout por nivel). **Parcialmente cubierto por 4.4:**
+      las INCIDENCIAS ya tienen **re-aviso diario + 1 nivel** configurable (`IncidentType.escalationAfterMinutes`/`escalationRoleId`). Falta
+      el escalamiento multi-nivel (tiers) y extenderlo a `round.overdue`/`entry.sla.breached`. **Diferido** (4.4 cubre el 90%).
+- [ ] **4.4 — rol de escalamiento sin endpoint propio.** El picker del rol de escalamiento en `IncidentTypeModal` usa `useRoles()` (gate
+      `role:read`): un admin de catálogo (`incidentcatalog:manage`) SIN `role:read` ve la lista vacía. Igual deuda que el picker de rol
+      responsable de CAPA → crear un `role-options` decoplado del módulo de incidencias (patrón `schedules/role-options`).
+- [ ] **4.4 — plantilla INAPP propia para los eventos de incidencias** (hoy la campanita reusa el contenido de la plantilla EMAIL, misma
+      deuda transversal del canal in-app).
 - [ ] **Smoke en vivo de `entry.transition` / `entry.sla.breached` / `entry.signature.pending`.** Los resolvers están typecheck+wired y comparten
       el pipeline (dispatcher/sender/render/ABAC/dedup/opt-out) ya probado end-to-end vía `round.overdue` (smoke 17/17). Falta un smoke que
       siembre una entrada + flujo + transición real y verifique el correo (necesita plantilla publicada con workflow + secciones completas).

@@ -16,6 +16,7 @@ import {
   useIncidentInvestigation,
   useIncidentReports,
   useTransitionIncident,
+  useUpdateIncident,
 } from "./incidents-queries.js";
 import { IncidentActionsBlock } from "./IncidentActionsBlock.js";
 import { IncidentInvestigationBlock } from "./IncidentInvestigationBlock.js";
@@ -31,6 +32,13 @@ interface Props {
   onClose: () => void;
 }
 
+/** ISO → valor de un <input type="datetime-local"> (hora local, sin segundos). */
+function toLocalInput(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export function IncidentDetailDrawer({ incidentId, onClose }: Props) {
   const { can } = usePermissions();
   const toast = useToast();
@@ -40,7 +48,10 @@ export function IncidentDetailDrawer({ incidentId, onClose }: Props) {
   const comment = useCommentIncident();
   const transition = useTransitionIncident();
   const cancel = useCancelIncident();
+  const updateIncident = useUpdateIncident();
 
+  const [dueEditing, setDueEditing] = useState(false);
+  const [dueDraft, setDueDraft] = useState("");
   const [commentText, setCommentText] = useState("");
   const [pending, setPending] = useState<IncidentAvailableTransition | null>(null);
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -149,7 +160,43 @@ export function IncidentDetailDrawer({ incidentId, onClose }: Props) {
                   <dd><Link to={`/bitacoras/${inc.originLogEntryId}`} className={styles.link}>Entrada #{inc.originLogEntryNumber}</Link></dd>
                 </>
               )}
-              {inc.dueAt && (<><dt>Vence</dt><dd className={inc.slaBreached ? styles.overdue : ""}>{formatDateTime(inc.dueAt)}</dd></>)}
+              <dt>Plazo de resolución</dt>
+              <dd className={inc.resolutionOverdue ? styles.overdue : ""}>
+                {dueEditing ? (
+                  <span className={styles.dueEditRow}>
+                    <Input
+                      type="datetime-local"
+                      value={dueDraft}
+                      onChange={(e) => setDueDraft(e.target.value)}
+                      aria-label="Plazo de resolución"
+                    />
+                    <Button
+                      variant="primary"
+                      loading={updateIncident.isPending}
+                      onClick={() => {
+                        updateIncident.mutate(
+                          { id: inc.id, dto: { dueAt: dueDraft ? new Date(dueDraft).toISOString() : null } },
+                          {
+                            onSuccess: () => { toast.success("Plazo actualizado"); setDueEditing(false); },
+                            onError: (e) => toast.error((e as Error).message || "No se pudo actualizar el plazo"),
+                          },
+                        );
+                      }}
+                    >Guardar</Button>
+                    <Button variant="secondary" onClick={() => setDueEditing(false)}>Cancelar</Button>
+                  </span>
+                ) : (
+                  <span className={styles.dueEditRow}>
+                    <span>{inc.dueAt ? `${formatDateTime(inc.dueAt)}${inc.resolutionOverdue ? " · vencido" : ""}` : "sin plazo"}</span>
+                    {can("incident:edit") && inc.lifecycle === "OPEN" && (
+                      <Button variant="secondary" onClick={() => { setDueDraft(inc.dueAt ? toLocalInput(inc.dueAt) : ""); setDueEditing(true); }}>
+                        Editar
+                      </Button>
+                    )}
+                  </span>
+                )}
+              </dd>
+              {inc.slaBreached && (<><dt>Permanencia</dt><dd className={styles.overdue}>Lleva demasiado tiempo en este estado</dd></>)}
             </dl>
           </div>
 

@@ -101,6 +101,17 @@ imponga un marco regulatorio fijo.
 **Beneficio:** cumples tus obligaciones de **reportabilidad** con trazabilidad y sin depender de la
 memoria de una persona; en una auditoría muestras qué se reportó, a quién, cuándo y con qué folio.
 
+### ⏱️ Plazos que avisan solos + escalamiento (SLA de incidencias)
+Cada tipo de incidencia puede tener un **plazo de resolución** (SLA) que se aplica **automáticamente**
+al crearla. Si una incidencia, una acción correctiva o un reporte a la autoridad **se pasa de su
+plazo**, la plataforma **avisa sola** por **correo y por la campanita** al responsable y a quienes
+deben actuar — y si sigue vencida, **escala a un superior** que tú configuras. El recordatorio se
+repite a diario hasta que se resuelve. Además se distingue claramente entre **«plazo de resolución
+vencido»** y **«lleva demasiado tiempo en un estado»** (dos problemas distintos, con sus propios
+indicadores y filtros). Todo reusa el mismo motor de avisos del producto (sin servicios externos).
+**Beneficio:** nada se queda olvidado en un cajón. Los atrasos **se ven y se avisan** antes de que se
+conviertan en un incumplimiento; el supervisor se entera **a tiempo**, no en la auditoría.
+
 ### 🔗 De la bitácora a la acción (sin saltos manuales)
 Cuando un dato de una bitácora se sale de umbral, el sistema puede generar una **excepción
 operacional** revisable y, si amerita, convertirla en **incidencia** — conservando el **valor

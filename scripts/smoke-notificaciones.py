@@ -99,10 +99,12 @@ def main():
 
     # === 1. Catálogo + plantillas ===
     s, r = call("GET", "/notifications/events", tok)
-    check("1a catálogo de eventos (4)", s == 200 and len(r.get("events", [])) == 4, f"{s}")
+    ev_keys = {e.get("key") for e in r.get("events", [])} if s == 200 else set()
+    # 4 base + 4 de incidencias (Fase 4.4). Se asegura la presencia de las base.
+    check("1a catálogo de eventos (8: 4 base + 4 incidencias)", s == 200 and len(ev_keys) >= 8 and "round.overdue" in ev_keys and "incident.overdue" in ev_keys, f"{s} n={len(ev_keys)}")
     s, r = call("GET", "/notifications/templates", tok)
     tpls = r.get("templates", []) if s == 200 else []
-    check("1b plantillas sembradas (4)", s == 200 and len(tpls) == 4, f"{s} n={len(tpls)}")
+    check("1b plantillas sembradas (8: 4 base + 4 incidencias)", s == 200 and len(tpls) >= 8, f"{s} n={len(tpls)}")
 
     # === 2. Render whitelist (sobre entry.transition para no tocar round.overdue) ===
     tr = next((t for t in tpls if t["eventKey"] == "entry.transition"), None)

@@ -3,6 +3,7 @@ import { AuthModule } from "../auth/auth.module";
 import { IncidentActionsService } from "./incident-actions.service";
 import { IncidentInvestigationService } from "./incident-investigation.service";
 import { IncidentReportsService } from "./incident-reports.service";
+import { IncidentSlaService } from "./incident-sla.service";
 import { IncidentsController } from "./incidents.controller";
 import { IncidentsService } from "./incidents.service";
 
@@ -15,7 +16,7 @@ import { IncidentsService } from "./incidents.service";
 @Module({
   imports: [AuthModule],
   controllers: [IncidentsController],
-  providers: [IncidentsService, IncidentActionsService, IncidentInvestigationService, IncidentReportsService],
-  exports: [IncidentsService, IncidentActionsService, IncidentInvestigationService, IncidentReportsService],
+  providers: [IncidentsService, IncidentActionsService, IncidentInvestigationService, IncidentReportsService, IncidentSlaService],
+  exports: [IncidentsService, IncidentActionsService, IncidentInvestigationService, IncidentReportsService, IncidentSlaService],
 })
 export class IncidentsModule {}

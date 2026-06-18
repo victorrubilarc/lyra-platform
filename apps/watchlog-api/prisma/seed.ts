@@ -409,12 +409,14 @@ async function seedOperationalCalendar(): Promise<void> {
 async function seedNotificationTemplates(): Promise<void> {
   let created = 0;
   for (const t of NOTIFICATION_TEMPLATE_SEEDS) {
-    const existing = await prisma.notificationTemplate.findUnique({
-      where: { eventKey_locale_channel: { eventKey: t.eventKey, locale: t.locale, channel: t.channel } },
+    // Las plantillas de sistema son GENÉRICAS (templateId null); la unique pasó a
+    // incluir templateId en Fase A, así que se busca la genérica con findFirst.
+    const existing = await prisma.notificationTemplate.findFirst({
+      where: { eventKey: t.eventKey, locale: t.locale, channel: t.channel, templateId: null },
     });
     if (existing) continue;
     await prisma.notificationTemplate.create({
-      data: { ...t, active: true, isSystem: true },
+      data: { ...t, templateId: null, active: true, isSystem: true },
     });
     created++;
   }
