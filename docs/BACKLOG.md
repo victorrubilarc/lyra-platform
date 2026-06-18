@@ -5,7 +5,16 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-17** (**Fase 4.5 — Dashboard de incidencias ✅ → FASE 4 COMPLETA** — `feat/incidencias-dashboard`:
+> actualización: **2026-06-18** (**Sesión QA / validación end-to-end** — sin features nuevas:
+> se creó `scripts/seed-demo-planta.py` (escenario «Faena Demo QA» = concentradora de cobre, idempotente, marca
+> DEMOQA, comando `--clean` verificado sin residuos) + `docs/QA_WALKTHROUGH.md` (guion 13 bloques + 9 credenciales
+> `@planta.local`/`Demo!Pass2026` + checklist + tabla de HALLAZGOS). Sembrado: estructura 4 niveles/17 nodos + 13
+> equipos + 3 listas ref + calendarios A/B y fiscal + plantilla multi-actor con umbral/condicional/regla→incidencia +
+> flujo bitácora (firma/MFA/SLA) + SLA+escalamiento en tipos + 2 rondas (3 vencidas) + **64 incidencias históricas
+> envejecidas por SQL** (50 cerradas/8 plazo vencido/reincidencia + 14 CAPA + 12 reportes) + 3 en vivo + 30 avisos.
+> **ABAC verificado** (sup.flotación NO ve Molienda; admin ve todo). **HALLAZGOS: el recorrido guiado los irá poblando
+> (§ pendiente en QA_WALKTHROUGH y aquí).** Anterior:
+> **Fase 4.5 — Dashboard de incidencias ✅ → FASE 4 COMPLETA** — `feat/incidencias-dashboard`:
 > analítica read-only con ABAC por nodo (mismo `buildWhere`), filtros 1 línea + rango de fechas, **Recharts** con tokens del DS
 > (claro/oscuro), export CSV y **drill-down** por querystring. Endpoint `GET /incidents/dashboard` (`groupBy` + `$queryRaw` acotado,
 > **nunca filas al cliente**, TZ de planta `PLANT_TIME_ZONE`). KPIs (creadas/cerradas/abiertas/críticas/plazo/permanencia/MTTR/
