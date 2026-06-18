@@ -4,6 +4,43 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-17 · Incidencias 4.5 — Dashboard de incidencias (analítica read-only, ABAC por nodo)
+
+**Contexto:** la Fase 4 ya tenía todos los datos para analítica (severidad/riesgo, lifecycle, originType, nodo/equipo/turno, flujo
+congelado, `dueAt` + doble "vencida" del §21, CAPA, investigación, reportabilidad, timeline). Faltaba la **vista analítica**: KPIs de
+periodo, tendencias y desgloses. Con 4.5 la Fase 4 queda COMPLETA.
+
+**Contraste con el estándar (no se inventan métricas):** ISO 45001 §9.1 (seguimiento/medición), ISO 9001 §10.2 (CAPA + eficacia),
+ISO 14224 / ITIL (MTTR, *time-to-resolution*), Pareto 80/20 (priorización), ITIL SLA attainment (% dentro de plazo), fiabilidad
+(reincidencia = fallas repetidas). **IF/IG (índices de frecuencia/gravedad) quedan DIFERIDOS**: requieren **HH trabajadas**, fuente
+que HOY no existe (ya en BACKLOG/ROADMAP). No se fabrican.
+
+**Decisión (forks resueltos con el dueño; los contestados explícitamente + los recomendados no objetados):**
+- **(a) Ubicación = página propia `/incidencias/dashboard`** con botón "Dashboard" en el header de `/incidencias` (patrón de
+  `/incidencias/catalogos` y `/seguridad/*`); **NO va en el sidebar** (evita el doble-resaltado por `startsWith`).
+- **(b) Agregación = un endpoint dedicado `GET /incidents/dashboard`** que agrega SIEMPRE en el backend (Prisma `groupBy` para
+  distribuciones/reincidencia; `$queryRaw` acotado para la tendencia bucketizada, MTTR y cumplimiento de SLA). **Nunca se traen filas
+  al cliente.** Reusa el MISMO cálculo de ABAC por nodo que `IncidentsService.buildWhere` (un `IncidentDashboardService` replica la
+  resolución de `getAccessibleNodeIds` ∩ `orgNodeIds`). Rango por `createdFrom`/`createdTo` (añadidos también a la query de la lista,
+  aditivo). **Zona horaria de PLANTA** para el bucketing (`PLANT_TIME_ZONE`, default `America/Santiago`) — single-tenant ⇒ una sola
+  TZ, no se infiere del navegador. **KPIs de estado vivo** (open/critical/overdue/permanencia/CAPA/reportes) NO se acotan al rango
+  (son estado "ahora"); **created/closed/distribuciones/tendencia/reincidencia** SÍ son del periodo.
+- **(c) Librería = Recharts** (ya era dependencia del web y la usa el `prototipo.tsx`; MIT, on-prem sin CDN, composable). Colores
+  **vía tokens del DS** (`var(--color-…)`) para respetar claro/oscuro — NO los hex en duro del prototipo.
+- **(d) Export = CSV** de las tablas agregadas (cliente, desde el payload ya traído; BOM + CRLF para Excel). **PNG diferido** (deuda).
+- **(e) Permisos = SIN permiso nuevo, reusa `incident:view`.** El dashboard no expone nada que el usuario no vea ya (mismo ABAC); un
+  `incident:dashboard:view`/`incident:export` sería parametrizar sin driver (YAGNI) y obligaría a FLUSHALL. **Sin migración** (es
+  lectura/agregación; el único cambio de contrato es aditivo: `createdFrom`/`createdTo` + el contrato del dashboard).
+- **(f) Drill-down = SÍ:** clic en barra/segmento/KPI navega a `/incidencias` con el querystring (rango + dimensión). La lista se
+  SIEMBRA desde el querystring (tipo/severidad/lifecycle/flags como controles; origen/equipo/nodo/rango como pase directo). Si llega
+  rango sin lifecycle explícito, la lista muestra TODAS (no solo abiertas) para coincidir con el conteo de la barra.
+
+**Métricas confirmadas:** conteos de periodo; tendencia creación vs cierre; MTTR (MTTA diferido); distribución por tipo (Pareto)/
+severidad/nodo/equipo/turno/origen; reincidencia (mismo tipo+equipo en ventana, default 30 días); CAPA abiertas/vencidas/eficacia;
+reportes pendientes/vencidos; cumplimiento de SLA de plazo.
+
+---
+
 ### 2026-06-17 · Incidencias 4.4 — SLA de resolución + avisos de plazo + escalamiento (reusa el Bloque N)
 
 **Contexto:** las incidencias guardaban `dueAt` y lo mostraban, pero el KPI/filtro "vencidas" usaba `slaBreached` (permanencia de

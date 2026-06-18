@@ -77,3 +77,6 @@ export * from "./incidents/investigation.js";
 
 // Reportabilidad configurable de incidencias (Fase 4.3)
 export * from "./incidents/reporting.js";
+
+// Dashboard de incidencias (Fase 4.5)
+export * from "./incidents/dashboard.js";

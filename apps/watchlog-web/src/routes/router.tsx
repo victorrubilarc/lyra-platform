@@ -32,6 +32,7 @@ import { MyRoundsPage } from "../features/schedules/MyRoundsPage.js";
 import { NotificationsPage } from "../features/notifications/NotificationsPage.js";
 import { MyNotificationsPage } from "../features/notifications/MyNotificationsPage.js";
 import { IncidentsPage } from "../features/incidents/IncidentsPage.js";
+import { IncidentDashboardPage } from "../features/incidents/IncidentDashboardPage.js";
 import { CatalogsPage } from "../features/incidents/CatalogsPage.js";
 import { ExceptionsPage } from "../features/exceptions/ExceptionsPage.js";
 
@@ -66,6 +67,7 @@ export const router = createBrowserRouter([
           { path: "/mis-rondas", element: <MyRoundsPage /> },
           { path: "/rondas", element: <SchedulesPage /> },
           { path: "/incidencias", element: <IncidentsPage /> },
+          { path: "/incidencias/dashboard", element: <IncidentDashboardPage /> },
           { path: "/incidencias/catalogos", element: <CatalogsPage /> },
           { path: "/excepciones", element: <ExceptionsPage /> },
           { path: "/notificaciones", element: <NotificationsPage /> },

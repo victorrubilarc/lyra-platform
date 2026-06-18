@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { AlertTriangle, LayoutGrid, List, Plus, Search, Tags } from "lucide-react";
+import { AlertTriangle, BarChart3, LayoutGrid, List, Plus, Search, Tags } from "lucide-react";
 import type { IncidentListItem, IncidentListQuery } from "@lyra/contracts";
 import { Button, Card, EmptyState, GridPager, Input, Select, Spinner } from "@lyra/ui";
 import { usePermissions } from "../../auth/use-permissions.js";
@@ -25,13 +25,27 @@ export function IncidentsPage() {
   const initialNode = params.get("fromNode");
   const [createOpen, setCreateOpen] = useState(!!initialOrigin);
 
+  // Drill-down desde el dashboard (Fase 4.5): la lista se SIEMBRA desde el querystring.
+  // Si llega un rango (createdFrom) sin lifecycle explícito, se muestran TODAS (no solo
+  // abiertas) para coincidir con el conteo de la barra/segmento clicado.
+  const FLAG_KEYS = ["mine", "unassignedOnly", "overdueOnly", "slaBreachedOnly", "reportableOnly", "reportOverdueOnly", "fromLogbookOnly"] as const;
+  const initialFlag = FLAG_KEYS.find((k) => params.get(k) === "true") ?? "";
   const [search, setSearch] = useState("");
-  const [lifecycle, setLifecycle] = useState<IncidentListQuery["lifecycle"] | "">("OPEN");
-  const [typeId, setTypeId] = useState("");
-  const [severity, setSeverity] = useState("");
-  const [priority, setPriority] = useState<IncidentListQuery["priority"] | "">("");
-  const [flag, setFlag] = useState<"" | "mine" | "unassignedOnly" | "overdueOnly" | "slaBreachedOnly" | "reportableOnly" | "reportOverdueOnly" | "fromLogbookOnly">("");
+  const [lifecycle, setLifecycle] = useState<IncidentListQuery["lifecycle"] | "">(
+    (params.get("lifecycle") as IncidentListQuery["lifecycle"] | null) ?? (params.has("createdFrom") ? "" : "OPEN"),
+  );
+  const [typeId, setTypeId] = useState(params.get("typeId") ?? "");
+  const [severity, setSeverity] = useState(params.get("severity") ?? "");
+  const [priority, setPriority] = useState<IncidentListQuery["priority"] | "">((params.get("priority") as IncidentListQuery["priority"] | null) ?? "");
+  const [flag, setFlag] = useState<"" | "mine" | "unassignedOnly" | "overdueOnly" | "slaBreachedOnly" | "reportableOnly" | "reportOverdueOnly" | "fromLogbookOnly">(initialFlag);
   const [sort, setSort] = useState<IncidentListQuery["sort"]>("recent");
+
+  // Pase directo del drill-down (sin control visible): origen/equipo/nodo/rango.
+  const passOriginType = (params.get("originType") as IncidentListQuery["originType"] | null) ?? undefined;
+  const passEquipmentId = params.get("equipmentId") ?? undefined;
+  const passOrgNodeIds = params.get("orgNodeIds")?.split(",").filter(Boolean);
+  const passCreatedFrom = params.get("createdFrom") ?? undefined;
+  const passCreatedTo = params.get("createdTo") ?? undefined;
 
   const query: IncidentListQuery = useMemo(() => ({
     search: search.trim() || undefined,
@@ -39,11 +53,16 @@ export function IncidentsPage() {
     typeId: typeId || undefined,
     severity: severity ? Number(severity) : undefined,
     priority: priority || undefined,
+    originType: passOriginType,
+    equipmentId: passEquipmentId,
+    orgNodeIds: passOrgNodeIds && passOrgNodeIds.length ? passOrgNodeIds : undefined,
+    createdFrom: passCreatedFrom ? new Date(passCreatedFrom) : undefined,
+    createdTo: passCreatedTo ? new Date(passCreatedTo) : undefined,
     sort,
     ...(flag ? { [flag]: true } : {}),
     page: view === "list" ? page : 1,
     pageSize: view === "list" ? pageSize : 200,
-  }), [search, lifecycle, typeId, severity, priority, sort, flag, page, pageSize, view]);
+  }), [search, lifecycle, typeId, severity, priority, passOriginType, passEquipmentId, passOrgNodeIds, passCreatedFrom, passCreatedTo, sort, flag, page, pageSize, view]);
 
   const { data, isLoading } = useIncidents(query);
   const { data: stats } = useIncidentStats();
@@ -64,6 +83,9 @@ export function IncidentsPage() {
           <p className={styles.sub}>Gestión de incidencias operacionales y HSE.</p>
         </div>
         <div className={styles.headerActions}>
+          <Link to="/incidencias/dashboard">
+            <Button variant="secondary" leftIcon={<BarChart3 size={16} />}>Dashboard</Button>
+          </Link>
           {can("incidentcatalog:manage") && (
             <Link to="/incidencias/catalogos">
               <Button variant="secondary" leftIcon={<Tags size={16} />}>Catálogos</Button>

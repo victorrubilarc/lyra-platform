@@ -303,6 +303,10 @@ export const incidentListQuerySchema = z.object({
   reportOverdueOnly: z.coerce.boolean().optional(),
   /** Solo creadas desde una bitácora/excepción/regla. */
   fromLogbookOnly: z.coerce.boolean().optional(),
+  /** Rango por fecha de creación (inclusive desde). ISO; usado por la lista y el dashboard (4.5). */
+  createdFrom: z.coerce.date().optional(),
+  /** Rango por fecha de creación (inclusive hasta). ISO; usado por la lista y el dashboard (4.5). */
+  createdTo: z.coerce.date().optional(),
   sort: z.enum(["recent", "severity", "priority", "due"]).optional(),
   page: z.coerce.number().int().min(1).optional(),
   pageSize: z.coerce.number().int().min(1).max(200).optional(),

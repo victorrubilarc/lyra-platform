@@ -353,6 +353,16 @@ GxP: MHRA Data Integrity 2018 / FDA DI Q&A (corrección tardía justificada + at
   el secreto del `.env` sigue fuera del repo. **Toggle "Correo activado"**: apagado ⇒ el worker marca los correos SUPPRESSED (no se
   envía; la recuperación de contraseña y los avisos no rompen el flujo).
 
+### Dashboard de incidencias (Fase 4.5) — agregación con ABAC por nodo
+- **La autorización y la agregación viven en el backend** (`IncidentDashboardService`, endpoint `GET /incidents/dashboard`, gate
+  `incident:view`). El servicio **replica el ABAC de la lista** (`getAccessibleNodeIds(userId)` ∩ `orgNodeIds` de la query): un
+  usuario con alcance limitado **NUNCA agrega incidencias de nodos ajenos** — si su alcance es vacío, el payload es vacío. Verificado
+  en vivo (`smoke-incidencias-dashboard.py`: un usuario scoped a un nodo no ve el conteo del nodo ajeno; el admin sí ve ambos).
+- **Solo lectura.** No expone nada que el usuario no pueda ver ya por la lista; por eso **reusa `incident:view`** (sin permiso nuevo,
+  sin migración). Agrega con `groupBy`/`$queryRaw` (nunca trae filas al navegador) y **no usa `eval`** (el bucketing es `date_trunc`
+  parametrizado; la TZ de planta es un valor de entorno, no entrada del usuario).
+- El front solo **visualiza** y enlaza (drill-down a la lista por querystring); la verdad de permisos y de datos es del backend.
+
 ### Motor de reglas de negocio — expresión SEGURA (Req-7, primer corte)
 - **Sin `eval` ni scripting libre.** Las fórmulas (campos formulados) y las reglas cruzadas se expresan como un **AST
   con LISTA BLANCA de operadores** (tipo JSONLogic) evaluado por un intérprete **PURO** y SÍNCRONO en `@lyra/contracts/

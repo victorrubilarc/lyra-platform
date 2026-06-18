@@ -1,4 +1,4 @@
-import { AlertOctagon, AlertTriangle, Bell, BookOpenCheck, CalendarClock, CalendarRange, FilePlus2, GitBranch, LayoutDashboard, Layers, ListChecks, ListTodo, Network, Route, Settings, ShieldCheck, Tags, UserCog, type LucideIcon } from "lucide-react";
+import { AlertOctagon, AlertTriangle, BarChart3, Bell, BookOpenCheck, CalendarClock, CalendarRange, FilePlus2, GitBranch, LayoutDashboard, Layers, ListChecks, ListTodo, Network, Route, Settings, ShieldCheck, Tags, UserCog, type LucideIcon } from "lucide-react";
 import type { Permission } from "@lyra/permissions";
 
 /**
@@ -124,6 +124,16 @@ export const ROUTES: readonly NavRoute[] = [
     labelKey: "nav.incidentCatalogs",
     icon: Tags,
     permission: "incidentcatalog:manage",
+    inSidebar: false,
+  },
+  // Dashboard de incidencias (Fase 4.5): analítica read-only. Sub-ruta de
+  // /incidencias, NO va en el sidebar (evita doble-resaltado del padre); se
+  // accede por el botón del header de /incidencias. Mismo gate que la lista.
+  {
+    path: "/incidencias/dashboard",
+    labelKey: "nav.incidentDashboard",
+    icon: BarChart3,
+    permission: "module:incidents:view",
     inSidebar: false,
   },
   {

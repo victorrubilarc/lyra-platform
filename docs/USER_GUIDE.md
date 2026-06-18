@@ -119,6 +119,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 - ✅ **Investigación de causa raíz (5 Porqués)** (cadena de "porqués", causa raíz que bloquea el cierre, enlace a CAPA) (§ Incidencias ▸ Investigación de causa raíz)
 - ✅ **Reportabilidad (reportes a autoridades / obligaciones)** (obligaciones configurables, plazo, folio externo, bloqueo de cierre, vencido) (§ Incidencias ▸ Reportabilidad)
 - ✅ **Plazos (SLA), avisos de vencimiento y escalamiento** (plazo de resolución automático por tipo, avisos por correo y campanita, escalamiento a un superior) (§ Incidencias ▸ Plazos y avisos (SLA))
+- ✅ **Dashboard de incidencias** (tendencias e indicadores: MTTR, cumplimiento de SLA, Pareto por tipo, reincidencia, CAPA/reportes; con rango de fechas, export CSV y clic-para-filtrar) (§ Incidencias ▸ Dashboard)
 - ✅ **Crear desde una bitácora** (botón "Reportar incidencia" en el visor de la entrada) (§ Incidencias ▸ Desde una bitácora)
 - ✅ **Administrar los catálogos** (tipos y categorías de incidencia) (§ Incidencias ▸ Catálogos) [solo administrador]
 
@@ -999,6 +1000,48 @@ fuera de su alcance). Recibir avisos no exige permiso especial: se ajusta en *Mi
 - El plazo automático usa la **fecha de creación** (cuándo se reportó), no la fecha del evento.
 - El escalamiento es a **un nivel** (un rol superior). Avisa **además** del responsable, no en
   vez de él.
+
+---
+
+### Incidencias ▸ Dashboard
+
+**Para qué sirve.** Es la pantalla de **análisis** del módulo: en vez de buscar incidencia por
+incidencia, muestra **tendencias e indicadores de gestión** del periodo que elijas —cuántas se
+abren y se cierran en el tiempo, cuánto se demora en resolverlas (MTTR), qué tipos concentran el
+problema (Pareto 80/20), en qué nodos/equipos/turnos ocurren más, cuántas se reportan tarde y si
+las acciones correctivas están al día. Sirve para reuniones de seguridad/operación, para detectar
+**reincidencias** (el mismo equipo fallando una y otra vez) y para rendir cuentas con datos.
+
+**Cómo se usa.**
+1. Entra a **Incidencias** y pulsa **«Dashboard»** (arriba a la derecha).
+2. Arriba eliges el **rango de fechas** («Desde» / «Hasta», por defecto los últimos 90 días) y,
+   si quieres acotar, **tipo**, **severidad** u **origen**. Todo se recalcula al instante.
+3. Lee los **recuadros (KPI)**: creadas y cerradas en el periodo, abiertas/críticas ahora, plazo
+   vencido y permanencia excedida, **MTTR** (horas promedio de resolución), **cumplimiento de SLA**
+   (% cerradas dentro de plazo), CAPA abiertas/vencidas y su **eficacia**, y reportes pendientes/
+   vencidos.
+4. Mira los **gráficos**: la **tendencia** de creación vs. cierre en el tiempo, el **Pareto por
+   tipo**, la **dona por severidad**, y barras por **nodo / origen / equipo / turno**. Abajo, una
+   tabla de **reincidencia** (mismo tipo + equipo repetido en la ventana).
+5. **Clic para filtrar (drill-down):** al hacer clic en una barra, un segmento o un KPI, saltas a
+   la lista de **Incidencias** ya filtrada por eso (con el mismo rango de fechas), para ver el
+   detalle de esas incidencias.
+6. **«Exportar CSV»** descarga todas las tablas (indicadores, distribuciones, tendencia,
+   reincidencia) para abrirlas en Excel o adjuntarlas a un informe.
+
+**Quién puede.** Cualquiera que pueda **ver incidencias**. El dashboard respeta tu **alcance**:
+solo agrega y muestra incidencias de los **nodos que tienes permitidos** —nunca verás datos de
+áreas que no te corresponden.
+
+**Importante.**
+- Los KPI de **estado actual** (abiertas, críticas, plazo vencido, permanencia, CAPA, reportes)
+  reflejan el **«ahora»** y no dependen del rango; los de **periodo** (creadas, cerradas, MTTR,
+  cumplimiento, distribuciones, tendencia, reincidencia) sí se calculan dentro de las fechas
+  elegidas.
+- **MTTR** se mide de la creación al cierre; **cumplimiento de SLA** cuenta qué porcentaje de las
+  cerradas terminó **dentro de su plazo**.
+- Los **índices de frecuencia/gravedad (IF/IG)** todavía no están: requieren registrar las
+  **horas-hombre trabajadas**, dato que el sistema aún no captura (está en el plan).
 
 ---
 
