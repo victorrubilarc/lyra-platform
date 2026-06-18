@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { AuthModule } from "../auth/auth.module";
 import { IncidentActionsService } from "./incident-actions.service";
+import { IncidentDashboardService } from "./incident-dashboard.service";
 import { IncidentInvestigationService } from "./incident-investigation.service";
 import { IncidentReportsService } from "./incident-reports.service";
 import { IncidentSlaService } from "./incident-sla.service";
@@ -16,7 +17,7 @@ import { IncidentsService } from "./incidents.service";
 @Module({
   imports: [AuthModule],
   controllers: [IncidentsController],
-  providers: [IncidentsService, IncidentActionsService, IncidentInvestigationService, IncidentReportsService, IncidentSlaService],
+  providers: [IncidentsService, IncidentActionsService, IncidentInvestigationService, IncidentReportsService, IncidentSlaService, IncidentDashboardService],
   exports: [IncidentsService, IncidentActionsService, IncidentInvestigationService, IncidentReportsService, IncidentSlaService],
 })
 export class IncidentsModule {}

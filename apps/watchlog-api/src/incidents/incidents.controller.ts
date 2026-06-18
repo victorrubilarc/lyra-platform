@@ -11,6 +11,7 @@ import {
   createIncidentActionRequestSchema,
   createIncidentReportRequestSchema,
   createIncidentRequestSchema,
+  incidentDashboardQuerySchema,
   incidentListQuerySchema,
   markIncidentReportNotApplicableRequestSchema,
   submitIncidentReportRequestSchema,
@@ -33,6 +34,7 @@ import {
   type CreateIncidentActionRequest,
   type CreateIncidentReportRequest,
   type CreateIncidentRequest,
+  type IncidentDashboardQuery,
   type IncidentListQuery,
   type MarkIncidentReportNotApplicableRequest,
   type SubmitIncidentReportRequest,
@@ -51,6 +53,7 @@ import type { RequestUser } from "../authz/auth-user";
 import { CurrentUser, RequirePermission } from "../authz/authz.decorators";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { IncidentActionsService } from "./incident-actions.service";
+import { IncidentDashboardService } from "./incident-dashboard.service";
 import { IncidentInvestigationService } from "./incident-investigation.service";
 import { IncidentReportsService } from "./incident-reports.service";
 import { IncidentsService } from "./incidents.service";
@@ -62,6 +65,7 @@ export class IncidentsController {
     private readonly actions: IncidentActionsService,
     private readonly investigation: IncidentInvestigationService,
     private readonly reports: IncidentReportsService,
+    private readonly dashboard: IncidentDashboardService,
   ) {}
 
   // --- Catálogos (antes de :id para no chocar) -------------------------------
@@ -125,6 +129,20 @@ export class IncidentsController {
   @RequirePermission("incident:view")
   stats(@CurrentUser() user: RequestUser) {
     return this.incidents.stats(user.id);
+  }
+
+  /**
+   * Dashboard de incidencias (Fase 4.5): analítica agregada read-only con ABAC por
+   * nodo (idéntico a la lista). Sin permiso nuevo — `incident:view` ya basta: no
+   * expone nada que el usuario no vea ya, solo lo agrega.
+   */
+  @Get("dashboard")
+  @RequirePermission("incident:view")
+  dashboardData(
+    @Query(new ZodValidationPipe(incidentDashboardQuerySchema)) q: IncidentDashboardQuery,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.dashboard.build(user.id, q);
   }
 
   /** Usuarios asignables como responsable (selector del detalle). */

@@ -587,6 +587,13 @@ tabla existente. El catálogo de EVENTOS vive en CÓDIGO (`@lyra/contracts NOTIF
   **"Vencido" se DERIVA** (`status=PENDING AND dueAt<now`; `isReportOverdue`), sin estado persistido ni cron — KPI
   `stats.reportOverdue`, filtro `reportOverdueOnly`, flag `reportOverdue` por fila. **Sin permiso nuevo** (catálogo
   `incidentcatalog:manage`, reportes `incident:edit`; cat. 83).
+- **Dashboard (4.5)** — **NO agrega entidades** (es analítica read-only). Único cambio de esquema/contrato: **aditivo** —
+  `createdFrom`/`createdTo` (filtro por fecha de creación) en `incidentListQuerySchema` (usado por `buildWhere` y por el dashboard).
+  La agregación vive en `IncidentDashboardService` (Prisma `groupBy` + `$queryRaw` acotado para tendencia bucketizada `date_trunc(...
+  AT TIME ZONE)`, MTTR `AVG(closedAt-createdAt)` y cumplimiento de SLA `FILTER (closedAt<=dueAt)`); **ABAC por nodo replicando
+  `buildWhere`** (mismo `getAccessibleNodeIds` ∩ `orgNodeIds`); la permanencia derivada reusa `IncidentsService.openSlaBreachedCount`.
+  TZ de bucketing por `PLANT_TIME_ZONE` (env, default America/Santiago). Sin permiso nuevo (reusa `incident:view`). El índice
+  `Incident(createdAt, id)` ya existente soporta el rango temporal.
 - **Diferido (4.4+):** unificar el criterio de "vencida" del módulo (`Incident.dueAt` vs `WorkflowState.maxStayMinutes`, §21) ·
   **aviso de plazo de reporte** "por vencer/vencido" (épico de notificaciones avanzadas) · `IncidentRegulatoryFlag`/
   clasificación minera/IF-IG · excepción por CELDA de TABLE/MATRIX · adjuntos a nivel de incidencia (MinIO, patrón Ola 3) ·

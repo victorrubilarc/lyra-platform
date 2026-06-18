@@ -5,7 +5,17 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-17** (**Fase 4.4 — SLA de incidencias + avisos de plazo + escalamiento ✅** — `feat/incidencias-sla`:
+> actualización: **2026-06-17** (**Fase 4.5 — Dashboard de incidencias ✅ → FASE 4 COMPLETA** — `feat/incidencias-dashboard`:
+> analítica read-only con ABAC por nodo (mismo `buildWhere`), filtros 1 línea + rango de fechas, **Recharts** con tokens del DS
+> (claro/oscuro), export CSV y **drill-down** por querystring. Endpoint `GET /incidents/dashboard` (`groupBy` + `$queryRaw` acotado,
+> **nunca filas al cliente**, TZ de planta `PLANT_TIME_ZONE`). KPIs (creadas/cerradas/abiertas/críticas/plazo/permanencia/MTTR/
+> cumplimiento SLA/CAPA/reportes) + tendencia creación-vs-cierre + Pareto por tipo + dona severidad + barras nodo/origen/equipo/turno +
+> reincidencia. Métricas por estándar (ISO 45001/9001/14224, ITIL, Pareto); **IF/IG diferidos** (requieren HH trabajadas). **Sin
+> permiso nuevo** (reusa `incident:view`), **sin migración, sin FLUSHALL**. Contracts 314 · API 247 · smoke `smoke-incidencias-dashboard.py`
+> 24/24 (incl. **ABAC**: usuario scoped no ve nodos ajenos) + regresión incidencias 32/32 · capa 23/23 · investigación 27/27 ·
+> reportabilidad 31/31 · sla 25/25. **PENDIENTE: smoke VISUAL del dueño.** **Deuda 4.5:** MTTA · export PNG · IF/IG. **Con esto la
+> Fase 4 de Incidencias queda COMPLETA → siguiente bloque a definir (¿Fase 5 turnos?).** Anterior:
+> **Fase 4.4 — SLA de incidencias + avisos de plazo + escalamiento ✅** — `feat/incidencias-sla`:
 > plazos de resolución que AVISAN al vencer (correo + campanita) con escalamiento, reusando el motor del Bloque N. SLA light
 > (`IncidentType.resolutionDueMinutes` → auto-`dueAt` + override editable con auditoría `DUE_CHANGED`); **4 eventos derivados**
 > (`incident.sla.breached`/`incident.overdue`/`incident.action.overdue`/`incident.report.due`) detectados por `IncidentSlaService` y
@@ -409,7 +419,8 @@ nunca queda más de una sesión atrás.
       filtros/KPIs aparte) + **aviso de plazo de reportes 4.3 y CAPA saldado**. Sin permiso nuevo (cat. 83). Contracts 303 · API 247 ·
       smoke `smoke-incidencias-sla.py` 25/25 + regresión. **Deuda 4.4:** rol de escalamiento usa `role:read` (→ `role-options`
       decoplado) · plantilla INAPP propia · escalamiento multi-nivel/tiers (diferido, ver §"Escalamiento por TIERS"). **Pendiente: smoke VISUAL.**
-- [ ] **4.5 · Dashboard/analítica** (MTTR, reincidencia, CAPA vencidas).
+- [x] **4.5 · Dashboard/analítica ✅** (`feat/incidencias-dashboard`): MTTR, reincidencia, tendencia creación/cierre, Pareto por tipo,
+      distribuciones, cumplimiento SLA, CAPA/reportes; ABAC por nodo; export CSV; drill-down. **Deuda:** MTTA · export PNG · IF/IG.
 - [ ] **Mejoras menores de la auditoría:** campos universales en el alta (medida inmediata, impactos) · dedup entre incidencias ·
       separar seed núcleo neutro vs paquetes verticales por industria (la arquitectura ya lo permite como datos).
 
@@ -585,8 +596,9 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
       `incident.action.overdue`/`incident.report.due`) detectados por `IncidentSlaService` y emitidos por el sweeper del worker (correo +
       campanita); escalamiento = re-aviso diario + 1 nivel configurable; §21 desambiguado (Permanencia vs Plazo). Sin permiso nuevo.
       Smoke `smoke-incidencias-sla.py` 25/25.
-- [ ] **4.5 — Dashboard e indicadores** (por tipo/estado/severidad/nodo/equipo/turno/origen + tendencias + reincidencias + MTTR + SLA +
-      CAPA + IF/IG + heatmap + export).
+- [x] **4.5 — Dashboard e indicadores ✅** (`feat/incidencias-dashboard`). Por tipo/severidad/nodo/equipo/turno/origen + tendencia
+      creación/cierre + reincidencia + MTTR + cumplimiento SLA + CAPA + reportes + export CSV + drill-down; ABAC por nodo; sin permiso
+      nuevo. smoke `smoke-incidencias-dashboard.py` 24/24. **Diferido:** MTTA · heatmap · export PNG · **IF/IG** (requiere HH trabajadas).
 - [ ] **4.6 (candidata) — Evaluación de riesgo FMEA/RPN + escalamiento dinámico del RCA → DIFERIDO, opt-in, solo bajo demanda
       regulada (decisión 2026-06-17).** Origen: contraste con el estándar de un "RCA/CAPA nativo" (FMEA con gravedad×ocurrencia×detección
       ⇒ RPN; modularidad dinámica que despliega módulos de investigación profunda al cruzar un umbral de riesgo). **Decisión del dueño:

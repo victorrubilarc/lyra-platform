@@ -1,5 +1,36 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-17 — Fase 4.5: Dashboard de incidencias (tendencias + indicadores de gestión) ✅ → FASE 4 COMPLETA** (`feat/incidencias-dashboard`).
+Cierra la 4.5 y con ella la **Fase 4 de Incidencias** (4.0 núcleo · 4.1 excepciones · 4.2a CAPA · 4.2b investigación · 4.3
+reportabilidad · 4.4 SLA · **4.5 dashboard**). Una pantalla de **análisis read-only** con ABAC por nodo (nunca muestra lo que el
+usuario no puede ver), filtros en 1 línea + rango de fechas, gráficos premium (identidad Lyra, claro/oscuro) y export CSV. **Métricas
+según estándar (no inventadas):** ISO 45001 §9.1 (conteos), ITIL/ISO 14224 (MTTR + tendencia creación/cierre), Pareto 80/20
+(distribución por tipo), ISO 9001 §10.2 (CAPA + eficacia), ITIL SLA attainment (% dentro de plazo), fiabilidad (reincidencia). **IF/IG
+DIFERIDOS** (requieren HH trabajadas, fuente inexistente; BACKLOG). **Plan aprobado; 3 forks contestados por el dueño + 3 recomendados
+no objetados (DECISIONS 2026-06-17):** (a) **página propia `/incidencias/dashboard`** con botón en el header de `/incidencias` (NO
+sidebar, evita doble-resaltado); (b) **un endpoint SQL dedicado** (`groupBy` + `$queryRaw` acotado), **nunca filas al cliente**, mismo
+ABAC que la lista, **TZ de planta** (`PLANT_TIME_ZONE`, def. America/Santiago); (c) **Recharts** (ya era dependencia, colores vía
+tokens del DS); (d) **export CSV** (PNG diferido); (e) **sin permiso nuevo** (reusa `incident:view`, sin migración, sin FLUSHALL); (f)
+**drill-down** por querystring. **Contratos** (`@lyra/contracts/incidents/dashboard`): `incidentDashboardQuerySchema` +
+`incidentDashboardSchema` (KPIs + tendencia + 6 distribuciones + reincidencia + `range` con bucket/TZ/ventana) + helpers PUROS
+`defaultDashboardRange`/`defaultBucketForRange`/`paretoOrder` + 11 specs; `createdFrom`/`createdTo` añadidos a `incidentListQuerySchema`
+(aditivo, los usa también `buildWhere`). **API:** `IncidentDashboardService.build()` (ABAC por nodo replicando `buildWhere`; **KPIs de
+estado vivo** open/critical/overdue/permanencia/CAPA/reportes NO acotados al rango; **created/closed/distribuciones/tendencia/
+reincidencia** del periodo; MTTR + cumplimiento SLA por `$queryRaw` con `AVG`/`FILTER`; tendencia bucketizada por `date_trunc(... AT
+TIME ZONE)`; permanencia derivada reusa `IncidentsService.openSlaBreachedCount`) + endpoint `GET /incidents/dashboard` (gate
+`incident:view`, antes de `:id`). **Web:** `IncidentDashboardPage` (KPI strip + filtros 1 línea + rango + tendencia área + Pareto por
+tipo + dona severidad + barras por nodo/origen/equipo/turno + tabla de reincidencia, todo con drill-down a la lista) + `dashboard.module.css`
++ botón "Dashboard" en el header de `IncidentsPage` + ruta `/incidencias/dashboard` + nav (no-sidebar) + i18n. La lista se SIEMBRA desde
+el querystring del drill-down. Identidad Lyra (tokens, Sora/Inter, Lucide, claro/oscuro, 44px). **Sin permiso nuevo, sin migración, sin
+FLUSHALL.** Tests: **contracts 314** (+11) · **API 247** sin regresión · web 3; typecheck/lint(0)/build verdes. **Smoke en vivo
+`scripts/smoke-incidencias-dashboard.py` 24/24** (agregación: created/byNode/bySeverity/byOrigin/Pareto, suma trend==created,
+byEquipment≥2, reincidencia par≥2, typeId filtra · cerradas/MTTR≈5h/SLA 100% · **ABAC: usuario temporal scoped a un nodo NO ve el nodo
+ajeno** [byNode y created] vs admin que ve ambos · rango lejano⇒0 · range echo · gate operador 403) **+ regresión incidencias 32/32 ·
+capa 23/23 · investigación 27/27 · reportabilidad 31/31 · sla 25/25** sin romper. **Pendiente: smoke VISUAL del dueño** (gráficos en
+claro/oscuro/responsive, drill-down, export CSV, rango de fechas). **Deuda 4.5 (BACKLOG):** MTTA (creación→asignación) · export PNG del
+gráfico · IF/IG (requiere HH trabajadas). **Con 4.5, la FASE 4 de Incidencias queda COMPLETA → siguiente bloque a definir (¿Fase 5
+turnos/cambio de turno?).**
+
 **2026-06-17 — Fase 4.4: SLA de incidencias + avisos de plazo + escalamiento ✅** (`feat/incidencias-sla`). Cierra la 4.4 del módulo
 de Incidencias: plazos de resolución claros que AVISAN al vencer (correo + campanita) con escalamiento, reusando el motor del Bloque N
 (outbox+worker+resolver multi-canal) — NO se reinventó. **Salda 3 deudas:** §21 "vencida" desalineada (permanencia vs plazo), aviso de

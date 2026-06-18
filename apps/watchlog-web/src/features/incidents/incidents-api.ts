@@ -1,7 +1,10 @@
 import {
+  incidentDashboardSchema,
   incidentDetailSchema,
   incidentListResponseSchema,
   incidentStatsSchema,
+  type IncidentDashboard,
+  type IncidentDashboardQuery,
   incidentTypeSchema,
   incidentCategorySchema,
   incidentCommentSchema,
@@ -73,6 +76,29 @@ function queryString(q: IncidentListQuery): string {
 
 export function fetchIncidents(q: IncidentListQuery): Promise<IncidentListResponse> {
   return apiJson(`/incidents${queryString(q)}`, incidentListResponseSchema);
+}
+
+/** Querystring del dashboard (Fase 4.5): filtros categóricos + rango + bucket + ventana. */
+function dashboardQueryString(q: IncidentDashboardQuery): string {
+  const p = new URLSearchParams();
+  if (q.lifecycle) p.set("lifecycle", q.lifecycle);
+  if (q.typeId) p.set("typeId", q.typeId);
+  if (q.categoryId) p.set("categoryId", q.categoryId);
+  if (q.severity) p.set("severity", String(q.severity));
+  if (q.priority) p.set("priority", q.priority);
+  if (q.originType) p.set("originType", q.originType);
+  if (q.orgNodeIds && q.orgNodeIds.length) p.set("orgNodeIds", q.orgNodeIds.join(","));
+  if (q.equipmentId) p.set("equipmentId", q.equipmentId);
+  if (q.createdFrom) p.set("createdFrom", new Date(q.createdFrom).toISOString());
+  if (q.createdTo) p.set("createdTo", new Date(q.createdTo).toISOString());
+  if (q.bucket) p.set("bucket", q.bucket);
+  if (q.recurrenceWindowDays) p.set("recurrenceWindowDays", String(q.recurrenceWindowDays));
+  const s = p.toString();
+  return s ? `?${s}` : "";
+}
+
+export function fetchIncidentDashboard(q: IncidentDashboardQuery): Promise<IncidentDashboard> {
+  return apiJson(`/incidents/dashboard${dashboardQueryString(q)}`, incidentDashboardSchema);
 }
 
 export function fetchIncidentDetail(id: string): Promise<IncidentDetail> {

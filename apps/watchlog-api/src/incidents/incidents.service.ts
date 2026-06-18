@@ -118,6 +118,21 @@ export class IncidentsService {
     return { open, critical, overdue, slaBreached, unassigned, fromLogbook, reportable, reportOverdue };
   }
 
+  /**
+   * Conteo de ABIERTAS con la PERMANENCIA de estado excedida (maxStayMinutes; §21),
+   * dentro de un WHERE de alcance YA resuelto por el llamador (ABAC incluido). Es
+   * un valor DERIVADO (estado actual + grafo congelado), no expresable como WHERE;
+   * por eso pasa por `toListItems`. Reutilizado por el dashboard (4.5) sin duplicar
+   * la evaluación de SLA ni la carga de grafos.
+   */
+  async openSlaBreachedCount(scopeWhere: Prisma.IncidentWhereInput): Promise<number> {
+    const open = await this.prisma.incident.findMany({
+      where: { ...scopeWhere, lifecycle: "OPEN" },
+      include: this.listInclude,
+    });
+    return (await this.toListItems(open)).filter((i) => i.slaBreached).length;
+  }
+
   // === Detalle ================================================================
 
   async getDetail(userId: string, id: string): Promise<IncidentDetail> {
@@ -649,6 +664,10 @@ export class IncidentsService {
       ...(q.reportOverdueOnly ? { reports: { some: { status: "PENDING", dueAt: { lt: new Date() } } } } : {}),
       ...(q.fromLogbookOnly ? { originType: { in: ["LOG_ENTRY", "EXCEPTION", "RULE"] } } : {}),
       ...(q.mine ? { OR: [{ ownerId: userId }, { reporterId: userId }] } : {}),
+      // Rango por fecha de creación (4.5; reutilizado por el dashboard).
+      ...(q.createdFrom || q.createdTo
+        ? { createdAt: { ...(q.createdFrom ? { gte: q.createdFrom } : {}), ...(q.createdTo ? { lte: q.createdTo } : {}) } }
+        : {}),
     };
     if (q.search && q.search.trim()) {
       const term = q.search.trim();

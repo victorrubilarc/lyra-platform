@@ -112,6 +112,17 @@ indicadores y filtros). Todo reusa el mismo motor de avisos del producto (sin se
 **Beneficio:** nada se queda olvidado en un cajón. Los atrasos **se ven y se avisan** antes de que se
 conviertan en un incumplimiento; el supervisor se entera **a tiempo**, no en la auditoría.
 
+### 📊 Dashboard de incidencias (tendencias e indicadores de gestión)
+Una pantalla de **análisis** que convierte tus incidencias en **decisiones**: cuántas se abren y se
+cierran en el tiempo, **cuánto demoras en resolverlas** (MTTR), qué **porcentaje cumple su plazo**
+(SLA), qué **tipos** concentran el problema (regla 80/20 / Pareto), en qué **nodos, equipos y turnos**
+ocurren más, si las **acciones correctivas** están al día y su **eficacia**, y —clave— **reincidencias**
+(el mismo equipo fallando una y otra vez). Eliges el **rango de fechas**, **haces clic en cualquier
+gráfico para ver el detalle** y **exportas a Excel/CSV** para tus informes. Respeta el alcance de cada
+usuario: cada quien ve **solo sus áreas**.
+**Beneficio:** llegas a la reunión de seguridad/operación **con datos, no con anécdotas**; detectas el
+equipo problemático antes de que cueste caro y demuestras mejora con números.
+
 ### 🔗 De la bitácora a la acción (sin saltos manuales)
 Cuando un dato de una bitácora se sale de umbral, el sistema puede generar una **excepción
 operacional** revisable y, si amerita, convertirla en **incidencia** — conservando el **valor
@@ -238,7 +249,9 @@ Preséntalo como evolución, no como funcionalidad actual:
 - **Inteligencia operacional con IA** (resúmenes de turno, asistente de consulta) con opción de
   modelo **local on-premise** (sin enviar datos a la nube).
 - **Conexión con sistemas de planta** (SCADA / historiadores) para traer lecturas automáticamente.
-- **Dashboards y analítica** (tendencias, reincidencia, tiempos de resolución).
+- **Dashboards ejecutivos transversales** (KPIs cruzados de toda la operación; el **dashboard de
+  incidencias** —tendencias, reincidencia, MTTR— ya está **disponible**, ver §3) e **índices HSE
+  IF/IG** (cuando se capturen las horas-hombre trabajadas).
 - **Reportabilidad regulatoria configurable** por industria y país.
 - **Notificaciones a la medida** (disponible): avisos **distintos por cada bitácora y por cada paso del flujo**, a los
   **destinatarios exactos** (roles, responsables, autor, ejecutor, incluso correos de terceros como contratistas o autoridades),
@@ -263,6 +276,11 @@ Preséntalo como evolución, no como funcionalidad actual:
 
 > Una línea por hito, en lenguaje de cliente. Lo más reciente arriba.
 
+- **2026-06-17** — **Dashboard de incidencias 📊 (disponible):** una pantalla de **análisis** que convierte las incidencias en
+  decisiones — **tendencia** de apertura/cierre, **tiempo de resolución (MTTR)**, **% de cumplimiento de plazos (SLA)**, **Pareto por
+  tipo**, desgloses por **nodo/equipo/turno/origen**, estado de las **acciones correctivas** y **reincidencias** (mismo equipo
+  repitiendo). Con **rango de fechas**, **clic en el gráfico para ver el detalle** y **export a Excel/CSV**. Respeta el alcance: cada
+  quien ve solo sus áreas. **Con esto se completa el módulo de Incidencias.**
 - **2026-06-17** — **Campanita de avisos dentro de la app 🔔 (disponible):** además del correo, cada aviso aparece como
   **notificación in-app** en la **campanita de la barra superior** — con **contador de no leídas**, **bandeja navegable** (un clic te
   lleva a la bitácora/incidencia/ronda) y **actualización en tiempo real**. Cada usuario decide recibir cada aviso por **correo, en la

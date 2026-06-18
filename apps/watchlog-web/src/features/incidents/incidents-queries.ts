@@ -8,6 +8,7 @@ import type {
   CompleteIncidentInvestigationRequest,
   CreateIncidentActionRequest,
   CreateIncidentRequest,
+  IncidentDashboardQuery,
   IncidentListQuery,
   TransitionIncidentRequest,
   UpdateIncidentActionRequest,
@@ -35,6 +36,7 @@ import {
   fetchIncidentActions,
   fetchIncidentEquipmentOptions,
   fetchIncidentCategories,
+  fetchIncidentDashboard,
   fetchIncidentDetail,
   fetchIncidentStats,
   fetchIncidentTypes,
@@ -71,7 +73,12 @@ export const INCIDENT_KEYS = {
   investigation: (incidentId: string) => ["incidents", "investigation", incidentId] as const,
   obligations: () => ["incidents", "obligations"] as const,
   reports: (incidentId: string) => ["incidents", "reports", incidentId] as const,
+  dashboard: (q: IncidentDashboardQuery) => ["incidents", "dashboard", q] as const,
 };
+
+export function useIncidentDashboard(q: IncidentDashboardQuery) {
+  return useQuery({ queryKey: INCIDENT_KEYS.dashboard(q), queryFn: () => fetchIncidentDashboard(q) });
+}
 
 export function useIncidents(q: IncidentListQuery) {
   return useQuery({ queryKey: INCIDENT_KEYS.list(q), queryFn: () => fetchIncidents(q) });

@@ -152,6 +152,7 @@ export const esCL = {
     incidents: "Incidencias",
     exceptions: "Excepciones",
     incidentCatalogs: "Catálogos de incidencias",
+    incidentDashboard: "Dashboard de incidencias",
   },
   shell: {
     brandTagline: "Bitácora operacional",
