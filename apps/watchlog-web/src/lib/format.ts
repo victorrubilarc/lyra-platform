@@ -37,7 +37,10 @@ export function formatDate(value: string | Date, opts?: Intl.DateTimeFormatOptio
 export function formatLocalDate(isoDate: string, opts?: Intl.DateTimeFormatOptions): string {
   const [y, m, d] = isoDate.split("-").map(Number);
   if (!y || !m || !d) return isoDate;
-  return new Intl.DateTimeFormat(locale(), { dateStyle: "medium", ...opts }).format(new Date(y, m - 1, d));
+  // `dateStyle` NO puede combinarse con componentes (day/month/…): Intl lanza. Si el
+  // llamador pasa opts propios, se usan tal cual; si no, el estilo medium por defecto.
+  const fmtOpts: Intl.DateTimeFormatOptions = opts ?? { dateStyle: "medium" };
+  return new Intl.DateTimeFormat(locale(), fmtOpts).format(new Date(y, m - 1, d));
 }
 
 /**

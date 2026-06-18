@@ -54,6 +54,11 @@ function todayMinus(days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+/** Etiqueta compacta "dd mmm" de un bucket "YYYY-MM-DD" (regional, sin desfase de TZ). */
+function shortBucketLabel(isoDate: string): string {
+  return formatLocalDate(isoDate, { day: "2-digit", month: "short" });
+}
+
 export function IncidentDashboardPage() {
   const navigate = useNavigate();
   const { data: types = [] } = useIncidentTypes();
@@ -187,7 +192,7 @@ export function IncidentDashboardPage() {
                     </linearGradient>
                   </defs>
                   <CartesianGrid stroke={GRID} vertical={false} />
-                  <XAxis dataKey="bucket" stroke={AXIS} fontSize={11} tickFormatter={(b) => formatLocalDate(b, { day: "2-digit", month: "short" })} />
+                  <XAxis dataKey="bucket" stroke={AXIS} fontSize={11} tickFormatter={(b) => shortBucketLabel(String(b))} />
                   <YAxis stroke={AXIS} fontSize={11} width={32} allowDecimals={false} />
                   <Tooltip contentStyle={TOOLTIP_STYLE} labelFormatter={(b) => formatLocalDate(String(b))} />
                   <Area type="monotone" dataKey="created" name="Creadas" stroke="#6366F1" strokeWidth={2.5} fill="url(#gCreated)" />
