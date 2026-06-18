@@ -59,12 +59,19 @@ function shortBucketLabel(isoDate: string): string {
   return formatLocalDate(isoDate, { day: "2-digit", month: "short" });
 }
 
+const QUICK_RANGES = [
+  { days: 30, label: "30 días" },
+  { days: 90, label: "90 días" },
+  { days: 365, label: "12 meses" },
+];
+
 export function IncidentDashboardPage() {
   const navigate = useNavigate();
   const { data: types = [] } = useIncidentTypes();
 
+  const todayStr = new Date().toISOString().slice(0, 10);
   const [from, setFrom] = useState(todayMinus(90));
-  const [to, setTo] = useState(new Date().toISOString().slice(0, 10));
+  const [to, setTo] = useState(todayStr);
   const [typeId, setTypeId] = useState("");
   const [severity, setSeverity] = useState("");
   const [origin, setOrigin] = useState("");
@@ -120,8 +127,24 @@ export function IncidentDashboardPage() {
         </Button>
       </header>
 
-      {/* Filtros en UNA línea */}
-      <div className={styles.filters}>
+      {/* Filtros en UNA línea: rangos rápidos + fechas + dimensiones */}
+      <div className={styles.toolbar}>
+        <div className={styles.quickRanges}>
+          {QUICK_RANGES.map((r) => {
+            const active = from === todayMinus(r.days) && to === todayStr;
+            return (
+              <button
+                key={r.days}
+                type="button"
+                className={active ? styles.rangeActive : styles.range}
+                onClick={() => { setFrom(todayMinus(r.days)); setTo(todayStr); }}
+              >
+                {r.label}
+              </button>
+            );
+          })}
+        </div>
+        <span className={styles.vsep} />
         <label className={styles.dateField}>
           Desde
           <input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} className={styles.dateInput} />
@@ -130,19 +153,20 @@ export function IncidentDashboardPage() {
           Hasta
           <input type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} className={styles.dateInput} />
         </label>
-        <Select value={typeId} onChange={(e) => setTypeId(e.target.value)} aria-label="Tipo">
+        <span className={styles.spacer} />
+        <Select value={typeId} onChange={(e) => setTypeId(e.target.value)} aria-label="Tipo" className={styles.sel}>
           <option value="">Todos los tipos</option>
           {types.map((t) => (
             <option key={t.id} value={t.id}>{t.name}</option>
           ))}
         </Select>
-        <Select value={severity} onChange={(e) => setSeverity(e.target.value)} aria-label="Severidad">
+        <Select value={severity} onChange={(e) => setSeverity(e.target.value)} aria-label="Severidad" className={styles.selSm}>
           <option value="">Toda severidad</option>
-          {[1, 2, 3, 4, 5].map((s) => (
+          {[5, 4, 3, 2, 1].map((s) => (
             <option key={s} value={s}>Severidad {s}</option>
           ))}
         </Select>
-        <Select value={origin} onChange={(e) => setOrigin(e.target.value)} aria-label="Origen">
+        <Select value={origin} onChange={(e) => setOrigin(e.target.value)} aria-label="Origen" className={styles.selSm}>
           <option value="">Todo origen</option>
           {Object.entries(ORIGIN_META).map(([k, m]) => (
             <option key={k} value={k}>{m.label}</option>
@@ -154,28 +178,45 @@ export function IncidentDashboardPage() {
         <div className={styles.loading}><Spinner /></div>
       ) : !data ? null : (
         <>
-          {/* === KPIs === */}
+          {/* === KPIs: estado vivo vs. periodo === */}
           {kpis && (
-            <div className={styles.kpis}>
-              <Kpi label="Creadas (periodo)" value={kpis.created} color="#6366F1" />
-              <Kpi label="Cerradas (periodo)" value={kpis.closed} color="#22C55E" />
-              <Kpi label="Abiertas (ahora)" value={kpis.open} color="#06B6D4" onClick={() => drill({ lifecycle: "OPEN" })} />
-              <Kpi label="Críticas (ahora)" value={kpis.critical} color="#EF4444" onClick={() => drill({ lifecycle: "OPEN", severity: "5" })} />
-              <Kpi label="Plazo vencido" value={kpis.overdue} color="#F97316" onClick={() => drill({ lifecycle: "OPEN", overdueOnly: "true" })} />
-              <Kpi label="Permanencia excedida" value={kpis.slaBreached} color="#EAB308" onClick={() => drill({ lifecycle: "OPEN", slaBreachedOnly: "true" })} />
-              <Kpi label="MTTR" value={kpis.mttrHours === null ? "—" : `${formatNumber(kpis.mttrHours, { maximumFractionDigits: 1 })} h`} color="#A855F7" />
-              <Kpi label="Cumplimiento SLA" value={kpis.slaCompliancePct === null ? "—" : formatPercent(kpis.slaCompliancePct / 100)} color="#22C55E" />
-              <Kpi label="CAPA abiertas" value={kpis.capaOpen} color="#6366F1" />
-              <Kpi label="CAPA vencidas" value={kpis.capaOverdue} color="#EF4444" />
-              <Kpi label="Eficacia CAPA" value={kpis.capaEffectivenessPct === null ? "—" : formatPercent(kpis.capaEffectivenessPct / 100)} color="#84CC16" />
-              <Kpi label="Reportes pendientes" value={kpis.reportPending} color="#06B6D4" onClick={() => drill({ lifecycle: "OPEN", reportableOnly: "true" })} />
-              <Kpi label="Reportes vencidos" value={kpis.reportOverdue} color="#EF4444" onClick={() => drill({ lifecycle: "OPEN", reportOverdueOnly: "true" })} />
-            </div>
+            <>
+              <section className={styles.kpiSection}>
+                <div className={styles.kpiGroupLabel}>Estado actual <span>en vivo</span></div>
+                <div className={styles.kpis}>
+                  <Kpi label="Abiertas" value={kpis.open} color="#06B6D4" onClick={() => drill({ lifecycle: "OPEN" })} />
+                  <Kpi label="Críticas" value={kpis.critical} color="#EF4444" onClick={() => drill({ lifecycle: "OPEN", severity: "5" })} />
+                  <Kpi label="Plazo vencido" value={kpis.overdue} color="#F97316" onClick={() => drill({ lifecycle: "OPEN", overdueOnly: "true" })} />
+                  <Kpi label="Permanencia excedida" value={kpis.slaBreached} color="#EAB308" onClick={() => drill({ lifecycle: "OPEN", slaBreachedOnly: "true" })} />
+                  <Kpi label="CAPA abiertas" value={kpis.capaOpen} color="#6366F1" />
+                  <Kpi label="CAPA vencidas" value={kpis.capaOverdue} color="#EF4444" />
+                  <Kpi label="Reportes pendientes" value={kpis.reportPending} color="#06B6D4" onClick={() => drill({ lifecycle: "OPEN", reportableOnly: "true" })} />
+                  <Kpi label="Reportes vencidos" value={kpis.reportOverdue} color="#EF4444" onClick={() => drill({ lifecycle: "OPEN", reportOverdueOnly: "true" })} />
+                </div>
+              </section>
+
+              <section className={styles.kpiSection}>
+                <div className={styles.kpiGroupLabel}>En el periodo</div>
+                <div className={styles.kpis}>
+                  <Kpi label="Creadas" value={kpis.created} color="#6366F1" />
+                  <Kpi label="Cerradas" value={kpis.closed} color="#22C55E" />
+                  <Kpi label="MTTR" value={kpis.mttrHours === null ? "—" : `${formatNumber(kpis.mttrHours, { maximumFractionDigits: 1 })} h`} color="#A855F7" />
+                  <Kpi label="Cumplimiento SLA" value={kpis.slaCompliancePct === null ? "—" : formatPercent(kpis.slaCompliancePct / 100)} color="#22C55E" />
+                  <Kpi label="Eficacia CAPA" value={kpis.capaEffectivenessPct === null ? "—" : formatPercent(kpis.capaEffectivenessPct / 100)} color="#84CC16" />
+                </div>
+              </section>
+            </>
           )}
 
           {/* === Tendencia creación vs cierre === */}
           <Card className={styles.chartCard}>
-            <h2 className={styles.chartTitle}>Tendencia: creación vs. cierre</h2>
+            <div className={styles.chartHead}>
+              <h2 className={styles.chartTitle}>Tendencia: creación vs. cierre</h2>
+              <span className={styles.legend}>
+                <span className={styles.legendItem}><span className={styles.legendDot} style={{ background: "#6366F1" }} /> Creadas</span>
+                <span className={styles.legendItem}><span className={styles.legendDot} style={{ background: "#22C55E" }} /> Cerradas</span>
+              </span>
+            </div>
             {data.trend.length === 0 ? (
               <p className={styles.empty}>Sin datos en el periodo.</p>
             ) : (
@@ -282,7 +323,7 @@ export function IncidentDashboardPage() {
                     <tr key={`${r.typeId}-${r.equipmentId}`}>
                       <td>{r.typeName}</td>
                       <td>{r.equipmentName ?? "—"}</td>
-                      <td className={styles.num}>{r.count}</td>
+                      <td className={styles.num}><span className={styles.countPill}>{r.count}</span></td>
                     </tr>
                   ))}
                 </tbody>
@@ -298,7 +339,11 @@ export function IncidentDashboardPage() {
 function Kpi({ label, value, color, onClick }: { label: string; value: number | string; color: string; onClick?: () => void }) {
   const Tag = onClick ? "button" : "div";
   return (
-    <Tag className={styles.kpi} onClick={onClick} style={{ ["--kpi" as string]: color, cursor: onClick ? "pointer" : "default" }}>
+    <Tag
+      className={onClick ? `${styles.kpi} ${styles.kpiClickable}` : styles.kpi}
+      onClick={onClick}
+      style={{ ["--kpi" as string]: color }}
+    >
       <span className={styles.kpiValue}>{typeof value === "number" ? formatNumber(value) : value}</span>
       <span className={styles.kpiLabel}>{label}</span>
     </Tag>
