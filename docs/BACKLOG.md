@@ -413,6 +413,38 @@ nunca queda más de una sesión atrás.
 - [ ] **Mejoras menores de la auditoría:** campos universales en el alta (medida inmediata, impactos) · dedup entre incidencias ·
       separar seed núcleo neutro vs paquetes verticales por industria (la arquitectura ya lo permite como datos).
 
+### Incidencias (Fase 4) — DEUDA TÉCNICA ACUMULADA (índice agrupado) 🗂️
+> Índice ÚNICO y accionable de todo lo que quedó abierto en 4.0–4.4 (las notas por fase de arriba son el registro histórico de
+> qué entregó cada una; ESTE bloque es la lista para retomar). Ninguna es bloqueante. Agrupada a pedido del dueño (2026-06-17).
+
+**Transversal del módulo (un fix salda varias fases):**
+- [ ] **Endpoint `role-options` del módulo de incidencias** (devuelve `{id,name}` de roles, gate `incidentcatalog:manage`/
+      `incident:edit`, decoplado de `role:read`; patrón `schedules/role-options`). **Salda DOS pickers que hoy dependen de
+      `role:read`:** el **rol responsable de CAPA** (4.2a) y el **rol de escalamiento** (4.4). Sin él, un admin de catálogos sin
+      `role:read` ve esos desplegables vacíos.
+- [ ] **Subida de evidencia (archivos)** reusando `StorageService` Ola 3 (proxied + presigned GET con ABAC) en: **acción CAPA**
+      (4.2a), **investigación** (4.2b) y **reporte enviado** (4.3). Las columnas `evidence Json?` ya están reservadas en los 3 modelos.
+- [ ] **Firma Part 11 (`payloadHash`)** en los actos GxP: verificar eficacia de CAPA (4.2a), completar investigación (4.2b), marcar
+      reporte enviado (4.3) y la transición con firma del núcleo 4.0 (hoy exige re-auth pero NO persiste la firma → falta
+      `IncidentSignature` o generalizar `LogEntrySignature`).
+
+**4.2 — Investigación / CAPA:**
+- [ ] **Plantillas de método** de investigación ICAM / Ishikawa (hoy solo 5 Porqués; el enum `INCIDENT_INVESTIGATION_METHODS` ya es
+      extensible sin re-migrar).
+
+**4.4 — SLA / avisos de plazo / escalamiento:**
+- [ ] **Plantilla INAPP propia** para los eventos de incidencias (hoy la campanita reusa el contenido renderizado de la plantilla
+      EMAIL; es la **misma deuda transversal del canal in-app**, ver §"Notificaciones (Bloque N) — deuda diferida").
+- [ ] **Escalamiento multi-nivel / tiers** estilo PagerDuty (N niveles ordenados con timeout por nivel). Hoy 4.4 da **re-aviso diario
+      + 1 nivel** (cubre el 90%); el modelo es extensible sin romper. Diferido — ítem maestro en §"Escalamiento por TIERS".
+
+**Núcleo / alta (de la auditoría y deuda fina 4.0):**
+- [ ] **Extras del alta** (no mínimos): matriz de riesgo prob×consec, asignar responsable al crear, flag "reportable" editable,
+      evidencia a nivel incidencia (MinIO Ola 3). · **Auditoría:** campos universales (medida inmediata/impactos), dedup entre
+      incidencias, separar seed núcleo neutro vs paquetes verticales. · **IF/IG** (índices de frecuencia/gravedad) — requiere fuente
+      de **HH trabajadas**, que HOY NO existe (precondición de 4.5/HSE). · Deuda fina 4.0: `incident:export` (CSV), facetas/SavedView/
+      peek/multi-sort en la lista, drag&drop en el kanban.
+
 ### Form Builder — FORMATEO EN VIVO de campos (acordado con el dueño 2026-06-15)
 - [x] **A · Quick wins ✅** (`feat/builder-formateo-paleta`): RUT al teclear (`formatRutLive`); número/moneda/porcentaje con
       miles+decimales (`FormattedNumberInput` + `Intl.NumberFormat`); «Decimales» expuesto en NUMBER.
@@ -589,14 +621,10 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
       es null, el correo se resuelve **solo por suscripciones** (no se hace fan-out automático a todos los que alcanzan el nodo, para evitar
       tormentas de avisos). El worklist in-app SÍ muestra esas rondas a todos los que alcanzan el nodo. Si se quiere el fan-out por nodo en
       correo, requiere un reverse-ABAC acotado (quién alcanza el nodo). **A confirmar con el dueño.**
-- [~] **Escalamiento por TIERS** (estilo PagerDuty escalation policy, N niveles con timeout por nivel). **Parcialmente cubierto por 4.4:**
-      las INCIDENCIAS ya tienen **re-aviso diario + 1 nivel** configurable (`IncidentType.escalationAfterMinutes`/`escalationRoleId`). Falta
-      el escalamiento multi-nivel (tiers) y extenderlo a `round.overdue`/`entry.sla.breached`. **Diferido** (4.4 cubre el 90%).
-- [ ] **4.4 — rol de escalamiento sin endpoint propio.** El picker del rol de escalamiento en `IncidentTypeModal` usa `useRoles()` (gate
-      `role:read`): un admin de catálogo (`incidentcatalog:manage`) SIN `role:read` ve la lista vacía. Igual deuda que el picker de rol
-      responsable de CAPA → crear un `role-options` decoplado del módulo de incidencias (patrón `schedules/role-options`).
-- [ ] **4.4 — plantilla INAPP propia para los eventos de incidencias** (hoy la campanita reusa el contenido de la plantilla EMAIL, misma
-      deuda transversal del canal in-app).
+- [~] **Escalamiento por TIERS** (ítem maestro; estilo PagerDuty escalation policy, N niveles con timeout por nivel). **Parcialmente
+      cubierto por 4.4:** las INCIDENCIAS ya tienen **re-aviso diario + 1 nivel** configurable (`IncidentType.escalationAfterMinutes`/
+      `escalationRoleId`). Falta el multi-nivel (tiers) y extenderlo a `round.overdue`/`entry.sla.breached`. **Diferido** (4.4 cubre el
+      90%). *(La parte de incidencias también está indexada en §"Incidencias (Fase 4) — DEUDA TÉCNICA ACUMULADA".)*
 - [ ] **Smoke en vivo de `entry.transition` / `entry.sla.breached` / `entry.signature.pending`.** Los resolvers están typecheck+wired y comparten
       el pipeline (dispatcher/sender/render/ABAC/dedup/opt-out) ya probado end-to-end vía `round.overdue` (smoke 17/17). Falta un smoke que
       siembre una entrada + flujo + transición real y verifique el correo (necesita plantilla publicada con workflow + secciones completas).
