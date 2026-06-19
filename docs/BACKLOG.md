@@ -5,7 +5,14 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-19** (**Cambio de turno — fix deep link "se queda pensando" ✅** — `feat/cambio-turno-deeplink-fix`:
+> actualización: **2026-06-19** (**Fase 5 · Cambio de turno · Slice 3 — resumen de turno por IA EN VIVO / streaming ✅** —
+> `feat/cambio-turno-resumen-ia-streaming`: "Generar con IA" escribe el brief token a token sobre el cockpit (SSE espejo del inbox,
+> endpoint dedicado `GET /shift-handover/:id/summary/stream`). `@lyra/llm` ganó `LlmStream`+`generateSummaryStream` en los 3 adapters;
+> **prompt v2** (guarda anti-inyección); **scrubber de PII** que redacta solo si la generación egresa de la planta (`egressesPlant`).
+> Persiste al completar por el PATCH auditado (`summaryProvider`); degradación stream→no-stream→determinista; crudo y firma humana intactos.
+> @lyra/llm 11 · contracts 321 · API 247; smoke-ia-stream **13/13** + regresión ia-config 20/20 · cambio-turno 29/29 · notif 18/18 · notif-inapp 18/18.
+> **PENDIENTE: smoke VISUAL del dueño.** **Siguiente: Slice 4 (export PDF).** Anterior:
+> **Cambio de turno — fix deep link "se queda pensando" ✅** — `feat/cambio-turno-deeplink-fix`:
 > al abrir desde la campanita la pestaña quedaba en spinner infinito. La API/datos/permisos eran correctos (200); el problema era resiliencia de
 > UI (`CockpitView` solo miraba `isLoading||!detail`). Fixes: error+Reintentar en `CockpitView` (nunca spinner infinito) · `useHandoverDetail`
 > `retry:1` · **`GET /shift-handover/:id` → `RequireAnyPermission(view,compile,sign,acknowledge)`** (el entrante a menudo solo tiene acknowledge) ·
@@ -421,11 +428,16 @@ nunca queda más de una sesión atrás.
   firma humana). smoke `smoke-ia-config.py` **20/20**. **Cumple AC-IA-1..6; AC-IA-7 parcial (prompt versionado + clave cifrada;
   scrubber de PII explícito = deuda).** Forks resueltos en DECISIONS 2026-06-18 (tabla dedicada · proveedor global · log de generaciones
   · streaming diferido). **Pendiente: smoke VISUAL del dueño.**
-- [ ] **Slice 3 — Resumen IA generativo + STREAMING** (token-a-token vía SSE, reusa el bus del Bloque N), sobre la fundación del
-  Slice 2 (la interfaz `@lyra/llm` admite `generateSummaryStream` sin reescribir consumidores). El crudo y la firma humana se mantienen.
-- [ ] **Deuda Slice 2 (IA):** panel de **costo/uso** sobre `AiGenerationLog` (tokens/latencia/$ por proveedor/periodo) · **scrubber de
-  PII** explícito en el grounding (AC-IA-7; hoy el grounding es operacional sin PII, pero no hay redacción explícita) · plantilla de
-  prompt por capacidad para Fase 6 (insights/RAG reusan `@lyra/llm`).
+- [x] **Slice 3 — Resumen IA generativo + STREAMING ✅** (`feat/cambio-turno-resumen-ia-streaming`, 2026-06-19). Token a token vía SSE
+  (`@Sse` + token por query, espejo del inbox; endpoint dedicado `GET /shift-handover/:id/summary/stream`). `@lyra/llm` ganó `LlmStream`
+  + `generateSummaryStream` en los 3 adapters (sin reescribir consumidores). **Prompt → v2** (priorización + guarda anti-inyección).
+  **Scrubber de PII** (`scrubGrounding` + política `egressesPlant`): redacta correo/RUT/teléfono **solo si la generación egresa de la
+  planta** (AC-IA-7 parcial). Persistencia al completar vía el PATCH auditado (`summaryProvider`). Degradación stream→no-stream→determinista.
+  Crudo y firma humana intactos. smoke `smoke-ia-stream.py` **13/13** + regresión (ia-config 20/20, cambio-turno 29/29, notif 18/18, notif-inapp 18/18).
+  **Pendiente: smoke VISUAL del dueño.**
+- [ ] **Deuda IA (Slices 2–3):** panel de **costo/uso** sobre `AiGenerationLog` (tokens/latencia/$ por proveedor/periodo) · **scrubber de
+  PII más completo** (nombres; hoy cubre correo/RUT/teléfono al egresar) · plantilla de prompt por capacidad para Fase 6 (insights/RAG
+  reusan `@lyra/llm`) · **streaming multi-instancia** (el aborto/heartbeat es in-proc, como el bus SSE del Bloque N; respaldo Redis si se escala).
 - [ ] **Slice 4 — Export PDF** de la entrega (carpeta/regulador).
 - [ ] **Deuda menor Slice 1:** disciplinas/categorías por taxonomía de catálogo (hoy secciones por tipo de dato) · firma con hash
   criptográfico del payload (hoy reauth Part 11 + método/significado, sin `payloadHash`) · estado general como catálogo configurable.

@@ -1,4 +1,5 @@
-import type { CompleteInput, GenerateSummaryInput, LlmProvider, LlmResult } from "../types.js";
+import type { CompleteInput, GenerateSummaryInput, LlmProvider, LlmResult, LlmStream } from "../types.js";
+import { CollectingLlmStream } from "../stream.js";
 
 /**
  * Proveedor `none` — sin IA, determinista/offline. Es el modo del Slice 1 y la base de
@@ -19,6 +20,26 @@ export class NoneLlmProvider implements LlmProvider {
       outputTokens: null,
       latencyMs: 0,
     };
+  }
+
+  /**
+   * "Streaming" trivial: emite el resumen determinista en UN bloque (sin red, costo cero).
+   * Sirve para que el cockpit ejercite la ruta de streaming aun sin IA configurada (AC-IA-1).
+   */
+  generateSummaryStream(input: GenerateSummaryInput): LlmStream {
+    const id = this.id;
+    const model = this.model;
+    async function* gen(): AsyncGenerator<string> {
+      yield input.fallbackText;
+    }
+    return new CollectingLlmStream(gen(), (text) => ({
+      text,
+      provider: id,
+      model,
+      inputTokens: null,
+      outputTokens: null,
+      latencyMs: 0,
+    }));
   }
 
   async complete(_input: CompleteInput): Promise<LlmResult> {

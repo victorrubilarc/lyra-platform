@@ -21,7 +21,7 @@ import {
   type UpdateHandoverSummaryRequest,
 } from "@lyra/contracts";
 import type { SummaryGrounding } from "@lyra/llm";
-import { AiService } from "../ai/ai.service";
+import { AiService, type SummaryStreamEvent } from "../ai/ai.service";
 import { AuditService, type AuditContext } from "../audit/audit.service";
 import { ReauthService } from "../auth/reauth.service";
 import { ScopeService } from "../authz/scope.service";
@@ -170,28 +170,17 @@ export class ShiftHandoverService {
     this.assertCompiling(handover);
 
     let summaryText: string | undefined = dto.summaryText;
-    // Edición manual del texto ⇒ deja de ser "generado por IA" (provider none).
-    let summaryProvider: string | undefined = summaryText !== undefined ? "none" : undefined;
+    // Texto manual ⇒ "none"; salvo que el cockpit PERSISTA un texto generado por IA en vivo
+    // (streaming, Slice 3): manda `summaryProvider` para conservar la procedencia sin re-generar.
+    let summaryProvider: string | undefined =
+      summaryText !== undefined ? (dto.summaryProvider ?? "none") : undefined;
 
     if (dto.regenerate || (summaryText === undefined && dto.generalStatus)) {
-      // Resuelve el nombre del nodo (como toDetail): el cockpit recompilado debe llevarlo
-      // para que el resumen —determinista o IA— mencione el nodo y el grounding sea completo.
-      const node = await this.prisma.orgNode.findUnique({ where: { id: handover.orgNodeId }, select: { name: true, path: true } });
-      const cockpit = await this.compiler.compile(userId, {
-        ...this.toCompileScope(handover, null),
-        nodeName: node?.name ?? "—",
-        nodePath: node?.path ?? "",
-        incomingShiftLabel: null,
-      });
-      const openItems = handover.items.filter((i) => isHandoverItemOpen(i.status)).map((i) => ({ title: i.title }));
       const generalStatus = dto.generalStatus ?? (handover.generalStatus as HandoverGeneralStatus | null);
-      const generalStatusLabel = generalStatus ? GENERAL_STATUS_LABELS[generalStatus] : undefined;
-      // Resumen DETERMINISTA: línea base y fallback offline (AC-IA-1).
-      const fallbackText = buildDeterministicSummary(cockpit, openItems, { generalStatus, generalStatusLabel });
+      const { fallbackText, grounding } = await this.buildSummaryInputs(userId, handover, generalStatus);
 
       if (dto.regenerate && dto.useAi) {
         // Resumen por IA: GROUNDED al cockpit congelado, con degradación elegante a determinista.
-        const grounding = this.buildSummaryGrounding(cockpit, openItems, generalStatusLabel ?? "Sin declarar");
         const res = await this.ai.generateSummary({ fallbackText, grounding }, { handoverId: id, userId });
         summaryText = res.text;
         summaryProvider = res.generatedByAi ? res.provider : "none";
@@ -211,6 +200,50 @@ export class ShiftHandoverService {
       },
     });
     return this.toDetail(userId, await this.loadHandover(id));
+  }
+
+  /**
+   * Arma los insumos del resumen (determinista + grounding) recompilando el cockpit EN VIVO.
+   * Compartido por `updateSummary` (no-streaming) y `streamSummary` (SSE) para que ambos usen
+   * exactamente la misma fuente de verdad (AC-IA-2). Resuelve el nombre del nodo (como toDetail).
+   */
+  private async buildSummaryInputs(
+    userId: string,
+    handover: HandoverWithRelations,
+    generalStatus: HandoverGeneralStatus | null,
+  ): Promise<{ fallbackText: string; grounding: SummaryGrounding }> {
+    const node = await this.prisma.orgNode.findUnique({ where: { id: handover.orgNodeId }, select: { name: true, path: true } });
+    const cockpit = await this.compiler.compile(userId, {
+      ...this.toCompileScope(handover, null),
+      nodeName: node?.name ?? "—",
+      nodePath: node?.path ?? "",
+      incomingShiftLabel: null,
+    });
+    const openItems = handover.items.filter((i) => isHandoverItemOpen(i.status)).map((i) => ({ title: i.title }));
+    const generalStatusLabel = generalStatus ? GENERAL_STATUS_LABELS[generalStatus] : undefined;
+    const fallbackText = buildDeterministicSummary(cockpit, openItems, { generalStatus, generalStatusLabel });
+    const grounding = this.buildSummaryGrounding(cockpit, openItems, generalStatusLabel ?? "Sin declarar");
+    return { fallbackText, grounding };
+  }
+
+  /**
+   * Resumen de turno por IA en STREAMING (Slice 3). Verifica acceso por nodo (ABAC) y que la
+   * entrega esté en COMPILING, recompila el cockpit EN VIVO para el grounding y delega en el
+   * gateway de IA, que emite los deltas + el cierre. El cockpit PERSISTE el texto final aparte
+   * (PATCH auditado): este generador NO escribe en la entrega. La firma sigue siendo humana.
+   */
+  async *streamSummary(
+    userId: string,
+    id: string,
+    generalStatusOverride: HandoverGeneralStatus | undefined,
+    signal?: AbortSignal,
+  ): AsyncGenerator<SummaryStreamEvent> {
+    const handover = await this.loadHandover(id);
+    await this.assertNodeAccess(userId, handover.orgNodeId);
+    this.assertCompiling(handover);
+    const generalStatus = generalStatusOverride ?? (handover.generalStatus as HandoverGeneralStatus | null);
+    const { fallbackText, grounding } = await this.buildSummaryInputs(userId, handover, generalStatus);
+    yield* this.ai.streamSummary({ fallbackText, grounding }, { handoverId: id, userId }, signal);
   }
 
   /**

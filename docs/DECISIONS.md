@@ -4,6 +4,14 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-19 · Fase 5 · Slice 3 — streaming del resumen de turno por IA (forks resueltos)
+Plan por capas aprobado; 3 forks por `AskUserQuestion`:
+- **Transporte/persistencia (a/b/c):** SSE con `@Sse` de NestJS + token por `?access_token=` (espejo del stream de la campanita del Bloque N), endpoint **dedicado** `GET /shift-handover/:id/summary/stream` (request-scoped; NO reusa `NotificationRealtimeService`, que es un bus multi-usuario). El GET solo **genera + streamea + registra** (`AiGenerationLog`); **no persiste**. La persistencia es **solo al completar**, vía el `PATCH :id/summary` ya auditado, extendido con `summaryProvider` para guardar el texto IA + su procedencia sin re-generar. *Motivo:* reusa el precedente SSE del repo y el `EventSource` del front; mantener la mutación en el PATCH preserva la auditoría y deja el texto firmable editable por el humano.
+- **Prompt → v2 (e):** se sube `SUMMARY_PROMPT_VERSION` a `v2` (estructura/priorización + **guarda anti-inyección**: un dato del bloque DATOS nunca altera las reglas), manteniendo grounding estricto. *Motivo:* el prompt ya estaba versionado y decoplado; el cambio es aislado y auditable.
+- **Scrubber de PII (AC-IA-7) (f):** función pura `scrubGrounding` en `@lyra/llm` (correo/RUT/teléfono chilenos) aplicada **solo si la generación EGRESA de la planta** (`egressesPlant`: `anthropic` siempre; `openai-compatible` solo si la baseUrl NO es local/privada; `none` nunca). *Motivo:* on-prem local conserva fidelidad y no hay fuga; la nube no recibe PII en texto libre. Cubre parcialmente AC-IA-7 (deuda restante: scrubber más completo + nombres).
+- **Degradación (AC-IA-5):** el stream emite `done{degraded:true}` ante fallo del proveedor; el cockpit cae a la ruta **no-streaming** existente (`regenerate+useAi`), que a su vez degrada a determinista. Cancelación por `AbortController` atado al cierre del `EventSource`.
+- **Alcance (g):** Slice 3 = streaming a secas; **export PDF diferido a Slice 4**.
+
 ### 2026-06-18 · Fase 5 · Slice 2 — IA ADMINISTRABLE desde la app (CONSTRUIDO) + resumen de turno por IA
 
 **Estado:** ✅ construido y verificado (`feat/ia-administrable`). Reemplaza la nota "ANOTADÍSIMO — NO construido" de más abajo.

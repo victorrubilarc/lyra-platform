@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { aiProviderSchema } from "../ai/ai.js";
 import {
   resolveShift,
   type ShiftResolverCalendar,
@@ -296,6 +297,13 @@ export const updateHandoverSummaryRequestSchema = z.object({
    * la respuesta vuelve con `summaryProvider="none"`. La firma sigue siendo humana.
    */
   useAi: z.boolean().optional(),
+  /**
+   * Proveedor con que se generó `summaryText` (Slice 3 — streaming). Lo manda el cockpit al
+   * PERSISTIR el texto que se escribió en vivo vía SSE, para que `summaryProvider` refleje "IA"
+   * sin re-generar. Solo se usa junto con `summaryText` (sin `regenerate`). El backend igual
+   * valida acceso/estado; la firma sigue siendo humana.
+   */
+  summaryProvider: aiProviderSchema.optional(),
 });
 export type UpdateHandoverSummaryRequest = z.infer<typeof updateHandoverSummaryRequestSchema>;
 

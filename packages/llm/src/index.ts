@@ -10,6 +10,8 @@
 export * from "./types.js";
 export * from "./prompt.js";
 export * from "./factory.js";
+export * from "./scrub.js";
+export { CollectingLlmStream } from "./stream.js";
 export { NoneLlmProvider } from "./providers/none.js";
 export { AnthropicLlmProvider } from "./providers/anthropic.js";
 export { OpenAiCompatibleLlmProvider } from "./providers/openai-compatible.js";

@@ -382,7 +382,23 @@ GxP: MHRA Data Integrity 2018 / FDA DI Q&A (corrección tardía justificada + at
   (sin tools/BD/internet); el crudo determinista queda siempre visible al lado; la firma sigue siendo del humano (Part 11 con reauth),
   la IA nunca firma. **Degradación elegante (AC-IA-5):** si la IA falla/timeout/sin clave, cae al determinista con aviso.
 - **Gobernanza de costo:** cada generación se registra en `AiGenerationLog` (proveedor/modelo/tokens/latencia/estado). El registro
-  NUNCA rompe la operación (se loguea si falla). **Deuda:** scrubber de PII explícito en el grounding (AC-IA-7).
+  NUNCA rompe la operación (se loguea si falla).
+
+### Resumen de turno por IA EN VIVO / streaming (Fase 5 · Slice 3)
+- **Endpoint SSE confinado:** `GET /shift-handover/:id/summary/stream` es `@Public` (salta el guard global) porque `EventSource` no
+  puede mandar `Authorization`; el access token viaja por `?access_token=` y se **verifica a mano** en el controller (espejo exacto del
+  stream de la campanita del Bloque N). Es la ÚNICA puerta sin guard del módulo y solo **lee/streamea** un resumen efímero; **no muta**.
+- **ABAC + estado en el servidor:** la generación valida **alcance por nodo** (`assertNodeAccess`, idéntico al PATCH auditado) y que la
+  entrega esté en `COMPILING`; un token válido de otro nodo no obtiene el resumen. La persistencia sigue por el `PATCH :id/summary`
+  auditado (el SSE no persiste): el texto que se firma es el que el humano revisa/edita, no lo que la IA produjo.
+- **Scrubber de PII con política de egreso (AC-IA-7, parcial):** antes de enviar el grounding a un proveedor que **EGRESA de la planta**
+  (`egressesPlant`: `anthropic` siempre; `openai-compatible` solo si la baseUrl no es local/privada; `none` nunca) se redactan los textos
+  libres (correo/RUT/teléfono CL) con `scrubGrounding`. On-prem local conserva fidelidad y no hay fuga; la nube no recibe PII en texto
+  libre. **Deuda:** scrubber más completo (nombres) sigue abierta.
+- **Grounding/firma/degradación intactos (AC-IA-2..6):** el stream usa el mismo snapshot congelado; el crudo determinista sigue visible;
+  la firma es humana; si el stream falla/se corta, el cockpit cae a la ruta no-streaming → determinista (AC-IA-5). Cancelación por
+  `AbortController` atado al cierre del `EventSource` (el backend aborta la llamada al proveedor). El **prompt versionado** sube a `v2`
+  con guarda **anti-inyección** (un dato del bloque DATOS nunca altera las reglas del sistema).
 
 ### Dashboard de incidencias (Fase 4.5) — agregación con ABAC por nodo
 - **La autorización y la agregación viven en el backend** (`IncidentDashboardService`, endpoint `GET /incidents/dashboard`, gate

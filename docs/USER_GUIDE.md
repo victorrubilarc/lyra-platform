@@ -130,7 +130,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 
 ### 17. Cambio de turno  [Supervisor saliente · Supervisor entrante]
 - ✅ **Entregar y recibir el turno** (cockpit auto-compilado por área y turno, entrega firmada de dos partes, pendientes que ruedan, historial) (§ Cambio de turno)
-- ✅ **Resumen de turno por IA** (botón "Generar con IA", grounded al turno, revisable; el crudo determinista siempre visible; la firma sigue siendo tuya) (§ Cambio de turno)
+- ✅ **Resumen de turno por IA EN VIVO** (botón "Generar con IA": el brief se escribe palabra por palabra, cancelable; grounded al turno, revisable; el crudo determinista siempre visible; la firma sigue siendo tuya) (§ Cambio de turno)
 
 ---
 
@@ -1192,9 +1192,13 @@ entrega **solo las áreas de su alcance** (un supervisor de Flotación no ve ni 
   continuidad operacional.
 - **Los pendientes ruedan solos** hasta que se cierran: no dependen de que alguien los recuerde.
 - **La pantalla se acomoda a ti:** arrastra los **divisores** entre las tres zonas para dar más espacio al listado o al resumen (doble-clic restablece; tu ajuste se recuerda). El **resumen** tiene un botón **"Ampliar"** que lo abre grande, con el resumen automático al lado para comparar. Y **cada ítem** (registro, excepción, incidencia, acción, ronda o pendiente) se **abre con un clic** en un panel lateral con todo su detalle y un acceso directo a su módulo de origen.
-- El resumen se genera **determinista** por defecto, y —si un admin configuró la IA
-  (Configuración ▸ Inteligencia Artificial)— puedes pulsar **"Generar con IA"**: el brief queda
-  marcado **"generado por IA · revisar"**, el **crudo determinista sigue visible al lado**, y la
-  **firma sigue siendo humana**. Con un modelo **local**, los datos **no salen de la planta**. Si
-  la IA falla, cae solo al determinista (no se rompe). *Próximo:* que el texto se escriba **en
-  vivo** (streaming) y export **PDF** de la entrega.
+- **Generar el resumen con IA, EN VIVO.** El resumen se genera **determinista** por defecto, y —si un
+  admin configuró la IA (Configuración ▸ Inteligencia Artificial)— puedes pulsar **"Generar con IA"** y
+  ver el brief **escribirse palabra por palabra** sobre el panel (como en un chat). Mientras escribe,
+  el botón cambia a **"Cancelar"** (puedes detenerlo y quedarte con lo que llevaba). Al terminar, el
+  texto queda marcado **"generado por IA · revisar"**, el **crudo determinista sigue visible al lado**
+  para contrastar cifra por cifra, y la **firma sigue siendo tuya** (la IA nunca firma). Si la IA falla
+  o se corta, el sistema **reintenta sin streaming** y, si tampoco responde, usa el resumen
+  determinista — nunca te deja sin resumen. Con un modelo **local**, los datos **no salen de la
+  planta**; cuando el proveedor es de nube, los textos libres (correos, RUT, teléfonos) se **redactan**
+  antes de enviarse. *Próximo:* export **PDF** de la entrega.
