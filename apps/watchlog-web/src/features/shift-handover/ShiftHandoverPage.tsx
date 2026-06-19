@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   ChevronRight,
   ClipboardList,
+  FileDown,
   History,
   Maximize2,
   PenLine,
@@ -59,6 +60,7 @@ import {
   useUpdateHandoverItem,
   useUpdateHandoverSummary,
 } from "./shift-handover-queries.js";
+import { downloadHandoverActa } from "./shift-handover-api.js";
 import { IncidentDetailDrawer } from "../incidents/IncidentDetailDrawer.js";
 import { HandoverReauthModal } from "./HandoverReauthModal.js";
 import { useSummaryStream } from "./use-summary-stream.js";
@@ -636,6 +638,62 @@ function BatonSection({ detail, canEdit }: { detail: ShiftHandoverDetail; canEdi
 
 // === Panel derecho: resumen + sign-off ========================================
 
+/** ¿La entrega ya produce acta OFICIAL? (solo firmada/reconocida — fork d, 409 antes de firmar). */
+function actaAvailable(status: ShiftHandoverStatus): boolean {
+  return status === "SIGNED_OUT" || status === "ACKNOWLEDGED";
+}
+
+/**
+ * Botón de descarga del ACTA (PDF) — Slice 4. Va con `apiBlob` (Bearer + refresh); el backend
+ * decide el acceso (ABAC + gate de lectura) y solo emite el oficial de una entrega firmada.
+ * `variant="icon"` para el historial; `"full"` para el cockpit. Estado de carga propio.
+ */
+function ActaDownloadButton({
+  meta,
+  variant = "full",
+}: {
+  meta: { id: string; code: string; nodeName: string; operationalDay: string };
+  variant?: "full" | "icon";
+}) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const [loading, setLoading] = useState(false);
+
+  async function onDownload() {
+    if (loading) return;
+    setLoading(true);
+    try {
+      await downloadHandoverActa(meta);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("handover.actaError"));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (variant === "icon") {
+    return (
+      <button
+        type="button"
+        className={styles.histActaBtn}
+        onClick={onDownload}
+        disabled={loading}
+        title={t("handover.downloadActa")}
+        aria-label={t("handover.downloadActa")}
+      >
+        {loading ? <Spinner size={14} /> : <FileDown size={15} />}
+      </button>
+    );
+  }
+
+  return (
+    <Button variant="secondary" className={styles.actaBtn} onClick={onDownload} disabled={loading}>
+      {loading ? <Spinner size={14} /> : <FileDown size={16} />}{" "}
+      {loading ? t("handover.downloadingActa") : t("handover.downloadActa")}
+    </Button>
+  );
+}
+
 function SignOffPanel({ detail, canCompile, canSign, canAck }: { detail: ShiftHandoverDetail; canCompile: boolean; canSign: boolean; canAck: boolean }) {
   const { t } = useTranslation();
   const toast = useToast();
@@ -891,6 +949,16 @@ function SignOffPanel({ detail, canCompile, canSign, canAck }: { detail: ShiftHa
         </div>
       )}
 
+      {/* Acta oficial (PDF) — disponible solo cuando la entrega está firmada (snapshot congelado). */}
+      {actaAvailable(detail.status) && (
+        <div className={styles.actaBlock}>
+          <ActaDownloadButton
+            meta={{ id: detail.id, code: detail.code, nodeName: detail.nodeName, operationalDay: detail.operationalDay }}
+          />
+          <p className={styles.actaHint}>{t("handover.actaHint")}</p>
+        </div>
+      )}
+
       {signModal && (
         <HandoverReauthModal
           title={t("handover.signOut")}
@@ -992,17 +1060,25 @@ function HistoryView({ onOpen }: { onOpen: (id: string) => void }) {
       ) : (
         <div className={styles.historyList}>
           {data.items.map((h) => (
-            <button key={h.id} className={styles.historyRow} onClick={() => onOpen(h.id)}>
-              <span className={styles.histCode}>{h.code}</span>
-              <span className={styles.histNode}>{h.nodeName}</span>
-              <span className={styles.histShift}>{h.shiftLabel ?? h.shiftCode ?? "—"}</span>
-              <span className={styles.histDay}>{formatLocalDate(h.operationalDay)}</span>
-              <span className={styles.histFlow}>
-                {h.outgoingByName ?? "—"} <ArrowRight size={13} /> {h.incomingByName ?? "—"}
-              </span>
-              {h.openItemCount > 0 && <Chip variant="warning" label={t("handover.openItems", { count: h.openItemCount })} />}
-              <StatusChip status={h.status} />
-            </button>
+            <div key={h.id} className={styles.historyRowWrap}>
+              <button className={styles.historyRow} onClick={() => onOpen(h.id)}>
+                <span className={styles.histCode}>{h.code}</span>
+                <span className={styles.histNode}>{h.nodeName}</span>
+                <span className={styles.histShift}>{h.shiftLabel ?? h.shiftCode ?? "—"}</span>
+                <span className={styles.histDay}>{formatLocalDate(h.operationalDay)}</span>
+                <span className={styles.histFlow}>
+                  {h.outgoingByName ?? "—"} <ArrowRight size={13} /> {h.incomingByName ?? "—"}
+                </span>
+                {h.openItemCount > 0 && <Chip variant="warning" label={t("handover.openItems", { count: h.openItemCount })} />}
+                <StatusChip status={h.status} />
+              </button>
+              {actaAvailable(h.status) && (
+                <ActaDownloadButton
+                  variant="icon"
+                  meta={{ id: h.id, code: h.code, nodeName: h.nodeName, operationalDay: h.operationalDay }}
+                />
+              )}
+            </div>
           ))}
         </div>
       )}

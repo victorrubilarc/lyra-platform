@@ -400,6 +400,24 @@ GxP: MHRA Data Integrity 2018 / FDA DI Q&A (corrección tardía justificada + at
   `AbortController` atado al cierre del `EventSource` (el backend aborta la llamada al proveedor). El **prompt versionado** sube a `v2`
   con guarda **anti-inyección** (un dato del bloque DATOS nunca altera las reglas del sistema).
 
+### Acta de entrega de turno en PDF (Fase 5 · Slice 4) — export de grado auditoría
+- **Generación 100% en el backend (AC-PDF-3):** el PDF se arma server-side con **pdfmake** (JS puro, sin headless Chrome) en
+  `GET /shift-handover/:id/acta.pdf`; el navegador solo descarga bytes. **Sin SaaS, sin recursos externos:** el motor corre con
+  `urlAccessPolicy=()=>false` (no descarga nada) y `localAccessPolicy` en **lista blanca** (solo lee los TTF de marca embebidos); el SVG
+  de la banda va inline. Nada del documento se decide ni se renderiza con datos en el cliente.
+- **Gate de LECTURA reusado + ABAC (AC-PDF-4):** mismo gate que `getDetail` (`RequireAnyPermission(shifthandover:view|compile|sign|acknowledge)`)
+  porque quien puede leer la entrega puede exportar su acta (el entrante a menudo solo tiene `acknowledge`); **sin permiso nuevo**. El
+  alcance por nodo lo impone el servicio (`assertNodeAccess`): un token válido de OTRO nodo ⇒ **403** (verificado en `smoke-acta-pdf.py`).
+- **Gobernanza de estado (AC-PDF-7):** el acta OFICIAL solo existe para una entrega **firmada** (SIGNED_OUT/ACKNOWLEDGED); en
+  COMPILING/CANCELED ⇒ **409** (no hay snapshot ni firmas). Se arma del **snapshot CONGELADO** (`toDetail` con `frozen`), nunca de la vista en vivo.
+- **Fidelidad/inmutable + verificabilidad (AC-PDF-1/5):** `actaIntegrityHash` = **SHA-256 de un JSON CANÓNICO** (claves ordenadas) del
+  snapshot + las dos firmas Part 11 + el resumen ⇒ dos exports producen el **mismo hash** (los bytes del PDF varían solo por el
+  `CreationDate` que estampa PDFKit). El **folio + hash** se imprimen en el pie y en un bloque de verificación. Cada exportación se
+  **AUDITA** (`shifthandover.acta.exported` con folio + status + hash). Este `integrityHash` es el candidato natural para el `payloadHash`
+  de la firma Part 11 (deuda abierta). No se persiste el binario (on-demand; el snapshot inmutable lo hace reproducible).
+- **Las firmas en el acta:** muestra ambas firmas Part 11 (quién / cuándo / método / significado); la **IA nunca firma** (el resumen lleva
+  su etiqueta determinista/IA, pero la certificación es humana). Si el entrante aún no reconoce, el acta lo marca "Pendiente de reconocimiento".
+
 ### Dashboard de incidencias (Fase 4.5) — agregación con ABAC por nodo
 - **La autorización y la agregación viven en el backend** (`IncidentDashboardService`, endpoint `GET /incidents/dashboard`, gate
   `incident:view`). El servicio **replica el ABAC de la lista** (`getAccessibleNodeIds(userId)` ∩ `orgNodeIds` de la query): un

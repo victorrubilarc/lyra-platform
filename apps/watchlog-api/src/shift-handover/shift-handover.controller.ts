@@ -1,8 +1,8 @@
-import { Body, Controller, Get, HttpCode, MessageEvent, Param, Patch, Post, Query, Req, Sse } from "@nestjs/common";
+import { Body, Controller, Get, HttpCode, MessageEvent, Param, Patch, Post, Query, Req, Res, Sse } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import { from, interval, map, merge, switchMap, takeWhile, type Observable } from "rxjs";
-import type { FastifyRequest } from "fastify";
+import type { FastifyReply, FastifyRequest } from "fastify";
 import {
   acknowledgeHandoverRequestSchema,
   addHandoverItemRequestSchema,
@@ -75,6 +75,29 @@ export class ShiftHandoverController {
   @RequireAnyPermission("shifthandover:view", "shifthandover:compile", "shifthandover:sign", "shifthandover:acknowledge")
   getDetail(@Param("id") id: string, @CurrentUser() user: RequestUser) {
     return this.handover.getDetail(user.id, id);
+  }
+
+  /**
+   * Descarga el ACTA de entrega de turno en PDF (Slice 4). Mismo gate de LECTURA que
+   * `getDetail` (quien puede leer la entrega puede exportar su acta — fork c, sin permiso
+   * nuevo) + ABAC por nodo y gobernanza de estado en el servicio. Se sirve con `@Res()`
+   * como el export CSV de bitácoras (stream binario propio, sin serialización de Nest).
+   */
+  @Get(":id/acta.pdf")
+  @RequireAnyPermission("shifthandover:view", "shifthandover:compile", "shifthandover:sign", "shifthandover:acknowledge")
+  async exportActa(
+    @Param("id") id: string,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+    @Res() reply: FastifyReply,
+  ): Promise<void> {
+    const { buffer, filename } = await this.handover.exportActa(user.id, id, this.ctx(user, req));
+    await reply
+      .header("Content-Type", "application/pdf")
+      .header("Content-Disposition", `attachment; filename="${filename}"`)
+      .header("Content-Length", String(buffer.length))
+      .header("Cache-Control", "no-store")
+      .send(buffer);
   }
 
   @Patch(":id/summary")

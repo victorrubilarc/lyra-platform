@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import type { ShiftHandover, ShiftHandoverItem as ShiftHandoverItemRow } from "@prisma/client";
 import {
@@ -29,6 +29,9 @@ import { NotificationEmitterService } from "../notifications/notification-emitte
 import { ShiftResolver } from "../operational-calendar/shift-resolver";
 import { PrismaService } from "../prisma/prisma.service";
 import { ShiftHandoverCompilerService, type CompileScope } from "./shift-handover-compiler.service";
+import { buildActaDocument } from "./acta/acta-document";
+import { actaIntegrityHash } from "./acta/acta-hash";
+import { renderActaPdf } from "./acta/acta-renderer";
 
 const GENERAL_STATUS_LABELS: Record<HandoverGeneralStatus, string> = {
   OPERATIONAL: "Operativo",
@@ -38,6 +41,18 @@ const GENERAL_STATUS_LABELS: Record<HandoverGeneralStatus, string> = {
 };
 
 type HandoverWithRelations = ShiftHandover & { items: ShiftHandoverItemRow[] };
+
+/** Nombre de archivo significativo del acta: `acta-<folio>-<nodo>-<dia>.pdf`. */
+function actaFilename(code: string, nodeName: string, operationalDay: string): string {
+  const slug =
+    nodeName
+      .normalize("NFD") // separa los diacríticos…
+      .replace(/[̀-ͯ]/g, "") // …y los elimina (Línea → Linea, no Li-nea)
+      .replace(/[^a-zA-Z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .toLowerCase() || "nodo";
+  return `acta-${code}-${slug}-${operationalDay}.pdf`;
+}
 
 /**
  * Cambio de turno (Fase 5 — Slice 1). Orquesta el ciclo FIJO de 3 pasos:
@@ -119,6 +134,59 @@ export class ShiftHandoverService {
     const handover = await this.loadHandover(id);
     await this.assertNodeAccess(userId, handover.orgNodeId);
     return this.toDetail(userId, handover);
+  }
+
+  /**
+   * Exporta el ACTA de entrega de turno en PDF (Fase 5 — Slice 4). Se arma del
+   * snapshot CONGELADO (vía `toDetail`, que sirve el snapshot cuando la entrega ya
+   * está firmada) ⇒ fiel e inmutable (AC-PDF-1). Reusa el permiso de lectura (gate
+   * en el controller); el alcance de dato (ABAC por nodo) lo impone aquí (AC-PDF-4).
+   * Gobernanza (fork d): el acta OFICIAL solo existe desde SIGNED_OUT/ACKNOWLEDGED;
+   * en COMPILING/CANCELED se rechaza con 409 (no hay snapshot ni firmas). Cada
+   * exportación se AUDITA con el folio + hash de integridad (AC-PDF-5).
+   */
+  async exportActa(userId: string, id: string, ctx: AuditContext): Promise<{ buffer: Buffer; filename: string; code: string }> {
+    const handover = await this.loadHandover(id);
+    await this.assertNodeAccess(userId, handover.orgNodeId);
+    if (handover.status === "COMPILING" || handover.status === "CANCELED") {
+      throw new ConflictException("El acta oficial solo está disponible para una entrega firmada (SIGNED_OUT/ACKNOWLEDGED).");
+    }
+
+    const detail = await this.toDetail(userId, handover);
+    const nodePathLabel = await this.resolveNodePathLabel(handover.orgNodeId);
+    const integrityHash = actaIntegrityHash(detail);
+    const exporter = await this.prisma.user.findUnique({ where: { id: userId }, select: { displayName: true, email: true } });
+    const exportedByName = exporter?.displayName ?? exporter?.email ?? "—";
+
+    const doc = buildActaDocument({
+      detail,
+      nodePathLabel,
+      integrityHash,
+      exportedAt: new Date().toISOString(),
+      exportedByName,
+    });
+    const buffer = await renderActaPdf(doc);
+
+    await this.audit.record({
+      ...ctx,
+      action: "shifthandover.acta.exported",
+      entityType: "ShiftHandover",
+      entityId: handover.id,
+      after: { code: detail.code, status: handover.status, integrityHash },
+    });
+
+    return { buffer, filename: actaFilename(detail.code, detail.nodeName, detail.operationalDay), code: detail.code };
+  }
+
+  /** Cadena legible de ancestros del nodo ("Planta › Área › Línea") para el encabezado del acta. */
+  private async resolveNodePathLabel(nodeId: string): Promise<string> {
+    const node = await this.prisma.orgNode.findUnique({ where: { id: nodeId }, select: { path: true } });
+    const ids = (node?.path ?? "").split("/").filter(Boolean);
+    const ancestorIds = ids.slice(0, -1); // el último id es el nodo mismo (ya se muestra como "Nodo")
+    if (ancestorIds.length === 0) return "";
+    const ancestors = await this.prisma.orgNode.findMany({ where: { id: { in: ancestorIds } }, select: { id: true, name: true } });
+    const byId = new Map(ancestors.map((n) => [n.id, n.name]));
+    return ancestorIds.map((i) => byId.get(i) ?? "…").join(" › ");
   }
 
   async list(userId: string, q: ShiftHandoverListQuery): Promise<ShiftHandoverListResponse> {
