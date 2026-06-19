@@ -37,6 +37,7 @@ import {
   buildDeterministicSummary,
   HANDOVER_SECTIONS,
   isHandoverItemOpen,
+  type AiProvider,
   type HandoverCockpit,
   type HandoverGeneralStatus,
   type HandoverSectionKey,
@@ -60,6 +61,7 @@ import {
 } from "./shift-handover-queries.js";
 import { IncidentDetailDrawer } from "../incidents/IncidentDetailDrawer.js";
 import { HandoverReauthModal } from "./HandoverReauthModal.js";
+import { useSummaryStream } from "./use-summary-stream.js";
 import { GENERAL_STATUS_OPTIONS, HANDOVER_STATUS_META, SECTION_ICON } from "./shift-handover-presentation.js";
 import styles from "./shift-handover.module.css";
 
@@ -638,6 +640,7 @@ function SignOffPanel({ detail, canCompile, canSign, canAck }: { detail: ShiftHa
   const { t } = useTranslation();
   const toast = useToast();
   const updateSummary = useUpdateHandoverSummary(detail.id);
+  const summaryStream = useSummaryStream(detail.id);
   const signOut = useSignOutHandover(detail.id);
   const acknowledge = useAcknowledgeHandover(detail.id);
 
@@ -668,7 +671,7 @@ function SignOffPanel({ detail, canCompile, canSign, canAck }: { detail: ShiftHa
   );
 
   function persistSummary() {
-    if (!editable) return;
+    if (!editable || summaryStream.streaming) return;
     updateSummary.mutate({ summaryText: summary, generalStatus });
   }
   function regenerate() {
@@ -677,19 +680,47 @@ function SignOffPanel({ detail, canCompile, canSign, canAck }: { detail: ShiftHa
       { onSuccess: (d) => setSummary(d.summaryText ?? "") },
     );
   }
-  function generateWithAi() {
+  // Degradación (AC-IA-5): el stream falló/se cortó ⇒ caemos a la ruta no-streaming, que a su
+  // vez degrada a determinista si la IA tampoco responde.
+  function regenerateNonStreaming() {
+    toast.toast(t("handover.aiStreamFell"), { variant: "warning" });
     updateSummary.mutate(
       { regenerate: true, useAi: true, generalStatus },
       {
         onSuccess: (d) => {
           setSummary(d.summaryText ?? "");
-          // Degradación elegante (AC-IA-5): se pidió IA pero volvió determinista.
           if (!d.summaryProvider || d.summaryProvider === "none") toast.toast(t("handover.aiDegraded"), { variant: "warning" });
           else toast.success(t("handover.aiGenerated"));
         },
         onError: (e) => toast.error(e instanceof Error ? e.message : t("handover.aiError")),
       },
     );
+  }
+  // Resumen por IA EN VIVO (Slice 3): el texto se escribe token a token en el editor; al cerrar
+  // se persiste el texto final + su proveedor (sin re-generar). El crudo determinista sigue al lado.
+  function generateWithAi() {
+    let acc = "";
+    setSummary("");
+    summaryStream.start({
+      generalStatus,
+      onDelta: (text) => {
+        acc += text;
+        setSummary(acc);
+      },
+      onDone: (done) => {
+        if (done.degraded) {
+          regenerateNonStreaming();
+          return;
+        }
+        const finalText = done.text || acc;
+        setSummary(finalText);
+        updateSummary.mutate(
+          { summaryText: finalText, summaryProvider: done.provider as AiProvider, generalStatus },
+          { onSuccess: () => done.generatedByAi && toast.success(t("handover.aiGenerated")) },
+        );
+      },
+      onError: regenerateNonStreaming,
+    });
   }
   function confirmSign(creds: { password: string; mfaCode?: string }) {
     signOut.mutate(
@@ -726,14 +757,29 @@ function SignOffPanel({ detail, canCompile, canSign, canAck }: { detail: ShiftHa
           </option>
         ))}
       </Select>
-      <Textarea value={summary} onChange={(e) => setSummary(e.target.value)} onBlur={persistSummary} rows={big ? 18 : 10} placeholder={t("handover.summaryPlaceholder")} />
+      <Textarea
+        value={summary}
+        onChange={(e) => setSummary(e.target.value)}
+        onBlur={persistSummary}
+        rows={big ? 18 : 10}
+        readOnly={summaryStream.streaming}
+        placeholder={t("handover.summaryPlaceholder")}
+      />
       <div className={styles.summaryActions}>
-        <Button variant="secondary" onClick={regenerate} loading={updateSummary.isPending}>
-          {t("handover.regenerate")}
-        </Button>
-        <Button variant="primary" onClick={generateWithAi} loading={updateSummary.isPending}>
-          <Sparkles size={14} /> {t("handover.generateAi")}
-        </Button>
+        {summaryStream.streaming ? (
+          <Button variant="secondary" onClick={summaryStream.cancel}>
+            <X size={14} /> {t("handover.cancelStream")}
+          </Button>
+        ) : (
+          <>
+            <Button variant="secondary" onClick={regenerate} loading={updateSummary.isPending}>
+              {t("handover.regenerate")}
+            </Button>
+            <Button variant="primary" onClick={generateWithAi} loading={updateSummary.isPending}>
+              <Sparkles size={14} /> {t("handover.generateAi")}
+            </Button>
+          </>
+        )}
       </div>
     </>
   );
@@ -761,8 +807,8 @@ function SignOffPanel({ detail, canCompile, canSign, canAck }: { detail: ShiftHa
       <div className={styles.summaryBlock}>
         <div className={styles.summaryHead}>
           <Sparkles size={14} /> {t("handover.summaryTitle")}
-          <span className={isAiSummary ? styles.providerTagAi : styles.providerTag}>
-            {isAiSummary ? t("handover.summaryAi") : t("handover.summaryNone")}
+          <span className={summaryStream.streaming || isAiSummary ? styles.providerTagAi : styles.providerTag}>
+            {summaryStream.streaming ? t("handover.streaming") : isAiSummary ? t("handover.summaryAi") : t("handover.summaryNone")}
           </span>
           <button type="button" className={styles.expandBtn} onClick={() => setSummaryModal(true)} title={t("handover.expand")} aria-label={t("handover.expand")}>
             <Maximize2 size={14} />

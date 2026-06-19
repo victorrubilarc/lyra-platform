@@ -56,16 +56,35 @@ export interface CompleteInput {
   maxTokens?: number;
 }
 
+/** Opciones de una generación en streaming. */
+export interface StreamOptions {
+  /** Cancela la generación (cierra la conexión con el proveedor) cuando se aborta. */
+  signal?: AbortSignal;
+}
+
 /**
- * Interfaz abstracta del proveedor de IA. Patrón `EmailService` (token DI). Un solo
- * contrato — `generateSummary` (grounded, primer consumidor) + `complete` (libre, para
- * Probar). El streaming es opcional y se difiere (Slice 3): la interfaz lo admitirá
- * agregando `generateSummaryStream` sin reescribir a los consumidores.
+ * Stream de UNA generación: deltas de TEXTO en orden + el `LlmResult` final (tokens/latencia)
+ * tras consumir el stream. Espeja `client.messages.stream()` + `.finalMessage()` del SDK de
+ * Anthropic. El consumidor itera los deltas y, al cerrar, lee `finalResult()` para registrar
+ * la generación en `AiGenerationLog` (gobernanza de costo).
+ */
+export interface LlmStream {
+  [Symbol.asyncIterator](): AsyncIterator<string>;
+  /** Resuelve cuando el stream terminó de emitirse; rechaza si el proveedor falló. */
+  finalResult(): Promise<LlmResult>;
+}
+
+/**
+ * Interfaz abstracta del proveedor de IA. Patrón `EmailService` (token DI). Contrato:
+ * `generateSummary` (grounded, no-streaming) + `complete` (libre, para Probar) +
+ * `generateSummaryStream` (grounded, token a token — Slice 3). El streaming se agregó SIN
+ * reescribir a los consumidores no-streaming, como se diseñó en Slice 2.
  */
 export interface LlmProvider {
   readonly id: AiProvider;
   readonly model: string;
   generateSummary(input: GenerateSummaryInput): Promise<LlmResult>;
+  generateSummaryStream(input: GenerateSummaryInput, opts?: StreamOptions): LlmStream;
   complete(input: CompleteInput): Promise<LlmResult>;
 }
 

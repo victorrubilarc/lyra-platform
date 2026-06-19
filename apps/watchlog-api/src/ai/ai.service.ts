@@ -2,6 +2,8 @@ import { Injectable, Logger } from "@nestjs/common";
 import type { AiCapability, AiProvider } from "@lyra/contracts";
 import {
   createLlmProvider,
+  egressesPlant,
+  scrubGrounding,
   type GenerateSummaryInput,
   type LlmResult,
   type ResolvedLlmConfig,
@@ -19,6 +21,15 @@ export interface SummaryGenerationResult {
   provider: AiProvider;
   model: string;
 }
+
+/**
+ * Evento del resumen por IA en STREAMING (Slice 3). `delta` = trozo de texto en vivo; `done`
+ * = cierre con el texto final + de dónde salió. En `degraded` el cockpit cae a la ruta
+ * no-streaming (AC-IA-5). El gateway registra la generación en `AiGenerationLog` al cerrar.
+ */
+export type SummaryStreamEvent =
+  | { type: "delta"; text: string }
+  | { type: "done"; text: string; provider: AiProvider; generatedByAi: boolean; degraded: boolean };
 
 /**
  * Gateway de IA del backend. Resuelve el proveedor activo desde la config (`AiConfigService`
@@ -64,6 +75,52 @@ export class AiService {
       this.logger.warn(`Resumen por IA falló (${resolved.provider}/${resolved.model}); se usa el determinista: ${message}`);
       await this.logFailure("shift-summary", resolved, message, ctx);
       return { text: input.fallbackText, generatedByAi: false, degraded: true, provider: "none", model: resolved.model };
+    }
+  }
+
+  /**
+   * Genera el resumen de turno en STREAMING (Slice 3): emite deltas en vivo y, al cerrar,
+   * registra la generación y emite `done`. GROUNDING intacto (snapshot congelado). Aplica el
+   * SCRUBBER de PII al grounding solo si la generación EGRESA de la planta (AC-IA-6/AC-IA-7);
+   * on-prem local no se redacta. DEGRADACIÓN (AC-IA-5): si el proveedor falla, emite
+   * `done{degraded:true}` para que el cockpit caiga a la ruta no-streaming. Si el cliente se
+   * desconecta (signal abortado), corta sin registrar fallo.
+   */
+  async *streamSummary(
+    input: GenerateSummaryInput,
+    ctx: { handoverId?: string; userId?: string },
+    signal?: AbortSignal,
+  ): AsyncGenerator<SummaryStreamEvent> {
+    const resolved = await this.config.getResolved();
+    const provider = createLlmProvider(resolved);
+
+    // Modo none: sin IA, sin red, sin registro de costo. Emite el determinista en un bloque.
+    if (provider.id === "none") {
+      yield { type: "delta", text: input.fallbackText };
+      yield { type: "done", text: input.fallbackText, provider: "none", generatedByAi: false, degraded: false };
+      return;
+    }
+
+    // Grounding que ve el modelo: redactado si la generación sale de la planta.
+    const grounding = egressesPlant(resolved) ? scrubGrounding(input.grounding) : input.grounding;
+    const stream = provider.generateSummaryStream({ fallbackText: input.fallbackText, grounding }, { signal });
+
+    try {
+      for await (const delta of stream) {
+        if (delta) yield { type: "delta", text: delta };
+      }
+      const result = await stream.finalResult();
+      const text = result.text.trim();
+      if (!text) throw new Error("El proveedor de IA devolvió una respuesta vacía.");
+      await this.log("shift-summary", "SUCCESS", result, null, ctx);
+      yield { type: "done", text, provider: result.provider, generatedByAi: true, degraded: false };
+    } catch (err) {
+      // El cliente cerró la conexión (EventSource.close): corta limpio, no es un fallo del modelo.
+      if (signal?.aborted) return;
+      const message = err instanceof Error ? err.message : "Error desconocido del proveedor de IA.";
+      this.logger.warn(`Resumen por IA (stream) falló (${resolved.provider}/${resolved.model}); el cockpit degradará: ${message}`);
+      await this.logFailure("shift-summary", resolved, message, ctx);
+      yield { type: "done", text: "", provider: "none", generatedByAi: false, degraded: true };
     }
   }
 

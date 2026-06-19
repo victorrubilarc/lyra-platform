@@ -12,7 +12,8 @@ import {
   type UpdateHandoverItemRequest,
   type UpdateHandoverSummaryRequest,
 } from "@lyra/contracts";
-import { apiJson } from "../../lib/api-client.js";
+import { API_BASE, apiJson } from "../../lib/api-client.js";
+import { getAccessToken } from "../../lib/session-token.js";
 
 function queryString(q: ShiftHandoverListQuery): string {
   const p = new URLSearchParams();
@@ -62,4 +63,17 @@ export function acknowledgeHandover(id: string, dto: AcknowledgeHandoverRequest)
 
 export function cancelHandover(id: string, dto: CancelHandoverRequest): Promise<ShiftHandoverDetail> {
   return apiJson(`/shift-handover/${id}/cancel`, shiftHandoverDetailSchema, { method: "POST", body: dto });
+}
+
+/**
+ * URL del stream SSE del resumen por IA en vivo (Slice 3). `EventSource` no puede mandar el
+ * header Authorization, así que el access token viaja por query (auth confinada a ese endpoint
+ * en el backend). `generalStatus` viaja para que el grounding refleje el estado seleccionado.
+ */
+export function handoverSummaryStreamUrl(id: string, generalStatus?: string): string | null {
+  const token = getAccessToken();
+  if (!token) return null;
+  const p = new URLSearchParams({ access_token: token });
+  if (generalStatus) p.set("generalStatus", generalStatus);
+  return `${API_BASE}/shift-handover/${id}/summary/stream?${p.toString()}`;
 }

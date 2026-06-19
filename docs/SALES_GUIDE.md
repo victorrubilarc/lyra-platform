@@ -140,14 +140,17 @@ los "no me avisaron" y el cuaderno que nadie lee. Alineado a las guías de segur
 La IA de Lyra WatchLog **se configura desde la aplicación**, no por un técnico tocando el servidor:
 el administrador elige el proveedor (**ninguno**, **Anthropic en la nube**, o un **modelo local**),
 pega su clave —que se guarda **cifrada y nunca se vuelve a mostrar**—, pulsa **Probar** y ve una
-respuesta real al instante. Con eso, el supervisor puede **"Generar con IA"** el resumen del turno:
-un brief profesional construido **solo con los datos del turno** (no inventa cifras), que él **revisa,
-edita y firma** —la IA nunca firma—, con el **resumen original siempre visible al lado** para
-contrastar. Si la IA no está disponible, el sistema **sigue funcionando** con el resumen automático.
-**Beneficio:** menos tiempo redactando y más calidad en el traspaso, **sin atarte a un proveedor** y
-—lo más importante para industria— con la opción de un **modelo local donde los datos NUNCA salen de
-la planta**. *Hoy:* resumen de turno por IA (texto completo al terminar). *En camino:* que se escriba
-**en vivo** (palabra a palabra) y un **asistente de consulta** sobre el histórico.
+respuesta real al instante. Con eso, el supervisor pulsa **"Generar con IA"** y ve el resumen del turno
+**escribirse palabra por palabra, en vivo** (como en un chat): un brief profesional construido **solo
+con los datos del turno** (no inventa cifras), que él **revisa, edita y firma** —la IA nunca firma—,
+con el **resumen original siempre visible al lado** para contrastar. Puede **cancelar** la generación a
+mitad, y si la IA no está disponible el sistema **sigue funcionando** con el resumen automático (nunca
+deja sin resumen). **Beneficio:** menos tiempo redactando y más calidad en el traspaso, con la
+percepción de **respuesta inmediata** (el texto empieza a aparecer al instante), **sin atarte a un
+proveedor** y —lo más importante para industria— con la opción de un **modelo local donde los datos
+NUNCA salen de la planta** (y, cuando el proveedor es de nube, los datos personales en texto libre se
+**redactan** antes de enviarse). *Hoy:* resumen de turno por IA **en vivo**. *En camino:* export **PDF**
+de la entrega y un **asistente de consulta** sobre el histórico.
 
 ### 🔗 De la bitácora a la acción (sin saltos manuales)
 Cuando un dato de una bitácora se sale de umbral, el sistema puede generar una **excepción
@@ -303,6 +306,10 @@ Preséntalo como evolución, no como funcionalidad actual:
 
 > Una línea por hito, en lenguaje de cliente. Lo más reciente arriba.
 
+- **2026-06-19** — **Resumen de turno por IA EN VIVO 🤖 (disponible):** el supervisor pulsa "Generar con IA" y ve el brief del turno
+  **escribirse palabra por palabra** sobre el cockpit (respuesta inmediata, como un chat), cancelable; el resumen automático sigue al
+  lado, la firma sigue siendo humana, y si la IA falla cae solo al automático. Con **modelo local los datos no salen de la planta**; con
+  nube, los datos personales en texto libre se **redactan** antes de enviarse.
 - **2026-06-18** — **Cambio de turno firmado 🔄 (disponible):** entrega de turno **auto-compilada** por área (el sistema arma solo el
   estado del turno), **firmada por las dos partes** (saliente entrega, entrante reconoce), con **pendientes que ruedan** entre turnos
   e **historial inmutable**. Continuidad operacional con evidencia de auditoría, alineada a HSE-UK/CCPS. *(El resumen redactado por

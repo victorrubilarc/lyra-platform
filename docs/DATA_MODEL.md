@@ -508,6 +508,9 @@ tabla existente. El catálogo de EVENTOS vive en CÓDIGO (`@lyra/contracts NOTIF
   `capability` ("shift-summary"|"test"), `provider`, `model`, `status` ("SUCCESS"|"FAILED"|"FALLBACK"), `inputTokens?`, `outputTokens?`,
   `latencyMs`, `error?`, `handoverId?` (ref BLANDA al cambio de turno, sin FK), `createdById?`, `createdAt`. Índices por `createdAt` y
   `(provider, createdAt)`. El modo `none` NO registra (sin costo). Migración aditiva `20260618010000_add_ai_admin`.
+- **Slice 3 (streaming) — SIN cambio de esquema.** El resumen por IA en vivo (SSE) reusa `AiGenerationLog` (registra al cerrar el
+  stream) y la columna `ShiftHandover.summaryProvider` (ya existente). El único cambio de contrato es el DTO `updateHandoverSummary`,
+  que ahora acepta `summaryProvider` opcional para PERSISTIR el texto IA generado en vivo sin re-generar (no toca la BD/migraciones).
 
 ### Orígenes de datos
 - **DataSource** — URL base, tipo de auth, **credencial cifrada en reposo**. *1—N* **DataSourceEndpoint** (path, método, mapeo JSONPath, TTL). Caché en Redis. **Espejo ENTRANTE:** en Fase 3 un endpoint puede **alimentar/materializar** una `ReferenceList` (`source=EXTERNAL`).

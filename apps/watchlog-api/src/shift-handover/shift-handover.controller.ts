@@ -1,10 +1,14 @@
-import { Body, Controller, Get, HttpCode, Param, Patch, Post, Query, Req } from "@nestjs/common";
+import { Body, Controller, Get, HttpCode, MessageEvent, Param, Patch, Post, Query, Req, Sse } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { JwtService } from "@nestjs/jwt";
+import { from, interval, map, merge, switchMap, takeWhile, type Observable } from "rxjs";
 import type { FastifyRequest } from "fastify";
 import {
   acknowledgeHandoverRequestSchema,
   addHandoverItemRequestSchema,
   cancelHandoverRequestSchema,
   compileHandoverRequestSchema,
+  handoverGeneralStatusSchema,
   shiftHandoverListQuerySchema,
   signOutHandoverRequestSchema,
   updateHandoverItemRequestSchema,
@@ -13,16 +17,21 @@ import {
   type AddHandoverItemRequest,
   type CancelHandoverRequest,
   type CompileHandoverRequest,
+  type HandoverGeneralStatus,
   type ShiftHandoverListQuery,
   type SignOutHandoverRequest,
   type UpdateHandoverItemRequest,
   type UpdateHandoverSummaryRequest,
 } from "@lyra/contracts";
+import type { Env } from "../config/env.schema";
 import type { AuditContext } from "../audit/audit.service";
-import type { RequestUser } from "../authz/auth-user";
-import { CurrentUser, RequireAnyPermission, RequirePermission } from "../authz/authz.decorators";
+import type { AccessTokenClaims, RequestUser } from "../authz/auth-user";
+import { CurrentUser, Public, RequireAnyPermission, RequirePermission } from "../authz/authz.decorators";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { ShiftHandoverService } from "./shift-handover.service";
+
+/** Heartbeat del stream SSE del resumen: mantiene viva la conexión tras proxies/timeouts. */
+const SSE_HEARTBEAT_MS = 15_000;
 
 /**
  * Cambio de turno / Shift Handover (Fase 5 — Slice 1). Segregación de funciones:
@@ -33,7 +42,11 @@ import { ShiftHandoverService } from "./shift-handover.service";
  */
 @Controller("shift-handover")
 export class ShiftHandoverController {
-  constructor(private readonly handover: ShiftHandoverService) {}
+  constructor(
+    private readonly handover: ShiftHandoverService,
+    private readonly jwt: JwtService,
+    private readonly config: ConfigService<Env, true>,
+  ) {}
 
   /** Compila (o recupera) la entrega del turno actual de un nodo. */
   @Post("compile")
@@ -73,6 +86,55 @@ export class ShiftHandoverController {
     @Req() req: FastifyRequest,
   ) {
     return this.handover.updateSummary(user.id, id, dto, this.ctx(user, req));
+  }
+
+  /**
+   * Resumen de turno por IA EN VIVO (Slice 3, streaming SSE). Espejo del stream de la campanita:
+   * `EventSource` no puede mandar Authorization, así que el access token viaja por `?access_token=`
+   * y se verifica aquí (`@Public` para saltar el guard global). El alcance de dato (ABAC) y el
+   * estado COMPILING los valida el servicio. Emite `{type:"delta"|"done"}` + un `ping` periódico.
+   * NO persiste: el cockpit guarda el texto final con el `PATCH :id/summary` auditado. Si el
+   * cliente cierra el `EventSource`, el `close` aborta la generación con el proveedor.
+   */
+  @Public()
+  @Sse(":id/summary/stream")
+  streamSummary(
+    @Param("id") id: string,
+    @Query("access_token") token: string,
+    @Query("generalStatus") generalStatus: string | undefined,
+    @Req() req: FastifyRequest,
+  ): Observable<MessageEvent> {
+    const gs = handoverGeneralStatusSchema.safeParse(generalStatus);
+    const generalStatusOverride: HandoverGeneralStatus | undefined = gs.success ? gs.data : undefined;
+    const abort = new AbortController();
+    req.raw.on("close", () => abort.abort());
+
+    return from(this.verifySseToken(token)).pipe(
+      switchMap((userId) => {
+        const events$ = from(this.handover.streamSummary(userId, id, generalStatusOverride, abort.signal)).pipe(
+          map((ev) => ({ data: ev }) as MessageEvent),
+        );
+        const heartbeat$ = interval(SSE_HEARTBEAT_MS).pipe(
+          map(() => ({ type: "ping", data: String(Date.now()) }) as MessageEvent),
+        );
+        // El heartbeat acompaña hasta que llega el `done`; ahí se cierra el stream (inclusive),
+        // lo que también detiene el heartbeat. Los `ping` llevan `data` string (sin `type`).
+        return merge(events$, heartbeat$).pipe(
+          takeWhile((ev) => {
+            const d = ev.data as { type?: string } | string;
+            return typeof d === "string" || d.type !== "done";
+          }, true),
+        );
+      }),
+    );
+  }
+
+  /** Verifica el access token del SSE (query param). Lanza si es inválido/expirado. */
+  private async verifySseToken(token: string): Promise<string> {
+    const claims = await this.jwt.verifyAsync<AccessTokenClaims>(token, {
+      secret: this.config.get("JWT_ACCESS_SECRET", { infer: true }),
+    });
+    return claims.sub;
   }
 
   @Post(":id/items")
