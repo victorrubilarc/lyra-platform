@@ -1297,6 +1297,33 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
 
 > Items con fundamento ya discutidos; aquí para que no se diluyan en `DECISIONS.md`.
 
+### Hallazgos de la sesión QA (2026-06-18) — ver `docs/QA_WALKTHROUGH.md` §4
+- [ ] **[QA#1 · bug · media] Pestañas del workspace no son por usuario.** Al cambiar de cuenta en el mismo navegador,
+      las pestañas abiertas del usuario anterior **persisten**. El estado de pestañas debe ser propio de cada usuario:
+      al iniciar sesión debería entrar **limpio** (o restaurar solo las del usuario que entra). Posible fuga de contexto
+      entre cuentas (revisar que el store de pestañas se aísle/limpie por `userId` en login/logout).
+- [ ] **[QA#2 · mejora UX · baja] Falta el "ojo" en cambio de contraseña.** La pantalla de cambio de contraseña no
+      tiene toggle mostrar/ocultar en los inputs de contraseña (sí existe en otros formularios de auth).
+- [ ] **[QA#3 · bug · media] Estructura: equipos de nodos intermedios invisibles.** `NodeDetail.tsx:352` muestra
+      **o hijos o equipos** según `isLastLevel` (excluyente). Un equipo asignado a un nodo que NO es del último nivel
+      queda inaccesible en la UI (el panel muestra sus sub-nodos, no sus equipos). Reproducible: Molino SAG en
+      «Molienda SAG» se oculta al existir las «Líneas» debajo. El backend permite equipo en cualquier nodo (orgNodeId
+      libre) ⇒ la UI debería mostrar **ambas** secciones (hijos + equipos) o pestañas, no excluirlas por profundidad.
+- [ ] **[QA#4 · bug i18n · baja] Matriz de permisos mezcla idiomas.** `es-CL.ts` `permGroups` solo traduce
+      `security/structure/users/roles`; el resto de grupos cae al string crudo en inglés (`PermissionMatrix.tsx:34`,
+      key `security.permGroups.<group>`). Faltan: templates, workflows, incidents, notifications, opscalendar,
+      referencedata, settings, schedules, logbook, opsperiod.
+- [ ] **[QA#5 · mejora UX/seguridad · media] El gate del cliente no se propaga a sesiones activas.** **Backend OK**
+      (devuelve 403 correcto; el caché Redis `authz:perms:<userId>` reflejó el set real — **no hay bug de caché**: el
+      `[]` observado se debía a que el usuario quedó sin roles, asignación legítima). El cliente gatea con
+      `session.permissions` del login (`use-permissions.ts`); al cambiar roles/permisos de un usuario con sesión activa,
+      su menú/pantallas siguen visibles hasta refrescar/re-login y puede **abrir** una pantalla ya no permitida.
+      Considerar invalidar sesión / refetch del checker ante cambios sensibles, o forzar re-login en revocaciones.
+- [ ] **[QA#6 · bug · media] La web no avisa ante 403 (pantalla vacía silenciosa).** Al recibir 403 del backend, las
+      grillas quedan en "cargando"/vacías (KPIs 0/0/0) sin error visible; la consola se llena de `403 (Forbidden)`
+      (repro: entrar a Bitácoras sin `logentry:view`). Falta estado de error / empty-state "Sin acceso" / toast.
+      Transversal a las vistas basadas en `useQuery`.
+
 - [ ] **Sidebar: limpieza de huérfanos tras la agrupación (`feat/sidebar-grupos`).** El estilo `.navLabel` (en
       `AppShell.module.css`) y la clave i18n `nav.sectionLabel` ("Módulos") dejaron de usarse al pasar a grupos
       (`.navGroupLabel` / `nav.groups.*`). Limpieza mecánica trivial. **No urgente** (inertes). (La deuda "Favoritos colapsable"
