@@ -117,6 +117,9 @@ ROLE_DEFS = {
             "exception:triage", "exception:dismiss", "exception:dismiss-critical", "exception:correct",
             "logentry:view", "logentry:transition", "schedule:view",
             "opsperiod:view", "audit:read",
+            # Cambio de turno (Fase 5): el jefe entrega y recibe turnos.
+            "module:handover:view", "shifthandover:view", "shifthandover:compile",
+            "shifthandover:sign", "shifthandover:acknowledge",
         ],
     },
     "demoqa-supervisor": {
@@ -128,6 +131,9 @@ ROLE_DEFS = {
             "exception:triage", "exception:dismiss", "exception:correct",
             "logentry:view", "logentry:fill", "logentry:create", "logentry:transition",
             "schedule:view", "round:execute",
+            # Cambio de turno (Fase 5): el supervisor de área es el actor principal del relevo.
+            "module:handover:view", "shifthandover:view", "shifthandover:compile",
+            "shifthandover:sign", "shifthandover:acknowledge",
         ],
     },
     "demoqa-operador": {

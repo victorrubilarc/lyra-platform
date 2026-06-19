@@ -5,7 +5,14 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-18** (**Cambio de turno — UX ronda 2 ✅** — `feat/cambio-turno-ux-fixes`:
+> actualización: **2026-06-19** (**Cambio de turno — fix deep link "se queda pensando" ✅** — `feat/cambio-turno-deeplink-fix`:
+> al abrir desde la campanita la pestaña quedaba en spinner infinito. La API/datos/permisos eran correctos (200); el problema era resiliencia de
+> UI (`CockpitView` solo miraba `isLoading||!detail`). Fixes: error+Reintentar en `CockpitView` (nunca spinner infinito) · `useHandoverDetail`
+> `retry:1` · **`GET /shift-handover/:id` → `RequireAnyPermission(view,compile,sign,acknowledge)`** (el entrante a menudo solo tiene acknowledge) ·
+> roles demo `supervisor`/`jefe` ganan los permisos `shifthandover:*` (el seed era anterior a Fase 5; aplicado en vivo + FLUSHALL) · smoke
+> `pick_nodes` prefiere nodo sin entregas previas (aísla la baton). smoke-cambio-turno **29/29**; typecheck/lint(0)/build verdes. **PENDIENTE: smoke
+> VISUAL del dueño.** **Siguiente: Slice 3 (streaming).** Anterior:
+> **Cambio de turno — UX ronda 2 ✅** — `feat/cambio-turno-ux-fixes`:
 > el detalle de una incidencia en el cockpit ahora **reutiliza el `IncidentDetailDrawer` REAL del módulo** (mismo panel/pestañas/acciones, en
 > contexto) en vez de un panel propio liviano + deep-link que perdía al usuario; aplica a incidencias, acciones/reportes (incidencia padre),
 > excepciones con incidencia y pendientes `refType=Incident` (gated `incident:view`). **Persistencia:** volver a la pestaña ya no la vacía
