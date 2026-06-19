@@ -170,7 +170,7 @@ export function ShiftHandoverPage() {
             {compile.isPending && <Spinner />}
           </Card>
           {activeId ? (
-            <CockpitView id={activeId} canCompile={can("shifthandover:compile")} canSign={can("shifthandover:sign")} canAck={can("shifthandover:acknowledge")} />
+            <CockpitView id={activeId} onResolveNode={setNodeId} canCompile={can("shifthandover:compile")} canSign={can("shifthandover:sign")} canAck={can("shifthandover:acknowledge")} />
           ) : (
             <EmptyState
               icon={<ArrowLeftRight size={40} />}
@@ -193,14 +193,33 @@ export function ShiftHandoverPage() {
 
 // === Cockpit (maestro-detalle de 3 zonas) =====================================
 
-function CockpitView({ id, canCompile, canSign, canAck }: { id: string; canCompile: boolean; canSign: boolean; canAck: boolean }) {
+function CockpitView({
+  id,
+  onResolveNode,
+  canCompile,
+  canSign,
+  canAck,
+}: {
+  id: string;
+  onResolveNode?: (nodeId: string) => void;
+  canCompile: boolean;
+  canSign: boolean;
+  canAck: boolean;
+}) {
   const { t } = useTranslation();
   const { data: detail, isLoading } = useHandoverDetail(id);
   const [section, setSection] = useState<HandoverSectionKey>("INCIDENTS");
   // Anchos de columna persistidos (centro flexible; nav y panel derecho redimensionables).
-  // El panel derecho arranca más ancho por defecto y se acota a 560 para que no se estire feo.
-  const nav = useColWidth("handover.navW", 232, 184, 380);
-  const aside = useColWidth("handover.asideW.v2", 468, 380, 560);
+  // El panel derecho arranca más ancho por defecto y admite bastante recorrido (hasta 920).
+  const nav = useColWidth("handover.navW", 232, 184, 420);
+  const aside = useColWidth("handover.asideW.v2", 468, 380, 920);
+
+  // Sincroniza el selector de nodo con la entrega cargada (al abrir desde historial / deep link
+  // / restauración el nodo no debe quedar vacío).
+  const resolvedNodeId = detail?.orgNodeId;
+  useEffect(() => {
+    if (resolvedNodeId) onResolveNode?.(resolvedNodeId);
+  }, [resolvedNodeId, onResolveNode]);
 
   if (isLoading || !detail) return <Spinner />;
   const c = detail.cockpit;
@@ -750,10 +769,10 @@ function SignOffPanel({ detail, canCompile, canSign, canAck }: { detail: ShiftHa
       {/* Sign-off saliente */}
       {detail.status === "COMPILING" && canSign && (
         <div className={styles.signAction}>
-          <p className={styles.signActionHint}>{t("handover.signReady")}</p>
           <Button variant="primary" className={styles.signBtn} onClick={() => setSignModal(true)}>
             <PenLine size={16} /> {t("handover.signOut")}
           </Button>
+          <p className={styles.signActionHint}>{t("handover.signReady")}</p>
         </div>
       )}
 

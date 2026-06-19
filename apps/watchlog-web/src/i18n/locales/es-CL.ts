@@ -1575,7 +1575,7 @@ export const esCL = {
     generateAi: "Generar con IA",
     expand: "Ampliar",
     viewDetail: "Ver detalle",
-    signReady: "Cuando la entrega esté completa, fírmala con tu identidad.",
+    signReady: "Firma electrónica con tu identidad.",
     crudoTitle: "Ver resumen determinista (crudo)",
     aiGenerated: "Resumen generado con IA. Revísalo y edítalo antes de firmar.",
     aiDegraded: "La IA no estaba disponible; se usó el resumen determinista.",
