@@ -20,6 +20,8 @@ import {
   type UpdateHandoverItemRequest,
   type UpdateHandoverSummaryRequest,
 } from "@lyra/contracts";
+import type { SummaryGrounding } from "@lyra/llm";
+import { AiService } from "../ai/ai.service";
 import { AuditService, type AuditContext } from "../audit/audit.service";
 import { ReauthService } from "../auth/reauth.service";
 import { ScopeService } from "../authz/scope.service";
@@ -55,6 +57,7 @@ export class ShiftHandoverService {
     private readonly audit: AuditService,
     private readonly shiftResolver: ShiftResolver,
     private readonly emitter: NotificationEmitterService,
+    private readonly ai: AiService,
   ) {}
 
   // === Compilación (get-or-create del turno actual) ===========================
@@ -167,13 +170,35 @@ export class ShiftHandoverService {
     this.assertCompiling(handover);
 
     let summaryText: string | undefined = dto.summaryText;
+    // Edición manual del texto ⇒ deja de ser "generado por IA" (provider none).
+    let summaryProvider: string | undefined = summaryText !== undefined ? "none" : undefined;
+
     if (dto.regenerate || (summaryText === undefined && dto.generalStatus)) {
-      const cockpit = await this.compiler.compile(userId, this.toCompileScope(handover, null));
-      const openItems = handover.items.filter((i) => isHandoverItemOpen(i.status)).map((i) => ({ title: i.title }));
-      summaryText = buildDeterministicSummary(cockpit, openItems, {
-        generalStatus: dto.generalStatus ?? (handover.generalStatus as HandoverGeneralStatus | null),
-        generalStatusLabel: dto.generalStatus ? GENERAL_STATUS_LABELS[dto.generalStatus] : undefined,
+      // Resuelve el nombre del nodo (como toDetail): el cockpit recompilado debe llevarlo
+      // para que el resumen —determinista o IA— mencione el nodo y el grounding sea completo.
+      const node = await this.prisma.orgNode.findUnique({ where: { id: handover.orgNodeId }, select: { name: true, path: true } });
+      const cockpit = await this.compiler.compile(userId, {
+        ...this.toCompileScope(handover, null),
+        nodeName: node?.name ?? "—",
+        nodePath: node?.path ?? "",
+        incomingShiftLabel: null,
       });
+      const openItems = handover.items.filter((i) => isHandoverItemOpen(i.status)).map((i) => ({ title: i.title }));
+      const generalStatus = dto.generalStatus ?? (handover.generalStatus as HandoverGeneralStatus | null);
+      const generalStatusLabel = generalStatus ? GENERAL_STATUS_LABELS[generalStatus] : undefined;
+      // Resumen DETERMINISTA: línea base y fallback offline (AC-IA-1).
+      const fallbackText = buildDeterministicSummary(cockpit, openItems, { generalStatus, generalStatusLabel });
+
+      if (dto.regenerate && dto.useAi) {
+        // Resumen por IA: GROUNDED al cockpit congelado, con degradación elegante a determinista.
+        const grounding = this.buildSummaryGrounding(cockpit, openItems, generalStatusLabel ?? "Sin declarar");
+        const res = await this.ai.generateSummary({ fallbackText, grounding }, { handoverId: id, userId });
+        summaryText = res.text;
+        summaryProvider = res.generatedByAi ? res.provider : "none";
+      } else {
+        summaryText = fallbackText;
+        summaryProvider = "none";
+      }
     }
 
     await this.prisma.shiftHandover.update({
@@ -181,11 +206,46 @@ export class ShiftHandoverService {
       data: {
         generalStatus: dto.generalStatus ?? undefined,
         summaryText: summaryText ?? undefined,
-        summaryProvider: summaryText !== undefined ? "none" : undefined,
+        summaryProvider: summaryProvider ?? undefined,
         updatedAt: new Date(),
       },
     });
     return this.toDetail(userId, await this.loadHandover(id));
+  }
+
+  /**
+   * Puente dominio→IA: arma el grounding (datos CONGELADOS) que el resumen por IA puede usar.
+   * Mapea el cockpit compilado a la estructura genérica de `@lyra/llm` (AC-IA-2). Nada que no
+   * esté aquí puede aparecer en el resumen generado.
+   */
+  private buildSummaryGrounding(
+    cockpit: HandoverCockpit,
+    openItems: readonly { title: string }[],
+    generalStatusLabel: string,
+  ): SummaryGrounding {
+    return {
+      nodeName: cockpit.scope.nodeName,
+      shiftLabel: cockpit.scope.shiftLabel ?? cockpit.scope.shiftCode ?? "turno",
+      operationalDay: cockpit.scope.operationalDay,
+      generalStatusLabel,
+      entriesCount: cockpit.entries.length,
+      incidents: cockpit.incidents.map((i) => ({
+        folio: i.folio,
+        title: i.title,
+        severity: i.severity,
+        critical: i.critical,
+        overdue: i.overdue,
+        stateName: i.stateName,
+      })),
+      exceptions: cockpit.exceptions.map((e) => ({ kind: e.kind, detail: e.detail, fieldLabel: e.fieldLabel })),
+      followups: cockpit.followups.map((f) => ({ kind: f.kind, code: f.code, title: f.title, overdue: f.overdue })),
+      rounds: {
+        done: cockpit.rounds.filter((r) => r.status === "COMPLETED").length,
+        overdue: cockpit.rounds.filter((r) => r.status === "OVERDUE").length,
+        total: cockpit.rounds.length,
+      },
+      openItems: openItems.map((i) => i.title),
+    };
   }
 
   async addItem(userId: string, id: string, dto: AddHandoverItemRequest, ctx: AuditContext): Promise<ShiftHandoverDetail> {

@@ -660,6 +660,18 @@ export const PERMISSION_CATALOG = [
     group: "handover",
     description: "Reconocer (acusar recibo de) la entrega como turno ENTRANTE (firma Part 11 con re-autenticación).",
   },
+
+  // --- Inteligencia Artificial administrable (Fase 5 — Slice 2) ---------------
+  // La IA del ecosistema deja de configurarse por `.env` y pasa a ser un módulo
+  // administrable desde la app. Este permiso gobierna ver/editar la config de IA
+  // (proveedor, modelo, clave write-only) y el botón "Probar". El proveedor LOCAL
+  // mantiene los datos dentro de la planta (on-prem).
+  {
+    key: "ai:config",
+    dimension: "ACTION",
+    group: "ai",
+    description: "Configurar la Inteligencia Artificial del sistema (proveedor, modelo, clave) y probar la conexión.",
+  },
 ] as const satisfies readonly PermissionDef[];
 
 /** Unión literal de todas las claves de permiso conocidas. */

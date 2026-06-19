@@ -4,6 +4,27 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-18 · Fase 5 · Slice 2 — IA ADMINISTRABLE desde la app (CONSTRUIDO) + resumen de turno por IA
+
+**Estado:** ✅ construido y verificado (`feat/ia-administrable`). Reemplaza la nota "ANOTADÍSIMO — NO construido" de más abajo.
+
+**Forks resueltos con el dueño (4 por `AskUserQuestion` + 3 recomendados sin objeción):**
+- **(a) Almacenamiento de la config = tabla DEDICADA `AiSettings`** (no en `SystemSettings` singleton como el SMTP). *Elección del dueño* sobre la recomendación (singleton): entidad propia, más aislada/extensible. Se conserva el mismo blindaje del SMTP: `apiKeyEnc` cifrada AES-256-GCM + write-only (`keySet`), `.env` solo fallback (`configuredAt` null ⇒ source=env).
+- **(b) Un proveedor ACTIVO global** (no por capacidad). La interfaz `@lyra/llm` recibe la "capacidad" como contexto para que Fase 6 (RAG/insights) pueda override después, pero hoy resuelve un único proveedor. Evita *parametrizar por parametrizar*.
+- **(c) Alcance = Slice 2 COMPLETO** (fundación `@lyra/llm` + config cifrada + Probar + permiso + auditoría + tab UI + resumen de turno por IA). Es el WoW.
+- **(d) Adapters = `none` + `anthropic` + `openai-compatible`** (este último cubre Ollama/vLLM/LM Studio/OpenAI/DeepSeek por `baseURL`).
+- **(e) Registro = tabla `AiGenerationLog`** (provider/model/tokens/latencyMs/status/handoverId, append-only) para gobernanza de costo. *Recomendado, no objetado.*
+- **(f) Streaming del resumen = DIFERIDO a Slice 3.** El brief es corto (pocos segundos); no-streaming con spinner es más simple y robusto; `@lyra/llm` queda listo para agregar `generateSummaryStream` sin reescribir a los consumidores. *Explicado al dueño y aceptado.*
+- **(g) Modelos por defecto (editables):** nube **`claude-opus-4-8`** (default Anthropic; `claude-sonnet-4-6` opción de costo); local **`qwen2.5:7b-instruct`** vía Ollama `http://localhost:11434/v1` (fuerte en español, on-prem). *Propuesta del agente.*
+
+**Arquitectura (mejor que ruta-bus):** `@lyra/llm` **decoplado de `@lyra/contracts`** (recibe `fallbackText`+`grounding` genéricos, no conoce el dominio del cambio de turno ⇒ reusable por Fase 6). Adapter `anthropic` sin `thinking`/`effort` para servir CUALQUIER modelo que el admin configure sin 400. Prompt **VERSIONADO** (`SUMMARY_PROMPT_VERSION`). Gateway `AiService` con **degradación elegante** a determinista (AC-IA-5) y registro de costo. Permiso nuevo **`ai:config`** (cat. 88→89). Migración aditiva `20260618010000_add_ai_admin`.
+
+**Bugfix latente del Slice 1 (descubierto por el smoke F2):** `updateSummary` recompilaba el cockpit con `toCompileScope(handover, null)` ⇒ `nodeName=""`, por lo que el resumen regenerado decía "Entrega de … en **.**". Ahora resuelve el nombre del nodo (lookup a `OrgNode`) como hace `toDetail`. Afectaba tanto al determinista como al grounding de la IA.
+
+**Criterios de aceptación IA cumplidos:** AC-IA-1 (none primero) · AC-IA-2 (grounding por construcción: el smoke verifica que el prompt enviado contiene el bloque DATOS y el nodo) · AC-IA-3 (crudo determinista siempre visible vía `<details>` + etiqueta "generado por IA · revisar") · AC-IA-4 (firma humana Part 11, la IA solo produce texto) · AC-IA-5 (degradación a none + aviso) · AC-IA-6 (local = sin fuga; documentado por proveedor en el contrato y la UI) · AC-IA-7 (prompt versionado, sin secretos, clave cifrada/write-only; **deuda: scrubber de PII explícito**).
+
+---
+
 ### 2026-06-18 · Fase 5 — Cambio de turno (Shift Handover) · Slice 1 (núcleo, sin IA)
 
 **Contexto:** la Fase 4 (Incidencias) quedó completa. La entrega de turno es un proceso CRÍTICO de seguridad de proceso

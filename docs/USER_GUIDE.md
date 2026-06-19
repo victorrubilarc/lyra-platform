@@ -100,6 +100,8 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 ### 12. Configuración del sistema  [Admin]
 - ✍️ `/configuracion`: MFA por acción, ventana de edición global
 - ✅ **Notificaciones**: comportamiento por defecto de los avisos de transición (§ Notificaciones ▸ Avisos a la medida)
+- ✅ **Servidor de correo (SMTP)**: proveedor, credenciales cifradas, probar (§ Configuración ▸ Servidor de correo)
+- ✅ **Inteligencia Artificial**: proveedor (ninguno/Anthropic/local), clave cifrada, "Probar" en vivo (§ Configuración ▸ Inteligencia Artificial)
 
 ### 13. Rondas  [Planificador · Operador]
 - ✅ **Programación de rondas** (horario por turno/intervalo/calendario + rol responsable) (§ Rondas ▸ Programación de rondas)
@@ -128,6 +130,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 
 ### 17. Cambio de turno  [Supervisor saliente · Supervisor entrante]
 - ✅ **Entregar y recibir el turno** (cockpit auto-compilado por área y turno, entrega firmada de dos partes, pendientes que ruedan, historial) (§ Cambio de turno)
+- ✅ **Resumen de turno por IA** (botón "Generar con IA", grounded al turno, revisable; el crudo determinista siempre visible; la firma sigue siendo tuya) (§ Cambio de turno)
 
 ---
 
@@ -753,6 +756,49 @@ servidor de correo). Es un permiso aparte del de plantillas y del de bandeja.
 
 ---
 
+## Configuración ▸ Inteligencia Artificial  [Admin]
+
+**Para qué sirve.** Decide **qué motor de IA** usa Lyra WatchLog y **dónde corre**. Hoy la
+IA potencia el **resumen de turno**; mañana, más capacidades. Antes esto vivía solo en
+variables de entorno; ahora se administra desde la app y **se aplica sin reiniciar**. Puedes
+elegir entre **no usar IA**, usar **Anthropic (en la nube)**, o un **modelo local** (Ollama,
+vLLM…) que mantiene **los datos dentro de tu planta**.
+
+**Cómo se usa.** En **Configuración ▸ Inteligencia Artificial**:
+1. Elige el **proveedor**:
+   - **Ninguno (sin IA):** el resumen de turno se arma de forma **determinista** (es el modo
+     por defecto y siempre disponible).
+   - **Anthropic (nube):** pega tu **API key** (se guarda **cifrada** y nunca se vuelve a
+     mostrar) y, si quieres, el modelo (por defecto `claude-opus-4-8`).
+   - **Local / OpenAI-compatible:** indica la **URL del endpoint** (p. ej. Ollama en
+     `http://localhost:11434/v1`) y el **modelo** (p. ej. `qwen2.5:7b-instruct`). Un endpoint
+     local **no requiere clave** y **los datos no salen de tu red**.
+2. Activa el interruptor **Activar IA**.
+3. Pulsa **Probar**: hace una **generación real corta** contra el proveedor del formulario (sin
+   guardar) y te muestra la **respuesta y la latencia**, o el **error exacto** si algo falla.
+4. **Guardar configuración**.
+
+Luego, en **Cambio de turno**, el supervisor saliente verá el botón **"Generar con IA"** junto
+al resumen: lo genera con el proveedor configurado, queda marcado **"generado por IA · revisar"**,
+y **el resumen determinista (crudo) sigue visible al lado** para contrastar. El supervisor lo
+**revisa, lo edita si quiere y lo firma él** (la IA nunca firma). Si la IA no está disponible o
+falla, el sistema **cae automáticamente al resumen determinista** con un aviso — nunca se rompe.
+
+**Quién puede.** Solo quien tenga el permiso **`ai:config`** (configurar la IA y probar). Es un
+permiso aparte; sin él, el tab no aparece.
+
+**Importante.**
+- La **API key se guarda cifrada** y la aplicación **nunca** la devuelve (solo indica si hay una
+  clave configurada). Déjala vacía para conservar la guardada.
+- **On-premise / sin fuga:** con el proveedor **local**, el contenido del resumen **no sale de la
+  planta**. Solo el proveedor **Anthropic** (o un endpoint remoto) envía ese contenido a la nube.
+- El resumen por IA usa **solo los datos del turno** (lo que ves en el cockpit); no inventa cifras
+  ni consulta fuentes externas. Toda cifra es rastreable al crudo de al lado.
+- Si nunca guardas la config aquí, el sistema usa las **variables de entorno** (`.env`) como
+  respaldo — la pantalla indica si la config actual viene «del sistema» o «del .env».
+
+---
+
 ## Incidencias
 
 **Para qué sirve.** Gestionar de forma formal y trazable los eventos, desviaciones,
@@ -1145,5 +1191,9 @@ entrega **solo las áreas de su alcance** (un supervisor de Flotación no ve ni 
 - **Una vez firmada, la entrega es inmutable** (foto congelada del turno) — es la evidencia de la
   continuidad operacional.
 - **Los pendientes ruedan solos** hasta que se cierran: no dependen de que alguien los recuerde.
-- *Hoy* el resumen se genera de forma **determinista** (sin IA). El resumen redactado por IA
-  on-premise llegará en una versión próxima (será revisable y la firma seguirá siendo humana).
+- El resumen se genera **determinista** por defecto, y —si un admin configuró la IA
+  (Configuración ▸ Inteligencia Artificial)— puedes pulsar **"Generar con IA"**: el brief queda
+  marcado **"generado por IA · revisar"**, el **crudo determinista sigue visible al lado**, y la
+  **firma sigue siendo humana**. Con un modelo **local**, los datos **no salen de la planta**. Si
+  la IA falla, cae solo al determinista (no se rompe). *Próximo:* que el texto se escriba **en
+  vivo** (streaming) y export **PDF** de la entrega.

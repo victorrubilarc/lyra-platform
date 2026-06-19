@@ -54,6 +54,21 @@ export const envSchema = z.object({
   SMTP_PASSWORD: z.string().optional(),
   SMTP_FROM: z.string().default("Lyra WatchLog <no-reply@watchlog.local>"),
 
+  // --- Inteligencia Artificial (Fase 5 · Slice 2) ---
+  // La IA se administra desde la app (tab "Inteligencia Artificial" en /configuracion,
+  // config en BD cifrada). Estas variables son SOLO FALLBACK de arranque (si nunca se
+  // guardó config en BD). provider: none | anthropic | openai-compatible.
+  AI_ENABLED: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
+  AI_PROVIDER: z.enum(["none", "anthropic", "openai-compatible"]).default("none"),
+  AI_MODEL: z.string().optional(),
+  // Solo para openai-compatible: endpoint local (Ollama/vLLM/LM Studio).
+  AI_BASE_URL: z.string().optional(),
+  // API key del proveedor (Anthropic / OpenAI-compatible). En BD va cifrada; aquí solo fallback.
+  AI_API_KEY: z.string().optional(),
+
   // --- Object storage (MinIO / S3, adjuntos de evidencia — Ola 3) ---
   // Interfaz abstracta StorageService → implementación MinIO (SDK `minio`). On-prem,
   // sin SaaS. El navegador NUNCA recibe credenciales ni accede directo: la API es el

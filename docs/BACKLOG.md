@@ -5,7 +5,16 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-18** (**Fase 5 — Cambio de turno · Slice 1 ✅** — `feat/cambio-turno`:
+> actualización: **2026-06-18** (**Fase 5 — Cambio de turno · Slice 2: IA ADMINISTRABLE ✅** — `feat/ia-administrable`:
+> la IA pasa de `.env` a **módulo administrable** (tab "Inteligencia Artificial" en `/configuracion`, permiso **`ai:config`**, cat. 88→89): proveedor
+> ninguno/Anthropic/local, clave **cifrada + write-only** (`AiSettings.apiKeyEnc`), botón **Probar** real, todo sin reiniciar. Fundación **`@lyra/llm`**
+> (interfaz `LlmProvider` + adapters none/anthropic/openai-compatible + prompt versionado, decoplado de contracts ⇒ reusable Fase 6). Gateway `AiService`
+> con **degradación elegante** a determinista + **`AiGenerationLog`** (gobernanza de costo). Primer consumidor: **resumen de turno por IA grounded**
+> (etiqueta "generado por IA · revisar", crudo determinista visible, firma humana). Bugfix latente Slice 1 (`updateSummary` con `nodeName=""`). Migración
+> aditiva `…_add_ai_admin`. contracts 321 · API 247 · `@lyra/llm` 6 · smoke `smoke-ia-config.py` **20/20** (servidor OpenAI-compatible FALSO) + regresión
+> cambio-turno 29/29 · notificaciones 18/18. **PENDIENTE: smoke VISUAL del dueño.** **Deuda:** streaming del resumen (Slice 3) · export PDF (Slice 4) ·
+> panel de costo sobre `AiGenerationLog` · scrubber de PII explícito (AC-IA-7). **Siguiente: Slice 3 (resumen IA generativo + streaming).** Anterior:
+> **Fase 5 — Cambio de turno · Slice 1 ✅** — `feat/cambio-turno`:
 > entrega de turno firmada de dos partes, auto-compilada por nodo+turno con ABAC, resumen DETERMINISTA (sin IA) y baton que rueda.
 > Estándar citado (HSE-UK/CCPS; Texas City/Piper Alpha; J5/eSOMS/Honeywell). Entidad dedicada `ShiftHandover` con ciclo FIJO de 3
 > pasos reusando SOLO firma Part 11 (NO `WorkflowDefinition`); snapshot congelado al firmar; baton = objetos abiertos del alcance +
@@ -385,17 +394,18 @@ nunca queda más de una sesión atrás.
 > Plan por slices aprobado (DECISIONS 2026-06-18). **Slice 1 (núcleo, resumen `none`) HECHO y publicado.**
 - [x] **Slice 1 — Núcleo:** entrega firmada de 2 partes (compilar→firma saliente→acuse entrante), cockpit 3 zonas, baton que rueda,
   snapshot congelado, `handover.ready`, historial ABAC, resumen determinista. `feat/cambio-turno`. smoke 29/29.
-- [ ] **Slice 2 — Fundación `@lyra/llm` + IA ADMINISTRABLE DESDE LA APP (config en BD, NO `.env`). ANOTADÍSIMO — ver DECISIONS
-  2026-06-18 (spec completa + AC-IA-1..7).** Referencia a replicar: `G:\Development\ruta-bus`
-  (`apps/api/src/modules/analytics/analytics.config.service.ts` + `analytics.assistant.service.ts` + `apps/admin/.../ai-assistant/page.tsx`).
-  Replicar PERO MEJOR reusando el SMTP administrable del Bloque N. Entregables: (a) `@lyra/llm` con `LlmProvider` + adapters
-  `none`/`anthropic`/`local`(openai-compatible por `baseURL`); (b) config en BD cifrada/write-only (`getPublic/getResolved/set`,
-  `keySet`); (c) botón "Probar" por proveedor + permiso `ai:config` + auditoría + registro de generaciones (tokens/latencia/costo);
-  (d) tab "Inteligencia Artificial" en `/configuracion`. **Gating: AC-IA-1 (none primero) · AC-IA-2 (grounding al snapshot) · AC-IA-3
-  (crudo siempre visible) · AC-IA-4 (firma el humano) · AC-IA-5 (degradación a none) · AC-IA-6 (on-prem/sin fuga) · AC-IA-7 (guardas
-  PII/tokens/prompt versionado).**
-- [ ] **Slice 3 — Resumen IA generativo (grounded) + streaming**, sobre la fundación del Slice 2 (reemplaza al `none` cuando hay
-  proveedor configurado; el crudo y la firma humana se mantienen).
+- [x] **Slice 2 — Fundación `@lyra/llm` + IA ADMINISTRABLE DESDE LA APP ✅** (`feat/ia-administrable`, 2026-06-18). Construido y
+  verificado: `@lyra/llm` (interfaz + adapters none/anthropic/openai-compatible + prompt versionado, decoplado de contracts) ·
+  `AiSettings`/`AiGenerationLog` (config cifrada/write-only + registro de costo) · endpoints `/settings/ai` + Probar + permiso
+  `ai:config` + auditoría · tab "Inteligencia Artificial" · resumen de turno por IA grounded (degradación elegante, crudo visible,
+  firma humana). smoke `smoke-ia-config.py` **20/20**. **Cumple AC-IA-1..6; AC-IA-7 parcial (prompt versionado + clave cifrada;
+  scrubber de PII explícito = deuda).** Forks resueltos en DECISIONS 2026-06-18 (tabla dedicada · proveedor global · log de generaciones
+  · streaming diferido). **Pendiente: smoke VISUAL del dueño.**
+- [ ] **Slice 3 — Resumen IA generativo + STREAMING** (token-a-token vía SSE, reusa el bus del Bloque N), sobre la fundación del
+  Slice 2 (la interfaz `@lyra/llm` admite `generateSummaryStream` sin reescribir consumidores). El crudo y la firma humana se mantienen.
+- [ ] **Deuda Slice 2 (IA):** panel de **costo/uso** sobre `AiGenerationLog` (tokens/latencia/$ por proveedor/periodo) · **scrubber de
+  PII** explícito en el grounding (AC-IA-7; hoy el grounding es operacional sin PII, pero no hay redacción explícita) · plantilla de
+  prompt por capacidad para Fase 6 (insights/RAG reusan `@lyra/llm`).
 - [ ] **Slice 4 — Export PDF** de la entrega (carpeta/regulador).
 - [ ] **Deuda menor Slice 1:** disciplinas/categorías por taxonomía de catálogo (hoy secciones por tipo de dato) · firma con hash
   criptográfico del payload (hoy reauth Part 11 + método/significado, sin `payloadHash`) · estado general como catálogo configurable.

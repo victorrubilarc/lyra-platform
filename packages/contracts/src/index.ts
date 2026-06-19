@@ -83,3 +83,6 @@ export * from "./incidents/dashboard.js";
 
 // Cambio de turno / Shift Handover (Fase 5 — Slice 1)
 export * from "./shift-handover/shift-handover.js";
+
+// Inteligencia Artificial administrable (Fase 5 — Slice 2)
+export * from "./ai/ai.js";

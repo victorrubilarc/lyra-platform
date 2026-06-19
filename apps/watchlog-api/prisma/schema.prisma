@@ -1164,6 +1164,55 @@ model SystemSettings {
   updatedAt                    DateTime         @updatedAt
 }
 
+// ===========================================================================
+//  Inteligencia Artificial administrable (Fase 5 — Slice 2)
+// ===========================================================================
+// Config de IA persistida en BD (NO en `.env`), editable desde `/configuracion`
+// (tab "Inteligencia Artificial", permiso `ai:config`) sin reiniciar. Tabla DEDICADA
+// (no en SystemSettings) por aislamiento. La API key va CIFRADA en reposo (`apiKeyEnc`,
+// EncryptionService/APP_ENC_KEY) y es WRITE-ONLY: nunca vuelve a la UI (solo `keySet`).
+// `configuredAt` null = nunca guardada en BD ⇒ la config vigente proviene del entorno
+// (source=env). Singleton (id="system"), single-tenant. El motor vive en `@lyra/llm`.
+model AiSettings {
+  id             String    @id @default("system")
+  enabled        Boolean   @default(false)
+  // "none" | "anthropic" | "openai-compatible" (validado por Zod en el borde).
+  provider       String    @default("none")
+  // Modelo (id Anthropic, o nombre del modelo del endpoint OpenAI-compatible).
+  model          String?
+  // Solo para openai-compatible: URL base del endpoint (Ollama/vLLM/LM Studio/…).
+  baseUrl        String?
+  // API key CIFRADA en reposo (write-only). null = sin clave guardada en BD.
+  apiKeyEnc      String?
+  configuredAt   DateTime?
+  configuredById String?
+  updatedById    String?
+  updatedAt      DateTime  @updatedAt
+}
+
+// Registro de cada GENERACIÓN de IA para gobernanza de costo (proveedor/modelo/tokens/
+// latencia/estado). Inmutable, append-only. `handoverId` es ref BLANDA al cambio de turno
+// (sin FK; single-tenant, sin borrado físico) para rastrear el resumen que la originó.
+model AiGenerationLog {
+  id           String   @id @default(cuid())
+  // "shift-summary" | "test".
+  capability   String
+  provider     String
+  model        String
+  // "SUCCESS" | "FAILED" | "FALLBACK" (cayó a determinista tras fallo del proveedor).
+  status       String
+  inputTokens  Int?
+  outputTokens Int?
+  latencyMs    Int
+  error        String?
+  handoverId   String?
+  createdById  String?
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([provider, createdAt])
+}
+
 model OperationalShift {
   id              String @id @default(cuid())
   calendarId      String

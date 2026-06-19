@@ -9,6 +9,7 @@ import { CryptoModule } from "./crypto/crypto.module";
 import { CacheModule } from "./redis/cache.module";
 import { AuditModule } from "./audit/audit.module";
 import { EmailModule } from "./email/email.module";
+import { AiModule } from "./ai/ai.module";
 import { StorageModule } from "./storage/storage.module";
 import { AuthzModule } from "./authz/authz.module";
 import { AuthModule } from "./auth/auth.module";
@@ -61,6 +62,7 @@ import { RuleActionsModule } from "./rule-actions/rule-actions.module";
     CacheModule,
     AuditModule,
     EmailModule,
+    AiModule,
     StorageModule,
     AuthzModule,
     AuthModule,

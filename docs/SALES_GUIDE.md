@@ -136,6 +136,19 @@ quién recibió y qué se traspasó. Cada supervisor ve y entrega **solo sus ár
 los "no me avisaron" y el cuaderno que nadie lee. Alineado a las guías de seguridad de proceso
 (HSE-UK, CCPS) que exigen una entrega estructurada, bidireccional y firmada.
 
+### 🤖 Resumen de turno por IA — administrable y on-premise
+La IA de Lyra WatchLog **se configura desde la aplicación**, no por un técnico tocando el servidor:
+el administrador elige el proveedor (**ninguno**, **Anthropic en la nube**, o un **modelo local**),
+pega su clave —que se guarda **cifrada y nunca se vuelve a mostrar**—, pulsa **Probar** y ve una
+respuesta real al instante. Con eso, el supervisor puede **"Generar con IA"** el resumen del turno:
+un brief profesional construido **solo con los datos del turno** (no inventa cifras), que él **revisa,
+edita y firma** —la IA nunca firma—, con el **resumen original siempre visible al lado** para
+contrastar. Si la IA no está disponible, el sistema **sigue funcionando** con el resumen automático.
+**Beneficio:** menos tiempo redactando y más calidad en el traspaso, **sin atarte a un proveedor** y
+—lo más importante para industria— con la opción de un **modelo local donde los datos NUNCA salen de
+la planta**. *Hoy:* resumen de turno por IA (texto completo al terminar). *En camino:* que se escriba
+**en vivo** (palabra a palabra) y un **asistente de consulta** sobre el histórico.
+
 ### 🔗 De la bitácora a la acción (sin saltos manuales)
 Cuando un dato de una bitácora se sale de umbral, el sistema puede generar una **excepción
 operacional** revisable y, si amerita, convertirla en **incidencia** — conservando el **valor
@@ -259,8 +272,9 @@ instaladas en tu propia infraestructura.*
 ## 10. Hacia dónde va (visión — roadmap, NO disponible aún)
 
 Preséntalo como evolución, no como funcionalidad actual:
-- **Inteligencia operacional con IA** (resúmenes de turno, asistente de consulta) con opción de
-  modelo **local on-premise** (sin enviar datos a la nube).
+- **Inteligencia operacional con IA**: el **resumen de turno por IA** —administrable desde la app, con
+  opción de **modelo local on-premise** sin enviar datos a la nube— ya está **disponible** (ver §3);
+  lo que **falta** es el texto **en vivo** (streaming) y un **asistente de consulta** sobre el histórico.
 - **Conexión con sistemas de planta** (SCADA / historiadores) para traer lecturas automáticamente.
 - **Dashboards ejecutivos transversales** (KPIs cruzados de toda la operación; el **dashboard de
   incidencias** —tendencias, reincidencia, MTTR— ya está **disponible**, ver §3) e **índices HSE

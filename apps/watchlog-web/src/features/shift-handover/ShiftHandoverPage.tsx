@@ -28,7 +28,9 @@ import {
   useToast,
 } from "@lyra/ui";
 import {
+  buildDeterministicSummary,
   HANDOVER_SECTIONS,
+  isHandoverItemOpen,
   type HandoverCockpit,
   type HandoverGeneralStatus,
   type HandoverSectionKey,
@@ -379,6 +381,13 @@ function SignOffPanel({ detail, canCompile, canSign, canAck }: { detail: ShiftHa
 
   const editable = detail.status === "COMPILING" && canCompile;
   const scope = detail.cockpit.scope;
+  const isAiSummary = !!detail.summaryProvider && detail.summaryProvider !== "none";
+  // Crudo determinista derivado del cockpit: SIEMPRE disponible junto al resumen (AC-IA-3).
+  const deterministicCrudo = buildDeterministicSummary(
+    detail.cockpit,
+    detail.items.filter((i) => isHandoverItemOpen(i.status)).map((i) => ({ title: i.title })),
+    { generalStatus },
+  );
 
   function persistSummary() {
     if (!editable) return;
@@ -388,6 +397,20 @@ function SignOffPanel({ detail, canCompile, canSign, canAck }: { detail: ShiftHa
     updateSummary.mutate(
       { regenerate: true, generalStatus },
       { onSuccess: (d) => setSummary(d.summaryText ?? "") },
+    );
+  }
+  function generateWithAi() {
+    updateSummary.mutate(
+      { regenerate: true, useAi: true, generalStatus },
+      {
+        onSuccess: (d) => {
+          setSummary(d.summaryText ?? "");
+          // Degradación elegante (AC-IA-5): se pidió IA pero volvió determinista.
+          if (!d.summaryProvider || d.summaryProvider === "none") toast.toast(t("handover.aiDegraded"), { variant: "warning" });
+          else toast.success(t("handover.aiGenerated"));
+        },
+        onError: (e) => toast.error(e instanceof Error ? e.message : t("handover.aiError")),
+      },
     );
   }
   function confirmSign(creds: { password: string; mfaCode?: string }) {
@@ -434,11 +457,13 @@ function SignOffPanel({ detail, canCompile, canSign, canAck }: { detail: ShiftHa
         {detail.frozen && <div className={styles.frozenNote}>{t("handover.frozenNote")}</div>}
       </div>
 
-      {/* Resumen (determinista, modo none) */}
+      {/* Resumen: determinista (modo none) o generado por IA (revisar). El crudo siempre disponible. */}
       <div className={styles.summaryBlock}>
         <div className={styles.summaryHead}>
           <Sparkles size={14} /> {t("handover.summaryTitle")}
-          <span className={styles.providerTag}>{t("handover.summaryNone")}</span>
+          <span className={isAiSummary ? styles.providerTagAi : styles.providerTag}>
+            {isAiSummary ? t("handover.summaryAi") : t("handover.summaryNone")}
+          </span>
         </div>
         {editable ? (
           <>
@@ -450,12 +475,31 @@ function SignOffPanel({ detail, canCompile, canSign, canAck }: { detail: ShiftHa
               ))}
             </Select>
             <Textarea value={summary} onChange={(e) => setSummary(e.target.value)} onBlur={persistSummary} rows={7} placeholder={t("handover.summaryPlaceholder")} />
-            <Button variant="secondary" onClick={regenerate} loading={updateSummary.isPending}>
-              <Sparkles size={14} /> {t("handover.regenerate")}
-            </Button>
+            <div className={styles.summaryActions}>
+              <Button variant="secondary" onClick={regenerate} loading={updateSummary.isPending}>
+                {t("handover.regenerate")}
+              </Button>
+              <Button variant="primary" onClick={generateWithAi} loading={updateSummary.isPending}>
+                <Sparkles size={14} /> {t("handover.generateAi")}
+              </Button>
+            </div>
+            {isAiSummary && (
+              <details className={styles.crudoBox}>
+                <summary>{t("handover.crudoTitle")}</summary>
+                <pre className={styles.crudoText}>{deterministicCrudo}</pre>
+              </details>
+            )}
           </>
         ) : (
-          <p className={styles.summaryText}>{detail.summaryText || t("handover.noSummary")}</p>
+          <>
+            <p className={styles.summaryText}>{detail.summaryText || t("handover.noSummary")}</p>
+            {isAiSummary && (
+              <details className={styles.crudoBox}>
+                <summary>{t("handover.crudoTitle")}</summary>
+                <pre className={styles.crudoText}>{deterministicCrudo}</pre>
+              </details>
+            )}
+          </>
         )}
       </div>
 
