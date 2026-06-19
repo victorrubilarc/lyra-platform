@@ -28,6 +28,7 @@ import { SecurityModule } from "./security/security.module";
 import { NotificationEmitterModule } from "./notifications/notification-emitter.module";
 import { NotificationsModule } from "./notifications/notifications.module";
 import { IncidentsModule } from "./incidents/incidents.module";
+import { ShiftHandoverModule } from "./shift-handover/shift-handover.module";
 import { ExceptionGeneratorModule } from "./exceptions/exception-generator.module";
 import { ExceptionsModule } from "./exceptions/exceptions.module";
 import { RuleActionEmitterModule } from "./rule-actions/rule-action-emitter.module";
@@ -83,6 +84,7 @@ import { RuleActionsModule } from "./rule-actions/rule-actions.module";
     IncidentsModule,
     ExceptionsModule,
     RuleActionsModule,
+    ShiftHandoverModule,
     HealthModule,
   ],
 })

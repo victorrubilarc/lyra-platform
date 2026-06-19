@@ -1,4 +1,4 @@
-import { AlertOctagon, AlertTriangle, BarChart3, Bell, BookOpenCheck, CalendarClock, CalendarRange, FilePlus2, GitBranch, LayoutDashboard, Layers, ListChecks, ListTodo, Network, Route, Settings, ShieldCheck, Tags, UserCog, type LucideIcon } from "lucide-react";
+import { AlertOctagon, AlertTriangle, ArrowLeftRight, BarChart3, Bell, BookOpenCheck, CalendarClock, CalendarRange, FilePlus2, GitBranch, LayoutDashboard, Layers, ListChecks, ListTodo, Network, Route, Settings, ShieldCheck, Tags, UserCog, type LucideIcon } from "lucide-react";
 import type { Permission } from "@lyra/permissions";
 
 /**
@@ -112,6 +112,16 @@ export const ROUTES: readonly NavRoute[] = [
     labelKey: "nav.exceptions",
     icon: AlertOctagon,
     permission: "module:incidents:view",
+    inSidebar: true,
+    group: "operation",
+  },
+  // Cambio de turno / Shift Handover (Fase 5): cockpit auto-compilado + entrega
+  // firmada de dos partes + historial. Operación diaria de los supervisores.
+  {
+    path: "/cambio-turno",
+    labelKey: "nav.shiftHandover",
+    icon: ArrowLeftRight,
+    permission: "module:handover:view",
     inSidebar: true,
     group: "operation",
   },

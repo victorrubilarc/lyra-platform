@@ -8,7 +8,7 @@
 >
 > **Regla de honestidad (importante para no quemar credibilidad en una venta):** lo que está en
 > "Qué hace hoy" **está construido y funcionando**. Lo que está bajo **"Hacia dónde va (visión)"**
-> es roadmap; preséntalo como tal, nunca como disponible. Última actualización: **2026-06-17**.
+> es roadmap; preséntalo como tal, nunca como disponible. Última actualización: **2026-06-18**.
 
 ---
 
@@ -122,6 +122,19 @@ gráfico para ver el detalle** y **exportas a Excel/CSV** para tus informes. Res
 usuario: cada quien ve **solo sus áreas**.
 **Beneficio:** llegas a la reunión de seguridad/operación **con datos, no con anécdotas**; detectas el
 equipo problemático antes de que cueste caro y demuestras mejora con números.
+
+### 🔄 Cambio de turno firmado (nada se cae entre turnos)
+El momento más peligroso de una operación es el **relevo**: si algo no se comunica del turno que sale
+al que entra, se pierde (los grandes accidentes de la industria empezaron en un cambio de turno mal
+hecho). Lyra WatchLog convierte la entrega en un **acto formal y trazable**: el sistema **arma solo**
+el estado del turno —registros, excepciones, incidencias abiertas, acciones y reportes pendientes,
+rondas cumplidas y vencidas, lecturas fuera de rango— sin que nadie re-escriba nada; el supervisor
+**saliente firma** lo que entrega y el **entrante revisa y reconoce** con su firma. Los **pendientes
+ruedan** de un turno al siguiente hasta cerrarse, y queda un **historial inmutable** de quién entregó,
+quién recibió y qué se traspasó. Cada supervisor ve y entrega **solo sus áreas**.
+**Beneficio:** continuidad operacional garantizada y **evidencia de auditoría** del traspaso; se acaban
+los "no me avisaron" y el cuaderno que nadie lee. Alineado a las guías de seguridad de proceso
+(HSE-UK, CCPS) que exigen una entrega estructurada, bidireccional y firmada.
 
 ### 🔗 De la bitácora a la acción (sin saltos manuales)
 Cuando un dato de una bitácora se sale de umbral, el sistema puede generar una **excepción
@@ -276,6 +289,10 @@ Preséntalo como evolución, no como funcionalidad actual:
 
 > Una línea por hito, en lenguaje de cliente. Lo más reciente arriba.
 
+- **2026-06-18** — **Cambio de turno firmado 🔄 (disponible):** entrega de turno **auto-compilada** por área (el sistema arma solo el
+  estado del turno), **firmada por las dos partes** (saliente entrega, entrante reconoce), con **pendientes que ruedan** entre turnos
+  e **historial inmutable**. Continuidad operacional con evidencia de auditoría, alineada a HSE-UK/CCPS. *(El resumen redactado por
+  **IA on-premise** —administrable desde la app, sin que tus datos salgan de la planta— es el siguiente paso de la visión.)*
 - **2026-06-17** — **Dashboard de incidencias 📊 (disponible):** una pantalla de **análisis** que convierte las incidencias en
   decisiones — **tendencia** de apertura/cierre, **tiempo de resolución (MTTR)**, **% de cumplimiento de plazos (SLA)**, **Pareto por
   tipo**, desgloses por **nodo/equipo/turno/origen**, estado de las **acciones correctivas** y **reincidencias** (mismo equipo

@@ -624,6 +624,42 @@ export const PERMISSION_CATALOG = [
     description:
       "Verificar la eficacia de una acción CAPA (efectiva / no efectiva) — separado de gestionarla (segregación de funciones).",
   },
+
+  // --- Cambio de turno / Shift Handover (Fase 5 — Slice 1) -------------------
+  // La entrega de turno es un protocolo FIJO de 2 partes (compilar → firma del
+  // saliente → acuse del entrante). Se SEGREGAN las funciones: quien compila/firma
+  // (saliente) no es quien reconoce (entrante). El alcance de datos (nodo) lo
+  // resuelve el ScopeService (ABAC): la compilación NUNCA muestra lo no autorizado.
+  {
+    key: "module:handover:view",
+    dimension: "MODULE",
+    group: "handover",
+    description: "Ver el módulo de cambio de turno (cockpit e historial de entregas).",
+  },
+  {
+    key: "shifthandover:view",
+    dimension: "ACTION",
+    group: "handover",
+    description: "Ver entregas de turno y el historial (acotado por alcance de nodo).",
+  },
+  {
+    key: "shifthandover:compile",
+    dimension: "ACTION",
+    group: "handover",
+    description: "Compilar (armar) la entrega del turno saliente y gestionar sus pendientes.",
+  },
+  {
+    key: "shifthandover:sign",
+    dimension: "WORKFLOW",
+    group: "handover",
+    description: "Firmar la entrega como turno SALIENTE (firma electrónica Part 11 con re-autenticación).",
+  },
+  {
+    key: "shifthandover:acknowledge",
+    dimension: "WORKFLOW",
+    group: "handover",
+    description: "Reconocer (acusar recibo de) la entrega como turno ENTRANTE (firma Part 11 con re-autenticación).",
+  },
 ] as const satisfies readonly PermissionDef[];
 
 /** Unión literal de todas las claves de permiso conocidas. */

@@ -1,0 +1,477 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.pageHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+.pageTitle {
+  font-family: var(--font-brand);
+  font-size: var(--text-h1-size);
+  font-weight: 800;
+  margin: 0;
+}
+.gradient {
+  background: var(--gradient-brand);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.pageSubtitle {
+  color: var(--color-text-secondary);
+  font-size: var(--text-body-sm-size);
+  margin: var(--space-1) 0 0;
+  max-width: 70ch;
+}
+
+.viewToggle {
+  display: inline-flex;
+  background: var(--color-bg-surface-2);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-full);
+  padding: 3px;
+}
+.toggleBtn,
+.toggleActive {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--text-body-sm-size);
+  font-weight: 600;
+  padding: 8px 16px;
+  min-height: 40px;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.toggleActive {
+  background: var(--gradient-brand);
+  color: #fff;
+}
+
+/* Barra de alcance (selector de nodo) */
+.scopeBar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+}
+.scopePicker {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1;
+  max-width: 480px;
+}
+.scopeIcon {
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+/* === Cockpit 3 zonas === */
+.cockpit {
+  display: grid;
+  grid-template-columns: 232px 1fr 340px;
+  gap: var(--space-4);
+  align-items: start;
+}
+@media (max-width: 1100px) {
+  .cockpit {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* IZQUIERDA */
+.sectionNav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--color-bg-surface-1);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-2);
+  position: sticky;
+  top: var(--space-2);
+}
+.sectionItem,
+.sectionItemActive {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--text-body-sm-size);
+  font-weight: 500;
+  padding: 0 var(--space-3);
+  min-height: 44px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  text-align: left;
+  transition: var(--transition-fast);
+}
+.sectionItem:hover {
+  background: var(--color-hover);
+  color: var(--color-text-primary);
+}
+.sectionItemActive {
+  background: var(--color-bg-surface-2);
+  color: var(--color-text-primary);
+  font-weight: 600;
+  box-shadow: inset 2px 0 0 var(--color-accent-primary);
+}
+.sectionLabel {
+  flex: 1;
+}
+.sectionCount {
+  font-family: var(--font-mono);
+  font-size: var(--text-caption-size);
+  color: var(--color-text-muted);
+  background: var(--color-bg-surface-2);
+  border-radius: var(--radius-full);
+  min-width: 22px;
+  text-align: center;
+  padding: 1px 6px;
+}
+.sectionItemActive .sectionCount {
+  color: var(--color-accent-secondary);
+}
+
+/* CENTRO */
+.sectionContent {
+  min-height: 320px;
+}
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.sectionHeading {
+  font-family: var(--font-brand);
+  font-size: var(--text-h2-size);
+  font-weight: 700;
+  margin: 0 0 var(--space-2);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.headingCount {
+  font-family: var(--font-mono);
+  font-size: var(--text-body-sm-size);
+  color: var(--color-text-muted);
+}
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  background: var(--color-bg-surface-1);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+}
+.rowMain {
+  min-width: 0;
+  flex: 1;
+}
+.rowTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-body-sm-size);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+.rowDetail {
+  font-size: var(--text-caption-size);
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+}
+.rowMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+.rowAt {
+  font-size: var(--text-caption-size);
+  color: var(--color-text-muted);
+}
+.dotCrit,
+.dotWarn {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+}
+.dotCrit {
+  background: var(--color-error);
+  box-shadow: 0 0 8px var(--color-error);
+}
+.dotWarn {
+  background: var(--color-warning);
+}
+
+.batonHint {
+  font-size: var(--text-caption-size);
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-2);
+}
+.addItemRow {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+.addItemRow > :first-child {
+  flex: 1;
+}
+.closedNote {
+  font-size: var(--text-caption-size);
+  color: var(--color-text-muted);
+  margin-top: var(--space-2);
+}
+
+/* DERECHA: sign-off */
+.signoff {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  position: sticky;
+  top: var(--space-2);
+}
+.turnCard {
+  background: var(--color-bg-surface-1);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+}
+.turnTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+}
+.handoverCode {
+  font-family: var(--font-mono);
+  font-size: var(--text-body-sm-size);
+  color: var(--color-accent-secondary);
+  font-weight: 600;
+}
+.turnFlow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.shiftPill {
+  background: var(--color-bg-surface-2);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-full);
+  padding: 5px 12px;
+  font-size: var(--text-body-sm-size);
+  font-weight: 600;
+}
+.flowArrow {
+  color: var(--color-accent-secondary);
+}
+.turnMeta {
+  font-size: var(--text-caption-size);
+  color: var(--color-text-secondary);
+  margin-top: var(--space-2);
+}
+.frozenNote {
+  font-size: var(--text-caption-size);
+  color: var(--color-text-muted);
+  margin-top: var(--space-2);
+  font-style: italic;
+}
+
+.summaryBlock {
+  background: var(--color-bg-surface-1);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.summaryHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-caption-size);
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--color-accent-primary);
+}
+.providerTag {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--color-text-muted);
+  background: var(--color-bg-surface-2);
+  border-radius: var(--radius-full);
+  padding: 2px 8px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.statusSelect {
+  width: 100%;
+}
+.summaryText {
+  font-size: var(--text-body-sm-size);
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  margin: 0;
+}
+
+.signBtn {
+  width: 100%;
+  justify-content: center;
+}
+.signedCard {
+  background: var(--color-success-bg, var(--color-bg-surface-1));
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+}
+.signedRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-body-sm-size);
+  color: var(--color-text-primary);
+}
+.signedAt {
+  font-size: var(--text-caption-size);
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+.signedMeaning {
+  font-size: var(--text-caption-size);
+  color: var(--color-text-secondary);
+  margin-top: var(--space-2);
+  font-style: italic;
+}
+
+.ackBlock {
+  background: var(--color-bg-surface-1);
+  border: 1px solid var(--color-border-active);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.ackTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 700;
+  font-size: var(--text-body-sm-size);
+}
+.ackCheck {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-body-sm-size);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+/* Modal de firma */
+.modalTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.signatureNotice {
+  background: var(--color-bg-surface-2);
+  border: 1px solid var(--color-border-active);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+}
+.signatureMeaning {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-body-sm-size);
+  color: var(--color-text-primary);
+}
+.signatureSigner {
+  font-size: var(--text-caption-size);
+  color: var(--color-text-muted);
+  margin-top: var(--space-2);
+}
+
+/* Historial */
+.historyCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+.filters {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.searchInput {
+  flex: 1;
+  min-width: 220px;
+}
+.historyList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.historyRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  background: var(--color-bg-surface-1);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+  text-align: left;
+  transition: var(--transition-fast);
+  flex-wrap: wrap;
+}
+.historyRow:hover {
+  border-color: var(--color-border-active);
+  background: var(--color-hover);
+}
+.histCode {
+  font-family: var(--font-mono);
+  font-size: var(--text-body-sm-size);
+  color: var(--color-accent-secondary);
+  font-weight: 600;
+}
+.histNode {
+  font-weight: 600;
+  font-size: var(--text-body-sm-size);
+}
+.histShift,
+.histDay {
+  font-size: var(--text-caption-size);
+  color: var(--color-text-secondary);
+}
+.histFlow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-caption-size);
+  color: var(--color-text-muted);
+  margin-left: auto;
+}

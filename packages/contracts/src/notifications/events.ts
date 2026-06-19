@@ -207,6 +207,25 @@ export const NOTIFICATION_EVENTS = [
       { name: "report.overdueBy", description: "Tiempo transcurrido desde el plazo del reporte.", sample: "3 h" },
     ],
   },
+  {
+    key: "handover.ready",
+    group: "handover",
+    labelKey: "notifications.events.handoverReady",
+    description:
+      "El turno saliente firmó una entrega de turno y está lista para reconocer. Avisa a quienes pueden recibir el turno entrante en ese nodo (rol del turno entrante, por ABAC).",
+    origin: "tx",
+    variables: [
+      ...COMMON_VARIABLES,
+      { name: "handover.code", description: "Folio de la entrega.", sample: "SH-0042" },
+      { name: "handover.node", description: "Nodo (área) de la entrega.", sample: "Planta Concentradora ▸ Molienda" },
+      { name: "handover.shift", description: "Turno saliente que se entrega.", sample: "Turno Día" },
+      { name: "handover.incomingShift", description: "Turno entrante que recibe.", sample: "Turno Noche" },
+      { name: "handover.outgoingBy", description: "Quién entrega (turno saliente).", sample: "Ana Pérez" },
+      { name: "handover.generalStatus", description: "Estado general declarado al cierre.", sample: "Operativo con observaciones" },
+      { name: "handover.openItems", description: "Pendientes que ruedan al turno entrante.", sample: "3" },
+      { name: "handover.url", description: "Enlace directo a la entrega.", sample: "https://watchlog.tuempresa.cl/cambio-turno?handoverId=abc123" },
+    ],
+  },
 ] as const satisfies readonly NotificationEventDef[];
 
 /** Unión literal de todas las claves de evento conocidas. */

@@ -93,6 +93,20 @@ Keycloak **descartado** para el MVP (complejidad operacional); si un cliente lo 
   autorizado; los filtros `overdueOnly`/`slaBreachedOnly` reusan el `where`+ABAC del listado (el id-set de permanencia se intersecta en
   AND, nunca amplía lo visible), igual que el patrón de "Retrasadas" del Workflow SLA.
 
+### Cambio de turno / Shift Handover (Fase 5 · Slice 1)
+- **4 permisos nuevos** (catálogo **83 → 88**), con **segregación de funciones** entre saliente y entrante:
+  **`module:handover:view`** (módulo), **`shifthandover:view`** (ver/historial), **`shifthandover:compile`** (armar la entrega + baton),
+  **`shifthandover:sign`** (firmar como SALIENTE — Part 11), **`shifthandover:acknowledge`** (reconocer como ENTRANTE — Part 11).
+  El servicio refuerza la segregación: el acuse se RECHAZA (400) si `outgoingById === userId` (quien entregó no puede reconocer).
+- **Firma electrónica Part 11** en ambos pasos (firma del saliente y acuse del entrante): re-autenticación con `ReauthService`
+  (contraseña + MFA step-up si la cuenta lo trae), con **significado** y **método** registrados inline en la entrega + timeline
+  append-only + auditoría (`shifthandover.signed_out` / `shifthandover.acknowledged`). El **snapshot** del cockpit se CONGELA al firmar
+  (inmutable). *(Deuda registrada: hash criptográfico del payload — hoy se persiste reauth + significado + método, sin `payloadHash`.)*
+- **ABAC por NODO en la compilación (regla de oro):** el cockpit junta SOLO lo que el usuario puede ver = **subárbol del nodo de la
+  entrega ∩ nodos accesibles del usuario** (`getAccessibleNodeIds`). Una entrega NUNCA muestra datos fuera del alcance; el historial y
+  el detalle gatean por `canAccessNode` (403). El aviso `handover.ready` resuelve destinatarios por **roles con
+  `shifthandover:acknowledge` ∩ ABAC de nodo**, excluido el saliente.
+
 ### Datos PERSONALES → autorización por OWNERSHIP (no RBAC)
 - Las preferencias de presentación del propio usuario **no** se gobiernan con permisos del catálogo: se autorizan por **pertenencia** (el recurso es del actor). Patrón aplicado a **`SavedView`** (vistas guardadas de Bitácoras, Fase 2.8.1b): toda consulta/mutación filtra por `userId === session.user.id` (404 si la vista es de otro); el endpoint se gatea además por acceso al módulo (`logentry:view`). No infla el catálogo (sigue en **59**). Inflar RBAC con preferencias de UI sería ruido administrativo; el límite real es la propiedad del dato.
 

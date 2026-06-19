@@ -244,4 +244,30 @@ export const NOTIFICATION_TEMPLATE_SEEDS: NotificationTemplateSeed[] = [
       { label: "Abrir incidencia", url: "{{incident.url}}" },
     ),
   },
+  {
+    eventKey: "handover.ready",
+    locale: "es-CL",
+    channel: "EMAIL",
+    subject: "Entrega de turno lista para recibir: {{handover.code}} ({{handover.node}})",
+    bodyText:
+      "Hola {{recipient.name}}:\n\n" +
+      "{{handover.outgoingBy}} firmó la entrega del {{handover.shift}} en {{handover.node}} " +
+      "y está lista para que la reciba ({{handover.incomingShift}}).\n\n" +
+      "Estado general al cierre: {{handover.generalStatus}}\n" +
+      "Pendientes que ruedan: {{handover.openItems}}\n\n" +
+      "Revise el resumen, los pendientes y confirme la recepción con su firma en {{handover.url}}.\n\n— {{app.name}}",
+    bodyHtml: htmlShell(
+      "Tienes un turno por recibir",
+      "<strong>{{handover.outgoingBy}}</strong> firmó la entrega del <strong>{{handover.shift}}</strong> y está lista para que la reciba.",
+      [
+        ["Entrega", "{{handover.code}}"],
+        ["Nodo", "{{handover.node}}"],
+        ["Turno saliente", "{{handover.shift}}"],
+        ["Turno entrante", "{{handover.incomingShift}}"],
+        ["Estado al cierre", "{{handover.generalStatus}}"],
+        ["Pendientes", "{{handover.openItems}}"],
+      ],
+      { label: "Recibir turno", url: "{{handover.url}}" },
+    ),
+  },
 ];

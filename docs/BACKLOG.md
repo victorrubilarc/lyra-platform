@@ -5,7 +5,17 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-18** (**Sesión QA / validación end-to-end** — sin features nuevas:
+> actualización: **2026-06-18** (**Fase 5 — Cambio de turno · Slice 1 ✅** — `feat/cambio-turno`:
+> entrega de turno firmada de dos partes, auto-compilada por nodo+turno con ABAC, resumen DETERMINISTA (sin IA) y baton que rueda.
+> Estándar citado (HSE-UK/CCPS; Texas City/Piper Alpha; J5/eSOMS/Honeywell). Entidad dedicada `ShiftHandover` con ciclo FIJO de 3
+> pasos reusando SOLO firma Part 11 (NO `WorkflowDefinition`); snapshot congelado al firmar; baton = objetos abiertos del alcance +
+> notas manuales (CARRIED) hasta cerrarse; `handover.ready` (Bloque N) al rol del turno entrante. **4 permisos nuevos**
+> `shifthandover:view/:compile/:sign/:acknowledge` + `module:handover:view` (cat. **83→88**; db:seed + FLUSHALL aplicado). Migración
+> aditiva `…_add_shift_handover`. Web `/cambio-turno`: cockpit maestro-detalle de 3 zonas + sub-modo Recibo + historial ABAC + deep
+> link. Contracts 326 · API 247 · smoke `smoke-cambio-turno.py` **29/29** + regresión notificaciones 18 · notif-inapp 18 · incidencias
+> 32 · sla 25. **PENDIENTE: smoke VISUAL del dueño.** **Slice 2 (IA administrable desde la app) ANOTADÍSIMO** abajo en §1 y en
+> DECISIONS con la referencia a `ruta-bus` + AC-IA-1..7 — NO construido. **Siguiente: Fase 5 · Slice 2.** Anterior:
+> **Sesión QA / validación end-to-end** — sin features nuevas:
 > se creó `scripts/seed-demo-planta.py` (escenario «Faena Demo QA» = concentradora de cobre, idempotente, marca
 > DEMOQA, comando `--clean` verificado sin residuos) + `docs/QA_WALKTHROUGH.md` (guion 13 bloques + 9 credenciales
 > `@planta.local`/`Demo!Pass2026` + checklist + tabla de HALLAZGOS). Sembrado: estructura 4 niveles/17 nodos + 13
@@ -370,6 +380,25 @@ nunca queda más de una sesión atrás.
 ---
 
 ## 2. Pendiente por HACER (módulos / submódulos)
+
+### Fase 5 — Cambio de turno / Shift Handover (Slice 1 ✅ 2026-06-18; Slices 2–4 pendientes)
+> Plan por slices aprobado (DECISIONS 2026-06-18). **Slice 1 (núcleo, resumen `none`) HECHO y publicado.**
+- [x] **Slice 1 — Núcleo:** entrega firmada de 2 partes (compilar→firma saliente→acuse entrante), cockpit 3 zonas, baton que rueda,
+  snapshot congelado, `handover.ready`, historial ABAC, resumen determinista. `feat/cambio-turno`. smoke 29/29.
+- [ ] **Slice 2 — Fundación `@lyra/llm` + IA ADMINISTRABLE DESDE LA APP (config en BD, NO `.env`). ANOTADÍSIMO — ver DECISIONS
+  2026-06-18 (spec completa + AC-IA-1..7).** Referencia a replicar: `G:\Development\ruta-bus`
+  (`apps/api/src/modules/analytics/analytics.config.service.ts` + `analytics.assistant.service.ts` + `apps/admin/.../ai-assistant/page.tsx`).
+  Replicar PERO MEJOR reusando el SMTP administrable del Bloque N. Entregables: (a) `@lyra/llm` con `LlmProvider` + adapters
+  `none`/`anthropic`/`local`(openai-compatible por `baseURL`); (b) config en BD cifrada/write-only (`getPublic/getResolved/set`,
+  `keySet`); (c) botón "Probar" por proveedor + permiso `ai:config` + auditoría + registro de generaciones (tokens/latencia/costo);
+  (d) tab "Inteligencia Artificial" en `/configuracion`. **Gating: AC-IA-1 (none primero) · AC-IA-2 (grounding al snapshot) · AC-IA-3
+  (crudo siempre visible) · AC-IA-4 (firma el humano) · AC-IA-5 (degradación a none) · AC-IA-6 (on-prem/sin fuga) · AC-IA-7 (guardas
+  PII/tokens/prompt versionado).**
+- [ ] **Slice 3 — Resumen IA generativo (grounded) + streaming**, sobre la fundación del Slice 2 (reemplaza al `none` cuando hay
+  proveedor configurado; el crudo y la firma humana se mantienen).
+- [ ] **Slice 4 — Export PDF** de la entrega (carpeta/regulador).
+- [ ] **Deuda menor Slice 1:** disciplinas/categorías por taxonomía de catálogo (hoy secciones por tipo de dato) · firma con hash
+  criptográfico del payload (hoy reauth Part 11 + método/significado, sin `payloadHash`) · estado general como catálogo configurable.
 
 ### Notificaciones avanzadas — épico (Fase A backend ✅ 2026-06-17; resto pendiente)
 > El dueño pidió el épico COMPLETO (A+B) y LUEGO la 4.4 (DECISIONS 2026-06-17). Fase A BACKEND está hecha y publicada.

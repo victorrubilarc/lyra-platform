@@ -375,6 +375,7 @@ model OrgNode {
   logEntries              LogEntry[]
   schedules               LogSchedule[]
   incidents               Incident[]
+  shiftHandovers          ShiftHandover[]
   operationalCalendar     OperationalCalendar?     @relation(fields: [operationalCalendarId], references: [id], onDelete: SetNull)
   fiscalCalendar          FiscalCalendar?          @relation(fields: [fiscalCalendarId], references: [id], onDelete: SetNull)
 
@@ -2348,4 +2349,146 @@ model IncidentReport {
   @@index([status, dueAt])
   @@index([obligationId])
   @@index([mandatory, status])
+}
+
+// ===========================================================================
+//  Cambio de turno / Shift Handover (Fase 5 — Slice 1)
+// ===========================================================================
+//
+// La entrega de turno es un proceso CRÍTICO de seguridad de proceso (HSE-UK
+// "Effective Shift Handover"; CCPS Conduct of Operations; lecciones de Piper
+// Alpha y Texas City). Ciclo FIJO de 3 pasos (NO un WorkflowDefinition
+// configurable): compilar → firma del saliente (Part 11) → acuse del entrante
+// (Part 11). Alcance por NODO + TURNO + día operacional (el turno y su ventana
+// salen del OperationalCalendar). Snapshot CONGELADO al firmar. Ver
+// docs/DECISIONS.md 2026-06-18.
+
+enum ShiftHandoverStatus {
+  COMPILING // borrador: el saliente arma la entrega (vista en vivo)
+  SIGNED_OUT // firmado por el saliente, esperando acuse del entrante
+  ACKNOWLEDGED // reconocido por el entrante (cerrado, inmutable)
+  CANCELED // anulado con motivo (sin borrado físico)
+}
+
+enum ShiftHandoverItemStatus {
+  OPEN
+  CARRIED // arrastrado desde una entrega previa (rueda entre turnos)
+  CLOSED
+}
+
+enum ShiftHandoverItemSource {
+  MANUAL // nota libre del saliente
+  INCIDENT
+  INCIDENT_ACTION
+  EXCEPTION
+  INCIDENT_REPORT
+  ROUND
+}
+
+// Entrega de turno. Una por (nodo, turno saliente, día operacional) no anulada
+// (la unicidad se garantiza en el servicio para permitir recompilar tras anular).
+model ShiftHandover {
+  id     String @id @default(cuid())
+  // Folio humano correlativo; el código "SH-####" se DERIVA del número.
+  number Int    @unique @default(autoincrement())
+
+  // --- Alcance / dimensiones operacionales (resueltas del calendario) ---------
+  orgNodeId         String
+  shiftCode         String? // turno SALIENTE (código en el calendario), null en huecos
+  shiftLabel        String?
+  incomingShiftCode String? // turno ENTRANTE derivado
+  operationalDay    String // "YYYY-MM-DD"
+  windowStart       DateTime // ventana del turno saliente (UTC)
+  windowEnd         DateTime
+  timezone          String
+  // Calendario del que salió el turno (ref. blanda; los turnos se reemplazan en bloque).
+  calendarId        String?
+
+  status        ShiftHandoverStatus @default(COMPILING)
+  generalStatus String? // estado general declarado al cierre (vocabulario en contrato)
+
+  // --- Resumen (Slice 1 = determinista; Slice 3 = IA) -------------------------
+  summaryText     String? // texto del brief de entrega
+  summaryProvider String? // "none" (determinista) | proveedor IA (futuro)
+
+  // --- Snapshot CONGELADO al firmar (integridad/auditoría) --------------------
+  snapshot   Json? // todo el cockpit compilado, congelado al firmar el saliente
+  snapshotAt DateTime?
+
+  // --- Firma del SALIENTE (Part 11 inline; reauth verificada en el servicio) --
+  outgoingById   String?
+  outgoingByName String?
+  signedOutAt    DateTime?
+  signOutMeaning String?
+  signOutMethod  String? // PASSWORD | PASSWORD_MFA
+
+  // --- Acuse del ENTRANTE (Part 11 inline) ------------------------------------
+  incomingById      String?
+  incomingByName    String?
+  acknowledgedAt    DateTime?
+  ackMeaning        String?
+  ackMethod         String?
+  ackReadSummary    Boolean   @default(false)
+  ackReviewedItems  Boolean   @default(false)
+  ackNoObservations Boolean   @default(false)
+  ackObservations   String?
+
+  // --- Anulación (sin borrado físico) -----------------------------------------
+  canceledAt   DateTime?
+  cancelReason String?
+  canceledById String?
+
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  orgNode    OrgNode                 @relation(fields: [orgNodeId], references: [id], onDelete: Restrict)
+  items      ShiftHandoverItem[]
+  activities ShiftHandoverActivity[]
+
+  @@index([orgNodeId, operationalDay])
+  @@index([status])
+  @@index([createdAt, id])
+}
+
+// Ítem de la "baton": objeto de dominio abierto auto-derivado del alcance, o una
+// nota manual. Rueda turno a turno (CARRIED) hasta cerrarse. El contenido es un
+// snapshot legible (refType/refId = ref. blanda al objeto vivo).
+model ShiftHandoverItem {
+  id               String                  @id @default(cuid())
+  handoverId       String
+  source           ShiftHandoverItemSource
+  status           ShiftHandoverItemStatus @default(OPEN)
+  refType          String? // "Incident" | "IncidentAction" | "IncidentReport" | "LogEntryException" | "RoundOccurrence"
+  refId            String?
+  title            String
+  detail           String?
+  category         String? // sección/disciplina sugerida del cockpit
+  severity         Int?
+  // Entrega donde NACIÓ el ítem (rastro del rolling).
+  originHandoverId String?
+  sortOrder        Int                     @default(0)
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  handover ShiftHandover @relation(fields: [handoverId], references: [id], onDelete: Cascade)
+
+  @@index([handoverId])
+  @@index([refType, refId])
+}
+
+// Timeline APPEND-ONLY de la entrega (creación/compilación/firma/acuse/anulación).
+model ShiftHandoverActivity {
+  id         String   @id @default(cuid())
+  handoverId String
+  kind       String // CREATED|COMPILED|SIGNED_OUT|ACKNOWLEDGED|ITEM_ADDED|ITEM_CLOSED|CANCELED
+  summary    String
+  actorId    String?
+  actorName  String?
+  metadata   Json?
+  occurredAt DateTime @default(now())
+
+  handover ShiftHandover @relation(fields: [handoverId], references: [id], onDelete: Cascade)
+
+  @@index([handoverId, occurredAt])
 }

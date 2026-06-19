@@ -10,7 +10,7 @@
 > funcionalidades existentes** aunque su detalle aún esté por redactar (✍️): así nada se
 > olvida; el backfill de lo ya construido se llena de a poco (incremental).
 >
-> Última actualización: **2026-06-17**.
+> Última actualización: **2026-06-18**.
 
 ## Convención de cada sección
 Cada funcionalidad se documenta con estas cuatro partes fijas:
@@ -125,6 +125,9 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 
 ### 16. Excepciones operacionales  [Supervisor · Operador con triage]
 - ✅ **Revisar y triar excepciones** (panel en la bitácora + bandeja global; corregir/reconocer/convertir/asociar/descartar) (§ Excepciones operacionales)
+
+### 17. Cambio de turno  [Supervisor saliente · Supervisor entrante]
+- ✅ **Entregar y recibir el turno** (cockpit auto-compilado por área y turno, entrega firmada de dos partes, pendientes que ruedan, historial) (§ Cambio de turno)
 
 ---
 
@@ -1093,3 +1096,54 @@ respeta tu **alcance por nodo** y queda auditado.
   *Reglas*; ver «Plantillas ▸ Reglas»). Estas excepciones llevan el **mensaje de la regla** (no un
   valor de campo, así que no se "corrigen") y la incidencia automática queda con **origen = Regla**.
   Aparecen segundos después de firmar (se procesan en segundo plano para no demorar la firma).
+
+---
+
+## Cambio de turno  [Supervisor saliente · Supervisor entrante]
+
+**Para qué sirve.** La entrega de turno es uno de los momentos más críticos de la operación: si algo
+queda sin comunicar entre el turno que sale y el que entra, se pierde (los accidentes de Texas City
+y Piper Alpha empezaron así). Esta pantalla convierte la entrega en un **acto formal, firmado y
+trazable**: el sistema **arma solo** el estado del turno (no hay que re-tipear nada), el supervisor
+saliente **firma** lo que entrega, el entrante **revisa y reconoce** con su firma, y los **pendientes
+ruedan** de un turno al siguiente hasta que se cierran. Nada se cae entre turnos.
+
+**Cómo se usa.**
+1. Entra a **Cambio de turno** en el menú (grupo *Operación*).
+2. Elige tu **área (nodo)** en el selector de arriba. El sistema resuelve automáticamente **qué turno
+   estás entregando** y su horario (según el calendario operacional del área) y **compila el cockpit**.
+3. El cockpit tiene **tres zonas**:
+   - **Izquierda — secciones:** Registros del turno · Excepciones · Incidencias · Acciones y reportes ·
+     Rondas · **Pendientes**. Cada una muestra un número con lo ocurrido en tu turno y en tu área.
+   - **Centro — el detalle** de la sección elegida (por ejemplo, las incidencias abiertas con su
+     severidad y estado, o las lecturas fuera de umbral).
+   - **Derecha — la entrega:** el turno que entregas → el que recibe, el **resumen** del turno
+     (se genera solo; puedes editarlo y elegir el **estado general** al cierre), y el botón de firma.
+4. En **Pendientes** agrega notas para el turno entrante ("reapriete de pernos en polín 14"). Los
+   pendientes que escribiste y los objetos abiertos del área (incidencias, acciones, reportes)
+   aparecen marcados; los que vienen del turno anterior se ven como **«Heredado»**.
+5. Cuando esté listo, pulsa **«Firmar y entregar turno»**: confirma con tu **contraseña** (y MFA si tu
+   cuenta lo tiene). Al firmar, **el contenido queda congelado** (ya no cambia) y el turno entrante
+   recibe un **aviso** (correo + campanita).
+6. **Para recibir el turno** (supervisor entrante): abre la entrega (desde el aviso de la campanita o
+   el historial), revisa el resumen y los pendientes, marca **«Leí el resumen»** y **«Revisé los
+   pendientes»**, anota observaciones si las hay, y pulsa **«Reconocer y recibir turno»** (de nuevo con
+   tu firma). La entrega queda **Recibida** e inmutable.
+7. La pestaña **Historial** lista las entregas anteriores de tu área (buscables y filtrables);
+   ábrelas para tomar contexto. Son de **solo lectura**.
+
+**Quién puede.** Ver y abrir el módulo: quien tenga *ver cambio de turno*. **Compilar y firmar la
+entrega** (turno saliente) y **reconocerla** (turno entrante) son permisos **separados** (no es la
+misma persona): el sistema **impide** que quien entregó reconozca su propia entrega. Cada quien ve y
+entrega **solo las áreas de su alcance** (un supervisor de Flotación no ve ni recibe las de Molienda).
+
+**Importante.**
+- **El sistema arma la entrega, tú la certificas.** El resumen y las cifras salen de lo que ya
+  registró el turno (entradas, excepciones, incidencias, rondas); revísalos antes de firmar.
+- **Las dos firmas son electrónicas (Part 11):** piden re-autenticación y quedan registradas con su
+  significado, quién y cuándo. No las hace el sistema por ti.
+- **Una vez firmada, la entrega es inmutable** (foto congelada del turno) — es la evidencia de la
+  continuidad operacional.
+- **Los pendientes ruedan solos** hasta que se cierran: no dependen de que alguien los recuerde.
+- *Hoy* el resumen se genera de forma **determinista** (sin IA). El resumen redactado por IA
+  on-premise llegará en una versión próxima (será revisable y la firma seguirá siendo humana).

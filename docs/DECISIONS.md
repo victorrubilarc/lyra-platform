@@ -4,6 +4,96 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-18 · Fase 5 — Cambio de turno (Shift Handover) · Slice 1 (núcleo, sin IA)
+
+**Contexto:** la Fase 4 (Incidencias) quedó completa. La entrega de turno es un proceso CRÍTICO de seguridad de proceso
+(HSE-UK *Effective Shift Handover* OTO 96 003 + HSG48; CCPS/AIChE *Conduct of Operations*; lecciones CSB de **Texas City 2005**
+y **Piper Alpha 1988**, donde la comunicación de relevo falló y los pendientes se cayeron entre turnos). Referentes de producto:
+Hexagon **J5**, AVEVA **eSOMS**, Honeywell. Lyra WatchLog ya CAPTURA todo lo del turno (entradas, excepciones, incidencias con
+CAPA/investigación/reportes/SLA, rondas, lecturas fuera de umbral); la Fase 5 lo convierte en una **entrega firmada de dos partes**.
+
+**Forks resueltos con el dueño (los 4 por `AskUserQuestion` + 2 recomendados sin objeción):**
+- **(a) Alcance** = por **NODO operativo (nivel configurable) + TURNO + día operacional** (no por planta). El turno y su ventana
+  salen del `OperationalCalendar` que ya existe (asignado por nodo, heredado por ruta). Coherente con el ABAC por área (J5/eSOMS).
+- **(b) Modelo/ciclo** = **entidad dedicada `ShiftHandover` con ciclo FIJO de 3 pasos** (COMPILING → SIGNED_OUT → ACKNOWLEDGED),
+  reusando **solo el mecanismo de firma Part 11** (`ReauthService` + significado + método), **NO** un `WorkflowDefinition`
+  configurable. *Objeción del agente aceptada (challenge-dont-please):* el relevo de dos partes es un protocolo que el estándar fija;
+  volverlo parametrizable sería *parametrizar por parametrizar*. Incidencias sí reusó `WorkflowDefinition` porque su ciclo es
+  configurable por tipo; aquí no.
+- **(c) Compilación** = **vista EN VIVO mientras se arma + snapshot CONGELADO al firmar** (`snapshot Json`), patrón de inmutabilidad
+  de incidencias (versión congelada). Integridad/auditoría.
+- **(d) Baton** = **objetos abiertos del alcance auto-incluidos + ítems manuales, ambos ruedan turno a turno hasta cerrarse**. Las
+  notas MANUALES se copian como `CARRIED` de la entrega previa; los objetos de dominio (incidencias/CAPA/reportes abiertos) se
+  re-derivan vivos en cada `compile` (`syncBaton`: agrega los nuevos, cierra los que su objeto ya cerró). Es el control que evita el
+  patrón Piper Alpha/Texas City.
+- **(e) Permisos** = **4 nuevos** `shifthandover:view/:compile/:sign/:acknowledge` + `module:handover:view` (segregación de funciones:
+  quien compila/firma —saliente— NO es quien reconoce —entrante—; el servicio bloquea acknowledge si `outgoingById === userId`).
+  Catálogo **83 → 88**. (db:seed + Redis FLUSHALL aplicado.)
+- **(f) Notificación** = reuso del **Bloque N**: evento `handover.ready` (correo + campanita) al **rol que puede recibir el turno
+  entrante en ese nodo** (`shifthandover:acknowledge`, ABAC por nodo, excluido el saliente) + deep link `/cambio-turno?handoverId=`.
+
+**Resumen del turno (Slice 1) = DETERMINISTA (`provider = none`):** `buildDeterministicSummary` (helper PURO en `@lyra/contracts`)
+arma un brief profesional por secciones desde el cockpit compilado. Todo lo que aparece es rastreable al dato crudo mostrado al lado
+(pre-cumple el grounding de la IA). La IA generativa se enchufa DESPUÉS detrás de la misma columna (Slice 3), sin tocar la fuente.
+
+**Implementación:** contratos `@lyra/contracts/shift-handover` (estados, cockpit, baton, requests, helpers PUROS
+`resolveHandoverWindow`/`buildDeterministicSummary`/`shiftHandoverCode` + specs); modelo `ShiftHandover`/`ShiftHandoverItem`/
+`ShiftHandoverActivity` (migración aditiva `20260618000000_add_shift_handover`, se removió del diff un DROP INDEX ajeno de drift);
+`ShiftHandoverCompilerService` (ABAC = subárbol del nodo ∩ nodos accesibles; entradas selladas/excepciones/incidencias/CAPA+reportes/
+rondas en la ventana); `ShiftHandoverService` (ciclo + firma + baton + resumen); `handover.ready` en el resolver del Bloque N. Web:
+cockpit **maestro-detalle de 3 zonas** (nav de secciones · contenido · panel de resumen + sign-off + baton) con sub-modo "Recibo",
+historial read-only con ABAC, identidad Lyra. Tests: contracts **326** · API **247** · smoke `smoke-cambio-turno.py` **29/29** +
+regresión (notificaciones 18 · notif-inapp 18 · incidencias 32 · sla 25). **Diferido (BACKLOG):** disciplinas/categorías por taxonomía
+de catálogo (hoy secciones por tipo de dato) · export PDF (Slice 4) · firma con hash criptográfico del payload (hoy reauth + método).
+
+---
+
+### 2026-06-18 · Fase 5 · Slice 2 (ANOTADÍSIMO — NO construido aún) — IA administrable desde la app (config en BD, no por `.env`)
+
+> **Estado: COMPROMETIDO, pendiente.** Se documenta COMPLETO aquí y en `BACKLOG.md` para que no se pierda nada. **No se construyó en
+> la sesión del Slice 1.**
+
+**Referencia a replicar (estudiada):** `G:\Development\ruta-bus` —
+`apps/api/src/modules/analytics/analytics.config.service.ts` + `analytics.assistant.service.ts` +
+`apps/admin/.../ai-assistant/page.tsx`. Patrón: **config de IA en BD (NO `.env`)**, API keys **write-only**, **abstracción de
+proveedor** (anthropic nativo + openai-compatible por `baseURL` = OpenAI/DeepSeek/Ollama/vLLM…), grounding por construcción y ABAC
+forzado en el servidor. **Replicarlo PERO MEJOR**, reusando NUESTRO precedente: el **SMTP administrable del Bloque N**
+(`SystemSettings.email*` cifrado + write-only + "probar conexión" + gate `notification:config` + tab en `/configuracion`).
+
+**Spec a construir en el Slice 2:**
+- **(a) Abstracción en `packages/` (`@lyra/llm`):** interfaz `LlmProvider` (`generateSummary`/`complete`, streaming opcional) +
+  adapters `none` (determinista/offline, el del Slice 1) · `anthropic` (claude-opus-4-8 / claude-sonnet-4-6 vía SDK) ·
+  `local`+`openai-compatible` (`baseURL` → Ollama/vLLM; la data NO sale de la planta). Reutilizable por el resumen de turno y por
+  insights/RAG de Fase 6.
+- **(b) Config en BD (env solo fallback):** `enabled`/`provider`/`model`/`baseURL`; API keys **CIFRADAS** en reposo
+  (`EncryptionService`/`APP_ENC_KEY`, como el password SMTP) y **WRITE-ONLY** (la UI expone `keySet` booleano; vacío = no cambiar).
+  Patrón `getPublic()`/`getResolved()`/`set()`.
+- **(c)** Botón **"PROBAR"** por proveedor (espejo del SMTP). Permiso nuevo **`ai:config`** (gate). Cambios **AUDITADOS**; cada
+  generación registrada (proveedor/modelo/tokens/latencia) para gobernanza de costo.
+- **(d) UI:** tab **"Inteligencia Artificial"** en `/configuracion` (DS de Lyra, espejo de "Correo saliente").
+
+**Mejoras sobre ruta-bus (explícitas):** modo `none`/offline de primera clase · keys cifradas · permiso + auditoría · abstracción en
+packages reutilizable · degradación elegante a `none` · on-prem explícito.
+
+**Criterios de aceptación — IA (gating del Slice de IA):**
+- **AC-IA-1 · MODO `none` PRIMERO:** el cambio de turno funciona COMPLETO sin IA (ya garantizado por el Slice 1). Los adapters
+  anthropic/local se construyen ENCIMA de eso.
+- **AC-IA-2 · GROUNDING:** el resumen IA se genera SOLO con la data estructurada del snapshot CONGELADO, pasada explícitamente en el
+  prompt; sin tools, sin BD, sin internet para "buscar"; toda cifra rastreable a la data cruda mostrada al lado. (El tool-use de
+  ruta-bus se reserva para el analista conversacional de Fase 6.)
+- **AC-IA-3 · CRUDO SIEMPRE VISIBLE** junto al resumen; etiqueta "generado por IA · revisar"; nunca reemplaza datos.
+- **AC-IA-4 · FIRMA EL HUMANO, NO LA IA** (Part 11 con reauth).
+- **AC-IA-5 · DEGRADACIÓN ELEGANTE:** si el proveedor falla/timeout/sin clave, cae a `none` con aviso, sin romper.
+- **AC-IA-6 · ON-PREM / SIN FUGA:** en `local` no sale data a internet; en `none`/`local` sin key ni red externa; documenta qué sale y
+  a dónde por proveedor.
+- **AC-IA-7 · GUARDAS:** redacción/omisión de PII; límite de tokens/longitud; prompt versionado; sin secretos en repo; si un dato no
+  está en la data compilada, no aparece en el resumen.
+
+**Secuencia completa de la Fase 5:** Slice 1 (núcleo, resumen `none`) ✅ → **Slice 2** (fundación `@lyra/llm` + IA administrable) →
+Slice 3 (resumen IA generativo grounded + streaming) → Slice 4 (export PDF para la carpeta/regulador).
+
+---
+
 ### 2026-06-17 · Incidencias 4.5 — Dashboard de incidencias (analítica read-only, ABAC por nodo)
 
 **Contexto:** la Fase 4 ya tenía todos los datos para analítica (severidad/riesgo, lifecycle, originType, nodo/equipo/turno, flujo

@@ -1,5 +1,42 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-18 — Fase 5: Cambio de turno (Shift Handover) · Slice 1 (núcleo, sin IA) ✅** (`feat/cambio-turno`).
+Primer slice de la Fase 5: la **entrega de turno firmada de dos partes**, auto-compilada por nodo+turno con ABAC, resumen
+DETERMINISTA (sin IA) y baton de pendientes que rueda. Estándar investigado y citado (HSE-UK *Effective Shift Handover* OTO 96 003 +
+HSG48; CCPS/AIChE *Conduct of Operations*; lecciones CSB Texas City 2005 / Piper Alpha 1988; referentes Hexagon J5 · AVEVA eSOMS ·
+Honeywell). **Plan por capas aprobado; 4 forks por `AskUserQuestion` + 2 recomendados (DECISIONS 2026-06-18):** (a) alcance por
+**nodo (nivel configurable) + turno + día operacional** (turno/ventana del `OperationalCalendar`); (b) **entidad dedicada con ciclo
+FIJO de 3 pasos** reusando SOLO la firma Part 11 (NO `WorkflowDefinition` configurable — objeción del agente aceptada); (c) **vista en
+vivo + snapshot CONGELADO al firmar**; (d) **baton** = objetos abiertos del alcance + notas manuales que ruedan (CARRIED) hasta
+cerrarse; (e) **4 permisos** `shifthandover:view/:compile/:sign/:acknowledge` + `module:handover:view` (segregación saliente≠entrante;
+cat. **83→88**); (f) **notificación** `handover.ready` (Bloque N, correo + campanita) al rol del turno entrante (ABAC). **Contratos**
+(`@lyra/contracts/shift-handover`): estados + cockpit (secciones ENTRIES/EXCEPTIONS/INCIDENTS/FOLLOWUP/ROUNDS/PENDING) + baton +
+sign-off + requests + helpers PUROS `resolveHandoverWindow` (turno saliente/entrante + ventana UTC vía `zonedTimeToUtc`) /
+`buildDeterministicSummary` (brief por secciones, fuente del modo `none`) / `shiftHandoverCode` + specs. **Modelo:** `ShiftHandover`
+(alcance + snapshot congelado + firma saliente/acuse entrante inline Part 11) + `ShiftHandoverItem` (baton OPEN/CARRIED/CLOSED) +
+`ShiftHandoverActivity` (timeline). Migración aditiva `20260618000000_add_shift_handover` (3 enums + 3 tablas; se quitó del diff un
+DROP INDEX ajeno de drift). **API:** `ShiftHandoverCompilerService` (ABAC = subárbol del nodo ∩ nodos accesibles; entradas selladas /
+excepciones / incidencias abiertas / CAPA+reportes pendientes-vencidos / rondas, en la ventana del turno) + `ShiftHandoverService`
+(compile get-or-create + `rollBatonFromPrevious` [notas manuales→CARRIED] + `syncBaton` [objetos de dominio vivos] · updateSummary/
+addItem/updateItem · **signOut** [reauth Part 11 → SIGNED_OUT + snapshot congelado + emite `handover.ready`] · **acknowledge** [reauth +
+checks/observaciones → ACKNOWLEDGED; bloquea si es el mismo que entregó] · cancel) + controller (9 endpoints, gates por permiso) +
+módulo registrado + caso `handover.ready` en el resolver del Bloque N (roles con `shifthandover:acknowledge` ∩ ABAC nodo, − saliente)
++ plantilla EMAIL seed. **Web:** `/cambio-turno` cockpit **maestro-detalle de 3 zonas** (nav de secciones con contadores · contenido
+de la sección · panel derecho: turno saliente→entrante + resumen determinista editable + sign-off Part 11 + sub-modo "Recibo" con
+checks/observaciones + baton) + **historial** read-only con filtros 1 línea + paginación + ABAC + deep link `?handoverId=`
+(campanita/correo); modal de reauth Part 11; nav en grupo Operación; i18n es-CL. Identidad Lyra (tokens, Sora/Inter, Lucide,
+claro/oscuro, 44px, glass sutil, gradiente solo en énfasis). **Sin secretos; .env.example sin cambios.** Tests: **contracts 326**
+(+5) · **API 247** · web 3; typecheck/lint(0 errores)/build verdes. **Smoke en vivo `scripts/smoke-cambio-turno.py` 29/29** (compile
+get-or-create + idempotente · ventana/turno resueltos · baton manual rueda CARRIED · baton de dominio auto-incluye incidencia abierta ·
+resumen determinista menciona estado/pendientes · firma clave inválida 401 / correcta → SIGNED_OUT + snapshot congelado · `handover.ready`
+emitido · **segregación: el saliente no reconoce 400** · acuse entrante → ACKNOWLEDGED + checks/observaciones · inmutable tras acuse 400 ·
+historial + filtros · **ABAC: scoped a otro nodo ⇒ 403 en compile + no ve la entrega** · gates operador 403 en compile/list/sign/ack)
+**+ regresión `smoke-notificaciones.py` 18/18 · `smoke-notif-inapp.py` 18/18 · `smoke-incidencias.py` 32/32 · `smoke-incidencias-sla.py`
+25/25** sin romper. **Pendiente: smoke VISUAL del dueño** (cockpit 3 zonas claro/oscuro/responsive, entrega→firma→recibo, baton,
+historial, deep link de la campanita). **Slice 2 (IA administrable desde la app, config en BD cifrada/write-only, none/anthropic/local,
+permiso `ai:config`, auditoría, tab en `/configuracion`) DEJADO ANOTADÍSIMO** en DECISIONS/BACKLOG con la referencia a `ruta-bus` y los
+AC-IA-1..7 — **NO construido en esta sesión**. **Siguiente: Fase 5 · Slice 2 (fundación `@lyra/llm` + IA administrable).**
+
 **2026-06-17 — Fase 4.5: Dashboard de incidencias (tendencias + indicadores de gestión) ✅ → FASE 4 COMPLETA** (`feat/incidencias-dashboard`).
 Cierra la 4.5 y con ella la **Fase 4 de Incidencias** (4.0 núcleo · 4.1 excepciones · 4.2a CAPA · 4.2b investigación · 4.3
 reportabilidad · 4.4 SLA · **4.5 dashboard**). Una pantalla de **análisis read-only** con ABAC por nodo (nunca muestra lo que el
