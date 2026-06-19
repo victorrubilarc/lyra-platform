@@ -8,7 +8,7 @@
 >
 > **Regla de honestidad (importante para no quemar credibilidad en una venta):** lo que está en
 > "Qué hace hoy" **está construido y funcionando**. Lo que está bajo **"Hacia dónde va (visión)"**
-> es roadmap; preséntalo como tal, nunca como disponible. Última actualización: **2026-06-18**.
+> es roadmap; preséntalo como tal, nunca como disponible. Última actualización: **2026-06-19**.
 
 ---
 
@@ -149,8 +149,19 @@ deja sin resumen). **Beneficio:** menos tiempo redactando y más calidad en el t
 percepción de **respuesta inmediata** (el texto empieza a aparecer al instante), **sin atarte a un
 proveedor** y —lo más importante para industria— con la opción de un **modelo local donde los datos
 NUNCA salen de la planta** (y, cuando el proveedor es de nube, los datos personales en texto libre se
-**redactan** antes de enviarse). *Hoy:* resumen de turno por IA **en vivo**. *En camino:* export **PDF**
-de la entrega y un **asistente de consulta** sobre el histórico.
+**redactan** antes de enviarse). *Hoy:* resumen de turno por IA **en vivo**. *En camino:* un
+**asistente de consulta** sobre el histórico.
+
+### 📄 Acta de entrega de turno en PDF (evidencia regulatoria portátil)
+Cada entrega de turno firmada se puede **descargar como un acta PDF de grado auditoría**: un documento
+con la **identidad Lyra**, la **foto congelada** del turno (estado, incidencias, pendientes, rondas), el
+resumen tal como se firmó, las **dos firmas electrónicas** (quién, cuándo, con qué significado) y un
+**folio + código de integridad (hash)** para verificar que no fue alterado. **Beneficio:** la evidencia
+que pide el **regulador**, una **auditoría ISO/HSE** o un **peritaje** sale en un clic, lista para
+imprimir o adjuntar — sin planillas armadas a mano ni capturas de pantalla. Se genera **on-premise** (el
+documento no sale de la planta), es **fiel e inmutable** (dos descargas dan el mismo contenido y el mismo
+hash) y cada descarga queda **registrada**. Cualquiera con acceso a esa área puede obtenerla; las firmas
+siguen siendo de las personas (la IA nunca firma).
 
 ### 🔗 De la bitácora a la acción (sin saltos manuales)
 Cuando un dato de una bitácora se sale de umbral, el sistema puede generar una **excepción
@@ -306,6 +317,9 @@ Preséntalo como evolución, no como funcionalidad actual:
 
 > Una línea por hito, en lenguaje de cliente. Lo más reciente arriba.
 
+- **2026-06-19** — **Acta de entrega de turno en PDF 📄 (disponible):** desde una entrega firmada, un clic descarga un **acta de grado
+  auditoría** (identidad Lyra, foto congelada del turno, dos firmas electrónicas, folio + código de integridad verificable), lista para
+  la carpeta del regulador / auditoría ISO-HSE / peritaje. Se genera **on-premise**, es **fiel e inmutable** y cada descarga queda registrada.
 - **2026-06-19** — **Resumen de turno por IA EN VIVO 🤖 (disponible):** el supervisor pulsa "Generar con IA" y ve el brief del turno
   **escribirse palabra por palabra** sobre el cockpit (respuesta inmediata, como un chat), cancelable; el resumen automático sigue al
   lado, la firma sigue siendo humana, y si la IA falla cae solo al automático. Con **modelo local los datos no salen de la planta**; con

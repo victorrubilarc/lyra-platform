@@ -10,7 +10,7 @@
 > funcionalidades existentes** aunque su detalle aún esté por redactar (✍️): así nada se
 > olvida; el backfill de lo ya construido se llena de a poco (incremental).
 >
-> Última actualización: **2026-06-18**.
+> Última actualización: **2026-06-19**.
 
 ## Convención de cada sección
 Cada funcionalidad se documenta con estas cuatro partes fijas:
@@ -131,6 +131,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 ### 17. Cambio de turno  [Supervisor saliente · Supervisor entrante]
 - ✅ **Entregar y recibir el turno** (cockpit auto-compilado por área y turno, entrega firmada de dos partes, pendientes que ruedan, historial) (§ Cambio de turno)
 - ✅ **Resumen de turno por IA EN VIVO** (botón "Generar con IA": el brief se escribe palabra por palabra, cancelable; grounded al turno, revisable; el crudo determinista siempre visible; la firma sigue siendo tuya) (§ Cambio de turno)
+- ✅ **Descargar el acta de entrega (PDF)** (documento de grado auditoría desde una entrega firmada: identidad Lyra, snapshot congelado, dos firmas Part 11, folio + hash verificable; on-premise) (§ Cambio de turno ▸ Descargar el acta)
 
 ---
 
@@ -1201,4 +1202,36 @@ entrega **solo las áreas de su alcance** (un supervisor de Flotación no ve ni 
   o se corta, el sistema **reintenta sin streaming** y, si tampoco responde, usa el resumen
   determinista — nunca te deja sin resumen. Con un modelo **local**, los datos **no salen de la
   planta**; cuando el proveedor es de nube, los textos libres (correos, RUT, teléfonos) se **redactan**
-  antes de enviarse. *Próximo:* export **PDF** de la entrega.
+  antes de enviarse.
+
+### Descargar el acta de entrega (PDF)
+
+**Para qué sirve.** Convierte una entrega **ya firmada** en un **documento portátil de grado
+auditoría**: un PDF con la identidad Lyra, la foto congelada del turno, las **dos firmas
+electrónicas**, el resumen tal como se firmó, los pendientes y un **folio + código de integridad**.
+Es la evidencia que va a la **carpeta del regulador**, a una **auditoría ISO/HSE** o a un peritaje, y
+que puedes **imprimir o adjuntar** sin depender de la app.
+
+**Cómo se usa.**
+1. Abre una entrega **firmada** (en el cockpit, una vez que la entregaste/reconociste, o desde el
+   **Historial**).
+2. Pulsa **"Descargar acta (PDF)"** (en el panel de la derecha del cockpit) o el **ícono de descarga**
+   en la fila del historial. Verás "Generando acta…" un instante y el PDF se descargará con un nombre
+   claro (p. ej. `acta-SH-0042-linea-sag-1-2026-06-19.pdf`).
+3. Ábrelo, imprímelo o adjúntalo donde lo necesites.
+
+**Quién puede.** Cualquiera que pueda **ver** esa entrega (mismo permiso que para abrirla), y siempre
+**dentro de su alcance de áreas**: no puedes descargar el acta de un área que no te corresponde.
+
+**Importante.**
+- **Solo entregas firmadas.** Mientras la entrega está en preparación no hay acta (el botón no
+  aparece): el documento oficial existe recién cuando hay firma y foto congelada.
+- **Es fiel e inmutable.** El acta se arma del **snapshot congelado**, no de la vista en vivo; dos
+  descargas de la misma entrega tienen el **mismo contenido y el mismo código de integridad** (hash) —
+  así se verifica que el documento no fue alterado.
+- **Trazable.** Cada descarga queda **registrada** (quién y cuándo). El acta lleva el **folio** y el
+  **hash SHA-256** impresos para poder cotejarla.
+- **Las firmas mandan; la IA nunca firma.** Si el resumen se generó con IA, el acta lo dice, pero la
+  certificación es de las personas que entregaron y recibieron el turno. Si el entrante aún no
+  reconoce, el acta lo indica como **"Pendiente de reconocimiento"**.
+- **Se genera en el servidor, on-premise:** el documento no sale de tu instalación.

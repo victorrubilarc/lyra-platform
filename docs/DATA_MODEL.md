@@ -637,6 +637,11 @@ Migración `20260618000000_add_shift_handover`. El régimen de turnos NO es una 
   objeto, snapshot legible en `title`/`detail`/`category`/`severity`).
 - **ShiftHandoverActivity** *(implementado)* — timeline append-only de la entrega (CREATED/COMPILED/SIGNED_OUT/ACKNOWLEDGED/
   ITEM_ADDED/ITEM_CLOSED/CANCELED).
+- **Acta PDF (Fase 5 · Slice 4 — *implementado*, SIN entidad nueva).** El acta de entrega se genera **on-demand** desde el `snapshot`
+  congelado (`GET /shift-handover/:id/acta.pdf`); **no se persiste** ningún artefacto ni columna nueva. La **integridad** se garantiza
+  con un **hash SHA-256 derivado** (`actaIntegrityHash` = SHA-256 de un JSON CANÓNICO del snapshot + las dos firmas + el resumen),
+  calculado en cada export ⇒ determinista, y registrado en **`AuditLog.after.integrityHash`** del evento `shifthandover.acta.exported`.
+  *Deuda:* si la carpeta regulatoria exige el binario archivado, persistir en MinIO (vía `Attachment`) + columna `snapshotHash`.
 
 ### Conocimiento
 - **KnowledgeArticle** — tipo (lección/procedimiento/patrón IA), `tsvector` para búsqueda; nutrido por incidencias resueltas.

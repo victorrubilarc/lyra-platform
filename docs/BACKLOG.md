@@ -5,7 +5,17 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-19** (**Fase 5 · Cambio de turno · Slice 3 — resumen de turno por IA EN VIVO / streaming ✅** —
+> actualización: **2026-06-19** (**Fase 5 · Cambio de turno · Slice 4 — EXPORT PDF del acta de entrega ✅ → FASE 5 COMPLETA** —
+> `feat/cambio-turno-acta-pdf`: desde una entrega FIRMADA se descarga un **acta PDF de grado auditoría** (identidad Lyra, snapshot
+> congelado, dos firmas Part 11, folio + hash verificable), generada en el backend, on-prem, sin SaaS. Motor **pdfmake** (NO Chromium;
+> Sora/Inter embebidas como TTF OFL); builder PURO `buildActaDocument` desde el snapshot; endpoint `GET /shift-handover/:id/acta.pdf`
+> (`@Res`, gate de lectura reusado, **ABAC**, **409** en COMPILING, auditoría `shifthandover.acta.exported`); **hash SHA-256 de JSON
+> canónico** del snapshot+firmas (determinista, sin persistir, sin migración); botón en cockpit/historial vía `apiBlob`. Sin permiso
+> nuevo, sin migración, sin FLUSHALL. api 247 · web 3 · smoke `smoke-acta-pdf.py` **17/17** + regresión cambio-turno 29/29 · ia-config
+> 20/20 · ia-stream 13/13 · notif 18/18 · notif-inapp 18/18. **PENDIENTE: smoke VISUAL del dueño.** **Deuda:** persistir artefacto en
+> MinIO si la carpeta regulatoria lo exige · verificador público de hash · usar `integrityHash` como payloadHash de la firma Part 11.
+> **Con el Slice 4 la FASE 5 queda COMPLETA → siguiente: Fase 6 o lo que defina el dueño.** Anterior:
+> **Fase 5 · Cambio de turno · Slice 3 — resumen de turno por IA EN VIVO / streaming ✅** —
 > `feat/cambio-turno-resumen-ia-streaming`: "Generar con IA" escribe el brief token a token sobre el cockpit (SSE espejo del inbox,
 > endpoint dedicado `GET /shift-handover/:id/summary/stream`). `@lyra/llm` ganó `LlmStream`+`generateSummaryStream` en los 3 adapters;
 > **prompt v2** (guarda anti-inyección); **scrubber de PII** que redacta solo si la generación egresa de la planta (`egressesPlant`).
@@ -405,9 +415,11 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 
 | **Notificaciones avanzadas · Fase B — canal IN-APP (campanita) + tiempo real** (CIERRA EL ÉPICO; enum `NotificationChannel += INAPP` + `NotificationOutbox.readAt` + índice `(recipientUserId,channel,readAt)` + migración `…_add_notif_inapp_channel`; contratos `NOTIFICATION_CHANNELS += INAPP` + DTOs inbox `inboxItem/ListQuery/ListResponse/UnreadCount` + helper `deepLinkForEntity` + 2 specs; API `InAppChannel`+`NotificationChannelRegistry` [worker enruta por canal], resolver multi-canal [EMAIL+INAPP por preferencia, `dedupeKey` con canal], sender SUPPRESSED solo EMAIL + nudge SSE tras SENT + `@Cron` purga leídas>90d, `NotificationRealtimeService` [bus in-memory], endpoints inbox `/inbox`+`/unread-count`+`/:id/read`+`/read-all`+`/stream` SSE [`@Public`+token query, ownership], preferencias por canal; web `NotificationBell` [Topbar badge+dropdown] + `useInboxRealtime` [EventSource+poll] + `InboxPanel` [bandeja en /mis-notificaciones] + `PreferencesPanel` columna INAPP + `formatRelativeTime`; SIN permiso nuevo [ownership]; contracts 295 · API 247 · web 3 · smoke `smoke-notif-inapp.py` 18/18 + regresión `smoke-notif-avanzadas.py` 22/22 + `smoke-notificaciones.py` 18/18) | `feat/notif-avanzadas-inapp` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 
-| **UX del builder de Flujos** (3 ajustes: atajo "copiar destinatarios" movido arriba + condicional · estados colapsables [paridad con transiciones] · fix sticky `.columnHeader` `top:58px`→`0`; solo frontend web/CSS/i18n; typecheck/lint(0)/build verdes) | `feat/builder-flujos-ux` → `main` | 🚧 pendiente de merge+push al cierre de esta sesión | push de la rama + merge a `main` + push |
+| **UX del builder de Flujos** (3 ajustes: atajo "copiar destinatarios" movido arriba + condicional · estados colapsables [paridad con transiciones] · fix sticky `.columnHeader` `top:58px`→`0`; solo frontend web/CSS/i18n; typecheck/lint(0)/build verdes) | `feat/builder-flujos-ux` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 
-**Estado:** `feat/builder-flujos-ux` se publica al cierre de esta sesión (merge a `main` + push). El resto: `main` = `origin/main`.
+| **Fase 5 · Slice 4 EXPORT PDF del acta de entrega** (deps `pdfmake`+`@types/pdfmake`+`@expo-google-fonts/sora`+`/inter`; `shift-handover/acta/` [`acta-renderer.ts` singleton pdfmake + Sora/Inter TTF OFL por ruta con `localAccessPolicy` lista blanca + `urlAccessPolicy=false`; `acta-document.ts` builder PURO `buildActaDocument` modo claro premium + gradiente solo en banda; `acta-hash.ts` SHA-256 de JSON canónico]; `ShiftHandoverService.exportActa` [ABAC + 409 COMPILING + snapshot + breadcrumb + auditoría `shifthandover.acta.exported`] + endpoint `GET /shift-handover/:id/acta.pdf` [`@Res`, gate `RequireAnyPermission(view/compile/sign/acknowledge)`, Content-Disposition significativo]; web `downloadHandoverActa` vía `apiBlob` + botón en cockpit/historial + i18n; SIN migración/permiso/FLUSHALL; api 247 · web 3 · smoke `smoke-acta-pdf.py` 17/17 + regresión cambio-turno 29/29 · ia-config 20/20 · ia-stream 13/13 · notif 18/18 · notif-inapp 18/18) | `feat/cambio-turno-acta-pdf` → `main` | 🚧 pendiente de merge+push al cierre de esta sesión | push de la rama + merge a `main` + push |
+
+**Estado:** `feat/cambio-turno-acta-pdf` se publica al cierre de esta sesión (merge a `main` + push). El resto: `main` = `origin/main`.
 
 **Convención propuesta (a confirmar):** trabajar cada módulo en rama `feat/<modulo>`;
 al cerrar la sesión → push de la rama + merge a `main` + push de `main`. Así `origin/main`
@@ -417,8 +429,8 @@ nunca queda más de una sesión atrás.
 
 ## 2. Pendiente por HACER (módulos / submódulos)
 
-### Fase 5 — Cambio de turno / Shift Handover (Slice 1 ✅ 2026-06-18; Slices 2–4 pendientes)
-> Plan por slices aprobado (DECISIONS 2026-06-18). **Slice 1 (núcleo, resumen `none`) HECHO y publicado.**
+### Fase 5 — Cambio de turno / Shift Handover (Slices 1–4 ✅ → FASE COMPLETA)
+> Plan por slices aprobado (DECISIONS 2026-06-18). **Los 4 slices HECHOS y publicados.**
 - [x] **Slice 1 — Núcleo:** entrega firmada de 2 partes (compilar→firma saliente→acuse entrante), cockpit 3 zonas, baton que rueda,
   snapshot congelado, `handover.ready`, historial ABAC, resumen determinista. `feat/cambio-turno`. smoke 29/29.
 - [x] **Slice 2 — Fundación `@lyra/llm` + IA ADMINISTRABLE DESDE LA APP ✅** (`feat/ia-administrable`, 2026-06-18). Construido y
@@ -438,9 +450,17 @@ nunca queda más de una sesión atrás.
 - [ ] **Deuda IA (Slices 2–3):** panel de **costo/uso** sobre `AiGenerationLog` (tokens/latencia/$ por proveedor/periodo) · **scrubber de
   PII más completo** (nombres; hoy cubre correo/RUT/teléfono al egresar) · plantilla de prompt por capacidad para Fase 6 (insights/RAG
   reusan `@lyra/llm`) · **streaming multi-instancia** (el aborto/heartbeat es in-proc, como el bus SSE del Bloque N; respaldo Redis si se escala).
-- [ ] **Slice 4 — Export PDF** de la entrega (carpeta/regulador).
+- [x] **Slice 4 — EXPORT PDF del acta de entrega ✅** (`feat/cambio-turno-acta-pdf`, 2026-06-19). Acta de grado auditoría desde el
+  snapshot congelado: motor **pdfmake** (NO Chromium; Sora/Inter TTF OFL embebidas), builder PURO `buildActaDocument`, endpoint
+  `GET /shift-handover/:id/acta.pdf` (`@Res`, gate de lectura reusado, **ABAC**, **409** en COMPILING, auditoría `shifthandover.acta.exported`),
+  **hash SHA-256 de JSON canónico** del snapshot+firmas (determinista, sin persistir, sin migración), botón en cockpit/historial vía
+  `apiBlob`. Sin permiso nuevo. smoke `smoke-acta-pdf.py` **17/17** + regresión. **Pendiente: smoke VISUAL del dueño.**
+- [ ] **Deuda Slice 4:** persistir el artefacto en **MinIO** (+ `snapshotHash` columna) si la carpeta regulatoria exige el binario
+  archivado · **verificador público de hash** (subir un PDF/folio y validar integridad) · usar el `integrityHash` como **payloadHash de
+  la firma Part 11** (cierra la deuda de firma de abajo) · export PNG/CSV del acta si se pide.
 - [ ] **Deuda menor Slice 1:** disciplinas/categorías por taxonomía de catálogo (hoy secciones por tipo de dato) · firma con hash
-  criptográfico del payload (hoy reauth Part 11 + método/significado, sin `payloadHash`) · estado general como catálogo configurable.
+  criptográfico del payload (hoy reauth Part 11 + método/significado, sin `payloadHash` — el `integrityHash` del Slice 4 es el candidato
+  natural) · estado general como catálogo configurable.
 
 ### Notificaciones avanzadas — épico (Fase A backend ✅ 2026-06-17; resto pendiente)
 > El dueño pidió el épico COMPLETO (A+B) y LUEGO la 4.4 (DECISIONS 2026-06-17). Fase A BACKEND está hecha y publicada.

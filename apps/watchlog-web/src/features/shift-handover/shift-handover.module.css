@@ -465,6 +465,26 @@
   min-width: 260px;
   justify-content: center;
 }
+/* Acta oficial (PDF) — Slice 4 */
+.actaBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  text-align: center;
+  border-top: 1px dashed var(--color-border-subtle);
+  padding-top: var(--space-3);
+}
+.actaBtn {
+  align-self: center;
+  min-width: 220px;
+  justify-content: center;
+}
+.actaHint {
+  font-size: var(--text-caption-size);
+  color: var(--color-text-muted);
+  margin: 0;
+}
 .signedCard {
   background: var(--color-success-bg, var(--color-bg-surface-1));
   border: 1px solid var(--color-border-subtle);
@@ -562,6 +582,11 @@
   flex-direction: column;
   gap: var(--space-2);
 }
+.historyRowWrap {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-2);
+}
 .historyRow {
   display: flex;
   align-items: center;
@@ -574,6 +599,28 @@
   text-align: left;
   transition: var(--transition-fast);
   flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
+}
+.histActaBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  background: var(--color-bg-surface-1);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--color-accent);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.histActaBtn:hover:not(:disabled) {
+  border-color: var(--color-border-active);
+  background: var(--color-hover);
+}
+.histActaBtn:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 .historyRow:hover {
   border-color: var(--color-border-active);

@@ -12,7 +12,8 @@ import {
   type UpdateHandoverItemRequest,
   type UpdateHandoverSummaryRequest,
 } from "@lyra/contracts";
-import { API_BASE, apiJson } from "../../lib/api-client.js";
+import { API_BASE, apiBlob, apiJson } from "../../lib/api-client.js";
+import { downloadBlob } from "../../lib/download.js";
 import { getAccessToken } from "../../lib/session-token.js";
 
 function queryString(q: ShiftHandoverListQuery): string {
@@ -63,6 +64,33 @@ export function acknowledgeHandover(id: string, dto: AcknowledgeHandoverRequest)
 
 export function cancelHandover(id: string, dto: CancelHandoverRequest): Promise<ShiftHandoverDetail> {
   return apiJson(`/shift-handover/${id}/cancel`, shiftHandoverDetailSchema, { method: "POST", body: dto });
+}
+
+/** Slug de un nombre de nodo para el archivo del acta (espejo del backend). */
+function actaSlug(nodeName: string): string {
+  return (
+    nodeName
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-zA-Z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .toLowerCase() || "nodo"
+  );
+}
+
+/**
+ * Descarga el ACTA de entrega de turno en PDF (Slice 4). Va con `apiBlob` (mantiene el
+ * Bearer + refresh transparente; un `<a>` simple no puede mandar Authorization). El backend
+ * solo la emite para entregas firmadas; el nombre de archivo es significativo.
+ */
+export async function downloadHandoverActa(meta: {
+  id: string;
+  code: string;
+  nodeName: string;
+  operationalDay: string;
+}): Promise<void> {
+  const blob = await apiBlob(`/shift-handover/${meta.id}/acta.pdf`);
+  downloadBlob(`acta-${meta.code}-${actaSlug(meta.nodeName)}-${meta.operationalDay}.pdf`, blob);
 }
 
 /**
