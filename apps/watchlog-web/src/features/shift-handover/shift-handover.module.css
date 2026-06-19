@@ -323,8 +323,50 @@
   text-transform: none;
   letter-spacing: 0;
 }
+.providerTagAi {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--color-accent-secondary);
+  background: color-mix(in srgb, var(--color-accent-secondary) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-accent-secondary) 35%, transparent);
+  border-radius: var(--radius-full);
+  padding: 2px 8px;
+  text-transform: none;
+  letter-spacing: 0;
+}
 .statusSelect {
   width: 100%;
+}
+.summaryActions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.summaryActions > * {
+  flex: 1 1 auto;
+  justify-content: center;
+}
+/* Crudo determinista SIEMPRE disponible junto al resumen por IA (AC-IA-3). */
+.crudoBox {
+  border: 1px dashed var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-bg-surface-2);
+}
+.crudoBox > summary {
+  cursor: pointer;
+  font-size: var(--text-caption-size);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  user-select: none;
+}
+.crudoText {
+  font-size: var(--text-body-sm-size);
+  color: var(--color-text-muted);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  margin: var(--space-2) 0 0;
+  font-family: inherit;
 }
 .summaryText {
   font-size: var(--text-body-sm-size);

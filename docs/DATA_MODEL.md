@@ -497,6 +497,18 @@ tabla existente. El catálogo de EVENTOS vive en CÓDIGO (`@lyra/contracts NOTIF
   2026-06-17)* — DEFAULT de sistema para las transiciones SIN config de aviso explícita: `true` (default) reproduce la conducta clásica
   (avisar a los roles del estado destino); `false` = no notifica si la transición no lo configura. No rompe nada.
 
+### Inteligencia Artificial administrable (Fase 5 · Slice 2 — *implementado*)
+- **AiSettings** *(implementado)* — config de IA **singleton** (`id="system"`), tabla DEDICADA (no en `SystemSettings`), editable
+  desde `/configuracion` sin reiniciar (permiso `ai:config`): `enabled`, `provider` ("none"|"anthropic"|"openai-compatible"), `model`,
+  `baseUrl` (solo openai-compatible), **`apiKeyEnc` (AES-256-GCM, write-only)** — la API NUNCA la devuelve (la UI solo ve `keySet`),
+  `configuredAt` (null = nunca guardada en BD ⇒ `source=env`; el `.env` `AI_*` es el fallback), `configuredById`, `updatedById`. La
+  administra `AiConfigService` (`getPublic`/`getResolved`/`resolveFrom`/`set`, espejo del `EmailConfigService`); el gateway `AiService`
+  resuelve el proveedor vía la factory de **`@lyra/llm`**.
+- **AiGenerationLog** *(implementado)* — registro inmutable (append-only) de cada GENERACIÓN de IA para gobernanza de costo:
+  `capability` ("shift-summary"|"test"), `provider`, `model`, `status` ("SUCCESS"|"FAILED"|"FALLBACK"), `inputTokens?`, `outputTokens?`,
+  `latencyMs`, `error?`, `handoverId?` (ref BLANDA al cambio de turno, sin FK), `createdById?`, `createdAt`. Índices por `createdAt` y
+  `(provider, createdAt)`. El modo `none` NO registra (sin costo). Migración aditiva `20260618010000_add_ai_admin`.
+
 ### Orígenes de datos
 - **DataSource** — URL base, tipo de auth, **credencial cifrada en reposo**. *1—N* **DataSourceEndpoint** (path, método, mapeo JSONPath, TTL). Caché en Redis. **Espejo ENTRANTE:** en Fase 3 un endpoint puede **alimentar/materializar** una `ReferenceList` (`source=EXTERNAL`).
 

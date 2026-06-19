@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Bell, BookOpenCheck, Lock, Mail, ShieldCheck } from "lucide-react";
+import { Bell, BookOpenCheck, BrainCircuit, Lock, Mail, ShieldCheck } from "lucide-react";
 import { EmptyState, Select, Skeleton, Toggle, cx, useToast } from "@lyra/ui";
 import type { LucideIcon } from "lucide-react";
 import type { EditWindowAnchor, SystemSettingsDto, UpdateSystemSettingsRequest } from "@lyra/contracts";
@@ -8,6 +8,7 @@ import { usePermissions } from "../../auth/use-permissions.js";
 import { ApiError } from "../../lib/api-client.js";
 import { EditWindowDurationField } from "./EditWindowDurationField.js";
 import { EmailSettingsPanel } from "./EmailSettingsPanel.js";
+import { AiSettingsPanel } from "./AiSettingsPanel.js";
 import { useSystemSettings, useUpdateSystemSettings } from "./settings-queries.js";
 import styles from "./SettingsPage.module.css";
 
@@ -19,7 +20,7 @@ const MFA_ACTIONS: { field: keyof UpdateSystemSettingsRequest; labelKey: string 
   { field: "requireMfaPeriodUnlock", labelKey: "settings.mfa.unlock" },
 ];
 
-type Category = "security" | "logbook" | "notifications" | "email";
+type Category = "security" | "logbook" | "notifications" | "email" | "ai";
 
 interface CategoryDef {
   id: Category;
@@ -34,6 +35,7 @@ const CATEGORIES: CategoryDef[] = [
   { id: "logbook", labelKey: "settings.cat.logbook", icon: BookOpenCheck },
   { id: "notifications", labelKey: "settings.cat.notifications", icon: Bell },
   { id: "email", labelKey: "settings.cat.email", icon: Mail, permission: "notification:config" },
+  { id: "ai", labelKey: "settings.cat.ai", icon: BrainCircuit, permission: "ai:config" },
 ];
 
 export function SettingsPage() {
@@ -228,6 +230,18 @@ export function SettingsPage() {
                 <p className={styles.sectionDesc}>{t("settings.emailDesc")}</p>
               </header>
               <EmailSettingsPanel />
+            </section>
+          )}
+
+          {tab === "ai" && perms.can("ai:config") && (
+            <section className={styles.section}>
+              <header className={styles.sectionHead}>
+                <h2 className={styles.sectionTitle}>
+                  <BrainCircuit size={18} /> {t("settings.cat.ai")}
+                </h2>
+                <p className={styles.sectionDesc}>{t("settings.aiDesc")}</p>
+              </header>
+              <AiSettingsPanel />
             </section>
           )}
         </div>

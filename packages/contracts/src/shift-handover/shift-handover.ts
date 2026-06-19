@@ -288,8 +288,14 @@ export const updateHandoverSummaryRequestSchema = z.object({
   generalStatus: handoverGeneralStatusSchema.optional(),
   /** Texto del resumen (editable antes de firmar). Vacío ⇒ se re-deriva el determinista. */
   summaryText: z.string().max(8000).optional(),
-  /** Re-derivar el resumen determinista desde el cockpit. */
+  /** Re-derivar el resumen desde el cockpit. */
   regenerate: z.boolean().optional(),
+  /**
+   * Solo con `regenerate`: generar el resumen con IA (proveedor configurado, grounded al
+   * snapshot). Si no hay IA o falla, cae al determinista (degradación elegante, AC-IA-5):
+   * la respuesta vuelve con `summaryProvider="none"`. La firma sigue siendo humana.
+   */
+  useAi: z.boolean().optional(),
 });
 export type UpdateHandoverSummaryRequest = z.infer<typeof updateHandoverSummaryRequestSchema>;
 

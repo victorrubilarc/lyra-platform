@@ -367,6 +367,23 @@ GxP: MHRA Data Integrity 2018 / FDA DI Q&A (corrección tardía justificada + at
   el secreto del `.env` sigue fuera del repo. **Toggle "Correo activado"**: apagado ⇒ el worker marca los correos SUPPRESSED (no se
   envía; la recuperación de contraseña y los avisos no rompen el flujo).
 
+### Inteligencia Artificial administrable (Fase 5 · Slice 2) — `ai:config`
+- **Permiso nuevo `ai:config`** (catálogo **88→89**, grupo `ai`): ver/editar la config de IA y usar "Probar". Pantalla en
+  `/configuracion` (tab "Inteligencia Artificial"). Dedicado, least-privilege. La autorización se decide en el backend (gate en
+  `AiController`); el frontend solo oculta el tab.
+- **API key CIFRADA en reposo + write-only** (OWASP ASVS): se guarda con `EncryptionService` (AES-256-GCM) en `AiSettings.apiKeyEnc`;
+  la API **nunca** la devuelve (la UI solo ve `keySet`). Payload vacío conserva la guardada. Cambios auditados (`ai.config.updated` /
+  `ai.config.tested`) **sin registrar la clave**.
+- **ON-PREM / sin fuga (AC-IA-6):** el proveedor `none` no hace red; `openai-compatible` contra un endpoint **local** (Ollama/vLLM)
+  mantiene los datos dentro de la planta; solo `anthropic` (o un endpoint OpenAI-compatible remoto) envía el contenido del resumen a la
+  nube — explicitado en la UI y el contrato por proveedor. Las llamadas a la IA se ejecutan **siempre en el backend**, nunca en el
+  navegador; la clave jamás llega al cliente.
+- **Grounding + firma humana (AC-IA-2/3/4):** el resumen de turno se genera SOLO con el snapshot congelado pasado explícito en el prompt
+  (sin tools/BD/internet); el crudo determinista queda siempre visible al lado; la firma sigue siendo del humano (Part 11 con reauth),
+  la IA nunca firma. **Degradación elegante (AC-IA-5):** si la IA falla/timeout/sin clave, cae al determinista con aviso.
+- **Gobernanza de costo:** cada generación se registra en `AiGenerationLog` (proveedor/modelo/tokens/latencia/estado). El registro
+  NUNCA rompe la operación (se loguea si falla). **Deuda:** scrubber de PII explícito en el grounding (AC-IA-7).
+
 ### Dashboard de incidencias (Fase 4.5) — agregación con ABAC por nodo
 - **La autorización y la agregación viven en el backend** (`IncidentDashboardService`, endpoint `GET /incidents/dashboard`, gate
   `incident:view`). El servicio **replica el ABAC de la lista** (`getAccessibleNodeIds(userId)` ∩ `orgNodeIds` de la query): un
