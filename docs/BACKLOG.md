@@ -5,7 +5,13 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-18** (**Fase 5 — Cambio de turno · Slice 2: IA ADMINISTRABLE ✅** — `feat/ia-administrable`:
+> actualización: **2026-06-18** (**Cambio de turno — retoques UX del cockpit ✅** — `feat/cambio-turno-ux`:
+> paneles del cockpit **redimensionables** (grid con `--nav-w`/`--aside-w` + 2 divisores `ColHandle`, doble-clic reset, persistido; centro flexible;
+> se descartó `ResizableSplit` del DS por su chrome de card 2-panel + overflow que rompe el sticky de los paneles). Narrativa del resumen **ampliable**
+> (textarea 7→10 + botón "Ampliar" → Modal xl con el crudo lado a lado). Ítems centrales y pendientes **clicables → `Drawer` de detalle** (todos los
+> campos + deep link "Abrir en Incidencias/Mis rondas"). Solo frontend; reusa `Modal`/`Drawer`. typecheck/lint(0)/build verdes. **PENDIENTE: smoke
+> VISUAL del dueño.** **Siguiente: Slice 3 (streaming del resumen).** Anterior:
+> **Fase 5 — Cambio de turno · Slice 2: IA ADMINISTRABLE ✅** — `feat/ia-administrable`:
 > la IA pasa de `.env` a **módulo administrable** (tab "Inteligencia Artificial" en `/configuracion`, permiso **`ai:config`**, cat. 88→89): proveedor
 > ninguno/Anthropic/local, clave **cifrada + write-only** (`AiSettings.apiKeyEnc`), botón **Probar** real, todo sin reiniciar. Fundación **`@lyra/llm`**
 > (interfaz `LlmProvider` + adapters none/anthropic/openai-compatible + prompt versionado, decoplado de contracts ⇒ reusable Fase 6). Gateway `AiService`

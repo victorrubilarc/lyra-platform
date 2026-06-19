@@ -1,12 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   ArrowLeftRight,
   ArrowRight,
   CheckCircle2,
+  ChevronRight,
   ClipboardList,
+  ExternalLink,
   History,
+  Maximize2,
   PenLine,
   Plus,
   Sparkles,
@@ -18,9 +21,11 @@ import {
   Card,
   Chip,
   Combobox,
+  Drawer,
   EmptyState,
   GridPager,
   Input,
+  Modal,
   Select,
   Spinner,
   Textarea,
@@ -166,38 +171,114 @@ function CockpitView({ id, canCompile, canSign, canAck }: { id: string; canCompi
   const { t } = useTranslation();
   const { data: detail, isLoading } = useHandoverDetail(id);
   const [section, setSection] = useState<HandoverSectionKey>("INCIDENTS");
+  // Anchos de columna persistidos (centro flexible; nav y panel derecho redimensionables).
+  const nav = useColWidth("handover.navW", 232, 184, 380);
+  const aside = useColWidth("handover.asideW", 372, 320, 620);
 
   if (isLoading || !detail) return <Spinner />;
   const c = detail.cockpit;
 
-  return (
-    <div className={styles.cockpit}>
-      {/* IZQUIERDA: navegación por secciones */}
-      <nav className={styles.sectionNav}>
-        {HANDOVER_SECTIONS.map((s) => {
-          const Icon = SECTION_ICON[s.key];
-          const count = s.key === "PENDING" ? detail.items.filter((i) => i.status !== "CLOSED").length : c.counts[s.key] ?? 0;
-          return (
-            <button
-              key={s.key}
-              className={section === s.key ? styles.sectionItemActive : styles.sectionItem}
-              onClick={() => setSection(s.key)}
-            >
-              <Icon size={17} />
-              <span className={styles.sectionLabel}>{t(`handover.sections.${s.key.toLowerCase()}`)}</span>
-              <span className={styles.sectionCount}>{count}</span>
-            </button>
-          );
-        })}
-      </nav>
+  const sectionNav = (
+    <nav className={styles.sectionNav}>
+      {HANDOVER_SECTIONS.map((s) => {
+        const Icon = SECTION_ICON[s.key];
+        const count = s.key === "PENDING" ? detail.items.filter((i) => i.status !== "CLOSED").length : c.counts[s.key] ?? 0;
+        return (
+          <button
+            key={s.key}
+            className={section === s.key ? styles.sectionItemActive : styles.sectionItem}
+            onClick={() => setSection(s.key)}
+          >
+            <Icon size={17} />
+            <span className={styles.sectionLabel}>{t(`handover.sections.${s.key.toLowerCase()}`)}</span>
+            <span className={styles.sectionCount}>{count}</span>
+          </button>
+        );
+      })}
+    </nav>
+  );
 
-      {/* CENTRO: contenido de la sección */}
+  // Cockpit de 3 zonas REDIMENSIONABLES (nav · contenido · resumen+sign-off). El centro es
+  // flexible (1fr); el nav y el panel derecho se ajustan arrastrando su divisor (doble-clic
+  // restablece). El ancho se persiste por usuario; en móvil los paneles se apilan.
+  return (
+    <div className={styles.cockpit} style={{ "--nav-w": `${nav.width}px`, "--aside-w": `${aside.width}px` } as CSSVars}>
+      {sectionNav}
+      <ColHandle onDelta={(d) => nav.add(d)} onReset={nav.reset} />
       <div className={styles.sectionContent}>
         <SectionContent section={section} detail={detail} canEdit={canCompile && detail.status === "COMPILING"} />
       </div>
-
-      {/* DERECHA: resumen + sign-off + baton compacta */}
+      <ColHandle onDelta={(d) => aside.add(-d)} onReset={aside.reset} />
       <SignOffPanel detail={detail} canCompile={canCompile} canSign={canSign} canAck={canAck} />
+    </div>
+  );
+}
+
+type CSSVars = CSSProperties & Record<"--nav-w" | "--aside-w", string>;
+
+/** Ancho de columna persistido + acotado (px). `add` aplica un delta; `reset` vuelve al default. */
+function useColWidth(storageKey: string, def: number, min: number, max: number) {
+  const clamp = useCallback((w: number) => Math.max(min, Math.min(max, w)), [min, max]);
+  const [width, setWidth] = useState<number>(() => {
+    try {
+      const saved = Number(localStorage.getItem(storageKey));
+      if (Number.isFinite(saved) && saved > 0) return clamp(saved);
+    } catch {
+      /* localStorage no disponible */
+    }
+    return def;
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(storageKey, String(Math.round(width)));
+    } catch {
+      /* localStorage no disponible */
+    }
+  }, [storageKey, width]);
+  return {
+    width,
+    add: (delta: number) => setWidth((w) => clamp(w + delta)),
+    reset: () => setWidth(def),
+  };
+}
+
+/** Divisor vertical arrastrable (pointer + teclado). Reporta el delta horizontal en px. */
+function ColHandle({ onDelta, onReset }: { onDelta: (deltaPx: number) => void; onReset: () => void }) {
+  const last = useRef(0);
+  const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    last.current = e.clientX;
+    const onMove = (ev: globalThis.PointerEvent) => {
+      onDelta(ev.clientX - last.current);
+      last.current = ev.clientX;
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
+  return (
+    <div
+      className={styles.colHandle}
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Redimensionar panel"
+      tabIndex={0}
+      onPointerDown={onPointerDown}
+      onDoubleClick={onReset}
+      onKeyDown={(e) => {
+        if (e.key === "ArrowLeft") {
+          e.preventDefault();
+          onDelta(-24);
+        } else if (e.key === "ArrowRight") {
+          e.preventDefault();
+          onDelta(24);
+        }
+      }}
+    >
+      <span className={styles.colHandleBar} />
     </div>
   );
 }
@@ -211,6 +292,7 @@ function StatusChip({ status }: { status: ShiftHandoverStatus }) {
 function SectionContent({ section, detail, canEdit }: { section: HandoverSectionKey; detail: ShiftHandoverDetail; canEdit: boolean }) {
   const { t } = useTranslation();
   const c = detail.cockpit;
+  const [detailRow, setDetailRow] = useState<RowVM | null>(null);
 
   if (section === "PENDING") return <BatonSection detail={detail} canEdit={canEdit} />;
 
@@ -222,7 +304,7 @@ function SectionContent({ section, detail, canEdit }: { section: HandoverSection
     <div className={styles.list}>
       <h2 className={styles.sectionHeading}>{t(`handover.sections.${section.toLowerCase()}`)} <span className={styles.headingCount}>{rows.length}</span></h2>
       {rows.map((r) => (
-        <div key={r.key} className={styles.row}>
+        <button key={r.key} type="button" className={styles.rowBtn} onClick={() => setDetailRow(r)} title={t("handover.viewDetail")}>
           <div className={styles.rowMain}>
             <div className={styles.rowTitle}>
               {r.flag && <span className={r.flag === "critical" ? styles.dotCrit : styles.dotWarn} />}
@@ -233,13 +315,19 @@ function SectionContent({ section, detail, canEdit }: { section: HandoverSection
           <div className={styles.rowMeta}>
             {r.badge && <Chip variant={r.badgeVariant ?? "default"} label={r.badge} />}
             {r.at && <span className={styles.rowAt}>{formatDateTime(r.at)}</span>}
+            <ChevronRight size={16} className={styles.rowChevron} />
           </div>
-        </div>
+        </button>
       ))}
+      <RowDetailDrawer row={detailRow} onClose={() => setDetailRow(null)} />
     </div>
   );
 }
 
+interface RowField {
+  label: string;
+  value: string | null | undefined;
+}
 interface RowVM {
   key: string;
   title: string;
@@ -248,12 +336,30 @@ interface RowVM {
   badge?: string;
   badgeVariant?: "default" | "warning" | "error" | "success" | "info";
   flag?: "critical" | "warning";
+  /** Campos completos para el panel de detalle (se omiten los vacíos). */
+  fields?: RowField[];
+  /** Enlace "Abrir en…" del detalle (módulo de origen). */
+  link?: { href: string; labelKey: string };
 }
 
 function sectionRows(section: HandoverSectionKey, c: HandoverCockpit): RowVM[] {
+  const dt = (v?: string | null) => (v ? formatDateTime(v) : null);
   switch (section) {
     case "ENTRIES":
-      return c.entries.map((e) => ({ key: e.id, title: `${e.folio} · ${e.templateName}`, detail: e.byName, at: e.at, badge: e.status }));
+      return c.entries.map((e) => ({
+        key: e.id,
+        title: `${e.folio} · ${e.templateName}`,
+        detail: e.byName,
+        at: e.at,
+        badge: e.status,
+        fields: [
+          { label: "Folio", value: e.folio },
+          { label: "Plantilla", value: e.templateName },
+          { label: "Registrado por", value: e.byName },
+          { label: "Estado", value: e.status },
+          { label: "Hora", value: dt(e.at) },
+        ],
+      }));
     case "EXCEPTIONS":
       return c.exceptions.map((e) => ({
         key: e.id,
@@ -263,6 +369,15 @@ function sectionRows(section: HandoverSectionKey, c: HandoverCockpit): RowVM[] {
         badge: e.kind,
         badgeVariant: e.kind === "critical" ? "error" : e.kind === "warning" ? "warning" : "info",
         flag: e.kind === "critical" ? "critical" : undefined,
+        fields: [
+          { label: "Tipo", value: e.kind },
+          { label: "Campo", value: e.fieldLabel },
+          { label: "Detalle", value: e.detail },
+          { label: "Estado", value: e.status },
+          { label: "Hora", value: dt(e.at) },
+          { label: "Derivó en incidencia", value: e.incidentId ? "Sí" : "No" },
+        ],
+        link: e.incidentId ? { href: "/incidencias", labelKey: "handover.openInIncidents" } : undefined,
       }));
     case "INCIDENTS":
       return c.incidents.map((i) => ({
@@ -272,6 +387,17 @@ function sectionRows(section: HandoverSectionKey, c: HandoverCockpit): RowVM[] {
         badge: i.overdue ? "vencida" : i.critical ? "crítica" : `sev ${i.severity}`,
         badgeVariant: i.overdue ? "error" : i.critical ? "error" : "default",
         flag: i.critical ? "critical" : undefined,
+        fields: [
+          { label: "Folio", value: i.folio },
+          { label: "Título", value: i.title },
+          { label: "Tipo", value: i.typeName },
+          { label: "Estado", value: i.stateName },
+          { label: "Severidad", value: `Sev ${i.severity}` },
+          { label: "Crítica", value: i.critical ? "Sí" : "No" },
+          { label: "Plazo", value: dt(i.dueAt) },
+          { label: "Plazo vencido", value: i.overdue ? "Sí" : "No" },
+        ],
+        link: { href: "/incidencias", labelKey: "handover.openInIncidents" },
       }));
     case "FOLLOWUP":
       return c.followups.map((f) => ({
@@ -282,6 +408,16 @@ function sectionRows(section: HandoverSectionKey, c: HandoverCockpit): RowVM[] {
         badge: f.overdue ? "vencido" : f.status,
         badgeVariant: f.overdue ? "error" : "warning",
         flag: f.overdue ? "warning" : undefined,
+        fields: [
+          { label: "Código", value: f.code },
+          { label: "Tipo", value: f.kind === "ACTION" ? "Acción (CAPA)" : "Reporte" },
+          { label: "Título", value: f.title },
+          { label: "Incidencia", value: f.incidentFolio },
+          { label: "Estado", value: f.status },
+          { label: "Plazo", value: dt(f.dueAt) },
+          { label: "Vencido", value: f.overdue ? "Sí" : "No" },
+        ],
+        link: { href: "/incidencias", labelKey: "handover.openInIncidents" },
       }));
     case "ROUNDS":
       return c.rounds.map((r) => ({
@@ -291,10 +427,58 @@ function sectionRows(section: HandoverSectionKey, c: HandoverCockpit): RowVM[] {
         at: r.scheduledFor,
         badge: r.status === "OVERDUE" ? "vencida" : r.status === "COMPLETED" ? "cumplida" : r.status,
         badgeVariant: r.status === "OVERDUE" ? "error" : r.status === "COMPLETED" ? "success" : "default",
+        fields: [
+          { label: "Ronda", value: r.name },
+          { label: "Plantilla", value: r.templateName },
+          { label: "Estado", value: r.status },
+          { label: "Programada", value: dt(r.scheduledFor) },
+          { label: "Plazo", value: dt(r.dueAt) },
+        ],
+        link: { href: "/mis-rondas", labelKey: "handover.openInRounds" },
       }));
     default:
       return [];
   }
+}
+
+/** Panel lateral de DETALLE de una fila del cockpit (todo a la mano, sin perder contexto). */
+function RowDetailDrawer({ row, onClose }: { row: RowVM | null; onClose: () => void }) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const fields = (row?.fields ?? []).filter((f) => f.value != null && String(f.value).trim() !== "");
+  return (
+    <Drawer
+      open={!!row}
+      onClose={onClose}
+      width={460}
+      title={row?.title}
+      footer={
+        row?.link ? (
+          <Button
+            variant="secondary"
+            onClick={() => {
+              navigate(row.link!.href);
+              onClose();
+            }}
+          >
+            <ExternalLink size={15} /> {t(row.link.labelKey)}
+          </Button>
+        ) : undefined
+      }
+    >
+      {row && (
+        <dl className={styles.detailList}>
+          {fields.map((f) => (
+            <div key={f.label} className={styles.detailRow}>
+              <dt className={styles.detailLabel}>{f.label}</dt>
+              <dd className={styles.detailValue}>{f.value}</dd>
+            </div>
+          ))}
+          {fields.length === 0 && <p className={styles.batonHint}>{row.detail}</p>}
+        </dl>
+      )}
+    </Drawer>
+  );
 }
 
 // === Baton ====================================================================
@@ -305,8 +489,24 @@ function BatonSection({ detail, canEdit }: { detail: ShiftHandoverDetail; canEdi
   const add = useAddHandoverItem(detail.id);
   const update = useUpdateHandoverItem(detail.id);
   const [title, setTitle] = useState("");
+  const [detailRow, setDetailRow] = useState<RowVM | null>(null);
   const open = detail.items.filter((i) => i.status !== "CLOSED");
   const closed = detail.items.filter((i) => i.status === "CLOSED");
+
+  // Mapea un pendiente (baton) al detalle genérico del panel lateral.
+  const itemToRow = (i: ShiftHandoverDetail["items"][number]): RowVM => ({
+    key: i.id,
+    title: i.title,
+    detail: i.detail,
+    fields: [
+      { label: "Origen", value: t(`handover.itemSource.${i.source.toLowerCase()}`) },
+      { label: "Estado", value: i.status === "CARRIED" ? t("handover.carried") : i.status },
+      { label: "Categoría", value: i.category },
+      { label: "Severidad", value: i.severity != null ? `Sev ${i.severity}` : null },
+      { label: "Detalle", value: i.detail },
+      { label: "Creado", value: formatDateTime(i.createdAt) },
+    ],
+  });
 
   function addItem() {
     if (title.trim().length < 3) return;
@@ -332,15 +532,16 @@ function BatonSection({ detail, canEdit }: { detail: ShiftHandoverDetail; canEdi
       {open.length === 0 && <EmptyState icon={<CheckCircle2 size={32} />} title={t("handover.noPending")} description={t("handover.noPendingDesc")} />}
       {open.map((i) => (
         <div key={i.id} className={styles.row}>
-          <div className={styles.rowMain}>
+          <button type="button" className={styles.rowMainBtn} onClick={() => setDetailRow(itemToRow(i))} title={t("handover.viewDetail")}>
             <div className={styles.rowTitle}>
               {i.status === "CARRIED" && <Chip variant="warning" label={t("handover.carried")} />}
               {i.title}
             </div>
             {i.detail && <div className={styles.rowDetail}>{i.detail}</div>}
-          </div>
+          </button>
           <div className={styles.rowMeta}>
             <Chip variant="default" label={t(`handover.itemSource.${i.source.toLowerCase()}`)} />
+            <ChevronRight size={16} className={styles.rowChevron} onClick={() => setDetailRow(itemToRow(i))} />
             {canEdit && (
               <Button variant="icon" onClick={() => update.mutate({ itemId: i.id, dto: { status: "CLOSED" } })} title={t("handover.closeItem")}>
                 <X size={14} />
@@ -351,6 +552,7 @@ function BatonSection({ detail, canEdit }: { detail: ShiftHandoverDetail; canEdi
       ))}
 
       {closed.length > 0 && <div className={styles.closedNote}>{t("handover.closedCount", { count: closed.length })}</div>}
+      <RowDetailDrawer row={detailRow} onClose={() => setDetailRow(null)} />
     </div>
   );
 }
@@ -368,6 +570,7 @@ function SignOffPanel({ detail, canCompile, canSign, canAck }: { detail: ShiftHa
   const [generalStatus, setGeneralStatus] = useState<HandoverGeneralStatus>(detail.generalStatus ?? "OPERATIONAL");
   const [signModal, setSignModal] = useState(false);
   const [ackModal, setAckModal] = useState(false);
+  const [summaryModal, setSummaryModal] = useState(false);
   // Acuse del entrante
   const [readSummary, setReadSummary] = useState(false);
   const [reviewedItems, setReviewedItems] = useState(false);
@@ -438,6 +641,28 @@ function SignOffPanel({ detail, canCompile, canSign, canAck }: { detail: ShiftHa
     );
   }
 
+  // Controles del resumen reutilizados en el panel (compacto) y en el modal ampliado.
+  const summaryEditor = (big: boolean) => (
+    <>
+      <Select value={generalStatus} onChange={(e) => setGeneralStatus(e.target.value as HandoverGeneralStatus)} className={styles.statusSelect}>
+        {GENERAL_STATUS_OPTIONS.map((o) => (
+          <option key={o.value} value={o.value}>
+            {t(o.labelKey)}
+          </option>
+        ))}
+      </Select>
+      <Textarea value={summary} onChange={(e) => setSummary(e.target.value)} onBlur={persistSummary} rows={big ? 18 : 10} placeholder={t("handover.summaryPlaceholder")} />
+      <div className={styles.summaryActions}>
+        <Button variant="secondary" onClick={regenerate} loading={updateSummary.isPending}>
+          {t("handover.regenerate")}
+        </Button>
+        <Button variant="primary" onClick={generateWithAi} loading={updateSummary.isPending}>
+          <Sparkles size={14} /> {t("handover.generateAi")}
+        </Button>
+      </div>
+    </>
+  );
+
   return (
     <aside className={styles.signoff}>
       {/* Encabezado del turno */}
@@ -464,25 +689,13 @@ function SignOffPanel({ detail, canCompile, canSign, canAck }: { detail: ShiftHa
           <span className={isAiSummary ? styles.providerTagAi : styles.providerTag}>
             {isAiSummary ? t("handover.summaryAi") : t("handover.summaryNone")}
           </span>
+          <button type="button" className={styles.expandBtn} onClick={() => setSummaryModal(true)} title={t("handover.expand")} aria-label={t("handover.expand")}>
+            <Maximize2 size={14} />
+          </button>
         </div>
         {editable ? (
           <>
-            <Select value={generalStatus} onChange={(e) => setGeneralStatus(e.target.value as HandoverGeneralStatus)} className={styles.statusSelect}>
-              {GENERAL_STATUS_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {t(o.labelKey)}
-                </option>
-              ))}
-            </Select>
-            <Textarea value={summary} onChange={(e) => setSummary(e.target.value)} onBlur={persistSummary} rows={7} placeholder={t("handover.summaryPlaceholder")} />
-            <div className={styles.summaryActions}>
-              <Button variant="secondary" onClick={regenerate} loading={updateSummary.isPending}>
-                {t("handover.regenerate")}
-              </Button>
-              <Button variant="primary" onClick={generateWithAi} loading={updateSummary.isPending}>
-                <Sparkles size={14} /> {t("handover.generateAi")}
-              </Button>
-            </div>
+            {summaryEditor(false)}
             {isAiSummary && (
               <details className={styles.crudoBox}>
                 <summary>{t("handover.crudoTitle")}</summary>
@@ -574,6 +787,36 @@ function SignOffPanel({ detail, canCompile, canSign, canAck }: { detail: ShiftHa
           onClose={() => setAckModal(false)}
         />
       )}
+
+      {/* Resumen AMPLIADO: lectura/edición cómoda + crudo determinista lado a lado. */}
+      <Modal
+        open={summaryModal}
+        onClose={() => {
+          persistSummary();
+          setSummaryModal(false);
+        }}
+        size="xl"
+        title={
+          <span className={styles.summaryModalTitle}>
+            <Sparkles size={16} /> {t("handover.summaryTitle")}
+            <span className={isAiSummary ? styles.providerTagAi : styles.providerTag}>
+              {isAiSummary ? t("handover.summaryAi") : t("handover.summaryNone")}
+            </span>
+          </span>
+        }
+      >
+        <div className={isAiSummary ? styles.summaryModalGrid : undefined}>
+          <div className={styles.summaryModalMain}>
+            {editable ? summaryEditor(true) : <p className={styles.summaryTextLg}>{detail.summaryText || t("handover.noSummary")}</p>}
+          </div>
+          {isAiSummary && (
+            <div className={styles.summaryModalCrudo}>
+              <div className={styles.crudoHead}>{t("handover.crudoTitle")}</div>
+              <pre className={styles.crudoText}>{deterministicCrudo}</pre>
+            </div>
+          )}
+        </div>
+      </Modal>
     </aside>
   );
 }
