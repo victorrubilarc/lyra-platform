@@ -20,7 +20,7 @@ import {
 } from "@lyra/contracts";
 import type { AuditContext } from "../audit/audit.service";
 import type { RequestUser } from "../authz/auth-user";
-import { CurrentUser, RequirePermission } from "../authz/authz.decorators";
+import { CurrentUser, RequireAnyPermission, RequirePermission } from "../authz/authz.decorators";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { ShiftHandoverService } from "./shift-handover.service";
 
@@ -56,8 +56,10 @@ export class ShiftHandoverController {
     return this.handover.list(user.id, q);
   }
 
+  // Cualquiera que pueda ACTUAR sobre la entrega puede LEERLA: el entrante a menudo solo
+  // tiene `acknowledge` (no `view`) — sin esto, el deep link de la notificación daría 403.
   @Get(":id")
-  @RequirePermission("shifthandover:view")
+  @RequireAnyPermission("shifthandover:view", "shifthandover:compile", "shifthandover:sign", "shifthandover:acknowledge")
   getDetail(@Param("id") id: string, @CurrentUser() user: RequestUser) {
     return this.handover.getDetail(user.id, id);
   }

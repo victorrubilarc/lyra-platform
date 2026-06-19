@@ -32,6 +32,8 @@ export function useHandoverDetail(id: string | null) {
     queryKey: [...KEY, "detail", id],
     queryFn: () => fetchHandoverDetail(id!),
     enabled: !!id,
+    // Si falla (permiso, red, deep link), no reintentar en bucle: que el error se muestre rápido.
+    retry: 1,
   });
 }
 

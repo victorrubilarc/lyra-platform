@@ -141,8 +141,15 @@ def cleanup():
 
 
 def pick_nodes():
-    """Nodo de prueba (resuelve turno) + un nodo DISJUNTO para el scope ABAC."""
-    test = sql('SELECT id FROM "OrgNode" WHERE "deletedAt" IS NULL ORDER BY length(path) DESC LIMIT 1;').splitlines()[0]
+    """Nodo de prueba (resuelve turno) + un nodo DISJUNTO para el scope ABAC.
+    Prefiere el nodo MÁS PROFUNDO SIN entregas previas, para aislar la baton (rollBaton
+    toma la entrega previa más reciente del nodo) de datos de prueba ya existentes."""
+    clean = sql(
+        'SELECT id FROM "OrgNode" WHERE "deletedAt" IS NULL '
+        'AND id NOT IN (SELECT DISTINCT "orgNodeId" FROM "ShiftHandover") '
+        'ORDER BY length(path) DESC LIMIT 1;'
+    ).splitlines()
+    test = clean[0] if clean and clean[0] else sql('SELECT id FROM "OrgNode" WHERE "deletedAt" IS NULL ORDER BY length(path) DESC LIMIT 1;').splitlines()[0]
     tpath = sql(f"SELECT path FROM \"OrgNode\" WHERE id='{test}';")
     other = ""
     rows = sql('SELECT id,path FROM "OrgNode" WHERE "deletedAt" IS NULL;').splitlines()

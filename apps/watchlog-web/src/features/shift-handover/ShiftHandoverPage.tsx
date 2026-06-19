@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, 
 import { useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
+  AlertTriangle,
   ArrowLeftRight,
   ArrowRight,
   CheckCircle2,
@@ -11,6 +12,7 @@ import {
   Maximize2,
   PenLine,
   Plus,
+  RotateCcw,
   Sparkles,
   UserCheck,
   X,
@@ -44,6 +46,7 @@ import {
 } from "@lyra/contracts";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { useOrgTree } from "../structure/structure-queries.js";
+import { ApiError } from "../../lib/api-client.js";
 import { formatDateTime, formatLocalDate } from "../../lib/format.js";
 import {
   useAcknowledgeHandover,
@@ -207,7 +210,7 @@ function CockpitView({
   canAck: boolean;
 }) {
   const { t } = useTranslation();
-  const { data: detail, isLoading } = useHandoverDetail(id);
+  const { data: detail, isLoading, isError, error, refetch } = useHandoverDetail(id);
   const [section, setSection] = useState<HandoverSectionKey>("INCIDENTS");
   // Anchos de columna persistidos (centro flexible; nav y panel derecho redimensionables).
   // El panel derecho arranca más ancho por defecto y admite bastante recorrido (hasta 920).
@@ -221,7 +224,29 @@ function CockpitView({
     if (resolvedNodeId) onResolveNode?.(resolvedNodeId);
   }, [resolvedNodeId, onResolveNode]);
 
-  if (isLoading || !detail) return <Spinner />;
+  if (isLoading) return <Spinner />;
+  // NUNCA quedarse en spinner indefinido: si la carga falla (deep link, permiso, red), avisar y dar reintentar.
+  if (isError || !detail) {
+    const status = error instanceof ApiError ? error.status : undefined;
+    const desc =
+      status === 403
+        ? t("handover.loadForbidden")
+        : error instanceof Error && error.message
+          ? error.message
+          : t("handover.loadErrorDesc");
+    return (
+      <EmptyState
+        icon={<AlertTriangle size={36} />}
+        title={t("handover.loadErrorTitle")}
+        description={desc}
+        action={
+          <Button variant="secondary" onClick={() => void refetch()}>
+            <RotateCcw size={15} /> {t("handover.retry")}
+          </Button>
+        }
+      />
+    );
+  }
   const c = detail.cockpit;
 
   const sectionNav = (
