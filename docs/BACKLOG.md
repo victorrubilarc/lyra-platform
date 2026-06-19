@@ -5,7 +5,14 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-18** (**Cambio de turno — retoques UX del cockpit ✅** — `feat/cambio-turno-ux`:
+> actualización: **2026-06-18** (**Cambio de turno — UX ronda 2 ✅** — `feat/cambio-turno-ux-fixes`:
+> el detalle de una incidencia en el cockpit ahora **reutiliza el `IncidentDetailDrawer` REAL del módulo** (mismo panel/pestañas/acciones, en
+> contexto) en vez de un panel propio liviano + deep-link que perdía al usuario; aplica a incidencias, acciones/reportes (incidencia padre),
+> excepciones con incidencia y pendientes `refType=Incident` (gated `incident:view`). **Persistencia:** volver a la pestaña ya no la vacía
+> (`sessionStorage` de entrega/nodo). **Panel derecho** más ancho por defecto (468, acotado 380–560). **CTA de firma** deja de ser de ancho
+> completo → tarjeta de acción centrada con botón a escala. Solo frontend. typecheck/lint(0)/build verdes. **PENDIENTE: smoke VISUAL del dueño.**
+> **Siguiente: Slice 3 (streaming).** Anterior:
+> **Cambio de turno — retoques UX del cockpit ✅** — `feat/cambio-turno-ux`:
 > paneles del cockpit **redimensionables** (grid con `--nav-w`/`--aside-w` + 2 divisores `ColHandle`, doble-clic reset, persistido; centro flexible;
 > se descartó `ResizableSplit` del DS por su chrome de card 2-panel + overflow que rompe el sticky de los paneles). Narrativa del resumen **ampliable**
 > (textarea 7→10 + botón "Ampliar" → Modal xl con el crudo lado a lado). Ítems centrales y pendientes **clicables → `Drawer` de detalle** (todos los

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   ArrowLeftRight,
@@ -7,7 +7,6 @@ import {
   CheckCircle2,
   ChevronRight,
   ClipboardList,
-  ExternalLink,
   History,
   Maximize2,
   PenLine,
@@ -56,9 +55,27 @@ import {
   useUpdateHandoverItem,
   useUpdateHandoverSummary,
 } from "./shift-handover-queries.js";
+import { IncidentDetailDrawer } from "../incidents/IncidentDetailDrawer.js";
 import { HandoverReauthModal } from "./HandoverReauthModal.js";
 import { GENERAL_STATUS_OPTIONS, HANDOVER_STATUS_META, SECTION_ICON } from "./shift-handover-presentation.js";
 import styles from "./shift-handover.module.css";
+
+/** sessionStorage seguro (no rompe si no está disponible). */
+function ssGet(key: string): string {
+  try {
+    return sessionStorage.getItem(key) ?? "";
+  } catch {
+    return "";
+  }
+}
+function ssSet(key: string, value: string | null): void {
+  try {
+    if (value) sessionStorage.setItem(key, value);
+    else sessionStorage.removeItem(key);
+  } catch {
+    /* sessionStorage no disponible */
+  }
+}
 
 function flatten(nodes: OrgNodeTree[], prefix = ""): { value: string; label: string }[] {
   const out: { value: string; label: string }[] = [];
@@ -75,8 +92,9 @@ export function ShiftHandoverPage() {
   const { can } = usePermissions();
   const [params, setParams] = useSearchParams();
   const [view, setView] = useState<"cockpit" | "history">("cockpit");
-  const [nodeId, setNodeId] = useState("");
-  const [activeId, setActiveId] = useState<string | null>(params.get("handoverId"));
+  // Recuerda la última entrega/nodo entre navegaciones (volver a la pestaña no debe vaciar el cockpit).
+  const [nodeId, setNodeId] = useState(() => ssGet("handover.nodeId"));
+  const [activeId, setActiveId] = useState<string | null>(() => params.get("handoverId") ?? ssGet("handover.activeId") ?? null);
 
   const { data: tree = [] } = useOrgTree();
   const nodeOptions = useMemo(() => flatten(tree), [tree]);
@@ -91,6 +109,14 @@ export function ShiftHandoverPage() {
       setView("cockpit");
     }
   }, [params]);
+
+  // Persiste la entrega/nodo activos para restaurarlos al volver a la pestaña.
+  useEffect(() => {
+    ssSet("handover.activeId", activeId);
+  }, [activeId]);
+  useEffect(() => {
+    ssSet("handover.nodeId", nodeId);
+  }, [nodeId]);
 
   function doCompile(node: string) {
     setNodeId(node);
@@ -172,8 +198,9 @@ function CockpitView({ id, canCompile, canSign, canAck }: { id: string; canCompi
   const { data: detail, isLoading } = useHandoverDetail(id);
   const [section, setSection] = useState<HandoverSectionKey>("INCIDENTS");
   // Anchos de columna persistidos (centro flexible; nav y panel derecho redimensionables).
+  // El panel derecho arranca más ancho por defecto y se acota a 560 para que no se estire feo.
   const nav = useColWidth("handover.navW", 232, 184, 380);
-  const aside = useColWidth("handover.asideW", 372, 320, 620);
+  const aside = useColWidth("handover.asideW.v2", 468, 380, 560);
 
   if (isLoading || !detail) return <Spinner />;
   const c = detail.cockpit;
@@ -291,8 +318,18 @@ function StatusChip({ status }: { status: ShiftHandoverStatus }) {
 
 function SectionContent({ section, detail, canEdit }: { section: HandoverSectionKey; detail: ShiftHandoverDetail; canEdit: boolean }) {
   const { t } = useTranslation();
+  const { can } = usePermissions();
   const c = detail.cockpit;
   const [detailRow, setDetailRow] = useState<RowVM | null>(null);
+  const [incidentId, setIncidentId] = useState<string | null>(null);
+  const canViewIncident = can("incident:view");
+
+  // Una fila respaldada por una incidencia abre el MISMO drawer del módulo (en contexto);
+  // el resto abre el panel de detalle liviano.
+  const openRow = (r: RowVM) => {
+    if (r.incidentRef && canViewIncident) setIncidentId(r.incidentRef);
+    else setDetailRow(r);
+  };
 
   if (section === "PENDING") return <BatonSection detail={detail} canEdit={canEdit} />;
 
@@ -304,7 +341,7 @@ function SectionContent({ section, detail, canEdit }: { section: HandoverSection
     <div className={styles.list}>
       <h2 className={styles.sectionHeading}>{t(`handover.sections.${section.toLowerCase()}`)} <span className={styles.headingCount}>{rows.length}</span></h2>
       {rows.map((r) => (
-        <button key={r.key} type="button" className={styles.rowBtn} onClick={() => setDetailRow(r)} title={t("handover.viewDetail")}>
+        <button key={r.key} type="button" className={styles.rowBtn} onClick={() => openRow(r)} title={t("handover.viewDetail")}>
           <div className={styles.rowMain}>
             <div className={styles.rowTitle}>
               {r.flag && <span className={r.flag === "critical" ? styles.dotCrit : styles.dotWarn} />}
@@ -320,6 +357,7 @@ function SectionContent({ section, detail, canEdit }: { section: HandoverSection
         </button>
       ))}
       <RowDetailDrawer row={detailRow} onClose={() => setDetailRow(null)} />
+      <IncidentDetailDrawer incidentId={incidentId} onClose={() => setIncidentId(null)} />
     </div>
   );
 }
@@ -338,8 +376,8 @@ interface RowVM {
   flag?: "critical" | "warning";
   /** Campos completos para el panel de detalle (se omiten los vacíos). */
   fields?: RowField[];
-  /** Enlace "Abrir en…" del detalle (módulo de origen). */
-  link?: { href: string; labelKey: string };
+  /** Id de la incidencia asociada: abre el MISMO drawer del módulo de incidencias, en contexto. */
+  incidentRef?: string | null;
 }
 
 function sectionRows(section: HandoverSectionKey, c: HandoverCockpit): RowVM[] {
@@ -377,7 +415,7 @@ function sectionRows(section: HandoverSectionKey, c: HandoverCockpit): RowVM[] {
           { label: "Hora", value: dt(e.at) },
           { label: "Derivó en incidencia", value: e.incidentId ? "Sí" : "No" },
         ],
-        link: e.incidentId ? { href: "/incidencias", labelKey: "handover.openInIncidents" } : undefined,
+        incidentRef: e.incidentId,
       }));
     case "INCIDENTS":
       return c.incidents.map((i) => ({
@@ -397,7 +435,7 @@ function sectionRows(section: HandoverSectionKey, c: HandoverCockpit): RowVM[] {
           { label: "Plazo", value: dt(i.dueAt) },
           { label: "Plazo vencido", value: i.overdue ? "Sí" : "No" },
         ],
-        link: { href: "/incidencias", labelKey: "handover.openInIncidents" },
+        incidentRef: i.id,
       }));
     case "FOLLOWUP":
       return c.followups.map((f) => ({
@@ -417,7 +455,7 @@ function sectionRows(section: HandoverSectionKey, c: HandoverCockpit): RowVM[] {
           { label: "Plazo", value: dt(f.dueAt) },
           { label: "Vencido", value: f.overdue ? "Sí" : "No" },
         ],
-        link: { href: "/incidencias", labelKey: "handover.openInIncidents" },
+        incidentRef: f.incidentId,
       }));
     case "ROUNDS":
       return c.rounds.map((r) => ({
@@ -434,38 +472,21 @@ function sectionRows(section: HandoverSectionKey, c: HandoverCockpit): RowVM[] {
           { label: "Programada", value: dt(r.scheduledFor) },
           { label: "Plazo", value: dt(r.dueAt) },
         ],
-        link: { href: "/mis-rondas", labelKey: "handover.openInRounds" },
       }));
     default:
       return [];
   }
 }
 
-/** Panel lateral de DETALLE de una fila del cockpit (todo a la mano, sin perder contexto). */
+/**
+ * Panel lateral de DETALLE de una fila del cockpit (todo a la mano, sin perder contexto).
+ * Se usa para objetos SIN un módulo propio rico (registros, rondas, excepciones sin incidencia,
+ * pendientes). Las incidencias abren el drawer REAL del módulo (`IncidentDetailDrawer`).
+ */
 function RowDetailDrawer({ row, onClose }: { row: RowVM | null; onClose: () => void }) {
-  const { t } = useTranslation();
-  const navigate = useNavigate();
   const fields = (row?.fields ?? []).filter((f) => f.value != null && String(f.value).trim() !== "");
   return (
-    <Drawer
-      open={!!row}
-      onClose={onClose}
-      width={460}
-      title={row?.title}
-      footer={
-        row?.link ? (
-          <Button
-            variant="secondary"
-            onClick={() => {
-              navigate(row.link!.href);
-              onClose();
-            }}
-          >
-            <ExternalLink size={15} /> {t(row.link.labelKey)}
-          </Button>
-        ) : undefined
-      }
-    >
+    <Drawer open={!!row} onClose={onClose} width={460} title={row?.title}>
       {row && (
         <dl className={styles.detailList}>
           {fields.map((f) => (
@@ -485,13 +506,22 @@ function RowDetailDrawer({ row, onClose }: { row: RowVM | null; onClose: () => v
 
 function BatonSection({ detail, canEdit }: { detail: ShiftHandoverDetail; canEdit: boolean }) {
   const { t } = useTranslation();
+  const { can } = usePermissions();
   const toast = useToast();
   const add = useAddHandoverItem(detail.id);
   const update = useUpdateHandoverItem(detail.id);
   const [title, setTitle] = useState("");
   const [detailRow, setDetailRow] = useState<RowVM | null>(null);
+  const [incidentId, setIncidentId] = useState<string | null>(null);
+  const canViewIncident = can("incident:view");
   const open = detail.items.filter((i) => i.status !== "CLOSED");
   const closed = detail.items.filter((i) => i.status === "CLOSED");
+
+  // Pendiente que ES una incidencia ⇒ abre el drawer real del módulo; el resto, detalle liviano.
+  const openItem = (i: ShiftHandoverDetail["items"][number]) => {
+    if (i.refType === "Incident" && i.refId && canViewIncident) setIncidentId(i.refId);
+    else setDetailRow(itemToRow(i));
+  };
 
   // Mapea un pendiente (baton) al detalle genérico del panel lateral.
   const itemToRow = (i: ShiftHandoverDetail["items"][number]): RowVM => ({
@@ -532,7 +562,7 @@ function BatonSection({ detail, canEdit }: { detail: ShiftHandoverDetail; canEdi
       {open.length === 0 && <EmptyState icon={<CheckCircle2 size={32} />} title={t("handover.noPending")} description={t("handover.noPendingDesc")} />}
       {open.map((i) => (
         <div key={i.id} className={styles.row}>
-          <button type="button" className={styles.rowMainBtn} onClick={() => setDetailRow(itemToRow(i))} title={t("handover.viewDetail")}>
+          <button type="button" className={styles.rowMainBtn} onClick={() => openItem(i)} title={t("handover.viewDetail")}>
             <div className={styles.rowTitle}>
               {i.status === "CARRIED" && <Chip variant="warning" label={t("handover.carried")} />}
               {i.title}
@@ -541,7 +571,7 @@ function BatonSection({ detail, canEdit }: { detail: ShiftHandoverDetail; canEdi
           </button>
           <div className={styles.rowMeta}>
             <Chip variant="default" label={t(`handover.itemSource.${i.source.toLowerCase()}`)} />
-            <ChevronRight size={16} className={styles.rowChevron} onClick={() => setDetailRow(itemToRow(i))} />
+            <ChevronRight size={16} className={styles.rowChevron} onClick={() => openItem(i)} />
             {canEdit && (
               <Button variant="icon" onClick={() => update.mutate({ itemId: i.id, dto: { status: "CLOSED" } })} title={t("handover.closeItem")}>
                 <X size={14} />
@@ -553,6 +583,7 @@ function BatonSection({ detail, canEdit }: { detail: ShiftHandoverDetail; canEdi
 
       {closed.length > 0 && <div className={styles.closedNote}>{t("handover.closedCount", { count: closed.length })}</div>}
       <RowDetailDrawer row={detailRow} onClose={() => setDetailRow(null)} />
+      <IncidentDetailDrawer incidentId={incidentId} onClose={() => setIncidentId(null)} />
     </div>
   );
 }
@@ -718,9 +749,12 @@ function SignOffPanel({ detail, canCompile, canSign, canAck }: { detail: ShiftHa
 
       {/* Sign-off saliente */}
       {detail.status === "COMPILING" && canSign && (
-        <Button variant="primary" className={styles.signBtn} onClick={() => setSignModal(true)}>
-          <PenLine size={16} /> {t("handover.signOut")}
-        </Button>
+        <div className={styles.signAction}>
+          <p className={styles.signActionHint}>{t("handover.signReady")}</p>
+          <Button variant="primary" className={styles.signBtn} onClick={() => setSignModal(true)}>
+            <PenLine size={16} /> {t("handover.signOut")}
+          </Button>
+        </div>
       )}
 
       {detail.signOut.byName && (
