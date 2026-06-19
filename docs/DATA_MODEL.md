@@ -601,9 +601,27 @@ tabla existente. El catálogo de EVENTOS vive en CÓDIGO (`@lyra/contracts NOTIF
   y al **reporte** (columnas `evidence` reservadas) · firma Part 11 al verificar eficacia, al completar la investigación y al
   enviar un reporte.
 
-### Turnos
-- **ShiftPattern** *1—N* **Shift** — régimen configurable.
-- **ShiftHandover** — parámetros recopilados, pendientes, incidencias heredadas, resumen IA. *1—1* **HandoverAck** (recepción + firma).
+### Cambio de turno / Shift Handover (Fase 5 · Slice 1 — *implementado*)
+Migración `20260618000000_add_shift_handover`. El régimen de turnos NO es una entidad nueva: el turno y su ventana se resuelven del
+**`OperationalCalendar`/`OperationalShift`** ya existentes (asignado por nodo, heredado por ruta). El ciclo es **FIJO** (no
+`WorkflowDefinition`): reusa el mecanismo de firma Part 11 (`ReauthService`) embebido en columnas, no la máquina de estados.
+- **ShiftHandover** *(implementado)* — entrega de un turno saliente de un **nodo** (`orgNodeId`) en un **día operacional**
+  (`operationalDay`), con la ventana del turno en UTC (`windowStart`/`windowEnd`), turno saliente (`shiftCode`/`shiftLabel`) y
+  entrante (`incomingShiftCode`), `timezone` y `calendarId` (ref. blanda). Ciclo `status`: enum **`ShiftHandoverStatus`**
+  `COMPILING → SIGNED_OUT → ACKNOWLEDGED` (+ `CANCELED`). `snapshot Json` = cockpit compilado **CONGELADO al firmar** (`snapshotAt`);
+  mientras `COMPILING` el cockpit se recalcula en vivo. **Firma del saliente** inline (Part 11): `outgoingById`/`outgoingByName`/
+  `signedOutAt`/`signOutMeaning`/`signOutMethod`. **Acuse del entrante** inline: `incomingById`/`incomingByName`/`acknowledgedAt`/
+  `ackMeaning`/`ackMethod` + checks `ackReadSummary`/`ackReviewedItems`/`ackNoObservations` + `ackObservations`. Resumen
+  `summaryText`/`summaryProvider` (`none` = determinista en Slice 1). Anulación sin borrado físico (`canceledAt`/`cancelReason`/
+  `canceledById`). Una entrega no anulada por (nodo, turno, día) — unicidad garantizada en el servicio. *1—N* **ShiftHandoverItem**,
+  *1—N* **ShiftHandoverActivity**.
+- **ShiftHandoverItem** *(implementado)* — la **baton** de pendientes que rueda. `source` enum **`ShiftHandoverItemSource`**
+  (`MANUAL` | `INCIDENT` | `INCIDENT_ACTION` | `INCIDENT_REPORT` | `EXCEPTION` | `ROUND`); `status` enum
+  **`ShiftHandoverItemStatus`** (`OPEN` | `CARRIED` | `CLOSED`). Las notas `MANUAL` se copian como `CARRIED` de la entrega previa
+  (`originHandoverId` = rastro); los ítems de dominio se re-derivan vivos en cada compilación (`refType`/`refId` = ref. blanda al
+  objeto, snapshot legible en `title`/`detail`/`category`/`severity`).
+- **ShiftHandoverActivity** *(implementado)* — timeline append-only de la entrega (CREATED/COMPILED/SIGNED_OUT/ACKNOWLEDGED/
+  ITEM_ADDED/ITEM_CLOSED/CANCELED).
 
 ### Conocimiento
 - **KnowledgeArticle** — tipo (lección/procedimiento/patrón IA), `tsvector` para búsqueda; nutrido por incidencias resueltas.

@@ -35,6 +35,7 @@ import { IncidentsPage } from "../features/incidents/IncidentsPage.js";
 import { IncidentDashboardPage } from "../features/incidents/IncidentDashboardPage.js";
 import { CatalogsPage } from "../features/incidents/CatalogsPage.js";
 import { ExceptionsPage } from "../features/exceptions/ExceptionsPage.js";
+import { ShiftHandoverPage } from "../features/shift-handover/ShiftHandoverPage.js";
 
 /**
  * Mapa de rutas. `/login` es pública; todo lo demás cuelga de `ProtectedRoute`
@@ -70,6 +71,7 @@ export const router = createBrowserRouter([
           { path: "/incidencias/dashboard", element: <IncidentDashboardPage /> },
           { path: "/incidencias/catalogos", element: <CatalogsPage /> },
           { path: "/excepciones", element: <ExceptionsPage /> },
+          { path: "/cambio-turno", element: <ShiftHandoverPage /> },
           { path: "/notificaciones", element: <NotificationsPage /> },
           { path: "/mis-notificaciones", element: <MyNotificationsPage /> },
           { path: "/bitacoras/:id", element: <EntryViewerPage /> },

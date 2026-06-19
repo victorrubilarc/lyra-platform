@@ -42,6 +42,7 @@ describe("notificaciones avanzadas — Fase A (contratos)", () => {
       expect(deepLinkForEntity("LogEntry", "le1")).toBe("/bitacoras/le1");
       expect(deepLinkForEntity("RoundOccurrence", "occ1")).toBe("/mis-rondas");
       expect(deepLinkForEntity("Incident", "inc1")).toBe("/incidencias?incidentId=inc1");
+      expect(deepLinkForEntity("ShiftHandover", "sh1")).toBe("/cambio-turno?handoverId=sh1");
     });
 
     it("degrada a null sin tipo/id o tipo desconocido", () => {

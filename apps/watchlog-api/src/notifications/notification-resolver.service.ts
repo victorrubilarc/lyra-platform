@@ -113,6 +113,9 @@ export class NotificationResolverService {
       case "incident.report.due":
         resolution = await this.resolveIncidentReportDue(payload);
         break;
+      case "handover.ready":
+        resolution = await this.resolveHandoverReady(payload);
+        break;
       default:
         resolution = null;
     }
@@ -524,6 +527,83 @@ export class NotificationResolverService {
         "report.overdueBy": this.formatDuration(overdueBy),
       },
     };
+  }
+
+  /**
+   * Entrega de turno lista (handover.ready, Fase 5): avisa a quienes PUEDEN recibir
+   * el turno entrante en ese nodo = usuarios con un rol que concede
+   * `shifthandover:acknowledge`, filtrados por ABAC de nodo, EXCLUIDO quien entregó
+   * (segregación de funciones). Si nadie califica, no se notifica (vacío).
+   */
+  private async resolveHandoverReady(payload: Record<string, unknown>): Promise<EventResolution | null> {
+    const handoverId = String(payload.handoverId ?? "");
+    if (!handoverId) return null;
+    const h = await this.prisma.shiftHandover.findUnique({
+      where: { id: handoverId },
+      select: {
+        id: true,
+        number: true,
+        orgNodeId: true,
+        shiftLabel: true,
+        shiftCode: true,
+        incomingShiftCode: true,
+        outgoingById: true,
+        outgoingByName: true,
+        generalStatus: true,
+        orgNode: { select: { name: true } },
+      },
+    });
+    if (!h) return null;
+
+    const roleIds = await this.rolesWithPermission("shifthandover:acknowledge");
+    let candidates = await this.usersOfRoleIds(roleIds);
+    if (h.outgoingById) candidates = candidates.filter((u) => u !== h.outgoingById);
+    const userIds = new Set(await this.filterByNode(candidates, h.orgNodeId));
+
+    const openItems = String(payload.openItemCount ?? "0");
+    const appUrl = this.appUrl();
+    return {
+      userIds,
+      externalEmails: [],
+      orgNodeId: h.orgNodeId,
+      templateId: null,
+      relatedEntityType: "ShiftHandover",
+      relatedEntityId: handoverId,
+      context: {
+        "handover.code": `SH-${String(h.number).padStart(4, "0")}`,
+        "handover.node": h.orgNode?.name ?? "—",
+        "handover.shift": h.shiftLabel ?? h.shiftCode ?? "—",
+        "handover.incomingShift": h.incomingShiftCode ?? "—",
+        "handover.outgoingBy": h.outgoingByName ?? String(payload.outgoingByName ?? "—"),
+        "handover.generalStatus": this.generalStatusLabel(h.generalStatus),
+        "handover.openItems": openItems,
+        "handover.url": `${appUrl}/cambio-turno?handoverId=${handoverId}`,
+      },
+    };
+  }
+
+  private generalStatusLabel(status: string | null): string {
+    switch (status) {
+      case "OPERATIONAL":
+        return "Operativo";
+      case "OPERATIONAL_WITH_OBSERVATIONS":
+        return "Operativo con observaciones";
+      case "STOPPED_MAINTENANCE":
+        return "Detenido por mantención";
+      case "STOPPED_FAILURE":
+        return "Detenido por falla";
+      default:
+        return "—";
+    }
+  }
+
+  /** Roles que conceden un permiso (por su clave del catálogo). */
+  private async rolesWithPermission(permissionKey: string): Promise<string[]> {
+    const rows = await this.prisma.rolePermission.findMany({
+      where: { permission: { key: permissionKey } },
+      select: { roleId: true },
+    });
+    return [...new Set(rows.map((r) => r.roleId))];
   }
 
   /** Parte común de la EventResolution de una incidencia (orgNode, related, sin templateId/campos). */
