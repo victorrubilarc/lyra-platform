@@ -78,16 +78,44 @@
 }
 
 /* === Cockpit 3 zonas === */
+/* 3 zonas: nav (ancho var) · divisor · contenido (flexible) · divisor · sign-off (ancho var). */
 .cockpit {
   display: grid;
-  grid-template-columns: 232px 1fr 340px;
-  gap: var(--space-4);
+  grid-template-columns: var(--nav-w, 232px) 14px minmax(320px, 1fr) 14px var(--aside-w, 372px);
   align-items: start;
 }
-@media (max-width: 1100px) {
+@media (max-width: 1180px) {
   .cockpit {
     grid-template-columns: 1fr;
+    gap: var(--space-4);
   }
+  .colHandle {
+    display: none;
+  }
+}
+/* Divisor arrastrable entre columnas (col-resize). */
+.colHandle {
+  align-self: stretch;
+  display: flex;
+  justify-content: center;
+  padding-top: 56px;
+  cursor: col-resize;
+  touch-action: none;
+}
+.colHandleBar {
+  width: 3px;
+  height: 44px;
+  border-radius: 2px;
+  background: var(--color-border-default);
+  transition: background 0.15s ease, height 0.15s ease;
+}
+.colHandle:hover .colHandleBar,
+.colHandle:focus-visible .colHandleBar {
+  background: var(--color-accent-primary);
+  height: 72px;
+}
+.colHandle:focus-visible {
+  outline: none;
 }
 
 /* IZQUIERDA */
@@ -195,6 +223,44 @@
   font-size: var(--text-caption-size);
   color: var(--color-text-secondary);
   margin-top: 2px;
+}
+/* Fila CLICABLE (abre el panel de detalle). Misma piel que .row pero como botón. */
+.rowBtn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  text-align: left;
+  background: var(--color-bg-surface-1);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.rowBtn:hover {
+  border-color: var(--color-border-active);
+  background: var(--color-bg-surface-2);
+}
+/* Botón que envuelve el contenido principal de un pendiente (baton). */
+.rowMainBtn {
+  min-width: 0;
+  flex: 1;
+  text-align: left;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+}
+.rowChevron {
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.rowBtn:hover .rowChevron {
+  color: var(--color-accent-primary);
 }
 .rowMeta {
   display: flex;
@@ -516,4 +582,99 @@
   font-size: var(--text-caption-size);
   color: var(--color-text-muted);
   margin-left: auto;
+}
+
+/* === Panel lateral de detalle de una fila === */
+.detailList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+}
+.detailRow {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+.detailRow:last-child {
+  border-bottom: none;
+}
+.detailLabel {
+  font-size: var(--text-caption-size);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.detailValue {
+  font-size: var(--text-body-sm-size);
+  color: var(--color-text-primary);
+  margin: 0;
+  word-break: break-word;
+}
+
+/* === Resumen: botón ampliar + modal lado a lado === */
+.expandBtn {
+  margin-left: var(--space-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-surface-2);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.expandBtn:hover {
+  color: var(--color-accent-primary);
+  border-color: var(--color-border-active);
+}
+.summaryModalTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.summaryModalGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+  align-items: start;
+}
+@media (max-width: 820px) {
+  .summaryModalGrid {
+    grid-template-columns: 1fr;
+  }
+}
+.summaryModalMain {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.summaryModalCrudo {
+  background: var(--color-bg-surface-2);
+  border: 1px dashed var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  min-width: 0;
+}
+.crudoHead {
+  font-size: var(--text-caption-size);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-2);
+}
+.summaryTextLg {
+  font-size: var(--text-body-size);
+  color: var(--color-text-primary);
+  line-height: 1.7;
+  white-space: pre-wrap;
+  margin: 0;
 }

@@ -1191,6 +1191,7 @@ entrega **solo las áreas de su alcance** (un supervisor de Flotación no ve ni 
 - **Una vez firmada, la entrega es inmutable** (foto congelada del turno) — es la evidencia de la
   continuidad operacional.
 - **Los pendientes ruedan solos** hasta que se cierran: no dependen de que alguien los recuerde.
+- **La pantalla se acomoda a ti:** arrastra los **divisores** entre las tres zonas para dar más espacio al listado o al resumen (doble-clic restablece; tu ajuste se recuerda). El **resumen** tiene un botón **"Ampliar"** que lo abre grande, con el resumen automático al lado para comparar. Y **cada ítem** (registro, excepción, incidencia, acción, ronda o pendiente) se **abre con un clic** en un panel lateral con todo su detalle y un acceso directo a su módulo de origen.
 - El resumen se genera **determinista** por defecto, y —si un admin configuró la IA
   (Configuración ▸ Inteligencia Artificial)— puedes pulsar **"Generar con IA"**: el brief queda
   marcado **"generado por IA · revisar"**, el **crudo determinista sigue visible al lado**, y la
