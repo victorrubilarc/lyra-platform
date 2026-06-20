@@ -324,6 +324,7 @@ export class ShiftHandoverService {
     openItems: readonly { title: string }[],
     generalStatusLabel: string,
   ): SummaryGrounding {
+    const tz = cockpit.scope.timezone;
     return {
       nodeName: cockpit.scope.nodeName,
       shiftLabel: cockpit.scope.shiftLabel ?? cockpit.scope.shiftCode ?? "turno",
@@ -333,13 +334,22 @@ export class ShiftHandoverService {
       incidents: cockpit.incidents.map((i) => ({
         folio: i.folio,
         title: i.title,
+        typeName: i.typeName,
         severity: i.severity,
         critical: i.critical,
         overdue: i.overdue,
+        dueLabel: this.formatDueLabel(i.dueAt, tz),
         stateName: i.stateName,
       })),
       exceptions: cockpit.exceptions.map((e) => ({ kind: e.kind, detail: e.detail, fieldLabel: e.fieldLabel })),
-      followups: cockpit.followups.map((f) => ({ kind: f.kind, code: f.code, title: f.title, overdue: f.overdue })),
+      followups: cockpit.followups.map((f) => ({
+        kind: f.kind,
+        code: f.code,
+        title: f.title,
+        incidentFolio: f.incidentFolio,
+        overdue: f.overdue,
+        dueLabel: this.formatDueLabel(f.dueAt, tz),
+      })),
       rounds: {
         done: cockpit.rounds.filter((r) => r.status === "COMPLETED").length,
         overdue: cockpit.rounds.filter((r) => r.status === "OVERDUE").length,
@@ -347,6 +357,19 @@ export class ShiftHandoverService {
       },
       openItems: openItems.map((i) => i.title),
     };
+  }
+
+  /** Plazo formateado (es-CL + TZ del nodo) para el grounding; null si no hay. El modelo solo lo cita. */
+  private formatDueLabel(iso: string | null, tz: string): string | null {
+    if (!iso) return null;
+    return new Intl.DateTimeFormat("es-CL", {
+      timeZone: tz,
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(new Date(iso));
   }
 
   async addItem(userId: string, id: string, dto: AddHandoverItemRequest, ctx: AuditContext): Promise<ShiftHandoverDetail> {

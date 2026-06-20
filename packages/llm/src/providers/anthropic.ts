@@ -4,7 +4,7 @@ import { buildSummaryUserPrompt, SUMMARY_SYSTEM_PROMPT } from "../prompt.js";
 import { CollectingLlmStream } from "../stream.js";
 
 /** Tope de tokens del resumen de turno: el brief es corto; acota costo y latencia. */
-const SUMMARY_MAX_TOKENS = 700;
+const SUMMARY_MAX_TOKENS = 900;
 
 /**
  * Proveedor Anthropic (nube). SDK oficial `@anthropic-ai/sdk`. El resumen de turno se
