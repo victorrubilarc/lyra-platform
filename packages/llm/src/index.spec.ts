@@ -23,10 +23,21 @@ const grounding: SummaryGrounding = {
   generalStatusLabel: "Operativo con observaciones",
   entriesCount: 14,
   incidents: [
-    { folio: "INC-0007", title: "Vibración alta molino SAG", severity: 4, critical: true, overdue: false, stateName: "En análisis" },
+    {
+      folio: "INC-0007",
+      title: "Vibración alta molino SAG",
+      typeName: "Mecánica",
+      severity: 4,
+      critical: true,
+      overdue: false,
+      dueLabel: "20-06 14:30",
+      stateName: "En análisis",
+    },
   ],
   exceptions: [{ kind: "critical", detail: "Temperatura descanso 92°C (umbral 85)", fieldLabel: "Temp. descanso" }],
-  followups: [{ kind: "ACTION", code: "ACT-0003", title: "Inspección rodamiento", overdue: true }],
+  followups: [
+    { kind: "ACTION", code: "ACT-0003", title: "Inspección rodamiento", incidentFolio: "INC-0007", overdue: true, dueLabel: null },
+  ],
   rounds: { done: 3, overdue: 1, total: 4 },
   openItems: ["Coordinar parada con mantención", "Pendiente repuesto sello"],
 };
@@ -111,6 +122,10 @@ describe("buildSummaryUserPrompt (grounding)", () => {
     expect(prompt).toContain("ACT-0003");
     expect(prompt).toContain("Coordinar parada con mantención");
     expect(prompt).toContain("3 cumplidas, 1 vencidas de 4");
+    // v3: el grounding expone tipo de incidencia + la incidencia padre de la acción (ganchos
+    // para explicar/recomendar SIN inventar).
+    expect(prompt).toContain("tipo: Mecánica");
+    expect(prompt).toContain("incidencia INC-0007");
   });
 
   it("es determinista (mismo input ⇒ mismo prompt)", () => {
@@ -118,6 +133,6 @@ describe("buildSummaryUserPrompt (grounding)", () => {
   });
 
   it("expone una versión de prompt estable", () => {
-    expect(SUMMARY_PROMPT_VERSION).toBe("v2");
+    expect(SUMMARY_PROMPT_VERSION).toBe("v3");
   });
 });

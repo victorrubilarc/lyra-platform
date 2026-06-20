@@ -27,13 +27,26 @@ export interface SummaryGrounding {
   incidents: ReadonlyArray<{
     folio: string;
     title: string;
+    /** Tipo de incidencia del catálogo (mecánica, eléctrica, HSE…), si está clasificada. */
+    typeName: string | null;
     severity: number;
     critical: boolean;
     overdue: boolean;
+    /** Plazo de resolución ya formateado (es-CL + TZ del nodo) o null si no tiene. */
+    dueLabel: string | null;
     stateName: string | null;
   }>;
   exceptions: ReadonlyArray<{ kind: string; detail: string; fieldLabel: string | null }>;
-  followups: ReadonlyArray<{ kind: string; code: string; title: string; overdue: boolean }>;
+  followups: ReadonlyArray<{
+    kind: string;
+    code: string;
+    title: string;
+    /** Folio de la incidencia padre (la acción/reporte condiciona su cierre). */
+    incidentFolio: string;
+    overdue: boolean;
+    /** Plazo ya formateado (es-CL + TZ) o null. */
+    dueLabel: string | null;
+  }>;
   rounds: { done: number; overdue: number; total: number };
   openItems: ReadonlyArray<string>;
 }
