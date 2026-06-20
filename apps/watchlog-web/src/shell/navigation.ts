@@ -152,6 +152,7 @@ export const ROUTES: readonly NavRoute[] = [
     icon: GitBranch,
     permission: "module:workflows:view",
     inSidebar: true,
+    group: "design",
   },
   {
     path: "/datos-referencia",
