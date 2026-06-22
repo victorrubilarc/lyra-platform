@@ -7,6 +7,7 @@ import {
 } from "../lib/session-token.js";
 import { fetchSession } from "./auth-api.js";
 import { useAuthStore } from "./auth-store.js";
+import { useWorkspaceStore } from "../shell/workspace-store.js";
 
 /** Margen (ms) con que se refresca el token ANTES de que expire. */
 const REFRESH_LEAD_MS = 30_000;
@@ -25,6 +26,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const setSession = useAuthStore((s) => s.setSession);
   const setUnauthenticated = useAuthStore((s) => s.setUnauthenticated);
   const status = useAuthStore((s) => s.status);
+  const userId = useAuthStore((s) => s.session?.user.id ?? null);
+  const syncTabsOwner = useWorkspaceStore((s) => s.syncOwner);
+
+  // Aísla las pestañas del workspace por usuario: al resolver la sesión, el
+  // dueño pasa a ser el usuario actual (mismo usuario tras un refresh = no-op,
+  // conserva sus pestañas); al cerrar sesión (`userId` null) entra limpio (QA#1).
+  useEffect(() => {
+    if (status === "loading") return; // espera a que el bootstrap resuelva
+    syncTabsOwner(userId);
+  }, [status, userId, syncTabsOwner]);
 
   // 1) Bootstrap + handler de expiración.
   useEffect(() => {

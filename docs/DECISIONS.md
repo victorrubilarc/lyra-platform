@@ -4,6 +4,33 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-22 · Sesión de barrido QA + caso de uso liviano "un día de operación" (sin features nuevas)
+Sesión de **entender, cerrar/diferir lo abierto de Fases 0–5 y HABILITAR una prueba manual end-to-end**.
+NO se construyó funcionalidad nueva. Forks resueltos por `AskUserQuestion`:
+- **Cierres rápidos (bugs de la QA del 2026-06-18):** se cerraron **QA#1** (pestañas del workspace aisladas por
+  usuario: `workspace-store.ownerUserId`+`syncOwner`, sincronizado en `AuthProvider`), **QA#2** (ojo mostrar/ocultar
+  en `ForcePasswordChangePage`), **QA#4** (i18n de los 16 grupos de la matriz de permisos en `es-CL.ts`) y **QA#6**
+  (toast transversal "Sin acceso" ante 403 vía `QueryCache.onError` → puente `forbidden-notice` → `ForbiddenToastBridge`,
+  con throttle). Rama `feat/qa-fixes-y-seed-lite`. **Diferidos con motivo:** QA#3 (equipos en nodos intermedios — caso
+  de borde, riesgo de regresión antes de la prueba) y QA#5 (propagación del gate a sesiones activas — endurecimiento
+  de sesión de su propio diseño; QA#6 lo mitiga parcialmente).
+- **Reversa/Anulación GxP de registros SELLADOS = se DIFIERE como MÓDULO PROPIO (candidato #1 tras la ronda QA).**
+  *Motivo:* es el pendiente de auditoría más serio (Part 11 §11.200) pero **no es un cierre rápido**: transición
+  inversa + nuevo significado de firma + `payloadHash` + reglas de quién revierte + auditoría reforzada. Hacerlo
+  apurado añade riesgo. Registrado en BACKLOG §2 como módulo candidato #1; unifica 2.5(a)(d), 2.8.2 y la deuda de firma.
+- **Caso de uso liviano = SEED NUEVO APARTE** (`scripts/seed-demo-lite.py`, marca `DEMOLITE`, `--clean` verificado sin
+  residuos) en vez de un "modo lite" del seed denso. *Motivo:* aislamiento total (no toca DEMOQA ni los datos del dueño),
+  más limpio y reversible. **Escenario:** «Planta Demo Andina» → Concentradora → {Molienda, Flotación} (4 nodos),
+  7 usuarios con roles reales + ABAC, 1 plantilla con 2 secciones y privilegios + umbral/condicional/regla→incidencia,
+  1 flujo con firma Part 11 + SLA, 1 ronda (1 vencida), 2 incidencias en vivo. **NO modifica catálogos compartidos**
+  (no toca las SLA de `IncidentType` base; eso se demuestra en DEMOQA) → `--clean` solo borra lo `DEMOLITE`.
+- **IA del resumen = modo `none` (determinista)** en el escenario liviano, para que la prueba no dependa de un proveedor;
+  IA real se prueba aparte (Anthropic/Ollama). **MFA = apagado por defecto** en DEMOLITE (sin enrolar TOTP en la prueba);
+  apéndice en el guion para activarlo. **Tamaño = "+1 proceso y +2 usuarios"** sobre el mínimo (elección del dueño).
+- **Guion** `docs/QA_DIA_OPERACION.md` (documento VIVO): 9 actos de menos a más (panorama → ABAC → correo → llenado →
+  excepción→incidencia → firmas Part 11 → notificaciones → cambio de turno + acta PDF → auditor), con tabla de hallazgos
+  y **mapeo a los smokes visuales del BACKLOG §4** para tacharlos durante la prueba.
+
 ### 2026-06-20 · Fase 5 — Resumen de turno por IA: prompt v3 (más potente, sin aflojar el anclaje)
 Feedback del dueño: el resumen por IA "se sentía pobre, no era para WOW". Diagnóstico: el prompt **v2** lo amordazaba a propósito (Slice 2 conservador) — *"no recomiendes acciones ni emitas juicios"* + tope de **180 palabras en prosa plana** ⇒ solo re-listaba los DATOS. **Fork resuelto por `AskUserQuestion`:** recomendaciones **ACOTADAS A LOS DATOS** (no "solo explicar", no "operativas amplias").
 - **Prompt → `v3`** (auditable, versionado): permite **EXPLICAR** el significado de los hechos (por qué algo es prioritario: severidad + plazo vencido; qué condiciona el cierre) y **RECOMENDAR** en un bloque final "Para el turno entrante", pero **cada recomendación DEBE referenciar un folio/ítem presente en DATOS** y limitarse a *priorizar / vigilar / dar seguimiento / cumplir un plazo*. **PROHIBIDO** causas raíz, diagnósticos, repuestos, procedimientos, cifras o fechas que no estén en DATOS; **no calcular tiempos** (usar el plazo solo si DATOS lo trae; si está "vencido", decirlo sin estimar cuánto). Estructura en 3–5 párrafos cortos con subtítulo, hasta ~300 palabras. Guarda anti-inyección intacta.
