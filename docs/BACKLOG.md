@@ -1403,20 +1403,19 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
 
 ### Hallazgos de la sesión QA (2026-06-18) — ver `docs/QA_WALKTHROUGH.md` §4
 > **Actualización 2026-06-22:** se cerraron QA#1, QA#2, QA#4 y QA#6 (rama `feat/qa-fixes-y-seed-lite`).
-> QA#3 y QA#5 quedan **diferidos con motivo** (abajo).
+> **QA#3 también se cerró** (apareció apenas el dueño abrió la prueba: los equipos sembrados en Molienda/Flotación
+> quedaban invisibles). QA#5 queda **diferido con motivo** (abajo).
 - [x] **[QA#1 · bug · media] Pestañas del workspace no son por usuario.** ✅ **RESUELTO 2026-06-22.**
       `workspace-store` ahora guarda `ownerUserId` y `syncOwner(userId)`; `AuthProvider` lo sincroniza al resolver la
       sesión (mismo usuario tras refresh = no-op, conserva sus pestañas; otro usuario / logout = entra **limpio**).
 - [x] **[QA#2 · mejora UX · baja] Falta el "ojo" en cambio de contraseña.** ✅ **RESUELTO 2026-06-22.**
       `ForcePasswordChangePage` gana el toggle mostrar/ocultar (mismo patrón `rightSlot`+Eye/EyeOff de `ResetPasswordPage`).
-- [ ] **[QA#3 · bug · media] Estructura: equipos de nodos intermedios invisibles.** `NodeDetail.tsx:352` muestra
-      **o hijos o equipos** según `isLastLevel` (excluyente). Un equipo asignado a un nodo que NO es del último nivel
-      queda inaccesible en la UI (el panel muestra sus sub-nodos, no sus equipos). Reproducible: Molino SAG en
-      «Molienda SAG» se oculta al existir las «Líneas» debajo. El backend permite equipo en cualquier nodo (orgNodeId
-      libre) ⇒ la UI debería mostrar **ambas** secciones (hijos + equipos) o pestañas, no excluirlas por profundidad.
-      **DIFERIDO (decidido 2026-06-22):** caso de borde de Estructura que el caso de uso liviano no necesita; tocar
-      `NodeDetail` justo antes de la ronda QA añade riesgo de regresión sin beneficio para la prueba. Retomar como
-      pulido de Estructura.
+- [x] **[QA#3 · bug · media] Estructura: equipos de nodos intermedios invisibles.** ✅ **RESUELTO 2026-06-22.**
+      `NodeDetail.tsx` mostraba **o hijos o equipos** según `isLastLevel` (excluyente); un equipo en un nodo que NO
+      es del último nivel quedaba inaccesible. **Fix:** la sección de **hijos** se muestra solo si existe un nivel
+      inferior y la **`EquipmentSection` se renderiza SIEMPRE** (con un divisor entre ambas cuando hay hijos), así un
+      nodo intermedio muestra hijos **y** equipos. *(Se cerró durante la prueba: los equipos sembrados en
+      Molienda/Flotación de DEMOLITE quedaban ocultos por existir el nivel «Línea» debajo de «Proceso».)*
 - [x] **[QA#4 · bug i18n · baja] Matriz de permisos mezcla idiomas.** ✅ **RESUELTO 2026-06-22.**
       `es-CL.ts` `permGroups` ahora traduce los 16 grupos del catálogo (templates, workflows, referencedata,
       opscalendar, opsperiod, settings, logbook, schedules, notifications, incidents, handover + los previos).

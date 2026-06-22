@@ -11,9 +11,11 @@ NO se construyó funcionalidad nueva. Forks resueltos por `AskUserQuestion`:
   usuario: `workspace-store.ownerUserId`+`syncOwner`, sincronizado en `AuthProvider`), **QA#2** (ojo mostrar/ocultar
   en `ForcePasswordChangePage`), **QA#4** (i18n de los 16 grupos de la matriz de permisos en `es-CL.ts`) y **QA#6**
   (toast transversal "Sin acceso" ante 403 vía `QueryCache.onError` → puente `forbidden-notice` → `ForbiddenToastBridge`,
-  con throttle). Rama `feat/qa-fixes-y-seed-lite`. **Diferidos con motivo:** QA#3 (equipos en nodos intermedios — caso
-  de borde, riesgo de regresión antes de la prueba) y QA#5 (propagación del gate a sesiones activas — endurecimiento
-  de sesión de su propio diseño; QA#6 lo mitiga parcialmente).
+  con throttle). Rama `feat/qa-fixes-y-seed-lite`. **+ QA#3** (cerrado durante la prueba: los equipos sembrados en
+  nodos intermedios Molienda/Flotación quedaban invisibles; `NodeDetail` ahora muestra hijos **y** `EquipmentSection`
+  siempre, no excluyente por nivel — se revirtió la decisión de diferirlo porque bloqueaba ver el equipo). **Diferido
+  con motivo:** QA#5 (propagación del gate a sesiones activas — endurecimiento de sesión de su propio diseño; QA#6 lo
+  mitiga parcialmente).
 - **Reversa/Anulación GxP de registros SELLADOS = se DIFIERE como MÓDULO PROPIO (candidato #1 tras la ronda QA).**
   *Motivo:* es el pendiente de auditoría más serio (Part 11 §11.200) pero **no es un cierre rápido**: transición
   inversa + nuevo significado de firma + `payloadHash` + reglas de quién revierte + auditoría reforzada. Hacerlo

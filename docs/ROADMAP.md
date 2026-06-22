@@ -119,6 +119,6 @@
   ir **tachando los smokes visuales** §4 (mapeo incluido en el guion). **Siguiente paso del proyecto = la ronda de prueba manual del dueño.**
 - **MÓDULO CANDIDATO #1 = Corrección/Anulación GxP de registros SELLADOS** (Part 11 §11.200; transición inversa firmada +
   `payloadHash`). Recomendado como el próximo módulo **tras la ronda QA**, antes de Fase 3/6. Detalle en BACKLOG §2 (cabecera).
-- **Bugs de la QA 2026-06-18 (BACKLOG §3):** cerrados QA#1/2/4/6 (2026-06-22); QA#3 y QA#5 diferidos con motivo.
+- **Bugs de la QA 2026-06-18 (BACKLOG §3):** cerrados QA#1/2/3/4/6 (2026-06-22); QA#5 diferido con motivo.
 - **Smokes VISUALES del dueño** (BACKLOG §4): grilla 2.8.1, diagrama de flujo, SLA/atrasos, **motor de reglas**, **VOID + ruta de edición (2.8.2)**, **catálogo de objetos · Olas 1, 2, 3 y 4** (Ola 3 = adjuntos/evidencia + escáner QR; Ola 4 = tabla/grupo repetible + matriz parámetro×turno), **programación de rondas (planificador `/rondas`: crear horario + rol responsable · generar; operador `/mis-rondas`: iniciar/continuar/omitir + toggles; widget en Inicio; badge de vencidas en /bitacoras)**.
 - Mantener este documento al cerrar cada sesión.

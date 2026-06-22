@@ -85,9 +85,11 @@ function sortEquipment(list: Equipment[], sort: TableSort): Equipment[] {
 
 interface EquipmentSectionProps {
   orgNodeId: string;
+  /** Oculta el título "EQUIPOS" (cuando ya lo comunica una pestaña encima). */
+  hideTitle?: boolean;
 }
 
-export function EquipmentSection({ orgNodeId }: EquipmentSectionProps) {
+export function EquipmentSection({ orgNodeId, hideTitle }: EquipmentSectionProps) {
   const { t } = useTranslation();
   const toast = useToast();
   const perms = usePermissions();
@@ -240,8 +242,8 @@ export function EquipmentSection({ orgNodeId }: EquipmentSectionProps) {
 
   return (
     <section className={styles.section}>
-      <div className={styles.sectionHeader}>
-        <h3 className={styles.sectionTitle}>{t("equipment.title")}</h3>
+      <div className={styles.sectionHeader} style={hideTitle ? { justifyContent: "flex-end" } : undefined}>
+        {!hideTitle && <h3 className={styles.sectionTitle}>{t("equipment.title")}</h3>}
         <div style={{ display: "flex", gap: 8 }}>
           {canManageCategories && (
             <Button variant="secondary" onClick={() => setCategoriesOpen(true)}>

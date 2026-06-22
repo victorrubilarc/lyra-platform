@@ -13,6 +13,7 @@ import type { OrgLevel, OrgNodeTree } from "@lyra/contracts";
 import type { TableColumn, TableSort } from "@lyra/ui";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { useUpdateNode } from "./structure-queries.js";
+import { useEquipmentByNode } from "./equipment-queries.js";
 import { levelColor, LevelIcon } from "./OrgTree.js";
 import { EquipmentSection } from "./EquipmentSection.js";
 import styles from "./NodeDetail.module.css";
@@ -165,6 +166,23 @@ export function NodeDetail({
 
   const currentLevel = node ? levelMap.get(node.levelId) : undefined;
   const isLastLevel  = !!node && !childLevel;
+
+  // Conteo de equipos para el badge de la pestaña (misma query/caché que usa
+  // EquipmentSection ⇒ sin doble llamada). Permite ver "Equipos N" aunque la
+  // pestaña activa sea la de hijos.
+  const { data: equipmentList } = useEquipmentByNode(node?.id ?? null);
+  const equipmentCount = equipmentList?.length;
+
+  // Sub-pestaña activa (hijos / equipos). Por defecto la que tiene contenido:
+  // si el nodo tiene hijos parte en "hijos"; si no, parte en "equipos" (así un
+  // proceso hoja como Molienda muestra de una sus equipos).
+  const [activeTab, setActiveTab] = useState<"children" | "equipment">("children");
+  const nodeId = node?.id;
+  const childCount = node?.children.length ?? 0;
+  useEffect(() => {
+    if (!nodeId) return;
+    setActiveTab(childCount > 0 ? "children" : "equipment");
+  }, [nodeId, childCount]);
 
   // ── Panel vacío ──────────────────────────────────────────────────────────────
   if (!node) {
@@ -348,52 +366,83 @@ export function NodeDetail({
 
       <div className={styles.divider} />
 
-      {/* Hijos o equipos */}
+      {/* Hijos Y equipos: un nodo puede tener AMBOS. Antes la UI los excluía por
+          profundidad (mostraba O hijos O equipos) y los equipos de nodos
+          intermedios quedaban invisibles (QA#3). Ahora: si hay un nivel inferior
+          se muestran SUB-PESTAÑAS con contador (el badge "Equipos N" hace visible
+          el equipo aunque la pestaña activa sea la de hijos); si es el último
+          nivel, solo equipos. */}
       {!isLastLevel ? (
-        <section className={styles.section}>
-          <div className={styles.sectionHeader}>
-            <h3 className={styles.sectionTitle}>
-              {childLevel
-                ? childLevel.name + "s"
-                : t("structure.detail.children")}
-            </h3>
-            {canCreate && (
-              <Button variant="primary" onClick={onCreateChild}>
-                <Plus size={14} />
-                {childLevel
-                  ? `${t("common.add")} ${childLevel.name}`
-                  : t("structure.node.addChild")}
-              </Button>
-            )}
+        <>
+          <div className={styles.tabBar} role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "children"}
+              className={`${styles.tab} ${activeTab === "children" ? styles.tabActive : ""}`}
+              onClick={() => setActiveTab("children")}
+            >
+              {childLevel ? childLevel.name + "s" : t("structure.detail.children")}
+              <span className={styles.tabCount}>{node.children.length}</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "equipment"}
+              className={`${styles.tab} ${activeTab === "equipment" ? styles.tabActive : ""}`}
+              onClick={() => setActiveTab("equipment")}
+            >
+              {t("equipment.title")}
+              {equipmentCount !== undefined && (
+                <span className={styles.tabCount}>{equipmentCount}</span>
+              )}
+            </button>
           </div>
-          <Table
-            columns={childColumns}
-            data={sortedChildren}
-            rowKey={(n) => n.id}
-            sort={sort}
-            onSort={(key, direction) => setSort({ key, direction })}
-            paginated
-            defaultPageSize={10}
-            emptyState={
-              <EmptyState
-                title={t("structure.detail.noChildren")}
-                description={
-                  canCreate ? t("structure.detail.noChildrenCreate") : undefined
-                }
-                action={
-                  canCreate ? (
-                    <Button variant="primary" onClick={onCreateChild}>
-                      <Plus size={14} />
-                      {childLevel
-                        ? `${t("common.add")} ${childLevel.name}`
-                        : t("structure.node.addChild")}
-                    </Button>
-                  ) : undefined
+
+          {activeTab === "children" ? (
+            <section className={styles.section}>
+              {canCreate && (
+                <div className={styles.sectionHeader} style={{ justifyContent: "flex-end" }}>
+                  <Button variant="primary" onClick={onCreateChild}>
+                    <Plus size={14} />
+                    {childLevel
+                      ? `${t("common.add")} ${childLevel.name}`
+                      : t("structure.node.addChild")}
+                  </Button>
+                </div>
+              )}
+              <Table
+                columns={childColumns}
+                data={sortedChildren}
+                rowKey={(n) => n.id}
+                sort={sort}
+                onSort={(key, direction) => setSort({ key, direction })}
+                paginated
+                defaultPageSize={10}
+                emptyState={
+                  <EmptyState
+                    title={t("structure.detail.noChildren")}
+                    description={
+                      canCreate ? t("structure.detail.noChildrenCreate") : undefined
+                    }
+                    action={
+                      canCreate ? (
+                        <Button variant="primary" onClick={onCreateChild}>
+                          <Plus size={14} />
+                          {childLevel
+                            ? `${t("common.add")} ${childLevel.name}`
+                            : t("structure.node.addChild")}
+                        </Button>
+                      ) : undefined
+                    }
+                  />
                 }
               />
-            }
-          />
-        </section>
+            </section>
+          ) : (
+            <EquipmentSection orgNodeId={node.id} hideTitle />
+          )}
+        </>
       ) : (
         <EquipmentSection orgNodeId={node.id} />
       )}
