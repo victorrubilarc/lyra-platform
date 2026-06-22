@@ -1,0 +1,123 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Lyra WatchLog — stack de PRODUCCIÓN para AWS (máquina compartida con otros
+# proyectos). Imágenes versionadas desde GHCR (build-once en CI; ver
+# .github/workflows/release.yml). NO publica 80/443: el TLS y el enrutamiento por
+# subdominio los hace un Caddy de BORDE COMPARTIDO (el de ruta-bus), que alcanza
+# este stack por la red externa `edge` (alias `watchlog-web`). Postgres/Redis/MinIO
+# son DEDICADOS a WatchLog (aislados de los otros proyectos).
+#
+#   despliegue:  ./onprem/update.sh v1.0.0     (lo invoca el GitHub Action por SSH)
+#   manual:      docker compose -f docker-compose.prod.yml --env-file .env up -d
+#
+# Requisitos en el host (una sola vez): `docker network create edge` y enganchar el
+# Caddy de ruta-bus a esa red + bloque del subdominio (ver docs/DEPLOYMENT.md).
+# ─────────────────────────────────────────────────────────────────────────────
+name: lyra-watchlog
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: "${POSTGRES_USER}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      POSTGRES_DB: "${POSTGRES_DB}"
+      TZ: "${TZ:-America/Santiago}"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [internal]
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [internal]
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: "${MINIO_ROOT_USER}"
+      MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD}"
+    volumes:
+      - miniodata:/data
+    networks: [internal]
+
+  # Init container: aplica migraciones (migrate deploy) de forma determinista. El
+  # seed solo corre en el bootstrap (RUN_SEED=true la primera vez; ver DEPLOYMENT.md).
+  migrate:
+    image: ${WL_REGISTRY:-ghcr.io}/${WL_OWNER}/lyra-watchlog-migrate:${WL_VERSION:-stable}
+    restart: "no"
+    env_file: .env
+    environment:
+      NODE_ENV: "production"
+      TZ: "${TZ:-America/Santiago}"
+      RUN_SEED: "${RUN_SEED:-false}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [internal]
+
+  api:
+    image: ${WL_REGISTRY:-ghcr.io}/${WL_OWNER}/lyra-watchlog-api:${WL_VERSION:-stable}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: "production"
+      API_PORT: "3000"
+      TZ: "${TZ:-America/Santiago}"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks: [internal]
+
+  # Caddy interno: sirve la SPA y proxea /api → api:3000 (HTTP en la red interna).
+  # El Caddy de BORDE (ruta-bus) le hace TLS y le manda watchlog.itesicws.com.
+  web:
+    image: ${WL_REGISTRY:-ghcr.io}/${WL_OWNER}/lyra-watchlog-web:${WL_VERSION:-stable}
+    restart: unless-stopped
+    environment:
+      # TLS lo hace el Caddy de borde; aquí solo HTTP interno en :80 (sin publicar puerto).
+      SITE_ADDRESS: ":80"
+      TZ: "${TZ:-America/Santiago}"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      internal: {}
+      edge:
+        aliases: [watchlog-web]
+
+volumes:
+  pgdata:
+  redisdata:
+  miniodata:
+
+networks:
+  # Red privada de WatchLog (postgres/redis/minio/api/web se ven entre sí).
+  internal: {}
+  # Red compartida con el Caddy de borde (ruta-bus). Se crea una vez en el host:
+  #   docker network create edge
+  edge:
+    external: true
