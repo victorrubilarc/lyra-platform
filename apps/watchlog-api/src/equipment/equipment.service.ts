@@ -8,7 +8,6 @@ import type {
 import { Prisma } from "@prisma/client";
 import type { Equipment, EquipmentCategory } from "@prisma/client";
 import { AuditService, type AuditContext } from "../audit/audit.service";
-import { ScopeService } from "../authz/scope.service";
 import { PrismaService } from "../prisma/prisma.service";
 
 /**
@@ -23,7 +22,6 @@ export class EquipmentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-    private readonly scope: ScopeService,
   ) {}
 
   // --- Catálogo de categorías ------------------------------------------------
@@ -98,20 +96,19 @@ export class EquipmentService {
   }
 
   /**
-   * Busca equipos por nombre / tag / código en TODA la estructura accesible del
-   * usuario (ABAC por nodo). Alimenta el buscador del árbol de Estructura, que
-   * solo conoce los nodos: así "Weinig" surface el nodo dueño del equipo. El
-   * `getAccessibleNodeIds` null = sin restricción (ve todo); Set vacío = nada.
+   * Busca equipos por nombre / tag / código en TODA la estructura. Alimenta el
+   * buscador del árbol de Estructura (que solo conoce los nodos), para que
+   * "Weinig" surface el nodo dueño del equipo. **Sin filtro de scope de datos**:
+   * la pantalla de Estructura es una vista de configuración GLOBAL (igual que
+   * `getTree`, que devuelve el árbol completo, y `listByNode`); el control de
+   * acceso es el permiso `equipment:view` del controller, no el alcance por nodo.
    */
-  async searchAccessible(userId: string, rawTerm: string): Promise<Equipment[]> {
+  search(rawTerm: string): Promise<Equipment[]> {
     const term = rawTerm.trim();
-    if (term.length < 2) return [];
-    const nodeIds = await this.scope.getAccessibleNodeIds(userId);
-    if (nodeIds && nodeIds.size === 0) return [];
+    if (term.length < 2) return Promise.resolve([]);
     return this.prisma.equipment.findMany({
       where: {
         deletedAt: null,
-        ...(nodeIds ? { orgNodeId: { in: [...nodeIds] } } : {}),
         OR: [
           { name: { contains: term, mode: "insensitive" } },
           { tag: { contains: term, mode: "insensitive" } },

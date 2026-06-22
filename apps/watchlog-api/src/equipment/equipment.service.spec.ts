@@ -3,7 +3,6 @@ import { Prisma } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EquipmentService } from "./equipment.service";
 import type { AuditService } from "../audit/audit.service";
-import type { ScopeService } from "../authz/scope.service";
 import type { PrismaService } from "../prisma/prisma.service";
 
 const ctx = { actorId: "admin", actorEmail: "a@x.cl", ip: null, userAgent: null };
@@ -29,10 +28,7 @@ function makeService(overrides: Record<string, unknown> = {}) {
     ...overrides,
   } as unknown as PrismaService;
   const audit = { record: vi.fn().mockResolvedValue(undefined) } as unknown as AuditService;
-  const scope = {
-    getAccessibleNodeIds: vi.fn().mockResolvedValue(null), // null = sin restricción
-  } as unknown as ScopeService;
-  return { service: new EquipmentService(prisma, audit, scope), prisma, audit, scope };
+  return { service: new EquipmentService(prisma, audit), prisma, audit };
 }
 
 describe("EquipmentService", () => {
@@ -139,37 +135,24 @@ describe("EquipmentService", () => {
     );
   });
 
-  it("searchAccessible ignora términos de menos de 2 caracteres", async () => {
+  it("search ignora términos de menos de 2 caracteres", async () => {
     const findMany = vi.fn().mockResolvedValue([]);
     const { service } = makeService({ equipment: { findMany } });
-    expect(await service.searchAccessible("u1", "a")).toEqual([]);
+    expect(await service.search("a")).toEqual([]);
     expect(findMany).not.toHaveBeenCalled();
   });
 
-  it("searchAccessible devuelve [] si el usuario no alcanza ningún nodo (ABAC)", async () => {
-    const findMany = vi.fn().mockResolvedValue([]);
-    const { service, scope } = makeService({ equipment: { findMany } });
-    (scope.getAccessibleNodeIds as ReturnType<typeof vi.fn>).mockResolvedValue(new Set());
-    expect(await service.searchAccessible("u1", "weinig")).toEqual([]);
-    expect(findMany).not.toHaveBeenCalled();
-  });
-
-  it("searchAccessible acota a los nodos accesibles y busca por nombre/tag/código", async () => {
+  it("search busca GLOBAL por nombre/tag/código (sin scope de datos: Estructura es config global)", async () => {
     const findMany = vi.fn().mockResolvedValue([{ id: "eq1", name: "Moldurera Weinig 1" }]);
-    const { service, scope } = makeService({ equipment: { findMany } });
-    (scope.getAccessibleNodeIds as ReturnType<typeof vi.fn>).mockResolvedValue(new Set(["n1", "n2"]));
-    const res = await service.searchAccessible("u1", "weinig");
+    const { service } = makeService({ equipment: { findMany } });
+    const res = await service.search("weinig");
     expect(res).toHaveLength(1);
-    expect(findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          deletedAt: null,
-          orgNodeId: { in: ["n1", "n2"] },
-          OR: expect.arrayContaining([
-            { name: { contains: "weinig", mode: "insensitive" } },
-          ]),
-        }),
-      }),
+    expect(findMany).toHaveBeenCalledTimes(1);
+    const where = (findMany.mock.calls[0]![0] as { where: Record<string, unknown> }).where;
+    expect(where).toMatchObject({ deletedAt: null });
+    expect(where).not.toHaveProperty("orgNodeId"); // NO filtra por nodo accesible
+    expect(where.OR).toEqual(
+      expect.arrayContaining([{ name: { contains: "weinig", mode: "insensitive" } }]),
     );
   });
 });

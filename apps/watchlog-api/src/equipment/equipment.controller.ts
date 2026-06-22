@@ -76,13 +76,11 @@ export class EquipmentController {
 
   @Get()
   @RequirePermission("equipment:view")
-  list(
-    @CurrentUser() user: RequestUser,
-    @Query("orgNodeId") orgNodeId?: string,
-    @Query("search") search?: string,
-  ) {
-    // Búsqueda global con ABAC (alimenta el buscador del árbol de Estructura).
-    if (search && search.trim()) return this.equipment.searchAccessible(user.id, search);
+  list(@Query("orgNodeId") orgNodeId?: string, @Query("search") search?: string) {
+    // Búsqueda GLOBAL (alimenta el buscador del árbol de Estructura). Sin scope de
+    // datos: la pantalla de Estructura es config global (como getTree/listByNode);
+    // el gate es el permiso `equipment:view`.
+    if (search && search.trim()) return this.equipment.search(search);
     if (!orgNodeId) throw new BadRequestException("Falta el parámetro orgNodeId");
     return this.equipment.listByNode(orgNodeId);
   }

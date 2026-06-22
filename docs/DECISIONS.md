@@ -32,6 +32,16 @@ NO se construyó funcionalidad nueva. Forks resueltos por `AskUserQuestion`:
 - **Guion** `docs/QA_DIA_OPERACION.md` (documento VIVO): 9 actos de menos a más (panorama → ABAC → correo → llenado →
   excepción→incidencia → firmas Part 11 → notificaciones → cambio de turno + acta PDF → auditor), con tabla de hallazgos
   y **mapeo a los smokes visuales del BACKLOG §4** para tacharlos durante la prueba.
+- **Hallazgos de la ronda en Estructura (mismo día):** (1) equipos de nodos intermedios invisibles → sub-pestañas
+  Hijos/Equipos con contador; (2) faltaba búsqueda → buscador de nodos en memoria + **búsqueda de equipos por API**;
+  (3) grilla de equipos: tag en 2 líneas → nowrap + anchos. **Decisión de diseño confirmada:** la **pantalla de
+  Estructura es una vista de CONFIGURACIÓN GLOBAL**, NO acotada por scope de datos — `OrgNodeService.getTree()` devuelve
+  el árbol COMPLETO y `EquipmentService.listByNode` no filtra por nodo accesible; el control de acceso es el permiso
+  (`module:structure:view`/`equipment:view`). Por eso la **búsqueda de equipos también es GLOBAL** (se descartó un primer
+  intento con `getAccessibleNodeIds` que la dejaba más estricta que el árbol: un admin acotado veía el nodo pero no su
+  equipo). El **ABAC por nodo gobierna los datos OPERACIONALES** (bitácoras, incidencias), no la configuración del
+  organigrama. *(Si en el futuro se quiere acotar el organigrama por scope, es una decisión transversal aparte que
+  tocaría también `getTree`.)*
 
 ### 2026-06-20 · Fase 5 — Resumen de turno por IA: prompt v3 (más potente, sin aflojar el anclaje)
 Feedback del dueño: el resumen por IA "se sentía pobre, no era para WOW". Diagnóstico: el prompt **v2** lo amordazaba a propósito (Slice 2 conservador) — *"no recomiendes acciones ni emitas juicios"* + tope de **180 palabras en prosa plana** ⇒ solo re-listaba los DATOS. **Fork resuelto por `AskUserQuestion`:** recomendaciones **ACOTADAS A LOS DATOS** (no "solo explicar", no "operativas amplias").

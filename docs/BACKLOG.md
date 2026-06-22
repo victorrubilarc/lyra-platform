@@ -1442,8 +1442,11 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
       cargado (`OrgTree` ganó prop `query`). **+ Búsqueda de EQUIPOS (2026-06-22):** la búsqueda también surface el
       **nodo dueño de un equipo** que coincide (ej. "Weinig") — endpoint backend `GET /structure/equipment?search=`
       con **ABAC** (`EquipmentService.searchAccessible` + `ScopeService`); el árbol muestra los equipos coincidentes
-      como chips bajo el nodo. **Pendiente a escala (diferido):** búsqueda server-side de NODOS si el árbol crece a
-      decenas de miles (hoy los nodos se filtran en memoria; los equipos ya van por API).
+      como chips bajo el nodo. **Búsqueda GLOBAL** (gated por `equipment:view`, **sin** scope de datos por nodo) — se
+      corrigió un primer intento que aplicaba `getAccessibleNodeIds` y resultaba MÁS estricto que el resto del módulo
+      de Estructura (`getTree` devuelve el árbol COMPLETO y `listByNode` no aplica scope): un admin acotado VEÍA el nodo
+      en el árbol pero la búsqueda de su equipo daba `[]`. **Pendiente a escala (diferido):** búsqueda server-side de
+      NODOS si el árbol crece a decenas de miles (hoy los nodos se filtran en memoria; los equipos ya van por API).
 - [x] **[QA-L#3 · UX · baja] Grilla de equipos: tag/placa en 2 líneas + nombre acapara.** ✅ **RESUELTO 2026-06-22.**
       `.code` con `white-space: nowrap` (tags largos como `REMA-ELAB-MOLD-01` en 1 línea) + columna tag 150→180 +
       columna nombre acotada a 260 (trunca con elipsis) en `EquipmentSection`.
