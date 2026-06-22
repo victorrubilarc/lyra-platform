@@ -19,18 +19,25 @@ export interface WorkTab {
 
 interface WorkspaceState {
   tabs: WorkTab[];
+  /** Usuario dueño de las pestañas actuales. Aísla el workspace por cuenta:
+   *  si entra otro usuario en el mismo navegador, las pestañas no se filtran. */
+  ownerUserId: string | null;
   /** Abre (o asegura) una pestaña para la ruta. Si se excede el tope, descarta
    *  la más antigua no fijada. */
   openTab: (tab: WorkTab) => void;
   /** Cierra una pestaña; devuelve la ruta vecina a la que navegar (o null). */
   closeTab: (path: string) => string | null;
   togglePin: (path: string) => void;
+  /** Sincroniza el dueño de las pestañas. Si cambió respecto del actual (login
+   *  de otra cuenta, o logout con `null`), entra LIMPIO (descarta las ajenas). */
+  syncOwner: (userId: string | null) => void;
 }
 
 export const useWorkspaceStore = create<WorkspaceState>()(
   persist(
     (set, get) => ({
       tabs: [],
+      ownerUserId: null,
       openTab: (tab) =>
         set((s) => {
           const existing = s.tabs.find((t) => t.path === tab.path);
@@ -59,6 +66,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         set((s) => ({
           tabs: s.tabs.map((t) => (t.path === path ? { ...t, pinned: !t.pinned } : t)),
         })),
+      syncOwner: (userId) =>
+        set((s) => (s.ownerUserId === userId ? {} : { ownerUserId: userId, tabs: [] })),
     }),
     { name: "wl_tabs" },
   ),

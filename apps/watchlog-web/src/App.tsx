@@ -1,6 +1,7 @@
 import { RouterProvider } from "react-router-dom";
 import { ToastProvider } from "@lyra/ui";
 import { AuthProvider } from "./auth/AuthProvider.js";
+import { ForbiddenToastBridge } from "./shell/ForbiddenToastBridge.js";
 import { useThemeController } from "./shell/use-theme-controller.js";
 import { router } from "./routes/router.js";
 
@@ -13,6 +14,7 @@ export function App() {
   useThemeController();
   return (
     <ToastProvider>
+      <ForbiddenToastBridge />
       <AuthProvider>
         <RouterProvider router={router} />
       </AuthProvider>

@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Navigate } from "react-router-dom";
-import { AlertTriangle, KeyRound } from "lucide-react";
+import { AlertTriangle, Eye, EyeOff, KeyRound } from "lucide-react";
 import { Button, FormField, Input, useToast } from "@lyra/ui";
 import { ApiError } from "../../lib/api-client.js";
 import { changePassword } from "../../auth/auth-api.js";
@@ -36,6 +36,7 @@ export function ForcePasswordChangePage() {
   const { user, refreshSession } = useAuth();
   const toast = useToast();
   const [serverError, setServerError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -84,9 +85,19 @@ export function ForcePasswordChangePage() {
               id={id}
               aria-describedby={describedBy}
               invalid={invalid}
-              type="password"
+              type={showPassword ? "text" : "password"}
               autoComplete="current-password"
               autoFocus
+              rightSlot={
+                <button
+                  type="button"
+                  className={styles.reveal}
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              }
               {...form.register("currentPassword")}
             />
           )}
@@ -102,7 +113,7 @@ export function ForcePasswordChangePage() {
               id={id}
               aria-describedby={describedBy}
               invalid={invalid}
-              type="password"
+              type={showPassword ? "text" : "password"}
               autoComplete="new-password"
               {...form.register("newPassword")}
             />
@@ -118,7 +129,7 @@ export function ForcePasswordChangePage() {
               id={id}
               aria-describedby={describedBy}
               invalid={invalid}
-              type="password"
+              type={showPassword ? "text" : "password"}
               autoComplete="new-password"
               {...form.register("confirmPassword")}
             />

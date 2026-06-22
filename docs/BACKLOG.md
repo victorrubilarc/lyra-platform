@@ -429,6 +429,19 @@ nunca queda más de una sesión atrás.
 
 ## 2. Pendiente por HACER (módulos / submódulos)
 
+### 🔴 MÓDULO CANDIDATO #1 (decidido 2026-06-22) — Corrección / Anulación GxP de registros SELLADOS
+> **Recomendado como el PRÓXIMO módulo tras la ronda de prueba manual (antes de Fase 3/6).** Es el pendiente
+> de auditoría más serio: hoy un registro **SELLADO** (firmado, inmutable) no tiene una vía gobernada de
+> **anulación/corrección**. En entorno regulado (FDA 21 CFR Part 11 **§11.200**, ALCOA+) NUNCA se borra un
+> registro firmado, pero **debe poder emitirse una corrección/anulación TRAZABLE** mediante una **transición
+> inversa firmada** que deje el original intacto + rastro del porqué. El modelo append-only ya lo soporta
+> conceptualmente. **Por qué es módulo aparte y NO un "cierre rápido":** toca el motor de flujo (transición
+> inversa), un nuevo *significado* de firma, persistencia de firma (`IncidentSignature` / generalizar
+> `LogEntrySignature` con `payloadHash`), reglas de quién puede revertir qué, y auditoría reforzada. Hacerlo
+> apurado *añade* riesgo de auditoría. **Unifica:** BACKLOG 2.5(a)(d) [reversa/anulación de transición +
+> anulación de entrada sellada], 2.8.2 [VOID GxP de SELLADAS] y la deuda de firma con `payloadHash`.
+> Esperar a que la ronda QA confirme prioridad para el cliente.
+
 ### Fase 5 — Cambio de turno / Shift Handover (Slices 1–4 ✅ → FASE COMPLETA)
 > Plan por slices aprobado (DECISIONS 2026-06-18). **Los 4 slices HECHOS y publicados.**
 - [x] **Slice 1 — Núcleo:** entrega firmada de 2 partes (compilar→firma saliente→acuse entrante), cockpit 3 zonas, baton que rueda,
@@ -1389,31 +1402,38 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
 > Items con fundamento ya discutidos; aquí para que no se diluyan en `DECISIONS.md`.
 
 ### Hallazgos de la sesión QA (2026-06-18) — ver `docs/QA_WALKTHROUGH.md` §4
-- [ ] **[QA#1 · bug · media] Pestañas del workspace no son por usuario.** Al cambiar de cuenta en el mismo navegador,
-      las pestañas abiertas del usuario anterior **persisten**. El estado de pestañas debe ser propio de cada usuario:
-      al iniciar sesión debería entrar **limpio** (o restaurar solo las del usuario que entra). Posible fuga de contexto
-      entre cuentas (revisar que el store de pestañas se aísle/limpie por `userId` en login/logout).
-- [ ] **[QA#2 · mejora UX · baja] Falta el "ojo" en cambio de contraseña.** La pantalla de cambio de contraseña no
-      tiene toggle mostrar/ocultar en los inputs de contraseña (sí existe en otros formularios de auth).
+> **Actualización 2026-06-22:** se cerraron QA#1, QA#2, QA#4 y QA#6 (rama `feat/qa-fixes-y-seed-lite`).
+> QA#3 y QA#5 quedan **diferidos con motivo** (abajo).
+- [x] **[QA#1 · bug · media] Pestañas del workspace no son por usuario.** ✅ **RESUELTO 2026-06-22.**
+      `workspace-store` ahora guarda `ownerUserId` y `syncOwner(userId)`; `AuthProvider` lo sincroniza al resolver la
+      sesión (mismo usuario tras refresh = no-op, conserva sus pestañas; otro usuario / logout = entra **limpio**).
+- [x] **[QA#2 · mejora UX · baja] Falta el "ojo" en cambio de contraseña.** ✅ **RESUELTO 2026-06-22.**
+      `ForcePasswordChangePage` gana el toggle mostrar/ocultar (mismo patrón `rightSlot`+Eye/EyeOff de `ResetPasswordPage`).
 - [ ] **[QA#3 · bug · media] Estructura: equipos de nodos intermedios invisibles.** `NodeDetail.tsx:352` muestra
       **o hijos o equipos** según `isLastLevel` (excluyente). Un equipo asignado a un nodo que NO es del último nivel
       queda inaccesible en la UI (el panel muestra sus sub-nodos, no sus equipos). Reproducible: Molino SAG en
       «Molienda SAG» se oculta al existir las «Líneas» debajo. El backend permite equipo en cualquier nodo (orgNodeId
       libre) ⇒ la UI debería mostrar **ambas** secciones (hijos + equipos) o pestañas, no excluirlas por profundidad.
-- [ ] **[QA#4 · bug i18n · baja] Matriz de permisos mezcla idiomas.** `es-CL.ts` `permGroups` solo traduce
-      `security/structure/users/roles`; el resto de grupos cae al string crudo en inglés (`PermissionMatrix.tsx:34`,
-      key `security.permGroups.<group>`). Faltan: templates, workflows, incidents, notifications, opscalendar,
-      referencedata, settings, schedules, logbook, opsperiod.
+      **DIFERIDO (decidido 2026-06-22):** caso de borde de Estructura que el caso de uso liviano no necesita; tocar
+      `NodeDetail` justo antes de la ronda QA añade riesgo de regresión sin beneficio para la prueba. Retomar como
+      pulido de Estructura.
+- [x] **[QA#4 · bug i18n · baja] Matriz de permisos mezcla idiomas.** ✅ **RESUELTO 2026-06-22.**
+      `es-CL.ts` `permGroups` ahora traduce los 16 grupos del catálogo (templates, workflows, referencedata,
+      opscalendar, opsperiod, settings, logbook, schedules, notifications, incidents, handover + los previos).
 - [ ] **[QA#5 · mejora UX/seguridad · media] El gate del cliente no se propaga a sesiones activas.** **Backend OK**
       (devuelve 403 correcto; el caché Redis `authz:perms:<userId>` reflejó el set real — **no hay bug de caché**: el
       `[]` observado se debía a que el usuario quedó sin roles, asignación legítima). El cliente gatea con
       `session.permissions` del login (`use-permissions.ts`); al cambiar roles/permisos de un usuario con sesión activa,
       su menú/pantallas siguen visibles hasta refrescar/re-login y puede **abrir** una pantalla ya no permitida.
       Considerar invalidar sesión / refetch del checker ante cambios sensibles, o forzar re-login en revocaciones.
-- [ ] **[QA#6 · bug · media] La web no avisa ante 403 (pantalla vacía silenciosa).** Al recibir 403 del backend, las
-      grillas quedan en "cargando"/vacías (KPIs 0/0/0) sin error visible; la consola se llena de `403 (Forbidden)`
-      (repro: entrar a Bitácoras sin `logentry:view`). Falta estado de error / empty-state "Sin acceso" / toast.
-      Transversal a las vistas basadas en `useQuery`.
+      **DIFERIDO (decidido 2026-06-22):** endurecimiento de sesión de su propio diseño (invalidación/refetch ante
+      cambios sensibles); no bloquea la prueba. **Mitigación parcial entregada:** con QA#6, abrir una pantalla ya no
+      permitida ahora muestra un aviso "Sin acceso" en vez de quedar muda.
+- [x] **[QA#6 · bug · media] La web no avisa ante 403 (pantalla vacía silenciosa).** ✅ **RESUELTO 2026-06-22** (parcial,
+      ver nota). El `QueryCache.onError` global detecta `ApiError` 403 y, vía el puente `forbidden-notice` →
+      `ForbiddenToastBridge`, muestra un **toast "Sin acceso"** (con throttle para no inundar). Cierra el "no avisa".
+      **Pulido menor diferido:** empty-states ricos por pantalla ("Sin acceso" dentro de la grilla en vez de toast) —
+      transversal a las vistas `useQuery`, no urgente.
 
 - [ ] **Sidebar: limpieza de huérfanos tras la agrupación (`feat/sidebar-grupos`).** El estilo `.navLabel` (en
       `AppShell.module.css`) y la clave i18n `nav.sectionLabel` ("Módulos") dejaron de usarse al pasar a grupos
