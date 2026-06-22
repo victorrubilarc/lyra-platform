@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Building2, Layers, Lock, Plus, TriangleAlert } from "lucide-react";
-import { Button, EmptyState, ResizableSplit, Skeleton } from "@lyra/ui";
+import { Building2, Layers, Lock, Plus, Search, TriangleAlert } from "lucide-react";
+import { Button, EmptyState, Input, ResizableSplit, Skeleton } from "@lyra/ui";
 import type { OrgNodeTree } from "@lyra/contracts";
 import { Can } from "../../auth/Can.js";
 import { usePermissions } from "../../auth/use-permissions.js";
@@ -46,6 +46,7 @@ export function StructurePage() {
   const [levelsOpen, setLevelsOpen]   = useState(false);
   const [moveNode, setMoveNode]       = useState<OrgNodeTree | null>(null);
   const [deleteNode, setDeleteNode]   = useState<OrgNodeTree | null>(null);
+  const [treeQuery, setTreeQuery]     = useState("");
 
   const flatMap      = useMemo(() => flattenTree(tree), [tree]);
   const selectedNode = selectedNodeId ? (flatMap.get(selectedNodeId) ?? null) : null;
@@ -115,6 +116,18 @@ export function StructurePage() {
               <span className={styles.treePanelTitle}>{t("structure.tree.panelTitle")}</span>
             </div>
 
+            {!isLoading && !treeError && tree.length > 0 && (
+              <div className={styles.treeSearch}>
+                <Input
+                  value={treeQuery}
+                  onChange={(e) => setTreeQuery(e.target.value)}
+                  placeholder={t("structure.tree.searchPlaceholder")}
+                  aria-label={t("structure.tree.searchPlaceholder")}
+                  rightSlot={<Search size={15} />}
+                />
+              </div>
+            )}
+
             {isLoading ? (
               <div className={styles.loadingSkeleton}>
                 <Skeleton height={26} width="60%" />
@@ -144,6 +157,7 @@ export function StructurePage() {
                 levels={levels}
                 selectedId={selectedNodeId}
                 onSelect={(node) => setSelectedNodeId(node.id)}
+                query={treeQuery}
               />
             )}
           </>

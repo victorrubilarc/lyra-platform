@@ -1434,6 +1434,21 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
       **Pulido menor diferido:** empty-states ricos por pantalla ("Sin acceso" dentro de la grilla en vez de toast) —
       transversal a las vistas `useQuery`, no urgente.
 
+### Hallazgos de la ronda QA liviana (2026-06-22) — ver `docs/QA_DIA_OPERACION.md`
+- [x] **[QA-L#1 · carencia · media-alta] No hay BÚSQUEDA de texto en Estructura.** ✅ **RESUELTO 2026-06-22.**
+      Buscador en el header del árbol (`StructurePage`) que filtra por nombre/código/cód. externo/descripción
+      (insensible a acentos/mayúsculas), **resalta** la coincidencia y **auto-expande** el camino a cada match
+      (ancestros + coincidencia); estado "Sin coincidencias" cuando no hay. Filtro **en memoria** sobre el árbol ya
+      cargado (`OrgTree` ganó prop `query`). **Pendiente a escala (diferido):** endpoint de búsqueda server-side si el
+      árbol crece a decenas de miles de nodos.
+- [ ] **[QA-L#2 · carencia · media] Niveles de estructura GLOBALES (una sola escalera por profundidad).** `OrgLevel`
+      tiene `@@unique([order])`: existe **un único nivel por profundidad** para TODO el sistema, así que todas las
+      estructuras raíz comparten los mismos nombres/semántica por nivel. **No** se puede tener "Faena→Área→Proceso→Línea"
+      en una estructura y "Planta→Sector→Equipo" en otra. Coherente con single-tenant simple, pero corto para
+      multi-faena/multi-industria (el seed ya mezcla minería + madera). **Recomendación:** conjuntos de niveles por
+      estructura (`LevelSet` referenciado por la raíz; reemplaza el `@@unique([order])` global) — cambio de modelo +
+      migración + UX, peso medio. **Diferir** hasta confirmar necesidad real de multi-industria; no bloquea la prueba.
+
 - [ ] **Sidebar: limpieza de huérfanos tras la agrupación (`feat/sidebar-grupos`).** El estilo `.navLabel` (en
       `AppShell.module.css`) y la clave i18n `nav.sectionLabel` ("Módulos") dejaron de usarse al pasar a grupos
       (`.navGroupLabel` / `nav.groups.*`). Limpieza mecánica trivial. **No urgente** (inertes). (La deuda "Favoritos colapsable"

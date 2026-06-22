@@ -224,6 +224,7 @@ export const esCL = {
     expand: "Expandir",
     tree: {
       panelTitle: "Jerarquía",
+      searchPlaceholder: "Buscar nodo por nombre o código…",
     },
     detail: {
       emptyTitle: "Selecciona un nodo",

@@ -2,6 +2,27 @@
   padding: var(--space-2) 0;
 }
 
+/* Resaltado de coincidencia de búsqueda en el nombre del nodo. */
+.mark {
+  background: color-mix(in srgb, var(--color-accent-secondary) 30%, transparent);
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 1px;
+}
+
+/* Estado "sin coincidencias" del filtro de búsqueda. */
+.noResults {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-8) var(--space-4);
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: var(--text-body-sm-size);
+}
+
 /* ── Fila de nodo ── */
 .nodeRow {
   display: flex;
