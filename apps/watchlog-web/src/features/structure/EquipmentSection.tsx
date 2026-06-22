@@ -135,6 +135,7 @@ export function EquipmentSection({ orgNodeId, hideTitle }: EquipmentSectionProps
       key: "name",
       header: t("equipment.name"),
       sortable: true,
+      width: 260,
       render: (row) => (
         <div className={styles.childNameCell}>
           <span className={styles.childNameText} style={{ fontWeight: 500 }}>{row.name}</span>
@@ -161,7 +162,7 @@ export function EquipmentSection({ orgNodeId, hideTitle }: EquipmentSectionProps
     {
       key: "tag",
       header: t("equipment.tag"),
-      width: 150,
+      width: 180,
       sortable: true,
       render: (row) =>
         row.tag ? <code className={styles.code}>{row.tag}</code> : <span className={styles.nullText}>—</span>,

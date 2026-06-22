@@ -336,6 +336,7 @@
   padding: 2px 6px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--color-border-subtle);
+  white-space: nowrap; /* tags/códigos largos (ej. REMA-ELAB-MOLD-01) en 1 línea */
 }
 
 .nullText {

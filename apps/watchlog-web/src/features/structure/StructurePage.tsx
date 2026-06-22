@@ -6,7 +6,8 @@ import type { OrgNodeTree } from "@lyra/contracts";
 import { Can } from "../../auth/Can.js";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { useOrgLevels, useOrgTree } from "./structure-queries.js";
-import { OrgTree } from "./OrgTree.js";
+import { useEquipmentSearch } from "./equipment-queries.js";
+import { OrgTree, type EquipmentHit } from "./OrgTree.js";
 import { NodeDetail } from "./NodeDetail.js";
 import { NodeDrawer, type NodeDrawerMode } from "./NodeDrawer.js";
 import { LevelsDrawer } from "./LevelsDrawer.js";
@@ -50,6 +51,21 @@ export function StructurePage() {
 
   const flatMap      = useMemo(() => flattenTree(tree), [tree]);
   const selectedNode = selectedNodeId ? (flatMap.get(selectedNodeId) ?? null) : null;
+
+  // Búsqueda de EQUIPOS en toda la estructura accesible (ABAC), para que el
+  // buscador del árbol —que solo conoce nodos— también surface nodos por su
+  // equipo (ej. "Weinig"). Agrupa los equipos coincidentes por nodo dueño.
+  const equipmentSearch = useEquipmentSearch(treeQuery);
+  const equipmentHits = useMemo(() => {
+    const m = new Map<string, EquipmentHit[]>();
+    for (const eq of equipmentSearch.data ?? []) {
+      const list = m.get(eq.orgNodeId) ?? [];
+      list.push({ id: eq.id, name: eq.name, tag: eq.tag });
+      m.set(eq.orgNodeId, list);
+    }
+    return m;
+  }, [equipmentSearch.data]);
+  const equipmentSearching = equipmentSearch.isFetching && treeQuery.trim().length >= 2;
 
   if (!perms.can("module:structure:view")) {
     return (
@@ -158,6 +174,8 @@ export function StructurePage() {
                 selectedId={selectedNodeId}
                 onSelect={(node) => setSelectedNodeId(node.id)}
                 query={treeQuery}
+                equipmentHits={equipmentHits}
+                searching={equipmentSearching}
               />
             )}
           </>

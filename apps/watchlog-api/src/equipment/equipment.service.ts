@@ -8,6 +8,7 @@ import type {
 import { Prisma } from "@prisma/client";
 import type { Equipment, EquipmentCategory } from "@prisma/client";
 import { AuditService, type AuditContext } from "../audit/audit.service";
+import { ScopeService } from "../authz/scope.service";
 import { PrismaService } from "../prisma/prisma.service";
 
 /**
@@ -22,6 +23,7 @@ export class EquipmentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly scope: ScopeService,
   ) {}
 
   // --- Catálogo de categorías ------------------------------------------------
@@ -92,6 +94,32 @@ export class EquipmentService {
     return this.prisma.equipment.findMany({
       where: { orgNodeId, deletedAt: null },
       orderBy: [{ reportOrder: "asc" }, { name: "asc" }],
+    });
+  }
+
+  /**
+   * Busca equipos por nombre / tag / código en TODA la estructura accesible del
+   * usuario (ABAC por nodo). Alimenta el buscador del árbol de Estructura, que
+   * solo conoce los nodos: así "Weinig" surface el nodo dueño del equipo. El
+   * `getAccessibleNodeIds` null = sin restricción (ve todo); Set vacío = nada.
+   */
+  async searchAccessible(userId: string, rawTerm: string): Promise<Equipment[]> {
+    const term = rawTerm.trim();
+    if (term.length < 2) return [];
+    const nodeIds = await this.scope.getAccessibleNodeIds(userId);
+    if (nodeIds && nodeIds.size === 0) return [];
+    return this.prisma.equipment.findMany({
+      where: {
+        deletedAt: null,
+        ...(nodeIds ? { orgNodeId: { in: [...nodeIds] } } : {}),
+        OR: [
+          { name: { contains: term, mode: "insensitive" } },
+          { tag: { contains: term, mode: "insensitive" } },
+          { code: { contains: term, mode: "insensitive" } },
+        ],
+      },
+      orderBy: [{ name: "asc" }],
+      take: 100,
     });
   }
 

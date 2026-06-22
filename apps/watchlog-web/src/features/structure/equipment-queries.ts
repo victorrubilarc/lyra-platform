@@ -12,6 +12,7 @@ import {
   deleteEquipment,
   fetchCategories,
   fetchEquipmentByNode,
+  searchEquipment,
   updateCategory,
   updateEquipment,
 } from "./equipment-api.js";
@@ -19,6 +20,7 @@ import {
 export const EQUIPMENT_KEYS = {
   categories: ["equipment", "categories"] as const,
   byNode: (orgNodeId: string) => ["equipment", "byNode", orgNodeId] as const,
+  search: (term: string) => ["equipment", "search", term] as const,
 };
 
 // ─── Categorías ──────────────────────────────────────────────────────────────
@@ -58,6 +60,16 @@ export function useEquipmentByNode(orgNodeId: string | null) {
     queryKey: EQUIPMENT_KEYS.byNode(orgNodeId ?? ""),
     queryFn: () => fetchEquipmentByNode(orgNodeId!),
     enabled: !!orgNodeId,
+  });
+}
+
+/** Busca equipos en toda la estructura accesible (para el buscador del árbol). */
+export function useEquipmentSearch(term: string) {
+  const q = term.trim();
+  return useQuery({
+    queryKey: EQUIPMENT_KEYS.search(q),
+    queryFn: () => searchEquipment(q),
+    enabled: q.length >= 2,
   });
 }
 

@@ -61,6 +61,13 @@ function highlightName(name: string, rawQuery: string): ReactNode {
 
 // ── Componente ────────────────────────────────────────────────────────────────
 
+/** Equipo coincidente con la búsqueda, agrupado bajo su nodo dueño. */
+export interface EquipmentHit {
+  id: string;
+  name: string;
+  tag: string | null;
+}
+
 interface OrgTreeProps {
   nodes: OrgNodeTree[];
   levels: OrgLevel[];
@@ -68,28 +75,37 @@ interface OrgTreeProps {
   onSelect: (node: OrgNodeTree) => void;
   /** Texto de búsqueda: filtra el árbol a las ramas con coincidencias y las expande. */
   query?: string;
+  /** Equipos que coinciden con la búsqueda, por nodo dueño (búsqueda global ABAC). */
+  equipmentHits?: Map<string, EquipmentHit[]>;
+  /** La búsqueda de equipos está en vuelo (evita un parpadeo de "sin coincidencias"). */
+  searching?: boolean;
 }
 
 function buildLevelMap(levels: OrgLevel[]): Map<string, OrgLevel> {
   return new Map(levels.map((l) => [l.id, l]));
 }
 
-export function OrgTree({ nodes, levels, selectedId, onSelect, query = "" }: OrgTreeProps) {
+const EMPTY_HITS: Map<string, EquipmentHit[]> = new Map();
+
+export function OrgTree({
+  nodes, levels, selectedId, onSelect, query = "", equipmentHits = EMPTY_HITS, searching = false,
+}: OrgTreeProps) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set);
   const levelMap = buildLevelMap(levels);
 
   const q = norm(query.trim());
   const rawQuery = query.trim();
 
-  // Ramas visibles al filtrar: cada coincidencia + todos sus ancestros (para
-  // ver el camino). Sin query, no se filtra nada.
+  // Ramas visibles al filtrar: cada coincidencia (por nombre del nodo O por un
+  // equipo que coincide) + todos sus ancestros (para ver el camino). Sin query,
+  // no se filtra nada.
   const { visibleIds, matchCount } = useMemo(() => {
     const visible = new Set<string>();
     if (!q) return { visibleIds: visible, matchCount: 0 };
     let count = 0;
     const walk = (list: OrgNodeTree[], ancestors: string[]): void => {
       for (const n of list) {
-        if (nodeMatches(n, q)) {
+        if (nodeMatches(n, q) || equipmentHits.has(n.id)) {
           count++;
           ancestors.forEach((a) => visible.add(a));
           visible.add(n.id);
@@ -99,7 +115,7 @@ export function OrgTree({ nodes, levels, selectedId, onSelect, query = "" }: Org
     };
     walk(nodes, []);
     return { visibleIds: visible, matchCount: count };
-  }, [nodes, q]);
+  }, [nodes, q, equipmentHits]);
 
   // Auto-expand los ancestros del nodo seleccionado (solo sin búsqueda activa;
   // con búsqueda, el filtro fuerza la apertura del camino).
@@ -141,7 +157,7 @@ export function OrgTree({ nodes, levels, selectedId, onSelect, query = "" }: Org
     return (
       <div className={styles.noResults}>
         <SearchX size={26} color="var(--color-text-muted)" />
-        <span>Sin coincidencias para «{rawQuery}»</span>
+        <span>{searching ? "Buscando equipos…" : `Sin coincidencias para «${rawQuery}»`}</span>
       </div>
     );
   }
@@ -161,6 +177,7 @@ export function OrgTree({ nodes, levels, selectedId, onSelect, query = "" }: Org
           filtering={filtering}
           visibleIds={visibleIds}
           rawQuery={rawQuery}
+          equipmentHits={equipmentHits}
         />
       ))}
     </div>
@@ -179,13 +196,15 @@ interface NodeBranchProps {
   filtering: boolean;
   visibleIds: Set<string>;
   rawQuery: string;
+  equipmentHits: Map<string, EquipmentHit[]>;
 }
 
 function NodeBranch({
-  node, depth, expanded, toggle, levelMap, selectedId, onSelect, filtering, visibleIds, rawQuery,
+  node, depth, expanded, toggle, levelMap, selectedId, onSelect, filtering, visibleIds, rawQuery, equipmentHits,
 }: NodeBranchProps) {
   const level      = levelMap.get(node.levelId);
   const isSelected = node.id === selectedId;
+  const hits       = equipmentHits.get(node.id);
 
   // Con búsqueda: el camino se abre solo y los hijos se acotan a coincidencias.
   const childNodes = filtering ? node.children.filter((c) => visibleIds.has(c.id)) : node.children;
@@ -237,6 +256,20 @@ function NodeBranch({
               )}
             </span>
           )}
+          {/* Equipos que coincidieron con la búsqueda (por qué se muestra el nodo). */}
+          {hits && hits.length > 0 && (
+            <span className={styles.equipHits}>
+              {hits.slice(0, 3).map((eq) => (
+                <span key={eq.id} className={styles.equipHit} title={eq.tag ?? eq.name}>
+                  <Wrench size={11} />
+                  {highlightName(eq.name, rawQuery)}
+                </span>
+              ))}
+              {hits.length > 3 && (
+                <span className={styles.equipHitMore}>+{hits.length - 3}</span>
+              )}
+            </span>
+          )}
         </span>
 
         {/* Código */}
@@ -263,6 +296,7 @@ function NodeBranch({
               filtering={filtering}
               visibleIds={visibleIds}
               rawQuery={rawQuery}
+              equipmentHits={equipmentHits}
             />
           ))}
         </div>

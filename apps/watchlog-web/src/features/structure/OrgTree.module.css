@@ -10,6 +10,36 @@
   padding: 0 1px;
 }
 
+/* Equipos que coincidieron con la búsqueda, bajo el nombre del nodo. */
+.equipHits {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 3px;
+}
+
+.equipHit {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-surface-2);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 1px 6px;
+  max-width: 220px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.equipHitMore {
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
 /* Estado "sin coincidencias" del filtro de búsqueda. */
 .noResults {
   display: flex;

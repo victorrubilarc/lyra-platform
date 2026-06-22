@@ -1439,8 +1439,14 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
       Buscador en el header del árbol (`StructurePage`) que filtra por nombre/código/cód. externo/descripción
       (insensible a acentos/mayúsculas), **resalta** la coincidencia y **auto-expande** el camino a cada match
       (ancestros + coincidencia); estado "Sin coincidencias" cuando no hay. Filtro **en memoria** sobre el árbol ya
-      cargado (`OrgTree` ganó prop `query`). **Pendiente a escala (diferido):** endpoint de búsqueda server-side si el
-      árbol crece a decenas de miles de nodos.
+      cargado (`OrgTree` ganó prop `query`). **+ Búsqueda de EQUIPOS (2026-06-22):** la búsqueda también surface el
+      **nodo dueño de un equipo** que coincide (ej. "Weinig") — endpoint backend `GET /structure/equipment?search=`
+      con **ABAC** (`EquipmentService.searchAccessible` + `ScopeService`); el árbol muestra los equipos coincidentes
+      como chips bajo el nodo. **Pendiente a escala (diferido):** búsqueda server-side de NODOS si el árbol crece a
+      decenas de miles (hoy los nodos se filtran en memoria; los equipos ya van por API).
+- [x] **[QA-L#3 · UX · baja] Grilla de equipos: tag/placa en 2 líneas + nombre acapara.** ✅ **RESUELTO 2026-06-22.**
+      `.code` con `white-space: nowrap` (tags largos como `REMA-ELAB-MOLD-01` en 1 línea) + columna tag 150→180 +
+      columna nombre acotada a 260 (trunca con elipsis) en `EquipmentSection`.
 - [ ] **[QA-L#2 · carencia · media] Niveles de estructura GLOBALES (una sola escalera por profundidad).** `OrgLevel`
       tiene `@@unique([order])`: existe **un único nivel por profundidad** para TODO el sistema, así que todas las
       estructuras raíz comparten los mismos nombres/semántica por nivel. **No** se puede tener "Faena→Área→Proceso→Línea"
