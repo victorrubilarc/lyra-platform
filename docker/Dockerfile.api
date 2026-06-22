@@ -31,3 +31,15 @@ WORKDIR /app
 COPY --from=build /app ./
 EXPOSE 3000
 CMD ["node", "dist/main.js"]
+
+# ---- Imagen de MIGRACIONES (init container) ----
+# Reusa el stage `build` (que SÍ tiene devDeps: el CLI de Prisma + tsx + las
+# migraciones + el seed). La imagen runtime de arriba se arma con `pnpm deploy
+# --prod` y NO incluye el CLI de Prisma, por eso las migraciones van en una
+# imagen aparte (patrón "migrate" init container). Aplica `migrate deploy`
+# (idempotente, no destructivo) y, solo en el bootstrap (RUN_SEED=true), siembra
+# catálogos + el admin de arranque (BOOTSTRAP_ADMIN_*). El entorno llega por env.
+FROM build AS migrate
+ENV NODE_ENV=production
+WORKDIR /repo/apps/watchlog-api
+CMD ["sh", "-c", "pnpm exec prisma migrate deploy && { [ \"$RUN_SEED\" != \"true\" ] || pnpm exec tsx prisma/seed.ts; }"]
