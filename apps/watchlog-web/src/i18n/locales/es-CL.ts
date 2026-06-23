@@ -232,7 +232,7 @@ export const esCL = {
     structures: {
       title: "Estructuras organizacionales",
       description:
-        "Define varias estructuras en paralelo, cada una con su propio set de niveles y su propio árbol (ej. una jerarquía minera y otra de infraestructura TI). El selector del encabezado cambia la estructura activa.",
+        "Define varias estructuras en paralelo, cada una con su propio set de niveles y su propio árbol (ej. una jerarquía minera y otra de infraestructura TI). Usa «Trabajar aquí» para elegir cuál configurar; luego define sus niveles y su árbol.",
       name: "Nombre",
       key: "Clave",
       namePlaceholder: "ej. Operación Minera Norte",
@@ -245,6 +245,9 @@ export const esCL = {
       invalid: "Indica un nombre y una clave válida (mín. 2 caracteres).",
       defaultTag: "Por defecto",
       inactiveTag: "Inactiva",
+      activeTag: "Configurando",
+      workHere: "Trabajar en esta estructura",
+      nowEditing: "Ahora configurando: {{name}}",
     },
     tree: {
       panelTitle: "Jerarquía",

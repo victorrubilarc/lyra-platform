@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Building2, Layers, Lock, Network, Plus, Search, TriangleAlert } from "lucide-react";
-import { Button, EmptyState, Input, ResizableSplit, Skeleton } from "@lyra/ui";
+import { Button, Chip, EmptyState, Input, ResizableSplit, Skeleton } from "@lyra/ui";
 import type { OrgNodeTree } from "@lyra/contracts";
 import { Can } from "../../auth/Can.js";
 import { usePermissions } from "../../auth/use-permissions.js";
-import { useOrgLevels, useOrgTree } from "./structure-queries.js";
+import { useActiveStructureId, useOrgLevels, useOrgStructures, useOrgTree } from "./structure-queries.js";
 import { useEquipmentSearch } from "./equipment-queries.js";
 import { OrgTree, type EquipmentHit } from "./OrgTree.js";
 import { NodeDetail } from "./NodeDetail.js";
@@ -38,6 +38,13 @@ export function StructurePage() {
 
   const { data: tree = [], isLoading: treeLoading, isError: treeError } = useOrgTree();
   const { data: levels = [], isLoading: levelsLoading } = useOrgLevels();
+
+  // Estructura que se está configurando (para que el árbol vacío de una recién creada
+  // no parezca un bug). Solo se muestra el rótulo si hay más de una estructura.
+  const { data: structures = [] } = useOrgStructures();
+  const activeStructureId = useActiveStructureId();
+  const activeStructure =
+    structures.find((s) => s.id === activeStructureId) ?? structures.find((s) => s.isDefault) ?? structures[0];
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [nodeDrawer, setNodeDrawer] = useState<NodeDrawerState>({
@@ -96,7 +103,15 @@ export function StructurePage() {
       <div className={styles.header}>
         <div className={styles.heading}>
           <h1 className={styles.title}>{t("structure.title")}</h1>
-          <p className={styles.subtitle}>{t("structure.subtitle")}</p>
+          <p className={styles.subtitle}>
+            {t("structure.subtitle")}
+            {structures.length > 1 && activeStructure && (
+              <>
+                {" · "}
+                <Chip label={`${t("structure.structures.activeTag")}: ${activeStructure.name}`} variant="primary" />
+              </>
+            )}
+          </p>
         </div>
         <div className={styles.actions}>
           <Can perform="orglevel:manage">

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Check, Network, Pencil, Plus, Trash2, X as XIcon } from "lucide-react";
+import { Check, LogIn, Network, Pencil, Plus, Trash2, X as XIcon } from "lucide-react";
 import { Button, Chip, Drawer, EmptyState, Input, Table, useToast } from "@lyra/ui";
 import type { TableColumn } from "@lyra/ui";
 import type { OrgStructure } from "@lyra/contracts";
@@ -42,6 +42,19 @@ export function StructuresDrawer({ open, onClose }: StructuresDrawerProps) {
   const updateStructure = useUpdateStructure();
   const deleteStructure = useDeleteStructure();
   const setActive = useStructureStore((s) => s.setActiveStructure);
+  const activeId = useStructureStore((s) => s.activeStructureId);
+
+  // Una fila es la estructura ACTIVA (la que se está configurando): la por defecto
+  // cuando no hay selección, o la que coincide con el id activo.
+  const isActiveRow = (row: OrgStructure): boolean =>
+    activeId === row.id || (activeId === null && row.isDefault);
+
+  /** Pasa a TRABAJAR en esa estructura (la activa para configurar) y cierra el panel. */
+  function selectStructure(row: OrgStructure) {
+    setActive(row.isDefault ? null : row.id);
+    toast.success(t("structure.structures.nowEditing", { name: row.name }));
+    onClose();
+  }
 
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
@@ -116,6 +129,7 @@ export function StructuresDrawer({ open, onClose }: StructuresDrawerProps) {
         ) : (
           <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
             {row.name}
+            {isActiveRow(row) && <Chip label={t("structure.structures.activeTag")} variant="primary" />}
             {row.isDefault && <Chip label={t("structure.structures.defaultTag")} variant="info" />}
             {!row.active && <Chip label={t("structure.structures.inactiveTag")} variant="default" />}
           </span>
@@ -131,7 +145,7 @@ export function StructuresDrawer({ open, onClose }: StructuresDrawerProps) {
       key: "_actions",
       header: "",
       align: "right",
-      width: 100,
+      width: 132,
       render: (row) => {
         if (editingId === row.id) {
           return (
@@ -148,6 +162,15 @@ export function StructuresDrawer({ open, onClose }: StructuresDrawerProps) {
         const isBusy = !!editingId || deletingId === row.id;
         return (
           <span style={{ display: "inline-flex", gap: 4 }}>
+            <Button
+              variant="icon"
+              onClick={() => selectStructure(row)}
+              disabled={isBusy || isActiveRow(row)}
+              aria-label={t("structure.structures.workHere")}
+              title={t("structure.structures.workHere")}
+            >
+              <LogIn size={15} />
+            </Button>
             <Button variant="icon" onClick={() => startEdit(row)} disabled={isBusy} aria-label={t("common.edit")}>
               <Pencil size={15} />
             </Button>
