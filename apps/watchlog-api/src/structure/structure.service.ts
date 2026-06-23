@@ -38,15 +38,26 @@ export class StructureService {
    * las recién creadas aún sin nodos. Un usuario acotado ve solo las estructuras de
    * sus nodos accesibles.
    */
-  async listStructures(userId?: string): Promise<OrgStructure[]> {
+  async listStructures(userId?: string): Promise<(OrgStructure & { nodeCount: number })[]> {
     const all = await this.prisma.orgStructure.findMany({
       where: { deletedAt: null },
       orderBy: [{ isDefault: "desc" }, { reportOrder: "asc" }, { name: "asc" }],
     });
-    if (!userId) return all;
+    // Conteo de nodos vivos por estructura: distingue CONFIGURADAS (≥1 nodo) de vacías.
+    const counts = await this.prisma.orgNode.groupBy({
+      by: ["structureId"],
+      where: { deletedAt: null },
+      _count: { _all: true },
+    });
+    const countBy = new Map(counts.map((c) => [c.structureId, c._count._all]));
+    const enrich = (s: OrgStructure): OrgStructure & { nodeCount: number } => ({
+      ...s,
+      nodeCount: countBy.get(s.id) ?? 0,
+    });
+    if (!userId) return all.map(enrich);
     const accessible = await this.scope.getAccessibleStructureIds(userId);
-    if (accessible === null) return all; // sin restricción
-    return all.filter((s) => accessible.has(s.id));
+    const visible = accessible === null ? all : all.filter((s) => accessible.has(s.id));
+    return visible.map(enrich);
   }
 
   /** Id de la estructura por defecto (la que absorbió lo legado). Cae a la 1ª viva. */

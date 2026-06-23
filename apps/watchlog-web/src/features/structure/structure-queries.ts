@@ -116,7 +116,11 @@ export function useCreateNode() {
   return useMutation({
     // structureId solo aplica a raíces (sin parentId); los hijos heredan del padre.
     mutationFn: (dto: CreateOrgNodeRequest) => createNode({ structureId: structureId ?? undefined, ...dto }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["structure", "tree"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["structure", "tree"] });
+      // El nodeCount por estructura cambió ⇒ refresca el selector (configuradas vs vacías).
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.structures });
+    },
   });
 }
 
@@ -132,6 +136,9 @@ export function useDeleteNode() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => deleteNode(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["structure", "tree"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["structure", "tree"] });
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.structures });
+    },
   });
 }

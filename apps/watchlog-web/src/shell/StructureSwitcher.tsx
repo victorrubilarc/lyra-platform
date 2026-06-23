@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Building2, Check, ChevronDown, Network, Settings2 } from "lucide-react";
 import { Menu, MenuItem, MenuLabel, MenuSeparator } from "@lyra/ui";
@@ -8,29 +8,46 @@ import { useOrgStructures } from "../features/structure/structure-queries.js";
 import { useStructureStore } from "./structure-store.js";
 import styles from "../features/structure/StructureSelector.module.css";
 
+/** Una estructura está CONFIGURADA cuando tiene al menos un nodo (es operable). */
+function isConfigured(s: { nodeCount?: number }): boolean {
+  return (s.nodeCount ?? 0) > 0;
+}
+
 /**
- * Selector GLOBAL de estructura activa, montado en el topbar. Como vive siempre, es
- * también el punto donde se SANEA la estructura activa: si la guardada dejó de existir
- * o de ser accesible, vuelve a la por defecto. Así ninguna pantalla (calendarios,
- * pickers de nodo de incidencias/bitácoras, etc.) queda "vacía" por una estructura
- * activa fantasma. Solo se muestra si hay ≥2 estructuras (en instalaciones de una sola
- * estructura no estorba). La gestión vive en la pantalla de Estructura.
+ * Selector GLOBAL de estructura activa, montado en el topbar. Solo ofrece estructuras
+ * CONFIGURADAS (con ≥1 nodo): una estructura vacía no es un contexto operativo válido.
+ * Como vive siempre, es también el punto donde se SANEA la estructura activa: si la
+ * guardada dejó de ser accesible, o quedó vacía mientras navegas FUERA de la pantalla
+ * de configuración, vuelve a la por defecto — así ninguna pantalla operativa queda
+ * "vacía" o mostrando datos de otra estructura. En la pantalla de Estructura
+ * (`/estructura`) NO se sanea, para poder trabajar dentro de una estructura recién
+ * creada (aún sin nodos) y configurarla.
  */
 export function StructureSwitcher() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const { data: structures = [] } = useOrgStructures();
   const activeId = useStructureStore((s) => s.activeStructureId);
   const setActive = useStructureStore((s) => s.setActiveStructure);
 
-  // Saneo global: una estructura activa que ya no es accesible vuelve a la por defecto.
-  useEffect(() => {
-    if (structures.length === 0) return;
-    if (activeId && !structures.some((s) => s.id === activeId)) setActive(null);
-  }, [structures, activeId, setActive]);
+  const onConfigPage = pathname.startsWith("/estructura");
 
-  // En instalaciones de una sola estructura, el conmutador no aporta nada.
-  if (structures.length < 2) return null;
+  // Saneo global de la estructura activa.
+  useEffect(() => {
+    if (structures.length === 0 || !activeId) return;
+    const active = structures.find((s) => s.id === activeId);
+    const inaccessible = !active;
+    const emptyOutsideConfig = active && !isConfigured(active) && !onConfigPage;
+    if (inaccessible || emptyOutsideConfig) setActive(null);
+  }, [structures, activeId, setActive, onConfigPage]);
+
+  // Solo se ofrecen estructuras configuradas; en config se incluye también la activa
+  // (aunque esté vacía) para no perder de vista dónde estás mientras la armas.
+  const selectable = structures.filter((s) => isConfigured(s) || (onConfigPage && s.id === activeId));
+
+  // En instalaciones con una sola estructura configurada, el conmutador no aporta nada.
+  if (selectable.length < 2) return null;
 
   const active =
     structures.find((s) => s.id === activeId) ?? structures.find((s) => s.isDefault) ?? structures[0];
@@ -49,7 +66,7 @@ export function StructureSwitcher() {
       }
     >
       <MenuLabel>{t("structure.selector.title")}</MenuLabel>
-      {structures.map((s) => (
+      {selectable.map((s) => (
         <MenuItem
           key={s.id}
           icon={<Building2 size={15} />}

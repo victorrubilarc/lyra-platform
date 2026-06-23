@@ -25,6 +25,8 @@ export const orgStructureSchema = z.object({
   /** Orden de presentación en selectores (asc). */
   reportOrder: z.number().int(),
   createdAt: z.string(),
+  /** Nº de nodos vivos (para distinguir estructuras CONFIGURADAS de vacías). */
+  nodeCount: z.number().int().optional(),
 });
 export type OrgStructure = z.infer<typeof orgStructureSchema>;
 
