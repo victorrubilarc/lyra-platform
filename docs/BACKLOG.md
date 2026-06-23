@@ -1401,6 +1401,25 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
 
 > Items con fundamento ya discutidos; aquí para que no se diluyan en `DECISIONS.md`.
 
+### Despliegue AWS — blindaje de deploys continuos (2026-06-22) — ver `docs/DEPLOYMENT.md`
+> WatchLog **EN VIVO** en `lyra.watchlog.itesicws.com`, en el EC2 compartido con Lyra Pass.
+> **Hecho:** #1 red `edge` persistente (un redeploy de Lyra Pass ya no tumba WatchLog) + swap 2 GB +
+> servicio `watchlog-web` (sin choque de nombres). **Pendiente de blindaje (el dueño lo pidió: que un
+> deploy NUNCA tumbe a la otra app):**
+- [ ] **#2 · Límites de memoria por app (`mem_limit`/`deploy.resources`).** Sin tope, una fuga/pico en
+      una app puede hacer que el kernel OOM-mate un contenedor de **la otra**. Con tope por servicio, el
+      problema se queda en su propio cgroup (se reinicia solo) y no toca a la vecina. Aplicar en los compose
+      de **ambas** apps (topes calculados para 3.7 GB RAM + 2 GB swap). **Prioridad: media-alta** (la más
+      valiosa de las dos).
+- [ ] **#3 · Auto-prune en el deploy.** Cada deploy deja la imagen vieja; con deploys continuos el disco se
+      llena → rompe a las dos. Agregar `docker image prune -f` (o `system prune`) al final de un deploy
+      exitoso en `deploy/onprem/update.sh` (y el equivalente para Lyra Pass). **Prioridad: media.**
+- [ ] **Backup de Postgres** (ambas apps) + cron (deuda Fase 7; red de seguridad antes de cualquier upgrade/migración).
+- [ ] **Higiene de repo (Lyra Pass):** los cambios de infra del host (Caddyfile + edge) ya se subieron a su
+      repo; mantener host↔repo en sync para que un `git pull` manual no choque. **Prioridad: baja.**
+- [ ] **Recordatorio en cada deploy** (el dueño lo pidió): verificar Lyra Pass después · `git pull` en
+      `/opt/watchlog` si se tocó `deploy/` · `docker system prune -af` cada varios deploys.
+
 ### Hallazgos de la sesión QA (2026-06-18) — ver `docs/QA_WALKTHROUGH.md` §4
 > **Actualización 2026-06-22:** se cerraron QA#1, QA#2, QA#4 y QA#6 (rama `feat/qa-fixes-y-seed-lite`).
 > **QA#3 también se cerró** (apareció apenas el dueño abrió la prueba: los equipos sembrados en Molienda/Flotación

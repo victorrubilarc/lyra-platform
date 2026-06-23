@@ -1,9 +1,40 @@
 # Despliegue en AWS (máquina compartida) — Lyra WatchLog
 
 > Cómo publicar WatchLog en `https://lyra.watchlog.itesicws.com` en el **mismo EC2**
-> donde ya corre **ruta-bus**, sin que peleen por los puertos 80/443. Mismo patrón
-> que ruta-bus: **GitHub Actions** construye imágenes → **GHCR** → **SSH al EC2** →
+> donde ya corre **ruta-bus** (Lyra Pass), sin que peleen por los puertos 80/443.
+> Patrón: **GitHub Actions** (tag `v*`) → imágenes a **GHCR** → **SSH al EC2** →
 > `update.sh`. Esto adelanta parte de la **Fase 7** (producción).
+
+## ✅ ESTADO: EN VIVO (desde 2026-06-22)
+
+- **WatchLog:** `https://lyra.watchlog.itesicws.com` (admin de arranque `admin@itesicws.cl`).
+- **Lyra Pass** (misma máquina): `lyrapass.itesicws.com/pos` + `admin.lyrapass.itesicws.com`.
+- **Host EC2** (São Paulo, sa-east-1): repo WatchLog en `/opt/watchlog`, Lyra Pass en `/opt/lyrapass`.
+  Borde = `lyrapass-caddy-1` (Caddy de Lyra Pass) en la red docker **`edge`**. 3.7 GB RAM + **2 GB swap**, disco gp3 (~28 GB).
+- **Versión desplegada inicial:** `v0.1.5` (los fixes de empaquetado se resolvieron entre v0.1.0 y v0.1.5).
+
+### Lecciones del primer despliegue (ya resueltas en el repo)
+El primer deploy destapó 7 problemas reales de empaquetado de producción, todos arreglados en `docker/Dockerfile.api` + `deploy/`:
+1. `@lyra/llm` faltaba en el stage `deps` del Dockerfile.api (el api lo importa).
+2. `@nestjs/schedule` era **dep fantasma** (sin declarar) → declarada en `apps/watchlog-api/package.json`.
+3. Faltaba **`.dockerignore`** → `COPY . .` metía `node_modules`/`.env` en la imagen (inseguro + rompía el build).
+4. `pnpm deploy` (v10+): requiere **`--legacy`** + **`--config.dangerouslyAllowAllBuilds=true`** (builds nativos argon2/prisma) + **openssl** en la base (motor de Prisma).
+5. El init `migrate` con `pnpm exec` purgaba node_modules sin TTY → invoca los **binarios directo** (`node_modules/.bin/prisma`/`tsx`).
+6. Healthcheck con `wget` (no existe en la imagen slim) → **`node`**.
+7. `@prisma/client did not initialize` → **`prisma generate` en el stage `runtime`** final (el del deploy queda en otra ubicación).
+
+### Lección de coexistencia (CRÍTICA)
+Ambas apps tenían un servicio `web`. Al compartir la red `edge`, el `reverse_proxy web:3000` del Caddy de borde resolvía ambiguo → **rompió el POS de Lyra Pass**. **Regla: en la red `edge` NUNCA dos servicios con el mismo nombre.** El servicio web de WatchLog se llama **`watchlog-web`** (único). Y la red `edge` se dejó **persistente** en el compose de Lyra Pass (su Caddy vuelve solo a `edge` en cada redeploy).
+
+### ✅ Checklist post-deploy (cada vez que se despliega WatchLog)
+1. **Verificar Lyra Pass** después (POS + admin) — comparten EC2.
+2. Cambios de **`deploy/`** (compose/update.sh/Caddyfile) **NO** son automáticos → `git pull` en `/opt/watchlog` antes/junto al deploy. Solo el **código de app** (imágenes) sube solo con el tag.
+3. Cada varios deploys: **`docker system prune -af`** (que el disco no se llene; **no** usar `--volumes`).
+
+### Pendiente de blindaje (próxima sesión — ver BACKLOG)
+- **#2 Límites de memoria por app** (que una fuga no OOM-mate a la otra).
+- **#3 Auto-prune** en el `update.sh` (disco no se llena con deploys continuos).
+- Backup de Postgres (deuda Fase 7).
 
 ## Arquitectura
 
