@@ -19,6 +19,10 @@
 > nodos; necesitaría un flujo de archivo/purga GxP) · (d) el `deleteLevel` da 500 si un nodo SOFT-deleted aún
 > referencia el nivel (bug latente preexistente; mitigado en estructuras por la cascada). **Dependencia:**
 > "rol acotado a nodo" (`Scope.roleId` en UI) sigue pendiente (memoria `role-node-scope-requirement`).
+> **+ Indicador de versión ✅** (mismo día): «Acerca de» en el menú de perfil con versión + fecha de compilación +
+> commit (Vite `define`; en prod los inyecta el release vía Docker build-args desde el tag git). **DEUDA (pedido del
+> dueño):** mostrar la versión en un lugar MÁS A LA VISTA — un pie en el login y/o junto al logo del sidebar — además
+> del «Acerca de».
 > Anterior: **Fase 5 · Cambio de turno · Slice 4 — EXPORT PDF del acta de entrega ✅ → FASE 5 COMPLETA** —
 > `feat/cambio-turno-acta-pdf`: desde una entrega FIRMADA se descarga un **acta PDF de grado auditoría** (identidad Lyra, snapshot
 > congelado, dos firmas Part 11, folio + hash verificable), generada en el backend, on-prem, sin SaaS. Motor **pdfmake** (NO Chromium;
