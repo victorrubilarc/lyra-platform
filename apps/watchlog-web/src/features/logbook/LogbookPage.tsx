@@ -34,7 +34,7 @@ import {
 import { formatDateTime, formatDuration } from "../../lib/format.js";
 import { ApiError } from "../../lib/api-client.js";
 import { downloadBlob, fileStamp } from "../../lib/download.js";
-import { useOrgTree } from "../structure/structure-queries.js";
+import { useAccessibleOrgTree } from "../structure/structure-queries.js";
 import { exportLogbookCsv, fetchMyShiftFilter } from "./logbook-api.js";
 import { useLogbookFacets, useLogbookFilterTemplates, useLogbookList, useLogbookStats, useSavedViewMutations, useSavedViews } from "./logbook-queries.js";
 import { formatSummaryValue } from "./logbook-cells.js";
@@ -282,7 +282,7 @@ export function LogbookPage() {
   useEffect(() => {
     setPage(1);
   }, [query]);
-  const { data: tree } = useOrgTree();
+  const { data: tree } = useAccessibleOrgTree();
   const { data: templates } = useLogbookFilterTemplates();
 
   const rows = useMemo(() => list.data?.pages.flatMap((p) => p.items) ?? [], [list.data]);

@@ -196,6 +196,30 @@ export class StructureService {
     return this.buildTree(nodes);
   }
 
+  /**
+   * Árbol de nodos vivos de una estructura ACOTADO al alcance ABAC del usuario.
+   * Es el camino para los SELECTORES de FLUJO OPERACIONAL (crear incidencia,
+   * abrir bitácora, etc.): a diferencia de `getTree()` —que sirve a la ADMINISTRACIÓN
+   * y debe mostrar TODOS los nodos—, aquí solo aparecen los que el usuario alcanza.
+   * `ScopeService.getAccessibleNodeIds` devuelve `null` para un usuario sin
+   * restricción de alcance (admin) ⇒ árbol completo; un Set vacío ⇒ árbol vacío.
+   * Si un nodo accesible cuelga de un ancestro NO accesible, `buildTree` lo deja
+   * como raíz: el usuario ve su subárbol, nunca nodos ajenos.
+   */
+  async getAccessibleTree(userId: string, structureId?: string | null): Promise<OrgNodeTree[]> {
+    const sid = await this.resolveStructureId(structureId);
+    const accessibleIds = await this.scope.getAccessibleNodeIds(userId);
+    const nodes = await this.prisma.orgNode.findMany({
+      where: {
+        deletedAt: null,
+        structureId: sid,
+        ...(accessibleIds === null ? {} : { id: { in: [...accessibleIds] } }),
+      },
+      orderBy: [{ reportOrder: "asc" }, { name: "asc" }],
+    });
+    return this.buildTree(nodes);
+  }
+
   async createNode(dto: CreateOrgNodeRequest, ctx: AuditContext): Promise<OrgNode> {
     // La estructura del nodo la DICTA el padre (aislamiento estricto): un nodo con
     // padre hereda su estructura; una raíz toma `dto.structureId` (o la por defecto).

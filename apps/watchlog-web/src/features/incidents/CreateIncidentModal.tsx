@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import type { CreateIncidentRequest, IncidentPriority } from "@lyra/contracts";
 import { Button, Combobox, Input, Modal, Select, Textarea, useToast } from "@lyra/ui";
 import type { OrgNodeTree } from "@lyra/contracts";
-import { useOrgTree } from "../structure/structure-queries.js";
+import { useAccessibleOrgTree } from "../structure/structure-queries.js";
 import { useCreateIncident, useIncidentCategories, useIncidentEquipmentOptions, useIncidentTypes } from "./incidents-queries.js";
 import { PRIORITY_META, severityLabel } from "./incidents-presentation.js";
 import styles from "./incidents.module.css";
@@ -16,12 +16,15 @@ interface Props {
   presetNodeId?: string;
 }
 
-function flatten(nodes: OrgNodeTree[], prefix = ""): { value: string; label: string }[] {
-  const out: { value: string; label: string }[] = [];
+// Label = nombre del nodo (corto, lo que se busca/lee); hint = ruta de ancestros
+// (contexto, en mono y truncada por el Combobox). Evita el label kilométrico que
+// se desbordaba.
+function flatten(nodes: OrgNodeTree[], prefix = ""): { value: string; label: string; hint?: string }[] {
+  const out: { value: string; label: string; hint?: string }[] = [];
   for (const n of nodes) {
-    const label = prefix ? `${prefix} › ${n.name}` : n.name;
-    out.push({ value: n.id, label });
-    if (n.children?.length) out.push(...flatten(n.children, label));
+    out.push({ value: n.id, label: n.name, hint: prefix || undefined });
+    const childPrefix = prefix ? `${prefix} › ${n.name}` : n.name;
+    if (n.children?.length) out.push(...flatten(n.children, childPrefix));
   }
   return out;
 }
@@ -30,7 +33,7 @@ export function CreateIncidentModal({ open, onClose, onCreated, originLogEntryId
   const toast = useToast();
   const { data: types = [] } = useIncidentTypes();
   const { data: categories = [] } = useIncidentCategories();
-  const { data: tree = [] } = useOrgTree();
+  const { data: tree = [] } = useAccessibleOrgTree();
   const create = useCreateIncident();
 
   const [title, setTitle] = useState("");

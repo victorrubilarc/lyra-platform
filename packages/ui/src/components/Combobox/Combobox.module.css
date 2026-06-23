@@ -221,7 +221,7 @@
   min-width: 0;
 }
 
-.optLabel > :first-child {
+.optText {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -231,6 +231,11 @@
   font-size: 11px;
   color: var(--color-text-muted);
   font-family: var(--font-mono, ui-monospace, monospace);
+  /* La pista suele ser la ruta completa del nodo: truncar para que no se
+     desborde ni se sobreponga con la opción vecina (el padre tiene min-width: 0). */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .check {

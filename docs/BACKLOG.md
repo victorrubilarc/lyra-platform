@@ -859,6 +859,16 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
       usuario). **Esfuerzo: BAJO.** Relacionado con el ítem "Seguridad a nivel de nodo en el mantenedor de
       Estructura" más abajo. Ver memoria `role-node-scope-requirement`. **Fuera de alcance de la sesión de
       multi-estructura** (no scope-creep).
+- [x] **Selector de nodos acotado por ABAC ✅ (2026-06-23, `feat/scoped-node-selector`).** Bug: el selector de
+      nodos al crear incidencia (y otros de flujo operacional) mostraba TODOS los nodos a un usuario con alcance
+      acotado. Fix con camino separado para no romper la administración (que sí debe ver todo): nuevo
+      `StructureService.getAccessibleTree` + endpoint `GET /structure/accessible-nodes` (filtra por
+      `getAccessibleNodeIds`, **sin `orgnode:read`** — el alcance ES la autorización) + hook `useAccessibleOrgTree`;
+      migrados `CreateIncidentModal`/`LogbookPage`/`ShiftHandoverPage`. **+ fix UX `Combobox` base** (el label largo
+      se desbordaba: envuelto en `.optText` truncable + `.optHint` truncado; el modal pasa nombre+ruta). Sin
+      permiso/migración/FLUSHALL. smoke-scoped-node-selector 12/12 + regresión multi-estructura 33/33. Ver
+      DECISIONS 2026-06-23. **NO cierra `org-views-vs-isolation`**: los LISTADOS operacionales (grillas de
+      bitácoras/incidencias/dashboards) siguen sin acotar por estructura activa — deuda en pausa (ver memoria).
 - [ ] **Visibilidad del calendario efectivo en el detalle del nodo (deuda UX, 2026-06-23).** Hoy el detalle de un
       nodo/host en `/estructura` **no muestra qué calendario operacional/fiscal rige** (ni el asignado directo ni el
       heredado por `path`). La asignación se hace solo desde el mantenedor de Calendarios (calendario → nodos), pero

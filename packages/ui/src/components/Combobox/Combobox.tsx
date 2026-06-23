@@ -200,7 +200,9 @@ export function Combobox({
                         onClick={() => pick(o.value)}
                       >
                         <span className={styles.optLabel}>
-                          {o.label}
+                          {/* El label va envuelto en un elemento para que TRUNQUE
+                              (un nodo de texto suelto no recibe el ellipsis). */}
+                          <span className={styles.optText}>{o.label}</span>
                           {o.hint && <span className={styles.optHint}>{o.hint}</span>}
                         </span>
                         {on && <Check size={15} className={styles.check} aria-hidden />}

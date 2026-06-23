@@ -112,6 +112,18 @@ export class StructureController {
     return this.structure.getTree(structureId);
   }
 
+  /**
+   * Árbol de nodos ACOTADO al alcance ABAC del usuario, para los SELECTORES de
+   * flujo operacional (crear incidencia/bitácora…), NO para la administración.
+   * NO exige `orgnode:read` (un operador no administra la estructura): el alcance
+   * del propio usuario ES la autorización — el servicio nunca devuelve nodos
+   * ajenos. Un usuario sin restricción de alcance recibe el árbol completo.
+   */
+  @Get("accessible-nodes")
+  getAccessibleTree(@CurrentUser() user: RequestUser, @Query("structureId") structureId?: string) {
+    return this.structure.getAccessibleTree(user.id, structureId);
+  }
+
   @Post("nodes")
   @RequirePermission("orgnode:create")
   createNode(

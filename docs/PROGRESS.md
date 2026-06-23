@@ -1,5 +1,22 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-23 — 🔒 Selector de nodos ACOTADO por ABAC + fix de truncado del Combobox ✅** (`feat/scoped-node-selector`).
+Bugfix: al **crear una incidencia**, un usuario con alcance acotado veía TODOS los nodos en el selector (la fuga
+de ABAC en los SELECTORES que estaba registrada como deuda). Causa: `GET /structure/nodes` (`getTree`) devuelve el
+árbol completo y lo usan TANTO los selectores operacionales COMO la administración del árbol (no se podía filtrar
+global sin romper la admin). **Solución — camino separado:** nuevo `StructureService.getAccessibleTree(userId)` +
+endpoint **`GET /structure/accessible-nodes`** (filtra por `ScopeService.getAccessibleNodeIds`; **sin
+`orgnode:read`** — el alcance del usuario ES la autorización, nunca devuelve nodos ajenos), hook
+`useAccessibleOrgTree()`. Migrados los selectores de **flujo operacional** (`CreateIncidentModal`, `LogbookPage`,
+`ShiftHandoverPage`); la **administración** sigue con `useOrgTree`/`getTree` sin acotar. Respeta estructura activa
+y ABAC multi-estructura. **Fix UX del `Combobox` base:** el label largo se desbordaba (el texto suelto no recibía
+el ellipsis; la regla truncaba el `.optHint`) → label envuelto en `.optText` truncable + `.optHint` truncado;
+el modal de incidencias pasa **nombre + ruta (hint)** en vez de la ruta entera como label. typecheck/lint(0)/build
+verdes; `smoke-scoped-node-selector.py` **12/12** (admin 83 nodos; scoped solo su subárbol de 2, NO el padre) +
+regresión `smoke-multi-estructura.py` 33/33. Sin permiso/migración/FLUSHALL. **Deuda `org-views-vs-isolation`**
+(otros listados operacionales aún sin acotar) sigue abierta; este fix cierra el SELECTOR de nodos. **Siguiente:
+seguir poblando el caso Eiser (plantillas) o lo que defina el dueño.**
+
 **2026-06-23 — 💾 Backup de Postgres pre-deploy + cron (OPS, sin features) ✅** (commit `6130774` en `main`).
 Cierra el **#4 / última pendiente** del blindaje de deploys (BACKLOG §3). Ahora era urgente: el deploy ya corre
 `prisma migrate deploy` contra la BD de **producción** en cada release, y `migrate deploy` es **forward-only** —

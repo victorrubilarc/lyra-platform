@@ -15,6 +15,7 @@ import {
   deleteLevel,
   deleteNode,
   deleteStructure,
+  fetchAccessibleTree,
   fetchLevels,
   fetchStructures,
   fetchTree,
@@ -29,6 +30,8 @@ export const QUERY_KEYS = {
   // que cambiar de estructura refresque TODO lo que cuelga de ellos (pickers incluidos).
   levels: (structureId: string | null) => ["structure", "levels", structureId] as const,
   tree: (structureId: string | null) => ["structure", "tree", structureId] as const,
+  // Árbol ACOTADO al alcance del usuario: clave aparte del árbol de administración.
+  accessibleTree: (structureId: string | null) => ["structure", "accessible-tree", structureId] as const,
 };
 
 /** Id de la estructura activa del shell (null = la por defecto del backend). */
@@ -51,6 +54,20 @@ export function useOrgLevels() {
 export function useOrgTree() {
   const structureId = useActiveStructureId();
   return useQuery({ queryKey: QUERY_KEYS.tree(structureId), queryFn: () => fetchTree(structureId) });
+}
+
+/**
+ * Árbol de nodos ACOTADO al alcance ABAC del usuario. Úsalo en los SELECTORES de
+ * flujo operacional (crear incidencia, abrir bitácora…) para que un usuario con
+ * alcance restringido NO vea nodos ajenos. El mantenedor de estructura sigue con
+ * `useOrgTree` (sin acotar).
+ */
+export function useAccessibleOrgTree() {
+  const structureId = useActiveStructureId();
+  return useQuery({
+    queryKey: QUERY_KEYS.accessibleTree(structureId),
+    queryFn: () => fetchAccessibleTree(structureId),
+  });
 }
 
 // ─── Mutations — estructuras ───────────────────────────────────────────────
@@ -118,6 +135,7 @@ export function useCreateNode() {
     mutationFn: (dto: CreateOrgNodeRequest) => createNode({ structureId: structureId ?? undefined, ...dto }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["structure", "tree"] });
+      qc.invalidateQueries({ queryKey: ["structure", "accessible-tree"] });
       // El nodeCount por estructura cambió ⇒ refresca el selector (configuradas vs vacías).
       qc.invalidateQueries({ queryKey: QUERY_KEYS.structures });
     },
@@ -128,7 +146,10 @@ export function useUpdateNode() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, dto }: { id: string; dto: UpdateOrgNodeRequest }) => updateNode(id, dto),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["structure", "tree"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["structure", "tree"] });
+      qc.invalidateQueries({ queryKey: ["structure", "accessible-tree"] });
+    },
   });
 }
 
@@ -138,6 +159,7 @@ export function useDeleteNode() {
     mutationFn: (id: string) => deleteNode(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["structure", "tree"] });
+      qc.invalidateQueries({ queryKey: ["structure", "accessible-tree"] });
       qc.invalidateQueries({ queryKey: QUERY_KEYS.structures });
     },
   });

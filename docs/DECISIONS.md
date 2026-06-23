@@ -4,6 +4,31 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-23 · Camino "scoped" para selectores de nodo de flujo operacional (ABAC)
+Bug: el selector de nodos al **crear una incidencia** (y otros selectores operacionales) mostraba TODOS los
+nodos a un usuario con alcance acotado, porque `GET /structure/nodes` (`StructureService.getTree`) devuelve el
+árbol completo sin filtrar por `ScopeService`. **Trampa de diseño:** ese mismo endpoint lo usan las pantallas de
+ADMINISTRACIÓN (mantenedor del árbol, asignación de nodos a calendarios), donde ver TODO es correcto — filtrar
+`getTree()` globalmente las rompería.
+**Decisión:** un **camino separado** para selectores operacionales en vez de tocar el de administración.
+- Backend: nuevo `StructureService.getAccessibleTree(userId, structureId?)` (filtra por
+  `getAccessibleNodeIds`: `null`=admin⇒árbol completo, `Set`⇒acota, vacío⇒vacío; nodo accesible bajo ancestro no
+  accesible queda como raíz, nunca se filtran nodos ajenos) y endpoint **`GET /structure/accessible-nodes`**.
+- **Sin `@RequirePermission`** (a diferencia de `/structure/nodes`, que exige `orgnode:read`): un operador NO
+  administra la estructura. El **alcance del propio usuario ES la autorización** — el servicio nunca devuelve
+  nodos ajenos. *Motivo:* exigir `orgnode:read` bloquearía a los operadores (que no lo tienen) en el flujo de
+  crear incidencia/bitácora.
+- Frontend: hook `useAccessibleOrgTree()` (clave de cache aparte `["structure","accessible-tree",sid]`,
+  invalidada en altas/bajas de nodo). Migrados a él: `CreateIncidentModal`, `LogbookPage`, `ShiftHandoverPage`
+  (selectores de flujo). Los de ADMINISTRACIÓN siguen con `useOrgTree`/`getTree` (sin acotar).
+- Respeta la estructura activa (`?structureId`) y el ABAC multi-estructura (deriva estructura del nodo).
+- Bonus UX: el `Combobox` base truncaba el label mal (el texto suelto no recibía el ellipsis; la regla apuntaba
+  al `.optHint`). Fix: envolver el label en `.optText` truncable + truncar `.optHint`; el modal de incidencias
+  pasa ahora **nombre (label) + ruta (hint)** en vez de la ruta kilométrica como label. Mejora TODOS los selectores.
+- Verificado: `smoke-scoped-node-selector.py` 12/12 (admin ve 83 nodos; usuario scoped ve solo su subárbol de 2,
+  no el padre) + regresión `smoke-multi-estructura.py` 33/33. Deuda relacionada `org-views-vs-isolation`
+  (otros listados operacionales aún sin acotar) sigue abierta; este fix cierra el selector de nodos.
+
 ### 2026-06-23 · Multi-estructura organizacional (varias estructuras en una instalación)
 Requerimiento urgente del dueño: poder definir **varias estructuras organizacionales** en paralelo en la
 misma instalación single-tenant (p. ej. una jerarquía minera Faena→Planta y otra de infra TI

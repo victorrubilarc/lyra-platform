@@ -75,6 +75,15 @@ export function fetchTree(structureId?: string | null): Promise<OrgNodeTree[]> {
   return apiJson(`/structure/nodes${structureQuery(structureId)}`, z.array(orgNodeTreeSchema));
 }
 
+/**
+ * Árbol de nodos ACOTADO al alcance del usuario (ABAC en el backend). Es el que
+ * deben usar los SELECTORES de flujo operacional (crear incidencia/bitácora…),
+ * no el mantenedor de estructura (que usa `fetchTree`, sin acotar).
+ */
+export function fetchAccessibleTree(structureId?: string | null): Promise<OrgNodeTree[]> {
+  return apiJson(`/structure/accessible-nodes${structureQuery(structureId)}`, z.array(orgNodeTreeSchema));
+}
+
 export function createNode(dto: CreateOrgNodeRequest): Promise<OrgNode> {
   createOrgNodeRequestSchema.parse(dto);
   return apiJson("/structure/nodes", orgNodeSchema, { method: "POST", body: dto });

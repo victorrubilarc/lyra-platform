@@ -47,7 +47,7 @@ import {
   type ShiftHandoverStatus,
 } from "@lyra/contracts";
 import { usePermissions } from "../../auth/use-permissions.js";
-import { useOrgTree } from "../structure/structure-queries.js";
+import { useAccessibleOrgTree } from "../structure/structure-queries.js";
 import { ApiError } from "../../lib/api-client.js";
 import { formatDateTime, formatLocalDate } from "../../lib/format.js";
 import {
@@ -103,7 +103,7 @@ export function ShiftHandoverPage() {
   const [nodeId, setNodeId] = useState(() => ssGet("handover.nodeId"));
   const [activeId, setActiveId] = useState<string | null>(() => params.get("handoverId") ?? ssGet("handover.activeId") ?? null);
 
-  const { data: tree = [] } = useOrgTree();
+  const { data: tree = [] } = useAccessibleOrgTree();
   const nodeOptions = useMemo(() => flatten(tree), [tree]);
   const compile = useCompileHandover();
   const toast = useToast();
