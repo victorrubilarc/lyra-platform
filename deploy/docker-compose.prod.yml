@@ -95,7 +95,11 @@ services:
 
   # Caddy interno: sirve la SPA y proxea /api → api:3000 (HTTP en la red interna).
   # El Caddy de BORDE (ruta-bus) le hace TLS y le manda watchlog.itesicws.com.
-  web:
+  # OJO: el servicio se llama `watchlog-web` (NO `web`) a propósito: la red `edge`
+  # es COMPARTIDA con ruta-bus, que también tiene un servicio `web` (su POS). Si
+  # este se llamara `web`, el Caddy de borde (en ambas redes) resolvería `web`
+  # ambiguamente y rompería el POS de ruta-bus. El nombre único lo evita.
+  watchlog-web:
     image: ${WL_REGISTRY:-ghcr.io}/${WL_OWNER}/lyra-watchlog-web:${WL_VERSION:-stable}
     restart: unless-stopped
     environment:
@@ -107,8 +111,7 @@ services:
         condition: service_healthy
     networks:
       internal: {}
-      edge:
-        aliases: [watchlog-web]
+      edge: {}
 
 volumes:
   pgdata:
