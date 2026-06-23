@@ -33,3 +33,7 @@ npm-debug.log*
 
 # Docker volumes (si se montan localmente)
 docker/volumes/
+
+# Backups de Postgres generados en el host (nunca al repo)
+/deploy/backups/*
+!/deploy/backups/.gitkeep

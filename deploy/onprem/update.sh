@@ -25,6 +25,24 @@ deploy() {
   $COMPOSE up -d
 }
 
+# Red de seguridad: respalda la BD ANTES de migrar. `migrate deploy` es forward-only
+# (el rollback de abajo solo revierte IMÁGENES, no el ESQUEMA) ⇒ si una migración
+# corrompe datos sin backup, la pérdida es irreversible. Bloquea por defecto; se puede
+# forzar la continuación con BACKUP_REQUIRED=false en el .env (asumiendo el riesgo).
+backup() {
+  echo "  · respaldo pre-deploy de Postgres…"
+  if bash onprem/backup.sh; then
+    return 0
+  fi
+  if [ "${BACKUP_REQUIRED:-true}" = "false" ]; then
+    echo "  ⚠ Backup falló pero BACKUP_REQUIRED=false → continúo bajo tu riesgo."
+    return 0
+  fi
+  echo "❌ Backup pre-deploy falló. Abortando ANTES de migrar (red de seguridad)."
+  echo "   Corrige el backup, o fuerza con BACKUP_REQUIRED=false si decides asumir el riesgo."
+  exit 1
+}
+
 healthy() {
   # node (no wget): la imagen slim no trae wget/curl.
   for _ in $(seq 1 30); do
@@ -52,6 +70,7 @@ prune_old() {
   docker image prune -f || true   # || true: no romper un deploy ya exitoso (set -e)
 }
 
+backup
 deploy "$NEW"
 if healthy; then
   echo "✅ WatchLog actualizado a ${NEW} y saludable."

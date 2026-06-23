@@ -1,0 +1,1 @@
+# Carpeta de backups de Postgres del host (los .dump NO se versionan; ver .gitignore).
