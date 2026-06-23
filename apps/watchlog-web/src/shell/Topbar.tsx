@@ -4,6 +4,7 @@ import { Bell, Check, Languages, LogOut, Monitor, Moon, Rows3, Search, Sun, User
 import { Breadcrumb, Menu, MenuItem, MenuLabel, MenuSeparator, Tooltip, type Crumb } from "@lyra/ui";
 import { FavoritesMenu } from "./FavoritesMenu.js";
 import { NotificationBell } from "./NotificationBell.js";
+import { StructureSwitcher } from "./StructureSwitcher.js";
 import { useAuth } from "../auth/use-auth.js";
 import { useUIStore } from "./ui-store.js";
 import { useThemeStore, type ThemePreference } from "./theme-store.js";
@@ -61,6 +62,8 @@ export function Topbar({ onOpenSearch }: TopbarProps) {
       </button>
 
       <div className={styles.topRight}>
+        <StructureSwitcher />
+
         <Tooltip
           side="bottom"
           label={`${t("topbar.density")}: ${t(density === "comfortable" ? "topbar.densityComfortable" : "topbar.densityCompact")}`}

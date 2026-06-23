@@ -212,6 +212,7 @@ export const esCL = {
     title: "Estructura organizacional",
     subtitle: "Jerarquía de nodos de la organización",
     configureLevels: "Configurar niveles",
+    manageStructures: "Estructuras",
     newRoot: "Nuevo nodo raíz",
     noAccess: "Sin acceso",
     noAccessDesc: "No tienes permiso para ver la estructura organizacional.",

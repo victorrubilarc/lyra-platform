@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Building2, Layers, Lock, Plus, Search, TriangleAlert } from "lucide-react";
+import { Building2, Layers, Lock, Network, Plus, Search, TriangleAlert } from "lucide-react";
 import { Button, EmptyState, Input, ResizableSplit, Skeleton } from "@lyra/ui";
 import type { OrgNodeTree } from "@lyra/contracts";
 import { Can } from "../../auth/Can.js";
@@ -11,7 +11,6 @@ import { OrgTree, type EquipmentHit } from "./OrgTree.js";
 import { NodeDetail } from "./NodeDetail.js";
 import { NodeDrawer, type NodeDrawerMode } from "./NodeDrawer.js";
 import { LevelsDrawer } from "./LevelsDrawer.js";
-import { StructureSelector } from "./StructureSelector.js";
 import { StructuresDrawer } from "./StructuresDrawer.js";
 import { DeleteNodeModal } from "./DeleteNodeModal.js";
 import { MoveNodeModal } from "./MoveNodeModal.js";
@@ -100,7 +99,12 @@ export function StructurePage() {
           <p className={styles.subtitle}>{t("structure.subtitle")}</p>
         </div>
         <div className={styles.actions}>
-          <StructureSelector onManage={() => setStructuresOpen(true)} />
+          <Can perform="orglevel:manage">
+            <Button variant="secondary" onClick={() => setStructuresOpen(true)}>
+              <Network size={16} />
+              {t("structure.manageStructures")}
+            </Button>
+          </Can>
           <Can perform="orglevel:manage">
             <Button variant="secondary" onClick={() => setLevelsOpen(true)}>
               <Layers size={16} />
