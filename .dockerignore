@@ -1,0 +1,30 @@
+# Contexto de build de Docker: excluye lo que NO debe entrar a las imágenes.
+# Sin esto, `COPY . .` arrastra node_modules del host (corrompe el install del
+# stage deps), .git, y hasta el .env (secreto) → imágenes pesadas e inseguras.
+
+# Dependencias y artefactos (se generan DENTRO de la imagen)
+node_modules
+**/node_modules
+dist
+**/dist
+**/.turbo
+**/*.tsbuildinfo
+coverage
+
+# Git / CI / editores
+.git
+.gitignore
+.github
+.vscode
+.idea
+
+# Secretos y entorno (el runtime los recibe por env del compose, NUNCA en la imagen)
+.env
+.env.*
+**/.env
+deploy/.env
+
+# Memoria/IA y temporales
+.claude
+*.log
+.DS_Store

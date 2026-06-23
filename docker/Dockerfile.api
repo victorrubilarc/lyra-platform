@@ -2,6 +2,11 @@
 # ----------- Backend NestJS (watchlog-api) -----------
 FROM node:22-bookworm-slim AS base
 ENV PNPM_HOME="/pnpm" PATH="/pnpm:$PATH"
+# OpenSSL: Prisma lo necesita para elegir el motor de consultas correcto en
+# runtime (bookworm-slim no lo trae). ca-certificates para TLS salientes (SMTP/IA).
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends openssl ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
 RUN corepack enable
 WORKDIR /repo
 
@@ -29,8 +34,13 @@ COPY . .
 RUN pnpm --filter "./packages/**" run build \
  && pnpm --filter @lyra/watchlog-api exec prisma generate \
  && pnpm --filter @lyra/watchlog-api build
-# Empaqueta el API con solo sus dependencias de producción.
-RUN pnpm --filter @lyra/watchlog-api deploy --prod /app
+# Empaqueta el API con solo sus dependencias de producción. `--legacy`: pnpm v10+
+# exige inject-workspace-packages para `deploy` por defecto; con --legacy usa el
+# modo clásico (copia el paquete + sus deps de prod, incl. los @lyra/* compilados).
+# `dangerouslyAllowAllBuilds`: el /app standalone NO hereda el `onlyBuiltDependencies`
+# del workspace ⇒ sin esto pnpm 11 BLOQUEA los builds nativos (argon2, prisma) y
+# falla sin TTY. Contexto de build confiable (deps propias), así que se permite.
+RUN pnpm --filter @lyra/watchlog-api deploy --prod --legacy --config.dangerouslyAllowAllBuilds=true /app
 
 # ---- Imagen final ----
 FROM base AS runtime
