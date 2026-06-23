@@ -47,6 +47,12 @@ FROM base AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=build /app ./
+# Regenera el cliente Prisma en la estructura FINAL de /app. El `prisma generate`
+# del `pnpm deploy` quedó en una ubicación que @prisma/client NO resuelve en
+# runtime (pnpm coloca @prisma/client en .pnpm/ y el cliente generado se pierde),
+# y el api crasheaba con "@prisma/client did not initialize yet". Regenerar aquí
+# (schema + CLI ya están en /app, openssl en base) lo deja donde el api lo busca.
+RUN node_modules/.bin/prisma generate
 EXPOSE 3000
 CMD ["node", "dist/main.js"]
 
