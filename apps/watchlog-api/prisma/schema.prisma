@@ -327,20 +327,65 @@ model PasswordPolicy {
 //  Estructura organizacional
 // ===========================================================================
 
+// Estructura organizacional (Fase: multi-estructura, 2026-06-23). Una instalación
+// single-tenant puede definir VARIAS estructuras en paralelo, cada una con su propio
+// set de niveles (OrgLevel) y su propio árbol de nodos (OrgNode). NO es multi-tenant:
+// es multi-estructura dentro de una misma instalación (p. ej. una jerarquía minera
+// Faena→Planta→Área y otra de infra TI Contrato→Dominio→Sitio coexistiendo). Los
+// CATÁLOGOS (plantillas, flujos, tipos de incidencia, listas de referencia) siguen
+// siendo COMPARTIDOS; solo el árbol + niveles + calendarios son por-estructura. El
+// aislamiento es ESTRICTO: cada nodo vive en exactamente una estructura y no se
+// reparenta entre estructuras; bitácoras/incidencias/handovers/rondas heredan la
+// estructura de su nodo (sin columna propia).
+model OrgStructure {
+  id          String    @id @default(cuid())
+  // Clave estable y única (slug). Para seed idempotente y referencias.
+  key         String    @unique
+  name        String
+  description String?
+  // Exactamente una estructura es la por defecto (índice único parcial en la migración:
+  // WHERE "isDefault" AND "deletedAt" IS NULL). Es la que absorbe los datos legados.
+  isDefault   Boolean   @default(false)
+  active      Boolean   @default(true)
+  // Orden de presentación en selectores (asc).
+  reportOrder Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime? // borrado lógico
+
+  levels    OrgLevel[]
+  nodes     OrgNode[]
+  opCalendars     OperationalCalendar[]
+  fiscalCalendars FiscalCalendar[]
+
+  @@index([deletedAt])
+}
+
 model OrgLevel {
-  id        String   @id @default(cuid())
-  name      String // configurable: "Área", "Proceso", "Equipo"…
-  order     Int // profundidad en la jerarquía (0 = raíz)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  // Estructura a la que pertenece este nivel (Fase multi-estructura). El `order` es
+  // único POR ESTRUCTURA: dos estructuras pueden tener cada una su "nivel 0".
+  structureId String
+  name        String // configurable: "Área", "Proceso", "Equipo"…
+  order       Int // profundidad en la jerarquía (0 = raíz)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  nodes OrgNode[]
+  structure OrgStructure @relation(fields: [structureId], references: [id], onDelete: Cascade)
+  nodes     OrgNode[]
 
-  @@unique([order])
+  @@unique([structureId, order])
+  @@index([structureId])
 }
 
 model OrgNode {
   id                    String    @id @default(cuid())
+  // Estructura a la que pertenece este nodo (Fase multi-estructura). DENORMALIZADO en
+  // cada nodo (no solo en la raíz) para filtrar el árbol sin join a la raíz. Invariante:
+  // node.structureId == parent.structureId (lo fuerza StructureService; reparentar no
+  // cruza estructuras). El `path` son IDs de nodo (cuid únicos): la lógica de ruta
+  // materializada NO colisiona entre estructuras, así que structureId es filtro+guardia.
+  structureId           String
   name                  String
   code                  String?
   /// Descripción de uso o propósito del nodo (planta, área, unidad, etc.)
@@ -364,6 +409,7 @@ model OrgNode {
   updatedAt             DateTime  @updatedAt
   deletedAt             DateTime? // borrado lógico
 
+  structure               OrgStructure             @relation(fields: [structureId], references: [id], onDelete: Cascade)
   level                   OrgLevel                 @relation(fields: [levelId], references: [id])
   parent                  OrgNode?                 @relation("OrgHierarchy", fields: [parentId], references: [id])
   children                OrgNode[]                @relation("OrgHierarchy")
@@ -381,6 +427,7 @@ model OrgNode {
 
   @@index([parentId])
   @@index([levelId])
+  @@index([structureId])
   @@index([path])
   @@index([operationalCalendarId])
   @@index([fiscalCalendarId])
@@ -1031,14 +1078,18 @@ model ReferenceItem {
 
 model OperationalCalendar {
   id                String    @id @default(cuid())
+  // Estructura dueña (Fase multi-estructura). Un calendario pertenece a una estructura
+  // y solo se asigna a nodos de ELLA; el default es POR ESTRUCTURA.
+  structureId       String
   // Clave estable y única (slug). Para seed idempotente y referencias.
   key               String    @unique
   name              String
   description       String?
   // Zona horaria IANA (ej. "America/Santiago"). Todo se guarda en UTC.
   timezone          String
-  // Exactamente un calendario es el por defecto (single-tenant). Se mantiene en
-  // transacción al marcar otro como default.
+  // Exactamente un calendario es el por defecto POR ESTRUCTURA (índice único parcial en
+  // la migración: WHERE "isDefault" AND "deletedAt" IS NULL, por structureId). Se
+  // mantiene en transacción al marcar otro como default.
   isDefault         Boolean   @default(false)
   active            Boolean   @default(true)
   // Turno cuyo inicio marca el arranque del día operacional (por código, no FK:
@@ -1050,9 +1101,11 @@ model OperationalCalendar {
   updatedAt         DateTime  @updatedAt
   deletedAt         DateTime? // borrado lógico
 
+  structure     OrgStructure       @relation(fields: [structureId], references: [id], onDelete: Cascade)
   shifts        OperationalShift[]
   assignedNodes OrgNode[]
 
+  @@index([structureId])
   @@index([deletedAt])
 }
 
@@ -1063,11 +1116,14 @@ model OperationalCalendar {
 // organización (SAP company code / Maximo Organization / NetSuite subsidiaria).
 model FiscalCalendar {
   id                 String     @id @default(cuid())
+  // Estructura dueña (Fase multi-estructura). Default e asignación POR ESTRUCTURA.
+  structureId        String
   key                String     @unique
   name               String
   description        String?
   // TZ IANA para ubicar "hoy" al generar / marcar el período Actual.
   timezone           String
+  // Default POR ESTRUCTURA (índice único parcial en la migración por structureId).
   isDefault          Boolean    @default(false)
   active             Boolean    @default(true)
   // Definición del período contable.
@@ -1082,9 +1138,11 @@ model FiscalCalendar {
   updatedAt          DateTime   @updatedAt
   deletedAt          DateTime? // borrado lógico
 
+  structure     OrgStructure        @relation(fields: [structureId], references: [id], onDelete: Cascade)
   assignedNodes OrgNode[]
   periods       OperationalPeriod[]
 
+  @@index([structureId])
   @@index([deletedAt])
 }
 

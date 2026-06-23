@@ -2,34 +2,148 @@ import { BadRequestException, Injectable, NotFoundException } from "@nestjs/comm
 import type {
   CreateOrgLevelRequest,
   CreateOrgNodeRequest,
+  CreateOrgStructureRequest,
   OrgNodeTree,
   UpdateOrgLevelRequest,
   UpdateOrgNodeRequest,
+  UpdateOrgStructureRequest,
 } from "@lyra/contracts";
-import type { OrgLevel, OrgNode } from "@prisma/client";
+import type { OrgLevel, OrgNode, OrgStructure } from "@prisma/client";
 import { AuditService, type AuditContext } from "../audit/audit.service";
+import { ScopeService } from "../authz/scope.service";
 import { PrismaService } from "../prisma/prisma.service";
 
 /**
- * Estructura organizacional: niveles (OrgLevel) y nodos jerárquicos (OrgNode).
- * Mantiene la ruta materializada `path` ("/<id>/<id>/.../") para consultar
- * descendientes de forma eficiente (usada por el ScopeService de ABAC).
+ * Estructura organizacional: estructuras (OrgStructure), niveles (OrgLevel) y nodos
+ * jerárquicos (OrgNode). Multi-estructura: cada estructura tiene su propio set de
+ * niveles (`order` único POR ESTRUCTURA) y su propio árbol de nodos. Mantiene la ruta
+ * materializada `path` ("/<id>/<id>/.../") — IDs de nodo (cuid únicos), así que NO
+ * colisiona entre estructuras — usada por el ScopeService de ABAC. Aislamiento
+ * ESTRICTO: un nodo no se reparenta entre estructuras (invariante
+ * node.structureId == parent.structureId, forzado aquí).
  */
 @Injectable()
 export class StructureService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly scope: ScopeService,
   ) {}
+
+  // --- Estructuras ---
+
+  /**
+   * Estructuras vivas que el usuario alcanza (ABAC), ordenadas para el selector (la
+   * por defecto primero). Sin restricción de alcance (super admin) = todas, incluidas
+   * las recién creadas aún sin nodos. Un usuario acotado ve solo las estructuras de
+   * sus nodos accesibles.
+   */
+  async listStructures(userId?: string): Promise<OrgStructure[]> {
+    const all = await this.prisma.orgStructure.findMany({
+      where: { deletedAt: null },
+      orderBy: [{ isDefault: "desc" }, { reportOrder: "asc" }, { name: "asc" }],
+    });
+    if (!userId) return all;
+    const accessible = await this.scope.getAccessibleStructureIds(userId);
+    if (accessible === null) return all; // sin restricción
+    return all.filter((s) => accessible.has(s.id));
+  }
+
+  /** Id de la estructura por defecto (la que absorbió lo legado). Cae a la 1ª viva. */
+  async defaultStructureId(): Promise<string> {
+    const def = await this.prisma.orgStructure.findFirst({
+      where: { isDefault: true, deletedAt: null },
+      select: { id: true },
+    });
+    if (def) return def.id;
+    const any = await this.prisma.orgStructure.findFirst({ where: { deletedAt: null }, select: { id: true } });
+    if (!any) throw new BadRequestException("No hay ninguna estructura organizacional configurada");
+    return any.id;
+  }
+
+  /** Resuelve el id de estructura a usar: el dado (si existe y vive) o el por defecto. */
+  async resolveStructureId(structureId?: string | null): Promise<string> {
+    if (structureId) {
+      const exists = await this.prisma.orgStructure.count({ where: { id: structureId, deletedAt: null } });
+      if (exists === 0) throw new BadRequestException("La estructura indicada no existe");
+      return structureId;
+    }
+    return this.defaultStructureId();
+  }
+
+  async createStructure(dto: CreateOrgStructureRequest, ctx: AuditContext): Promise<OrgStructure> {
+    const dup = await this.prisma.orgStructure.count({ where: { key: dto.key } });
+    if (dup > 0) throw new BadRequestException(`Ya existe una estructura con la clave "${dto.key}"`);
+    const structure = await this.prisma.orgStructure.create({
+      data: {
+        key: dto.key,
+        name: dto.name,
+        description: dto.description ?? null,
+        reportOrder: dto.reportOrder ?? 0,
+        // Las estructuras nuevas NUNCA son la por defecto (esa es la migrada).
+        isDefault: false,
+        active: true,
+      },
+    });
+    await this.audit.record({ ...ctx, action: "structure.structure.created", entityType: "OrgStructure", entityId: structure.id, after: { ...structure } });
+    return structure;
+  }
+
+  async updateStructure(id: string, dto: UpdateOrgStructureRequest, ctx: AuditContext): Promise<OrgStructure> {
+    const before = await this.prisma.orgStructure.findFirst({ where: { id, deletedAt: null } });
+    if (!before) throw new NotFoundException("Estructura no encontrada");
+    const structure = await this.prisma.orgStructure.update({
+      where: { id },
+      data: {
+        name: dto.name ?? undefined,
+        description: dto.description === undefined ? undefined : dto.description,
+        active: dto.active ?? undefined,
+        reportOrder: dto.reportOrder ?? undefined,
+      },
+    });
+    await this.audit.record({ ...ctx, action: "structure.structure.updated", entityType: "OrgStructure", entityId: id, before: { ...before }, after: { ...structure } });
+    return structure;
+  }
+
+  /**
+   * Borrado lógico. Bloquea la estructura por defecto y cualquiera que tenga nodos —
+   * ACTIVOS o ya eliminados— porque esos nodos arrastran datos (bitácoras/incidencias,
+   * relaciones `Restrict`) y borrarlos sería destructivo. Los NIVELES no bloquean: la
+   * relación `OrgLevel→OrgStructure` es `Cascade`, así que se limpian solos con la
+   * estructura. Una estructura solo con niveles (sin nodos) sí se puede eliminar.
+   */
+  async deleteStructure(id: string, ctx: AuditContext): Promise<void> {
+    const structure = await this.prisma.orgStructure.findFirst({ where: { id, deletedAt: null } });
+    if (!structure) throw new NotFoundException("Estructura no encontrada");
+    if (structure.isDefault) throw new BadRequestException("No se puede eliminar la estructura por defecto");
+    const nodeCount = await this.prisma.orgNode.count({ where: { structureId: id } });
+    if (nodeCount > 0) {
+      throw new BadRequestException(
+        `No se puede eliminar la estructura: tiene ${nodeCount} nodo${nodeCount === 1 ? "" : "s"} (incluidos eliminados). Una estructura con historial de nodos no se puede borrar.`,
+      );
+    }
+    // Limpia los niveles (la cascada de la BD también lo haría al borrar físicamente;
+    // aquí es borrado lógico de la estructura, así que los retiramos explícitamente).
+    await this.prisma.$transaction([
+      this.prisma.orgLevel.deleteMany({ where: { structureId: id } }),
+      this.prisma.orgStructure.update({ where: { id }, data: { deletedAt: new Date() } }),
+    ]);
+    await this.audit.record({ ...ctx, action: "structure.structure.deleted", entityType: "OrgStructure", entityId: id, before: { ...structure } });
+  }
 
   // --- Niveles ---
 
-  listLevels(): Promise<OrgLevel[]> {
-    return this.prisma.orgLevel.findMany({ orderBy: { order: "asc" } });
+  /** Niveles de una estructura (la dada o la por defecto). */
+  async listLevels(structureId?: string | null): Promise<OrgLevel[]> {
+    const sid = await this.resolveStructureId(structureId);
+    return this.prisma.orgLevel.findMany({ where: { structureId: sid }, orderBy: { order: "asc" } });
   }
 
   async createLevel(dto: CreateOrgLevelRequest, ctx: AuditContext): Promise<OrgLevel> {
-    const level = await this.prisma.orgLevel.create({ data: dto });
+    const structureId = await this.resolveStructureId(dto.structureId ?? null);
+    const level = await this.prisma.orgLevel.create({
+      data: { structureId, name: dto.name, order: dto.order },
+    });
     await this.audit.record({ ...ctx, action: "structure.level.created", entityType: "OrgLevel", entityId: level.id, after: { ...level } });
     return level;
   }
@@ -57,10 +171,11 @@ export class StructureService {
 
   // --- Nodos ---
 
-  /** Devuelve el árbol completo de nodos vivos. */
-  async getTree(): Promise<OrgNodeTree[]> {
+  /** Devuelve el árbol completo de nodos vivos de una estructura (la dada o la por defecto). */
+  async getTree(structureId?: string | null): Promise<OrgNodeTree[]> {
+    const sid = await this.resolveStructureId(structureId);
     const nodes = await this.prisma.orgNode.findMany({
-      where: { deletedAt: null },
+      where: { deletedAt: null, structureId: sid },
       // Orden en informes (asc) con desempate alfabético; aplica a árbol y grilla.
       orderBy: [{ reportOrder: "asc" }, { name: "asc" }],
     });
@@ -68,12 +183,17 @@ export class StructureService {
   }
 
   async createNode(dto: CreateOrgNodeRequest, ctx: AuditContext): Promise<OrgNode> {
-    await this.assertLevelExists(dto.levelId);
-    const parentPath = await this.resolveParentPath(dto.parentId ?? null);
+    // La estructura del nodo la DICTA el padre (aislamiento estricto): un nodo con
+    // padre hereda su estructura; una raíz toma `dto.structureId` (o la por defecto).
+    const parent = dto.parentId ? await this.loadLiveNode(dto.parentId) : null;
+    const structureId = parent ? parent.structureId : await this.resolveStructureId(dto.structureId ?? null);
+    await this.assertLevelInStructure(dto.levelId, structureId);
+    const parentPath = parent ? parent.path : "/";
 
     // El path incluye el propio id, que solo se conoce tras crear: 2 pasos.
     const created = await this.prisma.orgNode.create({
       data: {
+        structureId,
         name: dto.name,
         code: dto.code ?? null,
         description: dto.description ?? null,
@@ -94,7 +214,7 @@ export class StructureService {
   async updateNode(id: string, dto: UpdateOrgNodeRequest, ctx: AuditContext): Promise<OrgNode> {
     const before = await this.prisma.orgNode.findFirst({ where: { id, deletedAt: null } });
     if (!before) throw new NotFoundException("Nodo no encontrado");
-    if (dto.levelId) await this.assertLevelExists(dto.levelId);
+    if (dto.levelId) await this.assertLevelInStructure(dto.levelId, before.structureId);
 
     const reparenting = dto.parentId !== undefined && dto.parentId !== before.parentId;
     if (reparenting) await this.assertValidReparent(before, dto.parentId ?? null);
@@ -156,19 +276,25 @@ export class StructureService {
 
   // --- helpers ---
 
-  private async assertLevelExists(levelId: string): Promise<void> {
-    const exists = await this.prisma.orgLevel.count({ where: { id: levelId } });
-    if (exists === 0) throw new BadRequestException("El nivel indicado no existe");
+  /** El nivel debe existir y pertenecer a la MISMA estructura que el nodo. */
+  private async assertLevelInStructure(levelId: string, structureId: string): Promise<void> {
+    const level = await this.prisma.orgLevel.findUnique({ where: { id: levelId }, select: { structureId: true } });
+    if (!level) throw new BadRequestException("El nivel indicado no existe");
+    if (level.structureId !== structureId) {
+      throw new BadRequestException("El nivel pertenece a otra estructura organizacional");
+    }
   }
 
-  private async resolveParentPath(parentId: string | null): Promise<string> {
-    if (parentId == null) return "/";
-    const parent = await this.prisma.orgNode.findFirst({ where: { id: parentId, deletedAt: null } });
-    if (!parent) throw new BadRequestException("El nodo padre no existe");
-    return parent.path;
+  private async loadLiveNode(nodeId: string): Promise<OrgNode> {
+    const node = await this.prisma.orgNode.findFirst({ where: { id: nodeId, deletedAt: null } });
+    if (!node) throw new BadRequestException("El nodo padre no existe");
+    return node;
   }
 
-  /** Evita ciclos: el nuevo padre no puede ser el propio nodo ni un descendiente. */
+  /**
+   * Evita ciclos (el nuevo padre no puede ser el propio nodo ni un descendiente) y
+   * cruces de estructura (aislamiento estricto: el padre vive en la misma estructura).
+   */
   private async assertValidReparent(node: OrgNode, newParentId: string | null): Promise<void> {
     if (newParentId == null) return;
     if (newParentId === node.id) throw new BadRequestException("Un nodo no puede ser su propio padre");
@@ -176,6 +302,9 @@ export class StructureService {
       where: { id: newParentId, deletedAt: null },
     });
     if (!newParent) throw new BadRequestException("El nodo padre no existe");
+    if (newParent.structureId !== node.structureId) {
+      throw new BadRequestException("No se puede mover un nodo a otra estructura organizacional");
+    }
     if (newParent.path.startsWith(node.path)) {
       throw new BadRequestException("No se puede mover un nodo dentro de su propio subárbol");
     }
@@ -184,6 +313,7 @@ export class StructureService {
   private buildTree(nodes: OrgNode[]): OrgNodeTree[] {
     const toDto = (n: OrgNode): OrgNodeTree => ({
       id: n.id,
+      structureId: n.structureId,
       name: n.name,
       code: n.code,
       description: n.description,

@@ -24,9 +24,10 @@ export class FiscalCalendarService {
     private readonly audit: AuditService,
   ) {}
 
-  async list(): Promise<FiscalCalendar[]> {
+  async list(structureId?: string | null): Promise<FiscalCalendar[]> {
+    const sid = structureId ? await this.resolveStructureId(structureId) : undefined;
     return this.prisma.fiscalCalendar.findMany({
-      where: { deletedAt: null },
+      where: { deletedAt: null, ...(sid ? { structureId: sid } : {}) },
       orderBy: [{ isDefault: "desc" }, { name: "asc" }],
     });
   }
@@ -43,11 +44,13 @@ export class FiscalCalendarService {
 
   async create(dto: CreateFiscalCalendarRequest, ctx: AuditContext): Promise<FiscalDetail> {
     this.assertValid(dto);
+    const structureId = await this.resolveStructureId(dto.structureId ?? null);
     const created = await this.prisma
       .$transaction(async (tx) => {
-        if (dto.isDefault) await tx.fiscalCalendar.updateMany({ data: { isDefault: false }, where: { isDefault: true } });
+        if (dto.isDefault) await tx.fiscalCalendar.updateMany({ data: { isDefault: false }, where: { isDefault: true, structureId } });
         return tx.fiscalCalendar.create({
           data: {
+            structureId,
             key: dto.key,
             name: dto.name,
             description: dto.description ?? null,
@@ -90,7 +93,7 @@ export class FiscalCalendarService {
 
     await this.prisma.$transaction(async (tx) => {
       if (dto.isDefault) {
-        await tx.fiscalCalendar.updateMany({ data: { isDefault: false }, where: { isDefault: true, id: { not: id } } });
+        await tx.fiscalCalendar.updateMany({ data: { isDefault: false }, where: { isDefault: true, structureId: before.structureId, id: { not: id } } });
       }
       await tx.fiscalCalendar.update({
         where: { id },
@@ -125,7 +128,7 @@ export class FiscalCalendarService {
     const cal = await this.prisma.fiscalCalendar.findFirst({ where: { id, deletedAt: null } });
     if (!cal) throw new NotFoundException("Calendario fiscal no encontrado");
     await this.prisma.$transaction([
-      this.prisma.fiscalCalendar.updateMany({ data: { isDefault: false }, where: { isDefault: true, id: { not: id } } }),
+      this.prisma.fiscalCalendar.updateMany({ data: { isDefault: false }, where: { isDefault: true, structureId: cal.structureId, id: { not: id } } }),
       this.prisma.fiscalCalendar.update({ where: { id }, data: { isDefault: true } }),
     ]);
     await this.audit.record({ ...ctx, action: "fiscalcalendar.set_default", entityType: "FiscalCalendar", entityId: id });
@@ -137,8 +140,9 @@ export class FiscalCalendarService {
     if (!cal) throw new NotFoundException("Calendario fiscal no encontrado");
     const ids = [...new Set(dto.orgNodeIds)];
     if (ids.length > 0) {
-      const found = await this.prisma.orgNode.count({ where: { id: { in: ids }, deletedAt: null } });
-      if (found !== ids.length) throw new BadRequestException("Uno o más nodos no existen.");
+      // Aislamiento estricto: solo nodos de la MISMA estructura del calendario fiscal.
+      const found = await this.prisma.orgNode.count({ where: { id: { in: ids }, deletedAt: null, structureId: cal.structureId } });
+      if (found !== ids.length) throw new BadRequestException("Uno o más nodos no existen o pertenecen a otra estructura.");
     }
     await this.prisma.$transaction([
       this.prisma.orgNode.updateMany({
@@ -177,6 +181,20 @@ export class FiscalCalendarService {
   }
 
   // --- Helpers ---------------------------------------------------------------
+
+  /** Resuelve el id de estructura: el dado (si existe y vive) o el por defecto. */
+  private async resolveStructureId(structureId?: string | null): Promise<string> {
+    if (structureId) {
+      const exists = await this.prisma.orgStructure.count({ where: { id: structureId, deletedAt: null } });
+      if (exists === 0) throw new BadRequestException("La estructura indicada no existe");
+      return structureId;
+    }
+    const def = await this.prisma.orgStructure.findFirst({ where: { isDefault: true, deletedAt: null }, select: { id: true } });
+    if (def) return def.id;
+    const any = await this.prisma.orgStructure.findFirst({ where: { deletedAt: null }, select: { id: true } });
+    if (!any) throw new BadRequestException("No hay ninguna estructura organizacional configurada");
+    return any.id;
+  }
 
   private assertValid(input: Parameters<typeof validateFiscalCalendar>[0] & { timezone: string }): void {
     const errors: string[] = [];

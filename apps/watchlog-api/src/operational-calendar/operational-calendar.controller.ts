@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Req } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query, Req } from "@nestjs/common";
 import type { FastifyRequest } from "fastify";
 import {
   assignCalendarNodesRequestSchema,
@@ -22,8 +22,8 @@ export class OperationalCalendarController {
 
   @Get()
   @RequirePermission("opscalendar:view")
-  list() {
-    return this.calendars.list();
+  list(@Query("structureId") structureId?: string) {
+    return this.calendars.list(structureId);
   }
 
   @Get(":id")

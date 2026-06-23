@@ -9,6 +9,7 @@ import type {
   UnlockPeriodRequest,
   UpdateFiscalCalendarRequest,
 } from "@lyra/contracts";
+import { useActiveStructureId } from "../structure/structure-queries.js";
 import {
   assignFiscalNodes,
   closeFiscalPeriod,
@@ -28,13 +29,14 @@ import {
 
 export const FISCAL_KEYS = {
   all: ["fiscal-calendars"] as const,
-  list: () => ["fiscal-calendars", "list"] as const,
+  list: (structureId: string | null) => ["fiscal-calendars", "list", structureId] as const,
   detail: (id: string) => ["fiscal-calendars", "detail", id] as const,
   periods: (id: string) => ["fiscal-periods", id] as const,
 };
 
 export function useFiscalCalendars() {
-  return useQuery({ queryKey: FISCAL_KEYS.list(), queryFn: fetchFiscalCalendars });
+  const structureId = useActiveStructureId();
+  return useQuery({ queryKey: FISCAL_KEYS.list(structureId), queryFn: () => fetchFiscalCalendars(structureId) });
 }
 
 export function useFiscalCalendar(id: string | null) {
@@ -47,8 +49,10 @@ export function useFiscalCalendar(id: string | null) {
 
 export function useCreateFiscalCalendar() {
   const qc = useQueryClient();
+  const structureId = useActiveStructureId();
   return useMutation({
-    mutationFn: (dto: CreateFiscalCalendarRequest) => createFiscalCalendar(dto),
+    mutationFn: (dto: CreateFiscalCalendarRequest) =>
+      createFiscalCalendar({ structureId: structureId ?? undefined, ...dto }),
     onSuccess: () => qc.invalidateQueries({ queryKey: FISCAL_KEYS.all }),
   });
 }

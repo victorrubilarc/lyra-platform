@@ -16,8 +16,9 @@ import {
 import { z } from "zod";
 import { apiJson, apiVoid } from "../../lib/api-client.js";
 
-export function fetchOperationalCalendars(): Promise<OperationalCalendar[]> {
-  return apiJson("/operational-calendars", z.array(operationalCalendarSchema));
+export function fetchOperationalCalendars(structureId?: string | null): Promise<OperationalCalendar[]> {
+  const q = structureId ? `?structureId=${encodeURIComponent(structureId)}` : "";
+  return apiJson(`/operational-calendars${q}`, z.array(operationalCalendarSchema));
 }
 
 export function fetchOperationalCalendar(id: string): Promise<OperationalCalendarDetail> {

@@ -134,14 +134,23 @@ async function seedDemoStructure(): Promise<void> {
     return;
   }
 
+  // Multi-estructura: todo cuelga de la estructura por defecto (la que la migración
+  // inserta; upsert por si el seed corre sobre una BD recién migrada o de pruebas).
+  const defaultStructure = await prisma.orgStructure.upsert({
+    where: { key: "default" },
+    update: {},
+    create: { id: "org_structure_default", key: "default", name: "Estructura por defecto", isDefault: true, active: true },
+  });
+  const structureId = defaultStructure.id;
+
   // Sin nodos, puede haber niveles sueltos de pruebas manuales — limpiar para evitar
-  // conflictos en el @@unique([order]) de OrgLevel.
+  // conflictos en el @@unique([structureId, order]) de OrgLevel.
   await prisma.orgLevel.deleteMany();
 
   // ── Niveles ──────────────────────────────────────────────────────────────
-  const levelPlanta  = await prisma.orgLevel.create({ data: { id: "level-planta",  name: "Planta",  order: 0 } });
-  const levelArea    = await prisma.orgLevel.create({ data: { id: "level-area",    name: "Area",    order: 1 } });
-  const levelProceso = await prisma.orgLevel.create({ data: { id: "level-proceso", name: "Proceso", order: 2 } });
+  const levelPlanta  = await prisma.orgLevel.create({ data: { id: "level-planta",  name: "Planta",  order: 0, structureId } });
+  const levelArea    = await prisma.orgLevel.create({ data: { id: "level-area",    name: "Area",    order: 1, structureId } });
+  const levelProceso = await prisma.orgLevel.create({ data: { id: "level-proceso", name: "Proceso", order: 2, structureId } });
 
   // ── Función auxiliar ──────────────────────────────────────────────────────
   async function createNode(
@@ -154,7 +163,7 @@ async function seedDemoStructure(): Promise<void> {
   ) {
     const path = `${parentPath}${id}/`;
     return prisma.orgNode.create({
-      data: { id, name, code, description: NODE_DESCRIPTIONS[id] ?? null, levelId, parentId, path },
+      data: { id, name, code, description: NODE_DESCRIPTIONS[id] ?? null, levelId, parentId, path, structureId },
     });
   }
 
@@ -356,10 +365,19 @@ async function seedReferenceData(): Promise<void> {
 async function seedOperationalCalendar(): Promise<void> {
   if (process.env.NODE_ENV === "production") return;
 
+  // Multi-estructura: los calendarios de demo cuelgan de la estructura por defecto.
+  const defaultStructure = await prisma.orgStructure.upsert({
+    where: { key: "default" },
+    update: {},
+    create: { id: "org_structure_default", key: "default", name: "Estructura por defecto", isDefault: true, active: true },
+  });
+  const structureId = defaultStructure.id;
+
   const c = DEMO_CALENDAR;
   const cal = await prisma.operationalCalendar.upsert({
     where: { key: c.key },
     create: {
+      structureId,
       key: c.key,
       name: c.name,
       description: c.description,
@@ -387,6 +405,7 @@ async function seedOperationalCalendar(): Promise<void> {
   await prisma.fiscalCalendar.upsert({
     where: { key: f.key },
     create: {
+      structureId,
       key: f.key,
       name: f.name,
       description: f.description,

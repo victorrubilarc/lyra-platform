@@ -68,6 +68,7 @@ pnpm dev                # API (watch) + Web (Vite) en paralelo
 ## 5. Decisiones estructurales clave
 
 - **Single-tenant on-premise:** cada cliente = su propio stack Docker + su BD. Sin RLS ni multi-tenant. El modelo de datos se mantiene limpio por si en el futuro se evalúa SaaS, pero no se construye ahora. (Ver `DECISIONS.md`.)
+- **Multi-estructura ≠ multi-tenant (2026-06-23):** una instalación puede definir VARIAS estructuras organizacionales (`OrgStructure`), cada una con su set de niveles y su árbol. Solo el árbol + niveles + calendarios son por-estructura; los catálogos (plantillas, flujos, tipos de incidencia, listas) se comparten. Aislamiento estricto (un nodo vive en una estructura). La estructura activa se elige en un selector global del shell (store `structure-store`, persistido por usuario) y filtra todas las queries de árbol/niveles/calendarios; las estructuras visibles se derivan del ABAC por nodo. La ruta materializada `path` (IDs de nodo únicos) no colisiona entre estructuras, así que el ABAC y la herencia de calendarios no se reescriben. (Ver `DECISIONS.md` 2026-06-23 y `DATA_MODEL.md`.)
 - **IA y llamadas a orígenes externos SIEMPRE en el backend** (el prototipo llamaba a la IA desde el navegador: corregido).
 - **Autorización forzada en el servidor**; la UI solo oculta.
 

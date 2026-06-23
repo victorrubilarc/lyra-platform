@@ -82,24 +82,44 @@ export class ShiftResolverService extends ShiftResolver {
    * ninguno, el calendario por defecto.
    */
   private async calendarIdForNode(orgNodeId?: string | null): Promise<string | null> {
+    // Estructura en la que cae el default cuando ningún ancestro tiene calendario
+    // asignado: la del nodo (multi-estructura), o la estructura por defecto si no hay nodo.
+    let structureId: string | null = null;
     if (orgNodeId) {
-      const node = await this.prisma.orgNode.findUnique({ where: { id: orgNodeId }, select: { path: true } });
-      if (node?.path) {
-        // path = "/<id>/<id>/.../" (raíz → … → self). El nodo más profundo con
-        // calendario asignado gana (el de path más largo).
-        const ids = node.path.split("/").filter(Boolean);
-        const assigned = await this.prisma.orgNode.findMany({
-          where: { id: { in: ids }, operationalCalendarId: { not: null }, deletedAt: null },
-          select: { operationalCalendarId: true, path: true },
-        });
-        if (assigned.length > 0) {
-          assigned.sort((a, b) => a.path.length - b.path.length);
-          return assigned[assigned.length - 1]!.operationalCalendarId;
+      const node = await this.prisma.orgNode.findUnique({
+        where: { id: orgNodeId },
+        select: { path: true, structureId: true },
+      });
+      if (node) {
+        structureId = node.structureId;
+        if (node.path) {
+          // path = "/<id>/<id>/.../" (raíz → … → self). El nodo más profundo con
+          // calendario asignado gana (el de path más largo).
+          const ids = node.path.split("/").filter(Boolean);
+          const assigned = await this.prisma.orgNode.findMany({
+            where: { id: { in: ids }, operationalCalendarId: { not: null }, deletedAt: null },
+            select: { operationalCalendarId: true, path: true },
+          });
+          if (assigned.length > 0) {
+            assigned.sort((a, b) => a.path.length - b.path.length);
+            return assigned[assigned.length - 1]!.operationalCalendarId;
+          }
         }
       }
     }
+    const sid = structureId ?? (await this.defaultStructureId());
+    if (!sid) return null;
     const def = await this.prisma.operationalCalendar.findFirst({
-      where: { isDefault: true, deletedAt: null, active: true },
+      where: { isDefault: true, structureId: sid, deletedAt: null, active: true },
+      select: { id: true },
+    });
+    return def?.id ?? null;
+  }
+
+  /** Id de la estructura por defecto (fallback cuando no hay nodo de contexto). */
+  private async defaultStructureId(): Promise<string | null> {
+    const def = await this.prisma.orgStructure.findFirst({
+      where: { isDefault: true, deletedAt: null },
       select: { id: true },
     });
     return def?.id ?? null;

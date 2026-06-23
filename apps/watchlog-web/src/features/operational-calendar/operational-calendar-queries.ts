@@ -4,6 +4,7 @@ import type {
   CreateOperationalCalendarRequest,
   UpdateOperationalCalendarRequest,
 } from "@lyra/contracts";
+import { useActiveStructureId } from "../structure/structure-queries.js";
 import {
   assignCalendarNodes,
   createOperationalCalendar,
@@ -16,12 +17,16 @@ import {
 
 export const OPS_CALENDAR_KEYS = {
   all: ["operational-calendars"] as const,
-  list: () => ["operational-calendars", "list"] as const,
+  list: (structureId: string | null) => ["operational-calendars", "list", structureId] as const,
   detail: (id: string) => ["operational-calendars", "detail", id] as const,
 };
 
 export function useOperationalCalendars() {
-  return useQuery({ queryKey: OPS_CALENDAR_KEYS.list(), queryFn: fetchOperationalCalendars });
+  const structureId = useActiveStructureId();
+  return useQuery({
+    queryKey: OPS_CALENDAR_KEYS.list(structureId),
+    queryFn: () => fetchOperationalCalendars(structureId),
+  });
 }
 
 export function useOperationalCalendar(id: string | null) {
@@ -34,8 +39,11 @@ export function useOperationalCalendar(id: string | null) {
 
 export function useCreateCalendar() {
   const qc = useQueryClient();
+  const structureId = useActiveStructureId();
   return useMutation({
-    mutationFn: (dto: CreateOperationalCalendarRequest) => createOperationalCalendar(dto),
+    // El calendario nuevo nace en la estructura activa (o la por defecto si null).
+    mutationFn: (dto: CreateOperationalCalendarRequest) =>
+      createOperationalCalendar({ structureId: structureId ?? undefined, ...dto }),
     onSuccess: () => qc.invalidateQueries({ queryKey: OPS_CALENDAR_KEYS.all }),
   });
 }

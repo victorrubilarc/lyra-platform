@@ -10,7 +10,7 @@
 > funcionalidades existentes** aunque su detalle aún esté por redactar (✍️): así nada se
 > olvida; el backfill de lo ya construido se llena de a poco (incremental).
 >
-> Última actualización: **2026-06-19**.
+> Última actualización: **2026-06-23**.
 
 ## Convención de cada sección
 Cada funcionalidad se documenta con estas cuatro partes fijas:
@@ -41,6 +41,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 - ✍️ Pestañas, búsqueda ⌘K, idioma, densidad, tema claro/oscuro
 
 ### 3. Estructura organizacional  [Configurador/Admin]
+- ✅ **Múltiples estructuras organizacionales** (varias jerarquías en paralelo + selector de estructura activa) (§ Estructura organizacional ▸ Múltiples estructuras)
 - ✍️ Árbol de niveles y nodos (crear/editar/mover/orden)
 - ✍️ Código externo (integración ERP/CMMS) y alcance por nodo
 
@@ -132,6 +133,43 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 - ✅ **Entregar y recibir el turno** (cockpit auto-compilado por área y turno, entrega firmada de dos partes, pendientes que ruedan, historial) (§ Cambio de turno)
 - ✅ **Resumen de turno por IA EN VIVO** (botón "Generar con IA": el brief se escribe palabra por palabra, cancelable; grounded al turno, revisable; el crudo determinista siempre visible; la firma sigue siendo tuya) (§ Cambio de turno)
 - ✅ **Descargar el acta de entrega (PDF)** (documento de grado auditoría desde una entrega firmada: identidad Lyra, snapshot congelado, dos firmas Part 11, folio + hash verificable; on-premise) (§ Cambio de turno ▸ Descargar el acta)
+
+---
+
+## Estructura organizacional ▸ Múltiples estructuras  [Configurador/Admin]
+
+**Para qué sirve.** Una misma instalación de Lyra WatchLog puede modelar **varios negocios o casos de uso
+muy distintos a la vez**, cada uno con su propia forma de organizarse. Por ejemplo, una jerarquía minera
+*Faena → Planta → Área* y, en paralelo, una de infraestructura TI *Contrato → Dominio → Sitio*. Cada
+**estructura** tiene su **propio set de niveles** (los nombres y la profundidad de la jerarquía) y su **propio
+árbol de nodos**, totalmente independientes: lo que ocurre en una no se mezcla con la otra. (Las **plantillas,
+flujos, tipos de incidencia y listas de referencia se comparten** entre todas las estructuras; lo que cambia
+por estructura es el árbol, los niveles y los calendarios.)
+
+**Cómo se usa.**
+1. Entra a **Estructura organizacional**. Arriba a la derecha verás el **selector de estructura activa** (un
+   botón con el nombre de la estructura y una flecha). Todo lo que ves —el árbol, los niveles, los calendarios
+   y los selectores de nodo de toda la app— corresponde a la **estructura activa**.
+2. Para **cambiar de estructura**, abre el selector y elige otra. La pantalla se actualiza a su árbol y niveles.
+3. Para **crear o administrar** estructuras, abre el selector y elige **«Gestionar estructuras…»**. En el panel
+   puedes **crear** una estructura nueva (nombre + una clave corta que se autogenera), **renombrarla** o
+   **eliminarla**. Al crear una, el sistema te deja trabajando de inmediato en ella.
+4. En una estructura nueva, primero **configura sus niveles** (botón «Configurar niveles») y luego crea su
+   **árbol de nodos** como siempre. Los niveles que definas valen **solo para esa estructura**.
+
+**Quién puede.** Ver y cambiar de estructura: cualquiera con acceso al módulo de estructura (`orgnode:read`);
+solo verás las estructuras que tu **alcance (ABAC) por nodo** te permite. Crear, renombrar o eliminar
+estructuras: requiere el permiso de **gestión de niveles** (`orglevel:manage`). El backend siempre lo verifica.
+
+**Importante.**
+- **Aislamiento estricto:** un nodo pertenece a UNA estructura y **no se puede mover a otra**. Los niveles, los
+  calendarios y la asignación de calendarios a nodos también son **por estructura**.
+- **La «Estructura por defecto»** es la que ya existía antes de habilitar esta función: contiene **intactos**
+  todos tus niveles, nodos, alcances, asignaciones de plantillas y calendarios previos. **No se puede eliminar.**
+- Una estructura **no se puede eliminar si tiene nodos** (aunque estén dados de baja), porque arrastran
+  historial (bitácoras, incidencias). Una estructura **solo con niveles** (sin nodos) sí se puede eliminar.
+- Si tu usuario está **acotado por alcance**, verás solo las estructuras donde tienes algún nodo accesible. Un
+  administrador sin restricción ve todas, incluidas las recién creadas aún sin nodos.
 
 ---
 
