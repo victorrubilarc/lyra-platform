@@ -60,4 +60,8 @@ CMD ["node", "dist/main.js"]
 FROM build AS migrate
 ENV NODE_ENV=production
 WORKDIR /repo/apps/watchlog-api
-CMD ["sh", "-c", "pnpm exec prisma migrate deploy && { [ \"$RUN_SEED\" != \"true\" ] || pnpm exec tsx prisma/seed.ts; }"]
+# Invoca los binarios DIRECTO (no `pnpm exec`): con NODE_ENV=production, `pnpm exec`
+# intenta reconciliar node_modules a solo-producción (poda tsx/prisma CLI) y, sin
+# TTY, aborta con ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY. Los .bin ya existen
+# en la imagen (deps instaladas en el stage build).
+CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy && { [ \"$RUN_SEED\" != \"true\" ] || node_modules/.bin/tsx prisma/seed.ts; }"]
