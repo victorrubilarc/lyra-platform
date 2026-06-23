@@ -805,6 +805,38 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
       ✅ Fase Estructura (2026-06-07): Chip, Table, Select. Pendiente: nada para esta fase.
 
 ### Mejoras futuras de Estructura (enterprise, post-Seguridad)
+
+- [ ] 🔴 **MÚLTIPLES ESTRUCTURAS ORGANIZACIONALES (pedido URGENTE del dueño 2026-06-23) — PRÓXIMA SESIÓN.**
+      Soportar varias estructuras en paralelo en una instalación (cada una con su propio set de niveles y su
+      propio árbol), para modelar negocios/casos de uso distintos. **NO es multi-tenant**: es multi-estructura
+      dentro de una única instalación single-tenant on-prem.
+      **Estado actual VERIFICADO (schema.prisma):** una sola estructura global. Bloqueador concreto =
+      `OrgLevel @@unique([order])` (el `order`/profundidad es único en toda la instalación). Ni `OrgLevel`
+      ni `OrgNode` tienen `structureId`; un solo árbol. `OrgNode` es el eje del que cuelga casi todo
+      (LogEntry, Incident, `Scope`, `TemplateNodeAssignment`, calendarios operacional/fiscal por `path`,
+      `LogSchedule`/rondas).
+      **Migración NO-DESTRUCTIVA (requisito innegociable, CERO pérdida de datos):** crear `OrgStructure`,
+      insertar "Estructura por defecto", agregar `structureId` a niveles + raíces de nodos backfilleando TODO
+      lo existente a ella, y reescopar unique (`@@unique([structureId, order])`). Los nodos/niveles/alcances/
+      asignaciones/calendarios actuales quedan intactos bajo la estructura por defecto.
+      **Decisiones a resolver EN EL PLAN (antes de codear):** (1) **aislamiento** entre estructuras (¿mundos
+      separados o se cruzan? inclinación = aislamiento estricto v1); (2) selección de estructura activa por
+      usuario; (3) impacto en `Scope`/`TemplateScope`; (4) `OperationalCalendar.isDefault` ¿único por
+      estructura?; (5) UI de gestión/cambio (identidad Lyra); (6) no romper herencia por `path`.
+      **AUDITORÍA OBLIGATORIA:** derivar del código TODAS las referencias a OrgNode/OrgLevel que deban volverse
+      structure-aware (no asumir la lista). **Esfuerzo: ALTO** (cambio arquitectónico amplio, factible).
+      Ver memoria `multi-org-structure-requirement`. **Prioridad: ALTA, antes de seguir otros puntos del análisis
+      de casos de uso (espesador / Eiser).**
+- [ ] **Alcance por nodo a nivel de ROL ("rol acotado a un nodo") (pedido del dueño 2026-06-23).** Hoy el
+      alcance por nodo solo se configura por USUARIO (Seguridad → Usuarios → pestaña Alcance, `ScopeTreePicker`,
+      `PUT /security/users/:id/scope`); la pestaña Alcance del ROL acota SOLO plantillas (`TemplateScope`).
+      **La tabla `Scope` YA admite `roleId`** (modelo de datos listo) — falta exponer UI/API: `ScopeTreePicker`
+      en el `RoleDrawer` + endpoint `PUT /security/roles/:id/scope`. El alcance efectivo del usuario ya es la
+      UNIÓN de sus scopes + los de sus roles (verificar que la evaluación lo honra). Mantener AMBOS (rol y
+      usuario). **Esfuerzo: BAJO.** Relacionado con el ítem "Seguridad a nivel de nodo en el mantenedor de
+      Estructura" más abajo. Ver memoria `role-node-scope-requirement`. **Fuera de alcance de la sesión de
+      multi-estructura** (no scope-creep).
+
 - [x] **Alcance por plantillas (2.ª dimensión ABAC) ✅ (2026-06-12, `feat/alcance-plantilla` → `main`).** Entidad
       aparte **`TemplateScope`** (`userId|roleId` XOR + `templateId`, sin descendientes), eje ORTOGONAL al `Scope` de
       nodo que combina en **AND**. Semántica **PERMISIVA** (sin scope = ve todas; migración aditiva sin backfill).
