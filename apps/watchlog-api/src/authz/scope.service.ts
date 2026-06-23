@@ -91,6 +91,24 @@ export class ScopeService {
   }
 
   /**
+   * Multi-estructura: ids de las ESTRUCTURAS que el usuario alcanza, o `null` si no
+   * tiene restricción de alcance (ve todas). Se DERIVA de los nodos accesibles (cada
+   * nodo lleva su `structureId`): un usuario alcanza una estructura si tiene acceso a
+   * algún nodo de ella. Es la fuente que filtra el selector de estructura del front y
+   * autoriza el acceso por estructura en el backend.
+   */
+  async getAccessibleStructureIds(userId: string): Promise<Set<string> | null> {
+    const ids = await this.getAccessibleNodeIds(userId);
+    if (ids === null) return null; // sin restricción => todas las estructuras
+    if (ids.size === 0) return new Set();
+    const nodes = await this.prisma.orgNode.findMany({
+      where: { id: { in: [...ids] } },
+      select: { structureId: true },
+    });
+    return new Set(nodes.map((n) => n.structureId));
+  }
+
+  /**
    * ¿Una asignación de plantilla a un nodo cae dentro del alcance del usuario?
    * (Fase 2.8.0 multi-nodo.) La asignación cubre el nodo `orgNodeId` y, si
    * `includeDescendants`, todo su subárbol (`orgNodePath` = ruta materializada).

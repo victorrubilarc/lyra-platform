@@ -28,8 +28,9 @@ import { apiJson, apiVoid } from "../../lib/api-client.js";
 
 const detailSchema = fiscalCalendarSchema;
 
-export function fetchFiscalCalendars(): Promise<FiscalCalendarDto[]> {
-  return apiJson("/fiscal-calendars", z.array(fiscalCalendarSchema));
+export function fetchFiscalCalendars(structureId?: string | null): Promise<FiscalCalendarDto[]> {
+  const q = structureId ? `?structureId=${encodeURIComponent(structureId)}` : "";
+  return apiJson(`/fiscal-calendars${q}`, z.array(fiscalCalendarSchema));
 }
 
 export function fetchFiscalCalendar(id: string): Promise<FiscalCalendarDto> {

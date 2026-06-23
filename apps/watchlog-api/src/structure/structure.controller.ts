@@ -1,14 +1,18 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Req } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query, Req } from "@nestjs/common";
 import type { FastifyRequest } from "fastify";
 import {
   createOrgLevelRequestSchema,
   createOrgNodeRequestSchema,
+  createOrgStructureRequestSchema,
   updateOrgLevelRequestSchema,
   updateOrgNodeRequestSchema,
+  updateOrgStructureRequestSchema,
   type CreateOrgLevelRequest,
   type CreateOrgNodeRequest,
+  type CreateOrgStructureRequest,
   type UpdateOrgLevelRequest,
   type UpdateOrgNodeRequest,
+  type UpdateOrgStructureRequest,
 } from "@lyra/contracts";
 import type { AuditContext } from "../audit/audit.service";
 import type { RequestUser } from "../authz/auth-user";
@@ -20,12 +24,52 @@ import { StructureService } from "./structure.service";
 export class StructureController {
   constructor(private readonly structure: StructureService) {}
 
+  // --- Estructuras ---
+
+  @Get("structures")
+  @RequirePermission("orgnode:read")
+  listStructures(@CurrentUser() user: RequestUser) {
+    return this.structure.listStructures(user.id);
+  }
+
+  @Post("structures")
+  @RequirePermission("orglevel:manage")
+  createStructure(
+    @Body(new ZodValidationPipe(createOrgStructureRequestSchema)) dto: CreateOrgStructureRequest,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.structure.createStructure(dto, this.ctx(user, req));
+  }
+
+  @Patch("structures/:id")
+  @RequirePermission("orglevel:manage")
+  updateStructure(
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(updateOrgStructureRequestSchema)) dto: UpdateOrgStructureRequest,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.structure.updateStructure(id, dto, this.ctx(user, req));
+  }
+
+  @Delete("structures/:id")
+  @HttpCode(204)
+  @RequirePermission("orglevel:manage")
+  async deleteStructure(
+    @Param("id") id: string,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ): Promise<void> {
+    await this.structure.deleteStructure(id, this.ctx(user, req));
+  }
+
   // --- Niveles ---
 
   @Get("levels")
   @RequirePermission("orgnode:read")
-  listLevels() {
-    return this.structure.listLevels();
+  listLevels(@Query("structureId") structureId?: string) {
+    return this.structure.listLevels(structureId);
   }
 
   @Post("levels")
@@ -64,8 +108,8 @@ export class StructureController {
 
   @Get("nodes")
   @RequirePermission("orgnode:read")
-  getTree() {
-    return this.structure.getTree();
+  getTree(@Query("structureId") structureId?: string) {
+    return this.structure.getTree(structureId);
   }
 
   @Post("nodes")

@@ -173,13 +173,15 @@ export function validateFiscalCalendar(cfg: FiscalConfig): string[] {
 
 export const fiscalCalendarSchema = z.object({
   id: z.string(),
+  /** Estructura dueña; el default y la asignación de nodos son POR ESTRUCTURA. */
+  structureId: z.string(),
   /** Clave estable y única (slug). Para seed idempotente y referencias. */
   key: z.string(),
   name: z.string(),
   description: z.string().nullable(),
   /** Zona horaria IANA para ubicar "hoy" al generar/marcar el período Actual. */
   timezone: z.string(),
-  /** Exactamente un calendario fiscal es el por defecto (single-tenant). */
+  /** Exactamente un calendario fiscal es el por defecto POR ESTRUCTURA. */
   isDefault: z.boolean(),
   active: z.boolean(),
   periodKind: periodKindSchema,
@@ -241,7 +243,12 @@ function refineFiscalBody(
 }
 
 export const createFiscalCalendarRequestSchema = z
-  .object({ key: fiscalCalendarKeySchema, ...fiscalCalendarBodyShape })
+  .object({
+    key: fiscalCalendarKeySchema,
+    /** Estructura dueña; si se omite, la estructura por defecto. */
+    structureId: z.string().optional(),
+    ...fiscalCalendarBodyShape,
+  })
   .superRefine(refineFiscalBody);
 export type CreateFiscalCalendarRequest = z.infer<typeof createFiscalCalendarRequestSchema>;
 

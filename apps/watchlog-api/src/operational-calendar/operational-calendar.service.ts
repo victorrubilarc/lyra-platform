@@ -44,10 +44,11 @@ export class OperationalCalendarService {
     private readonly audit: AuditService,
   ) {}
 
-  /** Lista calendarios vivos con su conteo de turnos. */
-  async list(): Promise<(OperationalCalendar & { shiftCount: number })[]> {
+  /** Lista calendarios vivos con su conteo de turnos (de una estructura, o de todas). */
+  async list(structureId?: string | null): Promise<(OperationalCalendar & { shiftCount: number })[]> {
+    const sid = structureId ? await this.resolveStructureId(structureId) : undefined;
     const cals = await this.prisma.operationalCalendar.findMany({
-      where: { deletedAt: null },
+      where: { deletedAt: null, ...(sid ? { structureId: sid } : {}) },
       orderBy: [{ isDefault: "desc" }, { name: "asc" }],
       include: { _count: { select: { shifts: true } } },
     });
@@ -70,12 +71,15 @@ export class OperationalCalendarService {
 
   async create(dto: CreateOperationalCalendarRequest, ctx: AuditContext): Promise<CalendarWithShifts & { assignedNodeIds: string[] }> {
     this.assertValid(dto);
+    const structureId = await this.resolveStructureId(dto.structureId ?? null);
     const shifts = dto.shifts ?? [];
     const created = await this.prisma
       .$transaction(async (tx) => {
-        if (dto.isDefault) await tx.operationalCalendar.updateMany({ data: { isDefault: false }, where: { isDefault: true } });
+        // El default es POR ESTRUCTURA: solo desmarca dentro de la misma estructura.
+        if (dto.isDefault) await tx.operationalCalendar.updateMany({ data: { isDefault: false }, where: { isDefault: true, structureId } });
         return tx.operationalCalendar.create({
           data: {
+            structureId,
             key: dto.key,
             name: dto.name,
             description: dto.description ?? null,
@@ -101,7 +105,7 @@ export class OperationalCalendarService {
     this.assertValid({ ...dto, shifts: dto.shifts ?? before.shifts });
 
     await this.prisma.$transaction(async (tx) => {
-      if (dto.isDefault) await tx.operationalCalendar.updateMany({ data: { isDefault: false }, where: { isDefault: true, id: { not: id } } });
+      if (dto.isDefault) await tx.operationalCalendar.updateMany({ data: { isDefault: false }, where: { isDefault: true, structureId: before.structureId, id: { not: id } } });
       await tx.operationalCalendar.update({
         where: { id },
         data: {
@@ -133,7 +137,7 @@ export class OperationalCalendarService {
     const cal = await this.prisma.operationalCalendar.findFirst({ where: { id, deletedAt: null } });
     if (!cal) throw new NotFoundException("Calendario operacional no encontrado");
     await this.prisma.$transaction([
-      this.prisma.operationalCalendar.updateMany({ data: { isDefault: false }, where: { isDefault: true, id: { not: id } } }),
+      this.prisma.operationalCalendar.updateMany({ data: { isDefault: false }, where: { isDefault: true, structureId: cal.structureId, id: { not: id } } }),
       this.prisma.operationalCalendar.update({ where: { id }, data: { isDefault: true } }),
     ]);
     await this.audit.record({ ...ctx, action: "opscalendar.set_default", entityType: "OperationalCalendar", entityId: id });
@@ -146,8 +150,9 @@ export class OperationalCalendarService {
     if (!cal) throw new NotFoundException("Calendario operacional no encontrado");
     const ids = [...new Set(dto.orgNodeIds)];
     if (ids.length > 0) {
-      const found = await this.prisma.orgNode.count({ where: { id: { in: ids }, deletedAt: null } });
-      if (found !== ids.length) throw new BadRequestException("Uno o más nodos no existen.");
+      // Aislamiento estricto: solo se asignan nodos de la MISMA estructura del calendario.
+      const found = await this.prisma.orgNode.count({ where: { id: { in: ids }, deletedAt: null, structureId: cal.structureId } });
+      if (found !== ids.length) throw new BadRequestException("Uno o más nodos no existen o pertenecen a otra estructura.");
     }
     await this.prisma.$transaction([
       // Quitar de los nodos que ya no están en el set.
@@ -183,6 +188,20 @@ export class OperationalCalendarService {
   }
 
   // --- Helpers ---------------------------------------------------------------
+
+  /** Resuelve el id de estructura: el dado (si existe y vive) o el por defecto. */
+  private async resolveStructureId(structureId?: string | null): Promise<string> {
+    if (structureId) {
+      const exists = await this.prisma.orgStructure.count({ where: { id: structureId, deletedAt: null } });
+      if (exists === 0) throw new BadRequestException("La estructura indicada no existe");
+      return structureId;
+    }
+    const def = await this.prisma.orgStructure.findFirst({ where: { isDefault: true, deletedAt: null }, select: { id: true } });
+    if (def) return def.id;
+    const any = await this.prisma.orgStructure.findFirst({ where: { deletedAt: null }, select: { id: true } });
+    if (!any) throw new BadRequestException("No hay ninguna estructura organizacional configurada");
+    return any.id;
+  }
 
   /** Re-valida en backend (defensa en profundidad sobre el contrato). */
   private assertValid(input: Parameters<typeof validateOperationalCalendar>[0]): void {

@@ -39,6 +39,10 @@ function makeService(overrides: Record<string, unknown> = {}) {
       updateMany: vi.fn().mockResolvedValue({ count: 0 }),
       count: vi.fn().mockResolvedValue(0),
     },
+    orgStructure: {
+      findFirst: vi.fn().mockResolvedValue({ id: "org_structure_default" }),
+      count: vi.fn().mockResolvedValue(1),
+    },
     ...overrides,
   } as unknown as PrismaService;
   // $transaction: ejecuta el callback con el propio mock, o resuelve un arreglo de promesas.

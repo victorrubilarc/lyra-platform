@@ -62,17 +62,24 @@ export class FiscalResolverService extends FiscalResolver {
    */
   async resolveFiscalCalendar(orgNodeId?: string | null): Promise<FiscalCalendar | null> {
     let fiscalCalendarId: string | null = null;
+    let structureId: string | null = null;
     if (orgNodeId) {
-      const node = await this.prisma.orgNode.findUnique({ where: { id: orgNodeId }, select: { path: true } });
-      if (node?.path) {
-        const ids = node.path.split("/").filter(Boolean);
-        const assigned = await this.prisma.orgNode.findMany({
-          where: { id: { in: ids }, fiscalCalendarId: { not: null }, deletedAt: null },
-          select: { fiscalCalendarId: true, path: true },
-        });
-        if (assigned.length > 0) {
-          assigned.sort((a, b) => a.path.length - b.path.length);
-          fiscalCalendarId = assigned[assigned.length - 1]!.fiscalCalendarId;
+      const node = await this.prisma.orgNode.findUnique({
+        where: { id: orgNodeId },
+        select: { path: true, structureId: true },
+      });
+      if (node) {
+        structureId = node.structureId;
+        if (node.path) {
+          const ids = node.path.split("/").filter(Boolean);
+          const assigned = await this.prisma.orgNode.findMany({
+            where: { id: { in: ids }, fiscalCalendarId: { not: null }, deletedAt: null },
+            select: { fiscalCalendarId: true, path: true },
+          });
+          if (assigned.length > 0) {
+            assigned.sort((a, b) => a.path.length - b.path.length);
+            fiscalCalendarId = assigned[assigned.length - 1]!.fiscalCalendarId;
+          }
         }
       }
     }
@@ -82,6 +89,21 @@ export class FiscalResolverService extends FiscalResolver {
       });
       if (cal) return cal;
     }
-    return this.prisma.fiscalCalendar.findFirst({ where: { isDefault: true, deletedAt: null, active: true } });
+    // Fallback: el calendario fiscal por defecto DE LA ESTRUCTURA del nodo (o de la
+    // estructura por defecto si no hay nodo de contexto).
+    const sid = structureId ?? (await this.defaultStructureId());
+    if (!sid) return null;
+    return this.prisma.fiscalCalendar.findFirst({
+      where: { isDefault: true, structureId: sid, deletedAt: null, active: true },
+    });
+  }
+
+  /** Id de la estructura por defecto (fallback cuando no hay nodo de contexto). */
+  private async defaultStructureId(): Promise<string | null> {
+    const def = await this.prisma.orgStructure.findFirst({
+      where: { isDefault: true, deletedAt: null },
+      select: { id: true },
+    });
+    return def?.id ?? null;
   }
 }

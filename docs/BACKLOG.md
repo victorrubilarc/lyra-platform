@@ -5,7 +5,21 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-19** (**Fase 5 · Cambio de turno · Slice 4 — EXPORT PDF del acta de entrega ✅ → FASE 5 COMPLETA** —
+> actualización: **2026-06-23** (**Multi-estructura organizacional ✅** — `feat/multi-estructura-org`: una
+> instalación single-tenant puede definir VARIAS estructuras en paralelo (cada una con su set de niveles y su
+> árbol). Nueva `OrgStructure` + `structureId` en `OrgLevel`/`OrgNode`/calendarios; `@@unique([order])`→
+> `@@unique([structureId, order])`; default de calendarios POR ESTRUCTURA. Migración aditiva
+> `20260623120000_add_org_structure` con **"Estructura por defecto"** que absorbe lo legado (cero pérdida
+> verificada). Aislamiento estricto + selector global por usuario + ABAC; catálogos COMPARTIDOS. Permiso
+> reusado `orglevel:manage`. contracts 321 · API 249 · web verde · smoke `smoke-multi-estructura.py` **33/33** +
+> regresión incidencias 32 · cambio-turno 29 · sla 25. **PENDIENTE: smoke VISUAL del dueño.** **Deuda nueva:**
+> (a) `StructuresDrawer` no permite (des)activar ni reordenar estructuras (solo crear/renombrar/borrar) ·
+> (b) un admin ACOTADO no ve una estructura recién creada hasta que tenga un nodo accesible (se deriva del
+> ABAC por nodo) · (c) purgar una estructura con historial de nodos (soft-deleted) no es posible (bloquea por
+> nodos; necesitaría un flujo de archivo/purga GxP) · (d) el `deleteLevel` da 500 si un nodo SOFT-deleted aún
+> referencia el nivel (bug latente preexistente; mitigado en estructuras por la cascada). **Dependencia:**
+> "rol acotado a nodo" (`Scope.roleId` en UI) sigue pendiente (memoria `role-node-scope-requirement`).
+> Anterior: **Fase 5 · Cambio de turno · Slice 4 — EXPORT PDF del acta de entrega ✅ → FASE 5 COMPLETA** —
 > `feat/cambio-turno-acta-pdf`: desde una entrega FIRMADA se descarga un **acta PDF de grado auditoría** (identidad Lyra, snapshot
 > congelado, dos firmas Part 11, folio + hash verificable), generada en el backend, on-prem, sin SaaS. Motor **pdfmake** (NO Chromium;
 > Sora/Inter embebidas como TTF OFL); builder PURO `buildActaDocument` desde el snapshot; endpoint `GET /shift-handover/:id/acta.pdf`

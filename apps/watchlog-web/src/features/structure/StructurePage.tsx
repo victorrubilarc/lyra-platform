@@ -11,6 +11,8 @@ import { OrgTree, type EquipmentHit } from "./OrgTree.js";
 import { NodeDetail } from "./NodeDetail.js";
 import { NodeDrawer, type NodeDrawerMode } from "./NodeDrawer.js";
 import { LevelsDrawer } from "./LevelsDrawer.js";
+import { StructureSelector } from "./StructureSelector.js";
+import { StructuresDrawer } from "./StructuresDrawer.js";
 import { DeleteNodeModal } from "./DeleteNodeModal.js";
 import { MoveNodeModal } from "./MoveNodeModal.js";
 import styles from "./StructurePage.module.css";
@@ -45,6 +47,7 @@ export function StructurePage() {
     node: null,
   });
   const [levelsOpen, setLevelsOpen]   = useState(false);
+  const [structuresOpen, setStructuresOpen] = useState(false);
   const [moveNode, setMoveNode]       = useState<OrgNodeTree | null>(null);
   const [deleteNode, setDeleteNode]   = useState<OrgNodeTree | null>(null);
   const [treeQuery, setTreeQuery]     = useState("");
@@ -97,6 +100,7 @@ export function StructurePage() {
           <p className={styles.subtitle}>{t("structure.subtitle")}</p>
         </div>
         <div className={styles.actions}>
+          <StructureSelector onManage={() => setStructuresOpen(true)} />
           <Can perform="orglevel:manage">
             <Button variant="secondary" onClick={() => setLevelsOpen(true)}>
               <Layers size={16} />
@@ -208,6 +212,8 @@ export function StructurePage() {
       />
 
       <LevelsDrawer open={levelsOpen} onClose={() => setLevelsOpen(false)} />
+
+      <StructuresDrawer open={structuresOpen} onClose={() => setStructuresOpen(false)} />
 
       <DeleteNodeModal
         open={deleteNode !== null}

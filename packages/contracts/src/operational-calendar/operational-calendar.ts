@@ -65,13 +65,15 @@ export type OperationalShiftInput = z.infer<typeof operationalShiftInputSchema>;
 
 export const operationalCalendarSchema = z.object({
   id: z.string(),
+  /** Estructura dueña; el default y la asignación de nodos son POR ESTRUCTURA. */
+  structureId: z.string(),
   /** Clave estable y única (slug). Para seed idempotente y referencias. */
   key: z.string(),
   name: z.string(),
   description: z.string().nullable(),
   /** Zona horaria IANA (ej. "America/Santiago"). Todo se guarda en UTC. */
   timezone: z.string(),
-  /** Exactamente un calendario es el por defecto (single-tenant). */
+  /** Exactamente un calendario es el por defecto POR ESTRUCTURA. */
   isDefault: z.boolean(),
   active: z.boolean(),
   /**
@@ -135,7 +137,12 @@ function refineCalendarBody(
 }
 
 export const createOperationalCalendarRequestSchema = z
-  .object({ key: operationalCalendarKeySchema, ...operationalCalendarBodyShape })
+  .object({
+    key: operationalCalendarKeySchema,
+    /** Estructura dueña; si se omite, la estructura por defecto. */
+    structureId: z.string().optional(),
+    ...operationalCalendarBodyShape,
+  })
   .superRefine(refineCalendarBody);
 export type CreateOperationalCalendarRequest = z.infer<typeof createOperationalCalendarRequestSchema>;
 

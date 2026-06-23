@@ -1,5 +1,40 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-23 — 🏗️ Multi-estructura organizacional ✅** (`feat/multi-estructura-org`).
+El dueño pidió (urgente) poder definir **VARIAS estructuras organizacionales** en la misma instalación
+single-tenant (cada una con su propio set de niveles y su propio árbol), p. ej. una jerarquía minera
+Faena→Planta y otra de infra TI Contrato→Dominio. **NO es multi-tenant.** Plan aprobado; 3 forks por
+`AskUserQuestion` (DECISIONS 2026-06-23): **catálogos COMPARTIDOS** (solo árbol+niveles+calendarios por
+estructura; plantillas/flujos/tipos/listas siguen únicos) · **aislamiento ESTRICTO** + **selector global
+persistido por usuario** con estructuras **derivadas del ABAC** · **permiso REUSADO `orglevel:manage`**.
+**Hallazgo clave que bajó el riesgo:** `OrgNode.path` son IDs de nodo (cuid únicos) ⇒ los prefijos
+`startsWith` NO colisionan entre estructuras, así que ABAC por nodo y herencia de calendarios por ruta **no
+se reescriben**; `structureId` entra solo como filtro/guardia. **Modelo:** nueva `OrgStructure` + `structureId`
+en `OrgLevel` (reescopa `@@unique([order])`→`@@unique([structureId, order])` — el bloqueador real), `OrgNode`
+(denormalizado en cada nodo, invariante `node.structureId==parent.structureId`, no reparenta entre
+estructuras), `OperationalCalendar`/`FiscalCalendar` (default e asignación de nodos **por estructura**, índices
+únicos parciales). **Migración aditiva `20260623120000_add_org_structure`:** crea `OrgStructure`, inserta
+**"Estructura por defecto"**, backfillea TODO lo legado a ella, reescopa uniques. **Cero pérdida verificada:**
+4 niveles/83 nodos/5+5 calendarios + 18 scopes/19 asignaciones/70 bitácoras/71 incidencias intactos bajo la
+estructura por defecto. **Backend:** `StructureService`/`Controller` (estructuras CRUD + niveles/árbol por
+`?structureId` + invariante de reparent/nivel), `ScopeService.getAccessibleStructureIds` (derivado de los
+nodos accesibles), calendarios + resolvers con **fallback al default de la estructura del nodo**, `seed.ts`.
+**`deleteStructure` bloquea por NODOS (activos o eliminados, arrastran historial/FK), niveles caen por
+cascada** (corrección descubierta por el smoke: borrar el nivel de un nodo soft-deleted daba 500). **Frontend:**
+`structure-store` (estructura activa persistida por usuario, espejo de `workspace-store`) + `StructureSelector`
++ `StructuresDrawer` (CRUD) en el header de Estructura; **`useOrgTree`/`useOrgLevels` leen la estructura activa
+⇒ TODOS los pickers de nodo** (bitácoras, incidencias, alcance, asignar calendario, cambio de turno) quedan
+scoped sin tocarlos uno a uno; listas de calendarios también por estructura activa; selección aislada por
+usuario (`syncOwner` en `AuthProvider`). **Verde:** contracts 321 · API 249 (mock `orgStructure` agregado a
+`operational-calendar.service.spec`) · web typecheck/lint(0 err)/build · **smoke `smoke-multi-estructura.py`
+33/33** (2 estructuras reusando order 0/1 sin choque, niveles/árbol no se mezclan, hijo hereda estructura,
+reparent/nivel cruzado ⇒ 400, calendarios por estructura + asignar nodo ajeno ⇒ 400, default no se borra,
+estructura con nodos no se borra, vacía sí) + regresión incidencias 32 · cambio-turno 29 · sla 25.
+**Reusa `orglevel:manage`** (sin permiso nuevo, sin FLUSHALL). **Pendiente: smoke VISUAL del dueño** (selector
+en el header, crear estructura, niveles propios, datos no se mezclan). **Dependencia anotada (fuera de
+alcance):** "rol acotado a nodo" (`Scope.roleId` en UI). **Siguiente: lo que defina el dueño** (candidato:
+reversa GxP, o "rol acotado a nodo").
+
 **2026-06-22 — 🚀 WatchLog EN VIVO en AWS (`https://lyra.watchlog.itesicws.com`) ✅** (sesión de ops).
 Se desplegó WatchLog en producción en el **mismo EC2** que ruta-bus (Lyra Pass), compartiendo máquina y borde Caddy. Flujo: `git tag v*` → GitHub Actions construye imágenes → GHCR → SSH al EC2 → `update.sh` (pull + migrate + up + healthcheck + rollback). **El primer deploy destapó y arregló 7 bugs reales de empaquetado de prod** (detalle en `docs/DEPLOYMENT.md`): `@lyra/llm` faltante en Dockerfile.api · `@nestjs/schedule` dep fantasma · faltaba `.dockerignore` · `pnpm deploy` v10+ (`--legacy` + `dangerouslyAllowAllBuilds` + openssl) · migrate con `pnpm exec` purgaba sin TTY (→ binarios directo) · healthcheck `wget`→`node` · `prisma generate` en el stage runtime final. **Ops resuelto:** disco lleno por imágenes acumuladas (`docker system prune` liberó 4 GB) · **swap 2 GB** · **choque de nombres** `web` entre ambas apps en la red `edge` → rompió el POS de Lyra Pass → servicio renombrado a **`watchlog-web`** (regla: nombres únicos en `edge`) · red `edge` **persistente** en el compose de Lyra Pass + sincronizada en su repo (un redeploy de Lyra Pass ya no tumba a WatchLog). **Imágenes verificadas localmente** (api construye + `PrismaClient`/argon2 inicializan). **En vivo: v0.1.5.** **Pendiente de blindaje (próxima sesión, BACKLOG §2):** #2 límites de memoria por app, #3 auto-prune en el deploy, backup de Postgres. Decisiones: quedarse en São Paulo (latencia Chile > ahorro Virginia), disco gp3 OK.
 

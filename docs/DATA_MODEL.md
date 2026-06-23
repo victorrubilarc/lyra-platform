@@ -19,8 +19,21 @@
 - **AuthIdentity** (Fase futura) — vínculo a proveedor externo OIDC/LDAP cuando se active.
 
 ### Estructura organizacional
-- **OrgLevel** — nombres de nivel configurables (Área/Proceso/Equipo…).
-- **OrgNode** — auto-referencial (`parentId`, `level`); jerarquía configurable y opcional.
+- **OrgStructure** *(implementado — multi-estructura, migración `20260623120000_add_org_structure`)* — una
+  instalación puede definir VARIAS estructuras en paralelo, cada una con su propio set de niveles y su propio
+  árbol (p. ej. minera Faena→Planta y otra TI Contrato→Dominio). `key` única (slug), `name`, `isDefault`
+  (índice único parcial: exactamente UNA por defecto, la que absorbió lo legado), `active`, `reportOrder`,
+  borrado lógico. **NO es multi-tenant** (sigue sin `tenant_id`): es multi-estructura dentro de una instalación.
+  Los CATÁLOGOS (plantillas, flujos, tipos de incidencia, listas de referencia) siguen COMPARTIDOS; solo el
+  árbol + niveles + calendarios son por-estructura. Aislamiento ESTRICTO. Ver `DECISIONS.md` 2026-06-23.
+- **OrgLevel** — nombres de nivel configurables (Área/Proceso/Equipo…). Pertenece a una **OrgStructure**
+  (`structureId`); el `order` es único **por estructura** (`@@unique([structureId, order])` — reemplaza el
+  `@@unique([order])` global, que bloqueaba coexistir "nivel 0 = Faena" y "nivel 0 = Contrato").
+- **OrgNode** — auto-referencial (`parentId`, `level`); jerarquía configurable y opcional. Lleva `structureId`
+  **denormalizado en cada nodo** (== el del padre; invariante forzado en `StructureService`, no se reparenta
+  entre estructuras). La ruta materializada `path` (IDs de nodo, cuid únicos) **no colisiona** entre
+  estructuras, así que descendientes/ancestros/herencia de calendarios siguen funcionando sin cambios;
+  `structureId` es solo filtro y guardia.
 - **Equipment** *(implementado, migración `20260608195838`)* — equipo industrial anclado a un `OrgNode` (patrón SAP PM: Functional Location 1:N Equipment). Identidad (`name`, `code?`, `tag?` único = assetTag estable), `categoryId?` (FK), `manufacturer/model/serialNumber`, `criticality?` (1–5, check constraint), `active` (estado operacional) + `deletedAt` (borrado lógico), `reportOrder`. **No** es el 4.º nivel de OrgNode (ver DECISIONS 2026-06-07/08).
 - **EquipmentCategory** *(implementado)* — catálogo configurable de clases de equipo (`name`, `code?`, `isoRef?` opcional ISO 14224, `reportOrder`, `active`). No enum, no texto libre.
 - **ExternalReference** *(implementado — solo modelo; UI/motor en Fase 3)* — mapeo polimórfico de un `OrgNode` **o** un `Equipment` (XOR, check constraint, patrón Scope) hacia un sistema externo (historiador/MES/EAM). `systemType` (String configurable), `externalId` (WebID/NodeId/Equipment Number), `externalPath`, `endpoint`, `metadata jsonb`, `enabled`. Integration-ready: un equipo mapea a varios sistemas a la vez.

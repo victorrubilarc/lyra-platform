@@ -4,6 +4,56 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-23 · Multi-estructura organizacional (varias estructuras en una instalación)
+Requerimiento urgente del dueño: poder definir **varias estructuras organizacionales** en paralelo en la
+misma instalación single-tenant (p. ej. una jerarquía minera Faena→Planta y otra de infra TI
+Contrato→Dominio), cada una con su **propio set de niveles** y su **propio árbol**. NO es multi-tenant.
+Plan aprobado; forks resueltos por `AskUserQuestion`:
+- **Catálogos COMPARTIDOS (no por estructura).** Solo el árbol + niveles + calendarios se vuelven
+  por-estructura. Plantillas, flujos, tipos/categorías de incidencia, listas de referencia y datos maestros
+  siguen siendo un catálogo ÚNICO; una plantilla "aparece" en una estructura al asignarla a nodos de ella.
+  *Motivo:* acota el alcance (no `structureId` en ~15 entidades), evita re-crear catálogos por estructura.
+- **Aislamiento ESTRICTO.** Un nodo vive en exactamente UNA estructura; no se reparenta entre estructuras
+  (invariante `node.structureId == parent.structureId`). Bitácoras/incidencias/handovers/rondas heredan la
+  estructura de su nodo, sin columna propia (derivable por join). *Motivo:* los datos quedan particionados
+  por construcción; cruzar estructuras no tiene caso de uso y multiplicaría la complejidad.
+- **Selección por SELECTOR GLOBAL persistido por usuario** (store `structure-store`, espejo de
+  `workspace-store`/`ownerUserId`), con las estructuras seleccionables **derivadas del ABAC**
+  (`ScopeService.getAccessibleStructureIds`: distinct de las estructuras de los nodos accesibles; sin scopes
+  = todas). *Motivo:* sin pertenencia explícita usuario↔estructura nueva; reusa el ABAC por nodo existente.
+- **`structureId` solo donde hace falta:** `OrgStructure` (nueva) + `OrgLevel` (denormalizado, reescopa
+  `@@unique([order])`→`@@unique([structureId, order])` — el bloqueador real) + `OrgNode` (denormalizado en
+  CADA nodo para filtrar sin join a la raíz; guardia de invariante) + `OperationalCalendar`/`FiscalCalendar`
+  (default e asignación de nodos **por estructura**, índices únicos parciales). **NO** en `Scope`/`TemplateScope`
+  (el nodo ya implica su estructura) ni en `LogEntry`/`Incident`/`ShiftHandover`/`LogSchedule` (derivable).
+- **`path` (ruta materializada) SIN cambios.** Son IDs de nodo (cuid únicos): los prefijos `startsWith` de
+  descendientes/ancestros NO colisionan entre estructuras. ⇒ ABAC por nodo y herencia de calendarios por
+  ruta **no se reescriben**; `structureId` entra solo como filtro y guardia. *(Hallazgo clave que bajó el riesgo.)*
+- **Calendarios: default POR ESTRUCTURA.** El fallback de los resolvers (turno/fiscal) pasa de "el default
+  global" a "el default de la ESTRUCTURA del nodo" (o de la estructura por defecto si no hay nodo).
+  *Motivo:* industrias distintas, ritmos de turno/período distintos; un default global no tiene sentido.
+- **Permiso REUSADO `orglevel:manage`** para crear/editar/borrar una estructura (sin nuevo gate, sin FLUSHALL).
+  *Motivo:* quien configura niveles/árbol gestiona estructuras; no crece el catálogo de permisos.
+- **Migración ADITIVA no-destructiva** (`20260623120000_add_org_structure`): crea `OrgStructure`, inserta una
+  **"Estructura por defecto"** (`key=default`, `isDefault`), backfillea TODO lo legado a ella, reescopa el
+  unique de niveles e índices parciales de default. **Cero pérdida** (verificado: 4 niveles/83 nodos/5+5
+  calendarios + 18 scopes/19 asignaciones/70 bitácoras/71 incidencias intactos bajo la estructura por defecto).
+- **`deleteStructure` bloquea por NODOS (activos o eliminados), no por niveles.** Un nodo soft-deleted
+  arrastra historial y FKs `Restrict` (LogEntry/Incident); los niveles caen por cascada con la estructura.
+  *Motivo:* descubierto por el smoke — borrar el nivel de un nodo soft-deleted daba 500 (FK). Una estructura
+  con historial de nodos no se borra; una solo con niveles (sin nodos) sí.
+
+**Backend tocado:** `StructureService`/`Controller` (estructuras CRUD + scoping de niveles/árbol por
+`?structureId` + invariante de reparent/nivel), `ScopeService` (+`getAccessibleStructureIds`),
+`OperationalCalendarService`/`FiscalCalendarService` (default e asignación por estructura, list filtrable),
+`shift-resolver`/`fiscal-resolver` (fallback = default de la estructura del nodo), `seed.ts`.
+**Frontend:** `structure-store` + `StructureSelector` + `StructuresDrawer` (CRUD) en el header de Estructura;
+`useOrgTree`/`useOrgLevels` leen la estructura activa ⇒ **todos los pickers de nodo** (bitácoras, incidencias,
+alcance, asignar calendario, cambio de turno) quedan scoped sin tocarlos uno a uno; listas de calendarios
+también por estructura activa. **Smoke:** `smoke-multi-estructura.py` 33/33 (2 estructuras, datos no se
+mezclan, default intacto, aislamiento estricto, calendarios por estructura) + regresión incidencias 32 ·
+cambio-turno 29 · sla 25. **Dependencia anotada (fuera de alcance):** "rol acotado a nodo" (`Scope.roleId` en UI).
+
 ### 2026-06-22 · Sesión de barrido QA + caso de uso liviano "un día de operación" (sin features nuevas)
 Sesión de **entender, cerrar/diferir lo abierto de Fases 0–5 y HABILITAR una prueba manual end-to-end**.
 NO se construyó funcionalidad nueva. Forks resueltos por `AskUserQuestion`:
