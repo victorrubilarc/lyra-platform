@@ -92,4 +92,6 @@ jobs:
           script: |
             set -e
             cd "${{ secrets.DEPLOY_DIR }}"
-            ./onprem/update.sh ${{ github.ref_name }}
+            # Invocado con `bash` (no `./`) para no depender del bit ejecutable del script:
+            # un re-clone/pull en el EC2 lo resetea a 100644 y `./onprem/update.sh` daría 126.
+            bash onprem/update.sh ${{ github.ref_name }}
