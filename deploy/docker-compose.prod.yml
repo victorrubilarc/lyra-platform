@@ -18,6 +18,11 @@ services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
+    # Tope de memoria por servicio (aislamiento por cgroup): si una app se fuga, el
+    # kernel OOM-mata SOLO su contenedor (se reinicia solo) y no toca a la app vecina
+    # del EC2 compartido. Los topes son TECHOS, no reservas; el uso real es ~10× menor.
+    mem_limit: 512m
+    mem_reservation: 256m
     environment:
       POSTGRES_USER: "${POSTGRES_USER}"
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
@@ -35,6 +40,9 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    # 384m (no 256m): el --maxmemory interno ya es 256mb; un tope de 256m mataría a
+    # Redis al sumar overhead + el fork del bgsave (appendonly). 384m da aire.
+    mem_limit: 384m
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - redisdata:/data
@@ -48,6 +56,7 @@ services:
   minio:
     image: minio/minio:latest
     restart: unless-stopped
+    mem_limit: 384m
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: "${MINIO_ROOT_USER}"
@@ -61,6 +70,7 @@ services:
   migrate:
     image: ${WL_REGISTRY:-ghcr.io}/${WL_OWNER}/lyra-watchlog-migrate:${WL_VERSION:-stable}
     restart: "no"
+    mem_limit: 512m
     env_file: .env
     environment:
       NODE_ENV: "production"
@@ -74,10 +84,13 @@ services:
   api:
     image: ${WL_REGISTRY:-ghcr.io}/${WL_OWNER}/lyra-watchlog-api:${WL_VERSION:-stable}
     restart: unless-stopped
+    mem_limit: 512m
     env_file: .env
     environment:
       NODE_ENV: "production"
       API_PORT: "3000"
+      # V8 hace GC antes del tope del cgroup (el OOM-kill de cgroup es SIGKILL, no grácil).
+      NODE_OPTIONS: "--max-old-space-size=384"
       TZ: "${TZ:-America/Santiago}"
     depends_on:
       migrate:
@@ -102,6 +115,7 @@ services:
   watchlog-web:
     image: ${WL_REGISTRY:-ghcr.io}/${WL_OWNER}/lyra-watchlog-web:${WL_VERSION:-stable}
     restart: unless-stopped
+    mem_limit: 128m
     environment:
       # TLS lo hace el Caddy de borde; aquí solo HTTP interno en :80 (sin publicar puerto).
       SITE_ADDRESS: ":80"

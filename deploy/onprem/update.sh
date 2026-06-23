@@ -36,9 +36,27 @@ healthy() {
   return 1
 }
 
+# Auto-prune tras un deploy EXITOSO: con deploys continuos el disco se llena de
+# versiones viejas y rompería a AMBAS apps del EC2. Borra SOLO las imágenes de la
+# versión anterior de WatchLog (nunca las en uso ni las de la app vecina) + dangling.
+prune_old() {
+  local owner reg
+  owner="$(grep '^WL_OWNER=' .env | cut -d= -f2)"
+  reg="$(grep '^WL_REGISTRY=' .env | cut -d= -f2)"; reg="${reg:-ghcr.io}"
+  if [ -n "${PREV:-}" ] && [ "$PREV" != "$NEW" ] && [ -n "$owner" ]; then
+    local img
+    for img in api web migrate; do
+      docker image rm "${reg}/${owner}/lyra-watchlog-${img}:${PREV}" 2>/dev/null || true
+    done
+  fi
+  docker image prune -f || true   # || true: no romper un deploy ya exitoso (set -e)
+}
+
 deploy "$NEW"
 if healthy; then
   echo "✅ WatchLog actualizado a ${NEW} y saludable."
+  prune_old
+  echo "  · limpieza de imágenes viejas hecha."
 else
   echo "❌ Health del API falló. Rollback a ${PREV}…"
   deploy "$PREV"
