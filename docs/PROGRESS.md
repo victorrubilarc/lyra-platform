@@ -1,5 +1,25 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-23 — 💾 Backup de Postgres pre-deploy + cron (OPS, sin features) ✅** (commit `6130774` en `main`).
+Cierra el **#4 / última pendiente** del blindaje de deploys (BACKLOG §3). Ahora era urgente: el deploy ya corre
+`prisma migrate deploy` contra la BD de **producción** en cada release, y `migrate deploy` es **forward-only** —
+el rollback de `update.sh` solo revierte **imágenes**, no el **esquema** ⇒ una migración que corrompa datos sin
+backup es pérdida irreversible. **`deploy/onprem/backup.sh`** (espejo del de Lyra Pass, con mejoras de criterio,
+NO copia): `pg_dump -Fc` (formato CUSTOM — comprimido, restauración selectiva e **inspeccionable sin aplicarlo**
+con `pg_restore --list`/`--schema-only`, a diferencia del SQL plano de Lyra Pass) corrido dentro del contenedor
+`postgres:16-alpine` (versión exacta del server); **escritura a `.tmp` + `mv`-atómico** (nunca deja un dump
+parcial con nombre bueno — el `pg_dump|gzip>file` de Lyra Pass sí podía); **retención por días (14) con piso
+mínimo de copias (10)** — corrige un bug latente del de Lyra Pass (su `-mtime +14` a secas borra TODO tras un mes
+sin deploys ni cron, dejando CERO backups). Almacén `deploy/backups/` (gitignored). **Integración en `update.sh`:
+`backup()` ANTES de migrar, BLOQUEA por defecto** (decisión del dueño 2026-06-23; válvula de escape
+`BACKUP_REQUIRED=false`); nunca corre antes del rollback; se salta solo si Postgres no existe (bootstrap).
+**Verificado EN VIVO** (host EC2, BD de prod intacta — `pg_dump` es solo-lectura): dump **286 KB** formato CUSTOM
+(600 entradas TOC, server 16.14) · `pg_restore --list` OK · restauración **schema-only a BD descartable** =
+**74 tablas**, sin errores de extensión/rol, BD de prueba botada · **rotación** forzada con 15 dumps falsos
+añejados = bajó al piso de 10. **Cron diario 03:30 instalado** (`crontab` de `ubuntu` → `backups/backup.log`).
+**Siguiente: blindaje de deploys COMPLETO (#1–#4 ✅); próximo módulo a definir con el dueño** (candidato: reversa
+GxP de registros sellados, o Fase 6).
+
 **2026-06-23 — 🛡️ Blindaje de deploys continuos (OPS, sin features) ✅** (commit `8e8c9a6` en `main`).
 Las dos apps (WatchLog v0.1.7 + Lyra Pass) comparten el EC2 y el borde Caddy, ambas en deploy continuo. Se
 blindó el pipeline para que **un deploy/fuga de una NUNCA tumbe a la otra**, completando #2 y #3 de BACKLOG §3.

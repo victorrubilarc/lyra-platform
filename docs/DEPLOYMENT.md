@@ -31,11 +31,11 @@ Ambas apps tenían un servicio `web`. Al compartir la red `edge`, el `reverse_pr
 2. Cambios de **`deploy/`** (compose/update.sh/Caddyfile) **NO** son automáticos → `git pull` en `/opt/watchlog` antes/junto al deploy. Solo el **código de app** (imágenes) sube solo con el tag.
 3. Cada varios deploys: **`docker system prune -af`** (que el disco no se llene; **no** usar `--volumes`).
 
-### Blindaje de deploys continuos (2026-06-23) ✅ #2 y #3
+### Blindaje de deploys continuos (2026-06-23) ✅ #2, #3 y #4 — COMPLETO
 Ambas apps comparten EC2 + borde Caddy, ambas en deploy continuo. Blindado para que un deploy/fuga de una NUNCA tumbe a la otra:
 - **#2 Límites de memoria por servicio ✅** (`mem_limit` por servicio en AMBOS compose). Aislamiento por cgroup: una fuga OOM-mata SOLO su contenedor (que se reinicia solo), no a la vecina. Topes HOLGADOS sobre el uso real (`docker stats`) — son **techos, no reservas**; su suma puede exceder la RAM física (correcto). WatchLog: postgres 512m · redis **384m** (su `--maxmemory` interno es 256mb; 256m lo mataría con el fork del bgsave) · minio 384m · api 512m (+`NODE_OPTIONS=--max-old-space-size=384`, GC antes del SIGKILL del cgroup) · watchlog-web 128m · migrate 512m. Lyra Pass: postgres **768m** (por su `shm_size: 256mb`, que cuenta contra el cgroup) · redis 384m · api 512m (+NODE_OPTIONS) · web/admin 256m · worker 384m · migrate 512m · **caddy 192m** (borde/SPOF, margen extra).
 - **#3 Auto-prune tras deploy EXITOSO ✅** (`prune_old` en ambos `update.sh`, después del healthcheck OK, nunca en rollback). `docker image prune -f` solo borra **dangling**; las versiones viejas quedan **con tag** ⇒ no se reclaman. Por eso además se borran **dirigidamente** las imágenes de la versión anterior de la PROPIA app (`lyra-watchlog-{api,web,migrate}:$PREV` / `lyra-pass-{api,web,admin,worker,migrate}:$PREV`). App-scoped: nunca toca imágenes en uso ni de la app vecina; respeta el rollback (la versión actual queda; GHCR conserva el tag). `|| true` para no romper un deploy ya exitoso (`set -e`). Se ejercita solo en el próximo deploy con tag.
-- **Pendiente:** Backup de Postgres de WatchLog (deuda Fase 7). **Nota:** Lyra Pass ya tiene `onprem/backup.sh` y lo corre antes de cada deploy ⇒ espejarlo para WatchLog.
+- **#4 Backup de Postgres pre-deploy + cron ✅** (`deploy/onprem/backup.sh`, llamado por `backup()` en `update.sh` ANTES de migrar). **Por qué es la red de seguridad clave:** el deploy corre `prisma migrate deploy` contra la BD de prod en cada release, y `migrate deploy` es **forward-only** — el rollback de `update.sh` revierte **imágenes**, NO el **esquema**; sin backup, una migración que corrompa datos es pérdida irreversible. **Formato `pg_dump -Fc`** (CUSTOM: comprimido, restauración selectiva e **inspeccionable sin aplicarlo** con `pg_restore --list`/`--schema-only` — por eso se prefirió sobre el SQL plano del de Lyra Pass), corrido dentro del contenedor `postgres:16-alpine`. **Escritura a `.tmp` + `mv`-atómico** (nunca un dump parcial con nombre válido). **Retención por días (`RETENTION_DAYS=14`) con piso mínimo (`RETENTION_MIN_KEEP=10`)**: borra dumps > 14 días pero **siempre conserva los últimos 10** (evita el bug del `-mtime +14` puro de Lyra Pass, que tras un mes inactivo borra TODO). Almacén `deploy/backups/` (gitignored). **BLOQUEA el deploy por defecto** si el backup falla (decisión 2026-06-23); válvula de escape `BACKUP_REQUIRED=false` en el `.env`. Se salta solo si Postgres no existe aún (bootstrap). **Cron diario 03:30** en el host (`crontab` de `ubuntu`, log en `backups/backup.log`). **Verificado en vivo** (BD de prod intacta, `pg_dump` solo-lectura): dump 286 KB CUSTOM, `pg_restore --list` OK, restauración schema-only a BD descartable = 74 tablas, rotación al piso de 10. **Cron instalado:** `30 3 * * * /opt/watchlog/deploy/onprem/backup.sh >> /opt/watchlog/deploy/backups/backup.log 2>&1`.
 
 ## Arquitectura
 
@@ -68,7 +68,8 @@ Ambas apps comparten EC2 + borde Caddy, ambas en deploy continuo. Blindado para 
 | `.github/workflows/ci.yml` | typecheck + lint + test en push a main / PR |
 | `docker/Dockerfile.api` (target `migrate`) | imagen init con Prisma CLI + migraciones + seed |
 | `deploy/docker-compose.prod.yml` | stack prod (imágenes GHCR, sin 80/443, red `edge`) |
-| `deploy/onprem/update.sh` | pull → migrate deploy → up -d → healthcheck + rollback |
+| `deploy/onprem/update.sh` | backup → pull → migrate deploy → up -d → healthcheck + rollback + auto-prune |
+| `deploy/onprem/backup.sh` | `pg_dump -Fc` del Postgres dedicado a `deploy/backups/`, retención 14d/piso 10; pre-deploy (bloqueante) + cron diario |
 | `deploy/.env.prod.example` | plantilla del `.env` de producción |
 
 ---
@@ -173,12 +174,25 @@ git tag v1.0.0 && git push origin v1.0.0     # build → GHCR → deploy + rollb
 ## Notas importantes
 - **HTTPS / cookies:** el borde hace TLS; `COOKIE_SECURE=true` y `APP_PUBLIC_URL=https://lyra.watchlog.itesicws.com` son obligatorios. La API es same-origin (CORS off en prod).
 - **Migraciones:** corren en la imagen `migrate` (init container con Prisma CLI), NO en la imagen `api` (que se arma con `pnpm deploy --prod` sin el CLI).
-- **Datos persistentes:** volúmenes `pgdata`, `redisdata`, `miniodata` (de WatchLog, aislados). Respaldar Postgres antes de upgrades grandes (pendiente: script de backup como el de ruta-bus).
+- **Datos persistentes:** volúmenes `pgdata`, `redisdata`, `miniodata` (de WatchLog, aislados). **Backup de Postgres ✅** (`deploy/onprem/backup.sh`): automático **antes de cada deploy** (bloqueante) + **cron diario 03:30**; restaurar con `pg_restore`. Para upgrades mayores, correrlo a mano primero (`bash onprem/backup.sh`).
 - **Aislamiento:** WatchLog y ruta-bus NO comparten BD ni red `internal`; solo comparten el Caddy de borde vía la red `edge`.
 - **MinIO/SMTP:** MinIO interno (no expuesto). SMTP se administra en la app; el `.env` es solo fallback de arranque.
 
+### Restaurar desde un backup (procedimiento)
+```bash
+cd /opt/watchlog/deploy
+COMPOSE="docker compose -f docker-compose.prod.yml --env-file .env"
+DUMP="backups/watchlog_YYYYMMDD_HHMM.dump"            # elige el deseado (ls -lt backups/)
+# Inspeccionar SIN aplicar:
+$COMPOSE exec -T postgres sh -c 'pg_restore --list' < "$DUMP" | less
+# Restauración REAL (DESTRUCTIVA — sobre la BD viva): detén el api primero y usa --clean.
+# $COMPOSE stop api watchlog-web
+# $COMPOSE exec -T postgres sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --no-owner --no-acl' < "$DUMP"
+# $COMPOSE up -d
+```
+> Para validar un dump sin riesgo, restáuralo a una BD descartable (`createdb watchlog_restore_test` → `pg_restore --schema-only -d watchlog_restore_test` → `dropdb`).
+
 ## Pendiente / deuda de este despliegue (Fase 7)
-- Script de **backup** de Postgres + cron (espejo de `ruta-bus/deploy/onprem/backup.sh`).
 - `install.sh` idempotente (hoy el bootstrap es manual, descrito arriba).
 - Build de la web con **build-args VITE_** (branding por licenciatario) si se requiere.
 - Healthcheck del `web`/borde y observabilidad (logs centralizados).

@@ -5,7 +5,12 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-23** (**Multi-estructura organizacional ✅** — `feat/multi-estructura-org`: una
+> actualización: **2026-06-23** (**💾 Backup de Postgres pre-deploy + cron ✅** — commit `6130774`, OPS sin features:
+> cierra la última pendiente del blindaje de deploys (§3 #4) ⇒ **blindaje COMPLETO (#1–#4)**. `deploy/onprem/backup.sh`
+> (`pg_dump -Fc`, retención 14d/piso 10, `.tmp`+`mv`-atómico) llamado por `backup()` en `update.sh` ANTES de migrar,
+> **BLOQUEA por defecto** (`migrate deploy` es forward-only; el rollback no revierte el esquema). Cron diario 03:30 en el
+> host. Verificado en vivo: dump 286 KB CUSTOM · restauración schema-only = 74 tablas · rotación al piso de 10. Ver §3.
+> Anterior: **Multi-estructura organizacional ✅** — `feat/multi-estructura-org`: una
 > instalación single-tenant puede definir VARIAS estructuras en paralelo (cada una con su set de niveles y su
 > árbol). Nueva `OrgStructure` + `structureId` en `OrgLevel`/`OrgNode`/calendarios; `@@unique([order])`→
 > `@@unique([structureId, order])`; default de calendarios POR ESTRUCTURA. Migración aditiva
@@ -1461,7 +1466,8 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
 > WatchLog **EN VIVO** en `lyra.watchlog.itesicws.com`, en el EC2 compartido con Lyra Pass.
 > **Hecho:** #1 red `edge` persistente (un redeploy de Lyra Pass ya no tumba WatchLog) + swap 2 GB +
 > servicio `watchlog-web` (sin choque de nombres). **#2 y #3 ✅ (2026-06-23, OPS — WatchLog commit `8e8c9a6`,
-> Lyra Pass commit `9bfb07e`):** ver detalle en `docs/DEPLOYMENT.md` y `PROGRESS.md`.
+> Lyra Pass commit `9bfb07e`)** + **#4 backup de Postgres ✅ (2026-06-23, WatchLog commit `6130774`)**:
+> **blindaje COMPLETO (#1–#4).** Ver detalle en `docs/DEPLOYMENT.md` y `PROGRESS.md`.
 - [x] **#2 · Límites de memoria por servicio (`mem_limit`) ✅ 2026-06-23.** `mem_limit` por servicio en AMBOS
       compose (aislamiento por cgroup: una fuga OOM-mata SOLO su contenedor, no a la vecina). Topes holgados
       sobre el uso real medido (`docker stats`; son techos, no reservas). WatchLog: pg 512m · redis 384m · minio
@@ -1472,8 +1478,14 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
       `docker image prune -f` (dangling) + borrado DIRIGIDO de la versión anterior de la propia app
       (`lyra-watchlog-*` / `lyra-pass-*` con `$PREV`) — `prune -f` solo no reclama las versiones viejas (quedan
       con tag). App-scoped (nunca en uso ni la vecina), respeta el rollback. **Se ejercita en el próximo deploy con tag.**
-- [ ] **Backup de Postgres de WatchLog** + cron (deuda Fase 7; red de seguridad antes de cualquier upgrade/migración).
-      **Nota:** Lyra Pass YA tiene `onprem/backup.sh` y lo corre antes de cada deploy ⇒ espejarlo para WatchLog.
+- [x] **#4 · Backup de Postgres de WatchLog + cron ✅ 2026-06-23** (WatchLog commit `6130774`). Red de seguridad
+      antes de cada migración (`prisma migrate deploy` es forward-only; el rollback solo revierte imágenes, no el
+      esquema). `deploy/onprem/backup.sh`: `pg_dump -Fc` (CUSTOM, inspeccionable con `pg_restore --list`/
+      `--schema-only`) + `.tmp`/`mv`-atómico + retención 14d **con piso mínimo de 10 copias** (evita el bug del
+      `-mtime +14` puro de Lyra Pass). `backup()` en `update.sh` ANTES de migrar, **BLOQUEA por defecto** (escape
+      `BACKUP_REQUIRED=false`). Almacén `deploy/backups/` (gitignored). **Cron diario 03:30** instalado en el host.
+      Verificado en vivo (BD de prod intacta): dump 286 KB CUSTOM · restauración schema-only a BD descartable =
+      74 tablas · rotación al piso de 10. **Con esto el blindaje de deploys (#1–#4) queda COMPLETO.**
 - [ ] **Higiene de repo (Lyra Pass):** los cambios de infra del host (Caddyfile + edge) ya se subieron a su
       repo; mantener host↔repo en sync para que un `git pull` manual no choque. **Prioridad: baja.**
 - [ ] **Recordatorio en cada deploy** (el dueño lo pidió): verificar Lyra Pass después · `git pull` en
