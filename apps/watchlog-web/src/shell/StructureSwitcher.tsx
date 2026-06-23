@@ -8,9 +8,9 @@ import { useOrgStructures } from "../features/structure/structure-queries.js";
 import { useStructureStore } from "./structure-store.js";
 import styles from "../features/structure/StructureSelector.module.css";
 
-/** Una estructura está CONFIGURADA cuando tiene al menos un nodo (es operable). */
-function isConfigured(s: { nodeCount?: number }): boolean {
-  return (s.nodeCount ?? 0) > 0;
+/** Operable = tiene al menos un nodo (configurada) y está activa (habilitada). */
+function isOperable(s: { nodeCount?: number; active?: boolean }): boolean {
+  return (s.nodeCount ?? 0) > 0 && s.active !== false;
 }
 
 /**
@@ -38,13 +38,13 @@ export function StructureSwitcher() {
     if (structures.length === 0 || !activeId) return;
     const active = structures.find((s) => s.id === activeId);
     const inaccessible = !active;
-    const emptyOutsideConfig = active && !isConfigured(active) && !onConfigPage;
-    if (inaccessible || emptyOutsideConfig) setActive(null);
+    const notOperableOutsideConfig = active && !isOperable(active) && !onConfigPage;
+    if (inaccessible || notOperableOutsideConfig) setActive(null);
   }, [structures, activeId, setActive, onConfigPage]);
 
-  // Solo se ofrecen estructuras configuradas; en config se incluye también la activa
-  // (aunque esté vacía) para no perder de vista dónde estás mientras la armas.
-  const selectable = structures.filter((s) => isConfigured(s) || (onConfigPage && s.id === activeId));
+  // Solo se ofrecen estructuras operables (configuradas + activas); en config se incluye
+  // también la activa (aunque esté vacía/inactiva) para no perder de vista dónde estás.
+  const selectable = structures.filter((s) => isOperable(s) || (onConfigPage && s.id === activeId));
 
   // En instalaciones con una sola estructura configurada, el conmutador no aporta nada.
   if (selectable.length < 2) return null;

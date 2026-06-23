@@ -103,6 +103,9 @@ export class StructureService {
   async updateStructure(id: string, dto: UpdateOrgStructureRequest, ctx: AuditContext): Promise<OrgStructure> {
     const before = await this.prisma.orgStructure.findFirst({ where: { id, deletedAt: null } });
     if (!before) throw new NotFoundException("Estructura no encontrada");
+    if (before.isDefault && dto.active === false) {
+      throw new BadRequestException("La estructura por defecto no se puede desactivar");
+    }
     const structure = await this.prisma.orgStructure.update({
       where: { id },
       data: {
