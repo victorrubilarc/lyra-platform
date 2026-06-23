@@ -50,6 +50,10 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=stable
 
+      - name: Fecha de build (UTC, ISO-8601)
+        id: bd
+        run: echo "iso=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
       - name: Build & push
         uses: docker/build-push-action@v6
         with:
@@ -61,6 +65,12 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+          # Metadatos de versión para la imagen web (los ignora la api). Permiten mostrar
+          # versión + fecha + commit en «Acerca de». El tag git es la versión visible.
+          build-args: |
+            VITE_APP_VERSION=${{ github.ref_name }}
+            VITE_GIT_SHA=${{ github.sha }}
+            VITE_BUILD_DATE=${{ steps.bd.outputs.iso }}
 
   # ── Deploy automático al EC2 (máquina compartida con ruta-bus) ───────────────
   # Tras publicar las imágenes, entra por SSH y corre update.sh (pull → migrate

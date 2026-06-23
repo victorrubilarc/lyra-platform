@@ -180,6 +180,7 @@ export const esCL = {
     openProfileMenu: "Abrir menú de perfil",
     mySecurity: "Mi seguridad",
     myNotifications: "Mis notificaciones",
+    about: "Acerca de",
     preferences: "Preferencias",
     signOut: "Cerrar sesión",
     language: "Idioma",
@@ -207,6 +208,16 @@ export const esCL = {
   languages: {
     "es-CL": "Español (Chile)",
     en: "English",
+  },
+  about: {
+    title: "Acerca de",
+    ecosystem: "Plataforma de bitácoras operacionales · Ecosistema Lyra · ITESICWS",
+    version: "Versión",
+    builtOn: "Compilado",
+    commit: "Revisión",
+    dev: "Desarrollo",
+    prod: "Producción",
+    supportHint: "Si reportas un problema, incluye esta versión ({{version}}) para acelerar el soporte.",
   },
   structure: {
     title: "Estructura organizacional",

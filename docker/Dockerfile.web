@@ -7,6 +7,12 @@ WORKDIR /repo
 COPY . .
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile --ignore-scripts
+# Metadatos de versión (los pasa el release como build-args desde el tag git). Vite los
+# inyecta en build vía `define` (ver vite.config.ts) para mostrarlos en «Acerca de».
+ARG VITE_APP_VERSION
+ARG VITE_GIT_SHA
+ARG VITE_BUILD_DATE
+ENV VITE_APP_VERSION=$VITE_APP_VERSION VITE_GIT_SHA=$VITE_GIT_SHA VITE_BUILD_DATE=$VITE_BUILD_DATE
 RUN pnpm --filter @lyra/contracts build \
  && pnpm --filter @lyra/watchlog-web build
 

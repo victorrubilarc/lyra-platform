@@ -1,10 +1,13 @@
+import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Bell, Check, Languages, LogOut, Monitor, Moon, Rows3, Search, Sun, UserCog } from "lucide-react";
+import { Bell, Check, Info, Languages, LogOut, Monitor, Moon, Rows3, Search, Sun, UserCog } from "lucide-react";
 import { Breadcrumb, Menu, MenuItem, MenuLabel, MenuSeparator, Tooltip, type Crumb } from "@lyra/ui";
 import { FavoritesMenu } from "./FavoritesMenu.js";
 import { NotificationBell } from "./NotificationBell.js";
 import { StructureSwitcher } from "./StructureSwitcher.js";
+import { AboutModal } from "./AboutModal.js";
+import { VERSION_LABEL } from "./app-version.js";
 import { useAuth } from "../auth/use-auth.js";
 import { useUIStore } from "./ui-store.js";
 import { useThemeStore, type ThemePreference } from "./theme-store.js";
@@ -38,6 +41,7 @@ export function Topbar({ onOpenSearch }: TopbarProps) {
   const themePref = useThemeStore((s) => s.preference);
   const setThemePref = useThemeStore((s) => s.setPreference);
   const ThemeIcon = THEME_OPTIONS.find((o) => o.value === themePref)?.icon ?? Moon;
+  const [aboutOpen, setAboutOpen] = useState(false);
 
   const route = routeForPath(pathname);
   const crumbs: Crumb[] = [{ label: t("nav.home"), onClick: () => navigate("/") }];
@@ -150,12 +154,21 @@ export function Topbar({ onOpenSearch }: TopbarProps) {
               {t("topbar.myNotifications")}
             </MenuItem>
             <MenuSeparator />
+            <MenuItem
+              icon={<Info size={16} />}
+              trailing={<span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>{VERSION_LABEL}</span>}
+              onSelect={() => setAboutOpen(true)}
+            >
+              {t("topbar.about")}
+            </MenuItem>
             <MenuItem danger icon={<LogOut size={16} />} onSelect={() => void signOut()}>
               {t("topbar.signOut")}
             </MenuItem>
           </Menu>
         )}
       </div>
+
+      <AboutModal open={aboutOpen} onClose={() => setAboutOpen(false)} />
     </header>
   );
 }

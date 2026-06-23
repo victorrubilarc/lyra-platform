@@ -16,3 +16,8 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+/** Metadatos de versión inyectados por Vite (`define`) en tiempo de build. */
+declare const __APP_VERSION__: string;
+declare const __GIT_SHA__: string;
+declare const __BUILD_DATE__: string;
