@@ -26,8 +26,9 @@ deploy() {
 }
 
 healthy() {
+  # node (no wget): la imagen slim no trae wget/curl.
   for _ in $(seq 1 30); do
-    if $COMPOSE exec -T api wget -qO- http://localhost:3000/api/health >/dev/null 2>&1; then
+    if $COMPOSE exec -T api node -e "require('http').get('http://localhost:3000/api/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))" >/dev/null 2>&1; then
       return 0
     fi
     sleep 2
