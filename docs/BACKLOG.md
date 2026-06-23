@@ -854,6 +854,12 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
       usuario). **Esfuerzo: BAJO.** Relacionado con el ítem "Seguridad a nivel de nodo en el mantenedor de
       Estructura" más abajo. Ver memoria `role-node-scope-requirement`. **Fuera de alcance de la sesión de
       multi-estructura** (no scope-creep).
+- [ ] **Visibilidad del calendario efectivo en el detalle del nodo (deuda UX, 2026-06-23).** Hoy el detalle de un
+      nodo/host en `/estructura` **no muestra qué calendario operacional/fiscal rige** (ni el asignado directo ni el
+      heredado por `path`). La asignación se hace solo desde el mantenedor de Calendarios (calendario → nodos), pero
+      no hay forma de verificar desde el nodo "qué calendario me aplica". Propuesta: **badge "Calendario efectivo:
+      <nombre> (heredado de <ancestro> | directo)"** en el detalle del nodo. Con multi-estructura y varios calendarios
+      esto se vuelve necesario. **Esfuerzo: BAJO** (read-model: resolver el ancestro más cercano con calendario).
 
 - [x] **Alcance por plantillas (2.ª dimensión ABAC) ✅ (2026-06-12, `feat/alcance-plantilla` → `main`).** Entidad
       aparte **`TemplateScope`** (`userId|roleId` XOR + `templateId`, sin descendientes), eje ORTOGONAL al `Scope` de
@@ -1454,17 +1460,20 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
 ### Despliegue AWS — blindaje de deploys continuos (2026-06-22) — ver `docs/DEPLOYMENT.md`
 > WatchLog **EN VIVO** en `lyra.watchlog.itesicws.com`, en el EC2 compartido con Lyra Pass.
 > **Hecho:** #1 red `edge` persistente (un redeploy de Lyra Pass ya no tumba WatchLog) + swap 2 GB +
-> servicio `watchlog-web` (sin choque de nombres). **Pendiente de blindaje (el dueño lo pidió: que un
-> deploy NUNCA tumbe a la otra app):**
-- [ ] **#2 · Límites de memoria por app (`mem_limit`/`deploy.resources`).** Sin tope, una fuga/pico en
-      una app puede hacer que el kernel OOM-mate un contenedor de **la otra**. Con tope por servicio, el
-      problema se queda en su propio cgroup (se reinicia solo) y no toca a la vecina. Aplicar en los compose
-      de **ambas** apps (topes calculados para 3.7 GB RAM + 2 GB swap). **Prioridad: media-alta** (la más
-      valiosa de las dos).
-- [ ] **#3 · Auto-prune en el deploy.** Cada deploy deja la imagen vieja; con deploys continuos el disco se
-      llena → rompe a las dos. Agregar `docker image prune -f` (o `system prune`) al final de un deploy
-      exitoso en `deploy/onprem/update.sh` (y el equivalente para Lyra Pass). **Prioridad: media.**
-- [ ] **Backup de Postgres** (ambas apps) + cron (deuda Fase 7; red de seguridad antes de cualquier upgrade/migración).
+> servicio `watchlog-web` (sin choque de nombres). **#2 y #3 ✅ (2026-06-23, OPS — WatchLog commit `8e8c9a6`,
+> Lyra Pass commit `9bfb07e`):** ver detalle en `docs/DEPLOYMENT.md` y `PROGRESS.md`.
+- [x] **#2 · Límites de memoria por servicio (`mem_limit`) ✅ 2026-06-23.** `mem_limit` por servicio en AMBOS
+      compose (aislamiento por cgroup: una fuga OOM-mata SOLO su contenedor, no a la vecina). Topes holgados
+      sobre el uso real medido (`docker stats`; son techos, no reservas). WatchLog: pg 512m · redis 384m · minio
+      384m · api 512m (+NODE_OPTIONS=--max-old-space-size=384) · web 128m · migrate 512m. Lyra Pass: pg 768m (por
+      su `shm_size`) · redis 384m · api 512m (+NODE_OPTIONS) · web/admin 256m · worker 384m · migrate 512m · caddy
+      192m (borde). Verificado en vivo: 12 contenedores con tope + 3 URLs 200.
+- [x] **#3 · Auto-prune en el deploy ✅ 2026-06-23.** `prune_old` tras deploy EXITOSO en ambos `update.sh`:
+      `docker image prune -f` (dangling) + borrado DIRIGIDO de la versión anterior de la propia app
+      (`lyra-watchlog-*` / `lyra-pass-*` con `$PREV`) — `prune -f` solo no reclama las versiones viejas (quedan
+      con tag). App-scoped (nunca en uso ni la vecina), respeta el rollback. **Se ejercita en el próximo deploy con tag.**
+- [ ] **Backup de Postgres de WatchLog** + cron (deuda Fase 7; red de seguridad antes de cualquier upgrade/migración).
+      **Nota:** Lyra Pass YA tiene `onprem/backup.sh` y lo corre antes de cada deploy ⇒ espejarlo para WatchLog.
 - [ ] **Higiene de repo (Lyra Pass):** los cambios de infra del host (Caddyfile + edge) ya se subieron a su
       repo; mantener host↔repo en sync para que un `git pull` manual no choque. **Prioridad: baja.**
 - [ ] **Recordatorio en cada deploy** (el dueño lo pidió): verificar Lyra Pass después · `git pull` en

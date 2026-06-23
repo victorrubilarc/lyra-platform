@@ -31,10 +31,11 @@ Ambas apps tenían un servicio `web`. Al compartir la red `edge`, el `reverse_pr
 2. Cambios de **`deploy/`** (compose/update.sh/Caddyfile) **NO** son automáticos → `git pull` en `/opt/watchlog` antes/junto al deploy. Solo el **código de app** (imágenes) sube solo con el tag.
 3. Cada varios deploys: **`docker system prune -af`** (que el disco no se llene; **no** usar `--volumes`).
 
-### Pendiente de blindaje (próxima sesión — ver BACKLOG)
-- **#2 Límites de memoria por app** (que una fuga no OOM-mate a la otra).
-- **#3 Auto-prune** en el `update.sh` (disco no se llena con deploys continuos).
-- Backup de Postgres (deuda Fase 7).
+### Blindaje de deploys continuos (2026-06-23) ✅ #2 y #3
+Ambas apps comparten EC2 + borde Caddy, ambas en deploy continuo. Blindado para que un deploy/fuga de una NUNCA tumbe a la otra:
+- **#2 Límites de memoria por servicio ✅** (`mem_limit` por servicio en AMBOS compose). Aislamiento por cgroup: una fuga OOM-mata SOLO su contenedor (que se reinicia solo), no a la vecina. Topes HOLGADOS sobre el uso real (`docker stats`) — son **techos, no reservas**; su suma puede exceder la RAM física (correcto). WatchLog: postgres 512m · redis **384m** (su `--maxmemory` interno es 256mb; 256m lo mataría con el fork del bgsave) · minio 384m · api 512m (+`NODE_OPTIONS=--max-old-space-size=384`, GC antes del SIGKILL del cgroup) · watchlog-web 128m · migrate 512m. Lyra Pass: postgres **768m** (por su `shm_size: 256mb`, que cuenta contra el cgroup) · redis 384m · api 512m (+NODE_OPTIONS) · web/admin 256m · worker 384m · migrate 512m · **caddy 192m** (borde/SPOF, margen extra).
+- **#3 Auto-prune tras deploy EXITOSO ✅** (`prune_old` en ambos `update.sh`, después del healthcheck OK, nunca en rollback). `docker image prune -f` solo borra **dangling**; las versiones viejas quedan **con tag** ⇒ no se reclaman. Por eso además se borran **dirigidamente** las imágenes de la versión anterior de la PROPIA app (`lyra-watchlog-{api,web,migrate}:$PREV` / `lyra-pass-{api,web,admin,worker,migrate}:$PREV`). App-scoped: nunca toca imágenes en uso ni de la app vecina; respeta el rollback (la versión actual queda; GHCR conserva el tag). `|| true` para no romper un deploy ya exitoso (`set -e`). Se ejercita solo en el próximo deploy con tag.
+- **Pendiente:** Backup de Postgres de WatchLog (deuda Fase 7). **Nota:** Lyra Pass ya tiene `onprem/backup.sh` y lo corre antes de cada deploy ⇒ espejarlo para WatchLog.
 
 ## Arquitectura
 

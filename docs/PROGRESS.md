@@ -1,5 +1,26 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-23 — 🛡️ Blindaje de deploys continuos (OPS, sin features) ✅** (commit `8e8c9a6` en `main`).
+Las dos apps (WatchLog v0.1.7 + Lyra Pass) comparten el EC2 y el borde Caddy, ambas en deploy continuo. Se
+blindó el pipeline para que **un deploy/fuga de una NUNCA tumbe a la otra**, completando #2 y #3 de BACKLOG §3.
+**#2 Límites de memoria por servicio (`mem_limit`, aislamiento por cgroup):** una fuga/pico se queda en su
+propio cgroup (OOM-mata SOLO ese contenedor, que se reinicia solo) y no arrastra a la vecina. Topes HOLGADOS
+sobre el uso real medido con `docker stats` (la máquina usa ~1.3 GB de 3.7 GB; los topes son TECHOS, no
+reservas — su suma puede exceder la RAM física, es correcto). **WatchLog** (`deploy/docker-compose.prod.yml`):
+postgres 512m, redis 384m (su `--maxmemory` interno es 256mb ⇒ 256m lo mataría con el fork del bgsave), minio
+384m, api 512m (+`NODE_OPTIONS=--max-old-space-size=384` para que V8 haga GC antes del SIGKILL del cgroup),
+watchlog-web 128m, migrate 512m. **Lyra Pass** (en su repo, commit `9bfb07e`): postgres **768m** (por su
+`shm_size: 256mb` que cuenta contra el cgroup), redis 384m, api 512m (+NODE_OPTIONS), web/admin 256m, worker
+384m, migrate 512m, **caddy 192m** (borde/SPOF de ambas, margen extra). **#3 Auto-prune tras deploy EXITOSO**
+en ambos `update.sh`: borra SOLO las imágenes de la versión anterior de la PROPIA app (`lyra-watchlog-*` /
+`lyra-pass-*` con el tag `$PREV`) + dangling. **Hallazgo:** `docker image prune -f` solo borra dangling; las
+versiones viejas quedan **con tag** (no dangling) ⇒ no se reclamaban (5.7 GB acumulados). El borrado dirigido
+las reclama, app-scoped (nunca toca en uso ni la app vecina), respetando el rollback. **Verificado en vivo:**
+topes aplicados en los 12 contenedores + las **3 URLs → 200** tras recrear (incluido el borde Caddy). Cambios
+de config (recrear con `up -d`), sin subir versión ni tag. **Dato:** Lyra Pass ya tiene `backup.sh` y lo corre
+antes de cada deploy ⇒ baja urgencia del backup de Postgres de WatchLog (deuda Fase 7). **Pendiente:** el
+auto-prune se ejercita solo en el próximo deploy con tag; backup de Postgres de WatchLog (espejar `backup.sh`).
+
 **2026-06-23 — 🏗️ Multi-estructura organizacional ✅** (`feat/multi-estructura-org`).
 El dueño pidió (urgente) poder definir **VARIAS estructuras organizacionales** en la misma instalación
 single-tenant (cada una con su propio set de niveles y su propio árbol), p. ej. una jerarquía minera
