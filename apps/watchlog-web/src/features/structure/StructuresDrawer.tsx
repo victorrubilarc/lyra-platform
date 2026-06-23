@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AlertTriangle, ArrowLeft, Check, LogIn, Network, Pencil, Plus, Trash2 } from "lucide-react";
-import { Button, Chip, Drawer, EmptyState, FormField, Input, Modal, Table, Textarea, Toggle, useToast } from "@lyra/ui";
-import type { TableColumn } from "@lyra/ui";
+import { Button, Chip, Drawer, EmptyState, FormField, Input, Modal, Textarea, Toggle, useToast } from "@lyra/ui";
 import type { OrgStructure } from "@lyra/contracts";
 import { ApiError } from "../../lib/api-client.js";
 import { useStructureStore } from "../../shell/structure-store.js";
@@ -45,7 +44,8 @@ const EMPTY_FORM: FormValues = { name: "", key: "", description: "", active: tru
  * Mantenedor de ESTRUCTURAS organizacionales (multi-estructura). Lista, crea, edita
  * (nombre, descripción, estado activo, orden), elige cuál configurar («Trabajar aquí»)
  * y elimina (con confirmación). La estructura por defecto no se puede eliminar; tampoco
- * las que tengan nodos/datos (lo bloquea el backend).
+ * las que tengan nodos/datos (lo bloquea el backend). La lista es flex (no tabla con
+ * scroll): el nombre crece y los íconos de acción quedan FIJOS a la derecha, siempre visibles.
  */
 export function StructuresDrawer({ open, onClose }: StructuresDrawerProps) {
   const { t } = useTranslation();
@@ -66,6 +66,7 @@ export function StructuresDrawer({ open, onClose }: StructuresDrawerProps) {
     activeId === row.id || (activeId === null && row.isDefault);
 
   const saving = createStructure.isPending || updateStructure.isPending;
+  const busy = saving || deleteStructure.isPending;
 
   function openCreate() {
     setForm(EMPTY_FORM);
@@ -150,72 +151,83 @@ export function StructuresDrawer({ open, onClose }: StructuresDrawerProps) {
     }
   }
 
-  const columns: TableColumn<OrgStructure>[] = [
-    {
-      key: "name",
-      header: t("structure.structures.name"),
-      render: (row) => (
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          {row.name}
-          {isActiveRow(row) && <Chip label={t("structure.structures.activeTag")} variant="primary" />}
-          {row.isDefault && <Chip label={t("structure.structures.defaultTag")} variant="info" />}
-          {!row.active && <Chip label={t("structure.structures.inactiveTag")} variant="default" />}
-        </span>
-      ),
-    },
-    {
-      key: "key",
-      header: t("structure.structures.key"),
-      width: 130,
-      render: (row) => <code style={{ fontSize: 12, color: "var(--color-text-muted)" }}>{row.key}</code>,
-    },
-    {
-      key: "_actions",
-      header: "",
-      align: "right",
-      width: 132,
-      render: (row) => {
-        const busy = saving || deleteStructure.isPending;
-        return (
-          <span style={{ display: "inline-flex", gap: 4 }}>
-            <Button
-              variant="icon"
-              onClick={() => selectStructure(row)}
-              disabled={busy || isActiveRow(row)}
-              aria-label={t("structure.structures.workHere")}
-              title={t("structure.structures.workHere")}
-            >
-              <LogIn size={15} />
-            </Button>
-            <Button
-              variant="icon"
-              onClick={() => openEdit(row)}
-              disabled={busy}
-              aria-label={t("common.edit")}
-              title={t("common.edit")}
-            >
-              <Pencil size={15} />
-            </Button>
-            <Button
-              variant="icon"
-              onClick={() => setConfirmDelete(row)}
-              disabled={busy || row.isDefault}
-              aria-label={t("common.delete")}
-              title={row.isDefault ? t("structure.structures.defaultUndeletable") : t("common.delete")}
-            >
-              <Trash2 size={15} />
-            </Button>
-          </span>
-        );
-      },
-    },
-  ];
+  function renderRow(s: OrgStructure) {
+    return (
+      <div
+        key={s.id}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          padding: "12px 14px",
+          borderBottom: "1px solid var(--color-border-subtle)",
+        }}
+      >
+        {/* Identidad (crece y trunca) */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <span style={{ fontWeight: 500 }}>{s.name}</span>
+            <Chip
+              label={s.active ? t("structure.structures.activeState") : t("structure.structures.inactiveTag")}
+              variant={s.active ? "success" : "default"}
+            />
+            {isActiveRow(s) && <Chip label={t("structure.structures.activeTag")} variant="primary" />}
+            {s.isDefault && <Chip label={t("structure.structures.defaultTag")} variant="info" />}
+          </div>
+          <code
+            style={{
+              display: "block",
+              marginTop: 2,
+              fontSize: 12,
+              color: "var(--color-text-muted)",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {s.key}
+          </code>
+        </div>
+
+        {/* Acciones FIJAS (no se encogen, siempre visibles) */}
+        <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+          <Button
+            variant="icon"
+            onClick={() => selectStructure(s)}
+            disabled={busy || isActiveRow(s)}
+            aria-label={t("structure.structures.workHere")}
+            title={t("structure.structures.workHere")}
+          >
+            <LogIn size={15} />
+          </Button>
+          <Button
+            variant="icon"
+            onClick={() => openEdit(s)}
+            disabled={busy}
+            aria-label={t("common.edit")}
+            title={t("common.edit")}
+          >
+            <Pencil size={15} />
+          </Button>
+          <Button
+            variant="icon"
+            onClick={() => setConfirmDelete(s)}
+            disabled={busy || s.isDefault}
+            aria-label={t("common.delete")}
+            title={s.isDefault ? t("structure.structures.defaultUndeletable") : t("common.delete")}
+          >
+            <Trash2 size={15} />
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <Drawer
       open={open}
       onClose={onClose}
-      width={760}
+      width={680}
       title={
         <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <Network size={18} />
@@ -348,14 +360,21 @@ export function StructuresDrawer({ open, onClose }: StructuresDrawerProps) {
             {t("structure.structures.description")}
           </p>
 
-          <Table
-            columns={columns}
-            data={structures}
-            rowKey={(s) => s.id}
-            loading={isLoading}
-            skeletonRows={2}
-            emptyState={<EmptyState title={t("structure.structures.empty")} />}
-          />
+          {isLoading ? (
+            <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>{t("common.loading")}</p>
+          ) : structures.length === 0 ? (
+            <EmptyState title={t("structure.structures.empty")} />
+          ) : (
+            <div
+              style={{
+                border: "1px solid var(--color-border-subtle)",
+                borderRadius: "var(--radius-md)",
+                overflow: "hidden",
+              }}
+            >
+              {structures.map(renderRow)}
+            </div>
+          )}
 
           <Button variant="secondary" onClick={openCreate}>
             <Plus size={15} />
