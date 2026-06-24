@@ -104,6 +104,11 @@ export function deleteRole(id: string): Promise<void> {
   return apiVoid(`/security/roles/${id}`, { method: "DELETE" });
 }
 
+export function assignRoleScope(id: string, dto: AssignScopeRequest): Promise<RoleDetail> {
+  assignScopeRequestSchema.parse(dto);
+  return apiJson(`/security/roles/${id}/scope`, roleDetailSchema, { method: "PUT", body: dto });
+}
+
 export function assignRoleTemplateScope(id: string, dto: AssignTemplateScopeRequest): Promise<RoleDetail> {
   assignTemplateScopeRequestSchema.parse(dto);
   return apiJson(`/security/roles/${id}/template-scope`, roleDetailSchema, { method: "PUT", body: dto });

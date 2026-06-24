@@ -2,11 +2,14 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FileText, KeySquare, LayoutGrid, ShieldCheck } from "lucide-react";
 import { Button, Drawer, FormField, Input, Skeleton, Toggle, cx, useToast } from "@lyra/ui";
-import { roleKeySchema } from "@lyra/contracts";
+import { roleKeySchema, type ScopeEntry } from "@lyra/contracts";
 import { ApiError } from "../../lib/api-client.js";
+import { useOrgTree } from "../structure/structure-queries.js";
 import { PermissionMatrix } from "./PermissionMatrix.js";
+import { ScopeTreePicker } from "./ScopeTreePicker.js";
 import { TemplateScopePicker } from "./TemplateScopePicker.js";
 import {
+  useAssignRoleScope,
   useAssignRoleTemplateScope,
   useCreateRole,
   usePermissionCatalog,
@@ -29,6 +32,8 @@ interface FormState {
   description: string;
   requireMfa: boolean;
   permissions: Set<string>;
+  /** Alcance por NODO del rol (ABAC dim. 4). Vacío = el rol no aporta restricción. */
+  nodeScope: ScopeEntry[];
   /** Alcance por plantilla del rol (ids). Vacío = sin restricción. */
   templateScope: string[];
 }
@@ -39,6 +44,7 @@ const EMPTY: FormState = {
   description: "",
   requireMfa: false,
   permissions: new Set(),
+  nodeScope: [],
   templateScope: [],
 };
 
@@ -46,6 +52,12 @@ function sameSet(a: string[], b: string[]): boolean {
   if (a.length !== b.length) return false;
   const setB = new Set(b);
   return a.every((x) => setB.has(x));
+}
+
+function sameScope(a: ScopeEntry[], b: ScopeEntry[]): boolean {
+  if (a.length !== b.length) return false;
+  const map = new Map(b.map((e) => [e.orgNodeId, e.includeDescendants]));
+  return a.every((e) => map.get(e.orgNodeId) === e.includeDescendants);
 }
 
 export function RoleDrawer({ open, roleId, onClose }: RoleDrawerProps) {
@@ -56,8 +68,10 @@ export function RoleDrawer({ open, roleId, onClose }: RoleDrawerProps) {
   const { data: catalog = [] } = usePermissionCatalog();
   const { data: role, isLoading: roleLoading } = useRole(open && isEdit ? roleId : null);
   const { data: templateOptions = [] } = useTemplateScopeOptions(open && isEdit);
+  const { data: tree = [] } = useOrgTree();
   const createRole = useCreateRole();
   const updateRole = useUpdateRole();
+  const assignScope = useAssignRoleScope();
   const assignTemplateScope = useAssignRoleTemplateScope();
 
   const [state, setState] = useState<FormState>(EMPTY);
@@ -76,6 +90,7 @@ export function RoleDrawer({ open, roleId, onClose }: RoleDrawerProps) {
         description: role.description ?? "",
         requireMfa: role.requireMfa,
         permissions: new Set(role.permissionKeys),
+        nodeScope: role.scopes,
         templateScope: role.templateScopes,
       });
     } else if (!isEdit) {
@@ -85,7 +100,8 @@ export function RoleDrawer({ open, roleId, onClose }: RoleDrawerProps) {
     setNameError(null);
   }, [open, isEdit, role]);
 
-  const busy = createRole.isPending || updateRole.isPending || assignTemplateScope.isPending;
+  const busy =
+    createRole.isPending || updateRole.isPending || assignScope.isPending || assignTemplateScope.isPending;
   const isSystem = role?.isSystem ?? false;
 
   function validate(): boolean {
@@ -118,6 +134,10 @@ export function RoleDrawer({ open, roleId, onClose }: RoleDrawerProps) {
             permissionKeys: [...state.permissions],
           },
         });
+        // Alcance por NODO: endpoint propio, solo si cambió (eje ABAC aparte).
+        if (!sameScope(state.nodeScope, role.scopes)) {
+          await assignScope.mutateAsync({ id: role.id, dto: { scopes: state.nodeScope } });
+        }
         // Alcance por plantilla: endpoint propio, solo si cambió (eje aparte).
         if (!sameSet(state.templateScope, role.templateScopes)) {
           await assignTemplateScope.mutateAsync({ id: role.id, dto: { templateIds: state.templateScope } });
@@ -142,7 +162,7 @@ export function RoleDrawer({ open, roleId, onClose }: RoleDrawerProps) {
   const tabs = [
     { key: "datos" as const, label: t("security.roles.tabs.data"), icon: FileText },
     { key: "permisos" as const, label: t("security.roles.tabs.permissions"), icon: KeySquare, count: state.permissions.size },
-    { key: "alcance" as const, label: t("security.roles.tabs.scope"), icon: LayoutGrid, count: isEdit ? state.templateScope.length || undefined : undefined },
+    { key: "alcance" as const, label: t("security.roles.tabs.scope"), icon: LayoutGrid, count: isEdit ? state.nodeScope.length + state.templateScope.length || undefined : undefined },
   ];
 
   return (
@@ -265,23 +285,43 @@ export function RoleDrawer({ open, roleId, onClose }: RoleDrawerProps) {
             </div>
           )}
 
-          {/* ── Alcance por PLANTILLA del rol (2.º eje ABAC, Fase 2.8) ── */}
+          {/* ── Alcance del rol: dos ejes ABAC ortogonales (nodo + plantilla) ── */}
           {tab === "alcance" && (
             <div className={shared.tabPanel}>
               {isEdit ? (
-                <>
-                  <p className={shared.controlHint} style={{ margin: 0 }}>
-                    {state.templateScope.length === 0
-                      ? t("security.roles.templateScopeAll")
-                      : t("security.users.templateScope.desc")}
-                  </p>
-                  <TemplateScopePicker
-                    options={templateOptions}
-                    value={state.templateScope}
-                    onChange={(next) => setState((s) => ({ ...s, templateScope: next }))}
-                    disabled={busy}
-                  />
-                </>
+                <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+                  {/* Por NODO (ABAC dim. 4) — se UNE al alcance de cada usuario del rol */}
+                  <section>
+                    <h4 className={shared.panelTitle}>{t("security.roles.nodeScope.title")}</h4>
+                    <p className={shared.controlHint} style={{ margin: "0 0 12px" }}>
+                      {state.nodeScope.length === 0
+                        ? t("security.roles.nodeScope.all")
+                        : t("security.roles.nodeScope.desc")}
+                    </p>
+                    <ScopeTreePicker
+                      tree={tree}
+                      value={state.nodeScope}
+                      onChange={(next) => setState((s) => ({ ...s, nodeScope: next }))}
+                      disabled={busy}
+                    />
+                  </section>
+
+                  {/* Por PLANTILLA (2.º eje ABAC, Fase 2.8) */}
+                  <section>
+                    <h4 className={shared.panelTitle}>{t("security.roles.templateScope.title")}</h4>
+                    <p className={shared.controlHint} style={{ margin: "0 0 12px" }}>
+                      {state.templateScope.length === 0
+                        ? t("security.roles.templateScopeAll")
+                        : t("security.users.templateScope.desc")}
+                    </p>
+                    <TemplateScopePicker
+                      options={templateOptions}
+                      value={state.templateScope}
+                      onChange={(next) => setState((s) => ({ ...s, templateScope: next }))}
+                      disabled={busy}
+                    />
+                  </section>
+                </div>
               ) : (
                 <p className={shared.controlHint} style={{ margin: 0 }}>
                   {t("security.roles.templateScopeCreateHint")}

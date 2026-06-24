@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { mfaModeSchema } from "./auth.js";
+import { scopeEntrySchema } from "./users.js";
 
 /** Clave de rol: minúsculas, números y guiones (ej. `supervisor-turno`). */
 export const roleKeySchema = z
@@ -26,6 +27,12 @@ export type RoleSummary = z.infer<typeof roleSummarySchema>;
 /** Detalle de rol con sus permisos. */
 export const roleDetailSchema = roleSummarySchema.extend({
   permissionKeys: z.array(z.string()),
+  /**
+   * Alcance por NODO (ABAC dim. 4) del rol. Se UNE en read-time al alcance del
+   * usuario (unión user+roles en `ScopeService`). Vacío = el rol no aporta
+   * restricción de nodo. Eje ortogonal al de plantilla (combinan en AND).
+   */
+  scopes: z.array(scopeEntrySchema),
   /** Alcance por plantilla (ids) del rol. Vacío = sin restricción (ve todas). */
   templateScopes: z.array(z.string()),
 });

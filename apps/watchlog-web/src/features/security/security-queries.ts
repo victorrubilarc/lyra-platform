@@ -16,6 +16,7 @@ import type {
   UpdateUserRequest,
 } from "@lyra/contracts";
 import {
+  assignRoleScope,
   assignRoleTemplateScope,
   assignUserRoles,
   assignUserScope,
@@ -178,6 +179,18 @@ export function useDeleteRole() {
   return useMutation({
     mutationFn: (id: string) => deleteRole(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: SECURITY_KEYS.roles }),
+  });
+}
+
+export function useAssignRoleScope() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, dto }: { id: string; dto: AssignScopeRequest }) => assignRoleScope(id, dto),
+    onSuccess: (r) => {
+      void qc.invalidateQueries({ queryKey: SECURITY_KEYS.role(r.id) });
+      // El alcance por rol cambia el alcance efectivo de sus usuarios.
+      void qc.invalidateQueries({ queryKey: SECURITY_KEYS.users });
+    },
   });
 }
 

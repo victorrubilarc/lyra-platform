@@ -1,5 +1,26 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-24 — 🎯 L2a · Alcance por NODO a nivel de ROL ✅** (`feat/rol-alcance-nodo`).
+Cierra el requerimiento `role-node-scope-requirement`: el alcance ABAC por nodo ahora se configura también en el
+**ROL** (no solo usuario por usuario). Caso de uso: "Rol Analista-TI → subárbol TI" se define UNA vez y aplica a
+todos sus miembros. Conviven **ambos ejes de sujeto** (rol Y usuario), que se combinan por **UNIÓN** (gana el más
+amplio). Verificado en el código antes de tocar nada: la tabla `Scope` ya tenía `roleId` (⇒ **sin migración**) y
+`ScopeService.getAccessibleNodes` ya unía `userId` con los roles del usuario en read-time (⇒ el alcance efectivo
+YA era la unión; faltaba solo exponer la ESCRITURA del scope del rol, y quitarle el rol re-acota EN VIVO sin
+denormalizar). **Backend:** `RolesService.assignScope` = espejo exacto de `UsersService.assignScope` con sujeto
+`roleId` (delete+createMany, valida nodos, audita `role.scope.assigned`); `GET /security/roles/:id` ahora trae
+`scopes[]`; endpoint nuevo `PUT /security/roles/:id/scope` gateado por **`role:manage`** (sin clave nueva ⇒ **sin
+`db:seed`/FLUSHALL**). Contrato `RoleDetail += scopes[]` (reusa `scopeEntrySchema`/`assignScopeRequestSchema`).
+**Frontend:** la pestaña "Alcance" del `RoleDrawer` pasa a **dos sub-secciones** rotuladas — "Alcance por nodo"
+(reusa `ScopeTreePicker` + `useOrgTree`, respeta la estructura activa) y "Alcance por plantilla" (lo previo).
+**Decisiones** (en DECISIONS): permiso reusado `role:manage` (no inventar clave) · una pestaña con dos secciones
+(paridad con usuarios) · reuso total del service/picker/contrato. typecheck/lint(0)/build verdes; unit API
+**252/252** + web 6; `smoke-rol-alcance-nodo.py` **14/14** (write+read del scope del rol; usuario sin scope propio
++ rol→A ve solo A; sumar scope propio en B AMPLÍA a A∪B; quitar el rol re-acota a B en vivo; `role:manage`⇒403;
+nodo inexistente⇒400; lista vacía limpia) + regresión `smoke-aislamiento-estructura.py` 33/33 · `smoke-template-scope.py`
+14/14 · `smoke-multi-estructura.py` 33/33. **PENDIENTE: smoke VISUAL del dueño.** **NO** se hizo L2b/L2c/L3/L4.
+**Siguiente: L2c (ciclo de vida de estructura: activar/archivar/reordenar) o L2b (administración delegada).** Anterior:
+
 **2026-06-24 — 🔒 AISLAMIENTO COMPLETO por estructura organizacional (Enterprise L1) ✅** (`feat/aislamiento-estructura`).
 Cierra la deuda `org-views-vs-isolation`: la plataforma queda ENTERPRISE — ningún usuario/estructura ve datos
 operacionales de otra, en NINGÚN listado. Caso guía: una empresa con departamentos Industrial/TI/Logística, cada

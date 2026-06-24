@@ -4,6 +4,38 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-24 · L2a · Alcance por NODO a nivel de ROL (ABAC dim. 4 configurable en el rol)
+Cierra el requerimiento `role-node-scope-requirement`: hasta ahora el alcance ABAC por nodo solo se
+configuraba **por usuario** (Seguridad → Usuarios → "Alcance", `PUT /security/users/{id}/scope`). Ahora
+también se configura **por ROL**, una sola vez, y aplica a todos sus miembros (caso: "Rol Analista-TI →
+subárbol TI"). Conviven **ambos ejes de sujeto** (rol Y usuario) y se combinan por **UNIÓN** (gana el más
+amplio). Verificado en código (no asumido):
+- **Sin migración:** la tabla `Scope` ya tenía `roleId` + `@@unique([roleId, orgNodeId])`. Solo faltaba
+  exponer la ESCRITURA.
+- **El motor ya unía user+roles:** `ScopeService.getAccessibleNodes` consulta
+  `where:{ OR:[{userId},{role:{users:{some:{userId}}}}] }` ⇒ el alcance efectivo del usuario YA era la unión
+  de sus Scope propios + los de sus roles, evaluada **en read-time** (no se denormaliza). ⇒ quitarle el rol a
+  un usuario lo **re-acota EN VIVO** (cubierto por el smoke T5).
+Decisiones (las "a resolver", con su fundamento):
+- **Permiso del endpoint → REUSAR `role:manage`** (no se inventa clave nueva). *Motivo:* el `update`/`create`
+  del rol y su `PUT .../template-scope` ya usan `role:manage`; asignar el alcance de datos de un rol **es**
+  administrarlo. Mantiene mínimo privilegio + consistencia y, sobre todo, **evita el gotcha de dev**
+  (`db:seed` + Redis `FLUSHALL`) que exige toda clave nueva (el admin demo daría 403). El eje de usuario usa
+  `user:assign-scope`; el análogo correcto para el rol es `role:manage`.
+- **UX del doble eje del rol → una sola pestaña "Alcance" con DOS sub-secciones rotuladas** ("Alcance por nodo"
+  + "Alcance por plantilla"). *Motivo:* paridad con la pantalla de usuario (que también agrupa nodo+plantilla
+  en una pestaña) y evita proliferar pestañas. Los dos ejes son ABAC ortogonales (Scope vs TemplateScope) que
+  combinan en AND; vacío en cualquiera = sin restricción en ese eje.
+- **Reuso total, sin duplicar:** backend `RolesService.assignScope` = espejo de `UsersService.assignScope` con
+  sujeto `roleId`; front reusa `ScopeTreePicker` (mismo `useOrgTree`, respeta la estructura activa) y el
+  contrato `assignScopeRequestSchema`/`scopeEntrySchema` ya existentes. `RoleDetail += scopes[]`.
+- Verificado: `smoke-rol-alcance-nodo.py` **14/14** (write+read del scope del rol; unión user+rol; la unión
+  AMPLÍA al sumar scope propio; quitar el rol re-acota en vivo; gate `role:manage` ⇒ 403; nodo inexistente ⇒
+  400; lista vacía limpia) + regresión L1 `smoke-aislamiento-estructura.py` 33/33 · `smoke-template-scope.py`
+  14/14 · `smoke-multi-estructura.py` 33/33 + unit API 252/web 6. **NO** se hizo L2b/L2c/L3/L4.
+
+---
+
 ### 2026-06-24 · Aislamiento COMPLETO por estructura (L1): filtro `structureId` en TODO listado operacional
 Cierra la deuda `org-views-vs-isolation`: hasta ahora la "estructura activa" solo filtraba la CONFIGURACIÓN
 (árbol/niveles/calendarios) y los selectores de nodo, pero los **listados operacionales** (incidencias,

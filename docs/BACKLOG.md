@@ -5,7 +5,19 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-24** (**🔒 AISLAMIENTO COMPLETO por estructura (Enterprise L1) ✅** — `feat/aislamiento-estructura`:
+> actualización: **2026-06-24** (**🎯 L2a · Alcance por NODO a nivel de ROL ✅** — `feat/rol-alcance-nodo`:
+> cierra el requerimiento `role-node-scope-requirement`. El alcance ABAC por nodo ahora se configura también en el
+> **ROL** (no solo por usuario), una sola vez por rol, aplicando a todos sus miembros. Conviven ambos ejes de
+> sujeto (rol Y usuario), combinados por **UNIÓN** (gana el más amplio). **Sin migración** (`Scope.roleId` ya
+> existía) y **sin clave nueva** (endpoint `PUT /security/roles/:id/scope` reusa `role:manage` ⇒ sin `db:seed`/
+> FLUSHALL). Backend `RolesService.assignScope` = espejo de `UsersService.assignScope` con `roleId`; `RoleDetail
+> += scopes[]`. Front: pestaña "Alcance" del rol = 2 sub-secciones ("por nodo" reusa `ScopeTreePicker`, "por
+> plantilla" lo previo). Quitar el rol re-acota EN VIVO (`ScopeService.getAccessibleNodes` ya unía user+roles en
+> read-time; verificado, no denormaliza). `smoke-rol-alcance-nodo.py` **14/14** + regresión L1 33/33 ·
+> template-scope 14/14 · multi-estructura 33/33 + unit API 252/web 6. typecheck/lint(0)/build verdes. **PENDIENTE:
+> smoke VISUAL del dueño.** **NO** se hizo L2b/L2c/L3/L4. **Siguiente: L2c (ciclo de vida de estructura) o L2b
+> (administración delegada).** Anterior:
+> **🔒 AISLAMIENTO COMPLETO por estructura (Enterprise L1) ✅** — `feat/aislamiento-estructura`:
 > cierra la deuda `org-views-vs-isolation`. Ningún usuario/estructura ve datos operacionales de otra en NINGÚN listado.
 > **L1a:** cerradas las 2 fugas reales de ABAC en equipos (`search` sin scope, `listByNode` sin validar nodo → 403).
 > **L1b:** filtro por estructura activa (`?structureId=`, espejo de calendarios, sin tocar contratos Zod) intersectado
@@ -33,7 +45,7 @@
 > ABAC por nodo) · (c) purgar una estructura con historial de nodos (soft-deleted) no es posible (bloquea por
 > nodos; necesitaría un flujo de archivo/purga GxP) · (d) el `deleteLevel` da 500 si un nodo SOFT-deleted aún
 > referencia el nivel (bug latente preexistente; mitigado en estructuras por la cascada). **Dependencia:**
-> "rol acotado a nodo" (`Scope.roleId` en UI) sigue pendiente (memoria `role-node-scope-requirement`).
+> "rol acotado a nodo" (`Scope.roleId` en UI) ✅ RESUELTO 2026-06-24 (L2a, `feat/rol-alcance-nodo`).
 > **+ Indicador de versión ✅** (mismo día): «Acerca de» en el menú de perfil con versión + fecha de compilación +
 > commit (Vite `define`; en prod los inyecta el release vía Docker build-args desde el tag git). **DEUDA (pedido del
 > dueño):** mostrar la versión en un lugar MÁS A LA VISTA — un pie en el login y/o junto al logo del sidebar — además
@@ -872,15 +884,14 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
       structure-aware (no asumir la lista). **Esfuerzo: ALTO** (cambio arquitectónico amplio, factible).
       Ver memoria `multi-org-structure-requirement`. **Prioridad: ALTA, antes de seguir otros puntos del análisis
       de casos de uso (espesador / Eiser).**
-- [ ] **Alcance por nodo a nivel de ROL ("rol acotado a un nodo") (pedido del dueño 2026-06-23).** Hoy el
-      alcance por nodo solo se configura por USUARIO (Seguridad → Usuarios → pestaña Alcance, `ScopeTreePicker`,
-      `PUT /security/users/:id/scope`); la pestaña Alcance del ROL acota SOLO plantillas (`TemplateScope`).
-      **La tabla `Scope` YA admite `roleId`** (modelo de datos listo) — falta exponer UI/API: `ScopeTreePicker`
-      en el `RoleDrawer` + endpoint `PUT /security/roles/:id/scope`. El alcance efectivo del usuario ya es la
-      UNIÓN de sus scopes + los de sus roles (verificar que la evaluación lo honra). Mantener AMBOS (rol y
-      usuario). **Esfuerzo: BAJO.** Relacionado con el ítem "Seguridad a nivel de nodo en el mantenedor de
-      Estructura" más abajo. Ver memoria `role-node-scope-requirement`. **Fuera de alcance de la sesión de
-      multi-estructura** (no scope-creep).
+- [x] **Alcance por nodo a nivel de ROL ("rol acotado a un nodo") ✅ (L2a, 2026-06-24, `feat/rol-alcance-nodo`).**
+      Expuesto UI/API: endpoint `PUT /security/roles/:id/scope` (reusa `role:manage`, sin clave nueva) +
+      `RoleDetail.scopes[]` + sub-sección "Alcance por nodo" (con `ScopeTreePicker`) en la pestaña "Alcance" del
+      `RoleDrawer`. Backend `RolesService.assignScope` = espejo de `UsersService.assignScope` con `roleId`. Sin
+      migración (`Scope.roleId` ya existía). Confirmado: el alcance efectivo es la UNIÓN user+roles evaluada en
+      vivo (`ScopeService.getAccessibleNodes`); quitar el rol re-acota sin denormalizar. Ambos ejes (rol y usuario)
+      conviven. `smoke-rol-alcance-nodo.py` 14/14 + regresión L1 33/33 · template-scope 14/14 · multi-estructura
+      33/33. Ver DECISIONS 2026-06-24. **NO** se hizo L2b/L2c.
 - [x] **Selector de nodos acotado por ABAC ✅ (2026-06-23, `feat/scoped-node-selector`).** Bug: el selector de
       nodos al crear incidencia (y otros de flujo operacional) mostraba TODOS los nodos a un usuario con alcance
       acotado. Fix con camino separado para no romper la administración (que sí debe ver todo): nuevo

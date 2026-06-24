@@ -49,6 +49,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 - ✍️ CRUD de equipos, categorías, criticidad, baja lógica
 
 ### 5. Seguridad: usuarios, roles y permisos  [Admin]
+- ✅ **Alcance del rol (por nodo y por plantilla)** — define el recorte una vez en el rol; se une al del usuario (§ Seguridad ▸ Alcance del rol)
 - ✍️ Usuarios (alta, contraseña temporal, asignar roles y alcance)
 - ✍️ Roles y matriz de permisos (4 dimensiones), `requireMfa` por rol
 - ✍️ Política de contraseñas y modo de MFA global
@@ -177,6 +178,46 @@ estructuras: requiere el permiso de **gestión de niveles** (`orglevel:manage`).
   historial (bitácoras, incidencias). Una estructura **solo con niveles** (sin nodos) sí se puede eliminar.
 - Si tu usuario está **acotado por alcance**, verás solo las estructuras donde tienes algún nodo accesible. Un
   administrador sin restricción ve todas, incluidas las recién creadas aún sin nodos.
+
+---
+
+## Seguridad ▸ Alcance del rol (por nodo y por plantilla)  [Admin]
+
+**Para qué sirve.** El "alcance de datos" limita **qué** ve cada persona: a qué **nodos** de la estructura
+(áreas, plantas, equipos) y a qué **plantillas** tiene acceso. Hasta ahora ese alcance se definía persona por
+persona; ahora también puedes definirlo **en el rol**, una sola vez, y se aplica a **todos** los que tengan ese
+rol. Ejemplo: creas el rol "Analista TI" y lo acotas al subárbol **TI**; cualquier usuario al que le asignes ese
+rol queda automáticamente limitado a TI, sin tener que tocar su ficha. Ahorra trabajo y evita olvidos al dar de
+alta gente nueva.
+
+**Cómo se usa.**
+1. Ve a **Seguridad → Roles**, abre el rol (o créalo) y entra a la pestaña **Alcance**.
+2. Verás dos sub-secciones independientes:
+   - **Alcance por nodo** — marca en el árbol los nodos que el rol puede ver. El interruptor "incluye
+     descendientes" extiende el acceso a todo el subárbol bajo cada nodo marcado.
+   - **Alcance por plantilla** — marca las plantillas que el rol puede ver y usar.
+3. Guarda. El cambio aplica de inmediato a todos los miembros del rol.
+
+**Cómo se combina con el alcance del usuario.** El alcance efectivo de una persona es la **UNIÓN** de su alcance
+propio (su ficha de usuario) **más** el de todos sus roles: gana el más amplio. Es decir, los alcances **suman**.
+Ejemplo: si el usuario tiene en su ficha el nodo *Bodega* y su rol está acotado a *TI*, verá *Bodega* **y** *TI*.
+Si **le quitas el rol**, pierde *TI* al instante y queda solo con *Bodega* (no hace falta reconfigurar nada: se
+recalcula en vivo). El eje de **nodo** y el de **plantilla** son independientes y se combinan en "Y": para ver un
+dato debes cumplir ambos (estar en un nodo permitido **y** que la plantilla esté permitida). **Dejar un eje vacío
+= sin restricción en ese eje** (lo ve todo en esa dimensión).
+
+**Quién puede.** Configurar el alcance del rol requiere el permiso de **gestión de roles** (`role:manage`), el
+mismo que ya gobierna crear/editar roles y sus permisos. La autorización siempre la decide el servidor: la
+interfaz solo refleja lo que el backend permite.
+
+**Importante.**
+- El alcance del rol **respeta la estructura activa**: el árbol que ves al asignar nodos es el de la estructura
+  seleccionada en el shell.
+- Define alcance en el **rol** cuando varias personas comparten el mismo recorte (es lo mantenible); reserva el
+  alcance **por usuario** para excepciones individuales.
+- Como los alcances **suman**, no uses un rol acotado esperando que *restrinja* a alguien que ya tiene acceso más
+  amplio por otro rol o por su ficha: para reducir, debes recortar **todas** las fuentes de su alcance.
+- Un rol **sin** alcance por nodo no aporta restricción: sus miembros no ganan ni pierden nodos por él.
 
 ---
 

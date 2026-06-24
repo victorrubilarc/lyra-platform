@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type {
+  AssignScopeRequest,
   AssignTemplateScopeRequest,
   CreateRoleRequest,
   RoleDetail,
@@ -40,6 +41,7 @@ export class RolesService {
       where: { id },
       include: {
         permissions: { select: { permission: { select: { key: true } } } },
+        scopes: { where: { roleId: id }, select: { orgNodeId: true, includeDescendants: true } },
         templateScopes: { select: { templateId: true } },
         _count: { select: { permissions: true, users: true } },
       },
@@ -55,8 +57,37 @@ export class RolesService {
       permissionCount: role._count.permissions,
       userCount: role._count.users,
       permissionKeys: role.permissions.map((p) => p.permission.key),
+      scopes: role.scopes.map((s) => ({ orgNodeId: s.orgNodeId, includeDescendants: s.includeDescendants })),
       templateScopes: role.templateScopes.map((s) => s.templateId),
     };
+  }
+
+  /**
+   * Reemplaza el alcance por NODO (ABAC dim. 4) del rol. Espejo de
+   * `UsersService.assignScope` pero con sujeto `roleId`: el `ScopeService` une
+   * en read-time los scopes del usuario con los de sus roles (unión), así que
+   * este alcance AMPLÍA el de cada miembro del rol y se re-acota EN VIVO al
+   * quitarle el rol (no se denormaliza). Vacío ⇒ el rol no aporta restricción
+   * de nodo. La autorización efectiva la sigue decidiendo el backend.
+   */
+  async assignScope(id: string, dto: AssignScopeRequest, ctx: AuditContext): Promise<RoleDetail> {
+    const role = await this.prisma.role.findUnique({ where: { id } });
+    if (!role) throw new NotFoundException("Rol no encontrado");
+
+    const nodeIds = [...new Set(dto.scopes.map((s) => s.orgNodeId))];
+    if (nodeIds.length > 0) {
+      const found = await this.prisma.orgNode.count({ where: { id: { in: nodeIds }, deletedAt: null } });
+      if (found !== nodeIds.length) throw new BadRequestException("Uno o más nodos no existen");
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.scope.deleteMany({ where: { roleId: id } }),
+      this.prisma.scope.createMany({
+        data: dto.scopes.map((s) => ({ roleId: id, orgNodeId: s.orgNodeId, includeDescendants: s.includeDescendants })),
+      }),
+    ]);
+    await this.audit.record({ ...ctx, action: "role.scope.assigned", entityType: "Role", entityId: id, after: { scopes: dto.scopes } });
+    return this.get(id);
   }
 
   /**

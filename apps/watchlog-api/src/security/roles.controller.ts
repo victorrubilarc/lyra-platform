@@ -1,9 +1,11 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Put, Req } from "@nestjs/common";
 import type { FastifyRequest } from "fastify";
 import {
+  assignScopeRequestSchema,
   assignTemplateScopeRequestSchema,
   createRoleRequestSchema,
   updateRoleRequestSchema,
+  type AssignScopeRequest,
   type AssignTemplateScopeRequest,
   type CreateRoleRequest,
   type UpdateRoleRequest,
@@ -49,6 +51,22 @@ export class RolesController {
     @Req() req: FastifyRequest,
   ) {
     return this.roles.update(id, dto, this.ctx(user, req));
+  }
+
+  /**
+   * Alcance por NODO del rol (ABAC dim. 4). Reusa el permiso `role:manage`
+   * (asignar el alcance de datos de un rol es administrarlo); sin clave nueva.
+   * El alcance se UNE en read-time al del usuario (unión user+roles).
+   */
+  @Put(":id/scope")
+  @RequirePermission("role:manage")
+  assignScope(
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(assignScopeRequestSchema)) dto: AssignScopeRequest,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.roles.assignScope(id, dto, this.ctx(user, req));
   }
 
   /** Alcance por PLANTILLA del rol (2.º eje ABAC, Fase 2.8). */

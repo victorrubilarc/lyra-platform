@@ -2203,7 +2203,15 @@ export const esCL = {
       searchPermissions: "Buscar permiso (clave, descripción o grupo)…",
       noPermissionMatches: "Ningún permiso coincide con la búsqueda.",
       templateScopeAll: "Sin restricción: este rol no acota las plantillas. Se suma al alcance de plantilla de sus usuarios.",
-      templateScopeCreateHint: "Guarda el rol primero; luego podrás asignarle el alcance por plantilla.",
+      templateScopeCreateHint: "Guarda el rol primero; luego podrás asignarle el alcance por nodo y por plantilla.",
+      nodeScope: {
+        title: "Alcance por nodo",
+        all: "Sin restricción: este rol no acota los nodos. Se suma al alcance de nodo de cada usuario que lo tenga.",
+        desc: "Limita los datos visibles a los nodos seleccionados de la estructura. Se UNE al alcance propio de cada usuario del rol (gana el más amplio).",
+      },
+      templateScope: {
+        title: "Alcance por plantilla",
+      },
       tabs: {
         data: "Datos",
         permissions: "Permisos",
