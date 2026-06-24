@@ -172,9 +172,11 @@ original**, el equipo, el turno y el contexto.
 
 ### 🏭 Modela tu operación real (estructura + activos)
 Jerarquía organizacional (empresa › sitio › área › nodo) y **equipos/activos** asociados, base para
-filtrar, asignar responsabilidades y acotar permisos.
+filtrar, asignar responsabilidades y acotar permisos. Puedes modelar **varias estructuras en paralelo**
+(p. ej. una jerarquía minera y otra de TI), cada una con su identidad visual, y levantar un **área nueva
+en minutos** con un **asistente guiado** (nombre → niveles → primer nodo, lista para operar de una vez).
 **Beneficio:** cada usuario ve y opera **solo lo de su alcance**; la información está ordenada como la
-operación real.
+operación real, y crecer (un sitio, un negocio, un contrato nuevo) es **autoservicio**, sin proyecto.
 
 ### 🔐 Seguridad y permisos de grado empresarial
 Control de acceso por **roles y atributos (ABAC)** en 4 dimensiones (pantallas, acciones,

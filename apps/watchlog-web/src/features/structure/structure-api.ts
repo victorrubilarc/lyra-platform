@@ -6,6 +6,7 @@ import {
   orgNodeSchema,
   orgNodeTreeSchema,
   orgStructureSchema,
+  provisionOrgStructureRequestSchema,
   reorderOrgStructuresRequestSchema,
   updateOrgLevelRequestSchema,
   updateOrgNodeRequestSchema,
@@ -17,6 +18,7 @@ import {
   type OrgNode,
   type OrgNodeTree,
   type OrgStructure,
+  type ProvisionOrgStructureRequest,
   type UpdateOrgLevelRequest,
   type UpdateOrgNodeRequest,
   type UpdateOrgStructureRequest,
@@ -39,6 +41,16 @@ export function fetchStructures(): Promise<OrgStructure[]> {
 export function createStructure(dto: CreateOrgStructureRequest): Promise<OrgStructure> {
   createOrgStructureRequestSchema.parse(dto);
   return apiJson("/structure/structures", orgStructureSchema, { method: "POST", body: dto });
+}
+
+/**
+ * Aprovisiona un "área" completa (estructura + niveles base + nodo raíz) en una
+ * sola operación atómica (asistente L3b). El backend ejecuta las 3 inserciones en
+ * una transacción: o queda operable, o no se crea nada.
+ */
+export function provisionStructure(dto: ProvisionOrgStructureRequest): Promise<OrgStructure> {
+  provisionOrgStructureRequestSchema.parse(dto);
+  return apiJson("/structure/structures/provision", orgStructureSchema, { method: "POST", body: dto });
 }
 
 export function updateStructure(id: string, dto: UpdateOrgStructureRequest): Promise<OrgStructure> {

@@ -1,5 +1,34 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-24 — 🎯 L3b · Asistente «crear una nueva área» ✅** (`feat/estructura-asistente-area`). Levantar un
+"área/negocio" nuevo deja de ser un trámite de 3 pasos sueltos y dispersos (crear estructura → ir a definir niveles →
+crear el nodo raíz, con el riesgo de dejar una estructura **huérfana sin nodos**, no operable y oculta del selector) y
+pasa a ser **un solo flujo guiado premium**. Es lo que se DIFIRIÓ en L3. **(1) Wizard de 3 pasos** en un `Modal` lanzado
+desde el `StructuresDrawer` (botón **«Nueva área»**, que REEMPLAZA al "Nueva estructura" simple — el create vacío era
+justo la fricción que esto elimina): **Paso 1 · Identidad** (nombre, clave autogenerada/editable, descripción, color/ícono
+reusando el editor de identidad L3 con vista previa del badge); **Paso 2 · Niveles base** (3 **plantillas** curadas —
+Minería: Faena→Planta→Área→Equipo · Manufactura: Planta→Línea→Estación · TI: Contrato→Sitio→Host — + **Desde cero**, con
+edición manual: agregar/quitar/renombrar/reordenar; mínimo 1 nivel); **Paso 3 · Nodo raíz** (nombre + código opcional en
+el nivel 0) con **resumen** de lo que se creará. **(2) Backend ATÓMICO** `POST /structure/structures/provision`
+(`StructureService.provisionStructure`): las **tres** inserciones (estructura + niveles + nodo raíz) van en **una sola
+transacción Prisma** ⇒ o el área entera queda **operable** (≥1 nodo), o **no se crea nada** — sin estructuras huérfanas,
+sin lógica de compensación frágil en el front. **Sin migración** (modelos existentes), **sin permiso nuevo** (reusa
+`module:structure:manage` = super-admin; el controller mantiene el gate grueso `orglevel:manage` y el servicio re-autoriza
+super-admin) ⇒ **sin `db:seed`/FLUSHALL**. **(3) Componente `Stepper`** presentacional nuevo en `packages/ui` (indicador
+de pasos numerado con estado hecho/actual/pendiente + a11y; la lógica del wizard vive en el feature) y **subcomponente
+`StructureIdentityFields`** extraído del `StructuresDrawer` para reusar el editor de identidad L3 sin duplicar (única
+fuente de verdad de la identidad en la UI; el CSS se movió a `StructureIdentityFields.module.css`). **Al terminar OK:**
+fija la nueva estructura como **activa** (`setActive`) + toast + navega a `/estructura` para seguir poblándola. **Fallo
+parcial:** se disuelve con la transacción (no hay estado a medias); el wizard muestra UN banner de error en el submit y
+permite reintentar. **Decisiones** (en DECISIONS): endpoint atómico vs orquestación front (atómico, integridad en la
+frontera del agregado) · «Nueva área» reemplaza al create simple · Stepper en `packages/ui` · 3 plantillas + manual.
+typecheck/lint(0)/build/test (252+6) verdes; `smoke-estructura-asistente.py` **15/15** (provision crea área operable
+nodeCount≥1 + niveles en orden + nodo raíz en nivel 0; clave duplicada/0-niveles ⇒ 400 SIN huérfana; usuario con
+`orglevel:manage` pero sin super-admin ⇒ 403) + regresión ux-premium 18/18 · admin-delegada 29/29 · ciclo-vida 17/17 ·
+rol-alcance 14/14 · aislamiento L1 33/33 · multi-estructura 33/33 · template-scope 14/14. **PENDIENTE: smoke VISUAL del
+dueño.** **NO** se hizo L4 ni el panorama multi-módulo. **Siguiente: L4 (jerarquías alternativas) cuando el negocio lo
+pida, o el panorama multi-módulo.**
+
 **2026-06-24 — 🎯 L3 · UX premium cross-estructura ✅** (`feat/estructura-ux-premium`). Trabajar con varias estructuras
 ahora se siente de clase mundial y SIN ambigüedad. Tres piezas (el asistente "crear área" se DIFIRIÓ a **L3b**).
 **(1) Contexto inconfundible.** Cada estructura tiene **color de acento** (clave de una paleta curada Lyra de 8 acentos)

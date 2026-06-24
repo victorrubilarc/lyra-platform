@@ -179,3 +179,40 @@ export const updateOrgNodeRequestSchema = z.object({
   levelId: z.string().min(1).optional(),
 });
 export type UpdateOrgNodeRequest = z.infer<typeof updateOrgNodeRequestSchema>;
+
+// --- Aprovisionar un "área" completa (L3b · asistente) ---
+
+/**
+ * Aprovisiona una estructura organizacional COMPLETA y operativa en UNA sola
+ * operación atómica (transacción): identidad + niveles base + primer nodo raíz.
+ * Es lo que orquesta el asistente "crear área": evita estructuras huérfanas sin
+ * nodos (no operables, ocultas del selector). El backend re-autoriza como
+ * super-admin de estructura (igual que `createStructure`) y ejecuta las tres
+ * inserciones en una sola transacción: o el área entera queda operable (≥1 nodo),
+ * o no se crea nada.
+ */
+export const provisionOrgStructureRequestSchema = z.object({
+  /** Identidad de la estructura (mismos campos que `createOrgStructureRequestSchema`). */
+  key: z
+    .string()
+    .trim()
+    .min(2)
+    .max(40)
+    .regex(/^[a-z0-9][a-z0-9-]*$/, "Solo minúsculas, números y guiones"),
+  name: z.string().trim().min(1).max(80),
+  description: z.string().trim().max(500).optional(),
+  color: structureAccentSchema.nullable().optional(),
+  icon: structureIconSchema.nullable().optional(),
+  /**
+   * Niveles base, en orden de profundidad. El índice del arreglo fija el `order`
+   * (0 = nivel raíz). Mínimo 1: la estructura necesita al menos un nivel para que
+   * el nodo raíz cuelgue de él.
+   */
+  levels: z.array(z.string().trim().min(1).max(60)).min(1).max(12),
+  /** Primer nodo raíz, creado en el nivel 0, para dejar la estructura operativa. */
+  rootNode: z.object({
+    name: z.string().trim().min(1).max(120),
+    code: z.string().trim().max(40).optional(),
+  }),
+});
+export type ProvisionOrgStructureRequest = z.infer<typeof provisionOrgStructureRequestSchema>;

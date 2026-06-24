@@ -4,6 +4,7 @@ import type {
   CreateOrgNodeRequest,
   CreateOrgStructureRequest,
   OrgNodeTree,
+  ProvisionOrgStructureRequest,
   UpdateOrgLevelRequest,
   UpdateOrgNodeRequest,
   UpdateOrgStructureRequest,
@@ -127,6 +128,76 @@ export class StructureService {
     });
     await this.audit.record({ ...ctx, action: "structure.structure.created", entityType: "OrgStructure", entityId: structure.id, after: { ...structure } });
     return structure;
+  }
+
+  /**
+   * Aprovisiona un "área" COMPLETA y operativa en una sola operación atómica (L3b,
+   * asistente "crear área"): estructura + niveles base + primer nodo raíz. Las tres
+   * inserciones van dentro de UNA transacción Prisma: o el área entera queda operable
+   * (≥1 nodo), o no se crea NADA — sin estructuras huérfanas sin nodos (no operables,
+   * ocultas del selector). Autorización = super-admin de estructura, igual que
+   * `createStructure` (crear una estructura nueva es provisión de un "dominio"). El
+   * nodo raíz cuelga del nivel 0 para dejar la estructura usable de inmediato.
+   */
+  async provisionStructure(
+    dto: ProvisionOrgStructureRequest,
+    ctx: AuditContext,
+  ): Promise<OrgStructure & { nodeCount: number }> {
+    await this.scope.assertSuperStructureAdmin(this.requireActor(ctx));
+    const dup = await this.prisma.orgStructure.count({ where: { key: dto.key } });
+    if (dup > 0) throw new BadRequestException(`Ya existe una estructura con la clave "${dto.key}"`);
+
+    const { structure, rootNode } = await this.prisma.$transaction(async (tx) => {
+      const structure = await tx.orgStructure.create({
+        data: {
+          key: dto.key,
+          name: dto.name,
+          description: dto.description ?? null,
+          color: dto.color ?? null,
+          icon: dto.icon ?? null,
+          // Las estructuras nuevas NUNCA son la por defecto (esa es la migrada).
+          isDefault: false,
+          active: true,
+        },
+      });
+      // Niveles base: el índice fija la profundidad (`order` 0 = nivel raíz).
+      const levels = [];
+      for (let i = 0; i < dto.levels.length; i++) {
+        levels.push(
+          await tx.orgLevel.create({
+            data: { structureId: structure.id, name: dto.levels[i]!, order: i },
+          }),
+        );
+      }
+      const rootLevel = levels[0]!;
+      // Nodo raíz en el nivel 0. El `path` incluye el propio id (solo conocido tras
+      // crear): se crea y luego se completa el path en 2 pasos, igual que `createNode`.
+      const createdNode = await tx.orgNode.create({
+        data: {
+          structureId: structure.id,
+          name: dto.rootNode.name,
+          code: dto.rootNode.code ?? null,
+          levelId: rootLevel.id,
+          parentId: null,
+        },
+      });
+      const rootNode = await tx.orgNode.update({
+        where: { id: createdNode.id },
+        data: { path: `/${createdNode.id}/` },
+      });
+      return { structure, rootNode };
+    });
+
+    // Auditoría fuera de la transacción de dominio (mismo patrón que el resto del
+    // servicio). Un solo evento "provisioned" con el resumen del área creada.
+    await this.audit.record({
+      ...ctx,
+      action: "structure.structure.provisioned",
+      entityType: "OrgStructure",
+      entityId: structure.id,
+      after: { ...structure, levels: dto.levels, rootNodeId: rootNode.id, rootNodeName: rootNode.name },
+    });
+    return { ...structure, nodeCount: 1 };
   }
 
   async updateStructure(id: string, dto: UpdateOrgStructureRequest, ctx: AuditContext): Promise<OrgStructure> {

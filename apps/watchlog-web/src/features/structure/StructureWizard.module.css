@@ -1,0 +1,227 @@
+.wizard {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.step {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.stepTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.stepIntro {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--color-text-muted);
+}
+
+/* --- Banner de error (fallo del aprovisionamiento) --- */
+.errorBanner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--color-border-subtle);
+  border-left: 3px solid var(--color-error);
+  border-radius: var(--radius-md);
+  background: var(--color-error-bg);
+  color: var(--color-error);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.errorBanner span {
+  flex: 1;
+  min-width: 0;
+}
+
+.errorBanner button {
+  display: inline-flex;
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* --- Plantillas de niveles --- */
+.templatesLabel {
+  font-size: var(--text-body-sm-size);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.templateRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: -6px;
+}
+
+.templateChip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-full);
+  background: var(--color-bg-surface-2);
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition:
+    border-color 0.12s ease,
+    color 0.12s ease,
+    background 0.12s ease;
+}
+
+.templateChip:hover {
+  border-color: var(--color-border-active);
+  color: var(--color-text-primary);
+}
+
+.templateChipOn {
+  border-color: var(--color-accent-primary);
+  color: var(--color-accent-primary);
+  background: var(--color-info-bg);
+}
+
+/* --- Lista de niveles editables --- */
+.levelList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.levelsEmpty {
+  margin: 4px 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.levelRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.levelArrows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.levelArrows button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 18px;
+  background: none;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.levelArrows button:hover:not(:disabled) {
+  border-color: var(--color-border-active);
+  color: var(--color-text-primary);
+}
+
+.levelArrows button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.levelDepth {
+  flex-shrink: 0;
+  width: 64px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.levelRow > :global(.lyra-input),
+.levelRow input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* --- Resumen del paso 3 --- */
+.review {
+  margin-top: 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface-2);
+}
+
+.reviewTitle {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  margin-bottom: 10px;
+}
+
+.reviewGrid {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+  margin: 0;
+}
+
+.reviewGrid dt {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.reviewGrid dd {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  min-width: 0;
+  word-break: break-word;
+}
+
+.reviewGrid code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+/* --- Footer de navegación --- */
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+.footerLeft {
+  display: flex;
+}
+
+.footerRight {
+  display: flex;
+  gap: 8px;
+}

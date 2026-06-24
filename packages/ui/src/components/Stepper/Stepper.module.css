@@ -1,0 +1,123 @@
+.stepper {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  display: flex;
+  min-width: 0;
+}
+
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: none;
+  border: none;
+  padding: 6px 8px;
+  border-radius: var(--radius-md);
+  font-family: var(--font-body);
+  text-align: left;
+  color: inherit;
+}
+
+button.trigger {
+  cursor: pointer;
+}
+
+button.trigger:hover {
+  background: var(--color-hover);
+}
+
+.marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-full);
+  border: 1.5px solid var(--color-border-subtle);
+  color: var(--color-text-muted);
+  background: var(--color-bg-surface-2);
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.markerNum {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.label {
+  font-size: var(--text-body-sm-size);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.hint {
+  font-size: 11.5px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Conector entre pasos: crece para repartir el espacio. */
+.connector {
+  flex: 1;
+  min-width: 16px;
+  height: 1.5px;
+  margin: 15px 4px 0;
+  border-radius: var(--radius-full);
+  background: var(--color-border-subtle);
+}
+
+.connectorDone {
+  background: var(--color-accent-primary);
+}
+
+/* --- Estados --- */
+
+.done .marker {
+  background: var(--color-accent-primary);
+  border-color: var(--color-accent-primary);
+  color: #fff;
+}
+
+.done .label {
+  color: var(--color-text-primary);
+}
+
+.current .marker {
+  border-color: var(--color-accent-primary);
+  color: var(--color-accent-primary);
+  background: var(--color-bg-surface-1);
+  box-shadow: 0 0 0 4px var(--structure-accent-soft);
+}
+
+.current .label {
+  color: var(--color-text-primary);
+}
+
+@media (max-width: 640px) {
+  /* En móvil el rótulo del paso no actual se oculta para no saturar. */
+  .upcoming .body,
+  .done .body {
+    display: none;
+  }
+}

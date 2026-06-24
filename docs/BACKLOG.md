@@ -5,7 +5,22 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-24** (**🎯 L3 · UX premium cross-estructura ✅** — `feat/estructura-ux-premium`:
+> actualización: **2026-06-24** (**🎯 L3b · Asistente «crear una nueva área» ✅** — `feat/estructura-asistente-area`:
+> un **wizard de 3 pasos** (identidad → niveles base → primer nodo raíz) que aprovisiona una estructura organizacional
+> COMPLETA y operativa de una sola vez, lanzado desde el `StructuresDrawer` con el botón **«Nueva área»** (que REEMPLAZA
+> al "Nueva estructura" simple). **Backend ATÓMICO** `POST /structure/structures/provision`
+> (`StructureService.provisionStructure`): estructura + niveles + nodo raíz en **una sola `prisma.$transaction`** ⇒ o el
+> área queda operable (≥1 nodo) o no se crea nada (sin huérfanas). **Sin migración, sin permiso nuevo** (reusa
+> `module:structure:manage` = super-admin; el servicio re-autoriza) ⇒ **sin `db:seed`/FLUSHALL**. UI: componente `Stepper`
+> nuevo en `packages/ui` + subcomponente `StructureIdentityFields` extraído del `StructuresDrawer` (reusa el editor de
+> identidad L3 sin duplicar; CSS movido a `StructureIdentityFields.module.css`); 3 plantillas de niveles (Minería/
+> Manufactura/TI) + manual; al terminar fija la estructura activa + navega a `/estructura`. **CIERRA la deuda L3b.**
+> typecheck/lint(0)/build/test (252+6) verdes · smoke `smoke-estructura-asistente.py` **15/15** (área operable +
+> atomicidad sin huérfana + 403 sin super-admin) + regresión ux-premium 18/18 · admin-delegada 29/29 · ciclo-vida 17/17 ·
+> rol-alcance 14/14 · aislamiento L1 33/33 · multi-estructura 33/33 · template-scope 14/14. **PENDIENTE: smoke VISUAL del
+> dueño.** **NO** se hizo L4 ni el panorama multi-módulo. **Siguiente: L4 (jerarquías alternativas) o el panorama
+> multi-módulo.** Anterior:
+> **🎯 L3 · UX premium cross-estructura ✅** — `feat/estructura-ux-premium`:
 > tres piezas (el asistente "crear área" se DIFIRIÓ a **L3b**). **(1) Identidad inconfundible:** columnas aditivas
 > `OrgStructure.color`/`icon` (migración `20260624130000_add_structure_identity`, nullable, cero pérdida) — el color es
 > una **clave de paleta curada** (8 acentos Lyra) y el ícono una **lista blanca Lucide**, con **fallback determinístico**
@@ -938,9 +953,13 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
       sigue siendo la frontera** (verificado: scoped ve solo lo suyo, 403 sin permiso). (3) Switcher con búsqueda +
       identidad. Migración `20260624130000_add_structure_identity`; catálogo 89→90 (db:seed + FLUSHALL). smoke
       `smoke-estructura-ux-premium.py` 18/18 + regresión 29/17/33/33/14/14. Ver DECISIONS 2026-06-24. **NO** L3b/L4.
-  - [ ] **L3b · Asistente "crear nueva área" (diferido de L3).** Wizard de pasos (identidad → niveles base → nodo raíz)
-        que orquesta los endpoints existentes (POST structures + levels + nodes) en un solo flujo, super-admin only
-        (`module:structure:manage`), con buen estado de error. **Esfuerzo: MEDIO.**
+  - [x] **L3b · Asistente "crear nueva área" ✅ (2026-06-24, `feat/estructura-asistente-area`).** Wizard de 3 pasos
+        (identidad → niveles base → nodo raíz) lanzado desde el `StructuresDrawer` («Nueva área», reemplaza el create
+        simple). Se DECIDIÓ **endpoint atómico** `POST /structure/structures/provision` (las 3 inserciones en una
+        `prisma.$transaction`, sin huérfanas) en vez de orquestar desde el front; super-admin only
+        (`module:structure:manage`, el servicio re-autoriza), sin migración, sin permiso nuevo. `Stepper` nuevo en
+        `packages/ui` + `StructureIdentityFields` extraído (reusa identidad L3). smoke `smoke-estructura-asistente.py`
+        15/15 + regresión estructura completa. Ver DECISIONS/PROGRESS 2026-06-24.
   - [ ] **Panorama multi-módulo (deuda de L3).** La vista ejecutiva hoy consolida SOLO incidencias. Extender a
         bitácoras/rondas/cambio de turno (tarjetas/KPIs por estructura) cuando se justifique, manteniendo el ABAC como
         frontera. **Esfuerzo: MEDIO.**

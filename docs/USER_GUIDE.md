@@ -41,6 +41,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 - ✍️ Pestañas, búsqueda ⌘K, idioma, densidad, tema claro/oscuro
 
 ### 3. Estructura organizacional  [Configurador/Admin]
+- ✅ **Asistente: crear una nueva área** (wizard de 3 pasos: identidad → niveles → nodo raíz, deja el área operativa de una vez) (§ Estructura organizacional ▸ Asistente: crear una nueva área)
 - ✅ **Múltiples estructuras organizacionales** (varias jerarquías en paralelo + selector de estructura activa) (§ Estructura organizacional ▸ Múltiples estructuras)
 - ✅ **Ciclo de vida: archivar y ordenar estructuras** (archivar/reactivar sin borrar + reordenar el selector) (§ Estructura organizacional ▸ Ciclo de vida: archivar y ordenar)
 - ✅ **Contexto visual y vista ejecutiva** (color/ícono por estructura + badge "Estás en" + Panorama cross-estructura) (§ Estructura organizacional ▸ Contexto visual y vista ejecutiva)
@@ -140,6 +141,46 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 
 ---
 
+## Estructura organizacional ▸ Asistente: crear una nueva área  [Configurador/Admin]
+
+**Para qué sirve.** Levantar un **área o negocio nuevo** (una estructura organizacional completa) **de una sola
+vez y sin fricción**. Antes, dejar una estructura lista para usar exigía tres pasos sueltos y dispersos —crearla,
+ir a definir sus niveles y después crear su primer nodo— y era fácil quedarse a medias con una estructura **vacía
+que no servía** (no aparecía en el selector porque no tenía nodos). El **asistente** une esos tres pasos en un
+**flujo guiado** y garantiza que, al terminar, el área queda **operativa** (con al menos un nodo) y lista para
+empezar a trabajar.
+
+**Cómo se usa.**
+1. Abre el **selector de estructura activa** (arriba a la derecha) y elige **«Gestionar estructuras…»**.
+2. Pulsa **«Nueva área»**. Se abre el asistente con tres pasos:
+   - **Paso 1 · Identidad.** Escribe el **nombre** del área (la **clave** corta se autogenera, puedes ajustarla;
+     no se podrá cambiar después), una **descripción** opcional y elige su **color e ícono** (los mismos de la
+     identidad visual: verás una **vista previa** del distintivo «Estás en»). Si los dejas en **«Auto»**, se
+     derivan solos de la clave.
+   - **Paso 2 · Niveles base.** Define la **jerarquía** de mayor a menor (por ejemplo *Faena → Planta → Área →
+     Equipo*). Puedes partir de una **plantilla rápida** (Minería, Manufactura o TI/Infraestructura) y ajustarla,
+     o construirla **desde cero**. Agrega, quita, renombra y **reordena** los niveles con las flechas. Necesitas
+     **al menos un nivel**.
+   - **Paso 3 · Nodo raíz.** Crea el **primer nodo** (en el nivel más alto), con su **nombre** y un **código**
+     opcional. Verás un **resumen** de todo lo que se va a crear.
+3. Pulsa **«Crear área»**. El sistema crea la estructura, sus niveles y el primer nodo **en un solo paso seguro**,
+   te deja **trabajando de inmediato** en la nueva área y te lleva a **Estructura organizacional** para seguir
+   poblando su árbol.
+
+**Quién puede.** Solo el **administrador general de estructura** (super-admin, permiso `module:structure:manage`).
+A un administrador **delegado** (que administra solo ciertas estructuras) **no** se le ofrece el botón, y el
+backend lo verifica igual. Para seguir agregando nodos dentro del área basta el permiso de gestión de nodos.
+
+**Importante.**
+- **Todo o nada.** La creación es **atómica**: si algo falla (por ejemplo, la clave ya existe), **no se crea nada
+  a medias** —no quedan estructuras vacías dando vueltas. El asistente te muestra el error y puedes corregir y
+  reintentar sin limpiar nada.
+- La **clave** debe ser **única** y en minúsculas/números/guiones; si ya existe, el asistente te avisa.
+- Para **solo renombrar** o cambiar el color/ícono de un área existente, usa el lápiz de edición en «Gestionar
+  estructuras…» (no el asistente). El asistente es para **crear** áreas nuevas.
+
+---
+
 ## Estructura organizacional ▸ Múltiples estructuras  [Configurador/Admin]
 
 **Para qué sirve.** Una misma instalación de Lyra WatchLog puede modelar **varios negocios o casos de uso
@@ -155,11 +196,12 @@ por estructura es el árbol, los niveles y los calendarios.)
    botón con el nombre de la estructura y una flecha). Todo lo que ves —el árbol, los niveles, los calendarios
    y los selectores de nodo de toda la app— corresponde a la **estructura activa**.
 2. Para **cambiar de estructura**, abre el selector y elige otra. La pantalla se actualiza a su árbol y niveles.
-3. Para **crear o administrar** estructuras, abre el selector y elige **«Gestionar estructuras…»**. En el panel
-   puedes **crear** una estructura nueva (nombre + una clave corta que se autogenera), **renombrarla** o
-   **eliminarla**. Al crear una, el sistema te deja trabajando de inmediato en ella.
-4. En una estructura nueva, primero **configura sus niveles** (botón «Configurar niveles») y luego crea su
-   **árbol de nodos** como siempre. Los niveles que definas valen **solo para esa estructura**.
+3. Para **crear o administrar** estructuras, abre el selector y elige **«Gestionar estructuras…»**. Para **crear**
+   una estructura nueva, usa el botón **«Nueva área»**: un **asistente** que la deja operativa de una vez
+   (identidad → niveles → primer nodo). Desde el mismo panel puedes **renombrar**, cambiar identidad, **archivar**
+   o **eliminar** las existentes. (Ver § *Asistente: crear una nueva área*.)
+4. Al terminar el asistente, el sistema te deja trabajando de inmediato en la nueva estructura, ya con su primer
+   nodo. Sigue **poblando su árbol** como siempre. Los niveles que definiste valen **solo para esa estructura**.
 
 **Quién puede.** Ver y cambiar de estructura: cualquiera con acceso al módulo de estructura (`orgnode:read`);
 solo verás las estructuras que tu **alcance (ABAC) por nodo** te permite. Crear, renombrar o eliminar

@@ -3,6 +3,7 @@ import type {
   CreateOrgLevelRequest,
   CreateOrgNodeRequest,
   CreateOrgStructureRequest,
+  ProvisionOrgStructureRequest,
   UpdateOrgLevelRequest,
   UpdateOrgNodeRequest,
   UpdateOrgStructureRequest,
@@ -19,6 +20,7 @@ import {
   fetchLevels,
   fetchStructures,
   fetchTree,
+  provisionStructure,
   reorderStructures,
   updateLevel,
   updateNode,
@@ -78,6 +80,24 @@ export function useCreateStructure() {
   return useMutation({
     mutationFn: (dto: CreateOrgStructureRequest) => createStructure(dto),
     onSuccess: () => qc.invalidateQueries({ queryKey: QUERY_KEYS.structures }),
+  });
+}
+
+/**
+ * Aprovisiona un "área" completa (estructura + niveles + nodo raíz) en una sola
+ * llamada atómica (asistente L3b). Invalida estructuras, niveles y árbol porque la
+ * nueva estructura ya nace con su jerarquía y su nodo raíz.
+ */
+export function useProvisionStructure() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (dto: ProvisionOrgStructureRequest) => provisionStructure(dto),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.structures });
+      qc.invalidateQueries({ queryKey: ["structure", "levels"] });
+      qc.invalidateQueries({ queryKey: ["structure", "tree"] });
+      qc.invalidateQueries({ queryKey: ["structure", "accessible-tree"] });
+    },
   });
 }
 

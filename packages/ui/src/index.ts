@@ -83,3 +83,6 @@ export type { ResizableSplitProps } from "./components/ResizableSplit/ResizableS
 
 export { GridPager } from "./components/GridPager/GridPager.js";
 export type { GridPagerProps } from "./components/GridPager/GridPager.js";
+
+export { Stepper } from "./components/Stepper/Stepper.js";
+export type { StepperProps, Step } from "./components/Stepper/Stepper.js";

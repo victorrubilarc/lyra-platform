@@ -14,21 +14,14 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
-import { Button, Chip, Drawer, EmptyState, FormField, Input, Modal, Textarea, Toggle, cx, useToast } from "@lyra/ui";
+import { Button, Chip, Drawer, EmptyState, FormField, Input, Modal, Textarea, Toggle, useToast } from "@lyra/ui";
 import type { OrgStructure, StructureAccent, StructureIcon } from "@lyra/contracts";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { ApiError } from "../../lib/api-client.js";
 import { useStructureStore } from "../../shell/structure-store.js";
+import { StructureIdentityFields } from "./StructureIdentityFields.js";
+import { StructureWizard } from "./StructureWizard.js";
 import {
-  ACCENT_OPTIONS,
-  ICON_OPTIONS,
-  STRUCTURE_ICON_COMPONENTS,
-  accentOf,
-  iconComponentOf,
-} from "./structure-identity.js";
-import styles from "./StructuresDrawer.module.css";
-import {
-  useCreateStructure,
   useDeleteStructure,
   useOrgStructures,
   useReorderStructures,
@@ -40,18 +33,12 @@ interface StructuresDrawerProps {
   onClose: () => void;
 }
 
-/** Deriva un slug válido (minúsculas/números/guiones) a partir del nombre. */
-function slugify(name: string): string {
-  return name
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 40);
-}
-
-type Editor = { mode: "create" } | { mode: "edit"; structure: OrgStructure } | null;
+/**
+ * El editor del drawer solo EDITA estructuras existentes (identidad: nombre/desc/
+ * color/ícono; la clave es inmutable). La CREACIÓN vive en el asistente «crear área»
+ * (`StructureWizard`), que arma estructura + niveles + nodo raíz de una vez.
+ */
+type Editor = { structure: OrgStructure } | null;
 
 interface FormValues {
   name: string;
@@ -84,7 +71,6 @@ export function StructuresDrawer({ open, onClose }: StructuresDrawerProps) {
   // por fila vía `canAdminister`); el backend es la fuente de verdad y re-autoriza.
   const isSuperAdmin = perms.can("module:structure:manage");
   const { data: structures = [], isLoading } = useOrgStructures();
-  const createStructure = useCreateStructure();
   const updateStructure = useUpdateStructure();
   const deleteStructure = useDeleteStructure();
   const reorderStructures = useReorderStructures();
@@ -93,14 +79,14 @@ export function StructuresDrawer({ open, onClose }: StructuresDrawerProps) {
 
   const [editor, setEditor] = useState<Editor>(null);
   const [form, setForm] = useState<FormValues>(EMPTY_FORM);
-  const [keyTouched, setKeyTouched] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<OrgStructure | null>(null);
   const [showArchived, setShowArchived] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(false);
 
   const isActiveRow = (row: OrgStructure): boolean =>
     activeId === row.id || (activeId === null && row.isDefault);
 
-  const saving = createStructure.isPending || updateStructure.isPending;
+  const saving = updateStructure.isPending;
   const busy = saving || deleteStructure.isPending || reorderStructures.isPending;
 
   // Estructuras visibles en la GESTIÓN: por defecto solo las activas; con el toggle
@@ -144,12 +130,6 @@ export function StructuresDrawer({ open, onClose }: StructuresDrawerProps) {
     }
   }
 
-  function openCreate() {
-    setForm(EMPTY_FORM);
-    setKeyTouched(false);
-    setEditor({ mode: "create" });
-  }
-
   function openEdit(s: OrgStructure) {
     setForm({
       name: s.name,
@@ -158,13 +138,12 @@ export function StructuresDrawer({ open, onClose }: StructuresDrawerProps) {
       color: (s.color as StructureAccent | null) ?? null,
       icon: (s.icon as StructureIcon | null) ?? null,
     });
-    setEditor({ mode: "edit", structure: s });
+    setEditor({ structure: s });
   }
 
   function closeEditor() {
     setEditor(null);
     setForm(EMPTY_FORM);
-    setKeyTouched(false);
   }
 
   /** Pasa a TRABAJAR en esa estructura (la activa para configurar) y cierra el panel. */
@@ -177,35 +156,17 @@ export function StructuresDrawer({ open, onClose }: StructuresDrawerProps) {
   async function submit() {
     const name = form.name.trim();
     if (!editor) return;
+    if (!name) {
+      toast.error(t("structure.structures.invalid"));
+      return;
+    }
     try {
-      if (editor.mode === "create") {
-        const key = (keyTouched ? form.key : slugify(form.name)).trim();
-        if (!name || key.length < 2) {
-          toast.error(t("structure.structures.invalid"));
-          return;
-        }
-        const created = await createStructure.mutateAsync({
-          name,
-          key,
-          description: form.description.trim() || undefined,
-          color: form.color ?? undefined,
-          icon: form.icon ?? undefined,
-        });
-        toast.success(t("structure.structures.created"));
-        setActive(created.id); // pasa a trabajar de inmediato en la nueva estructura
-        closeEditor();
-      } else {
-        if (!name) {
-          toast.error(t("structure.structures.invalid"));
-          return;
-        }
-        await updateStructure.mutateAsync({
-          id: editor.structure.id,
-          dto: { name, description: form.description.trim() || null, color: form.color, icon: form.icon },
-        });
-        toast.success(t("structure.structures.updated"));
-        closeEditor();
-      }
+      await updateStructure.mutateAsync({
+        id: editor.structure.id,
+        dto: { name, description: form.description.trim() || null, color: form.color, icon: form.icon },
+      });
+      toast.success(t("structure.structures.updated"));
+      closeEditor();
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : t("common.errorGeneric"));
     }
@@ -394,9 +355,7 @@ export function StructuresDrawer({ open, onClose }: StructuresDrawerProps) {
             {t("structure.structures.backToList")}
           </button>
 
-          <h3 style={{ margin: 0, fontSize: 16 }}>
-            {editor.mode === "create" ? t("structure.structures.createTitle") : t("structure.structures.editTitle")}
-          </h3>
+          <h3 style={{ margin: 0, fontSize: 16 }}>{t("structure.structures.editTitle")}</h3>
 
           <FormField label={t("structure.structures.name")}>
             {(field) => (
@@ -410,21 +369,9 @@ export function StructuresDrawer({ open, onClose }: StructuresDrawerProps) {
             )}
           </FormField>
 
-          <FormField
-            label={t("structure.structures.key")}
-            hint={editor.mode === "edit" ? t("structure.structures.keyImmutable") : t("structure.structures.keyHint")}
-          >
+          <FormField label={t("structure.structures.key")} hint={t("structure.structures.keyImmutable")}>
             {(field) => (
-              <Input
-                {...field}
-                value={editor.mode === "edit" ? form.key : keyTouched ? form.key : slugify(form.name)}
-                onChange={(e) => {
-                  setKeyTouched(true);
-                  setForm((f) => ({ ...f, key: e.target.value }));
-                }}
-                placeholder={t("structure.structures.keyPlaceholder")}
-                disabled={editor.mode === "edit"}
-              />
+              <Input {...field} value={form.key} placeholder={t("structure.structures.keyPlaceholder")} disabled />
             )}
           </FormField>
 
@@ -441,90 +388,20 @@ export function StructuresDrawer({ open, onClose }: StructuresDrawerProps) {
             )}
           </FormField>
 
-          {/* Identidad visual (L3): acento + ícono, con vista previa y opción automática. */}
-          {(() => {
-            const previewKey =
-              (editor.mode === "edit" ? form.key : keyTouched ? form.key : slugify(form.name)) || "estructura";
-            const previewInput = { key: previewKey, color: form.color, icon: form.icon };
-            const effectiveAccent = accentOf(previewInput);
-            const PreviewIcon = iconComponentOf(previewInput);
-            return (
-              <div>
-                <div className={styles.identityLabel}>{t("structure.structures.appearance")}</div>
-                <p className={styles.identityHint}>{t("structure.structures.appearanceHint")}</p>
-
-                {/* Vista previa del badge tal como se verá en el topbar. */}
-                <div className={styles.identityPreview} data-accent={effectiveAccent}>
-                  <span className={styles.identityPreviewIcon}>
-                    <PreviewIcon size={15} aria-hidden="true" />
-                  </span>
-                  <span className={styles.identityPreviewText}>
-                    <span className={styles.identityPreviewKicker}>{t("structure.selector.youAreIn")}</span>
-                    <span className={styles.identityPreviewName}>{form.name.trim() || t("structure.structures.name")}</span>
-                  </span>
-                </div>
-
-                {/* Acentos: "Auto" + paleta curada. */}
-                <div className={styles.swatchRow}>
-                  <button
-                    type="button"
-                    className={cx(styles.autoChip, form.color === null && styles.autoChipOn)}
-                    onClick={() => setForm((f) => ({ ...f, color: null }))}
-                    title={t("structure.structures.appearanceAuto")}
-                  >
-                    {t("structure.structures.appearanceAuto")}
-                  </button>
-                  {ACCENT_OPTIONS.map((a) => (
-                    <button
-                      key={a}
-                      type="button"
-                      data-accent={a}
-                      className={cx(styles.swatch, form.color === a && styles.swatchOn)}
-                      onClick={() => setForm((f) => ({ ...f, color: a }))}
-                      aria-label={a}
-                      aria-pressed={form.color === a}
-                      title={a}
-                    >
-                      {form.color === a && <Check size={13} />}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Íconos: "Auto" + lista blanca Lucide. */}
-                <div className={styles.iconGrid}>
-                  <button
-                    type="button"
-                    className={cx(styles.iconCell, styles.iconCellAuto, form.icon === null && styles.iconCellOn)}
-                    onClick={() => setForm((f) => ({ ...f, icon: null }))}
-                    title={t("structure.structures.appearanceAuto")}
-                  >
-                    {t("structure.structures.appearanceAuto")}
-                  </button>
-                  {ICON_OPTIONS.map((ic) => {
-                    const Icon = STRUCTURE_ICON_COMPONENTS[ic];
-                    return (
-                      <button
-                        key={ic}
-                        type="button"
-                        className={cx(styles.iconCell, form.icon === ic && styles.iconCellOn)}
-                        onClick={() => setForm((f) => ({ ...f, icon: ic }))}
-                        aria-label={ic}
-                        aria-pressed={form.icon === ic}
-                        title={ic}
-                      >
-                        <Icon size={17} aria-hidden="true" />
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })()}
+          {/* Identidad visual (L3): subcomponente reutilizado por el asistente. */}
+          <StructureIdentityFields
+            name={form.name}
+            previewKey={form.key}
+            color={form.color}
+            icon={form.icon}
+            onColorChange={(color) => setForm((f) => ({ ...f, color }))}
+            onIconChange={(icon) => setForm((f) => ({ ...f, icon }))}
+          />
 
           <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
             <Button variant="primary" onClick={submit} loading={saving}>
               <Check size={15} />
-              {editor.mode === "create" ? t("common.create") : t("common.save")}
+              {t("common.save")}
             </Button>
             <Button variant="secondary" onClick={closeEditor} disabled={saving}>
               {t("common.cancel")}
@@ -568,11 +445,12 @@ export function StructuresDrawer({ open, onClose }: StructuresDrawerProps) {
             </div>
           )}
 
-          {/* Crear una estructura nueva = provisión de un dominio ⇒ solo super-admin. */}
+          {/* Crear un "área" nueva = asistente que arma estructura + niveles + nodo raíz
+              de una vez (operativa). Provisión de un dominio ⇒ solo super-admin. */}
           {isSuperAdmin && (
-            <Button variant="secondary" onClick={openCreate}>
+            <Button variant="primary" onClick={() => setWizardOpen(true)}>
               <Plus size={15} />
-              {t("structure.structures.newStructure")}
+              {t("structure.wizard.newArea")}
             </Button>
           )}
         </div>
@@ -617,6 +495,10 @@ export function StructuresDrawer({ open, onClose }: StructuresDrawerProps) {
           {t("structure.structures.deleteBlockedHint")}
         </p>
       </Modal>
+
+      {/* Asistente «crear área»: estructura + niveles + nodo raíz, operativa de una vez.
+          Al terminar, cierra también el drawer para llevar al usuario a /estructura. */}
+      <StructureWizard open={wizardOpen} onClose={() => setWizardOpen(false)} onDone={onClose} />
     </Drawer>
   );
 }

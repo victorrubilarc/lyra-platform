@@ -4,6 +4,33 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-24 · L3b · Asistente «crear una nueva área»
+Un wizard que aprovisiona una estructura organizacional COMPLETA y operativa de una vez (identidad → niveles →
+nodo raíz), eliminando la fricción de los 3 pasos sueltos. Decisiones (las "a resolver" del plan, con su motivo):
+- **Orquestación → ENDPOINT BACKEND ATÓMICO `POST /structure/structures/provision`** (no orquestar los 3 endpoints
+  desde el front). *Motivo:* el fallo parcial es feo — encadenar `createStructure`→`createLevel`→`createNode` (3
+  transacciones) puede dejar una **estructura huérfana sin nodos** (no operable, oculta del selector vía `isOperable`,
+  pero presente). El estándar es **integridad transaccional en la frontera del agregado**: las 3 inserciones van en un
+  solo `prisma.$transaction` ⇒ o el área queda operable (≥1 nodo), o no se crea nada. Evita lógica de compensación
+  frágil en el cliente. **Sin migración** (modelos existentes), **sin permiso nuevo** (reusa `module:structure:manage`).
+- **Autorización → super-admin (`module:structure:manage`)**, igual que crear una estructura. *Motivo:* aprovisionar un
+  "dominio" nuevo es provisión global. El controller mantiene el gate grueso `orglevel:manage`; el **servicio
+  re-autoriza super-admin** (`assertSuperStructureAdmin`) ⇒ un delegado con `orglevel:manage` pero sin super-admin
+  recibe **403** (verificado en smoke). El front solo OCULTA el botón al no-super-admin.
+- **Fallo parcial → se disuelve con la transacción.** *Motivo:* al ser atómico no hay estado a medias que limpiar; el
+  wizard muestra UN banner de error en el submit y permite reintentar. (Se descartó el rollback manual borrando lo
+  creado: redundante y propenso a errores.)
+- **«Nueva área» REEMPLAZA al «Nueva estructura» simple** del `StructuresDrawer` (no conviven). *Motivo:* el create
+  vacío producía exactamente la fricción que L3b elimina (estructura sin niveles/nodos = no operable). Un solo punto de
+  entrada premium; el editor de identidad de estructuras existentes queda intacto (solo edición).
+- **Componente de pasos → `Stepper` MÍNIMO presentacional en `packages/ui`** (no dentro del feature). *Motivo:* es
+  reutilizable a nivel DS y pequeño; honra "lo compartido vive en packages/ui" sin sobre-ingeniería. La **lógica** del
+  wizard (state machine, validación por paso) vive en el feature. Además se extrajo `StructureIdentityFields` (editor de
+  identidad L3) a subcomponente para reusarlo en el wizard sin duplicar.
+- **Plantillas de niveles → 3 curadas + manual** (Minería, Manufactura, TI/Infraestructura + «Desde cero»). *Motivo:*
+  arranque rápido sin encajonar; las plantillas prellenan la lista y el usuario agrega/quita/renombra/reordena (mínimo 1
+  nivel). Los nombres viven en i18n (`returnObjects`), no hardcodeados en el componente.
+
 ### 2026-06-24 · L3 · UX premium cross-estructura (identidad + vista ejecutiva + switcher)
 Hace que trabajar con varias estructuras se sienta de clase mundial y sin ambigüedad. Tres piezas (el asistente
 "crear área" se DIFIRIÓ a L3b por tamaño). Decisiones (las "a resolver" del plan, con su motivo):

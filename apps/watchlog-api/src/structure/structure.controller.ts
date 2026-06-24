@@ -4,6 +4,7 @@ import {
   createOrgLevelRequestSchema,
   createOrgNodeRequestSchema,
   createOrgStructureRequestSchema,
+  provisionOrgStructureRequestSchema,
   reorderOrgStructuresRequestSchema,
   updateOrgLevelRequestSchema,
   updateOrgNodeRequestSchema,
@@ -11,6 +12,7 @@ import {
   type CreateOrgLevelRequest,
   type CreateOrgNodeRequest,
   type CreateOrgStructureRequest,
+  type ProvisionOrgStructureRequest,
   type ReorderOrgStructuresRequest,
   type UpdateOrgLevelRequest,
   type UpdateOrgNodeRequest,
@@ -42,6 +44,19 @@ export class StructureController {
     @Req() req: FastifyRequest,
   ) {
     return this.structure.createStructure(dto, this.ctx(user, req));
+  }
+
+  // Aprovisiona un "área" completa (estructura + niveles + nodo raíz) en una
+  // transacción. Ruta ESTÁTICA antes de la paramétrica `structures/:id`. El gate de
+  // catálogo es el mismo que crear estructura; el servicio re-autoriza super-admin.
+  @Post("structures/provision")
+  @RequirePermission("orglevel:manage")
+  provisionStructure(
+    @Body(new ZodValidationPipe(provisionOrgStructureRequestSchema)) dto: ProvisionOrgStructureRequest,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.structure.provisionStructure(dto, this.ctx(user, req));
   }
 
   // Ruta ESTÁTICA antes de la paramétrica `structures/:id` (verbo distinto, sin colisión).
