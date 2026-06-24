@@ -55,9 +55,10 @@ export class LogEntriesController {
    */
   @Get("templates")
   @RequirePermission("logentry:create")
-  availableTemplates(@CurrentUser() user: RequestUser) {
-    // Picker operacional: aplica el 2.º eje ABAC (alcance por plantilla).
-    return this.templates.list(user.id, { status: "PUBLISHED" }, { applyTemplateScope: true });
+  availableTemplates(@CurrentUser() user: RequestUser, @Query("structureId") structureId?: string) {
+    // Picker operacional: aplica el 2.º eje ABAC (alcance por plantilla) + la
+    // coherencia con la estructura activa del workspace (L1c, aditivo al ABAC).
+    return this.templates.list(user.id, { status: "PUBLISHED" }, { applyTemplateScope: true, structureId });
   }
 
   /**
@@ -80,8 +81,12 @@ export class LogEntriesController {
    */
   @Get("templates/:templateId/nodes")
   @RequirePermission("logentry:create")
-  eligibleNodes(@Param("templateId") templateId: string, @CurrentUser() user: RequestUser) {
-    return this.entries.eligibleNodesForTemplate(user.id, templateId);
+  eligibleNodes(
+    @Param("templateId") templateId: string,
+    @CurrentUser() user: RequestUser,
+    @Query("structureId") structureId?: string,
+  ) {
+    return this.entries.eligibleNodesForTemplate(user.id, templateId, structureId);
   }
 
   @Get()

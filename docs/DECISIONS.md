@@ -4,6 +4,37 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-24 · L1c · Coherencia de la estructura activa en los caminos de CREACIÓN
+Hasta L1b los LISTADOS operacionales ya filtraban por la estructura activa (`?structureId=`), pero el flujo de
+«Nueva entrada» la IGNORABA: el picker de plantillas (`GET /log-entries/templates`) y el de nodos elegibles
+(`GET /log-entries/templates/:id/nodes`) solo aplicaban ABAC + alcance de plantilla. Resultado: un usuario cuyo
+alcance abarca DOS estructuras (A y B), estando «en A», veía y podía elegir plantillas/nodos de B — incoherente con
+el badge «Estás en A». NO era fuga de datos (el ABAC seguía siendo la frontera), pero rompía la promesa de la
+estructura activa. Decisiones (las "a resolver" del plan, con su motivo):
+- **Plantilla GLOBAL (sin asignación de nodo) bajo estructura activa → SIEMPRE aparece (opción a).** *Motivo:* una
+  plantilla global es «de toda la instalación»; acotarla a la estructura activa contradeciría su semántica. Solo se
+  acotan las plantillas CON asignación de nodo: aparecen si **≥1 de sus nodos vive en la estructura activa**. (Se
+  descartó la opción b —resolver también las globales contra los nodos de la estructura— por romper «global = en todos
+  lados».) Los **nodos elegibles** de una global SÍ se acotan a la estructura activa (∩ ABAC), porque el nodo concreto
+  donde se crea la entrada SÍ pertenece a una estructura — coherente con el badge.
+- **El filtro por estructura es UX/coherencia, NO un hard-block nuevo al materializar.** *Motivo:* `LogEntriesService.create`
+  ya valida el nodo con **ABAC** (`canAccessNode`) + **asignación de plantilla** (`assertNodeAllowedForTemplate`), y la
+  estructura del nodo ES su estructura — un bloqueo extra al guardar sería redundante y arriesgaría romper deep-links y
+  la creación legítima por id. El filtro vive SOLO en los pickers/listados, nunca en el GET por id (paridad con L1b).
+- **Mismo patrón que L1b, ADITIVO al ABAC (AND).** *Motivo:* no duplicar lógica — `structureId` se intersecta vía
+  `orgNode.structureId` (espejo de incidencias/bitácoras). Nunca reemplaza al ABAC: un usuario acotado a A jamás ve B
+  aunque no pase `structureId` (verificado en smoke E1/E2). **Sin migración, sin permiso nuevo** (es alcance de
+  visibilidad, no una capacidad).
+- **Catálogos COMPARTIDOS intactos.** *Motivo:* el mantenedor de plantillas/flujos (Configurador) sigue mostrando el
+  catálogo GLOBAL completo (`applyTemplateScope:false` / sin `structureId`). El filtro de estructura es exclusivo de las
+  superficies OPERACIONALES de creación.
+- **«Nueva incidencia» NO se tocó.** *Motivo:* su picker de nodo ya usa `useAccessibleOrgTree`, que YA pasa
+  `?structureId=` a `GET /structure/accessible-nodes` ⇒ ya era coherente (verificado por lectura + cubierto en el smoke
+  de aislamiento). Se evitó cambiar lo que ya funcionaba.
+- **Alcance ampliado de forma natural a la PROGRAMACIÓN DE RONDAS.** *Motivo:* `ScheduleDrawer` reusa el mismo hook
+  `useAvailableTemplates` y `fetchTemplateEligibleNodes`; al cablear la estructura activa en el hook, programar una ronda
+  «en A» tampoco ofrece plantillas/nodos de B — coherente, sin trabajo extra.
+
 ### 2026-06-24 · L3b · Asistente «crear una nueva área»
 Un wizard que aprovisiona una estructura organizacional COMPLETA y operativa de una vez (identidad → niveles →
 nodo raíz), eliminando la fricción de los 3 pasos sueltos. Decisiones (las "a resolver" del plan, con su motivo):

@@ -1,5 +1,30 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-24 — 🔒 L1c · Coherencia de la estructura activa en los caminos de CREACIÓN ✅** (`feat/estructura-creacion-coherente`).
+Cierra la última grieta del aislamiento por estructura. Hasta L1b los LISTADOS ya filtraban por la estructura activa
+(`?structureId=`), pero el flujo de **«Nueva entrada»** la ignoraba: el picker de plantillas y el de nodos elegibles solo
+aplicaban ABAC + alcance de plantilla. Un usuario con alcance en DOS estructuras (A y B), estando «en A», veía y podía
+elegir plantillas/nodos de **B** — incoherente con el badge «Estás en A» (no era fuga de datos: el ABAC seguía siendo la
+frontera, pero rompía la promesa de la estructura activa). **Backend:** `TemplatesService.list` y
+`LogEntriesService.eligibleNodesForTemplate` aceptan un `structureId` opcional que se intersecta **ADITIVO al ABAC** (AND,
+espejo de L1b vía `orgNode.structureId`): una plantilla CON asignación aparece solo si **≥1 de sus nodos vive en la
+estructura activa**; una plantilla **GLOBAL** (sin asignación) es «de toda la instalación» y aparece **SIEMPRE** (decisión
+(a)); los **nodos elegibles** (incluidos los de una global) se acotan a la estructura activa ∩ ABAC. Los endpoints
+`GET /log-entries/templates` y `GET /log-entries/templates/:id/nodes` reciben `@Query('structureId')`. **Web:**
+`fetchAvailableTemplates`/`fetchTemplateEligibleNodes` + el hook `useAvailableTemplates` (queryKey incluida) y los dos
+llamadores directos (`NewEntryPage`, `ScheduleDrawer`) cablean `useActiveStructureId()` — esto extiende la coherencia,
+sin trabajo extra, a la **programación de rondas** (otro camino de creación que reusa el mismo hook). **UX/coherencia, NO
+hard-block:** `create()` ya valida el nodo con ABAC + asignación de plantilla; no se añadió bloqueo nuevo al materializar
+(la estructura del nodo ES su estructura). **by-id/deep-links intactos** (el filtro vive solo en pickers/listados).
+**«Nueva incidencia» NO se tocó** (su picker ya usa `useAccessibleOrgTree`, que YA pasa `?structureId=` ⇒ coherente).
+**Catálogos COMPARTIDOS intactos** (el Configurador sigue mostrando el catálogo global completo). **Sin migración, sin
+permiso nuevo, sin FLUSHALL.** typecheck/lint(0)/build/test (252+6) verdes; `smoke-estructura-creacion-coherente.py`
+**16/16** (usuario dual A+B separa plantillas/nodos por estructura activa · global siempre visible · tplA bajo
+structureId=B ⇒ vacío · **frontera ABAC**: acotado a A jamás ve B aunque no pase structureId) + regresión aislamiento
+33/33 · multi-estructura 33/33 · template-scope 14/14 · asistente L3b 15/15 · ux-premium L3 18/18 · grid 25/25.
+**PENDIENTE: smoke VISUAL del dueño.** **NO** se hizo L4 ni el panorama multi-módulo. **Siguiente: panorama multi-módulo,
+L4 (jerarquías alternativas) u otro que defina el dueño.**
+
 **2026-06-24 — 🎯 L3b · Asistente «crear una nueva área» ✅** (`feat/estructura-asistente-area`). Levantar un
 "área/negocio" nuevo deja de ser un trámite de 3 pasos sueltos y dispersos (crear estructura → ir a definir niveles →
 crear el nodo raíz, con el riesgo de dejar una estructura **huérfana sin nodos**, no operable y oculta del selector) y

@@ -8,6 +8,7 @@ import { usePermissions } from "../../auth/use-permissions.js";
 import { localInputToIso } from "./datetime-local.js";
 import { fetchTemplateEligibleNodes } from "./log-entries-api.js";
 import { useAvailableTemplates } from "./log-entries-queries.js";
+import { useActiveStructureId } from "../structure/structure-queries.js";
 import styles from "./LogEntries.module.css";
 
 /** Resumen del alcance de estructura de una plantilla para mostrar en la card. */
@@ -28,6 +29,7 @@ export function NewEntryPage() {
   const toast = useToast();
 
   const { data: templates = [], isLoading, isError } = useAvailableTemplates();
+  const activeStructureId = useActiveStructureId();
 
   // Gesto mínimo de registro DIFERIDO (2.7.0): por defecto la entrada es "en
   // línea" (fecha/hora automática); el toggle declara la fecha/hora REAL del
@@ -81,7 +83,7 @@ export function NewEntryPage() {
     }
     setResolvingId(tpl.id);
     try {
-      const { equipmentMode, nodes } = await fetchTemplateEligibleNodes(tpl.id);
+      const { equipmentMode, nodes } = await fetchTemplateEligibleNodes(tpl.id, activeStructureId);
       if (nodes.length === 0) {
         toast.error(t("logbook.new.noEligibleNodes"));
         return;

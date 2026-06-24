@@ -2747,8 +2747,18 @@ export class LogEntriesService {
    * 2.8.0): intersección de las asignaciones de la plantilla (expandidas por
    * subárbol) con el alcance de NODO del usuario. Para una plantilla GLOBAL = todos
    * los nodos accesibles. El front autoselecciona si hay 1 y obliga a elegir si >1.
+   *
+   * Coherencia de ESTRUCTURA ACTIVA (L1c): si se pasa `structureId` (estructura del
+   * workspace), los nodos elegibles se acotan ADEMÁS a esa estructura — espejo del
+   * aislamiento L1b. Es ADITIVO al ABAC, nunca lo reemplaza. Para una plantilla
+   * global esto deja los nodos accesibles de la estructura activa (coherente con el
+   * badge "Estás en X"); no se filtra al GET por id (deep-links intactos).
    */
-  async eligibleNodesForTemplate(userId: string, templateId: string): Promise<TemplateEligibleNodes> {
+  async eligibleNodesForTemplate(
+    userId: string,
+    templateId: string,
+    structureId?: string,
+  ): Promise<TemplateEligibleNodes> {
     const template = await this.prisma.template.findFirst({
       where: { id: templateId, deletedAt: null },
       include: { nodeAssignments: { select: { orgNodeId: true, includeDescendants: true, orgNode: { select: { path: true } } } } },
@@ -2786,6 +2796,8 @@ export class LogEntriesService {
     } else if (access !== null) {
       where.id = { in: [...access.ids] };
     }
+    // Coherencia con la estructura activa (L1c): AND aditivo al ABAC.
+    if (structureId) where.structureId = structureId;
 
     const rows = await this.prisma.orgNode.findMany({ where, select: { id: true, name: true } });
     const nodeIdList = rows.map((r) => r.id);

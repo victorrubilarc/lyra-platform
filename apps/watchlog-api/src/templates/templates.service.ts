@@ -97,7 +97,7 @@ export class TemplatesService {
   async list(
     userId: string,
     query: TemplateListQuery,
-    opts: { applyTemplateScope?: boolean } = {},
+    opts: { applyTemplateScope?: boolean; structureId?: string } = {},
   ): Promise<TemplateListItem[]> {
     const access = await this.scope.getAccessibleNodes(userId);
     const accessibleTemplates = opts.applyTemplateScope
@@ -121,10 +121,24 @@ export class TemplatesService {
       include: {
         versions: { select: { id: true, versionNumber: true, status: true } },
         nodeAssignments: {
-          select: { orgNodeId: true, includeDescendants: true, orgNode: { select: { path: true } } },
+          select: {
+            orgNodeId: true,
+            includeDescendants: true,
+            orgNode: { select: { path: true, structureId: true } },
+          },
         },
       },
     });
+
+    // Coherencia de ESTRUCTURA ACTIVA (L1c): al CREAR, el picker debe respetar la
+    // estructura del workspace, espejo del aislamiento L1b de los listados. Es
+    // ADITIVO al ABAC (no lo reemplaza): una plantilla CON asignación aparece solo
+    // si ≥1 de sus nodos vive en la estructura activa; una plantilla GLOBAL (sin
+    // asignación) es "de toda la instalación" y aparece SIEMPRE (decisión 2026-06-24).
+    const inActiveStructure = (assignments: Array<{ orgNode: { structureId: string } }>): boolean =>
+      !opts.structureId ||
+      assignments.length === 0 ||
+      assignments.some((a) => a.orgNode.structureId === opts.structureId);
 
     // Alcance ABAC en AND de dos ejes:
     //  - NODO (multi-nodo 2.8.0): las globales (sin asignaciones) son visibles para
@@ -134,7 +148,8 @@ export class TemplatesService {
     const scoped = templates.filter(
       (t) =>
         this.scope.isTemplateVisibleByNode(toScopeAssignments(t.nodeAssignments), access) &&
-        (accessibleTemplates === null || accessibleTemplates.has(t.id)),
+        (accessibleTemplates === null || accessibleTemplates.has(t.id)) &&
+        inActiveStructure(t.nodeAssignments),
     );
 
     // Versión "a mostrar" por plantilla: la publicada si existe, si no el borrador.

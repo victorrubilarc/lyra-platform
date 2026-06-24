@@ -20,6 +20,7 @@ import {
   submitLogEntry,
   voidLogEntry,
 } from "./log-entries-api.js";
+import { useActiveStructureId } from "../structure/structure-queries.js";
 
 export const LOG_ENTRY_KEYS = {
   all: ["log-entries"] as const,
@@ -28,11 +29,17 @@ export const LOG_ENTRY_KEYS = {
     ["log-entries", "preview", templateId, orgNodeId ?? "", equipmentId ?? ""] as const,
 };
 
-/** Plantillas disponibles para crear una entrada (gateado por logentry:create). */
+/**
+ * Plantillas disponibles para crear una entrada (gateado por logentry:create).
+ * Acotadas a la estructura activa del workspace (coherencia L1c; aditivo al ABAC),
+ * espejo de los listados. La queryKey incluye la estructura para no servir caché de
+ * otra. Lo reusan "Nueva entrada" y el alta de programación de rondas.
+ */
 export function useAvailableTemplates() {
+  const structureId = useActiveStructureId();
   return useQuery({
-    queryKey: ["log-entries", "available-templates"] as const,
-    queryFn: fetchAvailableTemplates,
+    queryKey: ["log-entries", "available-templates", structureId ?? ""] as const,
+    queryFn: () => fetchAvailableTemplates(structureId),
   });
 }
 

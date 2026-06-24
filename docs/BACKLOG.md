@@ -5,7 +5,24 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-24** (**🎯 L3b · Asistente «crear una nueva área» ✅** — `feat/estructura-asistente-area`:
+> actualización: **2026-06-24** (**🔒 L1c · Coherencia de la estructura activa al CREAR ✅** — `feat/estructura-creacion-coherente`:
+> cierra la última grieta del aislamiento por estructura. Hasta L1b los LISTADOS filtraban por la estructura activa
+> (`?structureId=`) pero el flujo de **«Nueva entrada»** la ignoraba: un usuario con alcance en DOS estructuras (A y B),
+> «en A», veía/elegía plantillas y nodos de **B** (no era fuga — el ABAC seguía siendo la frontera — pero rompía la
+> promesa de la estructura activa). **Backend:** `TemplatesService.list` y `eligibleNodesForTemplate` aceptan `structureId`
+> opcional intersectado **ADITIVO al ABAC** vía `orgNode.structureId` (espejo de L1b): plantilla CON asignación aparece si
+> **≥1 nodo vive en la estructura activa**; plantilla **GLOBAL siempre aparece** (decisión (a)); nodos elegibles acotados a
+> la estructura ∩ ABAC; endpoints `GET /log-entries/templates` y `/templates/:id/nodes` reciben `@Query('structureId')`.
+> **Web:** `useAvailableTemplates` + `fetch*` + `NewEntryPage`/`ScheduleDrawer` cablean `useActiveStructureId()` (queryKey
+> incluida) ⇒ coherencia extendida también a la **programación de rondas**. **UX/coherencia, NO hard-block** (`create()` ya
+> valida nodo por ABAC + asignación); **by-id/deep-links intactos**; **«Nueva incidencia» NO se tocó** (ya usaba
+> `useAccessibleOrgTree` con `?structureId=`); **catálogos COMPARTIDOS intactos**. **Sin migración/permiso/FLUSHALL.**
+> typecheck/lint(0)/build/test (252+6) verdes · `smoke-estructura-creacion-coherente.py` **16/16** (dual A+B separa por
+> estructura · global siempre visible · tplA bajo structureId=B vacío · **frontera ABAC** acotado a A nunca ve B) +
+> regresión aislamiento 33/33 · multi-estructura 33/33 · template-scope 14/14 · asistente L3b 15/15 · ux-premium L3 18/18 ·
+> grid 25/25. **PENDIENTE: smoke VISUAL del dueño.** **NO** se hizo L4 ni panorama multi-módulo. **Siguiente: panorama
+> multi-módulo, L4 u otro.** Anterior:
+> **🎯 L3b · Asistente «crear una nueva área» ✅** — `feat/estructura-asistente-area`:
 > un **wizard de 3 pasos** (identidad → niveles base → primer nodo raíz) que aprovisiona una estructura organizacional
 > COMPLETA y operativa de una sola vez, lanzado desde el `StructuresDrawer` con el botón **«Nueva área»** (que REEMPLAZA
 > al "Nueva estructura" simple). **Backend ATÓMICO** `POST /structure/structures/provision`

@@ -10,6 +10,7 @@ import type {
 import { SCHEDULABLE_RECURRENCE_KINDS } from "@lyra/contracts";
 import { useAvailableTemplates } from "../log-entries/log-entries-queries.js";
 import { fetchTemplateEligibleNodes } from "../log-entries/log-entries-api.js";
+import { useActiveStructureId } from "../structure/structure-queries.js";
 import { useCreateSchedule, useScheduleRoleOptions, useUpdateSchedule } from "./schedules-queries.js";
 
 const WEEKDAYS = [
@@ -42,6 +43,7 @@ export function ScheduleDrawer({ open, schedule, onClose }: Props) {
   const update = useUpdateSchedule();
   const templates = useAvailableTemplates();
   const roles = useScheduleRoleOptions(open);
+  const activeStructureId = useActiveStructureId();
 
   const [name, setName] = useState("");
   const [templateId, setTemplateId] = useState<string | null>(null);
@@ -60,8 +62,8 @@ export function ScheduleDrawer({ open, schedule, onClose }: Props) {
 
   // Nodos elegibles de la plantilla (asignaciones ∩ alcance). Equipo solo si el nodo tiene.
   const eligible = useQuery({
-    queryKey: ["schedule-eligible", templateId],
-    queryFn: () => fetchTemplateEligibleNodes(templateId!),
+    queryKey: ["schedule-eligible", templateId, activeStructureId ?? ""],
+    queryFn: () => fetchTemplateEligibleNodes(templateId!, activeStructureId),
     enabled: !!templateId,
   });
   const node = eligible.data?.nodes.find((n) => n.id === orgNodeId);

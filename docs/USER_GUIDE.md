@@ -217,6 +217,13 @@ estructuras: requiere el permiso de **gestión de niveles** (`orglevel:manage`).
   donde no tienes nodos, las listas saldrán **vacías** (es lo correcto: nunca ves datos de un área ajena).
   *Excepción:* abrir un registro puntual por su enlace directo (p. ej. desde la **campanita** de avisos) funciona
   aunque sea de otra estructura, siempre que tu alcance te dé acceso a ese nodo —los enlaces no se rompen.
+- **La estructura activa también aplica al CREAR, no solo a las listas** (desde 2026-06-24). Al iniciar una
+  **«Nueva entrada»** (o programar una **ronda**), el selector de **plantilla** y de **nodo** ofrece solo lo de la
+  estructura en la que estás: si tu alcance abarca varias áreas, estando «en A» no se te ofrecen las plantillas ni
+  los nodos exclusivos de B. Así lo que creas siempre coincide con el badge **«Estás en…»**. Las **plantillas
+  globales** (las que no están ancladas a ningún nodo, válidas para toda la instalación) **siguen apareciendo en
+  todas las estructuras**; al elegirlas, los nodos disponibles son los de la estructura activa. Para crear en otra
+  área, cámbiala primero en el selector.
 - **La «Estructura por defecto»** es la que ya existía antes de habilitar esta función: contiene **intactos**
   todos tus niveles, nodos, alcances, asignaciones de plantillas y calendarios previos. **No se puede eliminar.**
 - Una estructura **no se puede eliminar si tiene nodos** (aunque estén dados de baja), porque arrastran

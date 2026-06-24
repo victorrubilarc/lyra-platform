@@ -75,19 +75,29 @@ export function fetchReferenceOptions(
 /**
  * Plantillas publicadas que el usuario puede usar para CREAR una entrada (picker de
  * "Nueva entrada"). Endpoint del módulo de bitácoras gateado por `logentry:create`
- * — no exige el permiso de administración de plantillas.
+ * — no exige el permiso de administración de plantillas. `structureId` acota el
+ * picker a la estructura activa del workspace (coherencia L1c; aditivo al ABAC).
  */
-export function fetchAvailableTemplates(): Promise<TemplateListItem[]> {
-  return apiJson("/log-entries/templates", z.array(templateListItemSchema));
+export function fetchAvailableTemplates(structureId?: string | null): Promise<TemplateListItem[]> {
+  const suffix = structureId ? `?structureId=${encodeURIComponent(structureId)}` : "";
+  return apiJson(`/log-entries/templates${suffix}`, z.array(templateListItemSchema));
 }
 
 /**
  * Nodos en los que el usuario puede crear una entrada con esta plantilla (multi-
  * nodo 2.8.0): asignaciones de la plantilla ∩ alcance de nodo del usuario. La web
- * autoselecciona si hay 1 y obliga a elegir si hay más de 1.
+ * autoselecciona si hay 1 y obliga a elegir si hay más de 1. `structureId` acota
+ * los nodos a la estructura activa del workspace (coherencia L1c; aditivo al ABAC).
  */
-export function fetchTemplateEligibleNodes(templateId: string): Promise<TemplateEligibleNodes> {
-  return apiJson(`/log-entries/templates/${encodeURIComponent(templateId)}/nodes`, templateEligibleNodesSchema);
+export function fetchTemplateEligibleNodes(
+  templateId: string,
+  structureId?: string | null,
+): Promise<TemplateEligibleNodes> {
+  const suffix = structureId ? `?structureId=${encodeURIComponent(structureId)}` : "";
+  return apiJson(
+    `/log-entries/templates/${encodeURIComponent(templateId)}/nodes${suffix}`,
+    templateEligibleNodesSchema,
+  );
 }
 
 // El LISTADO de entradas vive en `features/logbook` (módulo de Bitácoras 2.6,
