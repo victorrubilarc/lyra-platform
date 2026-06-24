@@ -829,6 +829,18 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
 
 ### Mejoras futuras de Estructura (enterprise, post-Seguridad)
 
+- [ ] 🔴 **L1 · AISLAMIENTO COMPLETO por estructura (Enterprise base) — PRÓXIMA SESIÓN (auditado 2026-06-23).**
+      Tras multi-estructura, el aislamiento quedó a medias: los **listados operacionales** no filtran por
+      estructura activa, y hay **fugas reales de ABAC por nodo** (`equipment.search()` SIN ScopeService;
+      `equipment.listByNode()` sin validar nodo). Caso guía: empresa con departamentos Industrial/TI/Logística
+      sin verse entre sí. **Plan completo + inventario auditado (backend y frontend) + prompt de sesión en
+      `docs/NOTA_estructuras_y_jerarquias.md` (Anexo A y B).** L1a (fugas ABAC, urgente) + L1b (filtro por
+      estructura activa en incidents/log-entries/exceptions/schedules/shift-handover + exports). **NO tocar
+      catálogos COMPARTIDOS** (templates/workflows/reference-data/roles/users/settings/audit/saved-views).
+      Smoke que barre TODOS los listados con usuario acotado. Esfuerzo ~3–5 días. Luego **L2** (rol-acotado-a-nodo
+      + administración delegada + ciclo de vida), **L3** (UX premium: contexto por estructura + vista ejecutiva
+      cross-estructura), **L4** (jerarquías alternativas + SSO/SCIM, a demanda). Ver memorias `org-views-vs-isolation`,
+      `multi-org-structure-requirement`, `role-node-scope-requirement`.
 - [ ] 🔴 **MÚLTIPLES ESTRUCTURAS ORGANIZACIONALES (pedido URGENTE del dueño 2026-06-23) — PRÓXIMA SESIÓN.**
       Soportar varias estructuras en paralelo en una instalación (cada una con su propio set de niveles y su
       propio árbol), para modelar negocios/casos de uso distintos. **NO es multi-tenant**: es multi-estructura
