@@ -5,7 +5,22 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-24** (**🎯 L2a · Alcance por NODO a nivel de ROL ✅** — `feat/rol-alcance-nodo`:
+> actualización: **2026-06-24** (**🎯 L2c · Ciclo de vida de la estructura organizacional ✅** —
+> `feat/estructura-ciclo-vida`: ARCHIVAR / REACTIVAR y REORDENAR estructuras sin borrar datos, desde el
+> `StructuresDrawer`. **Cierra la deuda (a) y (c)** de multi-estructura. El modelo ya existía (`OrgStructure.active`/
+> `reportOrder`/`deletedAt`) ⇒ **SIN migración**. Backend: endpoint atómico `PUT /structure/structures/reorder`
+> (lista ordenada de ids → `reportOrder`, auditado) + guarda "no archivar la última activa" (la por defecto ya estaba
+> protegida). Front: acciones **Archivar/Reactivar de primer nivel** por fila + **flechas ↑/↓** (la por defecto va fija
+> arriba) + toggle **"ver archivadas"** (la gestión las oculta por defecto; el selector global YA las ocultaba vía
+> `isOperable` y YA saneaba el fallback al archivar la activa). Editor simplificado a identidad (nombre/clave/desc):
+> estado y orden se gobiernan desde la lista. **Paridad L1**: una archivada (`active:false`, `deletedAt:null`) sigue
+> legible por id/deep-link (`resolveStructureId` solo filtra `deletedAt`). **Permiso reusado `orglevel:manage`** ⇒ sin
+> clave nueva, sin FLUSHALL. contracts 321 · API 252 · web 6 · smoke `smoke-estructura-ciclo-vida.py` **17/17** +
+> regresión multi-estructura 33/33 · aislamiento L1 33/33 · rol-alcance L2a 14/14 · template-scope 14/14.
+> typecheck/lint(0)/build verdes. **PENDIENTE: smoke VISUAL del dueño.** **(c) purga GxP destructiva** queda fuera por
+> diseño (la respuesta no-destructiva es archivar). **NO** se hizo L2b/L3/L4. **Siguiente: L2b (administración delegada
+> por estructura) o lo que defina el dueño.** Anterior:
+> **🎯 L2a · Alcance por NODO a nivel de ROL ✅** — `feat/rol-alcance-nodo`:
 > cierra el requerimiento `role-node-scope-requirement`. El alcance ABAC por nodo ahora se configura también en el
 > **ROL** (no solo por usuario), una sola vez por rol, aplicando a todos sus miembros. Conviven ambos ejes de
 > sujeto (rol Y usuario), combinados por **UNIÓN** (gana el más amplio). **Sin migración** (`Scope.roleId` ya
@@ -40,10 +55,12 @@
 > verificada). Aislamiento estricto + selector global por usuario + ABAC; catálogos COMPARTIDOS. Permiso
 > reusado `orglevel:manage`. contracts 321 · API 249 · web verde · smoke `smoke-multi-estructura.py` **33/33** +
 > regresión incidencias 32 · cambio-turno 29 · sla 25. **PENDIENTE: smoke VISUAL del dueño.** **Deuda nueva:**
-> (a) `StructuresDrawer` no permite (des)activar ni reordenar estructuras (solo crear/renombrar/borrar) ·
+> (a) ~~`StructuresDrawer` no permite (des)activar ni reordenar estructuras~~ ✅ RESUELTO 2026-06-24 (L2c,
+> `feat/estructura-ciclo-vida`: archivar/reactivar + flechas ↑/↓ + ver archivadas) ·
 > (b) un admin ACOTADO no ve una estructura recién creada hasta que tenga un nodo accesible (se deriva del
-> ABAC por nodo) · (c) purgar una estructura con historial de nodos (soft-deleted) no es posible (bloquea por
-> nodos; necesitaría un flujo de archivo/purga GxP) · (d) el `deleteLevel` da 500 si un nodo SOFT-deleted aún
+> ABAC por nodo) · (c) ~~purgar una estructura con historial de nodos no es posible~~ RESUELTO POR DISEÑO 2026-06-24
+> (L2c): la respuesta no-destructiva es ARCHIVAR (conserva el historial, sale del selector/listados, sigue legible por
+> id); la purga GxP destructiva queda fuera de alcance a propósito · (d) el `deleteLevel` da 500 si un nodo SOFT-deleted aún
 > referencia el nivel (bug latente preexistente; mitigado en estructuras por la cascada). **Dependencia:**
 > "rol acotado a nodo" (`Scope.roleId` en UI) ✅ RESUELTO 2026-06-24 (L2a, `feat/rol-alcance-nodo`).
 > **+ Indicador de versión ✅** (mismo día): «Acerca de» en el menú de perfil con versión + fecha de compilación +

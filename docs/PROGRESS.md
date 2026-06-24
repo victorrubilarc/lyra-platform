@@ -1,5 +1,31 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-24 — 🎯 L2c · Ciclo de vida de la estructura organizacional ✅** (`feat/estructura-ciclo-vida`).
+Permite **ARCHIVAR / REACTIVAR** y **REORDENAR** estructuras desde el `StructuresDrawer`, sin borrar datos. Cierra la
+deuda (a) y (c) de multi-estructura. Caso de uso: una empresa cierra temporalmente una línea → archiva su estructura
+(deja de aparecer en el selector y en los listados, pero conserva todo su historial), puede reactivarla, y puede
+ordenar las estructuras a gusto en el selector. **Hallazgo (verificado en código, no de memoria):** el modelo y buena
+parte del ciclo de vida YA existían como efecto colateral de multi-estructura — `OrgStructure.active`/`reportOrder`/
+`deletedAt`; `updateStructure` ya togglea `active`; el `StructureSwitcher` ya **oculta archivadas** (`isOperable`) y ya
+**sanea el fallback** (si tu estructura activa deja de ser operable, cae a la por defecto); `resolveStructureId` solo
+filtra `deletedAt` ⇒ **by-id/deep-link de una archivada sigue legible** (paridad L1). ⇒ **SIN migración.** Lo que
+faltaba era UX de primer nivel + robustez. **Backend:** endpoint atómico `PUT /structure/structures/reorder` (lista
+ordenada de ids → `reportOrder` 0..n, rechaza ids desconocidos, auditado `structure.structure.reordered`) + guarda
+explícita "no archivar la última activa" (la por defecto ya estaba protegida de archivarse). **Frontend:** acciones
+**Archivar/Reactivar de primer nivel** por fila (íconos `Archive`/`ArchiveRestore`) + **flechas ↑/↓** para reordenar (la
+por defecto va FIJA arriba, el backend la ancla con `isDefault desc`) + toggle **"ver archivadas"** (la gestión las
+oculta por defecto; se atenúan al mostrarlas; "Trabajar aquí" deshabilitado en archivadas). El editor se **simplificó a
+identidad** (nombre/clave/descripción): el estado y el orden ahora se gobiernan desde la lista, no en dos lugares.
+**Decisiones** (en DECISIONS): estado = `active:boolean` (ya cableado; el audit log ya timestampea, sin `archivedAt`) ·
+permiso reusado **`orglevel:manage`** (sin clave nueva ⇒ sin `db:seed`/FLUSHALL) · fallback = el saneo existente del
+switcher + guarda backend · purga GxP destructiva fuera de alcance (archivar es la respuesta no-destructiva).
+typecheck/lint(0)/build verdes; contracts 321 · API 252 · web 6; `smoke-estructura-ciclo-vida.py` **17/17** (crear A/B
+configuradas; archivar B ⇒ sigue en gestión inactiva + by-id legible + nodo intacto; reactivar; reorder + inverso +
+id desconocido⇒400; archivar la por defecto⇒400) + regresión `smoke-multi-estructura.py` 33/33 ·
+`smoke-aislamiento-estructura.py` 33/33 · `smoke-rol-alcance-nodo.py` 14/14 · `smoke-template-scope.py` 14/14.
+**PENDIENTE: smoke VISUAL del dueño.** **NO** se hizo L2b/L3/L4. **Siguiente: L2b (administración delegada por
+estructura) o lo que defina el dueño.** Anterior:
+
 **2026-06-24 — 🎯 L2a · Alcance por NODO a nivel de ROL ✅** (`feat/rol-alcance-nodo`).
 Cierra el requerimiento `role-node-scope-requirement`: el alcance ABAC por nodo ahora se configura también en el
 **ROL** (no solo usuario por usuario). Caso de uso: "Rol Analista-TI → subárbol TI" se define UNA vez y aplica a

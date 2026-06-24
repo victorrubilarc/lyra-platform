@@ -19,6 +19,7 @@ import {
   fetchLevels,
   fetchStructures,
   fetchTree,
+  reorderStructures,
   updateLevel,
   updateNode,
   updateStructure,
@@ -92,6 +93,15 @@ export function useDeleteStructure() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => deleteStructure(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: QUERY_KEYS.structures }),
+  });
+}
+
+/** Reordena las estructuras en bloque (lista ordenada de ids). */
+export function useReorderStructures() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: string[]) => reorderStructures(ids),
     onSuccess: () => qc.invalidateQueries({ queryKey: QUERY_KEYS.structures }),
   });
 }

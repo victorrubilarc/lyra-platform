@@ -1,6 +1,19 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { AlertTriangle, ArrowLeft, Check, LogIn, Network, Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  AlertTriangle,
+  Archive,
+  ArchiveRestore,
+  ArrowLeft,
+  ChevronDown,
+  ChevronUp,
+  Check,
+  LogIn,
+  Network,
+  Pencil,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { Button, Chip, Drawer, EmptyState, FormField, Input, Modal, Textarea, Toggle, useToast } from "@lyra/ui";
 import type { OrgStructure } from "@lyra/contracts";
 import { ApiError } from "../../lib/api-client.js";
@@ -9,6 +22,7 @@ import {
   useCreateStructure,
   useDeleteStructure,
   useOrgStructures,
+  useReorderStructures,
   useUpdateStructure,
 } from "./structure-queries.js";
 
@@ -34,18 +48,20 @@ interface FormValues {
   name: string;
   key: string;
   description: string;
-  active: boolean;
-  reportOrder: number;
 }
 
-const EMPTY_FORM: FormValues = { name: "", key: "", description: "", active: true, reportOrder: 0 };
+const EMPTY_FORM: FormValues = { name: "", key: "", description: "" };
 
 /**
- * Mantenedor de ESTRUCTURAS organizacionales (multi-estructura). Lista, crea, edita
- * (nombre, descripción, estado activo, orden), elige cuál configurar («Trabajar aquí»)
- * y elimina (con confirmación). La estructura por defecto no se puede eliminar; tampoco
- * las que tengan nodos/datos (lo bloquea el backend). La lista es flex (no tabla con
- * scroll): el nombre crece y los íconos de acción quedan FIJOS a la derecha, siempre visibles.
+ * Mantenedor de ESTRUCTURAS organizacionales (multi-estructura). Lista, crea, renombra,
+ * elige cuál configurar («Trabajar aquí»), elimina (con confirmación) y gobierna el CICLO
+ * DE VIDA (L2c): ARCHIVAR / REACTIVAR (sin borrar datos; una archivada desaparece del
+ * selector y de los listados, pero conserva su historial y sigue accesible por id) y
+ * REORDENAR con flechas ↑/↓ (la por defecto va fija arriba). Por defecto la gestión solo
+ * muestra las activas; el toggle «ver archivadas» las incluye. La por defecto no se puede
+ * archivar ni eliminar; tampoco se puede archivar la última activa ni eliminar una con
+ * nodos/datos (lo bloquea el backend). La lista es flex (no tabla con scroll): el nombre
+ * crece y los íconos de acción quedan FIJOS a la derecha, siempre visibles.
  */
 export function StructuresDrawer({ open, onClose }: StructuresDrawerProps) {
   const { t } = useTranslation();
@@ -54,6 +70,7 @@ export function StructuresDrawer({ open, onClose }: StructuresDrawerProps) {
   const createStructure = useCreateStructure();
   const updateStructure = useUpdateStructure();
   const deleteStructure = useDeleteStructure();
+  const reorderStructures = useReorderStructures();
   const setActive = useStructureStore((s) => s.setActiveStructure);
   const activeId = useStructureStore((s) => s.activeStructureId);
 
@@ -61,12 +78,54 @@ export function StructuresDrawer({ open, onClose }: StructuresDrawerProps) {
   const [form, setForm] = useState<FormValues>(EMPTY_FORM);
   const [keyTouched, setKeyTouched] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<OrgStructure | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
 
   const isActiveRow = (row: OrgStructure): boolean =>
     activeId === row.id || (activeId === null && row.isDefault);
 
   const saving = createStructure.isPending || updateStructure.isPending;
-  const busy = saving || deleteStructure.isPending;
+  const busy = saving || deleteStructure.isPending || reorderStructures.isPending;
+
+  // Estructuras visibles en la GESTIÓN: por defecto solo las activas; con el toggle
+  // "ver archivadas" se incluyen las archivadas (que el selector global nunca muestra).
+  const archivedCount = structures.filter((s) => !s.active).length;
+  const visible = showArchived ? structures : structures.filter((s) => s.active);
+  // La por defecto va SIEMPRE primera (el backend la fija con `isDefault desc`), así que
+  // el reordenamiento solo aplica al resto: las flechas operan sobre este segmento.
+  const reorderable = visible.filter((s) => !s.isDefault);
+
+  /** Archiva (active:false) o reactiva (active:true) una estructura. */
+  async function setArchived(s: OrgStructure, archived: boolean) {
+    try {
+      await updateStructure.mutateAsync({ id: s.id, dto: { active: !archived } });
+      toast.success(archived ? t("structure.structures.archived") : t("structure.structures.reactivated"));
+    } catch (err) {
+      // El backend bloquea archivar la default / la última activa: muestra su mensaje.
+      toast.error(err instanceof ApiError ? err.message : t("common.errorGeneric"));
+    }
+  }
+
+  /**
+   * Mueve una estructura una posición arriba/abajo dentro de la lista VISIBLE y envía
+   * el orden completo (visibles reordenadas + el resto preservando su orden) al backend.
+   */
+  async function move(index: number, dir: -1 | 1) {
+    const target = index + dir;
+    if (target < 0 || target >= reorderable.length) return;
+    const reordered = [...reorderable];
+    const [moved] = reordered.splice(index, 1);
+    if (!moved) return;
+    reordered.splice(target, 0, moved);
+    // Envía TODAS las estructuras vivas: el segmento reordenado + el resto (default y
+    // archivadas ocultas) preservando su orden, para no dejar huecos en `reportOrder`.
+    const movedIds = new Set(reordered.map((s) => s.id));
+    const rest = structures.filter((s) => !movedIds.has(s.id)).map((s) => s.id);
+    try {
+      await reorderStructures.mutateAsync([...reordered.map((s) => s.id), ...rest]);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : t("common.errorGeneric"));
+    }
+  }
 
   function openCreate() {
     setForm(EMPTY_FORM);
@@ -75,13 +134,7 @@ export function StructuresDrawer({ open, onClose }: StructuresDrawerProps) {
   }
 
   function openEdit(s: OrgStructure) {
-    setForm({
-      name: s.name,
-      key: s.key,
-      description: s.description ?? "",
-      active: s.active,
-      reportOrder: s.reportOrder,
-    });
+    setForm({ name: s.name, key: s.key, description: s.description ?? "" });
     setEditor({ mode: "edit", structure: s });
   }
 
@@ -112,7 +165,6 @@ export function StructuresDrawer({ open, onClose }: StructuresDrawerProps) {
           name,
           key,
           description: form.description.trim() || undefined,
-          reportOrder: form.reportOrder,
         });
         toast.success(t("structure.structures.created"));
         setActive(created.id); // pasa a trabajar de inmediato en la nueva estructura
@@ -124,12 +176,7 @@ export function StructuresDrawer({ open, onClose }: StructuresDrawerProps) {
         }
         await updateStructure.mutateAsync({
           id: editor.structure.id,
-          dto: {
-            name,
-            description: form.description.trim() || null,
-            active: form.active,
-            reportOrder: form.reportOrder,
-          },
+          dto: { name, description: form.description.trim() || null },
         });
         toast.success(t("structure.structures.updated"));
         closeEditor();
@@ -152,6 +199,8 @@ export function StructuresDrawer({ open, onClose }: StructuresDrawerProps) {
   }
 
   function renderRow(s: OrgStructure) {
+    const reorderIndex = reorderable.findIndex((r) => r.id === s.id);
+    const canReorder = reorderIndex !== -1;
     return (
       <div
         key={s.id}
@@ -161,8 +210,35 @@ export function StructuresDrawer({ open, onClose }: StructuresDrawerProps) {
           gap: 12,
           padding: "12px 14px",
           borderBottom: "1px solid var(--color-border-subtle)",
+          opacity: s.active ? 1 : 0.6,
         }}
       >
+        {/* Flechas de reorden (solo para las NO por defecto; la default va fija arriba) */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 2, flexShrink: 0, width: 26 }}>
+          {canReorder && (
+            <>
+              <Button
+                variant="icon"
+                onClick={() => move(reorderIndex, -1)}
+                disabled={busy || reorderIndex === 0}
+                aria-label={t("structure.structures.moveUp")}
+                title={t("structure.structures.moveUp")}
+              >
+                <ChevronUp size={14} />
+              </Button>
+              <Button
+                variant="icon"
+                onClick={() => move(reorderIndex, 1)}
+                disabled={busy || reorderIndex === reorderable.length - 1}
+                aria-label={t("structure.structures.moveDown")}
+                title={t("structure.structures.moveDown")}
+              >
+                <ChevronDown size={14} />
+              </Button>
+            </>
+          )}
+        </div>
+
         {/* Identidad (crece y trunca) */}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -194,9 +270,9 @@ export function StructuresDrawer({ open, onClose }: StructuresDrawerProps) {
           <Button
             variant="icon"
             onClick={() => selectStructure(s)}
-            disabled={busy || isActiveRow(s)}
+            disabled={busy || isActiveRow(s) || !s.active}
             aria-label={t("structure.structures.workHere")}
-            title={t("structure.structures.workHere")}
+            title={!s.active ? t("structure.structures.archivedNotSelectable") : t("structure.structures.workHere")}
           >
             <LogIn size={15} />
           </Button>
@@ -209,6 +285,27 @@ export function StructuresDrawer({ open, onClose }: StructuresDrawerProps) {
           >
             <Pencil size={15} />
           </Button>
+          {s.active ? (
+            <Button
+              variant="icon"
+              onClick={() => setArchived(s, true)}
+              disabled={busy || s.isDefault}
+              aria-label={t("structure.structures.archive")}
+              title={s.isDefault ? t("structure.structures.defaultUnarchivable") : t("structure.structures.archive")}
+            >
+              <Archive size={15} />
+            </Button>
+          ) : (
+            <Button
+              variant="icon"
+              onClick={() => setArchived(s, false)}
+              disabled={busy}
+              aria-label={t("structure.structures.reactivate")}
+              title={t("structure.structures.reactivate")}
+            >
+              <ArchiveRestore size={15} />
+            </Button>
+          )}
           <Button
             variant="icon"
             onClick={() => setConfirmDelete(s)}
@@ -305,44 +402,6 @@ export function StructuresDrawer({ open, onClose }: StructuresDrawerProps) {
             )}
           </FormField>
 
-          <FormField label={t("structure.structures.orderLabel")} hint={t("structure.structures.orderHint")}>
-            {(field) => (
-              <Input
-                {...field}
-                type="number"
-                value={String(form.reportOrder)}
-                onChange={(e) => setForm((f) => ({ ...f, reportOrder: Number(e.target.value) || 0 }))}
-                style={{ width: 120 }}
-              />
-            )}
-          </FormField>
-
-          {editor.mode === "edit" && (
-            <FormField
-              label={t("structure.structures.statusLabel")}
-              hint={
-                editor.structure.isDefault
-                  ? t("structure.structures.statusDefaultHint")
-                  : t("structure.structures.statusHint")
-              }
-            >
-              {(field) => (
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
-                  <Toggle
-                    id={field.id}
-                    checked={form.active}
-                    onChange={(v) => setForm((f) => ({ ...f, active: v }))}
-                    disabled={editor.structure.isDefault}
-                    aria-label={t("structure.structures.statusLabel")}
-                  />
-                  <span style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
-                    {form.active ? t("structure.structures.activeState") : t("structure.structures.inactiveTag")}
-                  </span>
-                </span>
-              )}
-            </FormField>
-          )}
-
           <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
             <Button variant="primary" onClick={submit} loading={saving}>
               <Check size={15} />
@@ -356,13 +415,27 @@ export function StructuresDrawer({ open, onClose }: StructuresDrawerProps) {
       ) : (
         // ── Lista ─────────────────────────────────────────────────────────────
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <p style={{ margin: 0, fontSize: 13, color: "var(--color-text-muted)", lineHeight: 1.5 }}>
-            {t("structure.structures.description")}
-          </p>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+            <p style={{ margin: 0, fontSize: 13, color: "var(--color-text-muted)", lineHeight: 1.5, flex: 1 }}>
+              {t("structure.structures.description")}
+            </p>
+            {archivedCount > 0 && (
+              <label style={{ display: "inline-flex", alignItems: "center", gap: 8, flexShrink: 0, fontSize: 13 }}>
+                <Toggle
+                  checked={showArchived}
+                  onChange={setShowArchived}
+                  aria-label={t("structure.structures.showArchived")}
+                />
+                <span style={{ color: "var(--color-text-secondary)" }}>
+                  {t("structure.structures.showArchived")} ({archivedCount})
+                </span>
+              </label>
+            )}
+          </div>
 
           {isLoading ? (
             <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>{t("common.loading")}</p>
-          ) : structures.length === 0 ? (
+          ) : visible.length === 0 ? (
             <EmptyState title={t("structure.structures.empty")} />
           ) : (
             <div
@@ -372,7 +445,7 @@ export function StructuresDrawer({ open, onClose }: StructuresDrawerProps) {
                 overflow: "hidden",
               }}
             >
-              {structures.map(renderRow)}
+              {visible.map(renderRow)}
             </div>
           )}
 

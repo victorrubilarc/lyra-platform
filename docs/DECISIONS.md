@@ -4,6 +4,35 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-24 · L2c · Ciclo de vida de la estructura organizacional (archivar / reactivar / reordenar)
+Permite gobernar el ESTADO y el ORDEN de las estructuras sin borrar datos. Verificado en código (no asumido):
+el modelo ya existía (`OrgStructure.active`/`reportOrder`/`deletedAt`/`isDefault`); `updateStructure` ya togglea
+`active` con guarda "la por defecto no se desactiva"; el `StructureSwitcher` ya **oculta archivadas** (`isOperable`)
+y ya **sanea el fallback** (cae a la por defecto si la activa deja de ser operable); `resolveStructureId` filtra solo
+`deletedAt` ⇒ una archivada sigue legible por id/deep-link. ⇒ **NO hubo migración.** Decisiones (las "a resolver"):
+- **Modelo de estado → `active: boolean` (NO se agrega `archivedAt`).** *Motivo:* ya está cableado en schema/
+  contratos/UI y es suficiente; el `AuditLog` (`structure.structure.updated`) ya registra QUIÉN y CUÁNDO archivó/
+  reactivó, así que un timestamp dedicado sería redundante. Archivada = `active:false` + `deletedAt:null` (viva pero
+  fuera de operación); eliminada = `deletedAt` (borrado lógico, solo si no tiene nodos).
+- **Permiso → REUSAR `orglevel:manage`** (el mismo que ya gobierna crear/editar/borrar estructura y multi-estructura).
+  *Motivo:* archivar/reactivar/reordenar **es** administrar la estructura; no inventar clave evita el gotcha de dev
+  (`db:seed` + Redis `FLUSHALL`). Sin clave nueva, sin migración.
+- **Reordenar → endpoint ATÓMICO dedicado `PUT /structure/structures/reorder`** (lista ordenada de ids → `reportOrder`
+  0..n en una transacción), no editar el orden estructura por estructura. *Motivo:* deja el orden del selector
+  consistente de una sola vez y sin huecos; rechaza ids desconocidos (no aplica un reorden a medias). La **por defecto
+  va fija arriba** porque el backend la ancla con `orderBy: isDefault desc`; por eso las flechas de la UI operan solo
+  sobre el segmento NO-default.
+- **Fallback al archivar la estructura activa de un usuario → el saneo YA existente del `StructureSwitcher`** (cae a la
+  por defecto al navegar fuera de configuración), reforzado con una guarda backend: no se archiva la por defecto ni la
+  ÚLTIMA activa (defensa en profundidad; en la práctica la por defecto, inarchivable, garantiza siempre ≥1 activa).
+- **Paridad con L1:** una archivada sigue legible por id/deep-link (no se filtra `active` en `resolveStructureId`),
+  igual que el criterio de L1 para by-id; solo desaparece de selector y listados operacionales.
+- **Purga GxP destructiva → FUERA de alcance por diseño.** *Motivo:* la respuesta correcta a "no puedo borrar una
+  estructura con historial" es **archivar** (conserva el historial). Una purga real exigiría un flujo regulatorio
+  (firma/justificación/retención) que no corresponde a esta sesión.
+- **Editor simplificado a identidad (nombre/clave/descripción).** *Motivo:* estado y orden ahora tienen acciones de
+  primer nivel en la lista; mantenerlos también en el formulario crearía dos fuentes de verdad.
+
 ### 2026-06-24 · L2a · Alcance por NODO a nivel de ROL (ABAC dim. 4 configurable en el rol)
 Cierra el requerimiento `role-node-scope-requirement`: hasta ahora el alcance ABAC por nodo solo se
 configuraba **por usuario** (Seguridad → Usuarios → "Alcance", `PUT /security/users/{id}/scope`). Ahora

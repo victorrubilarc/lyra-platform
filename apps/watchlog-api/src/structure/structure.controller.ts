@@ -1,15 +1,17 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query, Req } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Put, Query, Req } from "@nestjs/common";
 import type { FastifyRequest } from "fastify";
 import {
   createOrgLevelRequestSchema,
   createOrgNodeRequestSchema,
   createOrgStructureRequestSchema,
+  reorderOrgStructuresRequestSchema,
   updateOrgLevelRequestSchema,
   updateOrgNodeRequestSchema,
   updateOrgStructureRequestSchema,
   type CreateOrgLevelRequest,
   type CreateOrgNodeRequest,
   type CreateOrgStructureRequest,
+  type ReorderOrgStructuresRequest,
   type UpdateOrgLevelRequest,
   type UpdateOrgNodeRequest,
   type UpdateOrgStructureRequest,
@@ -40,6 +42,17 @@ export class StructureController {
     @Req() req: FastifyRequest,
   ) {
     return this.structure.createStructure(dto, this.ctx(user, req));
+  }
+
+  // Ruta ESTÁTICA antes de la paramétrica `structures/:id` (verbo distinto, sin colisión).
+  @Put("structures/reorder")
+  @RequirePermission("orglevel:manage")
+  reorderStructures(
+    @Body(new ZodValidationPipe(reorderOrgStructuresRequestSchema)) dto: ReorderOrgStructuresRequest,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.structure.reorderStructures(dto.ids, this.ctx(user, req));
   }
 
   @Patch("structures/:id")

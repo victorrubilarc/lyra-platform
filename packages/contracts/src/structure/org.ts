@@ -52,6 +52,17 @@ export const updateOrgStructureRequestSchema = z.object({
 });
 export type UpdateOrgStructureRequest = z.infer<typeof updateOrgStructureRequestSchema>;
 
+/**
+ * Reordena las estructuras en bloque: lista ORDENADA de ids → `reportOrder` 0..n-1.
+ * Atómico (una sola transacción) para que el orden del selector quede consistente sin
+ * editar cada estructura una por una. Solo se tocan las estructuras presentes en la lista.
+ */
+export const reorderOrgStructuresRequestSchema = z.object({
+  /** Ids de estructura en el orden deseado (asc). El índice fija el `reportOrder`. */
+  ids: z.array(z.string().min(1)).min(1).max(500),
+});
+export type ReorderOrgStructuresRequest = z.infer<typeof reorderOrgStructuresRequestSchema>;
+
 // --- Niveles ---
 
 export const orgLevelSchema = z.object({

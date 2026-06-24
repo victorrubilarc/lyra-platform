@@ -42,6 +42,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 
 ### 3. Estructura organizacional  [Configurador/Admin]
 - ✅ **Múltiples estructuras organizacionales** (varias jerarquías en paralelo + selector de estructura activa) (§ Estructura organizacional ▸ Múltiples estructuras)
+- ✅ **Ciclo de vida: archivar y ordenar estructuras** (archivar/reactivar sin borrar + reordenar el selector) (§ Estructura organizacional ▸ Ciclo de vida: archivar y ordenar)
 - ✍️ Árbol de niveles y nodos (crear/editar/mover/orden)
 - ✍️ Código externo (integración ERP/CMMS) y alcance por nodo
 
@@ -178,6 +179,43 @@ estructuras: requiere el permiso de **gestión de niveles** (`orglevel:manage`).
   historial (bitácoras, incidencias). Una estructura **solo con niveles** (sin nodos) sí se puede eliminar.
 - Si tu usuario está **acotado por alcance**, verás solo las estructuras donde tienes algún nodo accesible. Un
   administrador sin restricción ve todas, incluidas las recién creadas aún sin nodos.
+
+---
+
+## Estructura organizacional ▸ Ciclo de vida: archivar y ordenar  [Configurador/Admin]
+
+**Para qué sirve.** Gobernar el **estado** y el **orden** de tus estructuras sin perder información. Si una línea
+o un negocio **deja de operar temporalmente**, en vez de borrarlo (lo que destruiría su historial) lo
+**archivas**: desaparece del selector y de todos los listados operacionales, pero conserva intactos sus nodos,
+bitácoras e incidencias y puedes **reactivarlo** cuando vuelva a operar. Además puedes **reordenar** las
+estructuras para que aparezcan en el selector en el orden que tú quieras (las más usadas primero).
+
+**Cómo se usa.**
+1. Abre el selector de estructura activa (arriba a la derecha) y elige **«Gestionar estructuras…»**.
+2. **Archivar:** en la fila de la estructura, pulsa el ícono de **archivar** (la caja). Queda marcada como
+   *inactiva*, se atenúa en la lista y deja de aparecer en el selector y en las grillas operacionales. Su
+   historial sigue ahí.
+3. **Reactivar:** activa el interruptor **«Ver archivadas»** (arriba de la lista; aparece cuando hay alguna
+   archivada), ubica la estructura y pulsa el ícono de **reactivar** (la caja con flecha). Vuelve a estar
+   disponible de inmediato.
+4. **Reordenar:** usa las **flechas ↑ / ↓** a la izquierda de cada estructura para subirla o bajarla. El nuevo
+   orden se refleja al instante en el selector. La **«Estructura por defecto» va siempre primera** (no se mueve).
+
+**Quién puede.** Archivar, reactivar y reordenar requiere el permiso de **gestión de niveles**
+(`orglevel:manage`) — el mismo de crear/renombrar/eliminar estructuras. El backend siempre lo verifica.
+
+**Importante.**
+- **Archivar NO borra nada.** Una estructura archivada conserva todo su historial y **sigue siendo accesible por
+  su enlace directo** (deep-link): si abres un registro suyo desde la campanita o un enlace guardado, funciona.
+  Solo desaparece del selector y de los listados del día a día.
+- **La «Estructura por defecto» no se puede archivar** (ni eliminar): es el ancla del sistema. Tampoco se puede
+  archivar la **última estructura activa** (siempre debe quedar al menos una operativa).
+- **Si archivas la estructura en la que estabas trabajando**, la app te lleva automáticamente a la estructura por
+  defecto para que no quedes en un contexto vacío.
+- Para **operar** en una estructura archivada primero debes **reactivarla** (el botón «Trabajar aquí» está
+  deshabilitado mientras esté archivada).
+- Archivar es la **alternativa no destructiva** a eliminar: por eso una estructura con historial de nodos no se
+  puede borrar, pero sí archivar.
 
 ---
 

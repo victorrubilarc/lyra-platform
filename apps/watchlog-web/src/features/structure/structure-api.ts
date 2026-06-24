@@ -6,6 +6,7 @@ import {
   orgNodeSchema,
   orgNodeTreeSchema,
   orgStructureSchema,
+  reorderOrgStructuresRequestSchema,
   updateOrgLevelRequestSchema,
   updateOrgNodeRequestSchema,
   updateOrgStructureRequestSchema,
@@ -47,6 +48,12 @@ export function updateStructure(id: string, dto: UpdateOrgStructureRequest): Pro
 
 export function deleteStructure(id: string): Promise<void> {
   return apiVoid(`/structure/structures/${id}`, { method: "DELETE" });
+}
+
+/** Reordena las estructuras en bloque (lista ordenada de ids → reportOrder). Atómico. */
+export function reorderStructures(ids: string[]): Promise<OrgStructure[]> {
+  const body = reorderOrgStructuresRequestSchema.parse({ ids });
+  return apiJson("/structure/structures/reorder", z.array(orgStructureSchema), { method: "PUT", body });
 }
 
 // ─── Niveles ───────────────────────────────────────────────────────────────

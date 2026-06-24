@@ -279,6 +279,15 @@ export const esCL = {
       deleteWarning: "¿Eliminar la estructura «{{name}}»? Esta acción no se puede deshacer.",
       deleteBlockedHint:
         "Solo se puede eliminar una estructura SIN nodos. Si tiene datos (nodos, bitácoras, incidencias) el sistema lo impedirá.",
+      archive: "Archivar",
+      reactivate: "Reactivar",
+      archived: "Estructura archivada",
+      reactivated: "Estructura reactivada",
+      defaultUnarchivable: "La estructura por defecto no se puede archivar",
+      archivedNotSelectable: "Reactiva la estructura para poder operar en ella",
+      showArchived: "Ver archivadas",
+      moveUp: "Subir",
+      moveDown: "Bajar",
     },
     tree: {
       panelTitle: "Jerarquía",

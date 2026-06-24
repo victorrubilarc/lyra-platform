@@ -103,8 +103,18 @@ export class StructureService {
   async updateStructure(id: string, dto: UpdateOrgStructureRequest, ctx: AuditContext): Promise<OrgStructure> {
     const before = await this.prisma.orgStructure.findFirst({ where: { id, deletedAt: null } });
     if (!before) throw new NotFoundException("Estructura no encontrada");
-    if (before.isDefault && dto.active === false) {
-      throw new BadRequestException("La estructura por defecto no se puede desactivar");
+    // Archivar (active:false): la por defecto nunca se archiva, y nunca se deja la
+    // instalación sin NINGUNA estructura activa (el selector quedaría vacío).
+    if (dto.active === false && before.active) {
+      if (before.isDefault) {
+        throw new BadRequestException("La estructura por defecto no se puede archivar");
+      }
+      const otherActive = await this.prisma.orgStructure.count({
+        where: { deletedAt: null, active: true, id: { not: id } },
+      });
+      if (otherActive === 0) {
+        throw new BadRequestException("No se puede archivar la última estructura activa");
+      }
     }
     const structure = await this.prisma.orgStructure.update({
       where: { id },
@@ -143,6 +153,33 @@ export class StructureService {
       this.prisma.orgStructure.update({ where: { id }, data: { deletedAt: new Date() } }),
     ]);
     await this.audit.record({ ...ctx, action: "structure.structure.deleted", entityType: "OrgStructure", entityId: id, before: { ...structure } });
+  }
+
+  /**
+   * Reordena en bloque las estructuras: el índice de cada id en la lista fija su
+   * `reportOrder` (0..n-1). Atómico. Solo se aceptan ids de estructuras vivas; ids
+   * desconocidos se rechazan para no dejar el orden a medias. Auditado como un evento.
+   */
+  async reorderStructures(ids: string[], ctx: AuditContext): Promise<(OrgStructure & { nodeCount: number })[]> {
+    const live = await this.prisma.orgStructure.findMany({ where: { deletedAt: null }, select: { id: true } });
+    const liveIds = new Set(live.map((s) => s.id));
+    const unknown = ids.filter((id) => !liveIds.has(id));
+    if (unknown.length > 0) {
+      throw new BadRequestException("La lista de reordenamiento incluye estructuras inexistentes");
+    }
+    await this.prisma.$transaction(
+      ids.map((id, index) =>
+        this.prisma.orgStructure.update({ where: { id }, data: { reportOrder: index } }),
+      ),
+    );
+    await this.audit.record({
+      ...ctx,
+      action: "structure.structure.reordered",
+      entityType: "OrgStructure",
+      entityId: ids[0],
+      after: { order: ids },
+    });
+    return this.listStructures();
   }
 
   // --- Niveles ---
