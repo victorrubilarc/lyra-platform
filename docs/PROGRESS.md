@@ -1,5 +1,20 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-24 — 🛠️ OPS · Workflow CI reparado ✅** (`fix/ci-pnpm-builds`, PR #1 → `main`). El workflow
+`ci.yml` (typecheck+lint+test) **había fallado en TODAS las corridas desde que existe** — el gate de
+calidad nunca corrió en la nube. Dos causas que solo se manifiestan en checkout LIMPIO (en local no,
+porque `node_modules` y `packages/*` ya están construidos): **(1)** `pnpm install --frozen-lockfile`
+moría con `ERR_PNPM_IGNORED_BUILDS` (exit 1) por los build scripts nativos (prisma/argon2/esbuild/
+@nestjs/core); en este pnpm (11.5.2) `onlyBuiltDependencies` **no se aplica** al instalar y lo que se
+honra es **`allowBuilds: true`** en `pnpm-workspace.yaml` (el bloque "basura" con placeholders era el
+andamiaje que pnpm autoescribe sin decidir). **(2)** typecheck/lint/test fallaban porque los paquetes
+compartidos (`@lyra/contracts`, `@lyra/llm`) se resuelven por su `dist`/tipos y CI **nunca los
+construía** → nuevo paso **«Construir paquetes compartidos»** antes de typecheck. Validado en un **git
+worktree limpio** (reproduce CI): install exit 0 → packages build → typecheck → test 252+6; y luego en
+CI real (verde por primera vez, en la rama y en `main`). Sin cambios en el lockfile. Detalle en la
+memoria `ci-pipeline`. **Disparado durante el deploy de `v0.1.9`** (que fue exitoso por su propio
+camino de build Docker, ajeno a este fallo de CI).
+
 **2026-06-24 — 🔒 L1c · Coherencia de la estructura activa en los caminos de CREACIÓN ✅** (`feat/estructura-creacion-coherente`).
 Cierra la última grieta del aislamiento por estructura. Hasta L1b los LISTADOS ya filtraban por la estructura activa
 (`?structureId=`), pero el flujo de **«Nueva entrada»** la ignoraba: el picker de plantillas y el de nodos elegibles solo
