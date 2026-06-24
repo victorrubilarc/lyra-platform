@@ -170,8 +170,9 @@ No es una app genérica: es software industrial de alto estándar.
   4.1. Si se completó una funcionalidad de cara al usuario, actualiza **`docs/USER_GUIDE.md`** (manual de uso VIVO): redacta/actualiza su sección (para qué sirve · cómo se usa · quién puede · importante) y marca el índice (✅). Rellena de paso 1–2 secciones antiguas pendientes (✍️) cuando puedas (backfill incremental).
   5. Haz un commit descriptivo con todo el trabajo de la sesión.
   6. **Publica** (regla "nada se queda atrás"): push de la rama y/o merge a `main` + push de `main`. Verifica con `git status` / `git log origin/main..` que no quede nada solo en local. Si no se publica por instrucción mía, anótalo en `docs/BACKLOG.md` §1.
-  7. Muéstrame un resumen de lo que se completó y lo que viene.
-  8. Dime explícitamente: **"Esta sesión está completa. Por favor abre una sesión nueva para continuar con: [nombre del siguiente módulo]."**
+  7. **Deja el sitio OPERATIVO**: si levantaste el entorno de desarrollo para probar (smokes, etc.), déjalo CORRIENDO al cerrar (no mates el `pnpm dev`). Verifica que API (`:3000/api/health`) y web (`:5173`) respondan y avísame las URLs, porque suelo hacer el smoke visual justo después.
+  8. Muéstrame un resumen de lo que se completó y lo que viene.
+  9. Dime explícitamente: **"Esta sesión está completa. Por favor abre una sesión nueva para continuar con: [nombre del siguiente módulo]."**
 - No empieces el siguiente módulo en la misma sesión aunque parezca pequeño. Cierra siempre.
 - Si el contexto empieza a llenarse ANTES de terminar el módulo (respuestas más lentas, olvidos, incoherencias), avísame con: **"El contexto de esta sesión está llegando a su límite. Voy a consolidar el progreso para que puedas abrir una sesión nueva."** Luego actualiza los docs, commitea lo hecho y para.
 
