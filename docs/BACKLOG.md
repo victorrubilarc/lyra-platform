@@ -5,7 +5,16 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-24** (**🔒 L1c · Coherencia de la estructura activa al CREAR ✅** — `feat/estructura-creacion-coherente`:
+> actualización: **2026-06-24** (**🎨 EST-FIX-ALTO · Paneles maestro-detalle llenan el alto del viewport ✅** —
+> `fix/layout-altura-paneles`: el split «lista | detalle» quedaba a media pantalla con vacío debajo. Causa: cadena de
+> altura flex rota (`ResizableSplit` no crecía en un flex-column) + alturas por-página inconsistentes (calc frágil que
+> ignoraba la barra de pestañas / sin altura). Fix DRY en 2 lugares compartidos: contenedor de `ResizableSplit` pasa a
+> `flex:1 1 auto; min-height:0` y nueva variante de shell `data-fill-height="pad"` (llena el alto conservando el padding);
+> las 4 páginas afectadas solo marcan el atributo y se borra el `height: calc()` frágil de calendarios. Logbook
+> (`data-fill-height` a sangre) y UsersPage (ya llenaba) intactos. Solo CSS/contenedores, tokens, sin librerías nuevas.
+> typecheck/lint(0)/build/test (252+6) verdes. **PENDIENTE: smoke VISUAL del dueño.** **Siguiente: Sistema de temas /
+> paletas (EST-TEMAS).** Anterior:
+> **🔒 L1c · Coherencia de la estructura activa al CREAR ✅** — `feat/estructura-creacion-coherente`:
 > cierra la última grieta del aislamiento por estructura. Hasta L1b los LISTADOS filtraban por la estructura activa
 > (`?structureId=`) pero el flujo de **«Nueva entrada»** la ignoraba: un usuario con alcance en DOS estructuras (A y B),
 > «en A», veía/elegía plantillas y nodos de **B** (no era fuga — el ABAC seguía siendo la frontera — pero rompía la
@@ -532,6 +541,8 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **UX del builder de Flujos** (3 ajustes: atajo "copiar destinatarios" movido arriba + condicional · estados colapsables [paridad con transiciones] · fix sticky `.columnHeader` `top:58px`→`0`; solo frontend web/CSS/i18n; typecheck/lint(0)/build verdes) | `feat/builder-flujos-ux` → `main` | ✅ fusionado y publicado en `origin/main` | ninguna |
 
 | **Fase 5 · Slice 4 EXPORT PDF del acta de entrega** (deps `pdfmake`+`@types/pdfmake`+`@expo-google-fonts/sora`+`/inter`; `shift-handover/acta/` [`acta-renderer.ts` singleton pdfmake + Sora/Inter TTF OFL por ruta con `localAccessPolicy` lista blanca + `urlAccessPolicy=false`; `acta-document.ts` builder PURO `buildActaDocument` modo claro premium + gradiente solo en banda; `acta-hash.ts` SHA-256 de JSON canónico]; `ShiftHandoverService.exportActa` [ABAC + 409 COMPILING + snapshot + breadcrumb + auditoría `shifthandover.acta.exported`] + endpoint `GET /shift-handover/:id/acta.pdf` [`@Res`, gate `RequireAnyPermission(view/compile/sign/acknowledge)`, Content-Disposition significativo]; web `downloadHandoverActa` vía `apiBlob` + botón en cockpit/historial + i18n; SIN migración/permiso/FLUSHALL; api 247 · web 3 · smoke `smoke-acta-pdf.py` 17/17 + regresión cambio-turno 29/29 · ia-config 20/20 · ia-stream 13/13 · notif 18/18 · notif-inapp 18/18) | `feat/cambio-turno-acta-pdf` → `main` | ✅ fusionado y publicado en `origin/main` (`81db4ad`) | ninguna |
+
+| **EST-FIX-ALTO · Paneles maestro-detalle llenan el alto del viewport** (cadena de altura flex rota: `ResizableSplit` no crecía en flex-column + alturas por-página inconsistentes [calc frágil/sin altura]; fix DRY en 2 lugares compartidos: contenedor de `ResizableSplit` `flex:1 1 auto;min-height:0` + variante shell `data-fill-height="pad"` que llena conservando padding; 4 páginas marcan el atributo, se borra el `height:calc()` frágil de calendarios; Logbook/`data-fill-height` a sangre INTACTO; UsersPage ya llenaba; solo CSS/contenedores, tokens, sin libs; typecheck/lint(0)/build/test 252+6) | `fix/layout-altura-paneles` → `main` | ✅ fusionado y publicado en `origin/main` | **PENDIENTE: smoke VISUAL del dueño** (5 páginas, claro/oscuro, escritorio/tablet) |
 
 **Estado:** todo publicado — `main` = `origin/main` (verificado `git rev-list --count origin/main..main` = 0).
 

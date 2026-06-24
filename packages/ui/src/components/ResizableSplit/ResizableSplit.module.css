@@ -1,7 +1,12 @@
 .container {
   display: flex;
   width: 100%;
-  min-height: 520px;
+  /* Llena el alto del contenedor flex padre (páginas maestro-detalle marcadas con
+     `data-fill-height`). `min-height: 0` es indispensable para que los paneles
+     scrolleen internamente en vez de desbordar la página. Si el padre no acota la
+     altura, el split toma su alto de contenido (sin piso fijo). */
+  flex: 1 1 auto;
+  min-height: 0;
   background: var(--color-bg-surface-1);
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-lg);

@@ -98,7 +98,7 @@ export function StructurePage() {
   }
 
   return (
-    <div className={styles.page}>
+    <div className={styles.page} data-fill-height="pad">
       {/* Cabecera */}
       <div className={styles.header}>
         <div className={styles.heading}>

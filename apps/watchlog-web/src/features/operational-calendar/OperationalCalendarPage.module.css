@@ -2,10 +2,9 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  /* Acota la página al alto disponible (viewport − topbar − padding del contenido)
-     para que el panel derecho scrollee internamente y la cabecera quede fija. */
-  height: calc(100dvh - 58px - 2 * var(--layout-content-pad-y));
-  min-height: 520px;
+  /* El alto lo aporta el shell vía `data-fill-height="pad"` (cadena flex centralizada),
+     robusto a la barra de pestañas y a la densidad compacta. El panel derecho scrollea
+     internamente y la cabecera queda fija arriba. */
 }
 
 /* Hace que el ResizableSplit (su contenedor = hijo directo) llene el alto restante. */

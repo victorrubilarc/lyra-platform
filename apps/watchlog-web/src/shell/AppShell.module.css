@@ -569,10 +569,25 @@ button.navGroupHeader:hover {
   padding: var(--layout-content-pad-y) var(--layout-content-pad-x);
 }
 /* Las pantallas que gestionan su propio scroll interno desactivan el padding/scroll
-   del contenedor y llenan la altura disponible. */
+   del contenedor y llenan la altura disponible. Por defecto van a sangre (padding:0):
+   la pantalla pone su propio padding (grillas con cabecera sticky de borde a borde). */
 .content:has(> [data-fill-height]) {
   overflow: hidden;
   padding: 0;
+}
+/* Variante "maestro-detalle": llena el alto disponible PERO conserva el padding del
+   shell (la tarjeta enmarcada del split respira). El cuerpo (ResizableSplit) crece con
+   `flex:1` y scrollea internamente; la cabecera de la página queda fija arriba.
+   Centraliza la cadena de altura para todas las páginas de split (DRY): la página solo
+   marca el atributo, sin CSS de alto propio. */
+.content:has(> [data-fill-height="pad"]) {
+  padding: var(--layout-content-pad-y) var(--layout-content-pad-x);
+  display: flex;
+  flex-direction: column;
+}
+.content > [data-fill-height="pad"] {
+  flex: 1;
+  min-height: 0;
 }
 
 @media (min-width: 1920px) {

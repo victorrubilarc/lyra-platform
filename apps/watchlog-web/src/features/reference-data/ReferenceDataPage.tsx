@@ -41,7 +41,7 @@ export function ReferenceDataPage() {
   const selected = lists.find((l) => l.id === selectedId) ?? null;
 
   return (
-    <div className={styles.page}>
+    <div className={styles.page} data-fill-height="pad">
       <div className={styles.header}>
         <div className={styles.heading}>
           <h1 className={styles.title}>

@@ -38,7 +38,7 @@ export function FiscalCalendarPage() {
   }
 
   return (
-    <div className={styles.page}>
+    <div className={styles.page} data-fill-height="pad">
       <div className={styles.header}>
         <div className={styles.heading}>
           <h1 className={styles.title}>

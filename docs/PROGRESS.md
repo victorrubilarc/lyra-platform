@@ -1,5 +1,27 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-24 — 🎨 EST-FIX-ALTO · Paneles maestro-detalle llenan el alto del viewport ✅** (`fix/layout-altura-paneles`).
+Defecto **premium**: en las páginas tipo maestro-detalle (Estructura, calendarios, datos de referencia, usuarios) el
+split «lista | detalle» quedaba a **media pantalla** con un gran vacío debajo en vez de llegar al borde inferior. **Causa
+raíz:** la cadena de altura (flex) estaba rota/inconsistente — `ResizableSplit` dentro de un flex-column **no crecía** (su
+contenedor no tenía `flex-grow`; `align-items:stretch` solo estira el ancho), y cada página resolvía la altura de forma
+distinta: StructurePage/ReferenceDataPage sin altura (split clavado en su viejo `min-height:520px`), Operational/Fiscal
+con un hack frágil `height: calc(100dvh − 58px − 2·pad)` que **ignoraba la barra de pestañas del workspace y la densidad
+compacta**, y UsersPage ya correcta (cadena `flex:1/min-height:0` propia bajo `SecurityLayout`). **Fix DRY en 2 lugares
+compartidos:** **(1)** `ResizableSplit` (`packages/ui`) — su contenedor pasa a `flex: 1 1 auto; min-height: 0` (se quita
+el `min-height:520px` fijo): llena cualquier flex-column padre acotado y los paneles scrollean **internamente**.
+**(2)** El shell (`AppShell.module.css`) — nueva variante **`data-fill-height="pad"`**: llena el alto disponible PERO
+**conserva el padding del shell** (la tarjeta enmarcada respira), volviendo el contenedor un flex-column y estirando la
+página con `flex:1; min-height:0`. Centraliza la cadena de altura: cada página de split solo **marca el atributo** en su
+`<div>` raíz (wiring, no CSS de alto propio). Se borró el `height: calc(...)` frágil del CSS compartido de calendarios
+(deuda eliminada, no añadida). **El `data-fill-height` «a sangre» (padding:0) de Logbook queda INTACTO** (variante por
+defecto). **UsersPage no se tocó** (ya llenaba). Solo CSS/estructura de contenedores — sin librerías nuevas, sin modelo de
+datos, tokens existentes (respeta claro/oscuro y responsive/táctil). Beneficia a las **4** páginas rotas/frágiles + valida
+la 5.ª (Usuarios). typecheck/lint(0 errores)/build/test (**252 API + 6 web**) en verde. **PENDIENTE: smoke VISUAL del
+dueño** (las 5 páginas, claro/oscuro, escritorio/tablet). **Nota de incidente de tooling:** un `pnpm` con `CI=true`
+disparó un `install --production` que podó las devDependencies; se restauró con `pnpm install` completo y se desactivó
+`verify-deps-before-run` para esta máquina. **Siguiente: Sistema de temas / paletas (EST-TEMAS).**
+
 **2026-06-24 — 🛠️ OPS · Workflow CI reparado ✅** (`fix/ci-pnpm-builds`, PR #1 → `main`). El workflow
 `ci.yml` (typecheck+lint+test) **había fallado en TODAS las corridas desde que existe** — el gate de
 calidad nunca corrió en la nube. Dos causas que solo se manifiestan en checkout LIMPIO (en local no,

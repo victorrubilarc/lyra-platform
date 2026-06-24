@@ -4,6 +4,30 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-24 · EST-FIX-ALTO · Cadena de altura de páginas maestro-detalle (DS: `ResizableSplit`)
+Las páginas de split «lista | detalle» (Estructura, calendarios operacional/fiscal, datos de referencia) dejaban el
+panel a media pantalla con un vacío debajo — defecto premium. La causa era una cadena de altura (flex) rota e
+inconsistente, no un bug del componente. Decisiones (con motivo):
+- **El contenedor de `ResizableSplit` (`packages/ui`) pasa a `flex: 1 1 auto; min-height: 0` (se quita el
+  `min-height: 520px` fijo).** *Motivo:* un split dentro de un flex-column NO crecía — `align-items: stretch` solo
+  estira el eje transversal (ancho), y sin `flex-grow` el contenedor tomaba su alto de contenido (clavado en 520px). Con
+  `flex:1 1 auto` llena el alto del padre acotado y `min-height:0` es indispensable para que los paneles scrolleen
+  **internamente** en vez de desbordar. Si el padre no acota la altura, cae con gracia a su alto de contenido (sin piso
+  fijo); todos los consumidores actuales viven en contexto de fill.
+- **La cadena de altura se centraliza en el shell con la variante `data-fill-height="pad"`, NO parcheando cada página.**
+  *Motivo:* DRY. El shell ya tenía `data-fill-height` «a sangre» (padding:0) para las grillas que gestionan su propio
+  scroll de borde a borde (Logbook). Se añade una segunda variante que **llena el alto conservando el padding del shell**
+  (la tarjeta enmarcada del split respira): vuelve `.content` un flex-column y estira la página con `flex:1; min-height:0`.
+  Cada página de split solo **marca el atributo** en su `<div>` raíz (wiring, cero CSS de alto por página). El
+  `data-fill-height` por defecto (Logbook) queda **intacto**.
+- **Se elimina el hack `height: calc(100dvh − 58px − 2·pad)` del CSS compartido de calendarios.** *Motivo:* era deuda
+  frágil — asumía un topbar de 58px y NO descontaba la barra de pestañas del workspace ni la densidad compacta (topbar
+  52px), dando una altura equivocada cuando había pestañas. El mecanismo del shell es robusto a ambos. Net: **menos** CSS
+  divergente, no más.
+- **`UsersPage` no se tocó.** *Motivo:* ya llenaba el alto vía su propia cadena `flex:1/min-height:0` bajo
+  `SecurityLayout` (que provee `height:100%`); el cambio del contenedor de `ResizableSplit` la deja igual de correcta.
+  Solo CSS/estructura de contenedores; sin librerías nuevas, sin modelo de datos, tokens existentes (claro/oscuro y táctil).
+
 ### 2026-06-24 · L1c · Coherencia de la estructura activa en los caminos de CREACIÓN
 Hasta L1b los LISTADOS operacionales ya filtraban por la estructura activa (`?structureId=`), pero el flujo de
 «Nueva entrada» la IGNORABA: el picker de plantillas (`GET /log-entries/templates`) y el de nodos elegibles
