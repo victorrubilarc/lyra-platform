@@ -36,6 +36,7 @@ import {
   fetchIncidentActions,
   fetchIncidentEquipmentOptions,
   fetchIncidentCategories,
+  fetchCrossDashboard,
   fetchIncidentDashboard,
   fetchIncidentDetail,
   fetchIncidentStats,
@@ -75,11 +76,20 @@ export const INCIDENT_KEYS = {
   obligations: () => ["incidents", "obligations"] as const,
   reports: (incidentId: string) => ["incidents", "reports", incidentId] as const,
   dashboard: (q: IncidentDashboardQuery, structureId: string | null) => ["incidents", "dashboard", q, structureId] as const,
+  crossDashboard: () => ["incidents", "dashboard", "cross"] as const,
 };
 
 export function useIncidentDashboard(q: IncidentDashboardQuery) {
   const structureId = useActiveStructureId();
   return useQuery({ queryKey: INCIDENT_KEYS.dashboard(q, structureId), queryFn: () => fetchIncidentDashboard(q, structureId) });
+}
+
+/**
+ * Vista ejecutiva cross-estructura (L3). NO depende de la estructura activa (la cruza):
+ * por eso su queryKey no lleva `structureId`. El ABAC por nodo lo aplica el backend.
+ */
+export function useCrossDashboard() {
+  return useQuery({ queryKey: INCIDENT_KEYS.crossDashboard(), queryFn: () => fetchCrossDashboard() });
 }
 
 export function useIncidents(q: IncidentListQuery) {

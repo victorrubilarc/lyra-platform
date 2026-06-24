@@ -4,6 +4,38 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-24 · L3 · UX premium cross-estructura (identidad + vista ejecutiva + switcher)
+Hace que trabajar con varias estructuras se sienta de clase mundial y sin ambigüedad. Tres piezas (el asistente
+"crear área" se DIFIRIÓ a L3b por tamaño). Decisiones (las "a resolver" del plan, con su motivo):
+- **Identidad → columnas CONFIGURABLES `OrgStructure.color`/`icon` (migración aditiva, nullable) con FALLBACK
+  determinístico.** *Motivo:* premium + parametrizable donde se justifica; cero pérdida (NULL = "auto" ⇒ se deriva de
+  la `key` con un hash estable FNV-1a, mismo color/ícono entre recargas). Migración `20260624130000_add_structure_identity`.
+- **El color NO es hex libre: es una CLAVE de paleta curada** (indigo/cyan/violet/emerald/amber/rose/teal/slate), y el
+  ícono es de una **lista blanca Lucide**. *Motivo (objeción de marca):* dejar elegir un hex arbitrario rompería el
+  contraste y la coherencia Lyra. La hue vive UNA sola vez como token (`--accent-<clave>` en `tokens/index.css`); los
+  componentes consumen `var()` (incluido Recharts `fill`) — **nunca hex en el componente**. Validado por Zod (`z.enum`)
+  en el contrato ⇒ acento fuera de paleta = 400.
+- **Alcance del acento → SUTIL.** Badge "Estás en: <estructura>" SIEMPRE visible en el topbar (borde-izquierdo + tinte
+  translúcido del acento) y el switcher lo adopta. **Sin** gradiente a pantalla completa ni fondos claros en oscuro
+  (CLAUDE.md "lo que NO hacer visualmente"). Funciona en claro/oscuro vía tokens.
+- **Badge y switcher = UNA sola superficie.** *Motivo:* mostrar el nombre dos veces (badge + selector) es redundante;
+  el disparador del switcher ES el badge (estático si hay una sola estructura operable, desplegable con búsqueda si ≥2).
+- **Vista ejecutiva → permiso NUEVO de alto nivel `module:dashboard:cross-view`** (dimensión MODULE, grupo `dashboards`).
+  *Motivo:* es la **EXCEPCIÓN EXPLÍCITA al aislamiento L1** (la única forma de cruzar la estructura activa); merece una
+  llave propia y gerencial, no reusar `incident:view`. Gotcha asumido: `db:seed` + Redis `FLUSHALL` (catálogo 89→90).
+- **La vista cruza la estructura activa pero NO el ABAC por nodo.** *Motivo (seguridad):* el aislamiento por estructura
+  es un "lente de workspace"; la **frontera de datos es el ABAC**. El servicio interseca, por estructura, sus nodos vivos
+  con los nodos accesibles del usuario: un gerente sin alcance ve todas las estructuras; uno acotado, SOLO aquellas donde
+  tiene nodos accesibles (y solo sus nodos). Verificado en el smoke con usuario scoped (ve A, no B) y gate 403 sin permiso.
+- **Alcance de KPIs → primer corte ACOTADO a INCIDENCIAS** (reusa `IncidentDashboardService`, nuevo `buildCross`):
+  abiertas/críticas/vencidas/SLA por estructura + totales. *Motivo:* no reconstruir un BI multi-módulo; el panorama
+  bitácoras/rondas/turnos queda como **deuda** (BACKLOG).
+- **Endpoint `GET /incidents/dashboard/cross`** (montado en el controller de incidencias por reuso del servicio; sin
+  `?structureId=`). Read-only, agregado en el backend (counts, nunca filas crudas al cliente).
+- **Asistente "crear nueva área" → DIFERIDO a L3b** (objeción al plan): un wizard multi-paso que orquesta 3 endpoints con
+  manejo de error propio sobrecargaba la sesión junto a la pieza sensible (vista ejecutiva). Mejor 3 piezas verificadas
+  que 4 a medias.
+
 ### 2026-06-24 · L2b · Administración DELEGADA por estructura + red anti-lockout
 Permite que un administrador NO sea "dios de toda la instalación": se le delega administrar SOLO ciertas estructuras
 (árbol/niveles/ciclo de vida), mientras el super-admin sigue administrándolo todo (patrón ServiceNow domain-admin).

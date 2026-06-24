@@ -672,6 +672,20 @@ export const PERMISSION_CATALOG = [
     group: "ai",
     description: "Configurar la Inteligencia Artificial del sistema (proveedor, modelo, clave) y probar la conexión.",
   },
+
+  // --- Vista ejecutiva cross-estructura (L3 — UX premium) --------------------
+  // Permiso de ALTO NIVEL (gerencial) para la pantalla "Panorama": consolida KPIs
+  // de TODAS las estructuras accesibles a la vez, la EXCEPCIÓN EXPLÍCITA al filtro
+  // por estructura activa (L1). NO rompe el ABAC por nodo: sigue siendo la frontera
+  // de datos (un gerente sin alcance ve todo; uno acotado, solo sus nodos). Es la
+  // única forma de cruzar la estructura activa; por eso una clave aparte y de módulo.
+  {
+    key: "module:dashboard:cross-view",
+    dimension: "MODULE",
+    group: "dashboards",
+    description:
+      "Ver la vista ejecutiva CONSOLIDADA de todas las estructuras (Panorama). Cruza la estructura activa, pero respeta el alcance por nodo.",
+  },
 ] as const satisfies readonly PermissionDef[];
 
 /** Unión literal de todas las claves de permiso conocidas. */

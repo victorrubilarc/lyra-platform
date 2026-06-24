@@ -453,6 +453,19 @@ GxP: MHRA Data Integrity 2018 / FDA DI Q&A (corrección tardía justificada + at
   parametrizado; la TZ de planta es un valor de entorno, no entrada del usuario).
 - El front solo **visualiza** y enlaza (drill-down a la lista por querystring); la verdad de permisos y de datos es del backend.
 
+### Vista ejecutiva «Panorama» cross-estructura (L3) — EXCEPCIÓN explícita al filtro por estructura activa
+- **Qué es la excepción.** El aislamiento L1 acota TODOS los listados operacionales a la **estructura activa** (`?structureId=`
+  ∩ ABAC). La vista ejecutiva (`GET /incidents/dashboard/cross` → `IncidentDashboardService.buildCross`, gate
+  **`module:dashboard:cross-view`**) es la **ÚNICA** pantalla que **cruza la estructura activa**: consolida KPIs de incidencias
+  de TODAS las estructuras a la vez, para un perfil gerencial. No lleva `?structureId=`.
+- **El ABAC por nodo SIGUE siendo la frontera de datos.** La estructura es un "lente de workspace", no una frontera de
+  seguridad: el servicio interseca, **por estructura**, sus nodos vivos con `getAccessibleNodeIds(userId)` (`null` = sin
+  restricción ⇒ todos). Un gerente **sin** alcance ve TODAS las estructuras; uno **acotado** ve SOLO aquellas donde tiene nodos
+  accesibles, y los conteos cuentan **solo sus nodos**. Una estructura sin nodos accesibles NO aparece. Read-only, agregado en
+  el backend (counts, nunca filas crudas). Verificado: `smoke-estructura-ux-premium.py` (usuario scoped ve A pero no B; 403 sin
+  el permiso). Decisión y motivo en DECISIONS 2026-06-24 (L3). Permiso de ALTO NIVEL aparte (no reusa `incident:view`) porque
+  habilita justamente esa excepción.
+
 ### Motor de reglas de negocio — expresión SEGURA (Req-7, primer corte)
 - **Sin `eval` ni scripting libre.** Las fórmulas (campos formulados) y las reglas cruzadas se expresan como un **AST
   con LISTA BLANCA de operadores** (tipo JSONLogic) evaluado por un intérprete **PURO** y SÍNCRONO en `@lyra/contracts/

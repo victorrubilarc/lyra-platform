@@ -146,6 +146,19 @@ export class IncidentsController {
     return this.dashboard.build(user.id, q, structureId);
   }
 
+  /**
+   * Vista ejecutiva CROSS-ESTRUCTURA (L3): KPIs de incidencias CONSOLIDADOS por
+   * estructura, sobre TODAS las accesibles del usuario (no la activa). Permiso de alto
+   * nivel `module:dashboard:cross-view` — es la única forma de cruzar la estructura
+   * activa. El ABAC por nodo sigue siendo la frontera (lo aplica el servicio): un
+   * gerente sin alcance ve todas; uno acotado, solo las suyas. Ruta estática antes de `:id`.
+   */
+  @Get("dashboard/cross")
+  @RequirePermission("module:dashboard:cross-view")
+  crossDashboard(@CurrentUser() user: RequestUser) {
+    return this.dashboard.buildCross(user.id);
+  }
+
   /** Usuarios asignables como responsable (selector del detalle). */
   @Get("users")
   @RequirePermission("incident:view")

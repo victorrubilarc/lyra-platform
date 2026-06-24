@@ -1,4 +1,7 @@
 import { z } from "zod";
+import { structureAccentSchema, structureIconSchema } from "./identity.js";
+
+export * from "./identity.js";
 
 /**
  * Estructura organizacional: niveles configurables (OrgLevel) y nodos
@@ -24,6 +27,14 @@ export const orgStructureSchema = z.object({
   active: z.boolean(),
   /** Orden de presentación en selectores (asc). */
   reportOrder: z.number().int(),
+  /**
+   * Identidad visual (L3): acento de color y nombre de ícono Lucide propios. `null`
+   * = sin configurar ⇒ el front los DERIVA determinísticamente de la `key` (ver
+   * `resolveStructureAccent`/`resolveStructureIcon`). Se guardan como texto y se
+   * validan contra la paleta/lista-blanca al escribir.
+   */
+  color: z.string().nullable(),
+  icon: z.string().nullable(),
   createdAt: z.string(),
   /** Nº de nodos vivos (para distinguir estructuras CONFIGURADAS de vacías). */
   nodeCount: z.number().int().optional(),
@@ -48,6 +59,10 @@ export const createOrgStructureRequestSchema = z.object({
   name: z.string().trim().min(1).max(80),
   description: z.string().trim().max(500).optional(),
   reportOrder: z.number().int().min(0).max(100000).optional(),
+  /** Acento de la paleta curada; si se omite, se deriva de la `key`. */
+  color: structureAccentSchema.nullable().optional(),
+  /** Ícono de la lista blanca Lucide; si se omite, se usa el por defecto. */
+  icon: structureIconSchema.nullable().optional(),
 });
 export type CreateOrgStructureRequest = z.infer<typeof createOrgStructureRequestSchema>;
 
@@ -56,6 +71,10 @@ export const updateOrgStructureRequestSchema = z.object({
   description: z.string().trim().max(500).nullable().optional(),
   active: z.boolean().optional(),
   reportOrder: z.number().int().min(0).max(100000).optional(),
+  /** Acento de la paleta curada; `null` vuelve a derivarlo de la `key`. */
+  color: structureAccentSchema.nullable().optional(),
+  /** Ícono de la lista blanca Lucide; `null` vuelve al por defecto. */
+  icon: structureIconSchema.nullable().optional(),
 });
 export type UpdateOrgStructureRequest = z.infer<typeof updateOrgStructureRequestSchema>;
 

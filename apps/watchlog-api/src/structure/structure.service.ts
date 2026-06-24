@@ -117,6 +117,9 @@ export class StructureService {
         name: dto.name,
         description: dto.description ?? null,
         reportOrder: dto.reportOrder ?? 0,
+        // Identidad visual (L3): si se omiten, quedan NULL y el front los deriva de `key`.
+        color: dto.color ?? null,
+        icon: dto.icon ?? null,
         // Las estructuras nuevas NUNCA son la por defecto (esa es la migrada).
         isDefault: false,
         active: true,
@@ -152,6 +155,9 @@ export class StructureService {
         description: dto.description === undefined ? undefined : dto.description,
         active: dto.active ?? undefined,
         reportOrder: dto.reportOrder ?? undefined,
+        // `null` borra la identidad (vuelve a derivarse de `key`); `undefined` no la toca.
+        color: dto.color === undefined ? undefined : dto.color,
+        icon: dto.icon === undefined ? undefined : dto.icon,
       },
     });
     await this.audit.record({ ...ctx, action: "structure.structure.updated", entityType: "OrgStructure", entityId: id, before: { ...before }, after: { ...structure } });

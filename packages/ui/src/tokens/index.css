@@ -234,6 +234,36 @@
   --color-chrome: rgba(255, 255, 255, 0.72);
 }
 
+/* ------------------------------------------------------------
+   Acentos por estructura (L3 — identidad cross-estructura).
+   Paleta curada y coherente con la marca Lyra. La hue de cada clave vive UNA sola vez
+   como token nombrado (`--accent-<clave>`), para poder referenciarla por `var()` tanto
+   en CSS como en SVG/Recharts (fill), sin hex en duro en los componentes. Cada estructura
+   adopta una CLAVE; el componente pone `data-accent="<clave>"` y consume
+   `var(--structure-accent)` / `var(--structure-accent-soft)`. Tema-agnóstico (hue + alpha).
+   ------------------------------------------------------------ */
+:root {
+  --accent-indigo: #6366f1;
+  --accent-cyan: #06b6d4;
+  --accent-violet: #8b5cf6;
+  --accent-emerald: #10b981;
+  --accent-amber: #f59e0b;
+  --accent-rose: #f43f5e;
+  --accent-teal: #14b8a6;
+  --accent-slate: #64748b;
+  /* Fallback: consumir el acento sin `data-accent` cae al de marca. */
+  --structure-accent: var(--color-accent-primary);
+  --structure-accent-soft: rgba(99, 102, 241, 0.16);
+}
+[data-accent="indigo"]  { --structure-accent: var(--accent-indigo);  --structure-accent-soft: rgba(99, 102, 241, 0.16); }
+[data-accent="cyan"]    { --structure-accent: var(--accent-cyan);    --structure-accent-soft: rgba(6, 182, 212, 0.16); }
+[data-accent="violet"]  { --structure-accent: var(--accent-violet);  --structure-accent-soft: rgba(139, 92, 246, 0.16); }
+[data-accent="emerald"] { --structure-accent: var(--accent-emerald); --structure-accent-soft: rgba(16, 185, 129, 0.16); }
+[data-accent="amber"]   { --structure-accent: var(--accent-amber);   --structure-accent-soft: rgba(245, 158, 11, 0.16); }
+[data-accent="rose"]    { --structure-accent: var(--accent-rose);    --structure-accent-soft: rgba(244, 63, 94, 0.16); }
+[data-accent="teal"]    { --structure-accent: var(--accent-teal);    --structure-accent-soft: rgba(20, 184, 166, 0.16); }
+[data-accent="slate"]   { --structure-accent: var(--accent-slate);   --structure-accent-soft: rgba(100, 116, 139, 0.18); }
+
 /* Fondo de la app en claro (el oscuro lo da @layer base). */
 [data-theme="light"] body {
   background:

@@ -136,6 +136,7 @@ export const esCL = {
       admin: "Administración",
     },
     home: "Inicio",
+    panorama: "Panorama",
     structure: "Estructura",
     security: "Seguridad",
     templates: "Plantillas",
@@ -155,6 +156,24 @@ export const esCL = {
     incidentCatalogs: "Catálogos de incidencias",
     incidentDashboard: "Dashboard de incidencias",
     shiftHandover: "Cambio de turno",
+  },
+  panorama: {
+    title: "Panorama",
+    subtitle:
+      "Vista ejecutiva consolidada: KPIs de incidencias de todas las estructuras a las que tienes alcance, a la vez. El detalle por nodo sigue tu alcance de datos.",
+    empty: "Sin estructuras para mostrar",
+    emptyDesc: "No tienes nodos accesibles con incidencias en ninguna estructura todavía.",
+    openByStructure: "Incidencias abiertas por estructura",
+    byStructure: "Por estructura",
+    openIncidents: "Abrir incidencias de {{name}}",
+    nodes_one: "{{count}} nodo accesible",
+    nodes_other: "{{count}} nodos accesibles",
+    kpi: {
+      open: "Abiertas",
+      critical: "Críticas",
+      overdue: "Vencidas",
+      slaBreached: "SLA excedido",
+    },
   },
   shell: {
     brandTagline: "Bitácora operacional",
@@ -239,6 +258,9 @@ export const esCL = {
       aria: "Cambiar de estructura organizacional",
       manage: "Gestionar estructuras…",
       loading: "Cargando…",
+      youAreIn: "Estás en",
+      searchPlaceholder: "Buscar estructura…",
+      noMatches: "Sin coincidencias",
     },
     structures: {
       title: "Estructuras organizacionales",
@@ -289,6 +311,10 @@ export const esCL = {
       showArchived: "Ver archivadas",
       moveUp: "Subir",
       moveDown: "Bajar",
+      appearance: "Apariencia",
+      appearanceHint:
+        "Color e ícono para identificar esta estructura en el badge «Estás en», el selector y la vista ejecutiva. Si los dejas en «Auto», se derivan automáticamente de la clave.",
+      appearanceAuto: "Auto",
     },
     tree: {
       panelTitle: "Jerarquía",

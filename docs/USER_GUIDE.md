@@ -43,6 +43,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 ### 3. Estructura organizacional  [Configurador/Admin]
 - ✅ **Múltiples estructuras organizacionales** (varias jerarquías en paralelo + selector de estructura activa) (§ Estructura organizacional ▸ Múltiples estructuras)
 - ✅ **Ciclo de vida: archivar y ordenar estructuras** (archivar/reactivar sin borrar + reordenar el selector) (§ Estructura organizacional ▸ Ciclo de vida: archivar y ordenar)
+- ✅ **Contexto visual y vista ejecutiva** (color/ícono por estructura + badge "Estás en" + Panorama cross-estructura) (§ Estructura organizacional ▸ Contexto visual y vista ejecutiva)
 - ✍️ Árbol de niveles y nodos (crear/editar/mover/orden)
 - ✍️ Código externo (integración ERP/CMMS) y alcance por nodo
 
@@ -217,6 +218,47 @@ estructuras para que aparezcan en el selector en el orden que tú quieras (las m
   deshabilitado mientras esté archivada).
 - Archivar es la **alternativa no destructiva** a eliminar: por eso una estructura con historial de nodos no se
   puede borrar, pero sí archivar.
+
+---
+
+## Estructura organizacional ▸ Contexto visual y vista ejecutiva  [Configurador/Admin · Gerencia]
+
+**Para qué sirve.** Cuando trabajas con **varias estructuras** (p. ej. Industrial, TI, Logística), dos riesgos
+aparecen: (1) **registrar datos en la estructura equivocada** por no notar en cuál estás, y (2) que la **gerencia**
+no tenga una mirada del conjunto sin ir estructura por estructura. Esta funcionalidad resuelve ambos: da a cada
+estructura una **identidad visual propia** (color + ícono) con un **badge "Estás en: …" siempre visible**, y ofrece
+una **vista ejecutiva «Panorama»** que consolida los indicadores de **todas** las estructuras a las que tienes
+alcance, a la vez.
+
+**Cómo se usa.**
+1. **Dar identidad a una estructura.** En el selector de estructura activa (arriba a la derecha) → **«Gestionar
+   estructuras…»** → edita una estructura. En **«Apariencia»** elige un **acento de color** (paleta de marca) y un
+   **ícono**; una **vista previa** muestra cómo se verá el badge. Si dejas ambos en **«Auto»**, el sistema asigna un
+   color/ícono estable derivado de la estructura (siempre el mismo). Guarda.
+2. **Saber dónde estás.** El **badge "Estás en: <estructura>"** del topbar toma ese color e ícono. Si hay más de una
+   estructura operable, el badge es además el **selector**: haz clic, **busca** por nombre y cambia de estructura;
+   cada opción muestra su color/ícono.
+3. **Ver el Panorama (gerencia).** En el menú lateral entra a **«Panorama»** (solo aparece si tienes el permiso).
+   Verás los **totales consolidados** (incidencias abiertas, críticas, vencidas, SLA excedido) y una **tarjeta por
+   estructura** con su identidad y sus indicadores. Una **barra comparativa** muestra las incidencias abiertas por
+   estructura. Haz clic en cualquier tarjeta para **bajar al detalle**: te lleva a Incidencias ya filtrado por esa
+   estructura.
+
+**Quién puede.** Configurar color/ícono: quien administra la estructura (super-admin o delegado de ella). Ver el
+**Panorama**: solo quien tenga el permiso **«Vista ejecutiva consolidada»** (`module:dashboard:cross-view`) — pensado
+para perfiles **gerenciales**; los operadores siguen acotados a su estructura activa y no ven esta pantalla.
+
+**Importante.**
+- **El Panorama respeta tu alcance de datos.** Cruza la estructura activa (es la **única** pantalla que lo hace), pero
+  **NO** salta tu alcance por nodo: un gerente **sin** recorte ve **todas** las estructuras; uno **acotado** a ciertos
+  nodos ve **solo** las estructuras donde tiene acceso, y los números cuentan **solo sus nodos**. La seguridad por
+  nodo sigue siendo la frontera.
+- **El color no es libre:** se elige de una **paleta curada** de la marca para que siempre se vea profesional y con
+  buen contraste en tema claro y oscuro. El ícono se elige de una lista cuidada.
+- **«Auto» nunca queda sin identidad:** si no eliges nada, el color/ícono se derivan de forma estable de la estructura
+  (no cambian entre sesiones), así que el contexto siempre es reconocible.
+- **Primer alcance del Panorama:** hoy consolida **incidencias**. Otros módulos (bitácoras, rondas, turnos) se sumarán
+  más adelante.
 
 ---
 

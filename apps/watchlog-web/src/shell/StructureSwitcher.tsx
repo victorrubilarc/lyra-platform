@@ -1,10 +1,12 @@
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Building2, Check, ChevronDown, Network, Settings2 } from "lucide-react";
-import { Menu, MenuItem, MenuLabel, MenuSeparator } from "@lyra/ui";
+import { Check, ChevronDown, Search, Settings2 } from "lucide-react";
+import { Menu, MenuItem, MenuSeparator } from "@lyra/ui";
+import type { OrgStructure } from "@lyra/contracts";
 import { Can } from "../auth/Can.js";
 import { useOrgStructures } from "../features/structure/structure-queries.js";
+import { accentOf, iconComponentOf } from "../features/structure/structure-identity.js";
 import { useStructureStore } from "./structure-store.js";
 import styles from "../features/structure/StructureSelector.module.css";
 
@@ -13,15 +15,34 @@ function isOperable(s: { nodeCount?: number; active?: boolean }): boolean {
   return (s.nodeCount ?? 0) > 0 && s.active !== false;
 }
 
+/** Contenido visual del badge/disparador: ícono en acento + "Estás en" + nombre. */
+function BadgeInner({ structure, interactive }: { structure: OrgStructure; interactive: boolean }) {
+  const { t } = useTranslation();
+  const Icon = iconComponentOf(structure);
+  return (
+    <span className={styles.badge} data-accent={accentOf(structure)}>
+      <span className={styles.badgeIcon}>
+        <Icon size={15} aria-hidden="true" />
+      </span>
+      <span className={styles.badgeText}>
+        <span className={styles.badgeLabel}>{t("structure.selector.youAreIn")}</span>
+        <span className={styles.badgeName}>{structure.name}</span>
+      </span>
+      {interactive && <ChevronDown size={15} className={styles.badgeChevron} aria-hidden="true" />}
+    </span>
+  );
+}
+
 /**
- * Selector GLOBAL de estructura activa, montado en el topbar. Solo ofrece estructuras
- * CONFIGURADAS (con ≥1 nodo): una estructura vacía no es un contexto operativo válido.
- * Como vive siempre, es también el punto donde se SANEA la estructura activa: si la
- * guardada dejó de ser accesible, o quedó vacía mientras navegas FUERA de la pantalla
- * de configuración, vuelve a la por defecto — así ninguna pantalla operativa queda
- * "vacía" o mostrando datos de otra estructura. En la pantalla de Estructura
- * (`/estructura`) NO se sanea, para poder trabajar dentro de una estructura recién
- * creada (aún sin nodos) y configurarla.
+ * Contexto de estructura activa, montado en el topbar. Cumple DOS roles a la vez (L3):
+ *  · BADGE "Estás en: <estructura>" SIEMPRE visible (con su color/ícono), para que nadie
+ *    registre datos en la estructura equivocada.
+ *  · SWITCHER pulido (búsqueda + identidad por fila) cuando hay ≥2 estructuras operables.
+ * Si solo hay una estructura operable, se muestra como badge ESTÁTICO (sin desplegable).
+ *
+ * Solo ofrece estructuras CONFIGURADAS (con ≥1 nodo): una vacía no es contexto operativo
+ * válido. Como vive siempre, SANEA además la estructura activa: si la guardada dejó de ser
+ * accesible, o quedó vacía mientras navegas FUERA de `/estructura`, vuelve a la por defecto.
  */
 export function StructureSwitcher() {
   const { t } = useTranslation();
@@ -30,6 +51,7 @@ export function StructureSwitcher() {
   const { data: structures = [] } = useOrgStructures();
   const activeId = useStructureStore((s) => s.activeStructureId);
   const setActive = useStructureStore((s) => s.setActiveStructure);
+  const [query, setQuery] = useState("");
 
   const onConfigPage = pathname.startsWith("/estructura");
 
@@ -46,36 +68,64 @@ export function StructureSwitcher() {
   // también la activa (aunque esté vacía/inactiva) para no perder de vista dónde estás.
   const selectable = structures.filter((s) => isOperable(s) || (onConfigPage && s.id === activeId));
 
-  // En instalaciones con una sola estructura configurada, el conmutador no aporta nada.
-  if (selectable.length < 2) return null;
-
   const active =
     structures.find((s) => s.id === activeId) ?? structures.find((s) => s.isDefault) ?? structures[0];
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return selectable;
+    return selectable.filter((s) => s.name.toLowerCase().includes(q) || s.key.toLowerCase().includes(q));
+  }, [selectable, query]);
+
+  if (!active) return null;
+
+  // Una sola estructura operable: badge estático (sin desplegable). Igual da contexto.
+  if (selectable.length < 2) {
+    return <BadgeInner structure={active} interactive={false} />;
+  }
 
   return (
     <Menu
       align="end"
-      minWidth={260}
+      minWidth={280}
       ariaLabel={t("structure.selector.aria")}
-      trigger={
-        <span className={styles.trigger}>
-          <Network size={16} className={styles.triggerIcon} />
-          <span className={styles.triggerLabel}>{active?.name ?? t("structure.selector.loading")}</span>
-          <ChevronDown size={15} className={styles.triggerChevron} />
-        </span>
-      }
+      trigger={<BadgeInner structure={active} interactive />}
     >
-      <MenuLabel>{t("structure.selector.title")}</MenuLabel>
-      {selectable.map((s) => (
-        <MenuItem
-          key={s.id}
-          icon={<Building2 size={15} />}
-          trailing={active?.id === s.id ? <Check size={15} /> : undefined}
-          onSelect={() => setActive(s.isDefault ? null : s.id)}
-        >
-          {s.name}
-        </MenuItem>
-      ))}
+      <div className={styles.searchRow}>
+        <Search size={14} className={styles.searchIcon} aria-hidden="true" />
+        <input
+          className={styles.searchInput}
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={t("structure.selector.searchPlaceholder")}
+          aria-label={t("structure.selector.searchPlaceholder")}
+          autoFocus
+        />
+      </div>
+      <div className={styles.menuScroll} role="none">
+        {filtered.length === 0 ? (
+          <div className={styles.noMatches}>{t("structure.selector.noMatches")}</div>
+        ) : (
+          filtered.map((s) => {
+            const Icon = iconComponentOf(s);
+            return (
+              <MenuItem
+                key={s.id}
+                icon={
+                  <span className={styles.itemDot} data-accent={accentOf(s)}>
+                    <Icon size={14} aria-hidden="true" />
+                  </span>
+                }
+                trailing={active.id === s.id ? <Check size={15} /> : undefined}
+                onSelect={() => setActive(s.isDefault ? null : s.id)}
+              >
+                {s.name}
+              </MenuItem>
+            );
+          })
+        )}
+      </div>
       <Can perform="orglevel:manage">
         <MenuSeparator />
         <MenuItem icon={<Settings2 size={15} />} onSelect={() => navigate("/estructura")}>

@@ -33,6 +33,7 @@ import { NotificationsPage } from "../features/notifications/NotificationsPage.j
 import { MyNotificationsPage } from "../features/notifications/MyNotificationsPage.js";
 import { IncidentsPage } from "../features/incidents/IncidentsPage.js";
 import { IncidentDashboardPage } from "../features/incidents/IncidentDashboardPage.js";
+import { PanoramaPage } from "../features/dashboards/PanoramaPage.js";
 import { CatalogsPage } from "../features/incidents/CatalogsPage.js";
 import { ExceptionsPage } from "../features/exceptions/ExceptionsPage.js";
 import { ShiftHandoverPage } from "../features/shift-handover/ShiftHandoverPage.js";
@@ -56,6 +57,7 @@ export const router = createBrowserRouter([
         element: <AppShell />,
         children: [
           { index: true, element: <HomePage /> },
+          { path: "/panorama", element: <PanoramaPage /> },
           { path: "/estructura", element: <StructurePage /> },
           { path: "/plantillas", element: <TemplatesPage /> },
           { path: "/plantillas/:id", element: <TemplateBuilderPage /> },

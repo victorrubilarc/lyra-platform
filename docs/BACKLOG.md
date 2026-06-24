@@ -5,7 +5,25 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-24** (**🎯 L2c · Ciclo de vida de la estructura organizacional ✅** —
+> actualización: **2026-06-24** (**🎯 L3 · UX premium cross-estructura ✅** — `feat/estructura-ux-premium`:
+> tres piezas (el asistente "crear área" se DIFIRIÓ a **L3b**). **(1) Identidad inconfundible:** columnas aditivas
+> `OrgStructure.color`/`icon` (migración `20260624130000_add_structure_identity`, nullable, cero pérdida) — el color es
+> una **clave de paleta curada** (8 acentos Lyra) y el ícono una **lista blanca Lucide**, con **fallback determinístico**
+> por `key` (hash FNV-1a) cuando faltan. Badge **"Estás en: X"** SIEMPRE visible en el topbar (acento sutil) que ES el
+> disparador del switcher; editor de color/ícono con vista previa en el `StructuresDrawer`. Tokens nuevos `--accent-<clave>`
+> + `--structure-accent` (claro/oscuro, sin hex en componentes; Recharts usa `var()`). **(2) Vista ejecutiva «Panorama»:**
+> ruta `/panorama` (sidebar SOLO con el permiso) que CONSOLIDA KPIs de incidencias (abiertas/críticas/vencidas/SLA) de
+> **todas** las estructuras accesibles a la vez — endpoint `GET /incidents/dashboard/cross` + `IncidentDashboardService.buildCross`.
+> **Excepción explícita al aislamiento L1** (cruza la estructura activa) pero **el ABAC por nodo sigue siendo la frontera**:
+> un gerente sin alcance ve todas; uno acotado, solo sus nodos/estructuras. Tarjetas con identidad + drill-down (fija la
+> estructura activa y entra a Incidencias) + barra comparativa Recharts (tokens). **(3) Switcher pulido:** búsqueda +
+> identidad por fila + a11y. **Permiso NUEVO `module:dashboard:cross-view`** (catálogo 89→90 ⇒ `db:seed` + Redis FLUSHALL
+> hechos). contracts/API/web typecheck/lint(0)/build/test (252+6) verdes · smoke `smoke-estructura-ux-premium.py` **18/18**
+> (identidad en payload, consolida ≥2 estructuras para gerente sin scope, ABAC frontera con usuario acotado, gate 403) +
+> regresión admin-delegada 29/29 · ciclo-vida 17/17 · multi-estructura 33/33 · aislamiento L1 33/33 · rol-alcance 14/14 ·
+> template-scope 14/14. **PENDIENTE: smoke VISUAL del dueño.** **DEUDA:** L3b asistente "crear área"; panorama multi-módulo
+> (hoy solo incidencias). **NO** se hizo L4. **Siguiente: L3b (asistente) o L4 cuando el negocio lo pida.** Anterior:
+> **🎯 L2c · Ciclo de vida de la estructura organizacional ✅** —
 > `feat/estructura-ciclo-vida`: ARCHIVAR / REACTIVAR y REORDENAR estructuras sin borrar datos, desde el
 > `StructuresDrawer`. **Cierra la deuda (a) y (c)** de multi-estructura. El modelo ya existía (`OrgStructure.active`/
 > `reportOrder`/`deletedAt`) ⇒ **SIN migración**. Backend: endpoint atómico `PUT /structure/structures/reorder`
@@ -911,6 +929,21 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
       vivo (`ScopeService.getAccessibleNodes`); quitar el rol re-acota sin denormalizar. Ambos ejes (rol y usuario)
       conviven. `smoke-rol-alcance-nodo.py` 14/14 + regresión L1 33/33 · template-scope 14/14 · multi-estructura
       33/33. Ver DECISIONS 2026-06-24. **NO** se hizo L2b/L2c.
+- [x] **L3 · UX premium cross-estructura ✅ (2026-06-24, `feat/estructura-ux-premium`).** (1) Identidad por estructura:
+      columnas aditivas `OrgStructure.color`/`icon` (paleta curada de 8 acentos + lista blanca Lucide, fallback
+      determinístico por `key`); badge "Estás en: X" siempre visible (= disparador del switcher) + editor con vista
+      previa en `StructuresDrawer`; tokens `--accent-<clave>`/`--structure-accent`. (2) Vista ejecutiva «Panorama»
+      (`/panorama`, gate `module:dashboard:cross-view`): consolida KPIs de incidencias de TODAS las estructuras
+      accesibles (`GET /incidents/dashboard/cross` + `buildCross`); **excepción explícita a L1**, el **ABAC por nodo
+      sigue siendo la frontera** (verificado: scoped ve solo lo suyo, 403 sin permiso). (3) Switcher con búsqueda +
+      identidad. Migración `20260624130000_add_structure_identity`; catálogo 89→90 (db:seed + FLUSHALL). smoke
+      `smoke-estructura-ux-premium.py` 18/18 + regresión 29/17/33/33/14/14. Ver DECISIONS 2026-06-24. **NO** L3b/L4.
+  - [ ] **L3b · Asistente "crear nueva área" (diferido de L3).** Wizard de pasos (identidad → niveles base → nodo raíz)
+        que orquesta los endpoints existentes (POST structures + levels + nodes) en un solo flujo, super-admin only
+        (`module:structure:manage`), con buen estado de error. **Esfuerzo: MEDIO.**
+  - [ ] **Panorama multi-módulo (deuda de L3).** La vista ejecutiva hoy consolida SOLO incidencias. Extender a
+        bitácoras/rondas/cambio de turno (tarjetas/KPIs por estructura) cuando se justifique, manteniendo el ABAC como
+        frontera. **Esfuerzo: MEDIO.**
 - [x] **Selector de nodos acotado por ABAC ✅ (2026-06-23, `feat/scoped-node-selector`).** Bug: el selector de
       nodos al crear incidencia (y otros de flujo operacional) mostraba TODOS los nodos a un usuario con alcance
       acotado. Fix con camino separado para no romper la administración (que sí debe ver todo): nuevo

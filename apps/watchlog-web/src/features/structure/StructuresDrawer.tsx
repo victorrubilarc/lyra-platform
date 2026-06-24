@@ -14,11 +14,19 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
-import { Button, Chip, Drawer, EmptyState, FormField, Input, Modal, Textarea, Toggle, useToast } from "@lyra/ui";
-import type { OrgStructure } from "@lyra/contracts";
+import { Button, Chip, Drawer, EmptyState, FormField, Input, Modal, Textarea, Toggle, cx, useToast } from "@lyra/ui";
+import type { OrgStructure, StructureAccent, StructureIcon } from "@lyra/contracts";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { ApiError } from "../../lib/api-client.js";
 import { useStructureStore } from "../../shell/structure-store.js";
+import {
+  ACCENT_OPTIONS,
+  ICON_OPTIONS,
+  STRUCTURE_ICON_COMPONENTS,
+  accentOf,
+  iconComponentOf,
+} from "./structure-identity.js";
+import styles from "./StructuresDrawer.module.css";
 import {
   useCreateStructure,
   useDeleteStructure,
@@ -49,9 +57,12 @@ interface FormValues {
   name: string;
   key: string;
   description: string;
+  /** Identidad visual; `null` = automática (derivada de la clave). */
+  color: StructureAccent | null;
+  icon: StructureIcon | null;
 }
 
-const EMPTY_FORM: FormValues = { name: "", key: "", description: "" };
+const EMPTY_FORM: FormValues = { name: "", key: "", description: "", color: null, icon: null };
 
 /**
  * Mantenedor de ESTRUCTURAS organizacionales (multi-estructura). Lista, crea, renombra,
@@ -140,7 +151,13 @@ export function StructuresDrawer({ open, onClose }: StructuresDrawerProps) {
   }
 
   function openEdit(s: OrgStructure) {
-    setForm({ name: s.name, key: s.key, description: s.description ?? "" });
+    setForm({
+      name: s.name,
+      key: s.key,
+      description: s.description ?? "",
+      color: (s.color as StructureAccent | null) ?? null,
+      icon: (s.icon as StructureIcon | null) ?? null,
+    });
     setEditor({ mode: "edit", structure: s });
   }
 
@@ -171,6 +188,8 @@ export function StructuresDrawer({ open, onClose }: StructuresDrawerProps) {
           name,
           key,
           description: form.description.trim() || undefined,
+          color: form.color ?? undefined,
+          icon: form.icon ?? undefined,
         });
         toast.success(t("structure.structures.created"));
         setActive(created.id); // pasa a trabajar de inmediato en la nueva estructura
@@ -182,7 +201,7 @@ export function StructuresDrawer({ open, onClose }: StructuresDrawerProps) {
         }
         await updateStructure.mutateAsync({
           id: editor.structure.id,
-          dto: { name, description: form.description.trim() || null },
+          dto: { name, description: form.description.trim() || null, color: form.color, icon: form.icon },
         });
         toast.success(t("structure.structures.updated"));
         closeEditor();
@@ -421,6 +440,86 @@ export function StructuresDrawer({ open, onClose }: StructuresDrawerProps) {
               />
             )}
           </FormField>
+
+          {/* Identidad visual (L3): acento + ícono, con vista previa y opción automática. */}
+          {(() => {
+            const previewKey =
+              (editor.mode === "edit" ? form.key : keyTouched ? form.key : slugify(form.name)) || "estructura";
+            const previewInput = { key: previewKey, color: form.color, icon: form.icon };
+            const effectiveAccent = accentOf(previewInput);
+            const PreviewIcon = iconComponentOf(previewInput);
+            return (
+              <div>
+                <div className={styles.identityLabel}>{t("structure.structures.appearance")}</div>
+                <p className={styles.identityHint}>{t("structure.structures.appearanceHint")}</p>
+
+                {/* Vista previa del badge tal como se verá en el topbar. */}
+                <div className={styles.identityPreview} data-accent={effectiveAccent}>
+                  <span className={styles.identityPreviewIcon}>
+                    <PreviewIcon size={15} aria-hidden="true" />
+                  </span>
+                  <span className={styles.identityPreviewText}>
+                    <span className={styles.identityPreviewKicker}>{t("structure.selector.youAreIn")}</span>
+                    <span className={styles.identityPreviewName}>{form.name.trim() || t("structure.structures.name")}</span>
+                  </span>
+                </div>
+
+                {/* Acentos: "Auto" + paleta curada. */}
+                <div className={styles.swatchRow}>
+                  <button
+                    type="button"
+                    className={cx(styles.autoChip, form.color === null && styles.autoChipOn)}
+                    onClick={() => setForm((f) => ({ ...f, color: null }))}
+                    title={t("structure.structures.appearanceAuto")}
+                  >
+                    {t("structure.structures.appearanceAuto")}
+                  </button>
+                  {ACCENT_OPTIONS.map((a) => (
+                    <button
+                      key={a}
+                      type="button"
+                      data-accent={a}
+                      className={cx(styles.swatch, form.color === a && styles.swatchOn)}
+                      onClick={() => setForm((f) => ({ ...f, color: a }))}
+                      aria-label={a}
+                      aria-pressed={form.color === a}
+                      title={a}
+                    >
+                      {form.color === a && <Check size={13} />}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Íconos: "Auto" + lista blanca Lucide. */}
+                <div className={styles.iconGrid}>
+                  <button
+                    type="button"
+                    className={cx(styles.iconCell, styles.iconCellAuto, form.icon === null && styles.iconCellOn)}
+                    onClick={() => setForm((f) => ({ ...f, icon: null }))}
+                    title={t("structure.structures.appearanceAuto")}
+                  >
+                    {t("structure.structures.appearanceAuto")}
+                  </button>
+                  {ICON_OPTIONS.map((ic) => {
+                    const Icon = STRUCTURE_ICON_COMPONENTS[ic];
+                    return (
+                      <button
+                        key={ic}
+                        type="button"
+                        className={cx(styles.iconCell, form.icon === ic && styles.iconCellOn)}
+                        onClick={() => setForm((f) => ({ ...f, icon: ic }))}
+                        aria-label={ic}
+                        aria-pressed={form.icon === ic}
+                        title={ic}
+                      >
+                        <Icon size={17} aria-hidden="true" />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
 
           <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
             <Button variant="primary" onClick={submit} loading={saving}>

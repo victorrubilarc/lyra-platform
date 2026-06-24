@@ -1,0 +1,143 @@
+/* ── Editor de identidad visual de la estructura (L3) ──────────────────────── */
+.identityLabel {
+  font-size: var(--text-body-sm-size);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.identityHint {
+  margin: 2px 0 10px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+.identityPreview {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 6px 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--color-border-subtle);
+  border-left: 3px solid var(--structure-accent);
+  border-radius: var(--radius-md);
+  background: var(--structure-accent-soft);
+}
+
+.identityPreviewIcon {
+  display: inline-flex;
+  color: var(--structure-accent);
+}
+
+.identityPreviewText {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+  min-width: 0;
+}
+
+.identityPreviewKicker {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+}
+
+.identityPreviewName {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+/* Acentos */
+.swatchRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.swatch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  background: var(--structure-accent);
+  color: #fff;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.swatch:hover {
+  transform: scale(1.08);
+}
+
+.swatchOn {
+  box-shadow: 0 0 0 2px var(--color-bg-surface-1), 0 0 0 4px var(--structure-accent);
+}
+
+.autoChip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border-default);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.autoChipOn {
+  border-color: var(--color-accent-primary);
+  color: var(--color-accent-primary);
+  background: var(--color-info-bg);
+}
+
+/* Íconos */
+.iconGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+  gap: 8px;
+}
+
+.iconCell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface-2);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease;
+}
+
+.iconCell:hover {
+  border-color: var(--color-border-active);
+  color: var(--color-text-primary);
+}
+
+.iconCellAuto {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.iconCellOn {
+  border-color: var(--color-accent-primary);
+  color: var(--color-accent-primary);
+  background: var(--color-info-bg);
+}

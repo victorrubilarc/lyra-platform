@@ -1,8 +1,10 @@
 import {
+  crossDashboardSchema,
   incidentDashboardSchema,
   incidentDetailSchema,
   incidentListResponseSchema,
   incidentStatsSchema,
+  type CrossDashboard,
   type IncidentDashboard,
   type IncidentDashboardQuery,
   incidentTypeSchema,
@@ -105,6 +107,15 @@ function dashboardQueryString(q: IncidentDashboardQuery): string {
 
 export function fetchIncidentDashboard(q: IncidentDashboardQuery, structureId?: string | null): Promise<IncidentDashboard> {
   return apiJson(`/incidents/dashboard${withStructure(dashboardQueryString(q), structureId)}`, incidentDashboardSchema);
+}
+
+/**
+ * Vista ejecutiva CROSS-ESTRUCTURA (L3): KPIs consolidados por estructura. NO lleva
+ * `?structureId=` — es la EXCEPCIÓN explícita al filtro por estructura activa; cruza
+ * todas las accesibles (el ABAC por nodo lo aplica el backend).
+ */
+export function fetchCrossDashboard(): Promise<CrossDashboard> {
+  return apiJson("/incidents/dashboard/cross", crossDashboardSchema);
 }
 
 export function fetchIncidentDetail(id: string): Promise<IncidentDetail> {

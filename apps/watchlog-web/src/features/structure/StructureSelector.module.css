@@ -1,3 +1,117 @@
+/* ── Badge / disparador del switcher (L3: contexto inconfundible) ──────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 38px;
+  padding: 6px 12px;
+  border: 1px solid var(--color-border-subtle);
+  border-left: 3px solid var(--structure-accent);
+  border-radius: var(--radius-md);
+  /* Tinte SUTIL del acento (no gradiente full-screen, no fondo claro en oscuro). */
+  background: var(--structure-accent-soft);
+  color: var(--color-text-primary);
+  font-size: var(--text-body-sm-size);
+  cursor: inherit;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+button:hover > .badge,
+.badge:hover {
+  border-color: var(--structure-accent);
+}
+
+.badgeIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--structure-accent);
+  flex-shrink: 0;
+}
+
+.badgeText {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+  min-width: 0;
+}
+
+.badgeLabel {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+}
+
+.badgeName {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.badgeChevron {
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+/* ── Búsqueda dentro del desplegable ───────────────────────────────────────── */
+.searchRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 8px 10px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.searchIcon {
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text-primary);
+  font-size: var(--text-body-sm-size);
+  outline: none;
+}
+
+.searchInput::placeholder {
+  color: var(--color-text-muted);
+}
+
+.menuScroll {
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.noMatches {
+  padding: 12px 14px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+/* Punto de identidad por fila (acento + ícono de la estructura). */
+.itemDot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  background: var(--structure-accent-soft);
+  color: var(--structure-accent);
+  flex-shrink: 0;
+}
+
+/* ── Disparador legado (compat con StructureSelector si se reutiliza) ───────── */
 .trigger {
   display: inline-flex;
   align-items: center;

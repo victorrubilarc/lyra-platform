@@ -1,0 +1,217 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 4px 2px 24px;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-family: var(--font-display, "Sora", sans-serif);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.title svg {
+  color: var(--color-accent-primary);
+}
+
+.subtitle {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+  max-width: 70ch;
+}
+
+.center {
+  display: flex;
+  justify-content: center;
+  padding: 64px 0;
+}
+
+.sectionTitle {
+  margin: 6px 0 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+/* ── KPIs consolidados ─────────────────────────────────────────────────────── */
+.kpiRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+}
+
+.kpiCard {
+  padding: 14px 16px;
+}
+
+.kpiHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.kpiIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  background: var(--color-info-bg);
+  color: var(--color-accent-secondary);
+}
+
+.toneCritical {
+  background: var(--color-error-bg);
+  color: var(--color-error);
+}
+
+.toneWarn {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+.kpiLabel {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.kpiValue {
+  margin-top: 10px;
+  font-family: var(--font-display, "Sora", sans-serif);
+  font-size: 30px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  line-height: 1;
+}
+
+/* ── Gráfico ───────────────────────────────────────────────────────────────── */
+.chartCard {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ── Tarjetas por estructura ───────────────────────────────────────────────── */
+.cardGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.structureCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  text-align: left;
+  border: 1px solid var(--color-border-subtle);
+  border-left: 3px solid var(--structure-accent);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-surface-1);
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.12s ease;
+}
+
+.structureCard:hover {
+  border-color: var(--structure-accent);
+  box-shadow: 0 0 0 1px var(--structure-accent-soft), var(--shadow-card);
+  transform: translateY(-1px);
+}
+
+.structureCard:focus-visible {
+  outline: 2px solid var(--structure-accent);
+  outline-offset: 2px;
+}
+
+.cardTop {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cardIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-md);
+  background: var(--structure-accent-soft);
+  color: var(--structure-accent);
+  flex-shrink: 0;
+}
+
+.cardName {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardGo {
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.cardNodes {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.cardKpis {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 2px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.cardKpi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cardKpiValue {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  line-height: 1;
+}
+
+.cardKpiValue.danger {
+  color: var(--color-error);
+}
+
+.cardKpiValue.warn {
+  color: var(--color-warning);
+}
+
+.cardKpiLabel {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+}

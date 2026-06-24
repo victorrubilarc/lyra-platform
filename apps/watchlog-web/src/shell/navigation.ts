@@ -1,4 +1,4 @@
-import { AlertOctagon, AlertTriangle, ArrowLeftRight, BarChart3, Bell, BookOpenCheck, CalendarClock, CalendarRange, FilePlus2, GitBranch, LayoutDashboard, Layers, ListChecks, ListTodo, Network, Route, Settings, ShieldCheck, Tags, UserCog, type LucideIcon } from "lucide-react";
+import { AlertOctagon, AlertTriangle, ArrowLeftRight, BarChart3, Bell, BookOpenCheck, CalendarClock, CalendarRange, FilePlus2, Gauge, GitBranch, LayoutDashboard, Layers, ListChecks, ListTodo, Network, Route, Settings, ShieldCheck, Tags, UserCog, type LucideIcon } from "lucide-react";
 import type { Permission } from "@lyra/permissions";
 
 /**
@@ -43,6 +43,16 @@ export interface NavRoute {
 
 export const ROUTES: readonly NavRoute[] = [
   { path: "/", labelKey: "nav.home", icon: LayoutDashboard, inSidebar: true, group: "operation" },
+  // Vista ejecutiva cross-estructura (L3): KPIs consolidados de TODAS las estructuras
+  // accesibles. Solo aparece con el permiso de alto nivel `module:dashboard:cross-view`.
+  {
+    path: "/panorama",
+    labelKey: "nav.panorama",
+    icon: Gauge,
+    permission: "module:dashboard:cross-view",
+    inSidebar: true,
+    group: "operation",
+  },
   {
     path: "/estructura",
     labelKey: "nav.structure",

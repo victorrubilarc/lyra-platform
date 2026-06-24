@@ -3,6 +3,10 @@ import { Prisma } from "@prisma/client";
 import {
   defaultBucketForRange,
   defaultDashboardRange,
+  sumCrossKpis,
+  type CrossDashboard,
+  type CrossStructureCard,
+  type CrossStructureKpis,
   type DashboardBucket,
   type DashboardDimensionSlice,
   type DashboardRecurrenceRow,
@@ -124,6 +128,76 @@ export class IncidentDashboardService {
     ]);
 
     return { range, kpis, trend, byType, bySeverity, byNode, byEquipment, byShift, byOrigin, recurrence };
+  }
+
+  // === Vista ejecutiva CROSS-ESTRUCTURA (L3) =================================
+
+  /**
+   * Consolida KPIs de incidencias de TODAS las estructuras accesibles del usuario a
+   * la vez (no solo la activa). Es la EXCEPCIÓN EXPLÍCITA al aislamiento por estructura
+   * activa (L1): cruza la estructura, pero el ABAC por nodo SIGUE siendo la frontera de
+   * datos. Se aplica intersecando, por estructura, sus nodos vivos con los nodos
+   * accesibles del usuario (`null` = sin restricción ⇒ ve todos): una estructura sin
+   * nodos accesibles NO aparece (un gerente acotado solo ve lo suyo). Read-only, agregado.
+   */
+  async buildCross(userId: string): Promise<CrossDashboard> {
+    const empty: CrossStructureKpis = { open: 0, critical: 0, overdue: 0, slaBreached: 0 };
+    const nodeIds = await this.scope.getAccessibleNodeIds(userId); // null = sin restricción
+    if (nodeIds && nodeIds.size === 0) return { cards: [], totals: empty };
+
+    // Estructuras candidatas: las vivas; si el usuario está acotado, solo las que alcanza.
+    const accessibleStructures = await this.scope.getAccessibleStructureIds(userId); // null = todas
+    const structures = await this.prisma.orgStructure.findMany({
+      where: {
+        deletedAt: null,
+        ...(accessibleStructures ? { id: { in: [...accessibleStructures] } } : {}),
+      },
+      orderBy: [{ isDefault: "desc" }, { reportOrder: "asc" }, { name: "asc" }],
+    });
+    if (structures.length === 0) return { cards: [], totals: empty };
+
+    // Nodos vivos de esas estructuras (una sola consulta), intersectados con el ABAC.
+    const nodes = await this.prisma.orgNode.findMany({
+      where: { structureId: { in: structures.map((s) => s.id) }, deletedAt: null },
+      select: { id: true, structureId: true },
+    });
+    const accessibleByStructure = new Map<string, string[]>();
+    for (const n of nodes) {
+      if (nodeIds && !nodeIds.has(n.id)) continue; // frontera ABAC por nodo
+      const arr = accessibleByStructure.get(n.structureId) ?? [];
+      arr.push(n.id);
+      accessibleByStructure.set(n.structureId, arr);
+    }
+
+    const cards: CrossStructureCard[] = [];
+    for (const s of structures) {
+      const accessibleNodes = accessibleByStructure.get(s.id) ?? [];
+      if (accessibleNodes.length === 0) continue; // sin nodos accesibles ⇒ no se muestra
+      cards.push({
+        structureId: s.id,
+        key: s.key,
+        name: s.name,
+        color: s.color,
+        icon: s.icon,
+        accessibleNodeCount: accessibleNodes.length,
+        kpis: await this.crossKpis(accessibleNodes),
+      });
+    }
+    return { cards, totals: sumCrossKpis(cards) };
+  }
+
+  /** KPIs vivos de incidencias acotados a un conjunto de nodos (ya filtrado por ABAC). */
+  private async crossKpis(nodeFilter: string[]): Promise<CrossStructureKpis> {
+    const now = new Date();
+    const scopeWhere: Prisma.IncidentWhereInput = { orgNodeId: { in: nodeFilter } };
+    const openWhere: Prisma.IncidentWhereInput = { ...scopeWhere, lifecycle: "OPEN" };
+    const [open, critical, overdue, slaBreached] = await Promise.all([
+      this.prisma.incident.count({ where: openWhere }),
+      this.prisma.incident.count({ where: { ...openWhere, severity: 5 } }),
+      this.prisma.incident.count({ where: { ...openWhere, dueAt: { lt: now } } }),
+      this.incidents.openSlaBreachedCount(scopeWhere),
+    ]);
+    return { open, critical, overdue, slaBreached };
   }
 
   // === WHERE builders ========================================================

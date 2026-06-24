@@ -1,5 +1,32 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-24 — 🎯 L3 · UX premium cross-estructura ✅** (`feat/estructura-ux-premium`). Trabajar con varias estructuras
+ahora se siente de clase mundial y SIN ambigüedad. Tres piezas (el asistente "crear área" se DIFIRIÓ a **L3b**).
+**(1) Contexto inconfundible.** Cada estructura tiene **color de acento** (clave de una paleta curada Lyra de 8 acentos)
+e **ícono** (lista blanca Lucide), configurables por el super-admin con **fallback determinístico** por `key` (hash
+FNV-1a) cuando faltan ⇒ cero pérdida. Migración aditiva `20260624130000_add_structure_identity` (`OrgStructure.color`/`icon`
+nullable). Un **badge "Estás en: <estructura>"** SIEMPRE visible en el topbar (borde-izquierdo + tinte translúcido del
+acento) que ES el disparador del switcher, para que nadie registre datos en la estructura equivocada. Editor de
+color/ícono con **vista previa** en el `StructuresDrawer`. Tokens nuevos `--accent-<clave>` + `--structure-accent`/
+`--structure-accent-soft` en `tokens/index.css` (claro/oscuro, **sin hex en componentes**; Recharts usa `var()`).
+**(2) Vista ejecutiva «Panorama».** Ruta `/panorama` (en sidebar SOLO con el permiso) que CONSOLIDA KPIs de incidencias
+(abiertas/críticas/vencidas/SLA) de **todas** las estructuras accesibles a la vez: endpoint `GET /incidents/dashboard/cross`
++ `IncidentDashboardService.buildCross` (reuso, read-only, counts agregados en el backend). Es la **EXCEPCIÓN EXPLÍCITA al
+aislamiento L1** (cruza la estructura activa), pero **el ABAC por nodo sigue siendo la frontera de datos**: el servicio
+interseca, por estructura, sus nodos vivos con los nodos accesibles del usuario ⇒ un gerente sin alcance ve todas; uno
+acotado, SOLO aquellas donde tiene nodos accesibles (y solo sus nodos). Tarjetas por estructura con identidad +
+**drill-down** (fija la estructura activa y entra a Incidencias) + barra comparativa Recharts (tokens del DS). Contrato
+`incidents/cross-dashboard.ts` (`CrossDashboard`/`CrossStructureCard`/`sumCrossKpis`). **(3) Switcher pulido:** búsqueda +
+identidad por fila (acento + ícono) + a11y; badge estático si hay una sola estructura operable. **Permiso NUEVO
+`module:dashboard:cross-view`** (dimensión MODULE, grupo `dashboards`; catálogo 89→90 ⇒ `db:seed` + Redis `FLUSHALL`
+hechos). **Decisiones** (en DECISIONS): color CONFIGURABLE con fallback (no derivación pura) · clave de paleta + token
+(no hex libre) · acento SUTIL (badge+switcher, sin gradiente full-screen) · permiso de alto nivel = excepción documentada
+a L1 · KPIs primer corte solo incidencias (panorama multi-módulo = deuda) · asistente diferido a L3b. typecheck/lint(0)/
+build/test (252+6) verdes; `smoke-estructura-ux-premium.py` **18/18** (identidad en payload + persistencia/validación;
+consolida ≥2 estructuras para gerente sin scope; ABAC frontera con usuario acotado [ve A, no B]; gate 403 sin permiso) +
+regresión admin-delegada 29/29 · ciclo-vida 17/17 · multi-estructura 33/33 · aislamiento L1 33/33 · rol-alcance 14/14 ·
+template-scope 14/14. **PENDIENTE: smoke VISUAL del dueño.** **NO** se hizo L3b/L4. **Siguiente: L3b (asistente) o L4.**
+
 **2026-06-24 — 🎯 L2b · Administración DELEGADA por estructura + red anti-lockout ✅** (`feat/estructura-admin-delegada`).
 Un administrador deja de ser "dios de toda la instalación": ahora se le puede **delegar** la administración de SOLO
 ciertas estructuras (su árbol de nodos, sus niveles y su ciclo de vida), mientras el **super-admin** sigue

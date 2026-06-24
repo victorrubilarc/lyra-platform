@@ -377,6 +377,10 @@ model OrgStructure {
   active      Boolean   @default(true)
   // Orden de presentación en selectores (asc).
   reportOrder Int       @default(0)
+  // Identidad visual (L3): acento de color (clave de paleta curada) e ícono Lucide.
+  // NULL = sin configurar ⇒ el front los deriva determinísticamente de `key`.
+  color       String?
+  icon        String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   deletedAt   DateTime? // borrado lógico
