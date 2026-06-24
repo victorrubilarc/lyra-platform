@@ -4,6 +4,46 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-24 · L2b · Administración DELEGADA por estructura + red anti-lockout
+Permite que un administrador NO sea "dios de toda la instalación": se le delega administrar SOLO ciertas estructuras
+(árbol/niveles/ciclo de vida), mientras el super-admin sigue administrándolo todo (patrón ServiceNow domain-admin).
+Decisiones (las "a resolver" del plan, con su motivo):
+- **Modelo → tabla NUEVA `StructureAdmin(structureId, roleId?/userId?)`** (migración aditiva, no sobrecargar `Scope`).
+  *Motivo:* "administrar la estructura" es un eje DISTINTO de "ver los datos de sus nodos" (ABAC). Sobrecargar `Scope`
+  mezclaría semánticas (`includeDescendants` no aplica) y ataría la administración a los nodos (justo lo que causa la
+  deuda b). Sujeto polimórfico con check exclusivo, espejo de `Scope`. Migración `20260624120000_add_structure_admin_delegation`,
+  cero pérdida (sin filas = comportamiento previo: super-admin administra todo, nadie más).
+- **Sujeto → rol Y usuario, combinados por UNIÓN** (paridad exacta con L2a). *Motivo:* delegar a un rol ("Líderes TI") de
+  una vez, o a una persona puntual; el `ScopeService` une en read-time las filas propias + las de los roles, evaluado EN
+  VIVO (quitar el rol/la delegación re-acota sin denormalizar).
+- **Permiso → REUSAR `module:structure:manage`** (antes LATENTE en el catálogo) como marca de **super-admin** (administra
+  TODAS las estructuras + reparte delegaciones). Los `orglevel:manage`/`orgnode:*` pasan a ser **contextuales** (administran
+  solo lo delegado). *Motivo:* cero clave nueva ⇒ sin gotcha `db:seed`/Redis `FLUSHALL`; el rol de sistema "Administrador"
+  ya la tiene (todos los permisos) ⇒ **el super-admin sigue siéndolo con cero cambios de grants/migración**. Su descripción
+  ("Administrar la estructura organizacional") ya calza.
+- **Reparto de actos:** crear/eliminar estructura y reordenar el selector = **super-admin only** (provisión que afecta al
+  conjunto global); renombrar/archivar/reactivar X y CRUD de niveles/nodos de X = **delegado-de-X o super-admin** (ciclo de
+  vida y árbol DENTRO de X). *Motivo:* crear/borrar/reordenar el set global es "provisión de dominios"; configurar dentro de
+  una estructura es administración delegable.
+- **Autorización CONTEXTUAL centralizada** en `ScopeService.assertCanAdministerStructure` / `assertSuperStructureAdmin`,
+  invocada en el SERVICIO (donde se resuelve el `structureId`), con el controller manteniendo el gate grueso del decorador
+  (patrón híbrido, precedente `logentry:void`). *Motivo:* el `PermissionsGuard` es global y no conoce el `structureId` del
+  recurso; no dispersar la lógica copiándola endpoint por endpoint.
+- **Super-admin → criterio = TENER el permiso `module:structure:manage`** (NO "no tener delegaciones"). *Motivo (objeción al
+  plan):* atar el super-admin a "sin delegaciones" es frágil — delegarle algo al admin lo degradaría sin querer. El permiso
+  explícito es dato RBAC editable y garantiza que SIEMPRE haya quién administre todo.
+- **Deuda (b) CERRADA:** `listStructures` = `accesibles-por-nodo ∪ administrables-por-delegación`; un delegado VE y arma su
+  estructura aunque no tenga nodos accesibles. El backend marca por fila `canAdminister` (derivado del mismo cálculo) para
+  que la UI habilite/oculte la gestión, sin un endpoint extra.
+- **Paridad by-id/lectura:** leer un recurso por id sigue rigiéndose por ABAC; L2b restringe **MUTAR** estructuras ajenas,
+  no leerlas (igual que L1/L2c).
+- **Red ANTI-LOCKOUT (a petición del dueño; invariante "≥1 usuario ACTIVO con rol de sistema").** Tres candados en el
+  backend, con 400/403 claros: **(A)** el rol de sistema no puede modificar sus permisos (idempotente OK), **(B)** no se
+  quita el rol de sistema al último administrador, **(C)** no se deshabilita al último admin activo. *Motivo:* hoy era
+  posible vaciar de permisos el rol Administrador, quitarle el rol al último admin o deshabilitarlo, dejando la instalación
+  sin nadie capaz de administrar (riesgo real preexistente). Estándar de la industria (GitHub/AWS IAM/Atlassian: "last admin
+  protection"). "Administrador" = cualquier usuario con un rol `isSystem`.
+
 ### 2026-06-24 · L2c · Ciclo de vida de la estructura organizacional (archivar / reactivar / reordenar)
 Permite gobernar el ESTADO y el ORDEN de las estructuras sin borrar datos. Verificado en código (no asumido):
 el modelo ya existía (`OrgStructure.active`/`reportOrder`/`deletedAt`/`isDefault`); `updateStructure` ya togglea

@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type {
+  AssignAdminStructuresRequest,
   AssignScopeRequest,
   AssignTemplateScopeRequest,
   CreateRoleRequest,
@@ -43,6 +44,7 @@ export class RolesService {
         permissions: { select: { permission: { select: { key: true } } } },
         scopes: { where: { roleId: id }, select: { orgNodeId: true, includeDescendants: true } },
         templateScopes: { select: { templateId: true } },
+        structureAdmins: { select: { structureId: true } },
         _count: { select: { permissions: true, users: true } },
       },
     });
@@ -59,6 +61,7 @@ export class RolesService {
       permissionKeys: role.permissions.map((p) => p.permission.key),
       scopes: role.scopes.map((s) => ({ orgNodeId: s.orgNodeId, includeDescendants: s.includeDescendants })),
       templateScopes: role.templateScopes.map((s) => s.templateId),
+      adminStructureIds: role.structureAdmins.map((s) => s.structureId),
     };
   }
 
@@ -115,6 +118,36 @@ export class RolesService {
     return this.get(id);
   }
 
+  /**
+   * Reemplaza el conjunto de estructuras que los miembros de este rol pueden
+   * ADMINISTRAR por delegación (L2b). Espejo de `assignScope` con sujeto `roleId`:
+   * el `ScopeService` une en read-time la delegación del rol con la propia del
+   * usuario, así que se re-acota EN VIVO al quitarle el rol (sin denormalizar). Lista
+   * vacía ⇒ el rol no delega ninguna. No invalida la caché de permisos: la delegación
+   * es un eje aparte que se consulta en vivo, no forma parte de los permisos efectivos.
+   */
+  async assignAdminStructures(id: string, dto: AssignAdminStructuresRequest, ctx: AuditContext): Promise<RoleDetail> {
+    const role = await this.prisma.role.findUnique({ where: { id } });
+    if (!role) throw new NotFoundException("Rol no encontrado");
+
+    const structureIds = [...new Set(dto.structureIds)];
+    if (structureIds.length > 0) {
+      const found = await this.prisma.orgStructure.count({
+        where: { id: { in: structureIds }, deletedAt: null },
+      });
+      if (found !== structureIds.length) throw new BadRequestException("Una o más estructuras no existen");
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.structureAdmin.deleteMany({ where: { roleId: id } }),
+      this.prisma.structureAdmin.createMany({
+        data: structureIds.map((structureId) => ({ roleId: id, structureId })),
+      }),
+    ]);
+    await this.audit.record({ ...ctx, action: "role.adminstructures.assigned", entityType: "Role", entityId: id, after: { structureIds } });
+    return this.get(id);
+  }
+
   async create(dto: CreateRoleRequest, ctx: AuditContext): Promise<RoleDetail> {
     const existing = await this.prisma.role.findUnique({ where: { key: dto.key } });
     if (existing) throw new BadRequestException(`Ya existe un rol con la clave "${dto.key}"`);
@@ -138,6 +171,22 @@ export class RolesService {
     if (!role) throw new NotFoundException("Rol no encontrado");
 
     const before = await this.get(id);
+
+    // CANDADO A (red anti-lockout): el rol de sistema "Administrador" es el super-admin
+    // de facto (tiene TODOS los permisos). Bloquear cualquier cambio a SU conjunto de
+    // permisos garantiza que el llavero maestro nunca se vacíe (ni por error ni a
+    // propósito) y que la instalación conserve siempre quién administre todo. Se permite
+    // el guardado idempotente (mismo set) para no romper un "Guardar" del formulario.
+    if (role.isSystem && dto.permissionKeys !== undefined) {
+      const current = new Set(before.permissionKeys);
+      const next = new Set(dto.permissionKeys);
+      const changed = current.size !== next.size || [...next].some((k) => !current.has(k));
+      if (changed) {
+        throw new ForbiddenException(
+          "El rol de sistema no puede modificar sus permisos (protección anti-bloqueo).",
+        );
+      }
+    }
 
     await this.prisma.$transaction(async (tx) => {
       await tx.role.update({

@@ -35,6 +35,13 @@ export const roleDetailSchema = roleSummarySchema.extend({
   scopes: z.array(scopeEntrySchema),
   /** Alcance por plantilla (ids) del rol. Vacío = sin restricción (ve todas). */
   templateScopes: z.array(z.string()),
+  /**
+   * Administración DELEGADA por estructura (L2b): ids de las estructuras que los
+   * miembros de este rol pueden ADMINISTRAR. Se UNE en read-time con la delegación
+   * propia del usuario. Vacío = el rol no delega ninguna. Eje DISTINTO del alcance de
+   * datos (`scopes`): administrar la estructura ≠ ver los datos de sus nodos.
+   */
+  adminStructureIds: z.array(z.string()),
 });
 export type RoleDetail = z.infer<typeof roleDetailSchema>;
 

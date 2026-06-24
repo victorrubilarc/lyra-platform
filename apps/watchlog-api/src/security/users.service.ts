@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import type {
+  AssignAdminStructuresRequest,
   AssignRolesRequest,
   AssignScopeRequest,
   AssignTemplateScopeRequest,
@@ -48,6 +49,7 @@ export class UsersService {
         ...userInclude,
         scopes: { where: { userId: id } },
         templateScopes: { where: { userId: id }, select: { templateId: true } },
+        structureAdmins: { where: { userId: id }, select: { structureId: true } },
       },
     });
     if (!user) throw new NotFoundException("Usuario no encontrado");
@@ -58,6 +60,7 @@ export class UsersService {
       mfaRequired,
       scopes: user.scopes.map((s) => ({ orgNodeId: s.orgNodeId, includeDescendants: s.includeDescendants })),
       templateScopes: user.templateScopes.map((s) => s.templateId),
+      adminStructureIds: user.structureAdmins.map((s) => s.structureId),
     };
   }
 
@@ -106,6 +109,18 @@ export class UsersService {
   async update(id: string, dto: UpdateUserRequest, ctx: AuditContext): Promise<UserDetail> {
     const before = await this.prisma.user.findUnique({ where: { id } });
     if (!before) throw new NotFoundException("Usuario no encontrado");
+
+    // CANDADO C (red anti-lockout): no dejar la instalación sin NINGÚN administrador
+    // activo. Si esta edición DESHABILITA (status ≠ ACTIVE) a quien hoy es el último
+    // administrador activo (tiene un rol de sistema), se rechaza.
+    if (dto.status !== undefined && dto.status !== "ACTIVE" && before.status === "ACTIVE") {
+      if (await this.userHasSystemRole(id)) {
+        if ((await this.countOtherActiveAdmins(id)) === 0) {
+          throw new BadRequestException("No puedes deshabilitar el último administrador activo del sistema.");
+        }
+      }
+    }
+
     await this.prisma.user.update({
       where: { id },
       data: { displayName: dto.displayName ?? undefined, status: dto.status ?? undefined },
@@ -118,6 +133,16 @@ export class UsersService {
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) throw new NotFoundException("Usuario no encontrado");
     await this.assertRolesExist(dto.roleIds);
+
+    // CANDADO B (red anti-lockout): si esta asignación QUITA el rol de sistema a un
+    // administrador ACTIVO y no queda ningún otro administrador activo, se rechaza.
+    if (user.status === "ACTIVE" && (await this.userHasSystemRole(id))) {
+      const systemRoleIds = await this.systemRoleIds();
+      const keepsSystem = dto.roleIds.some((rid) => systemRoleIds.has(rid));
+      if (!keepsSystem && (await this.countOtherActiveAdmins(id)) === 0) {
+        throw new BadRequestException("No puedes quitar el último administrador del sistema.");
+      }
+    }
 
     await this.prisma.$transaction([
       this.prisma.userRole.deleteMany({ where: { userId: id } }),
@@ -174,11 +199,70 @@ export class UsersService {
     return this.get(id);
   }
 
+  /**
+   * Reemplaza el conjunto de estructuras que este usuario puede ADMINISTRAR por
+   * delegación (L2b). Espejo de `assignScope` con sujeto `userId`: se UNE en read-time
+   * con la delegación de sus roles (`ScopeService.getAdministrableStructureIds`). Lista
+   * vacía ⇒ el usuario no administra ninguna por delegación propia. No invalida la
+   * caché de permisos (la delegación es un eje aparte, consultado en vivo).
+   */
+  async assignAdminStructures(id: string, dto: AssignAdminStructuresRequest, ctx: AuditContext): Promise<UserDetail> {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new NotFoundException("Usuario no encontrado");
+
+    const structureIds = [...new Set(dto.structureIds)];
+    if (structureIds.length > 0) {
+      const found = await this.prisma.orgStructure.count({
+        where: { id: { in: structureIds }, deletedAt: null },
+      });
+      if (found !== structureIds.length) throw new BadRequestException("Una o más estructuras no existen");
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.structureAdmin.deleteMany({ where: { userId: id } }),
+      this.prisma.structureAdmin.createMany({
+        data: structureIds.map((structureId) => ({ userId: id, structureId })),
+      }),
+    ]);
+    await this.audit.record({ ...ctx, action: "user.adminstructures.assigned", entityType: "User", entityId: id, after: { structureIds } });
+    return this.get(id);
+  }
+
   private async assertRolesExist(roleIds: string[]): Promise<void> {
     const unique = [...new Set(roleIds)];
     if (unique.length === 0) return;
     const count = await this.prisma.role.count({ where: { id: { in: unique } } });
     if (count !== unique.length) throw new BadRequestException("Uno o más roles no existen");
+  }
+
+  // === Red anti-lockout (último administrador) =============================
+  // "Administrador" = usuario con algún rol de sistema (isSystem). El invariante
+  // es: SIEMPRE debe quedar ≥1 usuario ACTIVO con un rol de sistema. Los candados
+  // B (quitar el rol) y C (deshabilitar la cuenta) lo hacen cumplir en el backend.
+
+  /** Ids de los roles de sistema (Administrador, etc.). */
+  private async systemRoleIds(): Promise<Set<string>> {
+    const roles = await this.prisma.role.findMany({ where: { isSystem: true }, select: { id: true } });
+    return new Set(roles.map((r) => r.id));
+  }
+
+  /** ¿El usuario tiene asignado algún rol de sistema? */
+  private async userHasSystemRole(userId: string): Promise<boolean> {
+    const count = await this.prisma.userRole.count({
+      where: { userId, role: { isSystem: true } },
+    });
+    return count > 0;
+  }
+
+  /** Cuántos OTROS usuarios ACTIVOS conservan un rol de sistema (excluye al dado). */
+  private async countOtherActiveAdmins(excludeUserId: string): Promise<number> {
+    return this.prisma.user.count({
+      where: {
+        id: { not: excludeUserId },
+        status: "ACTIVE",
+        roles: { some: { role: { isSystem: true } } },
+      },
+    });
   }
 
   private toSummary(

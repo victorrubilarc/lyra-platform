@@ -42,6 +42,31 @@ Keycloak **descartado** para el MVP (complejidad operacional); si un cliente lo 
 - **La UI solo oculta** (mejor UX), nunca es la fuente de verdad.
 - El **catálogo de permisos** vive en `@lyra/contracts` (enum tipado), compartido por UI y backend.
 
+### Administración delegada por estructura (L2b) — autorización CONTEXTUAL
+- **Problema:** administrar la estructura era TODO-O-NADA (`orglevel:manage`/`orgnode:*` globales ⇒ quien tenía la clave
+  administraba TODAS las estructuras). L2b lo vuelve **delegable por estructura** sin volver a alguien super-admin.
+- **Modelo:** tabla `StructureAdmin(structureId, roleId?/userId?)` (eje DISTINTO del ABAC de datos: "administrar la
+  estructura" ≠ "ver los datos de sus nodos"). El alcance de administración efectivo = **unión** de las filas del usuario +
+  las de sus roles, en vivo. **Permiso de SUPER-ADMIN = `module:structure:manage`** (antes latente): administra todas y
+  reparte delegaciones; el rol de sistema "Administrador" ya lo tiene.
+- **Decidido 100% en backend, CONTEXTUAL:** cada mutación de structure/levels/nodes invoca
+  `ScopeService.assertCanAdministerStructure(userId, structureId)` (delegado o super-admin) — el controller mantiene el gate
+  grueso del decorador, el servicio resuelve el `structureId` del recurso y decide el fino (patrón híbrido, no se confía en
+  el cliente). Crear/eliminar estructura y reordenar el selector exigen `assertSuperStructureAdmin` (provisión global). **Leer
+  por id sigue por ABAC** (L2b restringe MUTAR, no leer). Cierra la deuda (b): la administración deja de derivarse de los
+  nodos (`listStructures` incluye las estructuras delegadas aunque no tengan nodos accesibles). Asignar/quitar delegaciones
+  (`PUT /security/{roles,users}/:id/admin-structures`) exige `module:structure:manage` y queda **auditado**
+  (`role.adminstructures.assigned` / `user.adminstructures.assigned`).
+
+### Red ANTI-LOCKOUT — invariante "siempre hay quién administre todo"
+- **Riesgo preexistente:** era posible vaciar de permisos el rol de sistema, quitarle el rol al último administrador o
+  deshabilitarlo, dejando la instalación **sin nadie capaz de administrar** (el clásico *last-admin lockout*; ref. GitHub /
+  AWS IAM / Atlassian). **Administrador = cualquier usuario con un rol `isSystem`.**
+- **Tres candados en el backend** (errores claros, nada se ejecuta si rompería el invariante): **(A)** el rol de sistema no
+  puede modificar sus permisos (403; el guardado idempotente del mismo set pasa) — `RolesService.update`; **(B)** no se quita
+  el rol de sistema al último administrador (400) — `UsersService.assignRoles`; **(C)** no se deshabilita al último admin
+  activo (400) — `UsersService.update`. El invariante protegido: **debe existir ≥1 usuario ACTIVO con un rol de sistema**.
+
 ### Excepciones operacionales (Fase 4.1) — triage gobernado + corrección GxP
 - 4 permisos nuevos (catálogo **77→81**, grupo `incidents`): **`exception:triage`** (reconocer/asociar/agrupar/convertir —
   convertir exige además `incident:create`, AND), **`exception:dismiss`** (descartar una advertencia con motivo), **`exception:dismiss-critical`**

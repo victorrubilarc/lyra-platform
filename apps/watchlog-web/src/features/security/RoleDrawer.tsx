@@ -3,12 +3,15 @@ import { useTranslation } from "react-i18next";
 import { FileText, KeySquare, LayoutGrid, ShieldCheck } from "lucide-react";
 import { Button, Drawer, FormField, Input, Skeleton, Toggle, cx, useToast } from "@lyra/ui";
 import { roleKeySchema, type ScopeEntry } from "@lyra/contracts";
+import { usePermissions } from "../../auth/use-permissions.js";
 import { ApiError } from "../../lib/api-client.js";
-import { useOrgTree } from "../structure/structure-queries.js";
+import { useOrgStructures, useOrgTree } from "../structure/structure-queries.js";
+import { AdminStructuresPicker } from "./AdminStructuresPicker.js";
 import { PermissionMatrix } from "./PermissionMatrix.js";
 import { ScopeTreePicker } from "./ScopeTreePicker.js";
 import { TemplateScopePicker } from "./TemplateScopePicker.js";
 import {
+  useAssignRoleAdminStructures,
   useAssignRoleScope,
   useAssignRoleTemplateScope,
   useCreateRole,
@@ -36,6 +39,8 @@ interface FormState {
   nodeScope: ScopeEntry[];
   /** Alcance por plantilla del rol (ids). Vacío = sin restricción. */
   templateScope: string[];
+  /** Estructuras que los miembros del rol pueden ADMINISTRAR por delegación (L2b). */
+  adminStructures: string[];
 }
 
 const EMPTY: FormState = {
@@ -46,6 +51,7 @@ const EMPTY: FormState = {
   permissions: new Set(),
   nodeScope: [],
   templateScope: [],
+  adminStructures: [],
 };
 
 function sameSet(a: string[], b: string[]): boolean {
@@ -65,14 +71,19 @@ export function RoleDrawer({ open, roleId, onClose }: RoleDrawerProps) {
   const toast = useToast();
   const isEdit = roleId !== null;
 
+  const perms = usePermissions();
+  const canDelegateStructures = perms.can("module:structure:manage");
+
   const { data: catalog = [] } = usePermissionCatalog();
   const { data: role, isLoading: roleLoading } = useRole(open && isEdit ? roleId : null);
   const { data: templateOptions = [] } = useTemplateScopeOptions(open && isEdit);
   const { data: tree = [] } = useOrgTree();
+  const { data: structures = [] } = useOrgStructures();
   const createRole = useCreateRole();
   const updateRole = useUpdateRole();
   const assignScope = useAssignRoleScope();
   const assignTemplateScope = useAssignRoleTemplateScope();
+  const assignAdminStructures = useAssignRoleAdminStructures();
 
   const [state, setState] = useState<FormState>(EMPTY);
   const [keyError, setKeyError] = useState<string | null>(null);
@@ -92,6 +103,7 @@ export function RoleDrawer({ open, roleId, onClose }: RoleDrawerProps) {
         permissions: new Set(role.permissionKeys),
         nodeScope: role.scopes,
         templateScope: role.templateScopes,
+        adminStructures: role.adminStructureIds,
       });
     } else if (!isEdit) {
       setState(EMPTY);
@@ -101,7 +113,11 @@ export function RoleDrawer({ open, roleId, onClose }: RoleDrawerProps) {
   }, [open, isEdit, role]);
 
   const busy =
-    createRole.isPending || updateRole.isPending || assignScope.isPending || assignTemplateScope.isPending;
+    createRole.isPending ||
+    updateRole.isPending ||
+    assignScope.isPending ||
+    assignTemplateScope.isPending ||
+    assignAdminStructures.isPending;
   const isSystem = role?.isSystem ?? false;
 
   function validate(): boolean {
@@ -142,6 +158,11 @@ export function RoleDrawer({ open, roleId, onClose }: RoleDrawerProps) {
         if (!sameSet(state.templateScope, role.templateScopes)) {
           await assignTemplateScope.mutateAsync({ id: role.id, dto: { templateIds: state.templateScope } });
         }
+        // Administración delegada por estructura (L2b): solo el super-admin puede
+        // mutarla, y solo si cambió. El backend re-autoriza igual (módulo struct:manage).
+        if (canDelegateStructures && !sameSet(state.adminStructures, role.adminStructureIds)) {
+          await assignAdminStructures.mutateAsync({ id: role.id, dto: { structureIds: state.adminStructures } });
+        }
         toast.success(t("security.roles.updated"));
       } else {
         await createRole.mutateAsync({
@@ -162,7 +183,7 @@ export function RoleDrawer({ open, roleId, onClose }: RoleDrawerProps) {
   const tabs = [
     { key: "datos" as const, label: t("security.roles.tabs.data"), icon: FileText },
     { key: "permisos" as const, label: t("security.roles.tabs.permissions"), icon: KeySquare, count: state.permissions.size },
-    { key: "alcance" as const, label: t("security.roles.tabs.scope"), icon: LayoutGrid, count: isEdit ? state.nodeScope.length + state.templateScope.length || undefined : undefined },
+    { key: "alcance" as const, label: t("security.roles.tabs.scope"), icon: LayoutGrid, count: isEdit ? state.nodeScope.length + state.templateScope.length + state.adminStructures.length || undefined : undefined },
   ];
 
   return (
@@ -321,6 +342,26 @@ export function RoleDrawer({ open, roleId, onClose }: RoleDrawerProps) {
                       disabled={busy}
                     />
                   </section>
+
+                  {/* Administración DELEGADA por estructura (L2b). Eje DISTINTO de los
+                      de arriba: NO es "ver datos", es "administrar la estructura". Solo
+                      el super-admin (module:structure:manage) puede editarlo. */}
+                  {(canDelegateStructures || state.adminStructures.length > 0) && (
+                    <section>
+                      <h4 className={shared.panelTitle}>{t("security.roles.adminStructures.title")}</h4>
+                      <p className={shared.controlHint} style={{ margin: "0 0 12px" }}>
+                        {canDelegateStructures
+                          ? t("security.roles.adminStructures.desc")
+                          : t("security.adminStructures.readOnly")}
+                      </p>
+                      <AdminStructuresPicker
+                        structures={structures}
+                        value={state.adminStructures}
+                        onChange={(next) => setState((s) => ({ ...s, adminStructures: next }))}
+                        disabled={busy || !canDelegateStructures}
+                      />
+                    </section>
+                  )}
                 </div>
               ) : (
                 <p className={shared.controlHint} style={{ margin: 0 }}>

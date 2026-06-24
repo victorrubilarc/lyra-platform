@@ -60,6 +60,14 @@ export const userDetailSchema = userSummarySchema.extend({
   scopes: z.array(scopeEntrySchema),
   /** Alcance por plantilla (ids). Vacío = sin restricción de plantilla (ve todas). */
   templateScopes: z.array(z.string()),
+  /**
+   * Administración DELEGADA por estructura (L2b): ids de las estructuras que este
+   * usuario puede ADMINISTRAR (árbol/niveles/ciclo de vida) sin ser super-admin. Se
+   * UNE en read-time con las de sus roles. Vacío = no administra ninguna por delegación
+   * (el super-admin —permiso `module:structure:manage`— administra todas igual). Es un
+   * eje DISTINTO del alcance de datos (`scopes`): administrar ≠ ver datos de sus nodos.
+   */
+  adminStructureIds: z.array(z.string()),
 });
 export type UserDetail = z.infer<typeof userDetailSchema>;
 
@@ -97,6 +105,18 @@ export const assignTemplateScopeRequestSchema = z.object({
   templateIds: z.array(z.string().min(1)),
 });
 export type AssignTemplateScopeRequest = z.infer<typeof assignTemplateScopeRequestSchema>;
+
+/**
+ * Reemplaza el conjunto de estructuras que un sujeto (usuario o rol) puede
+ * ADMINISTRAR por delegación (L2b). Lista plana de ids de estructura; vacía = quitar
+ * toda delegación. Compartido por los endpoints de usuario y de rol (paridad con el
+ * alcance por nodo de L2a). Gateado por el permiso de super-admin
+ * (`module:structure:manage`): solo quien administra todo reparte delegaciones.
+ */
+export const assignAdminStructuresRequestSchema = z.object({
+  structureIds: z.array(z.string().min(1)),
+});
+export type AssignAdminStructuresRequest = z.infer<typeof assignAdminStructuresRequestSchema>;
 
 /**
  * Reset de contraseña por un administrador: fija una contraseña temporal. El

@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type {
   CreateOrgLevelRequest,
   CreateOrgNodeRequest,
@@ -33,10 +33,14 @@ export class StructureService {
   // --- Estructuras ---
 
   /**
-   * Estructuras vivas que el usuario alcanza (ABAC), ordenadas para el selector (la
-   * por defecto primero). Sin restricción de alcance (super admin) = todas, incluidas
-   * las recién creadas aún sin nodos. Un usuario acotado ve solo las estructuras de
-   * sus nodos accesibles.
+   * Estructuras vivas que el usuario VE en el selector, ordenadas (la por defecto
+   * primero). La visibilidad es la UNIÓN de dos ejes:
+   *  - las que ALCANZA por ABAC de nodo (`getAccessibleStructureIds`), para operar; y
+   *  - las que ADMINISTRA por delegación (`getAdministrableStructureIds`, L2b), para
+   *    configurar — INCLUSO si aún no tiene nodos accesibles en ellas.
+   * Esa unión CIERRA la deuda "(b)": un administrador delegado a una estructura recién
+   * creada la ve y puede armarla aunque todavía no tenga nodos. `null` en cualquiera de
+   * los dos ejes = sin restricción (super-admin / sin scope de nodo) ⇒ ve TODAS.
    */
   async listStructures(userId?: string): Promise<(OrgStructure & { nodeCount: number })[]> {
     const all = await this.prisma.orgStructure.findMany({
@@ -50,14 +54,34 @@ export class StructureService {
       _count: { _all: true },
     });
     const countBy = new Map(counts.map((c) => [c.structureId, c._count._all]));
-    const enrich = (s: OrgStructure): OrgStructure & { nodeCount: number } => ({
+    const enrich = (
+      s: OrgStructure,
+      canAdminister?: boolean,
+    ): OrgStructure & { nodeCount: number; canAdminister?: boolean } => ({
       ...s,
       nodeCount: countBy.get(s.id) ?? 0,
+      ...(canAdminister === undefined ? {} : { canAdminister }),
     });
-    if (!userId) return all.map(enrich);
-    const accessible = await this.scope.getAccessibleStructureIds(userId);
-    const visible = accessible === null ? all : all.filter((s) => accessible.has(s.id));
-    return visible.map(enrich);
+    if (!userId) return all.map((s) => enrich(s));
+    const [accessible, administrable] = await Promise.all([
+      this.scope.getAccessibleStructureIds(userId),
+      this.scope.getAdministrableStructureIds(userId),
+    ]);
+    // `administrable === null` = super-admin (administra todas). Si no, marca por fila
+    // si la estructura está delegada (para que la UI habilite/oculte la gestión).
+    const canAdminister = (id: string): boolean => administrable === null || administrable.has(id);
+    // `null` en cualquiera de los ejes = sin restricción ahí ⇒ ve todas.
+    if (accessible === null || administrable === null) {
+      return all.map((s) => enrich(s, canAdminister(s.id)));
+    }
+    const visibleIds = new Set([...accessible, ...administrable]);
+    return all.filter((s) => visibleIds.has(s.id)).map((s) => enrich(s, canAdminister(s.id)));
+  }
+
+  /** Extrae el actor de la auditoría; estos flujos van siempre autenticados. */
+  private requireActor(ctx: AuditContext): string {
+    if (!ctx.actorId) throw new ForbiddenException("Acción no autenticada");
+    return ctx.actorId;
   }
 
   /** Id de la estructura por defecto (la que absorbió lo legado). Cae a la 1ª viva. */
@@ -83,6 +107,8 @@ export class StructureService {
   }
 
   async createStructure(dto: CreateOrgStructureRequest, ctx: AuditContext): Promise<OrgStructure> {
+    // Crear una estructura nueva = provisión de un "dominio" del sistema: solo super-admin.
+    await this.scope.assertSuperStructureAdmin(this.requireActor(ctx));
     const dup = await this.prisma.orgStructure.count({ where: { key: dto.key } });
     if (dup > 0) throw new BadRequestException(`Ya existe una estructura con la clave "${dto.key}"`);
     const structure = await this.prisma.orgStructure.create({
@@ -103,6 +129,9 @@ export class StructureService {
   async updateStructure(id: string, dto: UpdateOrgStructureRequest, ctx: AuditContext): Promise<OrgStructure> {
     const before = await this.prisma.orgStructure.findFirst({ where: { id, deletedAt: null } });
     if (!before) throw new NotFoundException("Estructura no encontrada");
+    // Renombrar / archivar / reactivar la estructura X = ciclo de vida DENTRO de X:
+    // basta tener X delegada (o ser super-admin).
+    await this.scope.assertCanAdministerStructure(this.requireActor(ctx), id);
     // Archivar (active:false): la por defecto nunca se archiva, y nunca se deja la
     // instalación sin NINGUNA estructura activa (el selector quedaría vacío).
     if (dto.active === false && before.active) {
@@ -137,6 +166,8 @@ export class StructureService {
    * estructura. Una estructura solo con niveles (sin nodos) sí se puede eliminar.
    */
   async deleteStructure(id: string, ctx: AuditContext): Promise<void> {
+    // Eliminar una estructura = acto destructivo de provisión global: solo super-admin.
+    await this.scope.assertSuperStructureAdmin(this.requireActor(ctx));
     const structure = await this.prisma.orgStructure.findFirst({ where: { id, deletedAt: null } });
     if (!structure) throw new NotFoundException("Estructura no encontrada");
     if (structure.isDefault) throw new BadRequestException("No se puede eliminar la estructura por defecto");
@@ -161,6 +192,8 @@ export class StructureService {
    * desconocidos se rechazan para no dejar el orden a medias. Auditado como un evento.
    */
   async reorderStructures(ids: string[], ctx: AuditContext): Promise<(OrgStructure & { nodeCount: number })[]> {
+    // Reordenar el set afecta el selector de TODOS: es un acto global ⇒ solo super-admin.
+    await this.scope.assertSuperStructureAdmin(this.requireActor(ctx));
     const live = await this.prisma.orgStructure.findMany({ where: { deletedAt: null }, select: { id: true } });
     const liveIds = new Set(live.map((s) => s.id));
     const unknown = ids.filter((id) => !liveIds.has(id));
@@ -192,6 +225,7 @@ export class StructureService {
 
   async createLevel(dto: CreateOrgLevelRequest, ctx: AuditContext): Promise<OrgLevel> {
     const structureId = await this.resolveStructureId(dto.structureId ?? null);
+    await this.scope.assertCanAdministerStructure(this.requireActor(ctx), structureId);
     const level = await this.prisma.orgLevel.create({
       data: { structureId, name: dto.name, order: dto.order },
     });
@@ -202,6 +236,7 @@ export class StructureService {
   async updateLevel(id: string, dto: UpdateOrgLevelRequest, ctx: AuditContext): Promise<OrgLevel> {
     const before = await this.prisma.orgLevel.findUnique({ where: { id } });
     if (!before) throw new NotFoundException("Nivel no encontrado");
+    await this.scope.assertCanAdministerStructure(this.requireActor(ctx), before.structureId);
     const level = await this.prisma.orgLevel.update({ where: { id }, data: dto });
     await this.audit.record({ ...ctx, action: "structure.level.updated", entityType: "OrgLevel", entityId: id, before: { ...before }, after: { ...level } });
     return level;
@@ -210,6 +245,7 @@ export class StructureService {
   async deleteLevel(id: string, ctx: AuditContext): Promise<void> {
     const level = await this.prisma.orgLevel.findUnique({ where: { id } });
     if (!level) throw new NotFoundException("Nivel no encontrado");
+    await this.scope.assertCanAdministerStructure(this.requireActor(ctx), level.structureId);
     const nodeCount = await this.prisma.orgNode.count({ where: { levelId: id, deletedAt: null } });
     if (nodeCount > 0) {
       throw new BadRequestException(
@@ -262,6 +298,7 @@ export class StructureService {
     // padre hereda su estructura; una raíz toma `dto.structureId` (o la por defecto).
     const parent = dto.parentId ? await this.loadLiveNode(dto.parentId) : null;
     const structureId = parent ? parent.structureId : await this.resolveStructureId(dto.structureId ?? null);
+    await this.scope.assertCanAdministerStructure(this.requireActor(ctx), structureId);
     await this.assertLevelInStructure(dto.levelId, structureId);
     const parentPath = parent ? parent.path : "/";
 
@@ -289,6 +326,7 @@ export class StructureService {
   async updateNode(id: string, dto: UpdateOrgNodeRequest, ctx: AuditContext): Promise<OrgNode> {
     const before = await this.prisma.orgNode.findFirst({ where: { id, deletedAt: null } });
     if (!before) throw new NotFoundException("Nodo no encontrado");
+    await this.scope.assertCanAdministerStructure(this.requireActor(ctx), before.structureId);
     if (dto.levelId) await this.assertLevelInStructure(dto.levelId, before.structureId);
 
     const reparenting = dto.parentId !== undefined && dto.parentId !== before.parentId;
@@ -335,6 +373,7 @@ export class StructureService {
   async deleteNode(id: string, ctx: AuditContext): Promise<void> {
     const node = await this.prisma.orgNode.findFirst({ where: { id, deletedAt: null } });
     if (!node) throw new NotFoundException("Nodo no encontrado");
+    await this.scope.assertCanAdministerStructure(this.requireActor(ctx), node.structureId);
     const childCount = await this.prisma.orgNode.count({ where: { parentId: id, deletedAt: null } });
     if (childCount > 0) {
       throw new BadRequestException("No se puede eliminar un nodo con hijos. Elimina los hijos primero.");

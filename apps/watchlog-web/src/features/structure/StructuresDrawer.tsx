@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Button, Chip, Drawer, EmptyState, FormField, Input, Modal, Textarea, Toggle, useToast } from "@lyra/ui";
 import type { OrgStructure } from "@lyra/contracts";
+import { usePermissions } from "../../auth/use-permissions.js";
 import { ApiError } from "../../lib/api-client.js";
 import { useStructureStore } from "../../shell/structure-store.js";
 import {
@@ -66,6 +67,11 @@ const EMPTY_FORM: FormValues = { name: "", key: "", description: "" };
 export function StructuresDrawer({ open, onClose }: StructuresDrawerProps) {
   const { t } = useTranslation();
   const toast = useToast();
+  const perms = usePermissions();
+  // Super-admin de estructura (L2b): solo él CREA/REORDENA/ELIMINA estructuras (actos de
+  // provisión global). El delegado administra únicamente las suyas (lo marca el backend
+  // por fila vía `canAdminister`); el backend es la fuente de verdad y re-autoriza.
+  const isSuperAdmin = perms.can("module:structure:manage");
   const { data: structures = [], isLoading } = useOrgStructures();
   const createStructure = useCreateStructure();
   const updateStructure = useUpdateStructure();
@@ -200,7 +206,12 @@ export function StructuresDrawer({ open, onClose }: StructuresDrawerProps) {
 
   function renderRow(s: OrgStructure) {
     const reorderIndex = reorderable.findIndex((r) => r.id === s.id);
-    const canReorder = reorderIndex !== -1;
+    // Reordenar es un acto GLOBAL (afecta el selector de todos) ⇒ solo super-admin.
+    const canReorder = reorderIndex !== -1 && isSuperAdmin;
+    // ¿El usuario puede ADMINISTRAR esta estructura (editar/archivar)? Lo marca el
+    // backend por fila (super-admin = todas; delegado = las suyas). Eliminar/crear son
+    // super-admin only aparte. `undefined` (lista sin contexto) ⇒ cae al rol del usuario.
+    const canManageRow = s.canAdminister ?? isSuperAdmin;
     return (
       <div
         key={s.id}
@@ -279,9 +290,9 @@ export function StructuresDrawer({ open, onClose }: StructuresDrawerProps) {
           <Button
             variant="icon"
             onClick={() => openEdit(s)}
-            disabled={busy}
+            disabled={busy || !canManageRow}
             aria-label={t("common.edit")}
-            title={t("common.edit")}
+            title={canManageRow ? t("common.edit") : t("structure.structures.notDelegated")}
           >
             <Pencil size={15} />
           </Button>
@@ -289,9 +300,15 @@ export function StructuresDrawer({ open, onClose }: StructuresDrawerProps) {
             <Button
               variant="icon"
               onClick={() => setArchived(s, true)}
-              disabled={busy || s.isDefault}
+              disabled={busy || s.isDefault || !canManageRow}
               aria-label={t("structure.structures.archive")}
-              title={s.isDefault ? t("structure.structures.defaultUnarchivable") : t("structure.structures.archive")}
+              title={
+                s.isDefault
+                  ? t("structure.structures.defaultUnarchivable")
+                  : !canManageRow
+                    ? t("structure.structures.notDelegated")
+                    : t("structure.structures.archive")
+              }
             >
               <Archive size={15} />
             </Button>
@@ -299,22 +316,25 @@ export function StructuresDrawer({ open, onClose }: StructuresDrawerProps) {
             <Button
               variant="icon"
               onClick={() => setArchived(s, false)}
-              disabled={busy}
+              disabled={busy || !canManageRow}
               aria-label={t("structure.structures.reactivate")}
-              title={t("structure.structures.reactivate")}
+              title={canManageRow ? t("structure.structures.reactivate") : t("structure.structures.notDelegated")}
             >
               <ArchiveRestore size={15} />
             </Button>
           )}
-          <Button
-            variant="icon"
-            onClick={() => setConfirmDelete(s)}
-            disabled={busy || s.isDefault}
-            aria-label={t("common.delete")}
-            title={s.isDefault ? t("structure.structures.defaultUndeletable") : t("common.delete")}
-          >
-            <Trash2 size={15} />
-          </Button>
+          {/* Eliminar una estructura es provisión global destructiva ⇒ solo super-admin. */}
+          {isSuperAdmin && (
+            <Button
+              variant="icon"
+              onClick={() => setConfirmDelete(s)}
+              disabled={busy || s.isDefault}
+              aria-label={t("common.delete")}
+              title={s.isDefault ? t("structure.structures.defaultUndeletable") : t("common.delete")}
+            >
+              <Trash2 size={15} />
+            </Button>
+          )}
         </div>
       </div>
     );
@@ -449,10 +469,13 @@ export function StructuresDrawer({ open, onClose }: StructuresDrawerProps) {
             </div>
           )}
 
-          <Button variant="secondary" onClick={openCreate}>
-            <Plus size={15} />
-            {t("structure.structures.newStructure")}
-          </Button>
+          {/* Crear una estructura nueva = provisión de un dominio ⇒ solo super-admin. */}
+          {isSuperAdmin && (
+            <Button variant="secondary" onClick={openCreate}>
+              <Plus size={15} />
+              {t("structure.structures.newStructure")}
+            </Button>
+          )}
         </div>
       )}
 

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TemplatesService } from "./templates.service";
 import type { AuditService } from "../audit/audit.service";
 import { ScopeService } from "../authz/scope.service";
+import type { PermissionService } from "../authz/permission.service";
 import type { PrismaService } from "../prisma/prisma.service";
 
 const ctx = { actorId: "admin", actorEmail: "a@x.cl", ip: null, userAgent: null };
@@ -32,7 +33,7 @@ function makeService(overrides: Record<string, unknown> = {}, scopeImpl: Partial
   } as unknown as PrismaService;
   const audit = { record: vi.fn().mockResolvedValue(undefined) } as unknown as AuditService;
   // Métodos PUROS reales (no tocan prisma): visibilidad por asignaciones de nodo.
-  const realScope = new ScopeService(null as unknown as PrismaService);
+  const realScope = new ScopeService(null as unknown as PrismaService, null as unknown as PermissionService);
   const scope = {
     getAccessibleNodeIds: vi.fn().mockResolvedValue(null),
     getAccessibleNodes: vi.fn().mockResolvedValue(null),

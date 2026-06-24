@@ -57,8 +57,10 @@
 > regresión incidencias 32 · cambio-turno 29 · sla 25. **PENDIENTE: smoke VISUAL del dueño.** **Deuda nueva:**
 > (a) ~~`StructuresDrawer` no permite (des)activar ni reordenar estructuras~~ ✅ RESUELTO 2026-06-24 (L2c,
 > `feat/estructura-ciclo-vida`: archivar/reactivar + flechas ↑/↓ + ver archivadas) ·
-> (b) un admin ACOTADO no ve una estructura recién creada hasta que tenga un nodo accesible (se deriva del
-> ABAC por nodo) · (c) ~~purgar una estructura con historial de nodos no es posible~~ RESUELTO POR DISEÑO 2026-06-24
+> (b) ~~un admin ACOTADO no ve una estructura recién creada hasta que tenga un nodo accesible (se deriva del
+> ABAC por nodo)~~ ✅ RESUELTO 2026-06-24 (L2b, `feat/estructura-admin-delegada`): la administración por estructura
+> deja de derivarse de nodos (tabla `StructureAdmin`); un delegado VE y arma su estructura aunque no tenga nodos
+> (`listStructures` = accesibles-por-nodo ∪ administrables-por-delegación) · (c) ~~purgar una estructura con historial de nodos no es posible~~ RESUELTO POR DISEÑO 2026-06-24
 > (L2c): la respuesta no-destructiva es ARCHIVAR (conserva el historial, sale del selector/listados, sigue legible por
 > id); la purga GxP destructiva queda fuera de alcance a propósito · (d) el `deleteLevel` da 500 si un nodo SOFT-deleted aún
 > referencia el nivel (bug latente preexistente; mitigado en estructuras por la cascada). **Dependencia:**

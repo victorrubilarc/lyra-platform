@@ -284,6 +284,7 @@ export const esCL = {
       archived: "Estructura archivada",
       reactivated: "Estructura reactivada",
       defaultUnarchivable: "La estructura por defecto no se puede archivar",
+      notDelegated: "No tienes delegada la administración de esta estructura",
       archivedNotSelectable: "Reactiva la estructura para poder operar en ella",
       showArchived: "Ver archivadas",
       moveUp: "Subir",
@@ -2145,6 +2146,12 @@ export const esCL = {
         selectedCount_one: "{{count}} plantilla",
         selectedCount_other: "{{count}} plantillas",
       },
+      adminStructures: {
+        section: "Administración delegada de estructuras",
+        desc: "Estructuras que este usuario puede ADMINISTRAR (árbol, niveles y ciclo de vida) sin ser administrador general. Es un eje distinto del alcance de datos: aquí se delega configurar la estructura, no ver sus datos.",
+        none: "Sin delegación: este usuario no administra ninguna estructura por esta vía (salvo lo que herede de sus roles).",
+        saved: "Administración delegada actualizada",
+      },
       password: {
         title: "Contraseña",
         desc: "Asigna una contraseña temporal; el usuario deberá cambiarla en su próximo ingreso.",
@@ -2196,7 +2203,7 @@ export const esCL = {
       system: "Sistema",
       createTitle: "Nuevo rol",
       editTitle: "Editar rol",
-      systemHint: "Rol de sistema: puedes editar su nombre y permisos, pero no eliminarlo.",
+      systemHint: "Rol de sistema (administrador): por protección anti-bloqueo, sus permisos no se pueden modificar ni el rol eliminar. Garantiza que siempre haya quién administre todo.",
       key: "Clave",
       keyHint: "Identificador estable: minúsculas, números y guiones (ej. supervisor-turno).",
       keyLocked: "La clave no se modifica tras el alta.",
@@ -2221,6 +2228,10 @@ export const esCL = {
       templateScope: {
         title: "Alcance por plantilla",
       },
+      adminStructures: {
+        title: "Administración delegada de estructuras",
+        desc: "Estructuras que los miembros de este rol pueden ADMINISTRAR (árbol, niveles y ciclo de vida) sin ser administradores generales. Se UNE a la delegación propia de cada usuario.",
+      },
       tabs: {
         data: "Datos",
         permissions: "Permisos",
@@ -2229,6 +2240,14 @@ export const esCL = {
       deleteTitle: "Eliminar rol",
       deleteConfirm: "¿Eliminar el rol «{{name}}»? Esta acción no se puede deshacer.",
       deleteUsersWarning: "Este rol está asignado a {{count}} usuario(s); perderán sus permisos.",
+    },
+    adminStructures: {
+      none: "No hay estructuras para delegar.",
+      noMatch: "Ninguna estructura coincide con la búsqueda.",
+      search: "Buscar estructura…",
+      default: "Por defecto",
+      archived: "Archivada",
+      readOnly: "Solo el administrador general (con «Administrar la estructura organizacional») puede cambiar la administración delegada.",
     },
     policy: {
       passwordsTitle: "Contraseñas",

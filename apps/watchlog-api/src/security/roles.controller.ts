@@ -1,10 +1,12 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Put, Req } from "@nestjs/common";
 import type { FastifyRequest } from "fastify";
 import {
+  assignAdminStructuresRequestSchema,
   assignScopeRequestSchema,
   assignTemplateScopeRequestSchema,
   createRoleRequestSchema,
   updateRoleRequestSchema,
+  type AssignAdminStructuresRequest,
   type AssignScopeRequest,
   type AssignTemplateScopeRequest,
   type CreateRoleRequest,
@@ -79,6 +81,23 @@ export class RolesController {
     @Req() req: FastifyRequest,
   ) {
     return this.roles.assignTemplateScope(id, dto, this.ctx(user, req));
+  }
+
+  /**
+   * Administración DELEGADA por estructura del rol (L2b): qué estructuras pueden
+   * ADMINISTRAR sus miembros. Gateado por `module:structure:manage` (el SUPER-ADMIN
+   * de estructura es quien reparte delegaciones), NO por `role:manage`: delegar es un
+   * acto de gobierno de estructura, no de edición ordinaria del rol.
+   */
+  @Put(":id/admin-structures")
+  @RequirePermission("module:structure:manage")
+  assignAdminStructures(
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(assignAdminStructuresRequestSchema)) dto: AssignAdminStructuresRequest,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.roles.assignAdminStructures(id, dto, this.ctx(user, req));
   }
 
   @Delete(":id")

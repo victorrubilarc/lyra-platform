@@ -61,6 +61,7 @@ model User {
   roles           UserRole[]
   scopes          Scope[]
   templateScopes  TemplateScope[]
+  structureAdmins StructureAdmin[]
   sessions        Session[]
   refreshTokens   RefreshToken[]
   mfaSecret       MfaSecret?
@@ -108,6 +109,7 @@ model Role {
   permissions             RolePermission[]
   scopes                  Scope[]
   templateScopes          TemplateScope[]
+  structureAdmins         StructureAdmin[]
   templateSectionRoles    TemplateSectionRole[]
   templateFieldRoles      TemplateFieldRole[]
   workflowTransitionRoles WorkflowTransitionRole[]
@@ -191,6 +193,32 @@ model TemplateScope {
   @@unique([userId, templateId])
   @@unique([roleId, templateId])
   @@index([templateId])
+}
+
+// Administración DELEGADA por estructura (L2b). Define qué sujeto (rol O usuario)
+// puede ADMINISTRAR una estructura organizacional concreta —su árbol de nodos, sus
+// niveles y su ciclo de vida (renombrar/archivar/reactivar)— SIN ser super-admin de
+// toda la instalación. Es un eje DISTINTO del ABAC de datos (`Scope`): "administrar
+// la estructura" ≠ "ver los datos de sus nodos". Por eso NO se deriva de los nodos
+// accesibles (cierra la deuda "(b)": un delegado ve su estructura aunque aún no tenga
+// nodos). El SUPER-ADMIN (quien tiene el permiso `module:structure:manage`) administra
+// TODAS las estructuras y reparte estas delegaciones, sin necesitar filas aquí. Sujeto
+// polimórfico: exactamente uno de userId/roleId presente (check constraint en la
+// migración). El alcance de administración efectivo de un usuario = unión de sus filas
+// propias + las de sus roles (espejo de la unión de `Scope`).
+model StructureAdmin {
+  id          String  @id @default(cuid())
+  userId      String?
+  roleId      String?
+  structureId String
+
+  user      User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      Role?        @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  structure OrgStructure @relation(fields: [structureId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, structureId])
+  @@unique([roleId, structureId])
+  @@index([structureId])
 }
 
 // Asignación de PLANTILLA a NODOS de la estructura (Fase 2.8.0 — multi-nodo).
@@ -357,6 +385,7 @@ model OrgStructure {
   nodes     OrgNode[]
   opCalendars     OperationalCalendar[]
   fiscalCalendars FiscalCalendar[]
+  admins          StructureAdmin[]
 
   @@index([deletedAt])
 }

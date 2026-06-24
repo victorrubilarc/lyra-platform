@@ -6,8 +6,9 @@ import { USER_STATUSES, type ScopeEntry, type UserStatus } from "@lyra/contracts
 import { Can } from "../../auth/Can.js";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { ApiError } from "../../lib/api-client.js";
-import { useOrgTree } from "../structure/structure-queries.js";
+import { useOrgStructures, useOrgTree } from "../structure/structure-queries.js";
 import {
+  useAssignUserAdminStructures,
   useAssignUserRoles,
   useAssignUserScope,
   useAssignUserTemplateScope,
@@ -18,6 +19,7 @@ import {
   useUpdateUser,
   useUser,
 } from "./security-queries.js";
+import { AdminStructuresPicker } from "./AdminStructuresPicker.js";
 import { ScopeTreePicker } from "./ScopeTreePicker.js";
 import { TemplateScopePicker } from "./TemplateScopePicker.js";
 import { ResetMfaModal } from "./ResetMfaModal.js";
@@ -60,15 +62,19 @@ export function UserDetail({ userId }: UserDetailProps) {
   const toast = useToast();
   const perms = usePermissions();
 
+  const canDelegateStructures = perms.can("module:structure:manage");
+
   const { data: user, isLoading } = useUser(userId);
   const { data: roles = [] } = useRoles();
   const { data: tree = [] } = useOrgTree();
   const { data: templateOptions = [] } = useTemplateScopeOptions(perms.can("user:assign-scope"));
+  const { data: structures = [] } = useOrgStructures();
 
   const updateUser = useUpdateUser();
   const assignRoles = useAssignUserRoles();
   const assignScope = useAssignUserScope();
   const assignTemplateScope = useAssignUserTemplateScope();
+  const assignAdminStructures = useAssignUserAdminStructures();
   const resetMfa = useResetUserMfa();
   const resetPassword = useResetUserPassword();
 
@@ -80,6 +86,7 @@ export function UserDetail({ userId }: UserDetailProps) {
   const [roleIds, setRoleIds] = useState<string[]>([]);
   const [scope, setScope] = useState<ScopeEntry[]>([]);
   const [templateScope, setTemplateScope] = useState<string[]>([]);
+  const [adminStructures, setAdminStructures] = useState<string[]>([]);
   const [resetOpen, setResetOpen] = useState(false);
   const [pwdResetOpen, setPwdResetOpen] = useState(false);
 
@@ -90,6 +97,7 @@ export function UserDetail({ userId }: UserDetailProps) {
     setRoleIds(user.roles.map((r) => r.id));
     setScope(user.scopes);
     setTemplateScope(user.templateScopes);
+    setAdminStructures(user.adminStructureIds);
     setTab("basic");
   }, [user]);
 
@@ -116,6 +124,7 @@ export function UserDetail({ userId }: UserDetailProps) {
   const rolesDirty = !sameSet(roleIds, user.roles.map((r) => r.id));
   const scopeDirty = !sameScope(scope, user.scopes);
   const templateScopeDirty = !sameSet(templateScope, user.templateScopes);
+  const adminStructuresDirty = !sameSet(adminStructures, user.adminStructureIds);
 
   async function saveBasic() {
     if (!user) return;
@@ -152,6 +161,16 @@ export function UserDetail({ userId }: UserDetailProps) {
     try {
       await assignTemplateScope.mutateAsync({ id: user.id, dto: { templateIds: templateScope } });
       toast.success(t("security.users.templateScope.saved"));
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : t("common.errorGeneric"));
+    }
+  }
+
+  async function saveAdminStructures() {
+    if (!user) return;
+    try {
+      await assignAdminStructures.mutateAsync({ id: user.id, dto: { structureIds: adminStructures } });
+      toast.success(t("security.users.adminStructures.saved"));
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : t("common.errorGeneric"));
     }
@@ -352,6 +371,41 @@ export function UserDetail({ userId }: UserDetailProps) {
               </Button>
             </div>
           </Can>
+
+          {/* Administración DELEGADA por estructura (L2b). Eje DISTINTO del alcance de
+              datos: NO es "ver datos de los nodos", es "administrar la estructura"
+              (árbol/niveles/ciclo de vida). Solo el super-admin
+              (module:structure:manage) puede editarlo; el backend re-autoriza. */}
+          {(canDelegateStructures || adminStructures.length > 0) && (
+            <>
+              <div className={styles.scopeSectionLabel}>{t("security.users.adminStructures.section")}</div>
+              <p className={shared.panelDesc} style={{ margin: 0 }}>
+                {canDelegateStructures
+                  ? adminStructures.length === 0
+                    ? t("security.users.adminStructures.none")
+                    : t("security.users.adminStructures.desc")
+                  : t("security.adminStructures.readOnly")}
+              </p>
+              <AdminStructuresPicker
+                structures={structures}
+                value={adminStructures}
+                onChange={setAdminStructures}
+                disabled={!canDelegateStructures}
+              />
+              {canDelegateStructures && (
+                <div className={shared.actionsFooter}>
+                  <Button
+                    variant="primary"
+                    onClick={saveAdminStructures}
+                    loading={assignAdminStructures.isPending}
+                    disabled={!adminStructuresDirty}
+                  >
+                    {t("common.save")}
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
 

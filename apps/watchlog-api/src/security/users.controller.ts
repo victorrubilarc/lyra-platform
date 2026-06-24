@@ -2,12 +2,14 @@ import { Body, Controller, Get, Param, Patch, Post, Put, Req } from "@nestjs/com
 import type { FastifyRequest } from "fastify";
 import {
   adminResetPasswordRequestSchema,
+  assignAdminStructuresRequestSchema,
   assignRolesRequestSchema,
   assignScopeRequestSchema,
   assignTemplateScopeRequestSchema,
   createUserRequestSchema,
   updateUserRequestSchema,
   type AdminResetPasswordRequest,
+  type AssignAdminStructuresRequest,
   type AssignRolesRequest,
   type AssignScopeRequest,
   type AssignTemplateScopeRequest,
@@ -89,6 +91,22 @@ export class UsersController {
     @Req() req: FastifyRequest,
   ) {
     return this.users.assignTemplateScope(id, dto, this.ctx(user, req));
+  }
+
+  /**
+   * Administración DELEGADA por estructura del usuario (L2b): qué estructuras puede
+   * ADMINISTRAR. Gateado por `module:structure:manage` (solo el super-admin de
+   * estructura reparte delegaciones), no por `user:assign-scope`.
+   */
+  @Put(":id/admin-structures")
+  @RequirePermission("module:structure:manage")
+  assignAdminStructures(
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(assignAdminStructuresRequestSchema)) dto: AssignAdminStructuresRequest,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.users.assignAdminStructures(id, dto, this.ctx(user, req));
   }
 
   /** Restablece el MFA del usuario (dispositivo perdido). El admin nunca enrola por él. */

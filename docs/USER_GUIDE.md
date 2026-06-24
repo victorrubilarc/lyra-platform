@@ -51,6 +51,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 
 ### 5. Seguridad: usuarios, roles y permisos  [Admin]
 - ✅ **Alcance del rol (por nodo y por plantilla)** — define el recorte una vez en el rol; se une al del usuario (§ Seguridad ▸ Alcance del rol)
+- ✅ **Administración delegada por estructura** — un rol/usuario administra SOLO las estructuras que se le delegan; el super-admin, todas; red anti-bloqueo del último administrador (§ Seguridad ▸ Administración delegada por estructura)
 - ✍️ Usuarios (alta, contraseña temporal, asignar roles y alcance)
 - ✍️ Roles y matriz de permisos (4 dimensiones), `requireMfa` por rol
 - ✍️ Política de contraseñas y modo de MFA global
@@ -256,6 +257,62 @@ interfaz solo refleja lo que el backend permite.
 - Como los alcances **suman**, no uses un rol acotado esperando que *restrinja* a alguien que ya tiene acceso más
   amplio por otro rol o por su ficha: para reducir, debes recortar **todas** las fuentes de su alcance.
 - Un rol **sin** alcance por nodo no aporta restricción: sus miembros no ganan ni pierden nodos por él.
+
+---
+
+## Seguridad ▸ Administración delegada por estructura  [Admin]
+
+**Para qué sirve.** Cuando tienes **varias estructuras** (p. ej. departamentos Industrial, TI y Logística, cada
+uno con su propia jerarquía), no siempre quieres que un administrador pueda tocarlas **todas**. La administración
+delegada te deja decir: *"este rol (o esta persona) administra **solo** la estructura TI"*. Esa persona podrá crear
+y editar nodos, configurar niveles y archivar/renombrar **su** estructura, pero **no** las demás. El **administrador
+general** (super-admin) sigue administrándolo todo y es quien reparte las delegaciones. Es la diferencia entre "el
+dueño del sistema" y "el líder de cada área".
+
+Ojo: esto es distinto del **alcance de datos** (§ Alcance del rol). El alcance dice *qué datos VE* una persona; la
+administración delegada dice *qué estructura puede CONFIGURAR*. Son ejes separados: puedes delegar administrar TI sin
+darle acceso a ningún dato operacional, y viceversa.
+
+**Cómo se usa.**
+1. Entra como **administrador general** (quien tiene el permiso "Administrar la estructura organizacional").
+2. **Por rol** (lo recomendado): **Seguridad → Roles**, abre el rol → pestaña **Alcance** → sección **"Administración
+   delegada de estructuras"**. Marca las estructuras que sus miembros podrán administrar. Guarda.
+3. **Por persona** (excepciones): **Seguridad → Usuarios**, abre la ficha → pestaña **Alcance** → sección
+   **"Administración delegada de estructuras"**. Marca las estructuras y guarda.
+4. El delegado, al entrar al selector de estructuras (ícono de estructura en el encabezado), verá **su** estructura
+   —aunque todavía no tenga nodos— y podrá empezar a armarla. Los botones de administrar aparecen **solo** en las
+   estructuras que tiene delegadas.
+
+**Qué puede hacer cada quién.**
+- **Administrador general (super-admin):** todo — crear estructuras nuevas, reordenar el selector, eliminar, y
+  administrar cualquier estructura. Es también quien delega.
+- **Administrador delegado de la estructura X:** dentro de X, crear/editar/mover nodos, configurar niveles, y
+  renombrar/archivar/reactivar X. **No** puede crear estructuras nuevas, reordenar el selector global ni eliminar
+  estructuras (son actos del super-admin), y **no** puede tocar ninguna estructura que no tenga delegada (recibe un
+  aviso de "sin permiso" si lo intenta).
+- **Leer** la estructura de otra área sigue rigiéndose por el alcance de datos normal: la delegación restringe
+  **configurar**, no mirar.
+
+**Quién puede.** Repartir delegaciones requiere el permiso **"Administrar la estructura organizacional"**
+(`module:structure:manage`), que es la marca del **administrador general**. Si no lo tienes, verás las delegaciones
+en modo **solo lectura**. La autorización siempre la decide el servidor.
+
+**Red anti-bloqueo (por qué nunca te quedas sin administrador).** El sistema impide, por diseño, las tres formas de
+"quedarse sin nadie que administre todo": (A) no se pueden **modificar los permisos** del rol de sistema
+"Administrador"; (B) no se puede **quitar** ese rol al **último** administrador; (C) no se puede **deshabilitar** al
+**último** administrador activo. En esos casos la acción se rechaza con un mensaje claro y no ocurre nada. Así, por
+error o a propósito, siempre queda al menos una cuenta capaz de administrarlo todo.
+
+**Importante.**
+- La delegación se evalúa **en vivo**: si le quitas a un rol/usuario una estructura, pierde su administración al
+  instante (igual que el alcance de datos).
+- Como un usuario hereda las delegaciones de **todos** sus roles **más** las propias (se **suman**), para retirarle
+  la administración de una estructura debes quitarla de **todas** sus fuentes.
+- **Cierra un problema previo:** un administrador acotado ahora ve y puede armar una estructura **recién creada
+  aunque todavía no tenga nodos** (antes la administración se deducía de los nodos, así que una estructura vacía era
+  invisible para él).
+- El backend es la fuente de verdad: aunque la interfaz oculte o deshabilite un botón, cualquier intento de
+  administrar una estructura no delegada se rechaza en el servidor.
 
 ---
 

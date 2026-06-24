@@ -1,5 +1,39 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-24 — 🎯 L2b · Administración DELEGADA por estructura + red anti-lockout ✅** (`feat/estructura-admin-delegada`).
+Un administrador deja de ser "dios de toda la instalación": ahora se le puede **delegar** la administración de SOLO
+ciertas estructuras (su árbol de nodos, sus niveles y su ciclo de vida), mientras el **super-admin** sigue
+administrándolo todo. Caso de uso: el "líder de TI" administra la estructura TI (crea nodos, edita niveles, renombra/
+archiva), pero NO puede tocar Industrial ni Logística; el dueño sí administra todas. Patrón ServiceNow domain-admin.
+**Modelo:** tabla nueva `StructureAdmin(structureId, roleId?/userId?)` (migración aditiva `20260624120000_add_structure_admin_delegation`,
+cero pérdida, check de sujeto exclusivo espejo de `Scope`). El alcance de administración = **UNIÓN** de las delegaciones
+propias del usuario + las de sus roles, evaluada **EN VIVO** (quitar el rol/la delegación re-acota al instante).
+**Autorización CONTEXTUAL centralizada** en `ScopeService` (`getAdministrableStructureIds`/`assertCanAdministerStructure`/
+`assertSuperStructureAdmin`), invocada en CADA mutación del `StructureService` (patrón híbrido: el controller mantiene el
+gate grueso `orglevel:manage`/`orgnode:*`, el servicio decide el fino contextual). **Reparto:** crear/eliminar estructura y
+reordenar el selector = **super-admin only** (provisión global); renombrar/archivar/reactivar X y CRUD de niveles/nodos de X
+= **delegado-de-X o super-admin**. **Permiso:** se REUSA `module:structure:manage` (antes latente) como marca de super-admin
+(administra todo + reparte delegaciones) — sin clave nueva ⇒ **sin `db:seed`/FLUSHALL**; el rol "Administrador" ya la tiene
+⇒ conserva acceso total con cero cambios de grants. **Cierra la deuda (b)** de multi-estructura: `listStructures` =
+`accesibles-por-nodo ∪ administrables-por-delegación` ⇒ un delegado VE y arma su estructura aunque aún no tenga nodos
+accesibles; el backend marca por fila `canAdminister` para que la UI habilite/oculte la gestión. **Lectura por id sigue por
+ABAC** (paridad L1/L2c: L2b restringe MUTAR, no leer). **API:** `PUT /security/{roles,users}/:id/admin-structures` (gate
+`module:structure:manage`), detalle de rol/usuario += `adminStructureIds`. **Red ANTI-LOCKOUT** (a petición del dueño, para
+que NUNCA se quede la instalación sin quién administre todo): **(A)** el rol de sistema no puede modificar sus permisos
+(403; idempotente OK), **(B)** no se quita el rol al último administrador (400), **(C)** no se deshabilita al último admin
+activo (400). **Frontend:** componente reusable `AdminStructuresPicker` + sección "Administración delegada de estructuras" en
+el `RoleDrawer` (pestaña Alcance) y en el editor de Usuario (pestaña Alcance), editable solo por el super-admin (el resto la
+ve read-only); el `StructuresDrawer` respeta la delegación (crear/reordenar/eliminar solo super-admin; editar/archivar por
+fila según `canAdminister`). **Decisiones** (en DECISIONS): modelo tabla nueva (no sobrecargar `Scope`) · sujeto rol Y usuario
+(unión, paridad L2a) · super-admin = permiso explícito (NO "sin delegaciones", que sería frágil) · anti-lockout como invariante
+"≥1 admin activo con rol de sistema". typecheck/lint(0)/build verdes; contracts 314 · API 252 · web 6;
+`smoke-estructura-admin-delegada.py` **29/29** (super-admin todo; delegado A: crea/edita/archiva A 200 pero B 403 en cada
+mutación; lee B por ABAC 200; crear/reordenar/eliminar estructura 403; deuda (b): ve y arma C sin nodos; quitar delegación
+re-acota en vivo; delegación por ROL une; candados A/B/C) + regresión `smoke-estructura-ciclo-vida` 17/17 ·
+`smoke-rol-alcance-nodo` 14/14 · `smoke-aislamiento-estructura` 33/33 · `smoke-multi-estructura` 33/33 · `smoke-template-scope`
+14/14. **PENDIENTE: smoke VISUAL del dueño.** **NO** se hizo L3/L4. **Siguiente: L3 (UX premium cross-estructura) o lo que
+defina el dueño.** Anterior:
+
 **2026-06-24 — 🎯 L2c · Ciclo de vida de la estructura organizacional ✅** (`feat/estructura-ciclo-vida`).
 Permite **ARCHIVAR / REACTIVAR** y **REORDENAR** estructuras desde el `StructuresDrawer`, sin borrar datos. Cierra la
 deuda (a) y (c) de multi-estructura. Caso de uso: una empresa cierra temporalmente una línea → archiva su estructura

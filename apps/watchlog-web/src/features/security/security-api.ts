@@ -1,5 +1,6 @@
 import {
   adminResetPasswordRequestSchema,
+  assignAdminStructuresRequestSchema,
   assignRolesRequestSchema,
   assignScopeRequestSchema,
   assignTemplateScopeRequestSchema,
@@ -15,6 +16,7 @@ import {
   updateUserRequestSchema,
   userDetailSchema,
   userSummarySchema,
+  type AssignAdminStructuresRequest,
   type AssignRolesRequest,
   type AssignScopeRequest,
   type AssignTemplateScopeRequest,
@@ -80,6 +82,12 @@ export function resetUserPassword(id: string, password: string): Promise<UserDet
   return apiJson(`/security/users/${id}/reset-password`, userDetailSchema, { method: "POST", body: dto });
 }
 
+/** Estructuras que este usuario puede ADMINISTRAR por delegación (L2b). */
+export function assignUserAdminStructures(id: string, dto: AssignAdminStructuresRequest): Promise<UserDetail> {
+  assignAdminStructuresRequestSchema.parse(dto);
+  return apiJson(`/security/users/${id}/admin-structures`, userDetailSchema, { method: "PUT", body: dto });
+}
+
 // ─── Roles ───────────────────────────────────────────────────────────────────
 
 export function fetchRoles(): Promise<RoleSummary[]> {
@@ -112,6 +120,12 @@ export function assignRoleScope(id: string, dto: AssignScopeRequest): Promise<Ro
 export function assignRoleTemplateScope(id: string, dto: AssignTemplateScopeRequest): Promise<RoleDetail> {
   assignTemplateScopeRequestSchema.parse(dto);
   return apiJson(`/security/roles/${id}/template-scope`, roleDetailSchema, { method: "PUT", body: dto });
+}
+
+/** Estructuras que los miembros de este rol pueden ADMINISTRAR por delegación (L2b). */
+export function assignRoleAdminStructures(id: string, dto: AssignAdminStructuresRequest): Promise<RoleDetail> {
+  assignAdminStructuresRequestSchema.parse(dto);
+  return apiJson(`/security/roles/${id}/admin-structures`, roleDetailSchema, { method: "PUT", body: dto });
 }
 
 // ─── Alcance por plantilla (opciones del selector) ─────────────────────────

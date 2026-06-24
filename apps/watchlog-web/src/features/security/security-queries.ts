@@ -5,6 +5,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import type {
+  AssignAdminStructuresRequest,
   AssignRolesRequest,
   AssignScopeRequest,
   AssignTemplateScopeRequest,
@@ -16,8 +17,10 @@ import type {
   UpdateUserRequest,
 } from "@lyra/contracts";
 import {
+  assignRoleAdminStructures,
   assignRoleScope,
   assignRoleTemplateScope,
+  assignUserAdminStructures,
   assignUserRoles,
   assignUserScope,
   assignUserTemplateScope,
@@ -117,6 +120,19 @@ export function useAssignUserTemplateScope() {
   });
 }
 
+export function useAssignUserAdminStructures() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, dto }: { id: string; dto: AssignAdminStructuresRequest }) =>
+      assignUserAdminStructures(id, dto),
+    onSuccess: (u) => {
+      invalidateUser(qc, u.id);
+      // La delegación cambia qué estructuras VE/administra el usuario en el selector.
+      void qc.invalidateQueries({ queryKey: ["structure"] });
+    },
+  });
+}
+
 export function useResetUserMfa() {
   const qc = useQueryClient();
   return useMutation({
@@ -203,6 +219,20 @@ export function useAssignRoleTemplateScope() {
       void qc.invalidateQueries({ queryKey: SECURITY_KEYS.role(r.id) });
       // El alcance por rol cambia el alcance efectivo de sus usuarios.
       void qc.invalidateQueries({ queryKey: SECURITY_KEYS.users });
+    },
+  });
+}
+
+export function useAssignRoleAdminStructures() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, dto }: { id: string; dto: AssignAdminStructuresRequest }) =>
+      assignRoleAdminStructures(id, dto),
+    onSuccess: (r) => {
+      void qc.invalidateQueries({ queryKey: SECURITY_KEYS.role(r.id) });
+      // La delegación del rol cambia qué estructuras administran sus miembros.
+      void qc.invalidateQueries({ queryKey: SECURITY_KEYS.users });
+      void qc.invalidateQueries({ queryKey: ["structure"] });
     },
   });
 }

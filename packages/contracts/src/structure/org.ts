@@ -27,6 +27,13 @@ export const orgStructureSchema = z.object({
   createdAt: z.string(),
   /** Nº de nodos vivos (para distinguir estructuras CONFIGURADAS de vacías). */
   nodeCount: z.number().int().optional(),
+  /**
+   * Administración delegada (L2b): ¿el usuario que pide la lista puede ADMINISTRAR
+   * esta estructura (super-admin, o delegado de ella)? Lo decide el backend; la UI lo
+   * usa para habilitar/ocultar los botones de gestión por fila. `undefined` cuando la
+   * lista no se pidió en contexto de un usuario (la verdad de permisos es del backend).
+   */
+  canAdminister: z.boolean().optional(),
 });
 export type OrgStructure = z.infer<typeof orgStructureSchema>;
 

@@ -1,5 +1,17 @@
 import { ForbiddenException, Injectable } from "@nestjs/common";
+import type { PermissionKey } from "@lyra/contracts";
+import { PermissionService } from "./permission.service";
 import { PrismaService } from "../prisma/prisma.service";
+
+/**
+ * Permiso de SUPER-ADMIN de estructura (L2b): quien lo tiene administra TODAS las
+ * estructuras y reparte las delegaciones (`StructureAdmin`). Se REUSA la clave de
+ * módulo `module:structure:manage` (antes latente): el rol de sistema "Administrador"
+ * ya la posee, así que conserva acceso total sin migrar grants. Un administrador
+ * DELEGADO tiene `orglevel:manage`/`orgnode:*` pero NO esta clave, y queda acotado a
+ * las estructuras que se le delegan.
+ */
+export const STRUCTURE_SUPER_ADMIN_PERMISSION: PermissionKey = "module:structure:manage";
 
 /**
  * Dimensión 4 (ABAC): alcance de datos. Calcula el conjunto de nodos de la
@@ -22,7 +34,10 @@ export interface AccessibleNodes {
 
 @Injectable()
 export class ScopeService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly permissions: PermissionService,
+  ) {}
 
   /**
    * Nodos accesibles (ids + rutas), o `null` si el usuario no tiene restricción.
@@ -106,6 +121,67 @@ export class ScopeService {
       select: { structureId: true },
     });
     return new Set(nodes.map((n) => n.structureId));
+  }
+
+  // === Administración DELEGADA por estructura (L2b) =========================
+  // Eje DISTINTO del ABAC de datos de arriba: decide quién puede ADMINISTRAR
+  // (mutar) una estructura (su árbol/niveles/ciclo de vida), no quién VE sus
+  // datos. La autorización es CONTEXTUAL: permiso ∧ estructura delegada (o
+  // super-admin). Centralizada aquí para no dispersarla endpoint por endpoint.
+
+  /** ¿El usuario es SUPER-ADMIN de estructura (administra todas y delega)? */
+  async isSuperStructureAdmin(userId: string): Promise<boolean> {
+    const held = await this.permissions.getEffectivePermissions(userId);
+    return held.has(STRUCTURE_SUPER_ADMIN_PERMISSION);
+  }
+
+  /**
+   * Ids de las estructuras que el usuario puede ADMINISTRAR, o `null` si las
+   * administra TODAS (super-admin). A diferencia de `getAccessibleStructureIds`,
+   * NO se deriva de los nodos: se lee de `StructureAdmin` (unión de las filas
+   * propias del usuario + las de sus roles, espejo de la unión de `Scope`). Por
+   * eso un delegado ve su estructura aunque aún no tenga nodos accesibles (cierra
+   * la deuda "(b)" de multi-estructura). Un usuario sin super-admin y sin
+   * delegaciones obtiene un Set VACÍO (no administra ninguna).
+   */
+  async getAdministrableStructureIds(userId: string): Promise<Set<string> | null> {
+    if (await this.isSuperStructureAdmin(userId)) return null; // administra todas
+    const rows = await this.prisma.structureAdmin.findMany({
+      where: { OR: [{ userId }, { role: { users: { some: { userId } } } }] },
+      select: { structureId: true },
+    });
+    return new Set(rows.map((r) => r.structureId));
+  }
+
+  /** ¿El usuario puede ADMINISTRAR esta estructura concreta (delegado o super-admin)? */
+  async canAdministerStructure(userId: string, structureId: string): Promise<boolean> {
+    const administrable = await this.getAdministrableStructureIds(userId);
+    return administrable === null || administrable.has(structureId);
+  }
+
+  /**
+   * Gate duro de administración por estructura: lanza 403 si el usuario no es
+   * super-admin ni tiene delegada esta estructura. Se invoca en CADA mutación de
+   * structure/levels/nodes, ADEMÁS del permiso de catálogo del controller (patrón
+   * híbrido: el gate grueso lo pone el decorador, el fino —contextual— el servicio).
+   */
+  async assertCanAdministerStructure(userId: string, structureId: string): Promise<void> {
+    if (!(await this.canAdministerStructure(userId, structureId))) {
+      throw new ForbiddenException("No tienes delegada la administración de esta estructura");
+    }
+  }
+
+  /**
+   * Gate duro de SUPER-ADMIN: lanza 403 si el usuario no administra TODAS las
+   * estructuras. Reservado para actos de provisión que afectan al conjunto global
+   * (crear/eliminar una estructura, reordenar el selector) o que delegan a otros.
+   */
+  async assertSuperStructureAdmin(userId: string): Promise<void> {
+    if (!(await this.isSuperStructureAdmin(userId))) {
+      throw new ForbiddenException(
+        "Solo un administrador general de estructura puede realizar esta acción",
+      );
+    }
   }
 
   /**
