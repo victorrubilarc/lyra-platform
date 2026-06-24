@@ -2,15 +2,19 @@ packages:
   - "apps/*"
   - "packages/*"
 
+# Scripts de build nativos aprobados explícitamente. pnpm 10+ bloquea los build
+# scripts de dependencias por defecto (seguridad) y en una instalación LIMPIA (CI)
+# un build sin decidir es ERROR DURO `ERR_PNPM_IGNORED_BUILDS` (exit 1). `allowBuilds`
+# es el mecanismo que pnpm 11 consulta y autoescribe sin decidir (placeholders
+# "set this to true or false"); aquí lo fijamos en `true` para los que necesitamos:
+# binarios nativos (argon2/esbuild) y el cliente/engines de Prisma. @nestjs/core
+# solo imprime un mensaje de patrocinio (inofensivo). NOTA: en este pnpm la lista
+# `onlyBuiltDependencies` NO se aplica al instalar (sí la lee `config get`, pero los
+# builds quedan ignorados); `allowBuilds:true` es lo que pnpm honra de verdad.
 allowBuilds:
-  esbuild: set this to true or false
-
-# Scripts de build nativos aprobados explícitamente (pnpm 10+ los bloquea por
-# defecto por seguridad). Estos los necesitamos para compilar binarios.
-onlyBuiltDependencies:
-  - "@nestjs/core"
-  - "@prisma/client"
-  - "@prisma/engines"
-  - argon2
-  - esbuild
-  - prisma
+  '@nestjs/core': true
+  '@prisma/client': true
+  '@prisma/engines': true
+  argon2: true
+  esbuild: true
+  prisma: true

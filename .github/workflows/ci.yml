@@ -26,6 +26,12 @@ jobs:
       - name: Generar cliente Prisma
         run: pnpm --filter @lyra/watchlog-api exec prisma generate
 
+      # Los paquetes compartidos (@lyra/contracts, @lyra/llm, …) se resuelven por su
+      # `dist`/tipos: hay que construirlos antes de typecheck/lint/test o las apps no
+      # los encuentran (en local lo hace `predev`; en CI, checkout limpio, no existe).
+      - name: Construir paquetes compartidos
+        run: pnpm --filter "./packages/**" run build
+
       - name: Typecheck
         run: pnpm typecheck
 
