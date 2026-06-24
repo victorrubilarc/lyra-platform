@@ -75,8 +75,8 @@ export class IncidentsService {
 
   // === Listado / KPIs ========================================================
 
-  async list(userId: string, q: IncidentListQuery): Promise<IncidentListResponse> {
-    const where = await this.buildWhere(userId, q);
+  async list(userId: string, q: IncidentListQuery, structureId?: string): Promise<IncidentListResponse> {
+    const where = await this.buildWhere(userId, q, structureId);
     if (where === null) return { items: [], total: 0, page: q.page ?? 1, pageSize: q.pageSize ?? 25 };
 
     const page = q.page ?? 1;
@@ -96,8 +96,8 @@ export class IncidentsService {
     return { items, total, page, pageSize };
   }
 
-  async stats(userId: string): Promise<IncidentStats> {
-    const base = await this.buildWhere(userId, {});
+  async stats(userId: string, structureId?: string): Promise<IncidentStats> {
+    const base = await this.buildWhere(userId, {}, structureId);
     if (base === null)
       return { open: 0, critical: 0, overdue: 0, slaBreached: 0, unassigned: 0, fromLogbook: 0, reportable: 0, reportOverdue: 0 };
     const openBase: Prisma.IncidentWhereInput = { ...base, lifecycle: "OPEN" };
@@ -637,8 +637,13 @@ export class IncidentsService {
     }
   }
 
-  /** Construye el WHERE con ABAC por nodo + filtros. `null` = el usuario no alcanza ningún nodo. */
-  private async buildWhere(userId: string, q: IncidentListQuery): Promise<Prisma.IncidentWhereInput | null> {
+  /**
+   * Construye el WHERE con ABAC por nodo + filtros. `null` = el usuario no alcanza
+   * ningún nodo. **Aislamiento L1b**: si se pasa `structureId` (estructura activa del
+   * workspace), se intersecta en AND vía la relación `orgNode.structureId` — un
+   * usuario acotado a otra estructura obtiene intersección vacía ⇒ lista vacía.
+   */
+  private async buildWhere(userId: string, q: IncidentListQuery, structureId?: string): Promise<Prisma.IncidentWhereInput | null> {
     const nodeIds = await this.scope.getAccessibleNodeIds(userId);
     if (nodeIds && nodeIds.size === 0) return null;
     let nodeFilter: string[] | undefined = nodeIds ? [...nodeIds] : undefined;
@@ -648,6 +653,7 @@ export class IncidentsService {
     }
     const where: Prisma.IncidentWhereInput = {
       ...(nodeFilter ? { orgNodeId: { in: nodeFilter } } : {}),
+      ...(structureId ? { orgNode: { structureId } } : {}),
       ...(q.lifecycle ? { lifecycle: q.lifecycle } : {}),
       ...(q.typeId ? { typeId: q.typeId } : {}),
       ...(q.categoryId ? { categoryId: q.categoryId } : {}),

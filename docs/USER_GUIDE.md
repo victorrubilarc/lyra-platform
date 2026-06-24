@@ -164,6 +164,13 @@ estructuras: requiere el permiso de **gestión de niveles** (`orglevel:manage`).
 **Importante.**
 - **Aislamiento estricto:** un nodo pertenece a UNA estructura y **no se puede mover a otra**. Los niveles, los
   calendarios y la asignación de calendarios a nodos también son **por estructura**.
+- **La estructura activa filtra TODA la operación, no solo la configuración** (desde 2026-06-24). Las grillas de
+  **bitácoras, incidencias, excepciones, rondas, mis rondas, cambio de turno y el dashboard**, además de sus
+  **KPIs y exportaciones** (CSV de bitácoras), muestran **solo** lo de la estructura activa. Cambia de estructura
+  en el selector para ver la operación de otra. Si tu usuario está **acotado por alcance** y eliges una estructura
+  donde no tienes nodos, las listas saldrán **vacías** (es lo correcto: nunca ves datos de un área ajena).
+  *Excepción:* abrir un registro puntual por su enlace directo (p. ej. desde la **campanita** de avisos) funciona
+  aunque sea de otra estructura, siempre que tu alcance te dé acceso a ese nodo —los enlaces no se rompen.
 - **La «Estructura por defecto»** es la que ya existía antes de habilitar esta función: contiene **intactos**
   todos tus niveles, nodos, alcances, asignaciones de plantillas y calendarios previos. **No se puede eliminar.**
 - Una estructura **no se puede eliminar si tiene nodos** (aunque estén dados de baja), porque arrastran

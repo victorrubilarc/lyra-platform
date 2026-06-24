@@ -26,8 +26,8 @@ export class SchedulesController {
 
   @Get()
   @RequirePermission("schedule:view")
-  list(@CurrentUser() user: RequestUser) {
-    return this.schedules.list(user.id);
+  list(@CurrentUser() user: RequestUser, @Query("structureId") structureId?: string) {
+    return this.schedules.list(user.id, structureId);
   }
 
   // Ocurrencias (rondas pendientes/vencidas). Antes de `:id` para no chocar con él.
@@ -36,14 +36,15 @@ export class SchedulesController {
   listOccurrences(
     @Query(new ZodValidationPipe(occurrenceQuerySchema)) q: OccurrenceQuery,
     @CurrentUser() user: RequestUser,
+    @Query("structureId") structureId?: string,
   ) {
-    return this.schedules.listOccurrences(user.id, q);
+    return this.schedules.listOccurrences(user.id, q, structureId);
   }
 
   @Get("occurrences/stats")
   @RequirePermission("schedule:view")
-  occurrenceStats(@CurrentUser() user: RequestUser) {
-    return this.schedules.occurrenceStats(user.id);
+  occurrenceStats(@CurrentUser() user: RequestUser, @Query("structureId") structureId?: string) {
+    return this.schedules.occurrenceStats(user.id, structureId);
   }
 
   // --- Worklist del operador ("Mis rondas", 2.3.1) ---------------------------
@@ -55,14 +56,15 @@ export class SchedulesController {
   myRounds(
     @Query(new ZodValidationPipe(myRoundsQuerySchema)) q: MyRoundsQuery,
     @CurrentUser() user: RequestUser,
+    @Query("structureId") structureId?: string,
   ) {
-    return this.schedules.listMyRounds(user.id, q);
+    return this.schedules.listMyRounds(user.id, q, structureId);
   }
 
   @Get("my-rounds/stats")
   @RequirePermission("round:execute")
-  myRoundsStats(@CurrentUser() user: RequestUser) {
-    return this.schedules.myRoundsStats(user.id);
+  myRoundsStats(@CurrentUser() user: RequestUser, @Query("structureId") structureId?: string) {
+    return this.schedules.myRoundsStats(user.id, structureId);
   }
 
   /** Roles para el selector de "rol responsable" del planificador (decoplado de role:read). */

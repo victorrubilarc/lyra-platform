@@ -127,8 +127,8 @@ export class IncidentsController {
 
   @Get("stats")
   @RequirePermission("incident:view")
-  stats(@CurrentUser() user: RequestUser) {
-    return this.incidents.stats(user.id);
+  stats(@CurrentUser() user: RequestUser, @Query("structureId") structureId?: string) {
+    return this.incidents.stats(user.id, structureId);
   }
 
   /**
@@ -141,8 +141,9 @@ export class IncidentsController {
   dashboardData(
     @Query(new ZodValidationPipe(incidentDashboardQuerySchema)) q: IncidentDashboardQuery,
     @CurrentUser() user: RequestUser,
+    @Query("structureId") structureId?: string,
   ) {
-    return this.dashboard.build(user.id, q);
+    return this.dashboard.build(user.id, q, structureId);
   }
 
   /** Usuarios asignables como responsable (selector del detalle). */
@@ -166,8 +167,9 @@ export class IncidentsController {
   list(
     @Query(new ZodValidationPipe(incidentListQuerySchema)) q: IncidentListQuery,
     @CurrentUser() user: RequestUser,
+    @Query("structureId") structureId?: string,
   ) {
-    return this.incidents.list(user.id, q);
+    return this.incidents.list(user.id, q, structureId);
   }
 
   @Get(":id")

@@ -33,8 +33,9 @@ export class ExceptionsController {
   list(
     @Query(new ZodValidationPipe(exceptionListQuerySchema)) q: ExceptionListQuery,
     @CurrentUser() user: RequestUser,
+    @Query("structureId") structureId?: string,
   ) {
-    return this.exceptions.list(user.id, q);
+    return this.exceptions.list(user.id, q, structureId);
   }
 
   /** Resumen para el panel de revisión de una entrada de bitácora. */

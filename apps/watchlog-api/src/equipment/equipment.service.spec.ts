@@ -1,13 +1,23 @@
-import { BadRequestException, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EquipmentService } from "./equipment.service";
 import type { AuditService } from "../audit/audit.service";
+import type { ScopeService } from "../authz/scope.service";
 import type { PrismaService } from "../prisma/prisma.service";
 
 const ctx = { actorId: "admin", actorEmail: "a@x.cl", ip: null, userAgent: null };
 
-function makeService(overrides: Record<string, unknown> = {}) {
+/** Mock de ScopeService; por defecto sin restricción (admin global). */
+function makeScope(overrides: Partial<Record<keyof ScopeService, unknown>> = {}) {
+  return {
+    getAccessibleNodeIds: vi.fn().mockResolvedValue(null),
+    canAccessNode: vi.fn().mockResolvedValue(true),
+    ...overrides,
+  } as unknown as ScopeService;
+}
+
+function makeService(overrides: Record<string, unknown> = {}, scope: ScopeService = makeScope()) {
   const prisma = {
     orgNode: { count: vi.fn().mockResolvedValue(1) },
     equipmentCategory: {
@@ -28,7 +38,7 @@ function makeService(overrides: Record<string, unknown> = {}) {
     ...overrides,
   } as unknown as PrismaService;
   const audit = { record: vi.fn().mockResolvedValue(undefined) } as unknown as AuditService;
-  return { service: new EquipmentService(prisma, audit), prisma, audit };
+  return { service: new EquipmentService(prisma, audit, scope), prisma, audit, scope };
 }
 
 describe("EquipmentService", () => {
@@ -126,33 +136,61 @@ describe("EquipmentService", () => {
     );
   });
 
-  it("listByNode filtra equipos vivos del nodo, ordenados", async () => {
+  it("listByNode filtra equipos vivos del nodo, ordenados (usuario sin restricción)", async () => {
     const findMany = vi.fn().mockResolvedValue([]);
     const { service } = makeService({ equipment: { findMany } });
-    await service.listByNode("n1");
+    await service.listByNode("admin", "n1");
     expect(findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { orgNodeId: "n1", deletedAt: null } }),
     );
   });
 
-  it("search ignora términos de menos de 2 caracteres", async () => {
+  it("listByNode lanza 403 si el nodo está fuera del alcance del usuario (L1a)", async () => {
     const findMany = vi.fn().mockResolvedValue([]);
-    const { service } = makeService({ equipment: { findMany } });
-    expect(await service.search("a")).toEqual([]);
+    const scope = makeScope({ canAccessNode: vi.fn().mockResolvedValue(false) });
+    const { service } = makeService({ equipment: { findMany } }, scope);
+    await expect(service.listByNode("beto", "n-ajeno")).rejects.toBeInstanceOf(ForbiddenException);
     expect(findMany).not.toHaveBeenCalled();
   });
 
-  it("search busca GLOBAL por nombre/tag/código (sin scope de datos: Estructura es config global)", async () => {
-    const findMany = vi.fn().mockResolvedValue([{ id: "eq1", name: "Moldurera Weinig 1" }]);
+  it("search ignora términos de menos de 2 caracteres", async () => {
+    const findMany = vi.fn().mockResolvedValue([]);
     const { service } = makeService({ equipment: { findMany } });
-    const res = await service.search("weinig");
+    expect(await service.search("admin", "a")).toEqual([]);
+    expect(findMany).not.toHaveBeenCalled();
+  });
+
+  it("search acota por ABAC: usuario sin acceso a ningún nodo => vacío sin consultar (L1a)", async () => {
+    const findMany = vi.fn().mockResolvedValue([]);
+    const scope = makeScope({ getAccessibleNodeIds: vi.fn().mockResolvedValue(new Set<string>()) });
+    const { service } = makeService({ equipment: { findMany } }, scope);
+    expect(await service.search("beto", "weinig")).toEqual([]);
+    expect(findMany).not.toHaveBeenCalled();
+  });
+
+  it("search acota por nodos accesibles y estructura activa (L1a/L1b)", async () => {
+    const findMany = vi.fn().mockResolvedValue([{ id: "eq1", name: "Moldurera Weinig 1" }]);
+    const scope = makeScope({ getAccessibleNodeIds: vi.fn().mockResolvedValue(new Set(["n1", "n2"])) });
+    const { service } = makeService({ equipment: { findMany } }, scope);
+    const res = await service.search("user", "weinig", "struct-A");
     expect(res).toHaveLength(1);
-    expect(findMany).toHaveBeenCalledTimes(1);
     const where = (findMany.mock.calls[0]![0] as { where: Record<string, unknown> }).where;
-    expect(where).toMatchObject({ deletedAt: null });
-    expect(where).not.toHaveProperty("orgNodeId"); // NO filtra por nodo accesible
+    expect(where).toMatchObject({
+      deletedAt: null,
+      orgNodeId: { in: ["n1", "n2"] }, // ABAC por nodo
+      orgNode: { structureId: "struct-A" }, // estructura activa
+    });
     expect(where.OR).toEqual(
       expect.arrayContaining([{ name: { contains: "weinig", mode: "insensitive" } }]),
     );
+  });
+
+  it("search sin restricción de nodo no agrega orgNodeId, pero sí estructura si se pasa", async () => {
+    const findMany = vi.fn().mockResolvedValue([]);
+    const { service } = makeService({ equipment: { findMany } }); // scope sin restricción (null)
+    await service.search("admin", "weinig", "struct-B");
+    const where = (findMany.mock.calls[0]![0] as { where: Record<string, unknown> }).where;
+    expect(where).not.toHaveProperty("orgNodeId");
+    expect(where).toMatchObject({ orgNode: { structureId: "struct-B" } });
   });
 });

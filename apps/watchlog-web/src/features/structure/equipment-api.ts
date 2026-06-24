@@ -44,12 +44,11 @@ export function fetchEquipmentByNode(orgNodeId: string): Promise<Equipment[]> {
   );
 }
 
-/** Busca equipos por nombre/tag/código en toda la estructura accesible (ABAC). */
-export function searchEquipment(term: string): Promise<Equipment[]> {
-  return apiJson(
-    `/structure/equipment?search=${encodeURIComponent(term)}`,
-    z.array(equipmentSchema),
-  );
+/** Busca equipos por nombre/tag/código, acotado al ABAC del usuario y a la estructura activa. */
+export function searchEquipment(term: string, structureId?: string | null): Promise<Equipment[]> {
+  const p = new URLSearchParams({ search: term });
+  if (structureId) p.set("structureId", structureId);
+  return apiJson(`/structure/equipment?${p.toString()}`, z.array(equipmentSchema));
 }
 
 export function createEquipment(dto: CreateEquipmentRequest): Promise<Equipment> {

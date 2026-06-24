@@ -36,6 +36,7 @@ import { ApiError } from "../../lib/api-client.js";
 import { downloadBlob, fileStamp } from "../../lib/download.js";
 import { useAccessibleOrgTree } from "../structure/structure-queries.js";
 import { exportLogbookCsv, fetchMyShiftFilter } from "./logbook-api.js";
+import { useActiveStructureId } from "../structure/structure-queries.js";
 import { useLogbookFacets, useLogbookFilterTemplates, useLogbookList, useLogbookStats, useSavedViewMutations, useSavedViews } from "./logbook-queries.js";
 import { formatSummaryValue } from "./logbook-cells.js";
 import { FacetsPanel } from "./FacetsPanel.js";
@@ -274,6 +275,7 @@ export function LogbookPage() {
   }, [state, setSearchParams]);
 
   const query = useMemo(() => toListQuery(state, userId), [state, userId]);
+  const activeStructureId = useActiveStructureId();
   const list = useLogbookList(query);
   const stats = useLogbookStats(query);
   const facets = useLogbookFacets(query, facetsOpen);
@@ -543,7 +545,7 @@ export function LogbookPage() {
   async function doExport() {
     setExporting(true);
     try {
-      const blob = await exportLogbookCsv(query);
+      const blob = await exportLogbookCsv(query, activeStructureId);
       downloadBlob(`bitacoras-${fileStamp()}.csv`, blob);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : t("common.errorGeneric"));

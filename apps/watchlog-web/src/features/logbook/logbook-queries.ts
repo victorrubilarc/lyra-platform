@@ -19,11 +19,12 @@ import {
   updateSavedView,
   verifyLogbookSignature,
 } from "./logbook-api.js";
+import { useActiveStructureId } from "../structure/structure-queries.js";
 
 export const LOGBOOK_KEYS = {
-  list: (query: LogEntryListQuery) => ["logbook", "list", query] as const,
-  stats: (query: LogEntryListQuery) => ["logbook", "stats", query] as const,
-  facets: (query: LogEntryListQuery) => ["logbook", "facets", query] as const,
+  list: (query: LogEntryListQuery, structureId: string | null) => ["logbook", "list", query, structureId] as const,
+  stats: (query: LogEntryListQuery, structureId: string | null) => ["logbook", "stats", query, structureId] as const,
+  facets: (query: LogEntryListQuery, structureId: string | null) => ["logbook", "facets", query, structureId] as const,
   timeline: (id: string) => ["logbook", "timeline", id] as const,
   changes: (id: string) => ["logbook", "changes", id] as const,
   related: (id: string) => ["logbook", "related", id] as const,
@@ -42,21 +43,24 @@ export function useLogbookFilterTemplates() {
 
 /** Listado paginado por cursor keyset (la query NO incluye `cursor`: lo maneja el hook). */
 export function useLogbookList(query: LogEntryListQuery) {
+  const structureId = useActiveStructureId();
   return useInfiniteQuery({
-    queryKey: LOGBOOK_KEYS.list(query),
-    queryFn: ({ pageParam }) => fetchLogbookList({ ...query, cursor: pageParam || undefined }),
+    queryKey: LOGBOOK_KEYS.list(query, structureId),
+    queryFn: ({ pageParam }) => fetchLogbookList({ ...query, cursor: pageParam || undefined }, structureId),
     initialPageParam: "",
     getNextPageParam: (last) => last.nextCursor,
   });
 }
 
 export function useLogbookStats(query: LogEntryListQuery) {
-  return useQuery({ queryKey: LOGBOOK_KEYS.stats(query), queryFn: () => fetchLogbookStats(query) });
+  const structureId = useActiveStructureId();
+  return useQuery({ queryKey: LOGBOOK_KEYS.stats(query, structureId), queryFn: () => fetchLogbookStats(query, structureId) });
 }
 
 /** Facetas con conteo del set filtrado (estilo Splunk/Kibana). */
 export function useLogbookFacets(query: LogEntryListQuery, enabled: boolean) {
-  return useQuery({ queryKey: LOGBOOK_KEYS.facets(query), queryFn: () => fetchLogbookFacets(query), enabled, staleTime: 15_000 });
+  const structureId = useActiveStructureId();
+  return useQuery({ queryKey: LOGBOOK_KEYS.facets(query, structureId), queryFn: () => fetchLogbookFacets(query, structureId), enabled, staleTime: 15_000 });
 }
 
 export function useLogbookTimeline(id: string) {

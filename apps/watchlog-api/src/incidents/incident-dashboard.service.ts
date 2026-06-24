@@ -59,7 +59,7 @@ export class IncidentDashboardService {
     private readonly incidents: IncidentsService,
   ) {}
 
-  async build(userId: string, q: IncidentDashboardQuery): Promise<IncidentDashboard> {
+  async build(userId: string, q: IncidentDashboardQuery, structureId?: string): Promise<IncidentDashboard> {
     const now = new Date();
     const fallback = defaultDashboardRange(now);
     const from = q.createdFrom ?? fallback.from;
@@ -84,6 +84,18 @@ export class IncidentDashboardService {
     let nodeFilter: string[] | undefined = nodeIds ? [...nodeIds] : undefined;
     if (q.orgNodeIds && q.orgNodeIds.length > 0) {
       nodeFilter = nodeFilter ? nodeFilter.filter((n) => q.orgNodeIds!.includes(n)) : q.orgNodeIds;
+      if (nodeFilter.length === 0) {
+        return { range, kpis: emptyKpis(), trend: [], byType: [], bySeverity: [], byNode: [], byEquipment: [], byShift: [], byOrigin: [], recurrence: [] };
+      }
+    }
+    // === Aislamiento L1b: intersección con la ESTRUCTURA ACTIVA ===============
+    // Se resuelve aquí (una vez) a su conjunto de nodos y se intersecta con el ABAC,
+    // de modo que TODA la analítica de abajo (Prisma groupBy y SQL crudo) queda acotada
+    // sin tocar `categoricalWhere`/`rawScope`. Intersección vacía ⇒ dashboard vacío.
+    if (structureId) {
+      const structNodes = await this.prisma.orgNode.findMany({ where: { structureId, deletedAt: null }, select: { id: true } });
+      const structIds = structNodes.map((n) => n.id);
+      nodeFilter = nodeFilter ? nodeFilter.filter((n) => structIds.includes(n)) : structIds;
       if (nodeFilter.length === 0) {
         return { range, kpis: emptyKpis(), trend: [], byType: [], bySeverity: [], byNode: [], byEquipment: [], byShift: [], byOrigin: [], recurrence: [] };
       }

@@ -55,20 +55,23 @@ export function listQueryString(query: LogEntryListQuery): string {
   return params.toString();
 }
 
-export function fetchLogbookList(query: LogEntryListQuery): Promise<LogEntryListResponse> {
-  const qs = listQueryString(query);
-  return apiJson(`/log-entries${qs ? `?${qs}` : ""}`, logEntryListResponseSchema);
+/** Une el querystring del listado con `structureId` (estructura activa; aislamiento L1b). */
+function withStructure(qs: string, structureId?: string | null): string {
+  const s = structureId ? (qs ? `${qs}&structureId=${encodeURIComponent(structureId)}` : `structureId=${encodeURIComponent(structureId)}`) : qs;
+  return s ? `?${s}` : "";
 }
 
-export function fetchLogbookStats(query: LogEntryListQuery): Promise<LogEntryStats> {
-  const qs = listQueryString(query);
-  return apiJson(`/log-entries/stats${qs ? `?${qs}` : ""}`, logEntryStatsSchema);
+export function fetchLogbookList(query: LogEntryListQuery, structureId?: string | null): Promise<LogEntryListResponse> {
+  return apiJson(`/log-entries${withStructure(listQueryString(query), structureId)}`, logEntryListResponseSchema);
+}
+
+export function fetchLogbookStats(query: LogEntryListQuery, structureId?: string | null): Promise<LogEntryStats> {
+  return apiJson(`/log-entries/stats${withStructure(listQueryString(query), structureId)}`, logEntryStatsSchema);
 }
 
 /** Facetas con conteo del set filtrado (mismo where+ABAC; conteos de hermanos). */
-export function fetchLogbookFacets(query: LogEntryListQuery): Promise<LogEntryFacets> {
-  const qs = listQueryString(query);
-  return apiJson(`/log-entries/facets${qs ? `?${qs}` : ""}`, logEntryFacetsSchema);
+export function fetchLogbookFacets(query: LogEntryListQuery, structureId?: string | null): Promise<LogEntryFacets> {
+  return apiJson(`/log-entries/facets${withStructure(listQueryString(query), structureId)}`, logEntryFacetsSchema);
 }
 
 /** Filtros resueltos de "Mi turno" (turno/día vigentes + autor), resueltos por backend. */
@@ -77,9 +80,8 @@ export function fetchMyShiftFilter(): Promise<MyShiftFilter> {
 }
 
 /** Export CSV server-side del set COMPLETO filtrado (no solo la página). */
-export function exportLogbookCsv(query: LogEntryListQuery): Promise<Blob> {
-  const qs = listQueryString(query);
-  return apiBlob(`/log-entries/export${qs ? `?${qs}` : ""}`);
+export function exportLogbookCsv(query: LogEntryListQuery, structureId?: string | null): Promise<Blob> {
+  return apiBlob(`/log-entries/export${withStructure(listQueryString(query), structureId)}`);
 }
 
 export function fetchLogbookTimeline(id: string, cursor?: string): Promise<LogEntryTimelineResponse> {

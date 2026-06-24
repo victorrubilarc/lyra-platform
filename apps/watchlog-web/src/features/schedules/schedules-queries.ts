@@ -14,35 +14,41 @@ import {
   startOccurrence,
   updateSchedule,
 } from "./schedules-api.js";
+import { useActiveStructureId } from "../structure/structure-queries.js";
 
 export const SCHEDULE_KEYS = {
   all: ["schedules"] as const,
-  list: () => ["schedules", "list"] as const,
-  occurrences: (q: OccurrenceQuery) => ["schedules", "occurrences", q] as const,
-  stats: () => ["schedules", "stats"] as const,
-  myRounds: (q: MyRoundsQuery) => ["schedules", "my-rounds", q] as const,
-  myRoundsStats: () => ["schedules", "my-rounds", "stats"] as const,
+  list: (structureId: string | null) => ["schedules", "list", structureId] as const,
+  occurrences: (q: OccurrenceQuery, structureId: string | null) => ["schedules", "occurrences", q, structureId] as const,
+  stats: (structureId: string | null) => ["schedules", "stats", structureId] as const,
+  myRounds: (q: MyRoundsQuery, structureId: string | null) => ["schedules", "my-rounds", q, structureId] as const,
+  myRoundsStats: (structureId: string | null) => ["schedules", "my-rounds", "stats", structureId] as const,
   roleOptions: () => ["schedules", "role-options"] as const,
 };
 
 export function useSchedules() {
-  return useQuery({ queryKey: SCHEDULE_KEYS.list(), queryFn: fetchSchedules });
+  const structureId = useActiveStructureId();
+  return useQuery({ queryKey: SCHEDULE_KEYS.list(structureId), queryFn: () => fetchSchedules(structureId) });
 }
 
 export function useOccurrences(q: OccurrenceQuery = {}, enabled = true) {
-  return useQuery({ queryKey: SCHEDULE_KEYS.occurrences(q), queryFn: () => fetchOccurrences(q), enabled });
+  const structureId = useActiveStructureId();
+  return useQuery({ queryKey: SCHEDULE_KEYS.occurrences(q, structureId), queryFn: () => fetchOccurrences(q, structureId), enabled });
 }
 
 export function useOccurrenceStats(enabled = true) {
-  return useQuery({ queryKey: SCHEDULE_KEYS.stats(), queryFn: fetchOccurrenceStats, enabled });
+  const structureId = useActiveStructureId();
+  return useQuery({ queryKey: SCHEDULE_KEYS.stats(structureId), queryFn: () => fetchOccurrenceStats(structureId), enabled });
 }
 
 export function useMyRounds(q: MyRoundsQuery = {}) {
-  return useQuery({ queryKey: SCHEDULE_KEYS.myRounds(q), queryFn: () => fetchMyRounds(q) });
+  const structureId = useActiveStructureId();
+  return useQuery({ queryKey: SCHEDULE_KEYS.myRounds(q, structureId), queryFn: () => fetchMyRounds(q, structureId) });
 }
 
 export function useMyRoundsStats(enabled = true) {
-  return useQuery({ queryKey: SCHEDULE_KEYS.myRoundsStats(), queryFn: fetchMyRoundsStats, enabled });
+  const structureId = useActiveStructureId();
+  return useQuery({ queryKey: SCHEDULE_KEYS.myRoundsStats(structureId), queryFn: () => fetchMyRoundsStats(structureId), enabled });
 }
 
 export function useScheduleRoleOptions(enabled = true) {

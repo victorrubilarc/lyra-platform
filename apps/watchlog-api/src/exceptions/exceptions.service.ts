@@ -50,8 +50,8 @@ export class ExceptionsService {
 
   // === Listado / resumen ======================================================
 
-  async list(userId: string, q: ExceptionListQuery): Promise<ExceptionListResponse> {
-    const where = await this.buildWhere(userId, q);
+  async list(userId: string, q: ExceptionListQuery, structureId?: string): Promise<ExceptionListResponse> {
+    const where = await this.buildWhere(userId, q, structureId);
     const page = q.page ?? 1;
     const pageSize = q.pageSize ?? 25;
     if (where === null) {
@@ -408,13 +408,25 @@ export class ExceptionsService {
     }
   }
 
-  /** WHERE con ABAC por nodo + filtros. `null` = el usuario no alcanza ningún nodo. */
-  private async buildWhere(userId: string, q: ExceptionListQuery): Promise<Prisma.LogEntryExceptionWhereInput | null> {
+  /**
+   * WHERE con ABAC por nodo + filtros. `null` = el usuario no alcanza ningún nodo.
+   * **Aislamiento L1b**: `structureId` (estructura activa) se intersecta en AND vía
+   * la relación `orgNode.structureId`.
+   */
+  private async buildWhere(userId: string, q: ExceptionListQuery, structureId?: string): Promise<Prisma.LogEntryExceptionWhereInput | null> {
     const nodeIds = await this.scope.getAccessibleNodeIds(userId);
     if (nodeIds && nodeIds.size === 0) return null;
     let nodeFilter: string[] | undefined = nodeIds ? [...nodeIds] : undefined;
     if (q.orgNodeIds && q.orgNodeIds.length > 0) {
       nodeFilter = nodeFilter ? nodeFilter.filter((n) => q.orgNodeIds!.includes(n)) : q.orgNodeIds;
+      if (nodeFilter.length === 0) return null;
+    }
+    // Aislamiento L1b: `LogEntryException` no expone relación `orgNode` navegable, así
+    // que la estructura activa se intersecta resolviendo sus nodos (igual que el dashboard).
+    if (structureId) {
+      const structNodes = await this.prisma.orgNode.findMany({ where: { structureId, deletedAt: null }, select: { id: true } });
+      const structIds = structNodes.map((n) => n.id);
+      nodeFilter = nodeFilter ? nodeFilter.filter((n) => structIds.includes(n)) : structIds;
       if (nodeFilter.length === 0) return null;
     }
     const where: Prisma.LogEntryExceptionWhereInput = {

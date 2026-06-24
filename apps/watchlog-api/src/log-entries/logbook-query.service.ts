@@ -107,8 +107,8 @@ export class LogbookQueryService {
 
   // --- Listado (grilla /bitacoras) --------------------------------------------
 
-  async list(userId: string, query: LogEntryListQuery): Promise<LogEntryListResponse> {
-    const where = await this.buildWhere(userId, query);
+  async list(userId: string, query: LogEntryListQuery, structureId?: string): Promise<LogEntryListResponse> {
+    const where = await this.buildWhere(userId, query, { structureId });
     const sortKeys = resolveSortKeys(query);
     const take = query.take ?? LogbookQueryService.DEFAULT_TAKE;
 
@@ -128,9 +128,9 @@ export class LogbookQueryService {
   }
 
   /** KPIs del set filtrado (mismo `where` que el listado). */
-  async stats(userId: string, query: LogEntryListQuery): Promise<LogEntryStats> {
+  async stats(userId: string, query: LogEntryListQuery, structureId?: string): Promise<LogEntryStats> {
     const delayedIds = await this.delayedEntryIds();
-    const where = await this.buildWhere(userId, query, { delayedIds });
+    const where = await this.buildWhere(userId, query, { delayedIds, structureId });
     const [total, byStatus, pendingSignatures, withCrit, withWarn, delayed] = await Promise.all([
       this.prisma.logEntry.count({ where }),
       this.prisma.logEntry.groupBy({ by: ["status"], where, _count: { _all: true } }),
@@ -156,9 +156,10 @@ export class LogbookQueryService {
    * "hermanos": elegir un valor no anula las demás opciones). COUNT exacto; a gran
    * escala migra a rollups/aproximado (Fase 7, BACKLOG §3).
    */
-  async facets(userId: string, query: LogEntryListQuery): Promise<LogEntryFacets> {
+  async facets(userId: string, query: LogEntryListQuery, structureId?: string): Promise<LogEntryFacets> {
     const delayedIds = await this.delayedEntryIds();
-    const without = (omit: Partial<LogEntryListQuery>) => this.buildWhere(userId, { ...query, ...omit }, { delayedIds });
+    const without = (omit: Partial<LogEntryListQuery>) =>
+      this.buildWhere(userId, { ...query, ...omit }, { delayedIds, structureId });
     const [statusW, stateW, templateW, equipW, bandW, delayedW] = await Promise.all([
       without({ status: undefined }),
       without({ stateKey: undefined }),
@@ -259,8 +260,8 @@ export class LogbookQueryService {
    * Exporta el set COMPLETO filtrado a CSV (`;` + BOM para Excel es-CL), iterando
    * por keyset en lotes (espejo del patrón de /security/audit/export).
    */
-  async exportCsv(userId: string, query: LogEntryListQuery): Promise<{ csv: string; truncated: boolean }> {
-    const where = await this.buildWhere(userId, query);
+  async exportCsv(userId: string, query: LogEntryListQuery, structureId?: string): Promise<{ csv: string; truncated: boolean }> {
+    const where = await this.buildWhere(userId, query, { structureId });
     const sortKeys = resolveSortKeys(query);
 
     const items: LogEntryListItem[] = [];
@@ -664,12 +665,16 @@ export class LogbookQueryService {
   private async buildWhere(
     userId: string,
     query: LogEntryListQuery,
-    opts?: { delayedIds?: string[] },
+    opts?: { delayedIds?: string[]; structureId?: string },
   ): Promise<Prisma.LogEntryWhereInput> {
     const and: Prisma.LogEntryWhereInput[] = [{ deletedAt: null }];
 
     const accessible = await this.scope.getAccessibleNodeIds(userId);
     if (accessible !== null) and.push({ orgNodeId: { in: [...accessible] } });
+
+    // Aislamiento L1b: estructura ACTIVA del workspace (AND con el ABAC por nodo).
+    // Un usuario acotado a otra estructura ⇒ intersección vacía ⇒ grilla/stats/export vacíos.
+    if (opts?.structureId) and.push({ orgNode: { structureId: opts.structureId } });
 
     // 2.º eje ABAC (Fase 2.8): alcance por PLANTILLA. Allow-list ⇒ filtra la
     // grilla/stats/export por las plantillas asignadas (AND con el eje de nodo).

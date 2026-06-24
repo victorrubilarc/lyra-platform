@@ -20,11 +20,13 @@ import {
   updateHandoverItem,
   updateHandoverSummary,
 } from "./shift-handover-api.js";
+import { useActiveStructureId } from "../structure/structure-queries.js";
 
 const KEY = ["shift-handover"] as const;
 
 export function useHandovers(q: ShiftHandoverListQuery) {
-  return useQuery({ queryKey: [...KEY, "list", q], queryFn: () => fetchHandovers(q) });
+  const structureId = useActiveStructureId();
+  return useQuery({ queryKey: [...KEY, "list", q, structureId], queryFn: () => fetchHandovers(q, structureId) });
 }
 
 export function useHandoverDetail(id: string | null) {

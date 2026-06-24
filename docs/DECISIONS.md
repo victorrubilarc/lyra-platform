@@ -4,6 +4,44 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-24 · Aislamiento COMPLETO por estructura (L1): filtro `structureId` en TODO listado operacional
+Cierra la deuda `org-views-vs-isolation`: hasta ahora la "estructura activa" solo filtraba la CONFIGURACIÓN
+(árbol/niveles/calendarios) y los selectores de nodo, pero los **listados operacionales** (incidencias,
+bitácoras, excepciones, rondas, cambio de turno, dashboard, exports) seguían mostrando datos de otra estructura
+(leak). El aislamiento "o es total, o no es aislamiento". Plan L1 del Anexo A de `NOTA_estructuras_y_jerarquias.md`.
+Decisiones (las 3 "a resolver", confirmadas con el dueño):
+- **¿Cómo conoce el backend la estructura activa?** Querystring **`?structureId=`** separado, idéntico al patrón
+  ya correcto de `operational-calendar` — **NO** se toca el contrato Zod de cada query (cero churn de contratos).
+  El controller lee `@Query("structureId") structureId?: string` y lo pasa al service. El front lo añade vía
+  `useActiveStructureId()` en el `queryKey` + la URL (espejo de calendarios).
+- **Combinación con el ABAC por nodo = AND (intersección).** Se aplica de dos formas según el modelo:
+  (a) relación navegable `orgNode: { structureId }` cuando existe (Incident, LogEntry, ShiftHandover);
+  (b) resolución del `structureId` a su **conjunto de nodos** e intersección con los nodos accesibles cuando el
+  modelo solo denormaliza `orgNodeId` sin relación `orgNode` (LogEntryException, LogSchedule, RoundOccurrence, y
+  el dashboard que mezcla Prisma + SQL crudo).
+- **Usuario acotado con estructura activa AJENA ⇒ lista VACÍA** (la intersección ABAC ∩ estructura es vacía). ✔
+- **by-id (getDetail) y descarga de UN acta/registro puntual ⇒ SOLO ABAC, NO se filtran por estructura activa.**
+  *Motivo:* la estructura activa es una **lente de workspace**, no la frontera de seguridad — esa frontera es el
+  ABAC por nodo (403 si el nodo no es accesible). Endurecer el by-id por estructura activa no añade aislamiento
+  para clientes realmente separados (ya bloqueados por ABAC) y **rompería los deep-links legítimos de la
+  campanita** entre estructuras (un admin abriendo una notificación suya de otra estructura). El filtro de
+  estructura aplica a LISTAS/stats/dashboard/**exports masivos** (CSV de bitácoras, lista de actas); la lectura
+  puntual se rige por ABAC. (Decisión del dueño vía `AskUserQuestion`, opción "Solo ABAC".)
+- **L1a (fugas reales de ABAC, URGENTE):** `equipment.search()` no aplicaba `ScopeService` (un usuario acotado
+  veía equipos de otras estructuras) y `equipment.listByNode()` no validaba el nodo. Cerradas: `search` acota al
+  ABAC del usuario + estructura activa; `listByNode` exige `canAccessNode` (403 si ajeno).
+- **NO se tocan los catálogos COMPARTIDOS** (templates, reference-data, workflows, roles, users, settings, audit,
+  saved-views): filtrarlos por estructura rompería el diseño "catálogos compartidos" (decisión 2026-06-23).
+- **Notificaciones: sin cambio (decisión explícita).** El inbox in-app es por **ownership** (las notificaciones
+  son del usuario, no de una estructura) y el outbox es vista de admin global; ninguno es un "listado operacional
+  por nodo". No se acota por estructura activa.
+- Verificado: `smoke-aislamiento-estructura.py` **33/33** (siembra datos reales en estructuras A y B; usuario
+  acotado a A ve solo A en incidencias/bitácoras/equipos y `?structureId=B` ⇒ vacío; `listByNode(B)` ⇒ 403; admin
+  cambiando estructura activa ve solo la activa en incidencias/bitácoras/equipos/dashboard) + regresión
+  incidencias 32 · grid-content 25 · mis-rondas 18 · cambio-turno 29 · excepciones 39 · dashboard 24 + unit 252.
+  **NO** se hizo L2/L3/L4. Deuda: el front del export imperativo (`exportLogbookCsv`) ya pasa la estructura activa;
+  los demás exports puntuales by-id quedan por ABAC (correcto).
+
 ### 2026-06-23 · Camino "scoped" para selectores de nodo de flujo operacional (ABAC)
 Bug: el selector de nodos al **crear una incidencia** (y otros selectores operacionales) mostraba TODOS los
 nodos a un usuario con alcance acotado, porque `GET /structure/nodes` (`StructureService.getTree`) devuelve el

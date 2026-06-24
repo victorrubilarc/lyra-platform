@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type {
   CreateEquipmentCategoryRequest,
   CreateEquipmentRequest,
@@ -8,6 +8,7 @@ import type {
 import { Prisma } from "@prisma/client";
 import type { Equipment, EquipmentCategory } from "@prisma/client";
 import { AuditService, type AuditContext } from "../audit/audit.service";
+import { ScopeService } from "../authz/scope.service";
 import { PrismaService } from "../prisma/prisma.service";
 
 /**
@@ -22,6 +23,7 @@ export class EquipmentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly scope: ScopeService,
   ) {}
 
   // --- Catálogo de categorías ------------------------------------------------
@@ -87,8 +89,15 @@ export class EquipmentService {
 
   // --- Equipos ---------------------------------------------------------------
 
-  /** Lista los equipos vivos de un nodo, ordenados para informes. */
-  listByNode(orgNodeId: string): Promise<Equipment[]> {
+  /**
+   * Lista los equipos vivos de un nodo, ordenados para informes. **ABAC por nodo**
+   * (L1a): si el usuario tiene alcance acotado, exige que el nodo sea accesible
+   * (403 en caso contrario); un usuario sin restricción ve cualquier nodo.
+   */
+  async listByNode(userId: string, orgNodeId: string): Promise<Equipment[]> {
+    if (!(await this.scope.canAccessNode(userId, orgNodeId))) {
+      throw new ForbiddenException("El nodo está fuera de tu alcance");
+    }
     return this.prisma.equipment.findMany({
       where: { orgNodeId, deletedAt: null },
       orderBy: [{ reportOrder: "asc" }, { name: "asc" }],
@@ -96,19 +105,23 @@ export class EquipmentService {
   }
 
   /**
-   * Busca equipos por nombre / tag / código en TODA la estructura. Alimenta el
-   * buscador del árbol de Estructura (que solo conoce los nodos), para que
-   * "Weinig" surface el nodo dueño del equipo. **Sin filtro de scope de datos**:
-   * la pantalla de Estructura es una vista de configuración GLOBAL (igual que
-   * `getTree`, que devuelve el árbol completo, y `listByNode`); el control de
-   * acceso es el permiso `equipment:view` del controller, no el alcance por nodo.
+   * Busca equipos por nombre / tag / código. Alimenta el buscador del árbol de
+   * Estructura, para que "Weinig" surface el nodo dueño del equipo. **Aislamiento
+   * (L1a + L1b)**: se acota al ABAC por nodo del usuario (un usuario acotado no ve
+   * equipos de otras estructuras/nodos) Y, si se pasa, a la **estructura activa**
+   * (`structureId`) — así el resultado coincide con el árbol visible. El permiso
+   * `equipment:view` del controller es el gate; el alcance por nodo es la frontera.
    */
-  search(rawTerm: string): Promise<Equipment[]> {
+  async search(userId: string, rawTerm: string, structureId?: string): Promise<Equipment[]> {
     const term = rawTerm.trim();
-    if (term.length < 2) return Promise.resolve([]);
+    if (term.length < 2) return [];
+    const accessible = await this.scope.getAccessibleNodeIds(userId);
+    if (accessible && accessible.size === 0) return [];
     return this.prisma.equipment.findMany({
       where: {
         deletedAt: null,
+        ...(accessible ? { orgNodeId: { in: [...accessible] } } : {}),
+        ...(structureId ? { orgNode: { structureId } } : {}),
         OR: [
           { name: { contains: term, mode: "insensitive" } },
           { tag: { contains: term, mode: "insensitive" } },

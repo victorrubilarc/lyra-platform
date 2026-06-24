@@ -5,7 +5,17 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-23** (**💾 Backup de Postgres pre-deploy + cron ✅** — commit `6130774`, OPS sin features:
+> actualización: **2026-06-24** (**🔒 AISLAMIENTO COMPLETO por estructura (Enterprise L1) ✅** — `feat/aislamiento-estructura`:
+> cierra la deuda `org-views-vs-isolation`. Ningún usuario/estructura ve datos operacionales de otra en NINGÚN listado.
+> **L1a:** cerradas las 2 fugas reales de ABAC en equipos (`search` sin scope, `listByNode` sin validar nodo → 403).
+> **L1b:** filtro por estructura activa (`?structureId=`, espejo de calendarios, sin tocar contratos Zod) intersectado
+> en AND con el ABAC por nodo en **incidencias** (list/stats/dashboard), **bitácoras** (list/stats/facets/export CSV),
+> **excepciones**, **rondas/mis-rondas**, **cambio de turno**; front cablea `useActiveStructureId()` en cada hook.
+> **by-id y descargas puntuales = SOLO ABAC** (no se filtran por estructura, para no romper deep-links). Notificaciones
+> sin cambio (ownership). Catálogos COMPARTIDOS intactos. `smoke-aislamiento-estructura.py` **33/33** + unit 252 +
+> regresión incidencias 32 · grid 25 · mis-rondas 18 · cambio-turno 29 · excepciones 39 · dashboard 24. typecheck/
+> lint(0)/build verdes. **PENDIENTE: smoke VISUAL del dueño.** **NO** se hizo L2/L3/L4 (siguiente). Anterior:
+> **💾 Backup de Postgres pre-deploy + cron ✅** — commit `6130774`, OPS sin features:
 > cierra la última pendiente del blindaje de deploys (§3 #4) ⇒ **blindaje COMPLETO (#1–#4)**. `deploy/onprem/backup.sh`
 > (`pg_dump -Fc`, retención 14d/piso 10, `.tmp`+`mv`-atómico) llamado por `backup()` en `update.sh` ANTES de migrar,
 > **BLOQUEA por defecto** (`migrate deploy` es forward-only; el rollback no revierte el esquema). Cron diario 03:30 en el

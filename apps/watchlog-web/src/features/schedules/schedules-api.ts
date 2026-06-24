@@ -13,8 +13,14 @@ import {
 import { z } from "zod";
 import { apiJson, apiVoid } from "../../lib/api-client.js";
 
-export function fetchSchedules(): Promise<LogScheduleDto[]> {
-  return apiJson("/schedules", z.array(logScheduleSchema));
+/** Anexa `structureId` (estructura activa; aislamiento L1b) a un querystring. */
+function structParam(qs: URLSearchParams, structureId?: string | null): string {
+  if (structureId) qs.set("structureId", structureId);
+  return qs.toString() ? `?${qs.toString()}` : "";
+}
+
+export function fetchSchedules(structureId?: string | null): Promise<LogScheduleDto[]> {
+  return apiJson(`/schedules${structParam(new URLSearchParams(), structureId)}`, z.array(logScheduleSchema));
 }
 
 export function createSchedule(dto: CreateLogScheduleRequest): Promise<LogScheduleDto> {
@@ -37,7 +43,7 @@ export function generateSchedules(scheduleId?: string): Promise<{ generated: num
   return apiJson("/schedules/generate", generateResultSchema, { method: "POST", body: scheduleId ? { scheduleId } : {} });
 }
 
-export function fetchOccurrences(q: OccurrenceQuery = {}): Promise<RoundOccurrenceDto[]> {
+export function fetchOccurrences(q: OccurrenceQuery = {}, structureId?: string | null): Promise<RoundOccurrenceDto[]> {
   const qs = new URLSearchParams();
   if (q.status) qs.set("status", q.status);
   if (q.overdueOnly) qs.set("overdueOnly", "true");
@@ -45,30 +51,28 @@ export function fetchOccurrences(q: OccurrenceQuery = {}): Promise<RoundOccurren
   if (q.orgNodeId) qs.set("orgNodeId", q.orgNodeId);
   if (q.templateId) qs.set("templateId", q.templateId);
   if (q.scheduleId) qs.set("scheduleId", q.scheduleId);
-  const suffix = qs.toString() ? `?${qs.toString()}` : "";
-  return apiJson(`/schedules/occurrences${suffix}`, z.array(roundOccurrenceSchema));
+  return apiJson(`/schedules/occurrences${structParam(qs, structureId)}`, z.array(roundOccurrenceSchema));
 }
 
 const occurrenceStatsSchema = z.object({ pending: z.number().int(), overdue: z.number().int(), today: z.number().int() });
 export type OccurrenceStats = z.infer<typeof occurrenceStatsSchema>;
 
-export function fetchOccurrenceStats(): Promise<OccurrenceStats> {
-  return apiJson("/schedules/occurrences/stats", occurrenceStatsSchema);
+export function fetchOccurrenceStats(structureId?: string | null): Promise<OccurrenceStats> {
+  return apiJson(`/schedules/occurrences/stats${structParam(new URLSearchParams(), structureId)}`, occurrenceStatsSchema);
 }
 
 // --- Worklist del operador ("Mis rondas", 2.3.1) ---------------------------
 
-export function fetchMyRounds(q: MyRoundsQuery = {}): Promise<RoundOccurrenceDto[]> {
+export function fetchMyRounds(q: MyRoundsQuery = {}, structureId?: string | null): Promise<RoundOccurrenceDto[]> {
   const qs = new URLSearchParams();
   if (q.overdueOnly) qs.set("overdueOnly", "true");
   if (q.shiftOnly) qs.set("shiftOnly", "true");
   if (q.includeUpcoming) qs.set("includeUpcoming", "true");
-  const suffix = qs.toString() ? `?${qs.toString()}` : "";
-  return apiJson(`/schedules/my-rounds${suffix}`, z.array(roundOccurrenceSchema));
+  return apiJson(`/schedules/my-rounds${structParam(qs, structureId)}`, z.array(roundOccurrenceSchema));
 }
 
-export function fetchMyRoundsStats(): Promise<OccurrenceStats> {
-  return apiJson("/schedules/my-rounds/stats", occurrenceStatsSchema);
+export function fetchMyRoundsStats(structureId?: string | null): Promise<OccurrenceStats> {
+  return apiJson(`/schedules/my-rounds/stats${structParam(new URLSearchParams(), structureId)}`, occurrenceStatsSchema);
 }
 
 const roleOptionSchema = z.object({ id: z.string(), name: z.string() });

@@ -77,8 +77,8 @@ export class SchedulesService {
 
   // --- Horarios (LogSchedule) ------------------------------------------------
 
-  async list(userId: string): Promise<LogScheduleDto[]> {
-    const scope = await this.scopeFilters(userId);
+  async list(userId: string, structureId?: string): Promise<LogScheduleDto[]> {
+    const scope = await this.scopeFilters(userId, structureId);
     const rows = await this.prisma.logSchedule.findMany({
       where: { deletedAt: null, ...scope },
       include: scheduleInclude,
@@ -272,9 +272,9 @@ export class SchedulesService {
   // --- Ocurrencias (RoundOccurrence) -----------------------------------------
 
   /** Lista ocurrencias (genera lazy primero). "Vencida" se DERIVA (PENDING && dueAt<now). */
-  async listOccurrences(userId: string, q: OccurrenceQuery): Promise<RoundOccurrenceDto[]> {
+  async listOccurrences(userId: string, q: OccurrenceQuery, structureId?: string): Promise<RoundOccurrenceDto[]> {
     await this.generateAll(userId, q.scheduleId);
-    const scope = await this.scopeFilters(userId);
+    const scope = await this.scopeFilters(userId, structureId);
     const now = new Date();
     const where: Prisma.RoundOccurrenceWhereInput = {
       ...scope,
@@ -295,10 +295,10 @@ export class SchedulesService {
   }
 
   /** Conteos para el KPI de /bitacoras y /rondas. */
-  async occurrenceStats(userId: string): Promise<{ pending: number; overdue: number; today: number }> {
+  async occurrenceStats(userId: string, structureId?: string): Promise<{ pending: number; overdue: number; today: number }> {
     await this.generateAll(userId);
     const now = new Date();
-    const base: Prisma.RoundOccurrenceWhereInput = await this.scopeFilters(userId);
+    const base: Prisma.RoundOccurrenceWhereInput = await this.scopeFilters(userId, structureId);
     const [pending, overdue, today] = await Promise.all([
       this.prisma.roundOccurrence.count({ where: { ...base, status: "PENDING" } }),
       this.prisma.roundOccurrence.count({ where: { ...base, status: "PENDING", dueAt: { lt: now } } }),
@@ -358,9 +358,9 @@ export class SchedulesService {
    * pendientes. Default = HOY + arrastre vencido (no oculta lo heredado del turno
    * anterior); toggles refinan a vencidas / mi turno / incluir futuras. Genera lazy.
    */
-  async listMyRounds(userId: string, q: MyRoundsQuery): Promise<RoundOccurrenceDto[]> {
+  async listMyRounds(userId: string, q: MyRoundsQuery, structureId?: string): Promise<RoundOccurrenceDto[]> {
     await this.generateAll(userId);
-    const where = await this.myRoundsWhere(userId, q);
+    const where = await this.myRoundsWhere(userId, q, structureId);
     if (where === null) return []; // sin roles ni acceso ⇒ nada que ejecutar
     const rows = await this.prisma.roundOccurrence.findMany({
       where,
@@ -372,9 +372,9 @@ export class SchedulesService {
   }
 
   /** Conteos del worklist propio (badge de /bitacoras + widget de Inicio). */
-  async myRoundsStats(userId: string): Promise<{ pending: number; overdue: number; today: number }> {
+  async myRoundsStats(userId: string, structureId?: string): Promise<{ pending: number; overdue: number; today: number }> {
     await this.generateAll(userId);
-    const base = await this.myRoundsWhere(userId, {});
+    const base = await this.myRoundsWhere(userId, {}, structureId);
     if (base === null) return { pending: 0, overdue: 0, today: 0 };
     const now = new Date();
     // `base` ya acota a hoy+vencidas; para "pending" total quitamos la cota temporal.
@@ -395,14 +395,22 @@ export class SchedulesService {
    * `null` señala "lista vacía sin consultar"). El filtro de responsabilidad combina
    * el rol responsable con sus roles, dejando pasar los horarios SIN responsable.
    */
-  private async myRoundsWhere(userId: string, q: MyRoundsQuery): Promise<Prisma.RoundOccurrenceWhereInput | null> {
+  private async myRoundsWhere(userId: string, q: MyRoundsQuery, structureId?: string): Promise<Prisma.RoundOccurrenceWhereInput | null> {
     const nodeIds = await this.scope.getAccessibleNodeIds(userId);
     if (nodeIds && nodeIds.size === 0) return null; // no alcanza ningún nodo
+    // Aislamiento L1b: intersección con los nodos de la estructura activa.
+    let nodeConstraint: string[] | undefined = nodeIds ? [...nodeIds] : undefined;
+    if (structureId) {
+      const structNodes = await this.prisma.orgNode.findMany({ where: { structureId, deletedAt: null }, select: { id: true } });
+      const structIds = structNodes.map((n) => n.id);
+      nodeConstraint = nodeIds ? [...nodeIds].filter((n) => structIds.includes(n)) : structIds;
+      if (nodeConstraint.length === 0) return null;
+    }
     const roleIds = await this.getUserRoleIds(userId);
     const now = new Date();
     const where: Prisma.RoundOccurrenceWhereInput = {
       status: "PENDING",
-      ...(nodeIds ? { orgNodeId: { in: [...nodeIds] } } : {}),
+      ...(nodeConstraint ? { orgNodeId: { in: nodeConstraint } } : {}),
       // Responsabilidad por ROL (o fallback nodo+turno si el horario no declara rol).
       schedule: {
         deletedAt: null,
@@ -586,13 +594,25 @@ export class SchedulesService {
    * el mismo filtro sirve para horarios y ocurrencias. Aísla por ÁREA (nodo) y por TIPO de
    * bitácora (plantilla): un planificador de un área no ve las de otra.
    */
-  private async scopeFilters(userId: string): Promise<{ orgNodeId?: { in: string[] }; templateId?: { in: string[] } }> {
+  private async scopeFilters(
+    userId: string,
+    structureId?: string,
+  ): Promise<{ orgNodeId?: { in: string[] }; templateId?: { in: string[] } }> {
     const [nodeIds, tplIds] = await Promise.all([
       this.scope.getAccessibleNodeIds(userId),
       this.scope.getAccessibleTemplateIds(userId),
     ]);
+    let nodeConstraint: { in: string[] } | undefined = nodeIds ? { in: [...nodeIds] } : undefined;
+    // Aislamiento L1b: `LogSchedule`/`RoundOccurrence` no exponen relación `orgNode`
+    // navegable; la estructura activa se intersecta resolviendo sus nodos. Un conjunto
+    // vacío (`in: []`) ⇒ ninguna fila ⇒ lista vacía (intersección con estructura ajena).
+    if (structureId) {
+      const structNodes = await this.prisma.orgNode.findMany({ where: { structureId, deletedAt: null }, select: { id: true } });
+      const structIds = structNodes.map((n) => n.id);
+      nodeConstraint = { in: nodeIds ? [...nodeIds].filter((n) => structIds.includes(n)) : structIds };
+    }
     return {
-      ...(nodeIds ? { orgNodeId: { in: [...nodeIds] } } : {}),
+      ...(nodeConstraint ? { orgNodeId: nodeConstraint } : {}),
       ...(tplIds ? { templateId: { in: [...tplIds] } } : {}),
     };
   }

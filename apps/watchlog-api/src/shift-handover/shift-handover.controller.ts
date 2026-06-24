@@ -65,8 +65,9 @@ export class ShiftHandoverController {
   list(
     @Query(new ZodValidationPipe(shiftHandoverListQuerySchema)) q: ShiftHandoverListQuery,
     @CurrentUser() user: RequestUser,
+    @Query("structureId") structureId?: string,
   ) {
-    return this.handover.list(user.id, q);
+    return this.handover.list(user.id, q, structureId);
   }
 
   // Cualquiera que pueda ACTUAR sobre la entrega puede LEERLA: el entrante a menudo solo

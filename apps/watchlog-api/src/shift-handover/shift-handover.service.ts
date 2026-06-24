@@ -189,12 +189,14 @@ export class ShiftHandoverService {
     return ancestorIds.map((i) => byId.get(i) ?? "…").join(" › ");
   }
 
-  async list(userId: string, q: ShiftHandoverListQuery): Promise<ShiftHandoverListResponse> {
+  async list(userId: string, q: ShiftHandoverListQuery, structureId?: string): Promise<ShiftHandoverListResponse> {
     const accessible = await this.scope.getAccessibleNodeIds(userId);
     if (accessible && accessible.size === 0) return { items: [], total: 0, page: q.page, pageSize: q.pageSize };
 
     const where: Prisma.ShiftHandoverWhereInput = {
       ...(accessible ? { orgNodeId: { in: [...accessible] } } : {}),
+      // Aislamiento L1b: estructura activa (AND con el ABAC por nodo) vía relación `orgNode`.
+      ...(structureId ? { orgNode: { structureId } } : {}),
       ...(q.orgNodeId ? { orgNodeId: q.orgNodeId } : {}),
       ...(q.shiftCode ? { shiftCode: q.shiftCode } : {}),
       ...(q.status ? { status: q.status } : {}),

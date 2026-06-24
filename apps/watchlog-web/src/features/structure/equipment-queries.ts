@@ -16,11 +16,12 @@ import {
   updateCategory,
   updateEquipment,
 } from "./equipment-api.js";
+import { useActiveStructureId } from "./structure-queries.js";
 
 export const EQUIPMENT_KEYS = {
   categories: ["equipment", "categories"] as const,
   byNode: (orgNodeId: string) => ["equipment", "byNode", orgNodeId] as const,
-  search: (term: string) => ["equipment", "search", term] as const,
+  search: (term: string, structureId: string | null) => ["equipment", "search", term, structureId] as const,
 };
 
 // ─── Categorías ──────────────────────────────────────────────────────────────
@@ -63,12 +64,13 @@ export function useEquipmentByNode(orgNodeId: string | null) {
   });
 }
 
-/** Busca equipos en toda la estructura accesible (para el buscador del árbol). */
+/** Busca equipos en la estructura activa accesible (para el buscador del árbol). */
 export function useEquipmentSearch(term: string) {
   const q = term.trim();
+  const structureId = useActiveStructureId();
   return useQuery({
-    queryKey: EQUIPMENT_KEYS.search(q),
-    queryFn: () => searchEquipment(q),
+    queryKey: EQUIPMENT_KEYS.search(q, structureId),
+    queryFn: () => searchEquipment(q, structureId),
     enabled: q.length >= 2,
   });
 }

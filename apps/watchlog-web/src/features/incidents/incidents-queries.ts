@@ -61,27 +61,30 @@ import {
   markIncidentReportNotApplicable,
   cancelIncidentReport,
 } from "./incidents-api.js";
+import { useActiveStructureId } from "../structure/structure-queries.js";
 
 export const INCIDENT_KEYS = {
   all: ["incidents"] as const,
-  list: (q: IncidentListQuery) => ["incidents", "list", q] as const,
+  list: (q: IncidentListQuery, structureId: string | null) => ["incidents", "list", q, structureId] as const,
   detail: (id: string) => ["incidents", "detail", id] as const,
-  stats: () => ["incidents", "stats"] as const,
+  stats: (structureId: string | null) => ["incidents", "stats", structureId] as const,
   types: () => ["incidents", "types"] as const,
   categories: () => ["incidents", "categories"] as const,
   actions: (incidentId: string) => ["incidents", "actions", incidentId] as const,
   investigation: (incidentId: string) => ["incidents", "investigation", incidentId] as const,
   obligations: () => ["incidents", "obligations"] as const,
   reports: (incidentId: string) => ["incidents", "reports", incidentId] as const,
-  dashboard: (q: IncidentDashboardQuery) => ["incidents", "dashboard", q] as const,
+  dashboard: (q: IncidentDashboardQuery, structureId: string | null) => ["incidents", "dashboard", q, structureId] as const,
 };
 
 export function useIncidentDashboard(q: IncidentDashboardQuery) {
-  return useQuery({ queryKey: INCIDENT_KEYS.dashboard(q), queryFn: () => fetchIncidentDashboard(q) });
+  const structureId = useActiveStructureId();
+  return useQuery({ queryKey: INCIDENT_KEYS.dashboard(q, structureId), queryFn: () => fetchIncidentDashboard(q, structureId) });
 }
 
 export function useIncidents(q: IncidentListQuery) {
-  return useQuery({ queryKey: INCIDENT_KEYS.list(q), queryFn: () => fetchIncidents(q) });
+  const structureId = useActiveStructureId();
+  return useQuery({ queryKey: INCIDENT_KEYS.list(q, structureId), queryFn: () => fetchIncidents(q, structureId) });
 }
 
 export function useIncidentDetail(id: string | null) {
@@ -89,7 +92,8 @@ export function useIncidentDetail(id: string | null) {
 }
 
 export function useIncidentStats() {
-  return useQuery({ queryKey: INCIDENT_KEYS.stats(), queryFn: fetchIncidentStats });
+  const structureId = useActiveStructureId();
+  return useQuery({ queryKey: INCIDENT_KEYS.stats(structureId), queryFn: () => fetchIncidentStats(structureId) });
 }
 
 export function useIncidentTypes() {

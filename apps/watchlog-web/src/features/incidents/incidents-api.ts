@@ -74,8 +74,14 @@ function queryString(q: IncidentListQuery): string {
   return s ? `?${s}` : "";
 }
 
-export function fetchIncidents(q: IncidentListQuery): Promise<IncidentListResponse> {
-  return apiJson(`/incidents${queryString(q)}`, incidentListResponseSchema);
+/** Anexa `&structureId=` (aislamiento L1b) a un querystring ya armado. */
+function withStructure(qs: string, structureId?: string | null): string {
+  if (!structureId) return qs;
+  return qs ? `${qs}&structureId=${encodeURIComponent(structureId)}` : `?structureId=${encodeURIComponent(structureId)}`;
+}
+
+export function fetchIncidents(q: IncidentListQuery, structureId?: string | null): Promise<IncidentListResponse> {
+  return apiJson(`/incidents${withStructure(queryString(q), structureId)}`, incidentListResponseSchema);
 }
 
 /** Querystring del dashboard (Fase 4.5): filtros categóricos + rango + bucket + ventana. */
@@ -97,16 +103,16 @@ function dashboardQueryString(q: IncidentDashboardQuery): string {
   return s ? `?${s}` : "";
 }
 
-export function fetchIncidentDashboard(q: IncidentDashboardQuery): Promise<IncidentDashboard> {
-  return apiJson(`/incidents/dashboard${dashboardQueryString(q)}`, incidentDashboardSchema);
+export function fetchIncidentDashboard(q: IncidentDashboardQuery, structureId?: string | null): Promise<IncidentDashboard> {
+  return apiJson(`/incidents/dashboard${withStructure(dashboardQueryString(q), structureId)}`, incidentDashboardSchema);
 }
 
 export function fetchIncidentDetail(id: string): Promise<IncidentDetail> {
   return apiJson(`/incidents/${id}`, incidentDetailSchema);
 }
 
-export function fetchIncidentStats(): Promise<IncidentStats> {
-  return apiJson("/incidents/stats", incidentStatsSchema);
+export function fetchIncidentStats(structureId?: string | null): Promise<IncidentStats> {
+  return apiJson(`/incidents/stats${withStructure("", structureId)}`, incidentStatsSchema);
 }
 
 export function fetchIncidentTypes(includeInactive = false): Promise<IncidentTypeDto[]> {

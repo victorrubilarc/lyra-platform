@@ -30,8 +30,10 @@ function queryString(q: ShiftHandoverListQuery): string {
   return s ? `?${s}` : "";
 }
 
-export function fetchHandovers(q: ShiftHandoverListQuery): Promise<ShiftHandoverListResponse> {
-  return apiJson(`/shift-handover${queryString(q)}`, shiftHandoverListResponseSchema);
+export function fetchHandovers(q: ShiftHandoverListQuery, structureId?: string | null): Promise<ShiftHandoverListResponse> {
+  const qs = queryString(q); // siempre trae page/pageSize ⇒ empieza con "?"
+  const url = structureId ? `/shift-handover${qs}&structureId=${encodeURIComponent(structureId)}` : `/shift-handover${qs}`;
+  return apiJson(url, shiftHandoverListResponseSchema);
 }
 
 export function fetchHandoverDetail(id: string): Promise<ShiftHandoverDetail> {

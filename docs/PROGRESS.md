@@ -1,5 +1,31 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-24 — 🔒 AISLAMIENTO COMPLETO por estructura organizacional (Enterprise L1) ✅** (`feat/aislamiento-estructura`).
+Cierra la deuda `org-views-vs-isolation`: la plataforma queda ENTERPRISE — ningún usuario/estructura ve datos
+operacionales de otra, en NINGÚN listado. Caso guía: una empresa con departamentos Industrial/TI/Logística, cada
+uno su estructura, sin fugas. Re-auditado el código (no de memoria): se enumeró CADA endpoint que lista/agrega/
+exporta datos operacionales y CADA grilla, marcando antes/después. **L1a (fugas reales de ABAC, cerradas):**
+`equipment.search()` no aplicaba `ScopeService` (un usuario acotado veía equipos de otras estructuras) y
+`equipment.listByNode()` no validaba el nodo → ahora `search` acota a los nodos accesibles + estructura activa y
+`listByNode` exige `canAccessNode` (403). **L1b (filtro por estructura activa en TODOS los listados):** patrón
+uniforme — el controller acepta `@Query("structureId")` separado (espejo de `operational-calendar`, SIN tocar los
+contratos Zod) y el `where` intersecta en AND con el ABAC por nodo, vía relación `orgNode: { structureId }`
+(Incident/LogEntry/ShiftHandover) o resolviendo la estructura a su conjunto de nodos (LogEntryException/LogSchedule/
+RoundOccurrence/dashboard). Cubiertos: **incidencias** (list/stats/dashboard), **bitácoras** (list/stats/facets/
+**export CSV**), **excepciones** (list), **rondas** (list/occurrences/stats/**my-rounds**/stats), **cambio de
+turno** (list). El front pasa `useActiveStructureId()` en `queryKey` + URL en cada hook (incidents/logbook/
+exceptions/schedules/shift-handover + búsqueda de equipos). **Decisiones** (confirmadas con el dueño, en
+DECISIONS): estructura activa por querystring · usuario acotado a estructura ajena ⇒ lista vacía (intersección) ·
+**by-id y descargas puntuales = SOLO ABAC** (no se filtran por estructura activa, para no romper deep-links de la
+campanita; la estructura es lente de workspace, no frontera de seguridad — esa es el ABAC). **Notificaciones sin
+cambio** (inbox = ownership; outbox = admin global). **NO se tocan los catálogos COMPARTIDOS** (templates/
+reference-data/workflows/roles/users/settings/audit/saved-views). typecheck/lint(0)/build verdes;
+`smoke-aislamiento-estructura.py` **33/33** (datos reales en A y B; acotado a A ve solo A y `?structureId=B`⇒vacío;
+`listByNode(B)`⇒403; admin cambiando estructura ve solo la activa en incidencias/bitácoras/equipos/dashboard) +
+unit **252/252** + regresión incidencias 32 · grid 25 · mis-rondas 18 · cambio-turno 29 · excepciones 39 ·
+dashboard 24. **PENDIENTE: smoke VISUAL del dueño.** **NO** se hizo L2/L3/L4. **Siguiente: L2 (gobierno: rol
+acotado a nodo en UI, administración delegada por estructura) o lo que defina el dueño.** Anterior:
+
 **2026-06-23 — 🔒 Selector de nodos ACOTADO por ABAC + fix de truncado del Combobox ✅** (`feat/scoped-node-selector`).
 Bugfix: al **crear una incidencia**, un usuario con alcance acotado veía TODOS los nodos en el selector (la fuga
 de ABAC en los SELECTORES que estaba registrada como deuda). Causa: `GET /structure/nodes` (`getTree`) devuelve el

@@ -37,8 +37,12 @@ function queryString(q: ExceptionListQuery): string {
   return s ? `?${s}` : "";
 }
 
-export function fetchExceptions(q: ExceptionListQuery): Promise<ExceptionListResponse> {
-  return apiJson(`/exceptions${queryString(q)}`, exceptionListResponseSchema);
+export function fetchExceptions(q: ExceptionListQuery, structureId?: string | null): Promise<ExceptionListResponse> {
+  const qs = queryString(q);
+  const url = structureId
+    ? `/exceptions${qs ? `${qs}&` : "?"}structureId=${encodeURIComponent(structureId)}`
+    : `/exceptions${qs}`;
+  return apiJson(url, exceptionListResponseSchema);
 }
 
 export function fetchExceptionSummary(logEntryId: string): Promise<ExceptionSummary> {

@@ -20,17 +20,19 @@ import {
   fetchExceptionSummary,
   fetchExceptions,
 } from "./exceptions-api.js";
+import { useActiveStructureId } from "../structure/structure-queries.js";
 
 export const EXCEPTION_KEYS = {
   all: ["exceptions"] as const,
-  list: (q: ExceptionListQuery) => ["exceptions", "list", q] as const,
+  list: (q: ExceptionListQuery, structureId: string | null) => ["exceptions", "list", q, structureId] as const,
   detail: (id: string) => ["exceptions", "detail", id] as const,
   summary: (logEntryId: string) => ["exceptions", "summary", logEntryId] as const,
   dedupe: (id: string) => ["exceptions", "dedupe", id] as const,
 };
 
 export function useExceptions(q: ExceptionListQuery, enabled = true) {
-  return useQuery({ queryKey: EXCEPTION_KEYS.list(q), queryFn: () => fetchExceptions(q), enabled });
+  const structureId = useActiveStructureId();
+  return useQuery({ queryKey: EXCEPTION_KEYS.list(q, structureId), queryFn: () => fetchExceptions(q, structureId), enabled });
 }
 
 export function useExceptionSummary(logEntryId: string | null) {

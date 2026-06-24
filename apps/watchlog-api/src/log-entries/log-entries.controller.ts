@@ -86,22 +86,34 @@ export class LogEntriesController {
 
   @Get()
   @RequirePermission("logentry:view")
-  list(@Query(new ZodValidationPipe(logEntryListQuerySchema)) query: LogEntryListQuery, @CurrentUser() user: RequestUser) {
-    return this.logbook.list(user.id, query);
+  list(
+    @Query(new ZodValidationPipe(logEntryListQuerySchema)) query: LogEntryListQuery,
+    @CurrentUser() user: RequestUser,
+    @Query("structureId") structureId?: string,
+  ) {
+    return this.logbook.list(user.id, query, structureId);
   }
 
   /** KPIs del set filtrado (misma query y mismo `where` que el listado). */
   @Get("stats")
   @RequirePermission("logentry:view")
-  stats(@Query(new ZodValidationPipe(logEntryListQuerySchema)) query: LogEntryListQuery, @CurrentUser() user: RequestUser) {
-    return this.logbook.stats(user.id, query);
+  stats(
+    @Query(new ZodValidationPipe(logEntryListQuerySchema)) query: LogEntryListQuery,
+    @CurrentUser() user: RequestUser,
+    @Query("structureId") structureId?: string,
+  ) {
+    return this.logbook.stats(user.id, query, structureId);
   }
 
   /** Facetas con conteo del set filtrado (estilo Splunk/Kibana; conteos de hermanos). */
   @Get("facets")
   @RequirePermission("logentry:view")
-  facets(@Query(new ZodValidationPipe(logEntryListQuerySchema)) query: LogEntryListQuery, @CurrentUser() user: RequestUser) {
-    return this.logbook.facets(user.id, query);
+  facets(
+    @Query(new ZodValidationPipe(logEntryListQuerySchema)) query: LogEntryListQuery,
+    @CurrentUser() user: RequestUser,
+    @Query("structureId") structureId?: string,
+  ) {
+    return this.logbook.facets(user.id, query, structureId);
   }
 
   /** Filtros resueltos de la vista de sistema "Mi turno" (turno/día vigentes + autor). */
@@ -118,8 +130,9 @@ export class LogEntriesController {
     @Query(new ZodValidationPipe(logEntryListQuerySchema)) query: LogEntryListQuery,
     @CurrentUser() user: RequestUser,
     @Res() reply: FastifyReply,
+    @Query("structureId") structureId?: string,
   ): Promise<void> {
-    const { csv, truncated } = await this.logbook.exportCsv(user.id, query);
+    const { csv, truncated } = await this.logbook.exportCsv(user.id, query, structureId);
     const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
     await reply
       .header("Content-Type", "text/csv; charset=utf-8")
