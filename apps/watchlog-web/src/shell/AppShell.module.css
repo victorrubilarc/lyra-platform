@@ -405,6 +405,15 @@ button.navGroupHeader:hover {
   font-size: 13px;
 }
 
+/* Punto de color de una paleta en el selector de tema (EST-TEMAS). */
+.paletteDot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border-strong);
+}
+
 .menuHead {
   display: flex;
   flex-direction: column;

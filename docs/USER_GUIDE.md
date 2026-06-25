@@ -10,7 +10,7 @@
 > funcionalidades existentes** aunque su detalle aún esté por redactar (✍️): así nada se
 > olvida; el backfill de lo ya construido se llena de a poco (incremental).
 >
-> Última actualización: **2026-06-23**.
+> Última actualización: **2026-06-24** (Apariencia / Temas).
 
 ## Convención de cada sección
 Cada funcionalidad se documenta con estas cuatro partes fijas:
@@ -108,6 +108,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 - ✅ **Notificaciones**: comportamiento por defecto de los avisos de transición (§ Notificaciones ▸ Avisos a la medida)
 - ✅ **Servidor de correo (SMTP)**: proveedor, credenciales cifradas, probar (§ Configuración ▸ Servidor de correo)
 - ✅ **Inteligencia Artificial**: proveedor (ninguno/Anthropic/local), clave cifrada, "Probar" en vivo (§ Configuración ▸ Inteligencia Artificial)
+- ✅ **Apariencia / Temas**: construir paletas de marca (claro+oscuro), publicar, elegir la por defecto; vista previa en vivo y contraste WCAG (§ Configuración ▸ Apariencia / Temas)
 
 ### 13. Rondas  [Planificador · Operador]
 - ✅ **Programación de rondas** (horario por turno/intervalo/calendario + rol responsable) (§ Rondas ▸ Programación de rondas)
@@ -1069,6 +1070,54 @@ permiso aparte; sin él, el tab no aparece.
   ni consulta fuentes externas. Toda cifra es rastreable al crudo de al lado.
 - Si nunca guardas la config aquí, el sistema usa las **variables de entorno** (`.env`) como
   respaldo — la pantalla indica si la config actual viene «del sistema» o «del .env».
+
+---
+
+## Configuración ▸ Apariencia / Temas  [Admin para construir · todos para elegir]
+
+**Para qué sirve.** Vestir la plataforma con **los colores de marca de tu organización** sin
+recompilar nada. Un administrador construye **paletas** (por ejemplo, los colores
+institucionales del cliente), con su versión para **tema claro** y **tema oscuro**, las
+**publica** y marca **una por defecto**; cualquier usuario puede **elegir** entre las paletas
+publicadas y el cambio se **aplica al instante**, sin recargar. Las paletas **personalizan** la
+identidad Lyra (no la reemplazan): lo que no toques conserva el look de marca, y la **pantalla
+de entrada (login) siempre se mantiene oscura** de marca.
+
+**Cómo se usa (construir una paleta) [Admin].** En **Configuración ▸ Apariencia**:
+1. Pulsa **«Nueva paleta»** (o elige una existente de la lista para editarla).
+2. Ponle **nombre** (p. ej. «Marca Minera Andes») y una descripción opcional.
+3. Elige la pestaña **Tema oscuro** o **Tema claro** y ajusta los colores por grupo:
+   **superficies** (fondos), **texto**, **bordes**, **acentos de marca** (color de acción
+   principal y secundario) y **colores de estado** (éxito/advertencia/error/info). Usa el
+   selector de color o escribe el valor; el botón **↺** devuelve un color al valor de la marca.
+4. Mira la **vista previa EN VIVO**: todo el espacio de trabajo adopta tus colores mientras
+   editas, y el recuadro de la derecha muestra la variante seleccionada con botones, chips y
+   textos de ejemplo.
+5. Revisa el **aviso de contraste (WCAG AA)**: si un texto sobre su fondo queda por debajo de
+   4.5:1 (o 3:1 para elementos de interfaz), te lo advierte para que lo corrijas.
+6. **Guardar**. Cuando esté lista, activa **Publicada** y, si quieres que sea la que reciben
+   todos por defecto, pulsa **Marcar por defecto**.
+
+**Cómo se usa (elegir una paleta) [todos].** En el **menú de tema del topbar** (el ícono de
+sol/luna), bajo **«Paleta»**, elige cualquier paleta publicada o **«Por defecto del sistema»**.
+Se aplica al instante y **te acompaña entre dispositivos** (tu elección se guarda en tu cuenta).
+La preferencia **claro / oscuro / automático** es aparte y se queda **en cada dispositivo**.
+
+**Quién puede.** **Construir, editar, publicar y elegir la por defecto** requiere el permiso
+**`theme:manage`** (sin él, la pestaña «Apariencia» no aparece). **Elegir** una paleta publicada
+**no requiere permiso**: es una preferencia personal.
+
+**Importante.**
+- Una paleta es un **ajuste de colores sobre los tokens de marca**, no estilos sueltos: solo se
+  pueden tocar los **colores temáticos curados**. La **escala de severidad (1–5)** NO es
+  editable —es **significado operacional**, no decoración— y el **gradiente de marca** se ajusta
+  automáticamente a tus acentos.
+- Solo las paletas **publicadas** aparecen a los usuarios. Si **despublicas** la que estaba por
+  defecto, deja de ser la por defecto automáticamente.
+- Si **eliminas** una paleta, los usuarios que la tenían vuelven a la **por defecto**.
+- Cada creación, publicación y cambio de paleta por defecto queda **auditado** (quién y cuándo).
+- Reemplaza la antigua personalización por **build** (recompilar la web por cliente): ahora el
+  branding se administra **en caliente**, desde la app.
 
 ---
 

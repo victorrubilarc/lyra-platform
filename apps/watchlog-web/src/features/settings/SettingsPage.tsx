@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Bell, BookOpenCheck, BrainCircuit, Lock, Mail, ShieldCheck } from "lucide-react";
+import { Bell, BookOpenCheck, BrainCircuit, Lock, Mail, Palette, ShieldCheck } from "lucide-react";
 import { EmptyState, Select, Skeleton, Toggle, cx, useToast } from "@lyra/ui";
 import type { LucideIcon } from "lucide-react";
 import type { EditWindowAnchor, SystemSettingsDto, UpdateSystemSettingsRequest } from "@lyra/contracts";
@@ -9,6 +9,7 @@ import { ApiError } from "../../lib/api-client.js";
 import { EditWindowDurationField } from "./EditWindowDurationField.js";
 import { EmailSettingsPanel } from "./EmailSettingsPanel.js";
 import { AiSettingsPanel } from "./AiSettingsPanel.js";
+import { AppearanceSettingsPanel } from "./AppearanceSettingsPanel.js";
 import { useSystemSettings, useUpdateSystemSettings } from "./settings-queries.js";
 import styles from "./SettingsPage.module.css";
 
@@ -20,7 +21,7 @@ const MFA_ACTIONS: { field: keyof UpdateSystemSettingsRequest; labelKey: string 
   { field: "requireMfaPeriodUnlock", labelKey: "settings.mfa.unlock" },
 ];
 
-type Category = "security" | "logbook" | "notifications" | "email" | "ai";
+type Category = "security" | "logbook" | "notifications" | "email" | "ai" | "appearance";
 
 interface CategoryDef {
   id: Category;
@@ -36,6 +37,7 @@ const CATEGORIES: CategoryDef[] = [
   { id: "notifications", labelKey: "settings.cat.notifications", icon: Bell },
   { id: "email", labelKey: "settings.cat.email", icon: Mail, permission: "notification:config" },
   { id: "ai", labelKey: "settings.cat.ai", icon: BrainCircuit, permission: "ai:config" },
+  { id: "appearance", labelKey: "settings.cat.appearance", icon: Palette, permission: "theme:manage" },
 ];
 
 export function SettingsPage() {
@@ -242,6 +244,18 @@ export function SettingsPage() {
                 <p className={styles.sectionDesc}>{t("settings.aiDesc")}</p>
               </header>
               <AiSettingsPanel />
+            </section>
+          )}
+
+          {tab === "appearance" && perms.can("theme:manage") && (
+            <section className={styles.section}>
+              <header className={styles.sectionHead}>
+                <h2 className={styles.sectionTitle}>
+                  <Palette size={18} /> {t("settings.cat.appearance")}
+                </h2>
+                <p className={styles.sectionDesc}>{t("settings.appearanceDesc")}</p>
+              </header>
+              <AppearanceSettingsPanel />
             </section>
           )}
         </div>

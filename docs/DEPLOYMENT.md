@@ -194,6 +194,8 @@ $COMPOSE exec -T postgres sh -c 'pg_restore --list' < "$DUMP" | less
 
 ## Pendiente / deuda de este despliegue (Fase 7)
 - `install.sh` idempotente (hoy el bootstrap es manual, descrito arriba).
-- Build de la web con **build-args VITE_** (branding por licenciatario) si se requiere.
+- ~~Build de la web con **build-args VITE_** (branding por licenciatario)~~ **SUPERADO por EST-TEMAS**
+  (2026-06-24): el branding por licenciatario ahora se administra **en runtime** (paletas de marca configurables por el
+  admin, sin rebuild). Ver `DECISIONS.md` 2026-06-24 · EST-TEMAS (decisión 7).
 - Healthcheck del `web`/borde y observabilidad (logs centralizados).
 - Considerar `docker compose` v2 `pull_policy`/digests fijos para reproducibilidad.

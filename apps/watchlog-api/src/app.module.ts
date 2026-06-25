@@ -34,6 +34,7 @@ import { ExceptionGeneratorModule } from "./exceptions/exception-generator.modul
 import { ExceptionsModule } from "./exceptions/exceptions.module";
 import { RuleActionEmitterModule } from "./rule-actions/rule-action-emitter.module";
 import { RuleActionsModule } from "./rule-actions/rule-actions.module";
+import { ThemeModule } from "./theme/theme.module";
 
 @Module({
   imports: [
@@ -87,6 +88,7 @@ import { RuleActionsModule } from "./rule-actions/rule-actions.module";
     ExceptionsModule,
     RuleActionsModule,
     ShiftHandoverModule,
+    ThemeModule,
     HealthModule,
   ],
 })

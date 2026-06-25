@@ -138,6 +138,13 @@ Keycloak **descartado** para el MVP (complejidad operacional); si un cliente lo 
 ## 3. Auditoría
 - **AuditLog append-only / inmutable**: quién, qué, cuándo, valores antes/después. Cubre entradas, incidencias y configuración de seguridad.
 - Edición de bitácoras: log de cambios con motivo obligatorio.
+- **Apariencia / Temas (EST-TEMAS)**: la construcción/publicación/cambio de paleta por defecto se **audita** como
+  configuración (`theme.palette.created|updated|published|unpublished|deleted`, `theme.default.changed`, before/after en
+  `AuditLog`). Permiso nuevo **`theme:manage`** (cat. 91, dimensión ACTION) gobierna construir/publicar/default; **elegir**
+  una paleta publicada NO requiere permiso (preferencia del usuario, patrón ownership). **Validación de entrada en el
+  backend**: los tokens de la paleta se validan con Zod (`paletteTokensSchema` `.strict()`) — formato de color acotado
+  (hex/`rgb()/rgba()`) + **whitelist de claves** (rechaza severidad y claves arbitrarias con 400), defensa anti-inyección
+  antes de construir el `<style>` de override. El login se mantiene en la identidad oscura de marca (paletas sólo al workspace).
 
 ## 4. Secretos y datos sensibles
 - Ningún secreto en el frontend.

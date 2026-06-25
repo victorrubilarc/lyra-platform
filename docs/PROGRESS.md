@@ -1,5 +1,29 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-24 — 🎨 EST-TEMAS · Sistema de TEMAS / PALETAS administrable (MVP) ✅** (`feat/tema-paletas`).
+Sistema enterprise para que un ADMIN construya **paletas de color de marca** (los colores institucionales del cliente),
+con variante **CLARA y OSCURA**, las **publique** con un flag y marque **UNA por defecto**; los **usuarios** eligen entre
+las publicadas, con **aplicación instantánea** sin recargar. Construido **SOBRE** el sistema de tokens existente (NO se
+forkea): una paleta es un **override PARCIAL** de un set ACOTADO y curado de **18 tokens temáticos** (superficies, texto,
+bordes, acentos, funcionales) por variante; lo no sobreescrito **cae a la marca Lyra**. **Contrato `@lyra/contracts`**:
+`theme/palette.ts` (whitelist de claves + `paletteTokensSchema` Zod `.strict()` con formato de color anti-inyección +
+DTOs + `buildPaletteOverrideCss` que **deriva el gradiente de marca de los acentos**) y `theme/contrast.ts` (cálculo
+**WCAG 2.1 PURO** reutilizable, con tests). La **severidad 1–5 queda PROTEGIDA** (semántica, no editable). **Backend:**
+modelo `ThemePalette` (tokensDark/Light JSON, isPublished, auditoría) + `SystemSettings.defaultPaletteId` +
+`User.themePaletteId` (preferencia PORTABLE server-side; migración aditiva `…140000_add_theme_palettes`); permiso nuevo
+**`theme:manage`** (cat. 91); `ThemeService`+controller con CRUD/publish/default/list-publicadas/`/theme/me` (elegir, sin
+permiso) y **auditoría** de crear/publicar/default. **Web:** capa de override `palette-store` (`<style>` scopeado a
+`[data-wl-themed]` ⇒ **el login conserva la identidad oscura de marca**) + `usePaletteController` + **selector en el menú
+de tema del Topbar** (junto a claro/oscuro/auto); **builder admin** en `/configuracion` → pestaña **«Apariencia»**
+(lista de paletas + editor por variante con **VISTA PREVIA EN VIVO** sobre todo el workspace + **aviso de contraste WCAG
+AA**). **claro/oscuro/auto sigue LOCAL** (ergonomía por dispositivo); la PALETA va server-side por usuario.
+typecheck/lint(0)/build/test (**contracts 349 + API 252**, incl. contrast/palette specs) verdes · `scripts/smoke-tema-paletas.py`
+**23/23** (crear→validar[color/whitelist/severidad]→publicar→default→sólo-publicadas→403 sin permiso→elegir/persistir→
+404 no-publicada→fallback default→despublicar quita default). **Reemplaza la deuda de branding por licenciatario de Fase 7**
+(build-args VITE_ → ahora runtime, sin rebuild). **PENDIENTE: smoke VISUAL del dueño** (construir una paleta institucional
+y verla en claro/oscuro). **Fase 2 (futuro):** semilla 1-color→rampas, import/export, logo, identidad por estructura.
+**Siguiente: lo que el dueño defina (L4 jerarquías alternativas u otro).**
+
 **2026-06-24 — 🎨 EST-FIX-ALTO · Paneles maestro-detalle llenan el alto del viewport ✅** (`fix/layout-altura-paneles`).
 Defecto **premium**: en las páginas tipo maestro-detalle (Estructura, calendarios, datos de referencia, usuarios) el
 split «lista | detalle» quedaba a **media pantalla** con un gran vacío debajo en vez de llegar al borde inferior. **Causa

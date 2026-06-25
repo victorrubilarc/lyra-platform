@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Bell, Check, Info, Languages, LogOut, Monitor, Moon, Rows3, Search, Sun, UserCog } from "lucide-react";
+import { Bell, Check, Info, Languages, LogOut, Monitor, Moon, Palette, Rows3, Search, Sun, UserCog } from "lucide-react";
 import { Breadcrumb, Menu, MenuItem, MenuLabel, MenuSeparator, Tooltip, type Crumb } from "@lyra/ui";
 import { FavoritesMenu } from "./FavoritesMenu.js";
 import { NotificationBell } from "./NotificationBell.js";
@@ -11,6 +11,7 @@ import { VERSION_LABEL } from "./app-version.js";
 import { useAuth } from "../auth/use-auth.js";
 import { useUIStore } from "./ui-store.js";
 import { useThemeStore, type ThemePreference } from "./theme-store.js";
+import { useMyTheme, usePublishedPalettes, useSelectPalette } from "../features/settings/theme-queries.js";
 import { routeForPath } from "./navigation.js";
 import { SUPPORTED_LANGUAGES, setLanguage } from "../i18n/i18n.js";
 import styles from "./AppShell.module.css";
@@ -42,6 +43,16 @@ export function Topbar({ onOpenSearch }: TopbarProps) {
   const setThemePref = useThemeStore((s) => s.setPreference);
   const ThemeIcon = THEME_OPTIONS.find((o) => o.value === themePref)?.icon ?? Moon;
   const [aboutOpen, setAboutOpen] = useState(false);
+
+  // Paletas (EST-TEMAS): el usuario elige entre las publicadas; "Por defecto" delega a la
+  // instalación. La sección solo aparece si hay paletas publicadas (evita ruido).
+  const { data: palettes } = usePublishedPalettes();
+  const { data: myTheme } = useMyTheme();
+  const selectPalette = useSelectPalette();
+  const activePaletteId = myTheme?.palette?.id ?? null;
+  const choosePalette = (id: string | null) => {
+    if (id !== activePaletteId) selectPalette.mutate(id);
+  };
 
   const route = routeForPath(pathname);
   const crumbs: Crumb[] = [{ label: t("nav.home"), onClick: () => navigate("/") }];
@@ -104,6 +115,35 @@ export function Topbar({ onOpenSearch }: TopbarProps) {
               </MenuItem>
             );
           })}
+          {palettes && palettes.length > 0 && (
+            <>
+              <MenuSeparator />
+              <MenuLabel>{t("theme.palette")}</MenuLabel>
+              <MenuItem
+                icon={<Palette size={16} />}
+                trailing={activePaletteId === null ? <Check size={14} /> : undefined}
+                onSelect={() => choosePalette(null)}
+              >
+                {t("theme.paletteDefault")}
+              </MenuItem>
+              {palettes.map((p) => (
+                <MenuItem
+                  key={p.id}
+                  icon={
+                    <span
+                      className={styles.paletteDot}
+                      style={{ background: p.tokensDark.accentPrimary ?? "var(--color-accent-primary)" }}
+                      aria-hidden="true"
+                    />
+                  }
+                  trailing={activePaletteId === p.id ? <Check size={14} /> : undefined}
+                  onSelect={() => choosePalette(p.id)}
+                >
+                  {p.name}
+                </MenuItem>
+              ))}
+            </>
+          )}
         </Menu>
 
         <Menu

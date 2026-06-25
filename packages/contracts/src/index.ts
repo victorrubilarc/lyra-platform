@@ -89,3 +89,7 @@ export * from "./shift-handover/shift-handover.js";
 
 // Inteligencia Artificial administrable (Fase 5 — Slice 2)
 export * from "./ai/ai.js";
+
+// Sistema de TEMAS / PALETAS administrable (EST-TEMAS)
+export * from "./theme/contrast.js";
+export * from "./theme/palette.js";

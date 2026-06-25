@@ -4,6 +4,44 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-24 · EST-TEMAS · Sistema de TEMAS / PALETAS administrable (MVP)
+Las 7 decisiones de diseño (aprobadas antes de construir), con motivo:
+1. **Granularidad = set ACOTADO y curado (18 tokens), NO los 100+.** *Motivo:* editar superficies/texto/bordes/acentos/
+   funcionales por variante cubre el 95% del rebranding sin volver inmanejable el builder. La **severidad 1–5 queda
+   PROTEGIDA** (es significado operacional, no decoración — CLAUDE.md) y el gradiente de marca **se DERIVA** de los acentos.
+   Semilla 1-color→rampas = Fase 2.
+2. **Aplicación en runtime = capa de OVERRIDE de variables CSS, no fork de tokens.** *Motivo:* un `<style>` inyectado con
+   bloques `[data-wl-themed][data-theme="dark|light"]` gana por orden de cascada + especificidad a los tokens base; lo no
+   sobreescrito cae a la marca. **Scopeado a `[data-wl-themed]`** (el workspace) ⇒ el **login conserva la identidad oscura
+   de marca** (regla CLAUDE.md). Reusa `data-theme`/theme-store; cero duplicación de los tokens.
+3. **Persistencia = `ThemePalette` + `SystemSettings.defaultPaletteId` + `User.themePaletteId`.** *Motivo:* paleta como
+   fila con tokens JSON validados por Zod; default a nivel de instalación en el singleton de settings (fácil de cambiar y
+   auditar); preferencia por usuario PORTABLE server-side (precedente `SavedView`/`NotificationPreference`). **claro/oscuro/
+   auto se queda LOCAL** (localStorage) — es **ergonomía ambiental del dispositivo** (claro en oficina, oscuro en la tablet
+   de terreno); sincronizarlo entre dispositivos sería PEOR UX. La PALETA (marca) sí debe ser consistente por usuario.
+4. **Permiso nuevo `theme:manage` (cat. 91); elegir una publicada NO requiere permiso.** *Motivo:* construir/publicar/
+   default son actos de configuración (auditados); elegir paleta es preferencia del usuario (patrón ownership, como las
+   notificaciones). Aplica `new-permission-dev-gotcha` (db:seed + Redis FLUSHALL).
+5. **Contraste WCAG en el MVP (cálculo PURO en `@lyra/contracts`).** *Motivo:* es barato, testeable y es **lo que hace
+   premium** al builder (Material Theme Builder / Radix lo hacen). Advierte AA (4.5:1 texto / 3:1 UI) al editar; no bloquea.
+6. **Instance-wide (single-tenant); NO atar la paleta a estructura.** *Motivo:* la identidad por estructura (L3,
+   `--accent-<clave>`) es OTRA capa y se conserva; atar paletas a estructura sería especular. Posible futuro, no MVP.
+7. **Este sistema ABSORBE el branding por licenciatario (deuda Fase 7 de `DEPLOYMENT.md`).** *Motivo:* un sistema de
+   paletas EN RUNTIME (configurable por el admin, sin rebuild) es **superior** a los build-args `VITE_` (requieren
+   recompilar la web por cliente). La identidad Lyra sigue siendo la base; las paletas la PERSONALIZAN sin romperla.
+   *Acción:* la deuda de Fase 7 queda **superada** por EST-TEMAS (registrar en BACKLOG al cerrarla).
+
+**Decisiones de implementación adicionales (con motivo):**
+- **Acentos editables + gradiente DERIVADO.** El cliente pone SU color institucional como acción primaria; se recalculan
+  `--gradient-brand`/`--gradient-brand-subtle`/`--color-border-accent` desde los dos acentos efectivos para no perder
+  coherencia (logo/CTA). "Gradiente reservado" (CLAUDE.md) = uso con restraint, no hue inmutable.
+- **Override PARCIAL (no full).** Una paleta sólo guarda las claves que cambia; el resto hereda la marca. Menos error,
+  permite "volver a la marca" por token (botón reset) y el contraste se evalúa sobre el valor EFECTIVO (override ?? base).
+- **Validación anti-inyección.** El formato de color se valida con regex acotada (hex/`rgb()/rgba()`) y las claves con
+  `.strict()` (whitelist) ANTES de construir el `<style>`; severidad y claves arbitrarias se rechazan con 400.
+- **Despublicar la default la quita de default.** *Motivo:* una paleta no publicada no puede ser la por defecto de la
+  instalación (coherencia); el servicio limpia `defaultPaletteId` al despublicarla (verificado en smoke T15).
+
 ### 2026-06-24 · EST-FIX-ALTO · Cadena de altura de páginas maestro-detalle (DS: `ResizableSplit`)
 Las páginas de split «lista | detalle» (Estructura, calendarios operacional/fiscal, datos de referencia) dejaban el
 panel a media pantalla con un vacío debajo — defecto premium. La causa era una cadena de altura (flex) rota e

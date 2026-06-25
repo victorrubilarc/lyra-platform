@@ -525,6 +525,21 @@ tabla existente. El catálogo de EVENTOS vive en CÓDIGO (`@lyra/contracts NOTIF
   stream) y la columna `ShiftHandover.summaryProvider` (ya existente). El único cambio de contrato es el DTO `updateHandoverSummary`,
   que ahora acepta `summaryProvider` opcional para PERSISTIR el texto IA generado en vivo sin re-generar (no toca la BD/migraciones).
 
+### Apariencia / Temas administrables (EST-TEMAS — *implementado*)
+- **ThemePalette** *(implementado, migración `20260624140000_add_theme_palettes`)* — paleta de color de marca construida
+  por un admin (`theme:manage`). `name`, `description?`, **`tokensDark`/`tokensLight` (JSONB)** = override PARCIAL de los
+  18 tokens temáticos curados (`{ "<tokenKey>": "<color>" }`), validado por `paletteTokensSchema` (whitelist de claves +
+  formato de color, `.strict()`) ANTES de persistir; **lo no sobreescrito cae a la marca Lyra**. `isPublished` (sólo las
+  publicadas aparecen a los usuarios), `createdById`/`updatedById` (ref BLANDA, sin FK, el nombre se resuelve por consulta),
+  `createdAt`/`updatedAt`. Índice por `isPublished`. La administra `ThemeService` (CRUD/publish/setDefault/listPublished/
+  `getMyPreference`/`selectForMe`); **auditoría** de crear/publicar/default. La **severidad 1–5 NO es editable** (semántica);
+  el gradiente de marca se DERIVA de los acentos en el cliente (`buildPaletteOverrideCss`). Instance-wide (single-tenant).
+- **SystemSettings** *(ampliado — EST-TEMAS)* — columna **`defaultPaletteId`** (ref BLANDA, sin FK): paleta por defecto de
+  la INSTALACIÓN (la que reciben quienes no eligieron). null = marca Lyra base. Despublicar la default la limpia.
+- **User** *(ampliado — EST-TEMAS)* — columna **`themePaletteId`** (FK a `ThemePalette`, **`onDelete: SetNull`**):
+  preferencia de paleta del usuario, PORTABLE entre dispositivos. La preferencia claro/oscuro/auto **sigue siendo LOCAL**
+  (localStorage, ergonomía por dispositivo) — NO se persiste en BD.
+
 ### Orígenes de datos
 - **DataSource** — URL base, tipo de auth, **credencial cifrada en reposo**. *1—N* **DataSourceEndpoint** (path, método, mapeo JSONPath, TTL). Caché en Redis. **Espejo ENTRANTE:** en Fase 3 un endpoint puede **alimentar/materializar** una `ReferenceList` (`source=EXTERNAL`).
 

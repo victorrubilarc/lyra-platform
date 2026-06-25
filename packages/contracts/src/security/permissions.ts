@@ -686,6 +686,19 @@ export const PERMISSION_CATALOG = [
     description:
       "Ver la vista ejecutiva CONSOLIDADA de todas las estructuras (Panorama). Cruza la estructura activa, pero respeta el alcance por nodo.",
   },
+
+  // --- Apariencia / Temas administrables (EST-TEMAS) -------------------------
+  // Construir/editar/publicar PALETAS de color de marca y marcar la por defecto de
+  // la instalación (tab "Apariencia" en `/configuracion`). ELEGIR una paleta publicada
+  // NO requiere permiso (es preferencia del usuario, patrón ownership). El login se
+  // mantiene SIEMPRE en la identidad oscura de marca: las paletas aplican al workspace.
+  {
+    key: "theme:manage",
+    dimension: "ACTION",
+    group: "appearance",
+    description:
+      "Construir, editar y publicar paletas de tema, y elegir la paleta por defecto del sistema.",
+  },
 ] as const satisfies readonly PermissionDef[];
 
 /** Unión literal de todas las claves de permiso conocidas. */

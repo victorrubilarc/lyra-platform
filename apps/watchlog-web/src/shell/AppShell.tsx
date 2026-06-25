@@ -7,6 +7,7 @@ import { CommandPalette } from "./CommandPalette.js";
 import { useUIStore } from "./ui-store.js";
 import { useWorkspaceStore } from "./workspace-store.js";
 import { useFavoritesStore } from "./favorites-store.js";
+import { usePaletteController } from "./use-palette-controller.js";
 import { routeForPath } from "./navigation.js";
 import styles from "./AppShell.module.css";
 
@@ -22,6 +23,9 @@ export function AppShell() {
   const openTab = useWorkspaceStore((s) => s.openTab);
   const pushRecent = useFavoritesStore((s) => s.pushRecent);
   const [paletteOpen, setPaletteOpen] = useState(false);
+
+  // Aplica la paleta de tema efectiva del usuario (override scopeado al workspace).
+  usePaletteController();
 
   // ⌘K / Ctrl+K alterna la paleta de comandos.
   useEffect(() => {
@@ -46,7 +50,7 @@ export function AppShell() {
   }, [pathname, openTab, pushRecent]);
 
   return (
-    <div className={styles.shell} data-density={density}>
+    <div className={styles.shell} data-density={density} data-wl-themed="">
       <Sidebar />
       <div className={styles.main}>
         <Topbar onOpenSearch={() => setPaletteOpen(true)} />

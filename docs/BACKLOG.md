@@ -5,7 +5,16 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-24** (**🎨 EST-FIX-ALTO · Paneles maestro-detalle llenan el alto del viewport ✅** —
+> actualización: **2026-06-24** (**🎨 EST-TEMAS · Sistema de TEMAS / PALETAS administrable (MVP) ✅** —
+> `feat/tema-paletas`: un admin construye paletas de marca (claro+oscuro) como **override PARCIAL de 18 tokens curados**
+> sobre el sistema de tokens (NO fork), con **vista previa en vivo** + **contraste WCAG**, las publica (flag) y marca una
+> por defecto; los usuarios eligen entre las publicadas (preferencia **portable** `User.themePaletteId`), aplicación
+> instantánea. Backend `ThemePalette`+`SystemSettings.defaultPaletteId`+permiso **`theme:manage`** (cat. 91)+auditoría;
+> capa de override scopeada a `[data-wl-themed]` ⇒ **login intacto** (marca oscura). Severidad PROTEGIDA; gradiente
+> derivado de acentos. **Reemplaza la deuda de branding por licenciatario de Fase 7** (build-args VITE_ → runtime).
+> typecheck/lint(0)/build/test (349+252) verdes · `smoke-tema-paletas.py` **23/23**. **PENDIENTE: smoke VISUAL del dueño.**
+> **Fase 2 (futuro):** semilla 1-color→rampas, import/export, logo. **Siguiente: lo que el dueño defina (L4 u otro).**
+> Anterior: **🎨 EST-FIX-ALTO · Paneles maestro-detalle llenan el alto del viewport ✅** —
 > `fix/layout-altura-paneles`: el split «lista | detalle» quedaba a media pantalla con vacío debajo. Causa: cadena de
 > altura flex rota (`ResizableSplit` no crecía en un flex-column) + alturas por-página inconsistentes (calc frágil que
 > ignoraba la barra de pestañas / sin altura). Fix DRY en 2 lugares compartidos: contenedor de `ResizableSplit` pasa a

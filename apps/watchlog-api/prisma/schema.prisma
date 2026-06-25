@@ -55,6 +55,10 @@ model User {
   mfaFailedCount      Int        @default(0)
   mfaLockedUntil      DateTime?
   lastLoginAt         DateTime?
+  // Paleta de tema elegida por el usuario (EST-TEMAS). null = usar la por defecto de la
+  // instalación. Preferencia PORTABLE (server-side) entre dispositivos; claro/oscuro/auto
+  // sigue siendo local (ergonomía por dispositivo). SetNull si se borra la paleta.
+  themePaletteId      String?
   createdAt           DateTime   @default(now())
   updatedAt           DateTime   @updatedAt
 
@@ -68,6 +72,7 @@ model User {
   passwordHistory PasswordHistory[]
   resetTokens     PasswordResetToken[]
   savedViews      SavedView[]
+  themePalette    ThemePalette?        @relation("UserSelectedPalette", fields: [themePaletteId], references: [id], onDelete: SetNull)
 
   @@index([status])
 }
@@ -1251,6 +1256,11 @@ model SystemSettings {
   // reproduce la conducta clásica de `entry.transition` (avisar a los roles del estado
   // destino); false = no se notifica si la transición no lo configura. No rompe nada.
   notifyTransitionDefaultDestinationRoles Boolean @default(true)
+  // --- Apariencia / Temas (EST-TEMAS) ----------------------------------------
+  // Paleta por defecto de la INSTALACIÓN: la que reciben los usuarios que no eligieron
+  // una. Ref BLANDA (sin FK, como emailConfiguredById): el servicio tolera un id colgante
+  // (paleta borrada ⇒ se trata como "sin default" ⇒ marca base). null = marca Lyra base.
+  defaultPaletteId             String?
   updatedById                  String?
   updatedAt                    DateTime         @updatedAt
 }
@@ -1302,6 +1312,36 @@ model AiGenerationLog {
 
   @@index([createdAt])
   @@index([provider, createdAt])
+}
+
+// ===========================================================================
+//  Apariencia / Temas administrables (EST-TEMAS)
+// ===========================================================================
+// Una PALETA construida por un admin: override PARCIAL de un set ACOTADO de tokens
+// "temáticos" (whitelist en @lyra/contracts), por variante CLARA y OSCURA, guardado
+// como JSON validado por Zod en el borde. Se PUBLICA con `isPublished` (sólo las
+// publicadas aparecen a los usuarios) y una se marca por defecto vía
+// `SystemSettings.defaultPaletteId`. Construye SOBRE el sistema de tokens (no lo
+// reemplaza): lo no sobreescrito cae a la marca Lyra. Single-tenant, instance-wide.
+model ThemePalette {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  // Override parcial de tokens por variante: { "<tokenKey>": "<color>" }. Validado por
+  // `paletteTokensSchema` (formato de color + whitelist de claves) ANTES de persistir.
+  tokensDark  Json     @default("{}")
+  tokensLight Json     @default("{}")
+  isPublished Boolean  @default(false)
+  // Ref BLANDA al autor (sin FK; se resuelve el nombre por consulta, como en settings).
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Usuarios que eligieron esta paleta (back-relation de User.themePalette).
+  usersSelecting User[] @relation("UserSelectedPalette")
+
+  @@index([isPublished])
 }
 
 model OperationalShift {
