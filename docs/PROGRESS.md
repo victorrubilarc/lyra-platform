@@ -1,5 +1,28 @@
 # Progreso — Lyra WatchLog
 
+**2026-06-24 — 🎨 TEMAS FASE 2A · Plantillas de inicio + Duplicar ✅** (`feat/temas-plantillas`).
+Primera de tres fases enterprise sobre EST-TEMAS (2A plantillas+duplicar · 2B generador desde colores de marca · 2C
+import DTCG/hex). Antes, crear una paleta partía de CERO (18 tokens × 2 variantes a mano): laborioso. Ahora hay un
+**catálogo CURADO de 10 plantillas de arranque** ("starter themes", como Material/Radix/shadcn) y dos atajos que CLONAN
+tokens en una paleta NUEVA editable (borrador), que se ajusta y publica con el flujo ya existente. **Plantillas =
+CONSTANTES en `@lyra/contracts`** (`theme/presets.ts`: `THEME_PRESETS` con `id/name/description/tokensDark/tokensLight`),
+**prístinas y versionadas con el código** — NO filas de BD, NO editables, NO publicables, el usuario final no las ve;
+son solo el punto de arranque del admin. Cada plantilla sobreescribe SOLO la whitelist de 18 tokens, y de ella
+únicamente **superficies + texto + 2 acentos** (bordes translúcidos y funcionales/severidad se dejan a la marca:
+semántica constante entre temas). Las 10: **Grafito, Cobre, Acero, Medianoche, Bosque, Solar, Índigo, Cobalto, Magma,
+Salitre** (industria chilena + constelación Lyra). **TODAS pasan contraste WCAG AA en claro Y oscuro**, garantizado por
+un test nuevo `presets.spec.ts` que recorre el catálogo (regresión: una plantilla nunca puede nacer inaccesible).
+**Duplicar = CLONADO EN CLIENTE** (leer paleta/plantilla → `POST /theme/admin/palettes` existente; menos superficie de
+API, reusa validación). **Web:** botón **«Desde plantilla»** (junto a «Nueva») abre `TemplatePicker` (modal con
+miniaturas dark+light de cada plantilla); elegir entra al editor con esos tokens como borrador sin guardar. Botón
+**«Duplicar»** en las acciones de una paleta existente → borrador «<nombre> (copia)» editable e independiente. `Swatch`
+extraído a `PaletteSwatch` reusable (lista + picker). **Sin backend nuevo, sin migración, sin permiso nuevo** (reusa
+`theme:manage`) ⇒ sin seed gap/FLUSHALL. typecheck/lint(0)/build/test verdes (**contracts 392** [+43 presets] · web vite
+ok) · `scripts/smoke-temas-plantillas.py` **11/11** (clonar plantilla→borrador con sus tokens · severidad protegida 400 ·
+duplicar→copia distinta · editar la copia NO altera el original · 403 sin permiso). **PENDIENTE: smoke VISUAL del dueño**
+(elegir una plantilla, ajustarla, publicarla; duplicar una existente). **Siguiente: Fase 2B (generador desde colores de
+marca, con OKLCH).**
+
 **2026-06-24 — 🎨 EST-TEMAS · Sistema de TEMAS / PALETAS administrable (MVP) ✅** (`feat/tema-paletas`).
 Sistema enterprise para que un ADMIN construya **paletas de color de marca** (los colores institucionales del cliente),
 con variante **CLARA y OSCURA**, las **publique** con un flag y marque **UNA por defecto**; los **usuarios** eligen entre

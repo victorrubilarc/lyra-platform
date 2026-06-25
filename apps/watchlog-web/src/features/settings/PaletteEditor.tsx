@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
-import { AlertTriangle, Check, RotateCcw, Star, Trash2 } from "lucide-react";
+import { AlertTriangle, Check, Copy, RotateCcw, Star, Trash2 } from "lucide-react";
 import { Button, Input, Textarea, Toggle, cx, useToast } from "@lyra/ui";
 import {
   THEME_TOKEN_DEFS,
@@ -55,21 +55,47 @@ interface Draft {
   tokensLight: PaletteTokens;
 }
 
-function draftFrom(palette: ThemePaletteDto | null): Draft {
-  return {
-    name: palette?.name ?? "",
-    description: palette?.description ?? "",
-    tokensDark: palette ? { ...palette.tokensDark } : {},
-    tokensLight: palette ? { ...palette.tokensLight } : {},
-  };
+/**
+ * Borrador inicial para crear una paleta NUEVA a partir de tokens dados (clonar una
+ * plantilla de inicio o duplicar una paleta existente). El admin lo ajusta y pulsa Crear.
+ */
+export interface PaletteSeed {
+  name: string;
+  description?: string;
+  tokensDark: PaletteTokens;
+  tokensLight: PaletteTokens;
+}
+
+function draftFrom(palette: ThemePaletteDto | null, seed?: PaletteSeed): Draft {
+  if (palette) {
+    return {
+      name: palette.name,
+      description: palette.description ?? "",
+      tokensDark: { ...palette.tokensDark },
+      tokensLight: { ...palette.tokensLight },
+    };
+  }
+  if (seed) {
+    return {
+      name: seed.name,
+      description: seed.description ?? "",
+      tokensDark: { ...seed.tokensDark },
+      tokensLight: { ...seed.tokensLight },
+    };
+  }
+  return { name: "", description: "", tokensDark: {}, tokensLight: {} };
 }
 
 interface PaletteEditorProps {
   /** Paleta existente a editar, o `null` para crear una nueva. */
   palette: ThemePaletteDto | null;
+  /** Tokens de arranque para una paleta nueva (clonar plantilla/duplicar). Solo si `palette` es null. */
+  seed?: PaletteSeed;
   canManage: boolean;
   onSaved: (id: string) => void;
   onDeleted: () => void;
+  /** Clonar la paleta GUARDADA en una nueva (borrador "… (copia)"), editable e independiente. */
+  onDuplicate: (palette: ThemePaletteDto) => void;
 }
 
 /**
@@ -77,7 +103,14 @@ interface PaletteEditorProps {
  * clara/oscura, VISTA PREVIA en vivo (todo el workspace + un recuadro contenido para ver
  * la otra variante), aviso de CONTRASTE WCAG AA, y acciones de publicación/por-defecto.
  */
-export function PaletteEditor({ palette, canManage, onSaved, onDeleted }: PaletteEditorProps) {
+export function PaletteEditor({
+  palette,
+  seed,
+  canManage,
+  onSaved,
+  onDeleted,
+  onDuplicate,
+}: PaletteEditorProps) {
   const { t } = useTranslation();
   const toast = useToast();
   const setPreview = usePaletteStore((s) => s.setPreview);
@@ -90,13 +123,13 @@ export function PaletteEditor({ palette, canManage, onSaved, onDeleted }: Palett
   const clearDefault = useClearDefaultPalette();
   const remove = useDeletePalette();
 
-  const [draft, setDraft] = useState<Draft>(() => draftFrom(palette));
+  const [draft, setDraft] = useState<Draft>(() => draftFrom(palette, seed));
   const [variant, setVariant] = useState<ThemeVariant>("dark");
 
-  // Reinicia el borrador al cambiar de paleta seleccionada.
+  // Reinicia el borrador al cambiar de paleta/seed seleccionado.
   useEffect(() => {
-    setDraft(draftFrom(palette));
-  }, [palette]);
+    setDraft(draftFrom(palette, seed));
+  }, [palette, seed]);
 
   // Vista previa EN VIVO: el workspace entero adopta el borrador mientras se edita.
   useEffect(() => {
@@ -339,6 +372,14 @@ export function PaletteEditor({ palette, canManage, onSaved, onDeleted }: Palett
                 }
               >
                 {palette.isDefault ? t("appearance.isDefault") : t("appearance.makeDefault")}
+              </Button>
+
+              <Button
+                variant="secondary"
+                leftIcon={<Copy size={15} />}
+                onClick={() => onDuplicate(palette)}
+              >
+                {t("appearance.duplicate")}
               </Button>
 
               <Button

@@ -10,7 +10,7 @@
 > funcionalidades existentes** aunque su detalle aún esté por redactar (✍️): así nada se
 > olvida; el backfill de lo ya construido se llena de a poco (incremental).
 >
-> Última actualización: **2026-06-24** (Apariencia / Temas).
+> Última actualización: **2026-06-24** (Apariencia / Temas — plantillas de inicio + duplicar).
 
 ## Convención de cada sección
 Cada funcionalidad se documenta con estas cuatro partes fijas:
@@ -108,7 +108,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 - ✅ **Notificaciones**: comportamiento por defecto de los avisos de transición (§ Notificaciones ▸ Avisos a la medida)
 - ✅ **Servidor de correo (SMTP)**: proveedor, credenciales cifradas, probar (§ Configuración ▸ Servidor de correo)
 - ✅ **Inteligencia Artificial**: proveedor (ninguno/Anthropic/local), clave cifrada, "Probar" en vivo (§ Configuración ▸ Inteligencia Artificial)
-- ✅ **Apariencia / Temas**: construir paletas de marca (claro+oscuro), publicar, elegir la por defecto; vista previa en vivo y contraste WCAG (§ Configuración ▸ Apariencia / Temas)
+- ✅ **Apariencia / Temas**: construir paletas de marca (claro+oscuro) **desde una plantilla curada o duplicando otra**, publicar, elegir la por defecto; vista previa en vivo y contraste WCAG (§ Configuración ▸ Apariencia / Temas)
 
 ### 13. Rondas  [Planificador · Operador]
 - ✅ **Programación de rondas** (horario por turno/intervalo/calendario + rol responsable) (§ Rondas ▸ Programación de rondas)
@@ -1083,8 +1083,19 @@ publicadas y el cambio se **aplica al instante**, sin recargar. Las paletas **pe
 identidad Lyra (no la reemplazan): lo que no toques conserva el look de marca, y la **pantalla
 de entrada (login) siempre se mantiene oscura** de marca.
 
-**Cómo se usa (construir una paleta) [Admin].** En **Configuración ▸ Apariencia**:
-1. Pulsa **«Nueva paleta»** (o elige una existente de la lista para editarla).
+**Cómo se usa (construir una paleta) [Admin].** En **Configuración ▸ Apariencia**, tienes
+**tres maneras de empezar** una paleta nueva:
+- **Desde cero:** pulsa **«Nueva paleta»** y define todos los colores a mano.
+- **Desde una plantilla** (recomendado): pulsa **«Desde plantilla»** y elige una de las
+  **plantillas de arranque** curadas (Grafito, Cobre, Acero, Medianoche, Bosque, Solar, Índigo,
+  Cobalto, Magma, Salitre). Cada una trae una miniatura con su look claro y oscuro y **ya cumple
+  el contraste AA**. Al elegirla, entras al editor con esos colores como **borrador** listo para
+  ajustar — la plantilla no se modifica, es solo tu punto de partida.
+- **Duplicando una existente:** abre una paleta de la lista y pulsa **«Duplicar»**; se crea una
+  copia «<nombre> (copia)» que editas de forma **independiente** (no afecta a la original).
+
+Luego, en cualquiera de los tres casos:
+1. (Si partiste de cero) elige una paleta de la lista para editarla, o sigue con el borrador.
 2. Ponle **nombre** (p. ej. «Marca Minera Andes») y una descripción opcional.
 3. Elige la pestaña **Tema oscuro** o **Tema claro** y ajusta los colores por grupo:
    **superficies** (fondos), **texto**, **bordes**, **acentos de marca** (color de acción
@@ -1108,6 +1119,11 @@ La preferencia **claro / oscuro / automático** es aparte y se queda **en cada d
 **no requiere permiso**: es una preferencia personal.
 
 **Importante.**
+- Las **plantillas de arranque** son solo un **punto de partida del administrador**: no son
+  paletas en sí, no se publican y los usuarios no las ven. Para que una plantilla llegue a la
+  gente, créala como paleta (desde el picker), ajústala si quieres y **publícala**.
+- **Duplicar** una paleta crea una **copia independiente**: editar la copia **no** cambia el
+  original (ni al revés). Útil para probar una variante sin arriesgar la paleta en uso.
 - Una paleta es un **ajuste de colores sobre los tokens de marca**, no estilos sueltos: solo se
   pueden tocar los **colores temáticos curados**. La **escala de severidad (1–5)** NO es
   editable —es **significado operacional**, no decoración— y el **gradiente de marca** se ajusta

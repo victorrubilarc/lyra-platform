@@ -20,6 +20,14 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.listActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
 }
 
 .listTitle {
@@ -478,6 +486,64 @@
   margin: 0;
   font-size: var(--text-caption-size);
   color: var(--color-text-muted);
+}
+
+/* --- Picker de plantillas de inicio --- */
+.templateDesc {
+  margin: 0 0 var(--space-4);
+  font-size: var(--text-body-sm-size);
+  color: var(--color-text-secondary);
+}
+
+.templateGrid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: var(--space-3);
+}
+
+.templateCard {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-height: 44px;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface-1);
+  cursor: pointer;
+  text-align: left;
+  transition: var(--transition-default);
+}
+
+.templateCard:hover {
+  border-color: var(--color-border-accent);
+  background: var(--color-hover);
+  box-shadow: var(--glow-brand);
+}
+
+.templateMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.templateName {
+  font-family: var(--font-brand);
+  font-weight: 600;
+  font-size: var(--text-body-size);
+  color: var(--color-text-primary);
+}
+
+.templateCardDesc {
+  font-size: var(--text-caption-size);
+  color: var(--color-text-secondary);
+  line-height: 1.4;
 }
 
 @media (max-width: 980px) {

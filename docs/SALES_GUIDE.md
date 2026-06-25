@@ -319,6 +319,11 @@ Preséntalo como evolución, no como funcionalidad actual:
 
 > Una línea por hito, en lenguaje de cliente. Lo más reciente arriba.
 
+- **2026-06-24** — **Plantillas de tema listas para usar 🎨 (disponible):** vestir la plataforma con tu marca es ahora cuestión de
+  minutos: el administrador elige una de **10 plantillas de color curadas** (Grafito, Cobre, Acero, Medianoche, Bosque, Solar, Índigo,
+  Cobalto, Magma, Salitre) —todas con **versión clara y oscura** y **contraste accesible (WCAG AA) garantizado**— como punto de partida,
+  la ajusta a sus colores y la publica. También puede **duplicar** cualquier paleta para probar variantes sin riesgo. Menos trabajo
+  manual, resultado siempre profesional.
 - **2026-06-19** — **Acta de entrega de turno en PDF 📄 (disponible):** desde una entrega firmada, un clic descarga un **acta de grado
   auditoría** (identidad Lyra, foto congelada del turno, dos firmas electrónicas, folio + código de integridad verificable), lista para
   la carpeta del regulador / auditoría ISO-HSE / peritaje. Se genera **on-premise**, es **fiel e inmutable** y cada descarga queda registrada.

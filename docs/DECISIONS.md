@@ -4,6 +4,31 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-06-24 · TEMAS FASE 2A · Plantillas de inicio + Duplicar
+Primera de tres fases enterprise sobre EST-TEMAS (2A plantillas+duplicar · 2B generador desde colores de marca con
+OKLCH · 2C import DTCG/hex). Las 5 decisiones de diseño (aprobadas antes de construir), con motivo:
+1. **Plantillas = CONSTANTES en `@lyra/contracts` (`theme/presets.ts`), NO filas de BD.** *Motivo:* una paleta es solo
+   JSON de tokens ⇒ un catálogo de plantillas es barato como código: prístino, versionado con el release, sin migración
+   ni seed. El backend NO necesita conocerlas (la creación ya valida tokens/whitelist). NO se seedean como `ThemePalette`,
+   NO son editables ni publicables, y el usuario final NUNCA las ve: son solo el punto de arranque del admin.
+2. **Duplicar = CLONADO EN CLIENTE (reusa `POST /theme/admin/palettes`), no endpoint dedicado.** *Motivo:* menos
+   superficie de API y reusa la validación existente; clonar es una sola inserción ⇒ la atomicidad server-side no aporta.
+   Tanto «desde plantilla» como «duplicar» leen tokens y crean una paleta NUEVA (borrador) con el flujo ya construido.
+3. **Toda plantilla PASA contraste WCAG AA en claro Y oscuro, garantizado por un TEST.** *Motivo:* regresión — una
+   plantilla nunca puede nacer inaccesible. `presets.spec.ts` recorre `THEME_PRESETS` y verifica whitelist + AA en ambas
+   variantes (los mismos pares de `evaluateContrast` que advierte el builder). Diseño con receta de TEXTO compartida (los
+   pares de texto pasan por construcción) ⇒ solo varían superficies tintadas y acentos.
+4. **UX = botón «Desde plantilla» (modal con miniaturas) y «Duplicar» (en las acciones de la paleta).** *Motivo:* patrón
+   Material/Radix; entra al editor con los tokens como borrador SIN guardar, el admin ajusta y pulsa Crear (reusa el flujo
+   de creación + vista previa en vivo + `PaletteSwatch` extraído para lista y picker).
+5. **Naming: desde plantilla = nombre de la plantilla; duplicar = «<nombre> (copia)».** *Motivo:* convención estándar; el
+   admin lo edita antes de guardar. **Alcance de las plantillas:** sobreescriben SOLO superficies + texto + 2 acentos;
+   bordes (translúcidos, se adaptan) y funcionales/severidad se dejan a la marca base ⇒ **semántica de estado constante**
+   entre todos los temas. 10 plantillas (industria chilena + constelación Lyra): Grafito, Cobre, Acero, Medianoche,
+   Bosque, Solar, Índigo, Cobalto, Magma, Salitre. **Sin permiso/migración nuevos** (reusa `theme:manage`).
+
+---
+
 ### 2026-06-24 · EST-TEMAS · Sistema de TEMAS / PALETAS administrable (MVP)
 Las 7 decisiones de diseño (aprobadas antes de construir), con motivo:
 1. **Granularidad = set ACOTADO y curado (18 tokens), NO los 100+.** *Motivo:* editar superficies/texto/bordes/acentos/

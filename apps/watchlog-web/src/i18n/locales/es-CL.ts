@@ -267,6 +267,15 @@ export const esCL = {
     deleted: "Paleta eliminada",
     readOnly: "Solo lectura: no tienes permiso para administrar temas.",
     baseHint: "Sin sobreescribir, cada token cae al valor de la marca Lyra (p. ej. fondo base {{variant}}: {{value}}).",
+    fromTemplate: "Desde plantilla",
+    duplicate: "Duplicar",
+    duplicateName: "{{name}} (copia)",
+    templateTitle: "Empezar desde una plantilla",
+    templateDesc:
+      "Elige un punto de partida curado. Se creará una paleta nueva (borrador) con esos colores, que podrás ajustar y publicar.",
+    templateDark: "Oscuro",
+    templateLight: "Claro",
+    templateUse: "Usar plantilla",
   },
   palette: {
     placeholder: "Escribe un comando o busca…",

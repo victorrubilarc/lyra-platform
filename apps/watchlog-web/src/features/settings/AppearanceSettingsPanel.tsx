@@ -1,36 +1,26 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Palette, Plus } from "lucide-react";
+import { LayoutTemplate, Palette, Plus } from "lucide-react";
 import { Button, EmptyState, Skeleton, cx } from "@lyra/ui";
-import { effectiveToken, type ThemePaletteDto } from "@lyra/contracts";
+import type { ThemePaletteDto, ThemePreset } from "@lyra/contracts";
 import { usePermissions } from "../../auth/use-permissions.js";
-import { PaletteEditor } from "./PaletteEditor.js";
+import { PaletteEditor, type PaletteSeed } from "./PaletteEditor.js";
+import { PaletteSwatch } from "./PaletteSwatch.js";
+import { TemplatePicker } from "./TemplatePicker.js";
 import { useAllPalettes } from "./theme-queries.js";
 import styles from "./AppearanceSettingsPanel.module.css";
 
-type Selection = { kind: "new" } | { kind: "edit"; id: string } | null;
-
-/** Mini muestra de la paleta (fondo oscuro + acento), para la lista. */
-function Swatch({ palette }: { palette: ThemePaletteDto }) {
-  return (
-    <span
-      className={styles.swatch}
-      style={{
-        background: effectiveToken(palette.tokensDark, "bgBase", "dark"),
-        borderColor: effectiveToken(palette.tokensDark, "accentPrimary", "dark"),
-      }}
-    >
-      <span style={{ background: effectiveToken(palette.tokensDark, "accentPrimary", "dark") }} />
-      <span style={{ background: effectiveToken(palette.tokensDark, "accentSecondary", "dark") }} />
-      <span style={{ background: effectiveToken(palette.tokensLight, "bgBase", "light") }} />
-    </span>
-  );
-}
+// `nonce` fuerza el remontaje del editor al iniciar otro borrador nuevo (plantilla/copia)
+// aunque `palette` siga siendo null.
+type Selection =
+  | { kind: "new"; seed?: PaletteSeed; nonce: number }
+  | { kind: "edit"; id: string }
+  | null;
 
 /**
  * Pestaña "Apariencia" (EST-TEMAS): lista de paletas + builder. Construir/publicar exige
  * `theme:manage`; sin él, sólo lectura. El builder muestra la vista previa EN VIVO sobre
- * todo el workspace.
+ * todo el workspace. Fase 2A: empezar desde una PLANTILLA curada o DUPLICAR una paleta.
  */
 export function AppearanceSettingsPanel() {
   const { t } = useTranslation();
@@ -39,9 +29,39 @@ export function AppearanceSettingsPanel() {
 
   const { data: palettes, isLoading } = useAllPalettes();
   const [selection, setSelection] = useState<Selection>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [draftNonce, setDraftNonce] = useState(0);
+
+  const startDraft = (seed?: PaletteSeed): void => {
+    const nonce = draftNonce + 1;
+    setDraftNonce(nonce);
+    setSelection({ kind: "new", seed, nonce });
+  };
+
+  // Clonar una PLANTILLA de inicio en una paleta nueva (borrador), con su nombre prefijado.
+  const startFromPreset = (preset: ThemePreset): void => {
+    setPickerOpen(false);
+    startDraft({
+      name: preset.name,
+      description: preset.description,
+      tokensDark: preset.tokensDark,
+      tokensLight: preset.tokensLight,
+    });
+  };
+
+  // DUPLICAR una paleta existente en una nueva "… (copia)", editable e independiente.
+  const startDuplicate = (palette: ThemePaletteDto): void => {
+    startDraft({
+      name: t("appearance.duplicateName", { name: palette.name }),
+      description: palette.description ?? undefined,
+      tokensDark: palette.tokensDark,
+      tokensLight: palette.tokensLight,
+    });
+  };
 
   const selected =
     selection?.kind === "edit" ? (palettes?.find((p) => p.id === selection.id) ?? null) : null;
+  const seed = selection?.kind === "new" ? selection.seed : undefined;
   const editing = selection !== null;
 
   return (
@@ -50,13 +70,22 @@ export function AppearanceSettingsPanel() {
         <div className={styles.listHead}>
           <span className={styles.listTitle}>{t("appearance.palettes")}</span>
           {canManage && (
-            <Button
-              variant={selection?.kind === "new" ? "primary" : "secondary"}
-              leftIcon={<Plus size={15} />}
-              onClick={() => setSelection({ kind: "new" })}
-            >
-              {t("appearance.new")}
-            </Button>
+            <div className={styles.listActions}>
+              <Button
+                variant="secondary"
+                leftIcon={<LayoutTemplate size={15} />}
+                onClick={() => setPickerOpen(true)}
+              >
+                {t("appearance.fromTemplate")}
+              </Button>
+              <Button
+                variant={selection?.kind === "new" ? "primary" : "secondary"}
+                leftIcon={<Plus size={15} />}
+                onClick={() => startDraft()}
+              >
+                {t("appearance.new")}
+              </Button>
+            </div>
           )}
         </div>
 
@@ -76,7 +105,7 @@ export function AppearanceSettingsPanel() {
                   )}
                   onClick={() => setSelection({ kind: "edit", id: p.id })}
                 >
-                  <Swatch palette={p} />
+                  <PaletteSwatch tokensDark={p.tokensDark} tokensLight={p.tokensLight} />
                   <span className={styles.paletteMeta}>
                     <span className={styles.paletteName}>{p.name}</span>
                     <span className={styles.paletteBadges}>
@@ -96,11 +125,13 @@ export function AppearanceSettingsPanel() {
       <div className={styles.editorPane}>
         {editing ? (
           <PaletteEditor
-            key={selection?.kind === "edit" ? selection.id : "new"}
+            key={selection?.kind === "edit" ? selection.id : `new-${selection.nonce}`}
             palette={selected}
+            seed={seed}
             canManage={canManage}
             onSaved={(id) => setSelection({ kind: "edit", id })}
             onDeleted={() => setSelection(null)}
+            onDuplicate={startDuplicate}
           />
         ) : (
           <EmptyState
@@ -110,6 +141,8 @@ export function AppearanceSettingsPanel() {
           />
         )}
       </div>
+
+      <TemplatePicker open={pickerOpen} onClose={() => setPickerOpen(false)} onPick={startFromPreset} />
     </div>
   );
 }

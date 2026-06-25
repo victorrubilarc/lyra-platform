@@ -5,7 +5,17 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-24** (**🎨 EST-TEMAS · Sistema de TEMAS / PALETAS administrable (MVP) ✅** —
+> actualización: **2026-06-24** (**🎨 TEMAS FASE 2A · Plantillas de inicio + Duplicar ✅** —
+> `feat/temas-plantillas`: catálogo CURADO de **10 plantillas de arranque** (constantes en `@lyra/contracts`
+> `theme/presets.ts`: Grafito/Cobre/Acero/Medianoche/Bosque/Solar/Índigo/Cobalto/Magma/Salitre; prístinas, NO BD, NO
+> publicables, usuario final no las ve) + botón **«Desde plantilla»** (modal `TemplatePicker`) y **«Duplicar»** que CLONAN
+> tokens en una paleta NUEVA editable (borrador) → se ajusta y publica con el flujo EST-TEMAS existente. Clonar/duplicar =
+> **clonado en CLIENTE** (POST existente, reusa validación). **TODAS pasan WCAG AA claro+oscuro** (test nuevo
+> `presets.spec.ts`). Solo tocan superficies/texto/2 acentos (bordes/funcionales/severidad = marca base). **Sin backend,
+> sin migración, sin permiso nuevo** (reusa `theme:manage`). typecheck/lint(0)/build/test (392 contracts) verdes ·
+> `smoke-temas-plantillas.py` **11/11**. **PENDIENTE: smoke VISUAL del dueño.** **Siguiente: Fase 2B (generador desde
+> colores de marca, OKLCH); luego 2C (import DTCG/hex).** Anterior: **🎨 EST-TEMAS · Sistema de TEMAS / PALETAS
+> administrable (MVP) ✅** —
 > `feat/tema-paletas`: un admin construye paletas de marca (claro+oscuro) como **override PARCIAL de 18 tokens curados**
 > sobre el sistema de tokens (NO fork), con **vista previa en vivo** + **contraste WCAG**, las publica (flag) y marca una
 > por defecto; los usuarios eligen entre las publicadas (preferencia **portable** `User.themePaletteId`), aplicación
@@ -552,6 +562,8 @@ Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado 
 | **Fase 5 · Slice 4 EXPORT PDF del acta de entrega** (deps `pdfmake`+`@types/pdfmake`+`@expo-google-fonts/sora`+`/inter`; `shift-handover/acta/` [`acta-renderer.ts` singleton pdfmake + Sora/Inter TTF OFL por ruta con `localAccessPolicy` lista blanca + `urlAccessPolicy=false`; `acta-document.ts` builder PURO `buildActaDocument` modo claro premium + gradiente solo en banda; `acta-hash.ts` SHA-256 de JSON canónico]; `ShiftHandoverService.exportActa` [ABAC + 409 COMPILING + snapshot + breadcrumb + auditoría `shifthandover.acta.exported`] + endpoint `GET /shift-handover/:id/acta.pdf` [`@Res`, gate `RequireAnyPermission(view/compile/sign/acknowledge)`, Content-Disposition significativo]; web `downloadHandoverActa` vía `apiBlob` + botón en cockpit/historial + i18n; SIN migración/permiso/FLUSHALL; api 247 · web 3 · smoke `smoke-acta-pdf.py` 17/17 + regresión cambio-turno 29/29 · ia-config 20/20 · ia-stream 13/13 · notif 18/18 · notif-inapp 18/18) | `feat/cambio-turno-acta-pdf` → `main` | ✅ fusionado y publicado en `origin/main` (`81db4ad`) | ninguna |
 
 | **EST-FIX-ALTO · Paneles maestro-detalle llenan el alto del viewport** (cadena de altura flex rota: `ResizableSplit` no crecía en flex-column + alturas por-página inconsistentes [calc frágil/sin altura]; fix DRY en 2 lugares compartidos: contenedor de `ResizableSplit` `flex:1 1 auto;min-height:0` + variante shell `data-fill-height="pad"` que llena conservando padding; 4 páginas marcan el atributo, se borra el `height:calc()` frágil de calendarios; Logbook/`data-fill-height` a sangre INTACTO; UsersPage ya llenaba; solo CSS/contenedores, tokens, sin libs; typecheck/lint(0)/build/test 252+6) | `fix/layout-altura-paneles` → `main` | ✅ fusionado y publicado en `origin/main` | **PENDIENTE: smoke VISUAL del dueño** (5 páginas, claro/oscuro, escritorio/tablet) |
+
+| **TEMAS FASE 2A · Plantillas de inicio + Duplicar** (catálogo CURADO de **10 plantillas** en `@lyra/contracts/theme/presets.ts` [`THEME_PRESETS`: Grafito/Cobre/Acero/Medianoche/Bosque/Solar/Índigo/Cobalto/Magma/Salitre; constantes, NO BD, NO publicables] + test `presets.spec.ts` [TODAS pasan WCAG AA claro+oscuro] · web botón «Desde plantilla» [`TemplatePicker` modal] + «Duplicar» [borrador «… (copia)»] + `PaletteSwatch` extraído + seed en `PaletteEditor` · clonar/duplicar = clonado en CLIENTE [POST existente] · SIN backend/migración/permiso nuevo · contracts 392 · `smoke-temas-plantillas.py` 11/11) | `feat/temas-plantillas` → `main` | ✅ fusionado y publicado en `origin/main` | **PENDIENTE: smoke VISUAL del dueño** (elegir plantilla → ajustar → publicar; duplicar una paleta) |
 
 **Estado:** todo publicado — `main` = `origin/main` (verificado `git rev-list --count origin/main..main` = 0).
 

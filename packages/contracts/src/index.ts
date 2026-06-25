@@ -93,3 +93,4 @@ export * from "./ai/ai.js";
 // Sistema de TEMAS / PALETAS administrable (EST-TEMAS)
 export * from "./theme/contrast.js";
 export * from "./theme/palette.js";
+export * from "./theme/presets.js";
