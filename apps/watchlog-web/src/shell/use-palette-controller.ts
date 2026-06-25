@@ -10,6 +10,18 @@ import { usePaletteStore } from "./palette-store.js";
 export function usePaletteController(): void {
   const { data } = useMyTheme();
   const setActive = usePaletteStore((s) => s.setActive);
+
+  // Marca el DOCUMENTO (<html>) como "workspace tematizable" mientras el shell esté
+  // montado. El override CSS de la paleta se scopea a `[data-wl-themed][data-theme=…]`
+  // —ambos atributos en <html>, el mismo elemento que ya lleva `data-theme`— para que
+  // gane a los tokens base y cubra TODO (incluidos los portales de menús/modales/toasts
+  // que se montan en <body>, fuera del árbol del shell). El login NO monta el shell ⇒
+  // el atributo se retira al desmontar ⇒ la entrada conserva la identidad oscura de marca.
+  useEffect(() => {
+    document.documentElement.setAttribute("data-wl-themed", "");
+    return () => document.documentElement.removeAttribute("data-wl-themed");
+  }, []);
+
   useEffect(() => {
     if (data !== undefined) setActive(data.palette);
   }, [data, setActive]);

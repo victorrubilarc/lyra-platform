@@ -50,7 +50,7 @@ export function AppShell() {
   }, [pathname, openTab, pushRecent]);
 
   return (
-    <div className={styles.shell} data-density={density} data-wl-themed="">
+    <div className={styles.shell} data-density={density}>
       <Sidebar />
       <div className={styles.main}>
         <Topbar onOpenSearch={() => setPaletteOpen(true)} />

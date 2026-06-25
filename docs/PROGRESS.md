@@ -22,7 +22,12 @@ typecheck/lint(0)/build/test (**contracts 349 + API 252**, incl. contrast/palett
 404 no-publicada→fallback default→despublicar quita default). **Reemplaza la deuda de branding por licenciatario de Fase 7**
 (build-args VITE_ → ahora runtime, sin rebuild). **PENDIENTE: smoke VISUAL del dueño** (construir una paleta institucional
 y verla en claro/oscuro). **Fase 2 (futuro):** semilla 1-color→rampas, import/export, logo, identidad por estructura.
-**Siguiente: lo que el dueño defina (L4 jerarquías alternativas u otro).**
+**FIX post-merge (selector de override, v0.1.11):** la paleta no aplicaba los colores — el override se generaba con
+`[data-wl-themed][data-theme]` (ambos atributos en UN mismo elemento) pero `data-wl-themed` estaba en el `<div>` del shell
+y `data-theme` en `<html>` ⇒ el selector compuesto nunca casaba. Se movió `data-wl-themed` a **`<html>`** (lo pone/quita
+`usePaletteController` al montar/desmontar el shell) ⇒ el override gana a los tokens base, **cubre TODO incluidos los
+portales** (menús/modales/toasts que se montan en `<body>`), y el login (sin shell) queda intacto. Verificado en vivo.
+**Siguiente: Fase 2A de temas (plantillas de inicio + duplicar), según definición del dueño.**
 
 **2026-06-24 — 🎨 EST-FIX-ALTO · Paneles maestro-detalle llenan el alto del viewport ✅** (`fix/layout-altura-paneles`).
 Defecto **premium**: en las páginas tipo maestro-detalle (Estructura, calendarios, datos de referencia, usuarios) el
