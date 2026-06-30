@@ -1112,18 +1112,29 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
       y nodos, renderizada como `BIT-000007`/`#7` en backend (no configurable, sin prefijo por plantilla, sin número
       inicial, sin scope). Incidencias usa el mismo patrón (`Incident.number` global → `INC-####`). En `Template`/
       `TemplateVersion` **no hay** ningún campo de folio/prefijo/secuencia (solo `versionNumber`, que es la versión de la
-      DEFINICIÓN, no un correlativo de registros). **Qué implicaría:** (1) config en la plantilla (p. ej.
-      `Template.folioPrefix`/`folioPadding`/`folioStart`/`folioScope`) editable en el builder; (2) un **contador por
-      plantilla** (tabla `TemplateSequence`/`FolioCounter` con asignación atómica —`INSERT … ON CONFLICT … RETURNING` o
-      `SELECT … FOR UPDATE`— para evitar huecos/colisiones bajo concurrencia, NO un autoincrement global); (3) **decidir el
-      ALCANCE del correlativo** (global por plantilla vs por nodo/estructura vs por período/año, patrón "reinicio anual"
-      común en folios regulatorios); (4) **migración + backfill** del histórico (las entradas ya tienen `entryNumber`
-      global; ¿se conserva como folio interno y el nuevo correlativo es ADITIVO, o se renumera? — recomendado ADITIVO
-      para no romper auditoría/Part 11); (5) folio mostrado en grilla/visor/PDF/notificaciones y **buscable**. **Referencia
-      industria:** WO number configurable de Maximo, document numbering de Veeva/MasterControl (prefijo+secuencia+reinicio
-      por año), numbering schemes de ServiceNow. **Viabilidad ALTA** (aditivo; reusa el patrón de contador + versión
-      inmutable). **Riesgo a cuidar:** atomicidad de la secuencia (no usar autoincrement por plantilla "a mano") e
-      inmutabilidad del folio una vez sellado el registro (GxP). Pendiente de plan/aprobación por sesión.
+      DEFINICIÓN, no un correlativo de registros).
+      **ENFOQUE ACORDADO (2026-06-30): "varias posibilidades" = UN esquema CONFIGURABLE, no N variantes.** Se modela un
+      **esquema de folio** en la plantilla con ejes independientes que el constructor COMBINA, y UN contador genérico
+      atómico que cubre todas las combinaciones. Ejes: **prefijo** (texto libre `PT-`/`OT-`), **máscara/tokens**
+      (`{prefijo}{aaaa}-{seq:0000}` → `PT-2026-0001`), **relleno** (ceros), **número inicial** (1, 500, 1000…),
+      **alcance del contador** (global por plantilla · por plantilla+**nodo/área** · por plantilla+**estructura** · por
+      plantilla+**equipo**), **reinicio** (nunca · **anual** · mensual · por **período/turno**).
+      **Mecanismo (la clave):** al SELLAR, el backend calcula una **"clave de secuencia"** concatenando los ejes elegidos
+      (p. ej. `templateId|nodeId|2026`) y pide el siguiente número de ESA clave a un contador atómico ⇒ cambiar de
+      "global" a "por área con reinicio anual" es **solo cambiar qué entra en la clave**, sin código por combinación.
+      **Qué implicaría:** (1) config en la plantilla (`Template.folioScheme` JSON: prefijo/máscara/padding/start/scope/
+      reset) editable en el builder; (2) tabla **`FolioCounter`** (1 fila por clave derivada) con asignación atómica
+      (`INSERT … ON CONFLICT … RETURNING` o `SELECT … FOR UPDATE`), **NO** autoincrement por plantilla a mano; (3)
+      **asignar al SELLAR, no al crear el borrador** (folios **sin huecos**/gapless que esperan auditorías; un borrador
+      abandonado no quema correlativo) — decisión de peso GxP; (4) **migración + backfill ADITIVO** (conservar
+      `entryNumber` global como folio interno; el nuevo correlativo es ADICIONAL, no se renumera — protege auditoría/Part
+      11); (5) folio en grilla/visor/PDF/notificaciones y **buscable**; (6) **inmutable** una vez sellado.
+      **MVP recomendado:** prefijo + padding + número inicial + alcance {global-plantilla|por-nodo} + reinicio
+      {nunca|anual} (cubre ~90%, patrón Veeva/Maximo "prefijo+año+secuencia"); resto (por equipo, mensual, máscara con
+      tokens arbitrarios) = crecimiento ADITIVO sobre el mismo motor. **Referencia industria:** WO number configurable de
+      Maximo, document numbering de Veeva/MasterControl (prefijo+secuencia+reinicio por año), numbering schemes de
+      ServiceNow. **Viabilidad ALTA.** **Riesgos a cuidar:** atomicidad de la secuencia, gapless ⇒ asignar al sellar,
+      inmutabilidad post-sellado. Pendiente de plan/aprobación por sesión.
 
 - [x] **2.1.2 — Layout de formulario en GRILLA responsiva ✅ (2026-06-14, `feat/layout-grilla` → `main`).** Ancho por
       campo (columna dedicada en la versión inmutable) + grilla CSS responsiva desde una fuente de render ÚNICA
