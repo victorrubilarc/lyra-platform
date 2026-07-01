@@ -4,6 +4,20 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-01 · OT — Sesión 0: DISEÑO FORMAL entregado (anexo técnico), forks pendientes de OK
+Se produjo `docs/design/OT_DESIGN_ARCHITECTURE.md` (diseño sin código; anexo de la propuesta comercial). Grounding
+verificado contra el repo, con **correcciones al plan de arranque**: (a) el modelo es `WorkflowDefinitionVersion`, **no**
+`WorkflowVersion`; (b) los permisos se catalogan por `group:string` + `dimension:MODULE|ACTION|WORKFLOW`, **NO** por
+"categorías numéricas" (las "cat. 8x/9x" de docs/memoria son convención de *display*); (c) **`FolioCounter` NO existe** hoy
+(los folios son `autoincrement()` global derivado) ⇒ el motor de folio gapless se **construye** (y de paso sirve al folio-
+por-plantilla del dueño); (d) el `prototipo.tsx` **no** dibuja OT. Se dejan **8 forks (W1–W8) con recomendación fundada** a
+la espera del visto bueno del dueño (destacan: W1 `WorkActivity` entidad propia — no fusionar con `IncidentAction`; W2 un
+solo `workorder:transition` con roles-por-transición como DATO — no 4 permisos de puerta; W4 construir `FolioCounter` con
+scope por-tipo + reinicio anual). **Las decisiones definitivas se consolidan aquí al aprobar los forks.** Plan S1–S8 (~397
+HH) confirmado. Deuda registrada: extraer `WorkflowExecutorService` compartido (sesión aparte, no OT).
+
+---
+
 ### 2026-07-01 · MÓDULO DE ÓRDENES DE TRABAJO (OT / PTW) — enfoque y fases (planificación)
 Ante una **oportunidad real de cliente en minería**, se decide absorber con Lyra WatchLog el flujo Solicitud de
 Trabajo → Orden de Trabajo con Permiso de Trabajo (PTW). Decisiones de enfoque (aprobadas antes del diseño detallado):

@@ -655,10 +655,13 @@ nunca queda más de una sesión atrás.
 > cerrables (opción 2, elegida por el dueño), cada una con el ciclo completo (código→verde→docs→memoria→commit→push→
 > prompt de la siguiente).
 
-- [ ] **Sesión 0 — Diseño y aprobación (SIN código, ~14 HH):** documento de arquitectura del módulo (schema Prisma +
-      relaciones con Incidencia/Bitácora, catálogo de permisos, workflow base de 4 puertas configurables, contratos, qué
-      va a `packages/`), registro en DECISIONS + este épico, y **visto bueno del dueño** antes de codificar. Entregable =
-      anexo técnico de la propuesta comercial. **← PRÓXIMA SESIÓN.**
+- [~] **Sesión 0 — Diseño y aprobación (SIN código, ~14 HH):** ✅ **documento entregado** →
+      `docs/design/OT_DESIGN_ARCHITECTURE.md` (schema Prisma de las entidades nuevas, relaciones con Incidencia/Bitácora,
+      catálogo de permisos `group:"workorders"`, workflow base de 4 puertas configurables + mecánica de folio-al-aprobar,
+      `FolioCounter` nuevo, qué va a `packages/`, 8 forks W1–W8 con recomendación fundada, plan S1–S8). **PENDIENTE: visto
+      bueno explícito del dueño de los forks W1–W8** antes de la Sesión 1. Registrado en DECISIONS 2026-07-01 (entrega S0).
+      **Deuda anotada:** extraer un `WorkflowExecutorService` compartido (LogEntry/Incident/WorkOrder = 3.ª copia del
+      ejecutor de transición) = sesión dedicada con tests, NO dentro de OT.
 - [ ] **Sesión 1 — Cimientos (~40 HH):** entidad `WorkOrder` + catálogos `WorkOrderType`, `Area`/`Specialty` (N:N);
       permisos nuevos; crear/listar solicitud (BORRADOR/INGRESADA) con ABAC nodo ∩ estructura; web `/ordenes-trabajo`
       (grilla con convenciones de filtro/paginación + wizard de nueva solicitud). Sin workflow/folio/checklists/actividades.

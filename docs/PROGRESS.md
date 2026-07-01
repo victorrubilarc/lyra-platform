@@ -1,5 +1,20 @@
 # Progreso — Lyra WatchLog
 
+**2026-07-01 — 🏗️ OT · Sesión 0 · DISEÑO FORMAL entregado (sin código).** Se produjo
+`docs/design/OT_DESIGN_ARCHITECTURE.md`, anexo técnico del módulo de Órdenes de Trabajo (OT/PTW) para la propuesta
+comercial. Grounding **verificado contra el repo** (no redescubierto): motor de workflow (`WorkflowDefinition`/
+`…Version`/`State`/`Transition`/`TransitionRole`), Form Builder/`LogEntry` como motor de checklists, `IncidentAction` como
+base de `WorkActivity`, Bloque N (`IncidentSlaService.findBreaches` + `NotificationWorkerService.sweep`),
+`IncidentDashboardService`, `ScopeService` (ABAC), firmas Part 11 (`LogEntrySignature`/`ReauthService`), `SavedView`. El
+documento define: **entidades nuevas** (`WorkOrder`, `WorkOrderType`, `Area`/`Specialty` N:N, `WorkOrderChecklistRule`/
+`WorkOrderChecklist`, `WorkActivity`/`WorkActivityUpdate`, satélites espejo, **`FolioCounter` nuevo**); **workflow base de
+4 puertas configurables** + mecánica exacta de **folio-al-aprobar** (`WorkOrderType.folioOnStateKey`, sin contaminar el
+modelo de workflow); **permisos** `group:"workorders"`; **integración Incidencia→OT** bidireccional; **qué va a
+`packages/`**; y **8 forks (W1–W8)** con recomendación fundada. **Correcciones al plan de arranque** registradas en
+DECISIONS (nombre real `WorkflowDefinitionVersion`; permisos por `group`/`dimension` no "categorías"; `FolioCounter` no
+existía; prototipo no dibuja OT). **Estado: a la espera del visto bueno explícito del dueño de los forks antes de la
+Sesión 1 (Cimientos).** Árbol limpio al iniciar (`origin/main..main`=0). Sin build/migración/smoke (es diseño).
+
 **2026-06-24 — 🎨 TEMAS FASE 2A · Plantillas de inicio + Duplicar ✅** (`feat/temas-plantillas`).
 Primera de tres fases enterprise sobre EST-TEMAS (2A plantillas+duplicar · 2B generador desde colores de marca · 2C
 import DTCG/hex). Antes, crear una paleta partía de CERO (18 tokens × 2 variantes a mano): laborioso. Ahora hay un
