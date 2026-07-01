@@ -5,7 +5,10 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-06-24** (**🎨 TEMAS FASE 2A · Plantillas de inicio + Duplicar ✅** —
+> actualización: **2026-07-01** (planificación, SIN código) — **📋 ROADMAP MÓDULO ÓRDENES DE TRABAJO (OT / PTW)
+> registrado** en §2 (épico nuevo, 8 sesiones S0–S8, ~397 HH; oportunidad real de cliente minero; **entitlements de
+> módulo DIFERIDOS** al épico de licenciamiento §2(1)). Ver DECISIONS 2026-07-01 y memoria `work-orders-module-plan`.
+> Última sesión de CÓDIGO: **2026-06-24** (**🎨 TEMAS FASE 2A · Plantillas de inicio + Duplicar ✅** —
 > `feat/temas-plantillas`: catálogo CURADO de **10 plantillas de arranque** (constantes en `@lyra/contracts`
 > `theme/presets.ts`: Grafito/Cobre/Acero/Medianoche/Bosque/Solar/Índigo/Cobalto/Magma/Salitre; prístinas, NO BD, NO
 > publicables, usuario final no las ve) + botón **«Desde plantilla»** (modal `TemplatePicker`) y **«Duplicar»** que CLONAN
@@ -574,6 +577,111 @@ nunca queda más de una sesión atrás.
 ---
 
 ## 2. Pendiente por HACER (módulos / submódulos)
+
+### 🟣 ÉPICO — PREPARACIÓN PARA DISTRIBUCIÓN / CANAL (modelo mayorista marca blanca) 🔒
+> **Registrado 2026-07-01.** Contexto de negocio: se vende vía un **socio de canal** (mayorista) que revende a
+> los clientes finales (minería/industria) con **marca blanca**; ITESICWS **no** llega al cliente final. Modelo:
+> **licencias ANUALES RENOVABLES por tramos de volumen** (ver `docs/estrategia-canal.md` — INTERNO). Este épico
+> agrupa TODO lo que falta para poder **distribuir a múltiples clientes on-premise de forma profesional y segura**.
+> **Bloquea firmar el canal.** Debe quedar **segurísimo**: software que corre en infraestructura ajena, distribuido
+> por un tercero. Docs de referencia: `estrategia-canal.md` (comercial), `LICENSING.md` (spec técnica), `SECURITY.md`
+> §9 (distribución segura), `DEPLOYMENT.md` (runbook de flota). Orden de magnitud total: **~255–540 HH**.
+>
+> **Regla de corte:** NO firmar el canal sin, al menos, (1) licenciamiento + (2) marca blanca + (4) seguridad de
+> cadena de suministro. La orquestación de flota (3) se puede diferir hasta tener ~3–5 clientes (con 1–2 se hace a
+> mano con el `update.sh` actual).
+
+- [ ] **(1) Módulo de licenciamiento / activación** (~80–160 HH) — **spec cerrada en `docs/LICENSING.md`.**
+      Llave firmada **Ed25519 OFFLINE** (JWS): `installationId`, vencimiento + `graceDays`, topes
+      (`maxInstallations`/`maxNodes`/`maxNamedUsers`), `modules[]` habilitados, `edition`, `whiteLabel`. Verificación
+      al arranque + periódica → máquina de estados (VÁLIDA/POR VENCER/GRACIA/BLOQUEADA=solo lectura, nunca borra
+      datos) + gating de módulos por *entitlement* (eje distinto del RBAC). CLI de emisión. **SEGURIDAD:** custodia
+      de la clave privada en **HSM/secret manager** (NUNCA en repo/imagen/.env), verificación **distribuida** (no un
+      solo `if`), empaquetado anti-tamper del módulo crítico (bytecode V8 / binario nativo). Antipirateo = disuasión
+      por capas + dependencia de updates, **no bóveda** (documentado honestamente en LICENSING §7).
+- [ ] **(2) Modo marca blanca COMPLETO** (~60–120 HH) — hoy los temas son override PARCIAL en runtime y el **login
+      queda con marca Lyra** (ver memoria `theme-system`). Falta: **nombre de producto configurable** en toda la app,
+      **login personalizable**, branding en el **acta PDF** y en los **correos** salientes. Sin rebuild (runtime),
+      gobernado por la licencia (`whiteLabel:true`). Reusa el sistema de temas EST-TEMAS.
+- [ ] **(3) Orquestación de flota / actualización multi-cliente** (~75–160 HH) — **runbook en `DEPLOYMENT.md`.**
+      Hoy el pipeline actualiza UNA instalación (`update.sh`: backup→pull→migrate→healthcheck→rollback→prune). Para
+      N clientes falta: **(3a) inventario/reporte de versión** por instalación (endpoint `/version` o *heartbeat* del
+      módulo de licencia, reusa `installationId`) ~20–40 HH · **(3b) actualizador estandarizado / agente** con
+      **aprobación** (versión "aprobada" + ventana de mantención; sin SSH manual en 10 máquinas) ~40–90 HH · **(3c)
+      bundle AIR-GAPPED** (`docker save`/`load` + migración empaquetada, para plantas SIN internet — muy común en
+      minería) ~15–30 HH · **(3d) despliegue por ANILLOS (canary)**: actualizar 1–2 clientes conejillo → verificar →
+      resto (NO los N de golpe). Recordatorio: migraciones `prisma migrate deploy` son **solo-hacia-adelante**; el
+      rollback revierte imágenes, NO el esquema ⇒ el **backup pre-update es la red** (ya existe en `backup.sh`).
+- [ ] **(4) Distribución SEGURA / cadena de suministro** (~40–100 HH) 🔒 — **requisitos en `SECURITY.md` §9.** Software
+      que corre en infra ajena y lo despliega un tercero ⇒ blindar la cadena: **firma de imágenes** (cosign/Sigstore)
+      + **verificación de firma** en el host antes de correr · **pull por DIGEST fijo** (no solo por tag mutable,
+      reproducibilidad e integridad) · **registro privado** con credenciales/tokens **read-only por cliente**
+      (revocables) · **escaneo de vulnerabilidades** de imágenes (Trivy/Grype) **antes de publicar** + gate en CI ·
+      **SBOM** (CycloneDX) por release para auditoría del cliente · **backups cifrados** (hoy `pg_dump -Fc` sin
+      cifrar) · **secrets por instalación cifrados** en reposo · **TLS** en todo (ya vía Caddy). Objetivo: que un
+      cliente/auditor pueda **verificar** que la imagen que corre vino de ITESICWS y no fue alterada.
+- [ ] **(5) Hardening del stack de producción para distribución** (parte hereda deuda Fase 7) — `install.sh`
+      idempotente (hoy bootstrap manual), healthcheck del `web`/borde, observabilidad/logs centralizados **opt-in por
+      cliente** (sin sacar datos de la planta salvo consentimiento), `pull_policy`/digests fijos, límites de recursos
+      (ya hechos), y checklist de **hardening del host** entregable al cliente/socio (firewall, actualizaciones de SO,
+      backups verificados, rotación de secretos).
+
+### 🟢 ÉPICO — MÓDULO DE ÓRDENES DE TRABAJO (OT / Permiso de Trabajo · PTW) 🏗️ **PRIORIDAD (oportunidad de cliente)**
+> **Registrado 2026-07-01** (planificación aprobada por el dueño; **diseño formal detallado = Sesión 0**). Contexto:
+> hay una **oportunidad real de cliente en MINERÍA** para absorber con Lyra WatchLog un flujo de **Solicitud de Trabajo
+> → Requerimiento/Orden de Trabajo con Permiso de Trabajo (PTW)**. Es el patrón enterprise EAM/CMMS (SAP PM Aviso→Orden,
+> IBM Maximo) + PTW de alto riesgo (LOTO/bloqueo de energías, trabajo en altura, espacios confinados, ART; exigido por
+> **DS 132 / SERNAGEOMIN**, ISO 45001). **El caso de uso financia el módulo**, que queda como producto reutilizable (IP
+> ITESICWS). ~**70% de la maquinaria transversal YA existe** (workflow configurable, form builder = motor de checklists,
+> `IncidentAction`/CAPA como base de actividades, Bloque N para alertas/SLA, `IncidentDashboardService` como plantilla de
+> dashboard, RBAC/ABAC, auditoría inmutable, firmas Part 11, `FolioCounter` diseñado). Ver DECISIONS 2026-07-01 y memoria
+> `work-orders-module-plan`.
+>
+> **4 fases / 4 puertas de aprobación:** (1) Solicitud→Aprobación inicial · (2) Preparación→Revisión de checklists ·
+> (3) Planificación→Autorización del plan · (4) Ejecución/Seguimiento→Cierre definitivo. **Reglas duras:** el **folio
+> nace SOLO al aprobar** (no al crear = evita "basura digital"/duplicados); **sin "botón de pánico"** (checklist
+> obligatorio rechazado BLOQUEA el avance); **plan base congelado** (permite medir desviación); **cierre gobernado** por
+> guards. Trazabilidad 360° + alertas democratizadas (responsable+supervisor+solicitante+gerencia).
+>
+> **Modelado como entidad NUEVA `WorkOrder`, espejo de `Incident`** (NO se mete en `LogEntry` ni en `Incident`): reusa
+> el motor de workflow para las 4 puertas **CONFIGURABLES** (un cliente puede usar 1 o 4). Nace de las mismas fuentes que
+> una incidencia (directa / regla en bitácora / excepción) **+** planificada; una **Incidencia puede gatillar una OT**.
+> **DIFERIDO explícitamente (decisión del dueño 2026-07-01):** la capa de **entitlements / activación de módulo por
+> contrato** (que Incidencias y OT sean activables según lo licenciado) se aborda dentro del **épico de licenciamiento
+> §2(1)**, NO en este épico. Por ahora la visibilidad es solo RBAC (`module:workorders:view`).
+>
+> **Orden de magnitud total: ~397 HH.** Paquete comercial recomendado: **S1–S5 (MVP, cierra el caso de uso, ~195 HH)**
+> + **S6–S7 (control/dashboard, ~80 HH)**; **S8 (enterprise, ~108 HH) = evolución opcional**. Sesiones chicas y
+> cerrables (opción 2, elegida por el dueño), cada una con el ciclo completo (código→verde→docs→memoria→commit→push→
+> prompt de la siguiente).
+
+- [ ] **Sesión 0 — Diseño y aprobación (SIN código, ~14 HH):** documento de arquitectura del módulo (schema Prisma +
+      relaciones con Incidencia/Bitácora, catálogo de permisos, workflow base de 4 puertas configurables, contratos, qué
+      va a `packages/`), registro en DECISIONS + este épico, y **visto bueno del dueño** antes de codificar. Entregable =
+      anexo técnico de la propuesta comercial. **← PRÓXIMA SESIÓN.**
+- [ ] **Sesión 1 — Cimientos (~40 HH):** entidad `WorkOrder` + catálogos `WorkOrderType`, `Area`/`Specialty` (N:N);
+      permisos nuevos; crear/listar solicitud (BORRADOR/INGRESADA) con ABAC nodo ∩ estructura; web `/ordenes-trabajo`
+      (grilla con convenciones de filtro/paginación + wizard de nueva solicitud). Sin workflow/folio/checklists/actividades.
+- [ ] **Sesión 2 — Aprobación inicial + folio al aprobar / Puerta 1 (~35 HH):** workflow congelado, aprobar/rechazar
+      (**motivo obligatorio**), `FolioCounter` gapless (emite folio **SOLO al aprobar**), firma Part 11 + timeline.
+- [ ] **Sesión 3 — Motor de checklists ligados / Puerta 2 (~45 HH):** tabla enlace `WorkOrderChecklist` + reglas de
+      aplicabilidad en `WorkOrderType` (tipo/criticidad/especialidad/riesgo); sugerencia automática + selección manual +
+      instanciación (reusa Form Builder / `LogEntry`); guard "obligatorios completos + aprobados" con rol revisor distinto.
+- [ ] **Sesión 4 — Plan de actividades / Puerta 3 (~40 HH):** `WorkActivity` (base `IncidentAction` + `progressPct`,
+      `plannedStart/End`, `actualStart/End`, `dependsOnId`); enviar/aprobar/rechazar plan → **congelar baseline**; guard
+      "no ejecuta sin plan aprobado".
+- [ ] **Sesión 5 — Seguimiento vivo + cierre / Puerta 4 (~35 HH) → CIERRA EL MVP:** `WorkActivityUpdate` (append-only:
+      % avance, fechas reales, evidencias, desviaciones, costos/HH opcionales); solicitud de cierre + revisión final +
+      guards de cierre. **Ciclo completo Solicitud→Cierre punta a punta.**
+- [ ] **Sesión 6 — Alertas, SLA y semáforos / "vigía digital" (~40 HH):** eventos `workorder.overdue`/`.activity.overdue`/
+      `.stalled`/`.sla.breached`; curva de alerta (esperado vs real / incoherencia); escalamiento democratizado; semáforos
+      + panel de seguimiento activo. Reusa Bloque N + `findBreaches`.
+- [ ] **Sesión 7 — Dashboard de OT + integración Incidencia→OT (~40 HH):** `WorkOrderDashboardService` (clon del de
+      incidencias: KPIs, cuellos de botella, tendencia, drill-down, export CSV); botón "Generar OT" desde incidencia/
+      excepción/bitácora con enlace bidireccional. **Fin del paquete comercial recomendado.**
+- [ ] **Sesión 8 — Enterprise / opcional (~108 HH, Fase 3):** aprobadores dinámicos por reglas (área/criticidad/
+      especialidad/monto/riesgo, reusa el motor de reglas); dependencias/ruta crítica; costos/HH + reportes/export;
+      escalamiento multinivel. Puede subdividirse al llegar.
 
 ### 🔴 MÓDULO CANDIDATO #1 (decidido 2026-06-22) — Corrección / Anulación GxP de registros SELLADOS
 > **Recomendado como el PRÓXIMO módulo tras la ronda de prueba manual (antes de Fase 3/6).** Es el pendiente

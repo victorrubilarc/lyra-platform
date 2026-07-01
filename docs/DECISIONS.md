@@ -4,6 +4,37 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-01 · MÓDULO DE ÓRDENES DE TRABAJO (OT / PTW) — enfoque y fases (planificación)
+Ante una **oportunidad real de cliente en minería**, se decide absorber con Lyra WatchLog el flujo Solicitud de
+Trabajo → Orden de Trabajo con Permiso de Trabajo (PTW). Decisiones de enfoque (aprobadas antes del diseño detallado):
+1. **Entidad NUEVA `WorkOrder`, espejo de `Incident` — NO meterlo en `LogEntry` ni en `Incident`.** *Motivo:* una OT
+   tiene N checklists, N actividades y varias aprobaciones que exceden a un checklist (LogEntry) y a un evento HSE
+   (Incident). El patrón de Incidencias ("entidad + workflow congelado + acciones + guards de cierre + dashboard") es el
+   molde correcto; reusa ~70% de la maquinaria transversal (workflow, form builder, CAPA, Bloque N, dashboard, RBAC/
+   ABAC, auditoría, firmas Part 11, `FolioCounter`).
+2. **4 puertas de aprobación = ESTADOS+TRANSICIONES del motor de workflow CONFIGURABLE, no hardcodeadas.** *Motivo:* un
+   cliente minero exigente usa las 4; una PYME, 1. Evita el "engendro ad-hoc": es el estándar de la propia plataforma.
+3. **El folio (N° de requerimiento) se emite SOLO al aprobar la solicitud, nunca al crear.** *Motivo:* regla de negocio
+   explícita del caso de uso; evita "basura digital"/duplicados. Reusa el diseño `FolioCounter` gapless (asignación al
+   aprobar en vez de al sellar).
+4. **Checklists = plantillas del Form Builder (NO entidad nueva).** *Motivo:* el motor de checklists ya existe; se
+   conecta vía tabla enlace `WorkOrderChecklist` + reglas de aplicabilidad por tipo/criticidad/especialidad/riesgo
+   (patrón `appliesToTypeIds` de reportabilidad). Config en 2 capas: diseño (Form Builder + regla) vs operación
+   (sugerencia automática + selección manual en la OT).
+5. **La OT nace de las mismas fuentes que una Incidencia (directa / regla en bitácora / excepción) + planificada, y una
+   Incidencia puede GATILLAR una OT.** *Motivo:* coherencia enterprise (Maximo: incident→work order), sin inventar
+   orígenes nuevos; la CAPA liviana sigue en la incidencia, el trabajo "pesado" se promueve a OT.
+6. **Entitlements / activación de módulo por contrato = DIFERIDO al épico de licenciamiento (§2(1)).** *Motivo:* decisión
+   explícita del dueño (2026-07-01): la capa que hace Incidencias/OT activables según lo licenciado (dos guardias en AND:
+   licencia de instalación ∩ RBAC) se aborda junto con todo el licenciamiento Ed25519, no dentro de este épico. Hoy la
+   visibilidad es solo RBAC (`module:workorders:view`). Diseño de referencia esbozado (ModuleRegistry + EntitlementService
+   + `@RequireModule`), a construir después.
+7. **Ejecución en sesiones chicas y cerrables (opción 2), NO 3 fases grandes.** *Motivo:* respeta el CLAUDE.md ("un
+   objetivo por sesión, cerrar siempre") y evita llenar el contexto. Roadmap S0–S8 (~397 HH) en BACKLOG §2. Paquete
+   comercial recomendado: MVP S1–S5 + control S6–S7; S8 opcional. Diseño formal detallado = Sesión 0.
+
+---
+
 ### 2026-06-24 · TEMAS FASE 2A · Plantillas de inicio + Duplicar
 Primera de tres fases enterprise sobre EST-TEMAS (2A plantillas+duplicar · 2B generador desde colores de marca con
 OKLCH · 2C import DTCG/hex). Las 5 decisiones de diseño (aprobadas antes de construir), con motivo:

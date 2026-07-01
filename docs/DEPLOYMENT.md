@@ -192,6 +192,50 @@ $COMPOSE exec -T postgres sh -c 'pg_restore --list' < "$DUMP" | less
 ```
 > Para validar un dump sin riesgo, restáuralo a una BD descartable (`createdb watchlog_restore_test` → `pg_restore --schema-only -d watchlog_restore_test` → `dropdb`).
 
+## Distribución multi-cliente y actualización de flota (preparación de canal) 🔒
+> **Diseño registrado 2026-07-01 — NO construido aún.** Hoy el pipeline actualiza **UNA** instalación (el EC2
+> propio). Para el modelo de canal (varios clientes on-premise, marca blanca; ver `estrategia-canal.md`) se necesita
+> una capa de orquestación de flota + distribución segura. Ítems y estimación en `BACKLOG.md §2` (Épico de
+> distribución). Requisitos de seguridad de cadena de suministro en `SECURITY.md §9`. Spec de licencias en
+> `LICENSING.md`.
+
+### Qué es un "update" en este formato
+Un update **no** distribuye código ni archivos: distribuye **imágenes versionadas inmutables** (`lyra-watchlog-{api,web,migrate}:vX.Y.Z`). Actualizar = la instalación **baja la etiqueta nueva y reinicia**. Se **construye una vez**
+(GitHub Actions) y se **despliega N veces** (cada cliente jala del registro). El pipeline por-instalación ya existe:
+`update.sh` = **backup (`backup.sh`) → pull → migrate (`prisma migrate deploy`) → restart → healthcheck → rollback si
+falla → prune**.
+
+### Cómo se actualiza a N clientes (3 escenarios)
+| Escenario | Mecanismo | Cuándo |
+|---|---|---|
+| **A. Cliente con internet** | Baja del **registro** (GHCR/privado). Disparo: SSH manual, o **agente** que revisa la "versión aprobada" y se actualiza en ventana de mantención. | La mayoría. |
+| **B. Cliente air-gapped (sin internet)** | **Bundle offline**: `docker save` (imágenes) + migración empaquetada; lo entrega el socio; en la planta `docker load` + `update.sh` local. | Faenas mineras/industriales sin salida a internet (frecuente). |
+| **C. Máquina que tú/el socio operan** | SSH directo + `update.sh` (como hoy en el EC2). | Pilotos, clientes chicos. |
+
+### Reglas de oro de la flota (para no romper una planta)
+- **Despliegue por ANILLOS (canary):** actualizar **1–2 clientes conejillo** primero → verificar en vivo → recién ahí
+  el resto. **Nunca** los N de golpe.
+- **Inventario de versiones:** saber **quién está en qué versión** (endpoint `/version` o *heartbeat* del módulo de
+  licencia con `installationId`). Sin esto, a 10 clientes pierdes el control (*version drift*).
+- **Migraciones = solo hacia adelante** (`prisma migrate deploy`). El rollback de `update.sh` revierte **imágenes, NO
+  el esquema** ⇒ el **backup pre-update es la red de seguridad** (ya bloquea el deploy si falla). Cada cliente respalda
+  su propia BD antes de migrar.
+- **Ventana de mantención** coordinada con el cliente (cambio de turno / baja actividad); el reinicio es de segundos.
+- **Quién aprieta el botón:** en el canal, idealmente el **socio (soporte L2)** o el **agente con aprobación tuya** —
+  tú apruebas la versión, el mecanismo la propaga. No SSH manual en 10 máquinas.
+
+### Distribución SEGURA (cadena de suministro) 🔒 — ver `SECURITY.md §9`
+Software que corre en **infra ajena** y lo despliega un **tercero** ⇒ la cadena debe ser verificable:
+- **Firmar las imágenes** (cosign/Sigstore) y **verificar la firma en el host** antes de correr.
+- **Pull por DIGEST fijo** (`@sha256:…`), no solo por tag mutable → integridad + reproducibilidad.
+- **Registro privado** con tokens **read-only por cliente**, revocables.
+- **Escaneo de vulnerabilidades** (Trivy/Grype) **antes de publicar** + **SBOM** (CycloneDX) por release para el auditor
+  del cliente.
+- **Backups cifrados**, **secrets por instalación cifrados**, **TLS** en todo (ya vía Caddy).
+- Objetivo: que el cliente/auditor pueda **probar** que la imagen que corre vino de ITESICWS y **no fue alterada**.
+
+---
+
 ## Pendiente / deuda de este despliegue (Fase 7)
 - `install.sh` idempotente (hoy el bootstrap es manual, descrito arriba).
 - ~~Build de la web con **build-args VITE_** (branding por licenciatario)~~ **SUPERADO por EST-TEMAS**

@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Lyra WatchLog — Dossier de Capacidades</title>
+<meta name="description" content="Dossier de capacidades y solution fit de Lyra WatchLog — plataforma de bitácoras operacionales industriales on-premise. Ecosistema Lyra · ITESICWS." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+/* ============================================================
+   Lyra WatchLog — Dossier de Capacidades
+   Tokens de marca (CLAUDE.md · identidad Lyra). Nunca hex sueltos.
+   ============================================================ */
+:root{
+  /* Fondos profundos */
+  --base:#06061A;
+  --surf-1:#0C1124;
+  --surf-2:#111827;
+  --surf-3:#161d33;
+  /* Bordes */
+  --border:rgba(255,255,255,0.08);
+  --border-active:rgba(99,102,241,0.40);
+  /* Acentos de marca */
+  --indigo:#6366F1;
+  --cyan:#06B6D4;
+  --grad:linear-gradient(135deg,#6366F1,#06B6D4);
+  /* Texto */
+  --text:#E7EAF3;
+  --text-2:#9AA3B8;
+  --muted:#6B7280;
+  /* Estado */
+  --ok:#22C55E;
+  --warn:#F59E0B;
+  --err:#EF4444;
+  /* Severidad */
+  --sev1:#22C55E;--sev2:#84CC16;--sev3:#EAB308;--sev4:#F97316;--sev5:#EF4444;
+  /* Layout */
+  --maxw:1080px;
+  --radius:16px;
+  --shadow:0 1px 0 rgba(255,255,255,0.04), 0 18px 50px -24px rgba(99,102,241,0.45);
+}
+
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{
+  margin:0;
+  background:
+     radial-gradient(1200px 700px at 80% -10%, rgba(99,102,241,0.16), transparent 60%),
+     radial-gradient(1000px 600px at -10% 10%, rgba(6,182,212,0.12), transparent 55%),
+     var(--base);
+  color:var(--text);
+  font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  font-weight:400;
+  line-height:1.62;
+  font-size:16px;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 28px;}
+
+h1,h2,h3,h4,.brand{font-family:'Sora','Inter',sans-serif;letter-spacing:-0.01em;}
+h2{font-size:1.9rem;font-weight:700;margin:0 0 6px;line-height:1.15;}
+h3{font-size:1.28rem;font-weight:700;margin:30px 0 10px;color:var(--text);}
+h4{font-size:1.04rem;font-weight:600;margin:18px 0 8px;}
+p{margin:0 0 14px;}
+a{color:var(--cyan);text-decoration:none;}
+a:hover{text-decoration:underline;}
+strong{color:#fff;font-weight:600;}
+small{color:var(--text-2);}
+ul,ol{margin:0 0 16px;padding-left:22px;}
+li{margin:5px 0;}
+hr{border:0;border-top:1px solid var(--border);margin:34px 0;}
+
+.grad-text{
+  background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;
+}
+
+/* ---------- Cover ---------- */
+.cover{
+  min-height:100vh;display:flex;flex-direction:column;justify-content:center;
+  padding:70px 0 60px;position:relative;overflow:hidden;
+}
+.cover-badge{
+  display:inline-flex;align-items:center;gap:8px;align-self:flex-start;
+  font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--text-2);
+  border:1px solid var(--border);border-radius:999px;padding:7px 14px;margin-bottom:34px;
+  background:rgba(255,255,255,0.03);
+}
+.cover-badge .dot{width:7px;height:7px;border-radius:50%;background:var(--grad);}
+.logo-row{display:flex;align-items:center;gap:18px;margin-bottom:28px;}
+.logo-mark{width:64px;height:64px;flex:0 0 64px;filter:drop-shadow(0 8px 24px rgba(99,102,241,.45));}
+.wordmark{font-family:'Sora';font-weight:800;font-size:2rem;line-height:1;}
+.wordmark .sub{display:block;font-size:.72rem;font-weight:600;letter-spacing:.26em;
+  text-transform:uppercase;color:var(--text-2);margin-top:8px;}
+.cover h1{
+  font-family:'Sora';font-weight:800;font-size:clamp(2.6rem,6vw,4.1rem);line-height:1.04;
+  margin:14px 0 18px;max-width:16ch;
+}
+.cover .lead{font-size:1.22rem;color:var(--text-2);max-width:60ch;font-weight:500;}
+.cover-meta{display:flex;flex-wrap:wrap;gap:14px 40px;margin-top:48px;}
+.cover-meta div{font-size:.92rem;}
+.cover-meta .k{color:var(--muted);font-size:.74rem;text-transform:uppercase;letter-spacing:.1em;display:block;margin-bottom:3px;}
+.confidential{
+  margin-top:40px;border:1px solid var(--border-active);border-left:3px solid var(--indigo);
+  border-radius:12px;padding:14px 18px;background:rgba(99,102,241,0.08);max-width:62ch;
+  font-size:.92rem;color:var(--text);
+}
+
+/* ---------- Sections ---------- */
+section{padding:54px 0;border-top:1px solid var(--border);}
+.eyebrow{font-size:.74rem;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--cyan);font-weight:600;margin-bottom:10px;display:block;}
+.sec-num{color:var(--indigo);font-weight:800;margin-right:10px;}
+.intro{font-size:1.08rem;color:var(--text-2);max-width:72ch;}
+
+/* ---------- TOC ---------- */
+.toc{background:var(--surf-1);border:1px solid var(--border);border-radius:var(--radius);
+  padding:26px 30px;box-shadow:var(--shadow);}
+.toc ol{list-style:none;padding:0;margin:0;columns:2;column-gap:46px;}
+.toc li{margin:0;padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.05);
+  break-inside:avoid;display:flex;gap:12px;align-items:baseline;}
+.toc li a{color:var(--text);font-weight:500;}
+.toc li .n{color:var(--indigo);font-weight:700;font-family:'Sora';min-width:24px;}
+
+/* ---------- Status chips ---------- */
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:.74rem;font-weight:600;
+  padding:3px 10px;border-radius:999px;white-space:nowrap;border:1px solid transparent;line-height:1.5;}
+.chip.now{background:rgba(34,197,94,.14);color:#9ff0bd;border-color:rgba(34,197,94,.3);}
+.chip.wip{background:rgba(245,158,11,.14);color:#fcd9a0;border-color:rgba(245,158,11,.3);}
+.chip.road{background:rgba(99,102,241,.16);color:#c2c4fb;border-color:rgba(99,102,241,.34);}
+.legend{display:flex;flex-wrap:wrap;gap:14px;margin:18px 0 6px;}
+.legend span{font-size:.88rem;color:var(--text-2);display:flex;align-items:center;gap:8px;}
+
+/* ---------- Cards ---------- */
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(244px,1fr));gap:16px;margin-top:8px;}
+.card{background:var(--surf-1);border:1px solid var(--border);border-radius:14px;padding:18px 18px 16px;
+  box-shadow:var(--shadow);transition:border-color .2s,transform .2s;break-inside:avoid;}
+.card:hover{border-color:var(--border-active);transform:translateY(-2px);}
+.card .ico{font-size:1.5rem;line-height:1;margin-bottom:10px;}
+.card h4{margin:0 0 6px;font-size:1rem;}
+.card p{font-size:.86rem;color:var(--text-2);margin:0;}
+.card .chip{margin-top:12px;}
+
+/* Module detail blocks */
+.mod{background:var(--surf-1);border:1px solid var(--border);border-radius:14px;
+  padding:22px 24px;margin:16px 0;box-shadow:var(--shadow);break-inside:avoid;}
+.mod-head{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:6px;}
+.mod-head h3{margin:0;display:flex;align-items:center;gap:11px;}
+.mod-head .ico{font-size:1.35rem;}
+.mod ul{margin:10px 0 0;}
+.mod ul li{font-size:.95rem;}
+.mod .tagline{color:var(--text-2);font-size:.96rem;margin:2px 0 0;}
+
+/* ---------- Tables ---------- */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:12px;margin:16px 0;box-shadow:var(--shadow);}
+table{width:100%;border-collapse:collapse;font-size:.9rem;min-width:560px;}
+thead th{background:var(--surf-2);text-align:left;font-weight:600;font-family:'Sora';
+  font-size:.78rem;letter-spacing:.04em;text-transform:uppercase;color:var(--text-2);
+  padding:13px 16px;border-bottom:1px solid var(--border);}
+tbody td{padding:13px 16px;border-bottom:1px solid rgba(255,255,255,0.05);vertical-align:top;color:var(--text);}
+tbody tr:last-child td{border-bottom:0;}
+tbody tr:nth-child(even){background:rgba(255,255,255,0.015);}
+td strong{color:#fff;}
+.fill-row td{color:var(--muted);font-style:italic;}
+
+/* ---------- Callouts ---------- */
+.note{border:1px solid var(--border);border-left:3px solid var(--cyan);border-radius:10px;
+  padding:14px 18px;background:rgba(6,182,212,0.06);margin:18px 0;font-size:.95rem;}
+.note.idx{border-left-color:var(--indigo);background:rgba(99,102,241,0.07);}
+.note .lbl{font-weight:700;color:#fff;display:block;margin-bottom:4px;font-family:'Sora';font-size:.92rem;}
+
+/* ---------- Diagrams ---------- */
+.diagram{background:var(--surf-1);border:1px solid var(--border);border-radius:14px;
+  padding:26px 22px;margin:18px 0;box-shadow:var(--shadow);overflow-x:auto;}
+.diagram svg{display:block;margin:0 auto;max-width:100%;height:auto;}
+.flow{display:flex;flex-wrap:wrap;align-items:stretch;gap:0;justify-content:center;}
+.flow .step{background:var(--surf-2);border:1px solid var(--border-active);border-radius:11px;
+  padding:12px 14px;min-width:128px;max-width:160px;text-align:center;font-size:.82rem;font-weight:500;
+  display:flex;flex-direction:column;justify-content:center;}
+.flow .step .si{font-size:1.2rem;margin-bottom:5px;}
+.flow .arrow{display:flex;align-items:center;color:var(--indigo);font-size:1.3rem;padding:0 6px;}
+.layers{display:grid;gap:12px;}
+.layer{display:grid;grid-template-columns:140px 1fr;gap:14px;align-items:center;
+  border:1px solid var(--border);border-radius:11px;padding:12px 16px;background:var(--surf-2);}
+.layer .lname{font-family:'Sora';font-weight:700;font-size:.84rem;color:var(--cyan);text-transform:uppercase;letter-spacing:.05em;}
+.layer .lbody{display:flex;flex-wrap:wrap;gap:8px;}
+.pill{display:inline-block;font-size:.8rem;padding:5px 11px;border-radius:8px;
+  background:rgba(99,102,241,0.12);border:1px solid var(--border-active);color:var(--text);}
+.pill.ext{background:rgba(245,158,11,0.1);border-color:rgba(245,158,11,.3);}
+.pill.opt{background:rgba(6,182,212,0.1);border-color:rgba(6,182,212,.3);}
+
+/* ---------- Fit framework ---------- */
+.fit-cols{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:18px 0;}
+.fit-col{border:1px solid var(--border);border-radius:13px;padding:18px;background:var(--surf-1);box-shadow:var(--shadow);}
+.fit-col h4{margin-top:0;display:flex;align-items:center;gap:8px;}
+.fit-col.a{border-top:3px solid var(--ok);}
+.fit-col.b{border-top:3px solid var(--warn);}
+.fit-col.c{border-top:3px solid var(--indigo);}
+.fit-col p{font-size:.88rem;color:var(--text-2);}
+
+/* ---------- Internal annex ---------- */
+.internal-band{background:repeating-linear-gradient(45deg,rgba(245,158,11,.14),rgba(245,158,11,.14) 14px,rgba(245,158,11,.05) 14px,rgba(245,158,11,.05) 28px);
+  border:1px solid var(--warn);border-radius:14px;padding:18px 22px;margin-bottom:24px;}
+.internal-band .t{font-family:'Sora';font-weight:800;color:#fcd9a0;font-size:1.05rem;letter-spacing:.04em;
+  display:flex;align-items:center;gap:10px;}
+.internal section,#annex{border-color:rgba(245,158,11,.25);}
+#annex{background:rgba(245,158,11,0.025);}
+.phase{border:1px solid var(--border);border-radius:12px;padding:16px 20px;margin:14px 0;background:var(--surf-1);}
+.phase h4{margin-top:0;color:var(--cyan);}
+.effort{display:inline-block;font-family:'Sora';font-weight:700;font-size:.8rem;padding:3px 10px;border-radius:8px;
+  background:rgba(99,102,241,.15);border:1px solid var(--border-active);color:#c2c4fb;}
+
+/* ---------- Footer ---------- */
+footer{padding:48px 0 70px;border-top:1px solid var(--border);color:var(--text-2);font-size:.9rem;}
+footer .brand-foot{font-family:'Sora';font-weight:700;color:var(--text);font-size:1.05rem;margin-bottom:6px;}
+
+.backlink{font-size:.82rem;color:var(--muted);margin-top:8px;}
+.backlink a{color:var(--text-2);}
+
+/* ============================================================
+   PRINT — A4, light, ink-friendly, page breaks per section
+   ============================================================ */
+@media print{
+  @page{size:A4;margin:15mm 14mm;}
+  html,body{background:#fff !important;color:#15192b !important;font-size:10.5pt;line-height:1.4;}
+  body{
+    --text:#15192b;--text-2:#3a4055;--muted:#6b7280;
+    --surf-1:#ffffff;--surf-2:#f5f6fa;--surf-3:#eef0f6;--base:#fff;
+    --border:#dfe2ec;--border-active:#b8bdf3;
+    background:#fff !important;
+  }
+  .wrap{max-width:100%;padding:0;}
+  a{color:#3b3fb0;}
+  .grad-text{color:#4338ca !important;-webkit-text-fill-color:#4338ca;}
+  .cover{min-height:auto;padding:0 0 18mm;page-break-after:always;}
+  .cover h1{font-size:30pt;}
+  .wordmark{color:#1a1f3a;}
+  section{page-break-before:always;border-top:0;padding:6mm 0;}
+  #toc{page-break-before:avoid;}
+  .card,.mod,.diagram,.tbl-wrap,.phase,.note,.fit-col,.toc{
+    box-shadow:none !important;break-inside:avoid;page-break-inside:avoid;
+  }
+  .card:hover,.card{transform:none !important;}
+  h2,h3,h4{page-break-after:avoid;}
+  .cards{grid-template-columns:repeat(3,1fr);}
+  thead th{background:#eef0f6 !important;color:#3a4055 !important;-webkit-print-color-adjust:exact;}
+  tbody tr:nth-child(even){background:#f8f9fc !important;}
+  .chip,.pill,.legend span,.internal-band,.fit-col{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .confidential,.note,.internal-band{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .logo-mark{filter:none;}
+}
+@media (max-width:720px){
+  .toc ol{columns:1;}
+  .fit-cols{grid-template-columns:1fr;}
+  .layer{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+
+<!-- ============ SVG defs (shared brand gradient) ============ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="lyraGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6366F1" />
+      <stop offset="1" stop-color="#06B6D4" />
+    </linearGradient>
+  </defs>
+</svg>
+
+<!-- ====================== 0 · COVER ====================== -->
+<header class="cover wrap">
+  <span class="cover-badge"><span class="dot"></span> Confidencial · Preparado para evaluación de cliente</span>
+
+  <div class="logo-row">
+    <!-- Wordmark: constelación Lyra (Vega + paralelogramo) con gradiente de marca -->
+    <svg class="logo-mark" viewBox="0 0 32 32" role="img" aria-label="Lyra WatchLog">
+      <rect width="32" height="32" rx="7.5" fill="url(#lyraGrad)" />
+      <g stroke="#ffffff" stroke-width="1.4" stroke-linecap="round" stroke-opacity="0.7" fill="none">
+        <path d="M10 10 L21 9" /><path d="M21 9 L23.5 18" /><path d="M23.5 18 L16.5 23" />
+        <path d="M16.5 23 L13 14.5" /><path d="M13 14.5 L21 9" />
+      </g>
+      <g fill="#ffffff">
+        <circle cx="10" cy="10" r="2.7" /><circle cx="21" cy="9" r="1.9" />
+        <circle cx="23.5" cy="18" r="1.7" /><circle cx="16.5" cy="23" r="1.9" /><circle cx="13" cy="14.5" r="1.7" />
+      </g>
+    </svg>
+    <div class="wordmark">Lyra <span class="grad-text">WatchLog</span>
+      <span class="sub">Ecosistema Lyra · ITESICWS</span>
+    </div>
+  </div>
+
+  <h1>Dossier de <span class="grad-text">Capacidades</span></h1>
+  <p class="lead">Plataforma de bitácoras operacionales para industria — digital, trazable y a prueba de auditorías, instalada en la propia infraestructura del cliente (on-premise).</p>
+
+  <div class="cover-meta">
+    <div><span class="k">Producto</span> Lyra WatchLog</div>
+    <div><span class="k">Empresa</span> ITESICWS</div>
+    <div><span class="k">Ecosistema</span> Lyra</div>
+    <div><span class="k">Fecha</span> 30 de junio de 2026</div>
+    <div><span class="k">Contacto</span> vrubilar@itesic.cl</div>
+  </div>
+
+  <div class="confidential">
+    <strong>Confidencial.</strong> Documento preparado para la evaluación de un cliente potencial.
+    Distingue de forma visible lo que la plataforma <strong>hace hoy</strong>, lo que está
+    <strong>en construcción</strong> y lo que vive en el <strong>roadmap / a medida</strong>.
+    Incluye un <strong>Anexo A de uso interno</strong> (no mostrar al cliente).
+  </div>
+</header>
+
+<main class="wrap">
+
+<!-- ====================== TOC ====================== -->
+<section id="toc">
+  <span class="eyebrow">Contenido</span>
+  <h2>Tabla de contenidos</h2>
+  <div class="toc" style="margin-top:18px;">
+    <ol>
+      <li><span class="n">1</span><a href="#resumen">Resumen ejecutivo</a></li>
+      <li><span class="n">2</span><a href="#que-es">Qué es Lyra WatchLog</a></li>
+      <li><span class="n">3</span><a href="#mapa">Mapa de capacidades</a></li>
+      <li><span class="n">4</span><a href="#hoy">Capacidades disponibles hoy</a></li>
+      <li><span class="n">5</span><a href="#roadmap">En construcción / Roadmap</a></li>
+      <li><span class="n">6</span><a href="#stack">Stack tecnológico en lenguaje claro</a></li>
+      <li><span class="n">7</span><a href="#diagramas">Diagramas</a></li>
+      <li><span class="n">8</span><a href="#bondades">Bondades y diferenciadores</a></li>
+      <li><span class="n">9</span><a href="#fit">Encaje con las necesidades del cliente</a></li>
+      <li><span class="n">10</span><a href="#contacto">Próximos pasos y contacto</a></li>
+      <li><span class="n">A</span><a href="#annex">Anexo A — Confidencial (uso interno)</a></li>
+    </ol>
+  </div>
+  <div class="legend" style="margin-top:22px;">
+    <span><span class="chip now">✅ Disponible hoy</span> construido y funcionando</span>
+    <span><span class="chip wip">🔧 En construcción</span> en desarrollo activo</span>
+    <span><span class="chip road">🗺️ Roadmap / a medida</span> diseñado o configurable bajo proyecto</span>
+  </div>
+</section>
+
+<!-- ====================== 1 · RESUMEN EJECUTIVO ====================== -->
+<section id="resumen">
+  <span class="eyebrow">01 · Síntesis</span>
+  <h2><span class="sec-num">1</span>Resumen ejecutivo</h2>
+  <p class="intro">Lyra WatchLog reemplaza las <strong>bitácoras de papel y las planillas Excel</strong> de la operación industrial por un sistema digital, trazable y a prueba de auditorías — <strong>instalado en la infraestructura del propio cliente (on-premise)</strong>, sin depender de la nube.</p>
+
+  <h3>Propuesta de valor</h3>
+  <ul>
+    <li><strong>Registra una vez, encuentra siempre.</strong> Datos validados en origen, firmados electrónicamente e inmutables: nada se pierde, todo es rastreable (quién, qué, cuándo).</li>
+    <li><strong>Del dato a la acción.</strong> Una lectura fuera de rango no se diluye en una planilla: genera una excepción revisable y, si amerita, una incidencia con acciones correctivas que se cierran <em>con verificación de eficacia</em>.</li>
+    <li><strong>A prueba de auditorías.</strong> Trazabilidad ALCOA+, historial inmutable y firmas electrónicas re-autenticadas (estilo FDA 21 CFR Part 11): la evidencia llega lista, no reconstruida a mano.</li>
+    <li><strong>Configurable sin programar.</strong> Formularios, flujos, tipos de incidencia, reportabilidad, permisos y notificaciones los define el cliente desde la aplicación; el mismo producto sirve a una concentradora minera y a una planta de alimentos — <em>cambia la configuración, no el software</em>.</li>
+    <li><strong>Tus datos, en tu casa.</strong> 100% on-premise sobre PostgreSQL y almacenamiento propio; la IA puede correr en un <strong>modelo local</strong> donde los datos nunca salen de la planta.</li>
+    <li><strong>Diseñado para terreno.</strong> Tablet, alto contraste, áreas táctiles amplias (uso con guantes), modo claro/oscuro y temas de marca configurables en caliente.</li>
+  </ul>
+
+  <div class="note idx">
+    <span class="lbl">Madurez del producto</span>
+    El núcleo operacional está <strong>construido y en producción</strong>: seguridad y permisos, estructura organizacional multi-jerarquía, Form Builder visual, bitácoras con firma, rondas, incidencias (módulo completo con CAPA, causa raíz, reportabilidad, SLA y dashboard), cambio de turno firmado con resumen por IA y acta PDF, y notificaciones por correo + campanita en tiempo real. El roadmap se concentra en <strong>orígenes de datos de planta (SCADA/PI/OPC)</strong> y profundizar la inteligencia operacional.
+  </div>
+</section>
+
+<!-- ====================== 2 · QUÉ ES ====================== -->
+<section id="que-es">
+  <span class="eyebrow">02 · Contexto</span>
+  <h2><span class="sec-num">2</span>Qué es Lyra WatchLog</h2>
+
+  <h3>El problema que resuelve</h3>
+  <p>La operación industrial todavía vive en <strong>cuadernos de turno, planillas Excel y formularios en PDF</strong>. Eso genera dolores concretos y caros:</p>
+  <ul>
+    <li><strong>Información que se pierde o no se encuentra</strong> justo cuando se necesita (un incidente, una auditoría, un reclamo).</li>
+    <li><strong>Cero trazabilidad real:</strong> ¿quién registró ese dato?, ¿cuándo?, ¿se modificó después?</li>
+    <li><strong>Desviaciones que nadie ve a tiempo:</strong> un valor fuera de rango se diluye en una planilla.</li>
+    <li><strong>Incidentes que se repiten</strong> porque no hubo seguimiento formal de acciones correctivas.</li>
+    <li><strong>Auditorías lentas y estresantes:</strong> reconstruir la evidencia a mano.</li>
+    <li><strong>Rondas y controles que "se hicieron"</strong> pero no hay forma de demostrarlo.</li>
+    <li><strong>Datos sensibles en la nube de terceros</strong>, algo inaceptable para muchas operaciones críticas.</li>
+  </ul>
+
+  <h3>A quién sirve</h3>
+  <p>Minería, manufactura, alimentos e inocuidad, energía y utilities, construcción, logística, salud y servicios industriales — en general, <strong>cualquier organización que gestione turnos, rondas, controles operacionales, calidad, mantenimiento o incidentes</strong>. El núcleo es genérico; las particularidades de cada industria (HSE, calidad, geomecánica) son <strong>configuración, no software a medida</strong>.</p>
+
+  <h3>El enfoque on-premise</h3>
+  <p>Lyra WatchLog se instala en la infraestructura del cliente (servidores propios o datacenter) como un stack <strong>Docker</strong> con base de datos <strong>PostgreSQL</strong> y almacenamiento de evidencia propio. <strong>No depende de un SaaS obligatorio</strong> ni saca los datos fuera del entorno del cliente: soberanía y control total del dato, requisito de muchas operaciones críticas y de las áreas de seguridad de la información. Es <strong>single-tenant</strong> (un cliente por instalación), pensado para pasar auditorías de ciberseguridad (referencia OWASP ASVS).</p>
+</section>
+
+<!-- ====================== 3 · MAPA DE CAPACIDADES ====================== -->
+<section id="mapa">
+  <span class="eyebrow">03 · Vista de conjunto</span>
+  <h2><span class="sec-num">3</span>Mapa de capacidades</h2>
+  <p class="intro">Once módulos integrados sobre un mismo núcleo configurable. Todos los de esta rejilla están <strong>disponibles hoy</strong>.</p>
+
+  <div class="cards">
+    <div class="card"><div class="ico">🔐</div><h4>Seguridad y permisos</h4><p>RBAC + ABAC en 4 dimensiones, MFA, Argon2id, auditoría inmutable.</p><span class="chip now">✅ Hoy</span></div>
+    <div class="card"><div class="ico">🏭</div><h4>Estructura organizacional</h4><p>Multi-estructura, alcance por nodo, asistente de áreas, admin delegada.</p><span class="chip now">✅ Hoy</span></div>
+    <div class="card"><div class="ico">🧩</div><h4>Plantillas / Form Builder</h4><p>Diseñador visual, catálogo de objetos, reglas, umbrales, publicación inmutable.</p><span class="chip now">✅ Hoy</span></div>
+    <div class="card"><div class="ico">📋</div><h4>Bitácoras y llenado</h4><p>Entradas por turno, registro diferido, firma Part 11, folio y estampados.</p><span class="chip now">✅ Hoy</span></div>
+    <div class="card"><div class="ico">🔁</div><h4>Flujos (máquina de estados)</h4><p>Estados, transiciones, roles y firma por transición — reutilizable.</p><span class="chip now">✅ Hoy</span></div>
+    <div class="card"><div class="ico">🔂</div><h4>Rondas y controles</h4><p>Programación por turno/intervalo/calendario + worklist "Mis rondas".</p><span class="chip now">✅ Hoy</span></div>
+    <div class="card"><div class="ico">🚨</div><h4>Incidencias</h4><p>Flujo configurable, CAPA verificada, causa raíz, reportabilidad, SLA, dashboard.</p><span class="chip now">✅ Hoy</span></div>
+    <div class="card"><div class="ico">🔄</div><h4>Cambio de turno</h4><p>Entrega firmada por dos partes, resumen por IA en vivo, acta PDF de auditoría.</p><span class="chip now">✅ Hoy</span></div>
+    <div class="card"><div class="ico">🔔</div><h4>Notificaciones</h4><p>Por transición, plantillas con comodines, campanita in-app en tiempo real.</p><span class="chip now">✅ Hoy</span></div>
+    <div class="card"><div class="ico">🤖</div><h4>IA administrable</h4><p>Interfaz abstracta, modelo local on-prem o nube, scrubber de datos personales.</p><span class="chip now">✅ Hoy</span></div>
+    <div class="card"><div class="ico">🎨</div><h4>Apariencia / Temas</h4><p>Paletas de marca claro+oscuro en runtime, plantillas, contraste WCAG.</p><span class="chip now">✅ Hoy</span></div>
+    <div class="card"><div class="ico">📎</div><h4>Evidencias y adjuntos</h4><p>Foto, voz, croquis, QR y archivos en almacén on-prem con acceso ABAC.</p><span class="chip now">✅ Hoy</span></div>
+  </div>
+</section>
+
+<!-- ====================== 4 · CAPACIDADES HOY ====================== -->
+<section id="hoy">
+  <span class="eyebrow">04 · El producto en detalle</span>
+  <h2><span class="sec-num">4</span>Capacidades disponibles hoy <span class="chip now" style="vertical-align:middle;">✅</span></h2>
+  <p class="intro">Cada bloque está construido, verificado y en uso. Se indica para qué sirve, qué incluye y quién lo opera.</p>
+
+  <!-- Seguridad -->
+  <div class="mod">
+    <div class="mod-head"><h3><span class="ico">🔐</span>Seguridad y permisos de grado empresarial</h3><span class="chip now">✅ Hoy</span></div>
+    <p class="tagline">Cada quien hace solo lo que le corresponde, y todo queda registrado.</p>
+    <ul>
+      <li><strong>Autenticación local enchufable:</strong> contraseñas con <strong>Argon2id</strong>, access token de vida corta + refresh token rotativo en cookie httpOnly, protección de fuerza bruta y bloqueo de cuenta, recuperación self-service por correo y expiración de sesión configurable.</li>
+      <li><strong>MFA (TOTP)</strong> self-service con política de requerimiento por rol y enrolamiento forzado; códigos de recuperación.</li>
+      <li><strong>RBAC + ABAC en 4 dimensiones:</strong> (1) pantallas/módulos, (2) acciones/funcionalidades, (3) transiciones de flujo y (4) alcance de datos — por <strong>nodo</strong> (con herencia a descendientes) y por <strong>plantilla/bitácora</strong>. Los alcances de usuario y rol se <strong>suman en vivo</strong>.</li>
+      <li><strong>Permisos 100% configurables</strong> desde la UI (nada hardcodeado); el backend siempre decide, la UI solo oculta.</li>
+      <li><strong>Auditoría inmutable</strong> (quién, qué, cuándo, antes/después) de la configuración sensible y las operaciones críticas.</li>
+      <li><strong>Red anti-bloqueo del último administrador</strong> (tres candados que impiden quedarse sin nadie que administre).</li>
+    </ul>
+    <p class="backlink">Ranura lista para <strong>OIDC</strong> (Azure AD/Entra, Google, Okta…) y LDAP/AD activable por configuración — ver §5 Roadmap.</p>
+  </div>
+
+  <!-- Estructura -->
+  <div class="mod">
+    <div class="mod-head"><h3><span class="ico">🏭</span>Estructura organizacional</h3><span class="chip now">✅ Hoy</span></div>
+    <p class="tagline">Modela tu operación real; cada usuario ve y opera solo lo de su alcance.</p>
+    <ul>
+      <li><strong>Múltiples estructuras en paralelo</strong> (p. ej. una jerarquía minera <em>Faena→Planta→Área</em> y otra de TI <em>Contrato→Dominio→Sitio</em>), cada una con sus niveles, su árbol de nodos y sus calendarios, aisladas entre sí. Catálogos (plantillas, flujos, listas) compartidos.</li>
+      <li><strong>Equipos / activos</strong> asociados a los nodos, base para filtrar, asignar y acotar permisos.</li>
+      <li><strong>Asistente "crear una nueva área"</strong> (wizard de 3 pasos: identidad → niveles → primer nodo) que deja el área operativa de una vez, de forma atómica.</li>
+      <li><strong>Ciclo de vida:</strong> archivar/reactivar estructuras sin borrar historial y reordenar el selector.</li>
+      <li><strong>Administración delegada por estructura:</strong> un rol/usuario administra solo las estructuras que se le delegan; el super-admin, todas.</li>
+      <li><strong>Contexto visual y vista ejecutiva:</strong> color e ícono por estructura, badge "Estás en…" siempre visible (que es también el selector con búsqueda) y <strong>Panorama</strong> cross-estructura que consolida los KPIs de incidencias de todas las áreas accesibles.</li>
+    </ul>
+  </div>
+
+  <!-- Form Builder -->
+  <div class="mod">
+    <div class="mod-head"><h3><span class="ico">🧩</span>Plantillas / Form Builder</h3><span class="chip now">✅ Hoy</span></div>
+    <p class="tagline">Cada faena define sus propios formularios sin depender de TI; los datos entran validados en origen.</p>
+    <ul>
+      <li><strong>Diseñador visual</strong> (estilo Canva/Power Apps): arrastrar y soltar campos, mover y redimensionar con tiradores, 3 zonas (objetos · lienzo · propiedades) y vista previa Escritorio/Tablet/Móvil.</li>
+      <li><strong>Catálogo de objetos completo</strong> en 7 categorías:
+        <ul>
+          <li><em>Básicos:</em> texto, párrafo, número (con unidad y umbrales), porcentaje, moneda, RUT (valida DV), correo/teléfono/URL, sí/no, fecha, hora, duración, rango; lectura con tolerancia y contador/acumulado (horómetro).</li>
+          <li><em>Selección:</em> desplegable, radio, segmentos, casillas, multiselección con modal — alimentables de listas de referencia gobernadas.</li>
+          <li><em>Evaluación:</em> conforme/no conforme/N.A., severidad 1–5, valoración (estrellas/Likert), <strong>matriz de riesgo</strong> (probabilidad × consecuencia, ISO 31000) y <strong>firma electrónica</strong>.</li>
+          <li><em>Referencia:</em> equipo/activo, usuario, nodo, turno (validados en servidor contra el alcance).</li>
+          <li><em>Evidencia / terreno:</em> foto, archivo, nota de voz, croquis a mano y escáner QR/código de barras.</li>
+          <li><em>Estructurados / repetibles:</em> tabla repetible (agregar/quitar/reordenar filas), grupo repetible (tarjetas) y matriz parámetro × turno — validados celda a celda.</li>
+          <li><em>Presentación:</em> encabezados, instrucciones, separadores, avisos, enlaces a procedimiento e imágenes de referencia.</li>
+        </ul>
+      </li>
+      <li><strong>Umbrales de alerta</strong> (bandas warn/crit, estándar ISA-18.2) que pintan advertencia/crítico y alimentan la revisión por excepción.</li>
+      <li><strong>Lógica condicional</strong> (mostrar un campo según otro) y <strong>motor de reglas</strong> (campos calculados y validaciones cruzadas con AST seguro, sin <code>eval</code>) que pueden <strong>disparar excepciones o incidencias al firmar</strong>.</li>
+      <li><strong>Borrador / publicación inmutable:</strong> la versión publicada se congela (trazabilidad GxP); las entradas viejas conservan su versión.</li>
+      <li><strong>Gobernanza viva</strong> sin republicar: modo de equipo (ninguno/opcional/sugerido/requerido), alcance de nodos/plantilla, ventana de edición y campos del resumen. Permisos por sección (la sección es la unidad de llenado y firma).</li>
+    </ul>
+  </div>
+
+  <!-- Bitácoras -->
+  <div class="mod">
+    <div class="mod-head"><h3><span class="ico">📋</span>Bitácoras — registrar, consultar y auditar</h3><span class="chip now">✅ Hoy</span></div>
+    <p class="tagline">El ciclo completo de llenado, firma y consulta del registro operacional.</p>
+    <ul>
+      <li><strong>Llenado por secciones</strong> multi-actor con concurrencia; <strong>registro diferido gobernado</strong> (evento ocurrido antes, con motivo).</li>
+      <li><strong>Firmas electrónicas Part 11</strong> re-autenticadas (contraseña + MFA si aplica), con folio, estampados y verificación de firmas.</li>
+      <li><strong>Anular un borrador</strong> con motivo (no se borra: queda trazable) y <strong>editar entradas en curso</strong> respetando ventana de edición y período contable.</li>
+      <li><strong>Grilla por contenido</strong> con búsqueda (pg_trgm), filtros/facetas, revisión por excepción y export CSV — todo acotado al alcance del usuario y a la estructura activa.</li>
+      <li><strong>Calendarios y períodos:</strong> calendario operacional (turnos, día operacional) y fiscal con cierre/bloqueo gobernado del registro.</li>
+      <li><strong>Datos de referencia / listas</strong> gobernadas con mantenedor e <strong>importación/exportación CSV</strong>.</li>
+    </ul>
+  </div>
+
+  <!-- Rondas -->
+  <div class="mod">
+    <div class="mod-head"><h3><span class="ico">🔂</span>Rondas y controles programados</h3><span class="chip now">✅ Hoy</span></div>
+    <p class="tagline">Se demuestra que los controles se hicieron, a tiempo, y se ve de inmediato lo vencido.</p>
+    <ul>
+      <li><strong>Programación de rondas</strong> recurrentes (por turno, cada N horas, o días y horas fijas) con rol responsable, plazo de cumplimiento y horizonte — patrón SAP PM / Maximo / j5.</li>
+      <li><strong>"Mis rondas"</strong>: worklist del operador filtrada por su turno, nodos y rol; iniciar (crea la entrada ligada), continuar, completar o <strong>omitir con motivo</strong> auditado.</li>
+      <li>KPIs de salud, pestañas Horarios/Ocurrencias/Resumen y respeto del alcance por área y por bitácora.</li>
+    </ul>
+  </div>
+
+  <!-- Flujos -->
+  <div class="mod">
+    <div class="mod-head"><h3><span class="ico">🔁</span>Flujos — máquina de estados configurable</h3><span class="chip now">✅ Hoy</span></div>
+    <p class="tagline">Un mismo motor de flujos gobierna bitácoras e incidencias.</p>
+    <ul>
+      <li>Estados, transiciones y <strong>roles por transición</strong> configurables y reutilizables.</li>
+      <li><strong>Firma electrónica por transición</strong> (Part 11) con MFA opcional y <strong>SLA de permanencia</strong> por estado (detección de atrasos).</li>
+      <li>Las versiones de flujo se <strong>congelan</strong>: las entradas/incidencias conservan la regla con que nacieron.</li>
+    </ul>
+  </div>
+
+  <!-- Incidencias -->
+  <div class="mod">
+    <div class="mod-head"><h3><span class="ico">🚨</span>Incidencias — módulo completo</h3><span class="chip now">✅ Hoy</span></div>
+    <p class="tagline">Los problemas se cierran de verdad, con evidencia de que la solución funcionó.</p>
+    <ul>
+      <li><strong>Alta y gestión</strong> con tipos/categorías configurables, severidad real vs. potencial de gravedad (cuasi-accidente), prioridad, nodo, equipo y fecha del evento; folio INC-####, <strong>lista + tablero kanban</strong> y detalle con flujo, timeline inmutable y comentarios.</li>
+      <li><strong>Acciones correctivas/preventivas (CAPA)</strong> con responsable, plazo, obligatoriedad, <strong>verificación de eficacia</strong> (no eficaz reabre) y <strong>bloqueo de cierre</strong> mientras queden acciones obligatorias sin resolver.</li>
+      <li><strong>Investigación de causa raíz (5 Porqués)</strong> que llega al fondo, enlaza cada causa a su CAPA y puede <strong>bloquear el cierre</strong> en los tipos que lo exigen.</li>
+      <li><strong>Reportabilidad configurable:</strong> obligaciones de reporte a autoridades (autoridad, plazo, aplicabilidad por tipo y severidad), materialización automática (folio REP-####), registro del folio externo, "no aplica" con motivo y <strong>bloqueo de cierre</strong> por reporte obligatorio pendiente; vencidos marcados solos.</li>
+      <li><strong>Plazos (SLA), avisos y escalamiento:</strong> plazo de resolución automático por tipo, avisos por correo y campanita, <strong>escalamiento a un superior</strong> configurable; desambigua "plazo de resolución vencido" de "lleva demasiado en un estado".</li>
+      <li><strong>Dashboard analítico:</strong> tendencia apertura/cierre, <strong>MTTR</strong>, cumplimiento de SLA, <strong>Pareto por tipo</strong>, desgloses por nodo/equipo/turno/origen, estado de CAPA y <strong>reincidencia</strong>; rango de fechas, <strong>drill-down</strong> clic-para-filtrar y export CSV, respetando el alcance.</li>
+      <li><strong>Origen trazable:</strong> manual, <strong>desde una bitácora</strong> (botón en el visor, hereda nodo/equipo) o <strong>desde una excepción operacional</strong>; apertura automática por reglas del formulario.</li>
+      <li><strong>Excepciones operacionales:</strong> lecturas fuera de umbral o reglas disparadas que se registran como desviaciones a triar (corregir conservando el valor original, reconocer, convertir/asociar a incidencia, descartar), con panel en la bitácora y bandeja global.</li>
+    </ul>
+  </div>
+
+  <!-- Cambio de turno -->
+  <div class="mod">
+    <div class="mod-head"><h3><span class="ico">🔄</span>Cambio de turno firmado</h3><span class="chip now">✅ Hoy</span></div>
+    <p class="tagline">Continuidad operacional garantizada y evidencia de auditoría del traspaso (alineado a HSE-UK / CCPS).</p>
+    <ul>
+      <li><strong>Cockpit auto-compilado</strong> por área y turno: el sistema arma solo el estado (registros, excepciones, incidencias abiertas, acciones y reportes pendientes, rondas cumplidas/vencidas, lecturas fuera de rango) — nadie re-tipea.</li>
+      <li><strong>Entrega firmada por dos partes</strong> (saliente entrega, entrante reconoce; el sistema impide auto-reconocerse), con <strong>pendientes que ruedan</strong> entre turnos e historial inmutable.</li>
+      <li><strong>Resumen de turno por IA EN VIVO:</strong> el brief se escribe palabra por palabra (streaming SSE), es cancelable, está <em>grounded</em> solo a los datos del turno (no inventa cifras), con el crudo determinista siempre visible y la firma siempre humana.</li>
+      <li><strong>Acta de entrega en PDF</strong> de grado auditoría (identidad Lyra, snapshot congelado, dos firmas Part 11, <strong>folio + hash SHA-256</strong> verificable), generada <strong>on-premise</strong>, fiel e inmutable, con cada descarga registrada.</li>
+    </ul>
+  </div>
+
+  <!-- Notificaciones -->
+  <div class="mod">
+    <div class="mod-head"><h3><span class="ico">🔔</span>Notificaciones</h3><span class="chip now">✅ Hoy</span></div>
+    <p class="tagline">Lo importante llega a quien corresponde, sin depender de que alguien mire la pantalla.</p>
+    <ul>
+      <li><strong>Avisos a la medida:</strong> cada transición de flujo decide si avisa y <strong>a quién</strong> (roles, usuarios, autor, ejecutor, roles del estado destino o correos externos de contratistas/autoridades), con destinatarios <strong>congelados</strong> en la versión del flujo.</li>
+      <li><strong>Plantillas por bitácora con comodines</strong> (<code>{{campo.&lt;clave&gt;}}</code>, <code>{{entry.summary}}</code>): "Temperatura: 78 °C" dentro del mensaje.</li>
+      <li><strong>Campanita in-app en tiempo real (SSE):</strong> contador de no leídas, bandeja navegable, deep-link al origen y marcado de leídas.</li>
+      <li><strong>Preferencias por canal:</strong> cada usuario elige correo, app o ambos por tipo de aviso; bandeja de correo saliente con reintentos y servidor SMTP configurable desde la app.</li>
+    </ul>
+  </div>
+
+  <!-- IA -->
+  <div class="mod">
+    <div class="mod-head"><h3><span class="ico">🤖</span>IA administrable y on-premise</h3><span class="chip now">✅ Hoy</span></div>
+    <p class="tagline">Sin atarte a un proveedor y, lo clave para industria, con opción de modelo local donde los datos nunca salen de la planta.</p>
+    <ul>
+      <li><strong>Interfaz abstracta</strong> (<code>@lyra/llm</code>) que se administra desde la app: proveedor <strong>ninguno</strong> (resumen determinista), <strong>Anthropic (nube)</strong> o <strong>modelo local</strong> (Ollama/vLLM, OpenAI-compatible).</li>
+      <li>Clave <strong>cifrada y write-only</strong>, botón <strong>Probar</strong> con generación real y latencia, y <strong>degradación elegante</strong> (si la IA falla, cae al resumen determinista — nunca se rompe).</li>
+      <li><strong>Scrubber de datos personales</strong> (correo, RUT, teléfono) que redacta el texto antes de egresar a la nube; con modelo local no egresa nada.</li>
+    </ul>
+  </div>
+
+  <!-- Temas + evidencias + regional -->
+  <div class="mod">
+    <div class="mod-head"><h3><span class="ico">🎨</span>Apariencia, evidencias y experiencia</h3><span class="chip now">✅ Hoy</span></div>
+    <p class="tagline">Premium en terreno, con la marca del cliente y datos en su propia infraestructura.</p>
+    <ul>
+      <li><strong>Temas de marca en runtime:</strong> el admin construye paletas claro+oscuro (desde 10 plantillas curadas, desde cero o duplicando), con vista previa en vivo y <strong>contraste WCAG AA garantizado</strong>; los usuarios eligen y se aplica al instante, sin recompilar.</li>
+      <li><strong>Adjuntos / evidencias</strong> en almacén on-prem (<strong>MinIO</strong>, S3-compatible): subida proxied que valida tamaño y tipo, descarga por enlace temporal firmado con <strong>acceso ABAC</strong> e inmutabilidad tras el sellado.</li>
+      <li><strong>Formato regional (es-CL)</strong> e i18n: fechas, números y monedas según el locale activo; menú lateral por grupos, búsqueda ⌘K, favoritos, densidad y modo claro/oscuro/auto.</li>
+      <li><strong>Diseño industrial de terreno:</strong> alto contraste, áreas táctiles de 44px (uso con guantes), responsivo a tablet y móvil.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ====================== 5 · ROADMAP ====================== -->
+<section id="roadmap">
+  <span class="eyebrow">05 · Hacia dónde va</span>
+  <h2><span class="sec-num">5</span>En construcción y roadmap</h2>
+  <p class="intro">Presentado con honestidad: lo siguiente <strong>no está disponible aún</strong>. Se distingue lo que está en desarrollo activo (🔧) de lo que vive en el roadmap o se aborda como desarrollo a medida acotado (🗺️).</p>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Capacidad</th><th>Qué es / qué aporta</th><th>Estado</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>Orígenes de datos de planta</strong> (SCADA / PI System / OPC&nbsp;UA)</td>
+          <td>Traer lecturas automáticamente desde historiadores y sistemas de control para autocompletar campos de la bitácora (Fase 3 / "Ola 5" del Form Builder). El modelo de equipos ya está pensado <em>integration-ready</em> (referencias externas PI Web API WebID, OPC NodeId, SAP&nbsp;PM, Maximo).</td>
+          <td><span class="chip road">🗺️ Roadmap</span></td>
+        </tr>
+        <tr>
+          <td><strong>Generador de temas desde colores de marca</strong> (OKLCH)</td>
+          <td>Pegar 1–2 colores institucionales y derivar automáticamente una paleta completa, accesible, claro+oscuro (Fase 2B sobre el sistema de temas ya disponible).</td>
+          <td><span class="chip wip">🔧 En construcción</span></td>
+        </tr>
+        <tr>
+          <td><strong>Importar temas estándar</strong> (DTCG / hex)</td>
+          <td>Cargar tokens de diseño desde un archivo estándar o una lista de hex para alinear la plataforma con un design system corporativo existente (Fase 2C).</td>
+          <td><span class="chip road">🗺️ Roadmap</span></td>
+        </tr>
+        <tr>
+          <td><strong>Anulación / corrección GxP de registros sellados</strong></td>
+          <td>Vía gobernada para emitir una corrección o anulación <em>trazable</em> de un registro ya firmado mediante una transición inversa firmada que deja el original intacto + el porqué (FDA 21 CFR Part 11 §11.200, ALCOA+). Próximo módulo candidato.</td>
+          <td><span class="chip road">🗺️ Roadmap</span></td>
+        </tr>
+        <tr>
+          <td><strong>Panorama / dashboard multi-módulo</strong></td>
+          <td>La vista ejecutiva consolidada hoy cubre incidencias; se ampliará a bitácoras, rondas y turnos para un tablero cross-estructura completo. Índices HSE <strong>IF/IG</strong> cuando se capturen las horas-hombre trabajadas.</td>
+          <td><span class="chip road">🗺️ Roadmap</span></td>
+        </tr>
+        <tr>
+          <td><strong>Identidad federada / SSO</strong> (OIDC, SAML, LDAP/AD, SCIM)</td>
+          <td>Activar el inicio de sesión corporativo (Azure&nbsp;AD/Entra, Google, Okta…) de forma aditiva: la ranura de autenticación ya está abstraída y el diseño (tabla <code>UserIdentity</code>, JIT provisioning, mapeo grupo→rol, MFA delegada) está aprobado. Se activa por despliegue o a pedido de un cliente.</td>
+          <td><span class="chip road">🗺️ Roadmap / a medida</span></td>
+        </tr>
+        <tr>
+          <td><strong>Asistente de consulta sobre el histórico</strong> (IA)</td>
+          <td>Preguntar en lenguaje natural sobre el historial operacional, reusando la capa de IA abstracta ya disponible (insights / RAG, Fase 6).</td>
+          <td><span class="chip road">🗺️ Roadmap</span></td>
+        </tr>
+        <tr>
+          <td><strong>Notificaciones avanzadas</strong> (digest, suscripciones, recordatorios escalonados)</td>
+          <td>Resumen agrupado, gestión de suscripciones desde pantalla y recordatorios escalonados sobre el motor de notificaciones ya disponible.</td>
+          <td><span class="chip wip">🔧 En construcción</span></td>
+        </tr>
+        <tr>
+          <td><strong>Profundización CAPA / investigación</strong></td>
+          <td>Evidencia con archivos en acciones y reportes, firma Part 11 al verificar/reportar, y métodos de investigación adicionales (ICAM/Ishikawa) sobre el módulo de incidencias ya disponible.</td>
+          <td><span class="chip road">🗺️ Roadmap</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="backlink">Casi todo el roadmap es <strong>extensión</strong> de un núcleo ya configurable (formularios, flujos, permisos, notificaciones), no reescritura — por eso la viabilidad de lo que el cliente pida suele ser alta (ver §9).</p>
+</section>
+
+<!-- ====================== 6 · STACK ====================== -->
+<section id="stack">
+  <span class="eyebrow">06 · Bajo el capó, en simple</span>
+  <h2><span class="sec-num">6</span>Stack tecnológico en lenguaje claro</h2>
+  <p class="intro">Tecnologías estándar de industria, maduras y sin dependencia de un proveedor cloud obligatorio. Todo corre dentro de la planta.</p>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Pieza</th><th>Qué es</th><th>Para qué sirve aquí</th><th>Por qué le conviene al cliente</th></tr></thead>
+      <tbody>
+        <tr><td><strong>NestJS</strong></td><td>El motor del backend (la lógica del servidor).</td><td>Aplica las reglas de negocio y <strong>toda la autorización</strong> antes de tocar el dato.</td><td>Robusto y modular; la seguridad se decide siempre en el servidor, no en el navegador.</td></tr>
+        <tr><td><strong>Prisma</strong></td><td>El traductor entre el código y la base de datos, con migraciones versionadas.</td><td>Garantiza que todo cambio de esquema quede registrado y sea reproducible.</td><td>Nada se toca "a mano" en la BD: cambios auditables y reversibles.</td></tr>
+        <tr><td><strong>PostgreSQL</strong></td><td>La base de datos (el archivo central de todo).</td><td>Guarda registros, formularios dinámicos (JSONB) y búsquedas de texto.</td><td>Estándar mundial, sólido, sin licencias propietarias; su dato vive en su servidor.</td></tr>
+        <tr><td><strong>React + Vite + TypeScript</strong></td><td>La aplicación web (lo que el usuario ve y usa).</td><td>Pantallas rápidas, responsivas y de terreno (tablet/guantes).</td><td>Experiencia premium y moderna, usable en faena.</td></tr>
+        <tr><td><strong>Redis</strong></td><td>Una memoria rápida auxiliar.</td><td>Acelera permisos, controla fuerza bruta y coordina tareas (SLA, escalamientos).</td><td>El sistema responde rápido incluso con mucha carga.</td></tr>
+        <tr><td><strong>MinIO</strong></td><td>Un almacén de archivos on-prem (alternativa a Amazon S3).</td><td>Guarda fotos, croquis, notas de voz y documentos fuera de la BD.</td><td>La evidencia vive en la infraestructura del cliente, no en la nube.</td></tr>
+        <tr><td><strong>pdfmake</strong></td><td>Generador de PDF sin navegador ni nube.</td><td>Arma el acta de entrega de turno de grado auditoría.</td><td>Documentos regulatorios generados dentro de la planta, fieles e inmutables.</td></tr>
+        <tr><td><strong>Capa de IA abstracta</strong> (<code>@lyra/llm</code>)</td><td>Un "enchufe" para conectar cualquier motor de IA.</td><td>Resúmenes de turno con modelo local o de nube, intercambiable.</td><td>Sin amarre a un proveedor; opción de IA 100% local sin fuga de datos.</td></tr>
+        <tr><td><strong>SSE</strong> (Server-Sent Events)</td><td>Canal en tiempo real ligero del navegador.</td><td>Campanita de avisos y resumen de IA "escribiéndose" en vivo.</td><td>Respuesta inmediata sin servicios externos de mensajería.</td></tr>
+        <tr><td><strong>Argon2id</strong></td><td>El algoritmo que protege las contraseñas.</td><td>Hashea las claves de los usuarios (ganador del estándar actual).</td><td>Las contraseñas no se pueden recuperar ni aunque alguien copie la BD.</td></tr>
+        <tr><td><strong>Docker / Compose</strong></td><td>El "envase" que empaqueta toda la plataforma.</td><td>Instala API, web, base de datos y almacén como un bloque reproducible.</td><td>Despliegue on-prem limpio, portable y fácil de mantener.</td></tr>
+        <tr><td><strong>Monorepo pnpm</strong></td><td>Un solo repositorio con apps y piezas compartidas.</td><td>Comparte tipos, validaciones y diseño entre backend y web.</td><td>Menos errores y consistencia: la misma regla vale en cliente y servidor.</td></tr>
+        <tr><td><strong>Caddy</strong></td><td>El portero web con HTTPS automático.</td><td>Cifra el tráfico y enruta a la aplicación.</td><td>TLS sin configuración manual; comunicación siempre cifrada.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <span class="lbl">En una línea</span>
+    <strong>On-premise, sin SaaS obligatorio, auditable y alineado a OWASP ASVS / FDA 21 CFR Part 11.</strong> Un solo stack Docker dentro de la planta; los datos nunca salen del entorno del cliente.
+  </div>
+</section>
+
+<!-- ====================== 7 · DIAGRAMAS ====================== -->
+<section id="diagramas">
+  <span class="eyebrow">07 · Cómo encaja todo</span>
+  <h2><span class="sec-num">7</span>Diagramas</h2>
+
+  <h3>(a) Flujo de valor — del dato a la decisión</h3>
+  <p class="intro">La cadena que recorre la información: se modela, se registra, se firma, y si algo se desvía, se acciona y se traspasa — terminando en analítica para decidir.</p>
+  <div class="diagram">
+    <div class="flow">
+      <div class="step"><span class="si">🏭</span>Estructura organizacional</div>
+      <div class="arrow">→</div>
+      <div class="step"><span class="si">🧩</span>Plantilla (Form Builder)</div>
+      <div class="arrow">→</div>
+      <div class="step"><span class="si">📋</span>Bitácora / entrada por turno</div>
+      <div class="arrow">→</div>
+      <div class="step"><span class="si">✍️</span>Firma Part 11</div>
+    </div>
+    <div class="flow" style="margin-top:14px;">
+      <div class="step" style="border-color:var(--border);"><span class="si">⚙️</span>Reglas / umbrales</div>
+      <div class="arrow">→</div>
+      <div class="step"><span class="si">🚨</span>Excepción / Incidencia</div>
+      <div class="arrow">→</div>
+      <div class="step"><span class="si">🔔</span>Notificación</div>
+      <div class="arrow">→</div>
+      <div class="step"><span class="si">🔄</span>Cambio de turno (acta)</div>
+      <div class="arrow">→</div>
+      <div class="step"><span class="si">📊</span>Dashboard</div>
+    </div>
+  </div>
+
+  <h3>(b) Arquitectura técnica on-premise</h3>
+  <p class="intro">Todo corre en Docker dentro de la planta. El navegador o la tablet hablan con la web; la web con la API; la API con la base de datos, la memoria rápida, el almacén de archivos y —opcional— una IA local. La única salida obligatoria al exterior es el correo (SMTP).</p>
+  <div class="diagram">
+    <div class="flow" style="margin-bottom:18px;">
+      <div class="step"><span class="si">📱</span>Navegador / Tablet (terreno)</div>
+      <div class="arrow">→</div>
+      <div class="step"><span class="si">🌐</span>Caddy (HTTPS) → Web (React)</div>
+      <div class="arrow">→</div>
+      <div class="step"><span class="si">🧠</span>API (NestJS)</div>
+    </div>
+    <div class="layers">
+      <div class="layer"><span class="lname">UI</span><div class="lbody"><span class="pill">Web React + Vite</span><span class="pill">Modo claro/oscuro · temas de marca</span><span class="pill">Solo oculta/deshabilita</span></div></div>
+      <div class="layer"><span class="lname">Negocio</span><div class="lbody"><span class="pill">API NestJS</span><span class="pill">Guards: autorización en servidor</span><span class="pill">Reglas · flujos · permisos ABAC</span></div></div>
+      <div class="layer"><span class="lname">Datos</span><div class="lbody"><span class="pill">PostgreSQL</span><span class="pill">Redis (caché/colas)</span><span class="pill">MinIO (evidencias)</span></div></div>
+      <div class="layer"><span class="lname">Integraciones</span><div class="lbody"><span class="pill opt">IA local (Ollama/vLLM) — opcional</span><span class="pill ext">SMTP (correo saliente)</span><span class="pill opt">SCADA/PI/OPC — roadmap</span></div></div>
+    </div>
+    <p class="backlink" style="margin-top:16px;text-align:center;">Todo dentro de un mismo stack Docker en la planta · sin dependencia de nube · TLS por el reverse proxy · IA de nube solo si el cliente la activa explícitamente.</p>
+  </div>
+</section>
+
+<!-- ====================== 8 · BONDADES ====================== -->
+<section id="bondades">
+  <span class="eyebrow">08 · Por qué Lyra WatchLog</span>
+  <h2><span class="sec-num">8</span>Bondades y diferenciadores</h2>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Diferenciador</th><th>Qué significa para el cliente</th></tr></thead>
+      <tbody>
+        <tr><td><strong>On-premise real y soberanía del dato</strong></td><td>Sus datos no salen de su infraestructura. Sin rehén de un proveedor cloud; cumple las exigencias de seguridad de la información.</td></tr>
+        <tr><td><strong>Cumplimiento de grado auditoría</strong></td><td>Trazabilidad ALCOA+, historial inmutable y firmas re-autenticadas, diseñado bajo FDA 21 CFR Part 11 / GxP y OWASP ASVS. Las auditorías son más rápidas y defendibles.</td></tr>
+        <tr><td><strong>Configurable sin programar</strong></td><td>Formularios, flujos, tipos de incidencia, reportabilidad, permisos y notificaciones los define el cliente desde la app, no TI.</td></tr>
+        <tr><td><strong>Del dato a la acción</strong></td><td>No solo registra: detecta desviaciones, abre incidencias y exige cerrarlas con acciones verificadas. Menos reincidencia.</td></tr>
+        <tr><td><strong>IA opcional y reemplazable</strong></td><td>Resúmenes con modelo local (sin fuga) o de nube, intercambiable; nunca obligatoria, el sistema funciona sin ella.</td></tr>
+        <tr><td><strong>Diseñado para terreno</strong></td><td>Tablet, alto contraste, áreas táctiles para guantes, modo claro/oscuro y temas de marca.</td></tr>
+        <tr><td><strong>Multi-estructura</strong></td><td>Varias jerarquías (minería, TI, logística) en una instalación, aisladas y con identidad propia, más una vista ejecutiva consolidada.</td></tr>
+        <tr><td><strong>Transversal a industrias</strong></td><td>El núcleo es genérico; las particularidades son configuración, no software a medida por industria.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ====================== 9 · SOLUTION FIT ====================== -->
+<section id="fit">
+  <span class="eyebrow">09 · Encaje con su operación</span>
+  <h2><span class="sec-num">9</span>Encaje con las necesidades del cliente <span style="font-size:1rem;color:var(--text-2);">(Solution Fit)</span></h2>
+  <p class="intro">Marco honesto para clasificar cada necesidad del cliente en una de tres vías. El mensaje de fondo: la plataforma es <strong>parametrizable</strong>, y lo que no exista hoy se evalúa por viabilidad — que suele ser alta, porque el núcleo (formularios, flujos, permisos, notificaciones) ya es configurable y extensible.</p>
+
+  <div class="fit-cols">
+    <div class="fit-col a">
+      <h4>✅ Ya lo cubre <small>(configuración)</small></h4>
+      <p>Se resuelve <strong>parametrizando</strong> desde la aplicación: un formulario nuevo, un flujo de estados, un tipo de incidencia, una obligación de reporte, una regla de umbral, un aviso. Sin desarrollo, sin esperar una versión.</p>
+    </div>
+    <div class="fit-col b">
+      <h4>🔧 Desarrollo a medida acotado</h4>
+      <p>Requiere extender el núcleo con un esfuerzo <strong>delimitado</strong>, reutilizando piezas ya probadas (motor de flujos, patrón de materialización diferida, ABAC, notificaciones). Se cotiza por alcance.</p>
+    </div>
+    <div class="fit-col c">
+      <h4>🗺️ Está en el roadmap</h4>
+      <p>Ya planificado (ver §5): orígenes SCADA/PI/OPC, SSO/federación, corrección GxP de sellados, panorama multi-módulo. Se puede <strong>priorizar</strong> según el cliente.</p>
+    </div>
+  </div>
+
+  <h3>Plantilla para la reunión — clasificar necesidades en vivo</h3>
+  <p class="intro">Anote aquí lo que el cliente plantee y clasifíquelo en el momento.</p>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th style="width:38%;">Necesidad del cliente</th><th>Vía (✅ / 🔧 / 🗺️)</th><th>Nota / cómo se aborda</th></tr></thead>
+      <tbody>
+        <tr class="fill-row"><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+        <tr class="fill-row"><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+        <tr class="fill-row"><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+        <tr class="fill-row"><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+        <tr class="fill-row"><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+        <tr class="fill-row"><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ====================== 10 · CONTACTO ====================== -->
+<section id="contacto">
+  <span class="eyebrow">10 · Siguientes pasos</span>
+  <h2><span class="sec-num">10</span>Próximos pasos y contacto</h2>
+  <ul>
+    <li><strong>Agendar una demo con sus propios formularios:</strong> armamos en vivo una bitácora real de su operación.</li>
+    <li><strong>Taller de descubrimiento:</strong> mapear sus necesidades con el marco de Solution Fit (§9) y dimensionar lo a medida.</li>
+    <li><strong>Plan de despliegue on-premise:</strong> definir la infraestructura del cliente y el alcance del piloto.</li>
+  </ul>
+  <div class="note idx" style="margin-top:24px;">
+    <span class="lbl">Contacto</span>
+    <strong>ITESICWS</strong> · Ecosistema Lyra · Producto <strong>Lyra WatchLog</strong><br/>
+    Víctor Rubilar — <a href="mailto:vrubilar@itesic.cl">vrubilar@itesic.cl</a>
+  </div>
+</section>
+
+<!-- ====================== ANEXO A — INTERNO ====================== -->
+<section id="annex" class="internal">
+  <div class="internal-band">
+    <div class="t">⚠ USO INTERNO — NO MOSTRAR AL CLIENTE</div>
+    <p style="margin:8px 0 0;font-size:.92rem;color:var(--text);">Material de preparación para el vendedor. Análisis de un requerimiento concreto del cliente, su mapeo a lo que ya existe, el gap real, una propuesta por fases y preguntas para acotar el alcance en la negociación.</p>
+  </div>
+
+  <span class="eyebrow" style="color:var(--warn);">Anexo A · Confidencial interno</span>
+  <h2>Análisis de requerimiento: <span class="grad-text">"plan de actividades que genera tareas con ciclo de vida"</span></h2>
+
+  <h3>El requerimiento (según lo conversado, alcance aún difuso)</h3>
+  <p>El cliente comentó querer un <strong>formulario</strong> que, además de registrar información, tenga una <strong>sección donde el usuario arme una lista de actividades</strong> (que se van <em>agregando</em>), y que esas actividades se conviertan en <strong>ítems con un flujo propio</strong> que más tarde se <strong>ejecutan</strong> y quedan <strong>conectados a la bitácora</strong> de origen. La interpretación que proponemos llevar a la reunión:</p>
+
+  <h3>Génesis / nombre del patrón</h3>
+  <p>Es un <strong>"checklist / plan de acciones que genera tareas con ciclo de vida"</strong> — en lenguaje de industria: <em>action items</em>, <em>lista de órdenes de trabajo</em> o <em>plan de tareas derivadas</em>. En simple: el operador, mientras llena una bitácora, <strong>levanta una lista de pendientes/tareas</strong>; cada pendiente nace como un <strong>ítem propio</strong> que sigue su <strong>propio mini-flujo</strong> (pendiente → en curso → hecho → verificado), tiene <strong>responsable y plazo</strong>, y al cerrarse <strong>vuelve a apuntar a la bitácora</strong> donde nació.</p>
+
+  <h3>Mapeo a building blocks que YA existen</h3>
+  <p>Casi todas las piezas del patrón ya están construidas y probadas en la plataforma — esto es clave para la negociación: <strong>no se parte de cero</strong>.</p>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Pieza del requerimiento</th><th>Lo que ya existe y lo demuestra</th></tr></thead>
+      <tbody>
+        <tr><td>"Ir agregando filas/actividades" en el formulario</td><td><strong>Form Builder — objetos repetibles:</strong> la <strong>Tabla repetible</strong> y el <strong>Grupo repetible</strong> ya permiten agregar, quitar y reordenar ítems durante el llenado, validados celda a celda ("agregar otro hallazgo").</td></tr>
+        <tr><td>"Cada ítem con su propio flujo configurable"</td><td><strong>Motor de flujos (WorkflowDefinition):</strong> máquinas de estado configurables, reutilizables, con roles por transición, firma y SLA — ya gobiernan bitácoras e incidencias.</td></tr>
+        <tr><td>"Ítem con flujo + acciones + conexión a la bitácora + materialización diferida"</td><td><strong>Incidencias lo demuestra entero:</strong> es un ítem con flujo, con <strong>acciones CAPA verificadas</strong>, <strong>backlink a la bitácora de origen</strong>, <strong>ABAC</strong>, <strong>auditoría inmutable</strong>, y se materializa de forma <strong>diferida al sellar</strong> vía patrón <em>outbox</em> (regla → excepción → incidencia con <code>RuleActionOutbox</code>).</td></tr>
+        <tr><td>"Avisar al responsable cuando le toca"</td><td><strong>Notificaciones:</strong> avisos por transición a roles/usuarios + <strong>campanita in-app en tiempo real</strong> + preferencias por canal.</td></tr>
+        <tr><td>"Pendientes que no se pierden entre turnos"</td><td><strong>Cambio de turno:</strong> los <strong>pendientes ruedan</strong> de un turno al siguiente hasta cerrarse, con historial inmutable.</td></tr>
+        <tr><td>"Ejecutarlas y cerrarlas después, viendo su estado"</td><td><strong>"Mis rondas" / bandejas / tablero kanban de incidencias:</strong> ya existen worklists y tableros que listan ítems con estado, plazo y acciones de cierre.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>El gap — qué falta de verdad</h3>
+  <p>Lo que <strong>no</strong> existe todavía es una <strong>entidad de primera clase "Actividad / Tarea"</strong> generada <strong>desde una sección del formulario</strong> (no solo como filas de datos opacas). En concreto faltan:</p>
+  <ul>
+    <li>Una entidad <strong>Tarea</strong> con su <strong>propio mini-flujo</strong> configurable (reutilizando <code>WorkflowDefinition</code>), <strong>responsable</strong>, <strong>plazo/SLA</strong> y <strong>backlink</strong> a la entrada de bitácora.</li>
+    <li>UI para <strong>agregarlas inline</strong> durante el llenado (un objeto de formulario "Lista de tareas" — variante del grupo repetible, pero que en vez de guardar filas <em>materializa tareas</em>).</li>
+    <li><strong>Materialización al sellar</strong> la entrada (patrón <em>outbox</em>, idéntico al ya probado RuleAction → Incidencia: se difiere para no demorar la firma).</li>
+    <li>Un <strong>tablero / bandeja de tareas</strong> para ejecutarlas y cerrarlas después, mostrando su estado de vuelta en la bitácora de origen.</li>
+  </ul>
+  <p>Es decir: el 80% de la maquinaria existe; el gap es <strong>modelar la Tarea como entidad propia y coserla al formulario</strong>, no construir un motor de flujos ni de notificaciones desde cero.</p>
+
+  <h3>Propuesta de solución — MVP por fases</h3>
+  <div class="phase">
+    <h4>Fase 1 — Tarea como entidad + materialización (MVP)</h4>
+    <p>Modelo <code>Task</code> (título, descripción, responsable rol/persona, plazo, estado, <code>sourceLogEntryId</code> backlink, nodo para ABAC) reutilizando <code>WorkflowDefinition</code> para el mini-flujo. Nuevo objeto de formulario <strong>"Lista de tareas"</strong> (variante del grupo repetible). Al <strong>sellar</strong> la entrada, un <em>outbox</em> materializa una Tarea por fila — patrón idéntico al ya probado RuleAction→Incidencia. Backlink visible en la bitácora.</p>
+  </div>
+  <div class="phase">
+    <h4>Fase 2 — Ejecución y cierre</h4>
+    <p><strong>Bandeja / tablero de tareas</strong> (reutiliza el patrón de "Mis rondas" y el kanban de incidencias): filtrar por responsable, nodo, estado y plazo; avanzar el flujo; cerrar con nota/firma. Estado reflejado de vuelta en la entrada de origen. <strong>Notificaciones</strong> al responsable por transición (motor ya disponible) y <strong>vencimiento por SLA</strong> (sweeper ya probado en incidencias).</p>
+  </div>
+  <div class="phase">
+    <h4>Fase 3 — Gobierno y reutilización (a medida, según interés)</h4>
+    <p><strong>Plantillas de actividades reutilizables</strong> (catálogos de tareas-tipo), verificación de eficacia estilo CAPA, evidencia adjunta (MinIO + ABAC, ya disponible), y que una tarea abierta pueda <strong>bloquear el cierre</strong> de la entrada o del turno (configurable, como ya hacen CAPA/reportes en incidencias).</p>
+  </div>
+
+  <h3>Viabilidad y esfuerzo</h3>
+  <p><strong>Viabilidad: ALTA.</strong> Reutiliza <code>WorkflowDefinition</code>, el patrón <em>outbox</em> de materialización diferida ya en producción, el ABAC por nodo, el motor de notificaciones y los patrones de UI de worklist/kanban. El riesgo técnico es bajo porque cada pieza ya está probada en incidencias y rondas.</p>
+  <p><strong>Esfuerzo (orden de magnitud, para negociar — no compromiso):</strong></p>
+  <ul>
+    <li><span class="effort">Fase 1 (MVP)</span> &nbsp;modelo + objeto de formulario + outbox + backlink. Esfuerzo <strong>medio</strong>.</li>
+    <li><span class="effort">Fase 2</span> &nbsp;bandeja/tablero + notificaciones + SLA. Esfuerzo <strong>medio</strong>.</li>
+    <li><span class="effort">Fase 3</span> &nbsp;plantillas + verificación + bloqueos. Esfuerzo <strong>bajo-medio</strong>, incremental.</li>
+  </ul>
+  <p class="backlink">Recomendación de venta: ofrecer la <strong>Fase 1 como piloto acotado</strong> (demuestra el patrón punta a punta) y dejar Fases 2–3 como crecimiento — coherente con el principio "MVP primero, luego crecer".</p>
+
+  <h3>Preguntas para acotar con el cliente</h3>
+  <ul>
+    <li>¿Una actividad es una <strong>tarea simple</strong> (pendiente con responsable y check) o un <strong>sub-flujo completo</strong> con varios estados y firma?</li>
+    <li>¿Quieren <strong>plantillas de actividades reutilizables</strong> (catálogo de tareas-tipo) o se escriben a mano cada vez?</li>
+    <li>¿Los <strong>responsables</strong> se asignan por <strong>rol</strong> (sobrevive a cambios de turno) o por <strong>persona</strong>?</li>
+    <li>¿Las tareas tienen <strong>plazo / SLA</strong> con avisos y escalamiento, o basta con el estado?</li>
+    <li>¿Se cierran <strong>dentro de la misma bitácora</strong> o en un <strong>módulo de tareas aparte</strong> (bandeja propia)?</li>
+    <li>¿Una tarea abierta debe <strong>impedir cerrar</strong> la entrada o el turno, o son independientes?</li>
+    <li>¿Necesitan <strong>evidencia adjunta</strong> y/o <strong>verificación de eficacia</strong> (estilo CAPA) al cerrar?</li>
+    <li>¿La tarea puede nacer también <strong>fuera</strong> de un formulario (creación manual directa), o siempre desde una bitácora?</li>
+  </ul>
+
+  <div class="note" style="border-left-color:var(--warn);background:rgba(245,158,11,0.06);">
+    <span class="lbl" style="color:#fcd9a0;">Mensaje para el vendedor</span>
+    Posicionar como <strong>"ya tenemos el 80% construido"</strong>: el cliente no paga por inventar un motor de flujos ni de tareas — paga por <strong>coser una pieza nueva (la Tarea) a building blocks ya probados</strong>. Eso baja el riesgo, el costo y el tiempo, y es honesto. Cerrar la reunión con las preguntas de arriba para convertir el alcance difuso en una Fase 1 cotizable.
+  </div>
+</section>
+
+</main>
+
+<footer class="wrap">
+  <div class="brand-foot">Lyra <span class="grad-text">WatchLog</span></div>
+  <p>Plataforma de bitácoras operacionales · Ecosistema Lyra · ITESICWS · 30 de junio de 2026</p>
+  <p class="backlink">Documento confidencial preparado para evaluación de cliente. El Anexo A es de uso interno y no debe mostrarse al cliente. Las capacidades se declaran según su estado real (✅ disponible · 🔧 en construcción · 🗺️ roadmap/a medida); no se prometen certificaciones formales ni cifras no respaldadas.</p>
+</footer>
+
+</body>
+</html>

@@ -487,6 +487,51 @@ GxP: MHRA Data Integrity 2018 / FDA DI Q&A (corrección tardía justificada + at
   `COMPUTED`) y se **congelan al sellar**; el estampado va **antes** de la firma para que el snapshot canónico (§11.70)
   coincida con lo persistido. **Sin permisos nuevos** (catálogo 59): editar reglas usa `template:edit`/draft/publish.
 
+## 9. Distribución segura / cadena de suministro (preparación de canal) 🔒
+> **Diseño registrado 2026-07-01 — NO implementado aún.** Requisitos de seguridad para **distribuir a múltiples
+> clientes on-premise a través de un socio de canal** (marca blanca). El software corre en **infraestructura ajena** y
+> lo despliega un **tercero**, así que la cadena entera debe ser **verificable e íntegra**. Ítems y estimación en
+> `BACKLOG.md §2` (Épico de distribución); runbook operativo en `DEPLOYMENT.md`; licenciamiento en `LICENSING.md`.
+> Referencia: SLSA (niveles de integridad de cadena de suministro), OWASP, Sigstore.
+
+### 9.1 Integridad de la imagen (que corra solo lo que ITESICWS publicó)
+- **Firma de imágenes** con **cosign/Sigstore**: cada imagen `lyra-watchlog-*` se firma en CI al publicar; el host
+  **verifica la firma** antes de correrla. Sin firma válida ⇒ no arranca.
+- **Pull por DIGEST inmutable** (`@sha256:…`), no solo por tag mutable (un tag se puede re-apuntar; un digest, no) →
+  reproducibilidad e integridad del artefacto exacto.
+- **Escaneo de vulnerabilidades** (Trivy/Grype) **antes de publicar**, con **gate en CI** (no se publica una imagen con
+  CVEs críticos sin excepción justificada).
+- **SBOM** (CycloneDX) por release: inventario de dependencias entregable al **auditor del cliente** (trazabilidad de
+  qué hay dentro de la imagen).
+
+### 9.2 Control de acceso a la distribución
+- **Registro privado** (no público). **Tokens read-only por cliente/socio**, revocables (si un cliente sale o un token
+  se filtra, se corta sin afectar a los demás).
+- **Custodia de la clave privada de licencias** (Ed25519, ver `LICENSING.md`) en **HSM o secret manager** — NUNCA en el
+  repo, la imagen o el `.env`. Es la raíz de confianza del licenciamiento; su fuga comprometería todo el modelo.
+- **Secrets por instalación** (`.env` de cada cliente: BD, JWT, cifrado de campos, SMTP, IA) **cifrados en reposo** y
+  con **rotación** documentada. Cada instalación tiene sus **propios** secretos (un compromiso no se propaga entre
+  clientes — refuerza el aislamiento single-tenant).
+
+### 9.3 Integridad de los datos del cliente
+- **Backups cifrados** (hoy `pg_dump -Fc` **sin** cifrar; a cifrar antes de distribuir a terceros) + retención +
+  restauración verificada. El backup pre-update es la red ante migraciones forward-only (ver `DEPLOYMENT.md`).
+- **Licencia vencida = SOLO LECTURA**, nunca borrado ni secuestro de datos (los datos son del cliente; ver
+  `LICENSING.md §5`). Todo cambio de estado de licencia se **audita**.
+- **TLS** obligatorio en todo el tráfico (ya vía Caddy de borde).
+
+### 9.4 Anti-manipulación / antipirateo (honesto)
+- El módulo de licencia se empaqueta **anti-tamper** (bytecode V8 / binario nativo) y la verificación es **distribuida**
+  (no un solo `if` desactivable). **No se entrega código fuente** al socio (imágenes compiladas, no repo).
+- **Verdad explícita:** ningún candado en máquina ajena es inviolable ⇒ es **disuasión por capas + dependencia de
+  updates/soporte**, no una bóveda (ver `LICENSING.md §7`). La firma asimétrica sí cierra el frente de **falsificar
+  licencias** (el socio no tiene la clave privada).
+
+### 9.5 Objetivo verificable
+Que un **cliente o su auditor de seguridad** pueda comprobar, sin confiar a ciegas: (a) que la imagen que corre **vino
+de ITESICWS y no fue alterada** (firma + digest), (b) **qué contiene** (SBOM) y que fue **escaneada**, (c) que sus
+**datos y secretos** están cifrados y aislados, y (d) que la **licencia** no puede secuestrar ni borrar sus datos.
+
 ## Estado
 - **Fase 0:** cabeceras (Helmet) y validación de entorno activas.
 - **Fase 1 (backend, ✅):** auth local Argon2id; access JWT (15 min) + refresh rotativo httpOnly con detección de reuso por familia; CSRF de doble envío en refresh/logout; lockout por fuerza bruta (contador en BD); **MFA TOTP** completo (enrolamiento + recovery codes, secreto cifrado en reposo); `PermissionsGuard` + `@RequirePermission` (dims. 1–3) globales; `ScopeService` (dim. 4) con ruta materializada; catálogo de permisos en `@lyra/contracts`; `AuditLog` append-only con **trigger Postgres** que rechaza UPDATE/DELETE; política de contraseñas configurable + historial; seed idempotente con admin de arranque (forzado a cambiar contraseña).
