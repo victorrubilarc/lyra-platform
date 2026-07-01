@@ -4,6 +4,27 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-01 · OT — Forks W1–W8 APROBADOS por el dueño (diseño congelado para la Sesión 1)
+El dueño dio el **visto bueno explícito** al diseño de `docs/design/OT_DESIGN_ARCHITECTURE.md`. Decisiones DEFINITIVAS:
+1. **W1** — `WorkActivity` = **entidad propia** (base conceptual `IncidentAction`, pero con `progressPct`/baseline/
+   `dependsOnId`/HH). NO se fusiona con `IncidentAction`; solo se comparten **guards de cierre PUROS** en `packages/contracts`.
+2. **W2** — **un único permiso `workorder:transition`** (dimensión WORKFLOW); QUIÉN ejecuta cada puerta = **DATO**
+   (`WorkflowTransitionRole`). NO se crean 4 permisos fijos de puerta (contradiría el motor de workflow configurable).
+3. **W3** — catálogos `Area`/`Specialty` **separados** (N:N con la OT); `orgNodeId` sigue siendo ubicación + ancla ABAC.
+4. **W4** — se **construye `FolioCounter`** (gapless, atómico `ON CONFLICT … RETURNING`); default OT = **scope por-tipo +
+   reinicio anual** (`OT-2026-0001`), configurable vía `WorkOrderType.folioScheme`; emisión en la transición cuyo
+   `toStateKey == WorkOrderType.folioOnStateKey` (default `aprobada`), dentro de la tx. Motor reutilizable (sirve al
+   folio-por-plantilla del dueño, BACKLOG 2026-06-30).
+5. **W5** — checklists = `Template` normal + marcador **opcional** `Template.purpose` (null|CHECKLIST) solo como filtro UX.
+6. **W6** — se **siembra** el flujo "OT — 4 puertas PTW" (dato clonable/simplificable a 1 puerta).
+7. **W7** — **paridad UI con Incidencias** (lista + kanban + facetas + `SavedView module:"work-orders"` + peek).
+8. **W8** — OT nace **directo desde la incidencia** (`originIncidentId`, enlace bidireccional); la CAPA liviana
+   (`IncidentAction`) se queda en la incidencia.
+**Deuda aceptada:** extraer `WorkflowExecutorService` compartido (LogEntry/Incident/WorkOrder) = sesión dedicada con tests,
+NO dentro de OT. **Siguiente = Sesión 1 (Cimientos), en sesión NUEVA.**
+
+---
+
 ### 2026-07-01 · OT — Sesión 0: DISEÑO FORMAL entregado (anexo técnico), forks pendientes de OK
 Se produjo `docs/design/OT_DESIGN_ARCHITECTURE.md` (diseño sin código; anexo de la propuesta comercial). Grounding
 verificado contra el repo, con **correcciones al plan de arranque**: (a) el modelo es `WorkflowDefinitionVersion`, **no**
