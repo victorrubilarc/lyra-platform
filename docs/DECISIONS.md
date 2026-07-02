@@ -4,6 +4,30 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-02 · OT — Realineación PTW al estándar: el PERMISO tiene 3 momentos (no uno)
+El dueño cuestionó (con razón) que la Puerta 2 pidiera "aplicar el bloqueo / verificar energía cero" durante la
+**preparación**, cuando el bloqueo de energías (LOTO) se aplica **físicamente en terreno al momento de ejecutar**, no en la
+oficina días antes. *Diagnóstico:* el MECANISMO de S3 (checklists configurables sobre el Form Builder + guard de puerta +
+segregación) es correcto y estándar, pero conflaba **dos momentos distintos** del Permiso de Trabajo. **Modelo fiel al
+estándar (PTW / ISO 45001 / DS 132 / LOTO OSHA 1910.147), acordado:** el permiso tiene **3 momentos** a lo largo de la OT:
+1. **Autorizar el permiso** (documental, ANTES de ejecutar) = **Puerta 2**: peligros identificados, plan de aislación,
+   personal competente, coordinación con Operaciones. *(Es lo que S3 ya hace; solo estaba mal REDACTADA la plantilla.)*
+2. **Aplicar/aceptar controles en terreno** (físico, AL EJECUTAR, **por actividad**): poner candados/tarjetas, verificar
+   energía cero, LMRA/toma-5. → **S4/S5, ligado a `WorkActivity`** (checklists de EJECUCIÓN, aún no construidos).
+3. **Cerrar el permiso** (retirar controles, reenergizar, sitio seguro) → **Puerta 4 / S5** (checklist de cierre).
+**Orden correcto del flujo:** **planificar → autorizar el permiso → ejecutar** (los peligros dependen de las tareas). El
+flujo sembrado hoy pone checklists ANTES de planificar (al revés); como el flujo es DATO, se **reordena en S4** (cuando
+exista la planificación de actividades), no ahora, para no dejar estados a medio construir ni romper S3.
+**Hecho ahora (seguro, sin tocar el flujo):** se REDACTÓ la plantilla de demo en modo AUTORIZACIÓN
+("Permiso de Trabajo — Aislación de energías (LOTO)": ¿fuentes identificadas? ¿procedimiento de bloqueo definido?
+¿personal competente? ¿coordinado con Operaciones?) y se **retiró el demo legado** (regla desactivada + plantilla
+ARCHIVED, sin borrar por si hay una OT en curso que la referencia; `LEGACY_CHECKLIST_*` en `work-orders-seed-data.ts`).
+smoke 65/65. **S4 incorporará:** reordenar el flujo (planificación antes del permiso) + `WorkActivity` + **checklists de
+EJECUCIÓN por actividad**; **S5:** checklist de **cierre** del permiso. *(Principio del dueño: implementar el estándar de
+la industria, sin engendros.)*
+
+---
+
 ### 2026-07-02 · OT — FIX: folio de OT = serie ÚNICA GLOBAL (corrige colisión entre tipos)
 El bug de folio cross-tipo detectado al cerrar S3 (ver abajo, decisión #6) se **corrigió el mismo día** porque bloqueaba
 al dueño (aprobar una 2.ª OT de otro tipo → Internal Error 500). *Decisión:* el default de `folioScheme` pasa de

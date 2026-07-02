@@ -115,10 +115,14 @@ export const WORK_ORDER_SPECIALTIES: WorkOrderTagSeed[] = [
 ];
 
 /**
- * Checklists / PTW de arranque (Sesión 3 — Puerta 2). Cada checklist ES una plantilla
- * del Form Builder (fork W5); aquí sembramos UNA plantilla PTW realista (LOTO) publicada
- * + una regla OBLIGATORIA transversal, para que la Puerta 2 sea operable/demo día 1.
- * Campos OPTATIVOS (el operador marca la sección completa y sella sin fricción).
+ * Checklists / PTW de arranque (Sesión 3 — Puerta 2 = AUTORIZACIÓN del permiso).
+ * Cada checklist ES una plantilla del Form Builder (fork W5). La Puerta 2 es el momento
+ * de AUTORIZAR el permiso ANTES de ejecutar (documental: peligros, plan de aislación,
+ * personal competente) — NO la aplicación física de controles (poner candados, energía
+ * cero, toma-5), que es de EJECUCIÓN por actividad (S4/S5, ligada a `WorkActivity`).
+ * Por eso las preguntas están redactadas en modo AUTORIZACIÓN, no de aplicación.
+ * Campos OPTATIVOS (el revisor marca la sección completa y sella sin fricción en la demo).
+ * Ver DECISIONS 2026-07-02 (realineación PTW al estándar).
  */
 export interface ChecklistSeedField {
   key: string;
@@ -145,26 +149,36 @@ export interface ChecklistRuleSeed {
 
 export const WORK_ORDER_CHECKLIST_TEMPLATES: ChecklistTemplateSeed[] = [
   {
-    name: "Checklist PTW — Bloqueo de energías (LOTO)",
-    description: "Permiso de trabajo: bloqueo y etiquetado de energías peligrosas (LOTO) antes de intervenir el equipo.",
-    sectionKey: "loto",
-    sectionTitle: "Bloqueo y verificación",
+    name: "Permiso de Trabajo — Aislación de energías (LOTO)",
+    description:
+      "AUTORIZACIÓN del permiso de aislación de energías peligrosas (LOTO) ANTES de ejecutar: peligros, plan de aislación, personal competente. La aplicación física (candados, energía cero) se registra al EJECUTAR, por actividad.",
+    sectionKey: "autorizacion_loto",
+    sectionTitle: "Autorización del permiso (aislación de energías)",
     fields: [
-      { key: "energias_identificadas", type: "BOOLEAN", dataType: "BOOLEAN", label: "¿Se identificaron todas las fuentes de energía?", order: 10 },
-      { key: "bloqueo_aplicado", type: "BOOLEAN", dataType: "BOOLEAN", label: "¿Se aplicó bloqueo y etiquetado (candado personal)?", order: 20 },
-      { key: "energia_cero", type: "BOOLEAN", dataType: "BOOLEAN", label: "¿Se verificó energía cero (prueba de arranque)?", order: 30 },
-      { key: "observaciones", type: "TEXTAREA", dataType: "STRING", label: "Observaciones", order: 40 },
+      { key: "fuentes_identificadas", type: "BOOLEAN", dataType: "BOOLEAN", label: "¿Se identificaron todas las fuentes de energía peligrosa a aislar?", order: 10 },
+      { key: "procedimiento_definido", type: "BOOLEAN", dataType: "BOOLEAN", label: "¿Se definió el procedimiento y los puntos de bloqueo/aislación?", order: 20 },
+      { key: "personal_competente", type: "BOOLEAN", dataType: "BOOLEAN", label: "¿El personal asignado está autorizado y es competente para el bloqueo?", order: 30 },
+      { key: "coordinacion_operaciones", type: "BOOLEAN", dataType: "BOOLEAN", label: "¿Se coordinó la liberación/detención del equipo con Operaciones?", order: 40 },
+      { key: "peligros_controles", type: "TEXTAREA", dataType: "STRING", label: "Peligros identificados y controles requeridos", order: 50 },
     ],
   },
 ];
 
 export const WORK_ORDER_CHECKLIST_RULES: ChecklistRuleSeed[] = [
   {
-    name: "PTW obligatorio — Bloqueo de energías (LOTO)",
-    templateName: "Checklist PTW — Bloqueo de energías (LOTO)",
+    name: "Permiso obligatorio — Aislación de energías (LOTO)",
+    templateName: "Permiso de Trabajo — Aislación de energías (LOTO)",
     mandatory: true,
     appliesToTypeKeys: [], // transversal: aplica a toda OT que llegue a preparación
     requiresPtw: null,
     sortOrder: 10,
   },
 ];
+
+/**
+ * Nombres del demo LEGADO de S3 (redactado en modo "aplicación física", incorrecto para
+ * la Puerta 2 de AUTORIZACIÓN). Se retiran al re-sembrar (regla desactivada, plantilla
+ * archivada) para no sugerir dos veces; no se borran (una OT en curso puede referenciarlos).
+ */
+export const LEGACY_CHECKLIST_TEMPLATE_NAME = "Checklist PTW — Bloqueo de energías (LOTO)";
+export const LEGACY_CHECKLIST_RULE_NAME = "PTW obligatorio — Bloqueo de energías (LOTO)";

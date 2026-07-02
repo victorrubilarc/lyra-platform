@@ -229,11 +229,16 @@ quedar solo en manos del jefe de área aunque más personas tengan el permiso ba
 
 ### Órdenes de trabajo ▸ Checklists y permisos de trabajo (Puerta 2)  [Supervisor/Ejecutor + Revisor]
 
-**Para qué sirve.** Asegura que **antes de planificar y ejecutar** una OT se completen los **checklists / permisos de
-trabajo** obligatorios (p. ej. **bloqueo de energías — LOTO**, trabajo en altura, espacio confinado, ART). Cada checklist
-es un **formulario del constructor de formularios** que se **llena, firma y sella** como cualquier registro de bitácora —
-no es una lista de texto suelta, sino un registro trazable. La OT **no puede pasar la Puerta 2** mientras quede un
-checklist **obligatorio** sin **aprobar**.
+**Para qué sirve.** Es el momento de **AUTORIZAR el permiso de trabajo** —de forma **documental, antes de ejecutar**—:
+identificar peligros, definir el plan de aislación/controles, confirmar personal competente y coordinar con Operaciones
+(p. ej. **permiso de aislación de energías — LOTO**, altura, espacio confinado, ART). Cada permiso/checklist es un
+**formulario del constructor de formularios** que se **llena, firma y sella** como cualquier registro — trazable, no una
+lista de texto suelta. La OT **no puede pasar la Puerta 2** mientras quede un permiso **obligatorio** sin **aprobar**.
+
+> **Autorizar ≠ aplicar.** La Puerta 2 es la **autorización** del permiso (¿está todo listo y autorizado para empezar?).
+> La **aplicación física de los controles** en terreno —poner los candados, verificar energía cero, el *toma-5*— se
+> registra **al EJECUTAR cada actividad** (checklists de ejecución ligados a la actividad), no aquí. Ese segundo momento
+> llega con la planificación/ejecución de actividades (Sesiones 4–5). *(Alineado al estándar PTW / ISO 45001 / LOTO.)*
 
 **Cómo se usa** (en el detalle de la OT, pestaña **«Checklists»**):
 1. Al **iniciar la preparación** de la OT (transición «Iniciar preparación»), el sistema **sugiere automáticamente** los

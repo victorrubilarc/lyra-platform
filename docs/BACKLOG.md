@@ -744,10 +744,15 @@ nunca queda más de una sesión atrás.
       Ver DECISIONS 2026-07-02. **Siguiente = Sesión 4.**
 - [ ] **Sesión 4 — Plan de actividades / Puerta 3 (~40 HH):** `WorkActivity` (base `IncidentAction` + `progressPct`,
       `plannedStart/End`, `actualStart/End`, `dependsOnId`); enviar/aprobar/rechazar plan → **congelar baseline**; guard
-      "no ejecuta sin plan aprobado".
+      "no ejecuta sin plan aprobado". **+ Realineación PTW al estándar (DECISIONS 2026-07-02):** (a) **reordenar el flujo
+      sembrado** para que **planificación vaya ANTES de la autorización del permiso** (los peligros dependen de las tareas;
+      hoy los checklists van antes de planificar, al revés) — es cambio de DATO del flujo, actualizar seed + smoke;
+      (b) **checklists de EJECUCIÓN ligados a `WorkActivity`** (aplicación física en terreno: poner candados/energía cero,
+      LMRA/toma-5), que se completan al ejecutar cada actividad — distinto de la AUTORIZACIÓN documental de la Puerta 2.
 - [ ] **Sesión 5 — Seguimiento vivo + cierre / Puerta 4 (~35 HH) → CIERRA EL MVP:** `WorkActivityUpdate` (append-only:
       % avance, fechas reales, evidencias, desviaciones, costos/HH opcionales); solicitud de cierre + revisión final +
-      guards de cierre. **Ciclo completo Solicitud→Cierre punta a punta.**
+      guards de cierre. **+ Checklist de CIERRE del permiso** (retirar controles/candados, reenergizar, sitio seguro) como
+      3.er momento del PTW (DECISIONS 2026-07-02). **Ciclo completo Solicitud→Cierre punta a punta.**
 - [ ] **Sesión 6 — Alertas, SLA y semáforos / "vigía digital" (~40 HH):** eventos `workorder.overdue`/`.activity.overdue`/
       `.stalled`/`.sla.breached`; curva de alerta (esperado vs real / incoherencia); escalamiento democratizado; semáforos
       + panel de seguimiento activo. Reusa Bloque N + `findBreaches`.

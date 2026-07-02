@@ -55,8 +55,8 @@ WO_TITLE = "OT Smoke — reparación de prueba"
 # Reviewer temporal (Puerta 2): revisor ≠ responsable (segregación de funciones).
 REV_USER = "smoke-ot-reviewer-user"
 REV_EMAIL = "smoke-ot-reviewer@watchlog.local"
-# Plantilla de checklist sembrada (LOTO) + su regla obligatoria (S3, seed).
-CHECKLIST_TEMPLATE = "Checklist PTW — Bloqueo de energías (LOTO)"
+# Plantilla de PERMISO sembrada (autorización LOTO) + su regla obligatoria (S3, seed).
+CHECKLIST_TEMPLATE = "Permiso de Trabajo — Aislación de energías (LOTO)"
 
 
 def call(method, path, tok=None, body=None):
