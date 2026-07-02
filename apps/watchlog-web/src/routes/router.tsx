@@ -38,6 +38,7 @@ import { CatalogsPage } from "../features/incidents/CatalogsPage.js";
 import { ExceptionsPage } from "../features/exceptions/ExceptionsPage.js";
 import { ShiftHandoverPage } from "../features/shift-handover/ShiftHandoverPage.js";
 import { WorkOrdersPage } from "../features/work-orders/WorkOrdersPage.js";
+import { WorkOrderDetailPage } from "../features/work-orders/WorkOrderDetailPage.js";
 import { WorkOrderCatalogsPage } from "../features/work-orders/WorkOrderCatalogsPage.js";
 
 /**
@@ -78,6 +79,7 @@ export const router = createBrowserRouter([
           { path: "/cambio-turno", element: <ShiftHandoverPage /> },
           { path: "/ordenes-trabajo", element: <WorkOrdersPage /> },
           { path: "/ordenes-trabajo/catalogos", element: <WorkOrderCatalogsPage /> },
+          { path: "/ordenes-trabajo/:id", element: <WorkOrderDetailPage /> },
           { path: "/notificaciones", element: <NotificationsPage /> },
           { path: "/mis-notificaciones", element: <MyNotificationsPage /> },
           { path: "/bitacoras/:id", element: <EntryViewerPage /> },

@@ -1,12 +1,11 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ClipboardList, Plus, Search, Tags } from "lucide-react";
 import type { WorkOrderListQuery } from "@lyra/contracts";
 import { Button, Card, EmptyState, GridPager, Input, Select, Spinner } from "@lyra/ui";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { useWorkOrderSpecialties, useWorkOrderStats, useWorkOrderTypes, useWorkOrders } from "./work-orders-queries.js";
 import { CreateWorkOrderModal } from "./CreateWorkOrderModal.js";
-import { WorkOrderDetailDrawer } from "./WorkOrderDetailDrawer.js";
 import { LIFECYCLE_META, ORIGIN_META, PRIORITY_META, criticalityColor, criticalityLabel } from "./work-orders-presentation.js";
 import styles from "./work-orders.module.css";
 
@@ -14,9 +13,10 @@ type FlagKey = "" | "mine" | "unassignedOnly" | "requiresPtw";
 
 export function WorkOrdersPage() {
   const { can } = usePermissions();
+  const navigate = useNavigate();
+  const openDetail = (id: string) => navigate(`/ordenes-trabajo/${id}`);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
-  const [selId, setSelId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
 
   const [search, setSearch] = useState("");
@@ -142,7 +142,7 @@ export function WorkOrdersPage() {
               </thead>
               <tbody>
                 {items.map((w) => (
-                  <tr key={w.id} className={styles.row} onClick={() => setSelId(w.id)}>
+                  <tr key={w.id} className={styles.row} onClick={() => openDetail(w.id)}>
                     <td className={styles.mono}>{w.code}</td>
                     <td className={styles.titleCell}>{w.title}{w.requiresPtw && <span className={styles.ptwTag}>PTW</span>}</td>
                     <td>{w.typeName ?? "—"}</td>
@@ -172,8 +172,7 @@ export function WorkOrdersPage() {
         </>
       )}
 
-      <WorkOrderDetailDrawer workOrderId={selId} onClose={() => setSelId(null)} />
-      <CreateWorkOrderModal open={createOpen} onClose={() => setCreateOpen(false)} onCreated={(id) => { setCreateOpen(false); setSelId(id); }} />
+      <CreateWorkOrderModal open={createOpen} onClose={() => setCreateOpen(false)} onCreated={(id) => { setCreateOpen(false); openDetail(id); }} />
     </div>
   );
 }

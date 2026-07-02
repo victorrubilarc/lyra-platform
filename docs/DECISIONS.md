@@ -4,6 +4,21 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-02 · OT — UX: el detalle pasa de DRAWER lateral a PÁGINA dedicada (Object Page)
+El dueño observó que el **drawer lateral** (680px) comprime la OT justo cuando más espacio necesita (objeto denso: 4 puertas
++ folio + checklists + plan + baseline + firmas + timeline). *Decisión (con su visto bueno, 2 opciones):* reemplazar el
+drawer por una **página de detalle dedicada** con ruta propia `/ordenes-trabajo/:id` (**deep-linkable**), estándar
+**SAP Fiori Object Page / IBM Maximo Work Order** para objetos de trabajo densos. Layout: cabecera con folio+estado+
+**CTA primario de etapa** (la transición de AVANCE destacada; las secundarias —devolver/reabrir/rechazar— discretas) +
+stepper del flujo + **cuerpo a 2 columnas** (pestañas Resumen/Plan/Permiso/Actividad a todo el ancho + panel lateral de
+estado/responsable/prioridad/metadatos). Responsive: el panel baja debajo en pantallas angostas (tablet/terreno).
+`WorkOrderDetailDrawer` **eliminado**; `WorkOrderDetailPage` nueva; la lista navega con `useNavigate` (fila → detalle) y
+el alta redirige al detalle. `WorkOrderPlanBlock`/`WorkOrderChecklistsBlock`/`TransitionModal` se **reutilizan tal cual**.
+**Alcance (decisión del dueño):** **solo OT ahora**; **Incidencias usa el mismo drawer** → alinear al Object Page queda
+como **deuda en BACKLOG** (slice aparte, para no tocar dos módulos a la vez). typecheck/lint(0 err)/build web verdes.
+
+---
+
 ### 2026-07-02 · OT — Sesión 4 (Puerta 3 · plan de actividades + congelar baseline + reorden del flujo)
 Se dio vida a la fase Planificación (`feat/ot-puerta3`). Con visto bueno explícito del dueño (3 preguntas):
 1. **REORDEN del flujo `ot-4-puertas` al estándar EAM** (§11.3): **planificar → autorizar el permiso → ejecutar**
