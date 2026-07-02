@@ -186,3 +186,25 @@
 .wizardReview li { display: flex; align-items: center; gap: 8px; color: var(--color-text-primary); font-size: var(--text-body-sm-size); }
 .wizardNav { display: flex; justify-content: space-between; gap: var(--space-2); margin-top: var(--space-2); }
 .wizardNav:has(> :only-child) { justify-content: flex-end; }
+
+/* === Object Page: detalle de OT a página completa (S4 UX) === */
+.detailPage { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4); max-width: 1400px; margin: 0 auto; width: 100%; }
+.detailTopbar { display: flex; align-items: center; }
+.detailHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
+.detailHeaderMain { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.detailPageTitle { font-family: var(--font-display, inherit); font-size: var(--text-title-lg-size, 1.5rem); font-weight: 700; color: var(--color-text-primary); margin: 0; line-height: 1.2; }
+.detailHeaderActions { display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; justify-content: flex-end; }
+
+.detailBody { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: var(--space-4); align-items: start; }
+.detailMain { min-width: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+.detailAside { display: flex; flex-direction: column; gap: var(--space-3); position: sticky; top: var(--space-4); }
+.asideCard { border: 1px solid var(--color-border-subtle); border-radius: var(--radius-md); background: var(--color-bg-surface-1); padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-3); }
+.asideTitle { font-size: var(--text-body-sm-size); font-weight: 600; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
+
+/* Panel lateral debajo del contenido en pantallas angostas (tablet/terreno) */
+@media (max-width: 900px) {
+  .detailBody { grid-template-columns: 1fr; }
+  .detailAside { position: static; }
+  .detailPage { padding: var(--space-3); }
+  .detailHeaderActions { justify-content: flex-start; }
+}

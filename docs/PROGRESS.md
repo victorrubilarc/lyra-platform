@@ -1,5 +1,13 @@
 # Progreso — Lyra WatchLog
 
+**2026-07-02 — 🎨 OT · UX: detalle DRAWER → PÁGINA dedicada (Object Page)** (`feat/ot-detalle-pagina`). El detalle de la
+OT deja de ser un drawer lateral (680px, comprimía el objeto) y pasa a una **página dedicada** con ruta propia
+`/ordenes-trabajo/:id` (deep-linkable), estándar SAP Fiori Object Page / Maximo. Cabecera con folio+estado + **CTA primario
+de etapa** (transición de avance destacada; secundarias discretas) + stepper + **cuerpo a 2 columnas** (pestañas a todo el
+ancho + panel lateral de estado/responsable/prioridad/metadatos); responsive (el panel baja en tablet/terreno). Drawer
+eliminado; `WorkOrderDetailPage` reutiliza Plan/Permiso/Actividad + `TransitionModal`. **Solo OT** (Incidencias sigue con
+drawer → deuda en BACKLOG). typecheck/lint(0 err)/build web verdes. Ver DECISIONS 2026-07-02.
+
 **2026-07-02 — 🔧 OT · Sesión 4 · PUERTA 3 (plan de actividades + congelar baseline) + reorden del flujo ✅**
 (`feat/ot-puerta3`). La fase **Planificación** está VIVA. **Reorden al estándar EAM (§11.3):** el flujo `ot-4-puertas`
 pasa a **planificar → autorizar el permiso → ejecutar** (los peligros dependen de las tareas). Nuevo orden:

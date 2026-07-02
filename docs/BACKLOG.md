@@ -810,6 +810,14 @@ nunca queda más de una sesión atrás.
 > **todas las plantillas PUBLICADAS**. Si el catálogo de plantillas crece y el picker se vuelve ruidoso, agregar `purpose`
 > (columna nullable + selector en el builder + `?purpose=CHECKLIST` en `/templates`). Ver DECISIONS 2026-07-02.
 
+### 🟡 DEUDA UX — Alinear el detalle de Incidencias al patrón Object Page (~6–10 HH)
+> **Decisión del dueño (2026-07-02):** OT migró su detalle de **drawer lateral → página dedicada** (Object Page, ruta
+> `/ordenes-trabajo/:id`, deep-linkable, cuerpo a todo el ancho + panel lateral; ver DECISIONS/PROGRESS). **Incidencias
+> sigue usando el `IncidentDetailDrawer`** (720px). Para coherencia del producto, migrarlo al mismo patrón: nueva ruta
+> `/incidencias/:id` + `IncidentDetailPage` (reusar el layout de `WorkOrderDetailPage`: header + CTA de etapa + stepper +
+> 2 columnas), `IncidentsPage` navega con `useNavigate`, eliminar el drawer. Se dejó para una sesión aparte (no tocar dos
+> módulos a la vez). *(Si conviene, extraer un `ObjectPageLayout` reutilizable en `packages/ui` al hacerlo.)*
+
 ### 🟡 DEUDA TRANSVERSAL — Vistas guardadas (`SavedView`) para Incidencias **y** Órdenes de Trabajo (~15–20 HH)
 > **Decisión del dueño (2026-07-01): DEJAR PENDIENTE para AMBOS módulos** (no hacerlo solo para OT). Hoy `SavedView`
 > (vistas guardadas: filtros + búsqueda + orden + columnas + densidad, ownership-gated, con vistas de sistema en código)
