@@ -1,5 +1,12 @@
 # Progreso — Lyra WatchLog
 
+**2026-07-02 — 🔧 OT/Form Builder · W5 `Template.purpose` (filtrar plantillas a «checklist»)** (`feat/ot-template-purpose`).
+A pedido del dueño (la lista de plantillas mezclaba todo). Marcador **`Template.purpose`** (`TemplatePurpose?`, hoy
+`CHECKLIST`; null=general; migr. `20260702190000`) + contrato + servicio + **selector «Propósito» en el Form Builder**
+(gobernanza viva) + el **picker de reglas filtra por defecto a checklist** (Combobox buscable, toggle «ver todas», fallback
+a todas si no hay marcadas, selección actual siempre visible); seed marca LOTO. Verde + contracts 421 + smoke-workorders
+**78/78**. Se anotaron 2 ideas del dueño en BACKLOG (Gantt de actividades · grilla de OT enriquecida). Ver DECISIONS 2026-07-02.
+
 **2026-07-02 — 🎨 OT · UX: llenar el checklist en MODAL embebido** (`feat/ot-checklist-modal`). Llenar/ver un checklist de
 la OT ya no saca de la pantalla: reutiliza `EntryFillPage` en **modo embebido** (props opcionales `embedded`/`entryId`/
 `onClose`; **la ruta normal de Bitácoras NO cambia**) abierto en un **modal** sobre la OT, con **"Cerrar"** en vez de

@@ -159,12 +159,12 @@ export function useWorkOrderChecklistRules() {
   return useQuery({ queryKey: WORK_ORDER_CHECKLIST_KEYS.rules(), queryFn: () => fetchWorkOrderChecklistRules(true) });
 }
 
-/** Plantillas PUBLICADAS (id+nombre) para el picker del editor de reglas de checklist. */
+/** Plantillas PUBLICADAS (id+nombre+propósito) para el picker del editor de reglas de checklist. */
 export function usePublishedTemplateOptions() {
   return useQuery({
     queryKey: ["work-orders", "published-templates"],
     queryFn: () => fetchTemplates(),
-    select: (rows) => rows.filter((t) => t.status === "PUBLISHED").map((t) => ({ id: t.id, name: t.name })),
+    select: (rows) => rows.filter((t) => t.status === "PUBLISHED").map((t) => ({ id: t.id, name: t.name, purpose: t.purpose })),
   });
 }
 

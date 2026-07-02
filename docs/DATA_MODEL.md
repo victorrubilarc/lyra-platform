@@ -45,7 +45,10 @@
 - **Template** *(implementado)* — contenedor lógico mutable: `name`, `description?`, `orgNodeId?` (**nodo PRIMARIO
   DERIVADO**, deprecado tras 2.8.0 — la visibilidad por nodo la gobierna `TemplateNodeAssignment`; null = global/varios/
   rama), `status` (DRAFT/PUBLISHED/ARCHIVED), `currentVersionId?` (versión publicada viva), `createdById/updatedById`
-  (referencia blanda), `deletedAt` (borrado lógico).
+  (referencia blanda), `deletedAt` (borrado lógico). **`purpose`** *(fork W5, 2026-07-02)* — enum **`TemplatePurpose?`**
+  (hoy `CHECKLIST`; null = general): marcador de UX en el contenedor mutable (gobernanza viva, editable en el Form Builder)
+  que **filtra** el picker de reglas de checklist de OT a las plantillas pensadas como checklist/permiso. No cambia la
+  mecánica del formulario (cualquier plantilla PUBLICADA sigue usable). Migr. `20260702190000_add_template_purpose`.
 - **TemplateNodeAssignment** *(implementado — Fase 2.8.0)* — asignación N:M **plantilla × nodo** = **fuente de verdad
   única del eje de NODO** de la visibilidad de plantilla: `templateId`, `orgNodeId`, `includeDescendants` (si true cubre
   el subárbol, incl. nodos futuros). Único `[templateId,orgNodeId]`. **CERO filas = GLOBAL** (visible en todo nodo,

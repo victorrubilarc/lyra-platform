@@ -30,6 +30,7 @@ export function WorkOrderChecklistRuleModal({ open, onClose, rule }: { open: boo
   const [requiresPtw, setRequiresPtw] = useState<string>(""); // "" | "true" | "false"
   const [active, setActive] = useState(true);
   const [sortOrder, setSortOrder] = useState(0);
+  const [showAllTemplates, setShowAllTemplates] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -48,10 +49,17 @@ export function WorkOrderChecklistRuleModal({ open, onClose, rule }: { open: boo
 
   // Opciones ORDENADAS alfabéticamente para búsqueda rápida (Combobox/MultiSelect filtran
   // al escribir ⇒ funciona igual con pocas o con muchas plantillas/tipos).
-  const templateOptions = useMemo(
-    () => [...templates].sort((a, b) => a.name.localeCompare(b.name)).map((t) => ({ value: t.id, label: t.name })),
-    [templates],
-  );
+  // Por defecto se ofrecen SOLO las plantillas marcadas como «checklist» (fork W5); si no
+  // hay ninguna marcada, se muestran todas (para no dejar el picker vacío). Toggle «ver todas».
+  const checklistTemplates = useMemo(() => templates.filter((t) => t.purpose === "CHECKLIST"), [templates]);
+  const noChecklistTemplates = checklistTemplates.length === 0;
+  const templateOptions = useMemo(() => {
+    const base = showAllTemplates || noChecklistTemplates ? templates : checklistTemplates;
+    // La plantilla ya seleccionada (aunque no sea checklist) SIEMPRE visible (editar reglas viejas).
+    const withSelected =
+      templateId && !base.some((t) => t.id === templateId) ? [...base, ...templates.filter((t) => t.id === templateId)] : base;
+    return [...withSelected].sort((a, b) => a.name.localeCompare(b.name)).map((t) => ({ value: t.id, label: t.name }));
+  }, [templates, checklistTemplates, showAllTemplates, noChecklistTemplates, templateId]);
   const typeOptions = useMemo(
     () => [...types].sort((a, b) => a.name.localeCompare(b.name)).map((t) => ({ value: t.id, label: t.name })),
     [types],
@@ -97,7 +105,16 @@ export function WorkOrderChecklistRuleModal({ open, onClose, rule }: { open: boo
             placeholder="Selecciona…"
             searchPlaceholder="Buscar plantilla…"
           />
-          {templates.length === 0 && <span className={styles.hint}>No hay plantillas publicadas. Publica una plantilla en el Form Builder para usarla como checklist.</span>}
+          {templates.length === 0 ? (
+            <span className={styles.hint}>No hay plantillas publicadas. Publica una plantilla en el Form Builder para usarla como checklist.</span>
+          ) : noChecklistTemplates ? (
+            <span className={styles.hint}>Aún no hay plantillas marcadas como «checklist». Marca el propósito de una plantilla en el Form Builder para filtrarlas aquí; por ahora se muestran todas.</span>
+          ) : (
+            <label className={styles.checkboxRow} style={{ marginTop: 2 }}>
+              <Toggle checked={showAllTemplates} onChange={(v) => setShowAllTemplates(v)} size="sm" />
+              <span>Ver todas las plantillas (no solo las de tipo checklist)</span>
+            </label>
+          )}
         </div>
 
         <label className={styles.checkboxRow}>

@@ -24,6 +24,7 @@ function detailWithRoles(): TemplateDetail {
     name: "Bitácora con roles",
     description: null,
     orgNodeId: null,
+    purpose: null,
     status: "PUBLISHED",
     currentVersionId: "ver-1",
     editWindowAnchor: null,
