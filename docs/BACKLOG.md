@@ -14,9 +14,10 @@
 > **segregación revisor ≠ responsable**. Claves de estado data-driven en `WorkOrderType` (`checklistSuggestStateKey`/
 > `checklistGateStateKey`). Migración `20260702120000`. Seed: plantilla LOTO + regla obligatoria. Web: pestaña "Checklists"
 > en el drawer + sub-tab "Reglas de checklist" en catálogos. verde + contracts **412** + `smoke-workorders.py` **65/65** +
-> regresión incidencias 32/32. **🔴 BUG descubierto (S2, requiere tu decisión): folio de OT colisiona entre TIPOS** (ver
-> §2 detalle). **DEUDA:** `Template.purpose` (W5) diferido; editor UI de `folioScheme`. **Siguiente: OT Sesión 4 (Puerta 3
-> — plan de actividades + baseline).** Antes (2026-07-01): **🔧 OT · Sesión 2 · PUERTA 1 ✅** (`feat/ot-puerta1`): workflow CONGELADO al crear
+> regresión incidencias 32/32. **✅ FIX mismo día (`fix/ot-folio-global`): folio de OT = serie ÚNICA GLOBAL** (corrige la
+> colisión entre tipos que daba Internal Error al aprobar; default scope `type`→`global` + reconciliación de contador; ver
+> §2). **DEUDA:** `Template.purpose` (W5) diferido; editor UI de `folioScheme`. **Siguiente: OT Sesión 4 (Puerta 3 — plan
+> de actividades + baseline).** Antes (2026-07-01): **🔧 OT · Sesión 2 · PUERTA 1 ✅** (`feat/ot-puerta1`): workflow CONGELADO al crear
 > (flujo sembrado **"OT — 4 puertas PTW"** como DATO; la solicitud nace `borrador`/DRAFT) + ejecutor de transiciones
 > espejo de Incidencias (permiso NUEVO **`workorder:transition`** dim. WORKFLOW, rol-dato, **firma Part 11**
 > re-autenticada) + **`FolioCounter` gapless** (atómico `ON CONFLICT…RETURNING` dentro de la tx; folio **SOLO al
@@ -757,18 +758,17 @@ nunca queda más de una sesión atrás.
       especialidad/monto/riesgo, reusa el motor de reglas); dependencias/ruta crítica; costos/HH + reportes/export;
       escalamiento multinivel. Puede subdividirse al llegar.
 
-> **🔴 BUG descubierto en S3 — folio de OT colisiona entre TIPOS (defecto de S2, requiere tu decisión + migración).**
-> El default de `folioScheme` es **scope `type`** (contador por tipo) pero `renderFolio` produce **`OT-2026-0001`**
-> SIN el tipo en el string, y `WorkOrder.folio` es **@unique GLOBAL**. ⇒ el **segundo TIPO** que apruebe una OT choca
-> con el `OT-2026-0001` del primero (500 `Unique constraint failed: folio`). Se detectó porque un OT de QA
-> (`Solicitud de Prueba`, `OT-2026-0001`) ya ocupaba ese folio. **Es un defecto real de uso normal (>1 tipo).**
-> No se corrige en S3 (toca el default aprobado W4 + datos existentes). **Opciones a decidir contigo:** (a) default
-> scope **`global`** = una sola serie anual de OT (estándar SAP/Maximo, folio EXACTO `OT-2026-0001` global-único) — la más
-> limpia, pero renumera la serie y hay que **migrar** el `folio`/`folioSeqKey` del OT de QA existente; (b) incluir el tipo
-> en la máscara (`OT-<tipo>-2026-0001`) — cambia el formato de folio que ya viste. Recomiendo **(a)**. Mientras tanto la
-> emisión funciona para 1 tipo; el smoke de OT usa un **prefijo propio** (`OTSMK`) para no chocar con datos reales.
-> **Deuda relacionada (de S2, sigue abierta): editor UI de `folioScheme`/`folioOnStateKey`** en el mantenedor de tipos
-> (hoy API-only). Al abrir ese editor, resolver este bug de una vez.
+> **✅ BUG folio cross-tipo — CORREGIDO 2026-07-02 (`fix/ot-folio-global`).** *Síntoma:* aprobar una 2.ª OT (de otro
+> tipo) daba **Internal Error** (500 `Unique constraint failed: folio`). *Causa:* el default `folioScheme` era **scope
+> `type`** (contador por tipo) pero `renderFolio` produce `OT-2026-0001` SIN el tipo y `WorkOrder.folio` es **@unique
+> GLOBAL** ⇒ dos tipos colisionaban en el mismo string. *Fix (opción (a), estándar SAP/Maximo):* `DEFAULT_WORK_ORDER_FOLIO_SCHEME.scope`
+> = **`global`** ⇒ una sola serie anual `OT-2026-0001, 0002…` global-única (formato intacto). **Reconciliación** en `seed.ts`
+> (`reconcileWorkOrderFolioCounters`, idempotente): fija el contador `workorder|global|<año>` al mayor folio existente del
+> año para no re-emitir uno ya usado. Los folios existentes (`Solicitud de Prueba` 0001, `Reparacion de cable` 0002) quedan
+> intactos; la siguiente OT toma `0003`. Un cliente que quiera serie POR TIPO debe usar una `mask` con el tipo en
+> `WorkOrderType.folioScheme`. folio.spec actualizado (413) + smoke 65/65 + aprobación real verificada.
+> **Deuda relacionada (sigue abierta): editor UI de `folioScheme`/`folioOnStateKey`** en el mantenedor de tipos (hoy
+> API-only).
 
 > **DEUDA S3 (menor) — marcador `Template.purpose` (fork W5) DIFERIDO.** El diseño §2.4/W5 contemplaba una columna
 > **opcional** `Template.purpose` (null|CHECKLIST) SOLO como filtro UX del picker de plantillas de checklist. **Se difirió**

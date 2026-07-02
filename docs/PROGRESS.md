@@ -1,5 +1,17 @@
 # Progreso — Lyra WatchLog
 
+**2026-07-02 — 🐞 FIX OT · folio = serie ÚNICA GLOBAL** (`fix/ot-folio-global`). *Síntoma reportado por el dueño:*
+aprobar una 2.ª OT (de otro tipo) daba **Internal Error** (500 `Unique constraint failed: folio`). *Causa:* el default
+`folioScheme` era **scope `type`** (contador por tipo) pero el folio renderizado (`OT-2026-0001`) NO lleva el tipo y
+`WorkOrder.folio` es **@unique global** ⇒ dos tipos colisionaban en el mismo string. *Fix (opción (a), estándar SAP/
+Maximo):* `DEFAULT_WORK_ORDER_FOLIO_SCHEME.scope` = **`global`** → una sola serie anual `OT-2026-0001, 0002…`
+global-única (formato intacto). **Reconciliación** idempotente en `seed.ts` (`reconcileWorkOrderFolioCounters`): fija el
+contador `workorder|global|<año>` al mayor folio existente del año (no re-emite folios ya usados; los OT reales
+`Solicitud de Prueba`/`Reparacion de cable` = 0001/0002 quedan intactos, el siguiente = 0003). El smoke usa
+`folioScheme {prefix:"OTSMK", scope:"type"}` para aislar su serie. `folio.spec.ts` actualizado. Verde: contracts **413** +
+smoke-workorders **65/65** + **aprobación real verificada** (OT-2026-0003). Ver DECISIONS 2026-07-02. *(Serie por-tipo
+sigue disponible por `WorkOrderType.folioScheme` con `mask` que incluya el tipo.)*
+
 **2026-07-02 — 🔧 OT · Sesión 3 · PUERTA 2 (checklists / permisos de trabajo) ✅** (`feat/ot-puerta2`). La fase
 **Preparación** está VIVA: se diseñan reglas de checklist, se sugieren/agregan a una OT, se instancian como `LogEntry`
 vivos (Form Builder) y la Puerta 2 se bloquea si falta un obligatorio sin aprobar. **NO se reinventó el motor de

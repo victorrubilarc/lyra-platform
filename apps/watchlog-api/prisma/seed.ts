@@ -709,6 +709,32 @@ async function seedWorkOrderChecklists(): Promise<void> {
   console.log(`✔ Checklists de OT sembrados: ${WORK_ORDER_CHECKLIST_TEMPLATES.length} plantilla(s) + ${WORK_ORDER_CHECKLIST_RULES.length} regla(s)`);
 }
 
+// Reconcilia el contador GLOBAL de folio de OT con los folios ya emitidos. Necesario
+// tras el cambio de scope `type`→`global` (2026-07-02): el contador de cada año debe
+// quedar >= al mayor número de folio existente de ese año, para NUNCA re-emitir un folio
+// ya usado (WorkOrder.folio es único global). Idempotente. Asume el patrón por defecto
+// "…-YYYY-SEQ"; tipos con `mask`/`scope` propios no se tocan.
+async function reconcileWorkOrderFolioCounters(): Promise<void> {
+  const rows = await prisma.workOrder.findMany({ where: { folio: { not: null } }, select: { folio: true } });
+  const maxByYear = new Map<string, number>();
+  for (const r of rows) {
+    const m = /-(\d{4})-(\d+)$/.exec(r.folio ?? "");
+    if (!m) continue;
+    const [, year, seq] = m;
+    maxByYear.set(year, Math.max(maxByYear.get(year) ?? 0, Number(seq)));
+  }
+  let fixed = 0;
+  for (const [year, maxSeq] of maxByYear) {
+    const sequenceKey = `workorder|global|${year}`;
+    const existing = await prisma.folioCounter.findUnique({ where: { sequenceKey } });
+    if (!existing || existing.lastValue < maxSeq) {
+      await prisma.folioCounter.upsert({ where: { sequenceKey }, create: { sequenceKey, lastValue: maxSeq }, update: { lastValue: maxSeq } });
+      fixed++;
+    }
+  }
+  if (fixed > 0) console.log(`✔ Contador global de folio de OT reconciliado (${fixed} año/s)`);
+}
+
 async function main(): Promise<void> {
   await seedPermissions();
   await seedAdminRole();
@@ -726,6 +752,7 @@ async function main(): Promise<void> {
   await seedWorkOrderWorkflow();
   await seedWorkOrderCatalog();
   await seedWorkOrderChecklists();
+  await reconcileWorkOrderFolioCounters();
 }
 
 main()

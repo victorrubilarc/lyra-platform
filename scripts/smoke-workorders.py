@@ -159,7 +159,7 @@ def main():
         "requiresPtwDefault": True, "criticalityDefault": 4, "sortOrder": 99,
         # Prefijo de folio propio: aísla el smoke de datos reales (evita colisión con
         # el folio global-único de otras OT; ver BUG folio cross-tipo en BACKLOG).
-        "folioScheme": {"prefix": "OTSMK"},
+        "folioScheme": {"prefix": "OTSMK", "scope": "type"},
     })
     check("crear tipo → 2xx + flags", s in (200, 201) and isinstance(r, dict) and r.get("requiresPtwDefault") is True and r.get("criticalityDefault") == 4, str(s))
     tid = r.get("id") if isinstance(r, dict) else None
@@ -173,7 +173,7 @@ def main():
     check("tipo inactivo NO en desplegables", not any(t.get("key") == TYPE_KEY for t in active))
     check("tipo inactivo SÍ en ?includeInactive", any(t.get("key") == TYPE_KEY for t in allt))
     # reactivar para usarlo al crear la OT (se re-envía folioScheme: el upsert reemplaza todo el registro)
-    call("POST", "/work-orders/types", admin, {"key": TYPE_KEY, "name": "Tipo OT Smoke EDIT", "active": True, "criticalityDefault": 4, "folioScheme": {"prefix": "OTSMK"}})
+    call("POST", "/work-orders/types", admin, {"key": TYPE_KEY, "name": "Tipo OT Smoke EDIT", "active": True, "criticalityDefault": 4, "folioScheme": {"prefix": "OTSMK", "scope": "type"}})
 
     # 3) Especialidad: crear + colisión + desactivar
     s, r = call("POST", "/work-orders/specialties?create=true", admin, {"key": SPEC_KEY, "name": "Especialidad OT Smoke", "sortOrder": 99})

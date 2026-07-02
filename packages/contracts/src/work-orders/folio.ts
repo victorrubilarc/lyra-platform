@@ -54,13 +54,20 @@ export interface ResolvedFolioScheme {
   reset: FolioReset;
 }
 
-/** Default OT (fork W4): correlativo POR TIPO con reinicio ANUAL → "OT-2026-0001". */
+/**
+ * Default OT: **serie ÚNICA GLOBAL** con reinicio ANUAL → "OT-2026-0001", "OT-2026-0002"…
+ * (estándar SAP PM / Maximo: un solo rango de número de OT). *Corrección 2026-07-02:* el
+ * default de W4 era `scope: "type"`, pero el folio renderizado NO incluye el tipo y
+ * `WorkOrder.folio` es único GLOBAL ⇒ dos tipos distintos colisionaban en "OT-2026-0001".
+ * `global` numera una sola serie por año, siempre única. Si un cliente quiere serie por
+ * tipo, debe usar una `mask` que incluya el tipo (`folioScheme` por `WorkOrderType`).
+ */
 export const DEFAULT_WORK_ORDER_FOLIO_SCHEME: ResolvedFolioScheme = {
   prefix: "OT",
   mask: null,
   padding: 4,
   start: 1,
-  scope: "type",
+  scope: "global",
   reset: "annual",
 };
 
