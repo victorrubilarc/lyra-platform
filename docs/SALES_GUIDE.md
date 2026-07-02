@@ -195,6 +195,19 @@ fuera.
 Notificaciones configurables (p. ej. rondas vencidas, vencimientos de flujo) con plantillas propias.
 **Beneficio:** lo importante **llega a quien corresponde** sin depender de que alguien "mire la pantalla".
 
+### 🛠️ Órdenes de trabajo con permiso (OT / PTW) — *en construcción, MVP por etapas*
+Del **requerimiento** a la **ejecución controlada**, con las mismas garantías de auditoría de las bitácoras. **Hoy
+disponible:** crear/gestionar la solicitud de trabajo (con ABAC por nodo/estructura), **aprobación con firma electrónica
+y folio oficial emitido solo al aprobar** (correlativo único, sin duplicados), y **checklists / permisos de trabajo
+configurables** que **bloquean el avance** hasta estar aprobados, con **segregación de funciones** (quien revisa ≠ quien
+ejecuta). **Clave diferenciadora:** los checklists **no son un "módulo LOTO" cerrado** — son el **mismo motor de
+formularios** de las bitácoras, así que sirven para **cualquier tipo**: permisos de alto riesgo (bloqueo de energías,
+altura, espacio confinado), **inspecciones de calidad (ITP)**, **registros regulatorios (GMP/HACCP)**, checklists de
+puesta en marcha o de cierre. El cliente configura **qué checklist, en qué momento, obligatorio o no, para qué trabajo** —
+cero software a medida. **Beneficio:** un solo sistema para el trabajo operacional con la gobernanza que exige una
+auditoría, adaptable a minería, O&G, farma, manufactura o construcción sin reprogramar. *(Planificación de actividades,
+aplicación de controles en terreno por tarea y cierre definitivo llegan en las siguientes etapas — ver §10.)*
+
 ---
 
 ## 4. Por qué Lyra WatchLog (diferenciadores)
@@ -319,6 +332,15 @@ Preséntalo como evolución, no como funcionalidad actual:
 
 > Una línea por hito, en lenguaje de cliente. Lo más reciente arriba.
 
+- **2026-07-02** — **Checklists / permisos de trabajo en las Órdenes de Trabajo 🛠️ (disponible):** una OT puede exigir
+  **checklists o permisos** (bloqueo de energías, altura, calidad/ITP, regulatorios…) que **bloquean el avance** hasta
+  ser aprobados, con **firma y segregación de funciones** (revisa alguien distinto de quien ejecuta). Es el **mismo motor
+  de formularios** de las bitácoras, así que el cliente **configura cualquier tipo de checklist** —no es un módulo cerrado—:
+  qué se exige, cuándo y para qué trabajo. Un solo sistema, gobernanza de auditoría, adaptable a cada industria sin
+  reprogramar.
+- **2026-07-01** — **Órdenes de trabajo con aprobación firmada y folio oficial 🧾 (disponible):** del requerimiento a la
+  aprobación con **firma electrónica** y **folio único emitido solo al aprobar** (sin "basura digital" ni duplicados),
+  con trazabilidad completa y control de acceso por área.
 - **2026-06-24** — **Plantillas de tema listas para usar 🎨 (disponible):** vestir la plataforma con tu marca es ahora cuestión de
   minutos: el administrador elige una de **10 plantillas de color curadas** (Grafito, Cobre, Acero, Medianoche, Bosque, Solar, Índigo,
   Cobalto, Magma, Salitre) —todas con **versión clara y oscura** y **contraste accesible (WCAG AA) garantizado**— como punto de partida,
