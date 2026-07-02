@@ -4,7 +4,6 @@ import { Button, Combobox, Input, Modal, Select, Stepper, Textarea, useToast } f
 import { useAccessibleOrgTree } from "../structure/structure-queries.js";
 import {
   useCreateWorkOrder,
-  useWorkOrderAreas,
   useWorkOrderEquipmentOptions,
   useWorkOrderSpecialties,
   useWorkOrderTypes,
@@ -44,7 +43,6 @@ const STEPS = [
 export function CreateWorkOrderModal({ open, onClose, onCreated, presetNodeId }: Props) {
   const toast = useToast();
   const { data: types = [] } = useWorkOrderTypes();
-  const { data: areas = [] } = useWorkOrderAreas();
   const { data: specialties = [] } = useWorkOrderSpecialties();
   const { data: tree = [] } = useAccessibleOrgTree();
   const create = useCreateWorkOrder();
@@ -59,7 +57,6 @@ export function CreateWorkOrderModal({ open, onClose, onCreated, presetNodeId }:
   const [orgNodeId, setOrgNodeId] = useState(presetNodeId ?? "");
   const [equipmentId, setEquipmentId] = useState("");
   const [locationDetail, setLocationDetail] = useState("");
-  const [areaIds, setAreaIds] = useState<string[]>([]);
   const [specialtyIds, setSpecialtyIds] = useState<string[]>([]);
   const [dueAt, setDueAt] = useState("");
 
@@ -97,7 +94,7 @@ export function CreateWorkOrderModal({ open, onClose, onCreated, presetNodeId }:
   function reset() {
     setStep(0); setTitle(""); setDescription(""); setTypeId(""); setCriticality(3); setPriority("MEDIUM");
     setRequiresPtw(false); setOrgNodeId(presetNodeId ?? ""); setEquipmentId(""); setLocationDetail("");
-    setAreaIds([]); setSpecialtyIds([]); setDueAt("");
+    setSpecialtyIds([]); setDueAt("");
   }
 
   function submit() {
@@ -112,7 +109,6 @@ export function CreateWorkOrderModal({ open, onClose, onCreated, presetNodeId }:
       orgNodeId,
       equipmentId: equipmentId || undefined,
       locationDetail: locationDetail.trim() || undefined,
-      areaIds: areaIds.length ? areaIds : undefined,
       specialtyIds: specialtyIds.length ? specialtyIds : undefined,
       dueAt: dueAt ? new Date(dueAt).toISOString() : undefined,
     };
@@ -193,21 +189,6 @@ export function CreateWorkOrderModal({ open, onClose, onCreated, presetNodeId }:
             <label className={styles.field}><span className={styles.fieldLabel}>Detalle de ubicación</span>
               <Input value={locationDetail} onChange={(e) => setLocationDetail(e.target.value)} placeholder="Ej. Chancador primario, nivel 3" />
             </label>
-            <div className={styles.field}><span className={styles.fieldLabel}>Áreas</span>
-              <div className={styles.chips}>
-                {areas.length === 0 && <span className={styles.muted}>Sin áreas en el catálogo</span>}
-                {areas.map((a) => (
-                  <button
-                    key={a.id}
-                    type="button"
-                    className={areaIds.includes(a.id) ? `${styles.chipToggle} ${styles.chipToggleOn}` : styles.chipToggle}
-                    onClick={() => toggle(areaIds, a.id, setAreaIds)}
-                  >
-                    {a.name}
-                  </button>
-                ))}
-              </div>
-            </div>
             <div className={styles.field}><span className={styles.fieldLabel}>Especialidades</span>
               <div className={styles.chips}>
                 {specialties.length === 0 && <span className={styles.muted}>Sin especialidades en el catálogo</span>}

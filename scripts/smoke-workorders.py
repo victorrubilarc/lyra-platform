@@ -35,7 +35,6 @@ PG = ["docker", "exec", "lyra-watchlog-dev-postgres-1", "psql", "-U", "watchlog"
 OK, FAIL = [], []
 
 TYPE_KEY = "smoke-ot-tipo"
-AREA_KEY = "smoke-ot-area"
 SPEC_KEY = "smoke-ot-especialidad"
 WO_TITLE = "OT Smoke — reparación de prueba"
 
@@ -78,7 +77,6 @@ def check(name, cond, detail=""):
 def cleanup():
     sql(f"DELETE FROM \"WorkOrder\" WHERE title = '{WO_TITLE}';")
     sql(f"DELETE FROM \"WorkOrderType\" WHERE key = '{TYPE_KEY}';")
-    sql(f"DELETE FROM \"Area\" WHERE key = '{AREA_KEY}';")
     sql(f"DELETE FROM \"Specialty\" WHERE key = '{SPEC_KEY}';")
 
 
@@ -93,8 +91,6 @@ def main():
     # 1) Catálogos sembrados
     s, types = call("GET", "/work-orders/types", admin)
     check("GET /work-orders/types → 200 + tipos sembrados", s == 200 and isinstance(types, list) and len(types) >= 1, str(s))
-    s, areas = call("GET", "/work-orders/areas", admin)
-    check("GET /work-orders/areas → 200 + áreas sembradas", s == 200 and isinstance(areas, list) and len(areas) >= 1, str(s))
     s, specs = call("GET", "/work-orders/specialties", admin)
     check("GET /work-orders/specialties → 200 + especialidades sembradas", s == 200 and isinstance(specs, list) and len(specs) >= 1, str(s))
 
@@ -117,24 +113,17 @@ def main():
     # reactivar para usarlo al crear la OT
     call("POST", "/work-orders/types", admin, {"key": TYPE_KEY, "name": "Tipo OT Smoke EDIT", "active": True, "criticalityDefault": 4})
 
-    # 3) Crear/colisión ÁREA
-    s, r = call("POST", "/work-orders/areas?create=true", admin, {"key": AREA_KEY, "name": "Área OT Smoke", "sortOrder": 99})
-    check("crear área → 2xx", s in (200, 201), str(s))
-    aid = r.get("id") if isinstance(r, dict) else None
-    s, _ = call("POST", "/work-orders/areas?create=true", admin, {"key": AREA_KEY, "name": "dup"})
-    check("crear área con key existente → 409", s == 409, str(s))
-    # 3b) Área: desactivar → fuera de la lista por defecto, dentro de ?includeInactive
-    call("POST", "/work-orders/areas", admin, {"key": AREA_KEY, "name": "Área OT Smoke", "active": False})
-    _, aActive = call("GET", "/work-orders/areas", admin)
-    _, aAll = call("GET", "/work-orders/areas?includeInactive=true", admin)
-    check("área inactiva NO en desplegables", not any(a.get("key") == AREA_KEY for a in aActive))
-    check("área inactiva SÍ en ?includeInactive", any(a.get("key") == AREA_KEY for a in aAll))
-    call("POST", "/work-orders/areas", admin, {"key": AREA_KEY, "name": "Área OT Smoke", "active": True})
-    # 3c) Especialidad: crear + colisión
+    # 3) Especialidad: crear + colisión + desactivar
     s, r = call("POST", "/work-orders/specialties?create=true", admin, {"key": SPEC_KEY, "name": "Especialidad OT Smoke", "sortOrder": 99})
     check("crear especialidad → 2xx", s in (200, 201), str(s))
     s, _ = call("POST", "/work-orders/specialties?create=true", admin, {"key": SPEC_KEY, "name": "dup"})
     check("crear especialidad con key existente → 409", s == 409, str(s))
+    call("POST", "/work-orders/specialties", admin, {"key": SPEC_KEY, "name": "Especialidad OT Smoke", "active": False})
+    _, spActive = call("GET", "/work-orders/specialties", admin)
+    _, spAll = call("GET", "/work-orders/specialties?includeInactive=true", admin)
+    check("especialidad inactiva NO en desplegables", not any(x.get("key") == SPEC_KEY for x in spActive))
+    check("especialidad inactiva SÍ en ?includeInactive", any(x.get("key") == SPEC_KEY for x in spAll))
+    call("POST", "/work-orders/specialties", admin, {"key": SPEC_KEY, "name": "Especialidad OT Smoke", "active": True})
 
     # nodo + especialidad reales
     node = sql("SELECT id FROM \"OrgNode\" WHERE \"deletedAt\" IS NULL ORDER BY \"createdAt\" LIMIT 1;")
@@ -145,24 +134,23 @@ def main():
     s, wo = call("POST", "/work-orders", admin, {
         "title": WO_TITLE, "description": "creada por smoke", "typeId": tid,
         "criticality": 4, "priority": "HIGH", "requiresPtw": True,
-        "orgNodeId": node, "areaIds": [aid], "specialtyIds": [spec_id] if spec_id else [],
+        "orgNodeId": node, "specialtyIds": [spec_id] if spec_id else [],
     })
     check("crear solicitud → 2xx", s in (200, 201), str(s) + (json.dumps(wo) if s not in (200, 201) else ""))
     wid = wo.get("id") if isinstance(wo, dict) else None
     check("solicitud: code SOL-…, folio null, lifecycle OPEN, PTW",
           isinstance(wo, dict) and str(wo.get("code", "")).startswith("SOL-") and wo.get("folio") is None
           and wo.get("lifecycle") == "OPEN" and wo.get("requiresPtw") is True, json.dumps(wo) if isinstance(wo, dict) else str(wo))
-    check("solicitud: N:N área/especialidad reflejado",
-          isinstance(wo, dict) and any(a.get("id") == aid for a in wo.get("areas", []))
-          and (not spec_id or any(sp.get("id") == spec_id for sp in wo.get("specialties", []))))
+    check("solicitud: N:N especialidad reflejado",
+          isinstance(wo, dict) and (not spec_id or any(sp.get("id") == spec_id for sp in wo.get("specialties", []))))
 
     # 5) Listar + filtros
     _, lst = call("GET", "/work-orders?lifecycle=OPEN&pageSize=200", admin)
     check("listar → aparece la solicitud", isinstance(lst, dict) and any(i.get("id") == wid for i in lst.get("items", [])))
     _, byType = call("GET", f"/work-orders?typeId={tid}", admin)
     check("filtro typeId → la incluye", isinstance(byType, dict) and any(i.get("id") == wid for i in byType.get("items", [])))
-    _, byArea = call("GET", f"/work-orders?areaId={aid}", admin)
-    check("filtro areaId → la incluye", isinstance(byArea, dict) and any(i.get("id") == wid for i in byArea.get("items", [])))
+    _, bySpec = call("GET", f"/work-orders?specialtyId={spec_id}", admin) if spec_id else (None, {"items": [{"id": wid}]})
+    check("filtro specialtyId → la incluye", isinstance(bySpec, dict) and any(i.get("id") == wid for i in bySpec.get("items", [])))
     _, byCrit = call("GET", "/work-orders?criticality=4", admin)
     check("filtro criticality=4 → la incluye", isinstance(byCrit, dict) and any(i.get("id") == wid for i in byCrit.get("items", [])))
     _, bySearch = call("GET", "/work-orders?search=reparaci", admin)

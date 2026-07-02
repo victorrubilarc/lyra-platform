@@ -142,7 +142,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 
 ### 18. Órdenes de trabajo (OT / PTW)  [todos los roles operativos]
 - ✅ **Crear y listar solicitudes de trabajo** (asistente de 2 pasos, grilla con filtros/facetas, detalle con reasignar/prioridad/anular) (§ Órdenes de trabajo)
-- ✅ **Administrar los catálogos** (tipos de OT, áreas y especialidades) (§ Órdenes de trabajo ▸ Catálogos) [solo administrador]
+- ✅ **Administrar los catálogos** (tipos de OT y especialidades) (§ Órdenes de trabajo ▸ Catálogos) [solo administrador]
 - ✍️ Aprobación y folio al aprobar (Puerta 1 — Sesión 2)
 - ✍️ Checklists / permisos de trabajo, plan de actividades y cierre (Puertas 2–4 — Sesiones 3–5)
 
@@ -164,38 +164,40 @@ entregas del módulo.
    - **Paso 1 · Trabajo:** título, descripción, **tipo** (correctiva, preventiva, predictiva, mejora, permiso de alto
      riesgo…), **criticidad** (1–5), **prioridad** y si **requiere PTW** (se prellena según el tipo).
    - **Paso 2 · Ubicación y clasificación:** **nodo** (obligatorio; define dónde y a la vez el alcance de datos),
-     **equipo** del nodo (opcional), **detalle de ubicación**, **áreas** y **especialidades** (etiquetas de
-     clasificación, puedes elegir varias), y una **fecha límite** opcional.
+     **equipo** del nodo (opcional), **detalle de ubicación**, **especialidades** (disciplinas; puedes elegir
+     varias), y una **fecha límite** opcional.
 3. Al crear, la solicitud aparece en la lista con un **código provisional "SOL-######"** (el folio oficial se emite
    al aprobarla, en una entrega posterior).
 4. Haz clic en una fila para abrir el **detalle**: ahí puedes **reasignar el responsable**, cambiar la **prioridad** o
    **anular** la solicitud con un motivo (queda auditado; no se borra).
-5. Filtra la lista por estado, tipo, criticidad, prioridad, área, especialidad o por "Mías / Sin responsable /
+5. Filtra la lista por estado, tipo, criticidad, prioridad, especialidad o por "Mías / Sin responsable /
    Requieren PTW", y busca por folio, título o descripción.
 
 **Quién puede.** Ver el módulo requiere **`module:workorders:view`**; crear **`workorder:create`**; editar
 **`workorder:edit`**; reasignar **`workorder:assign`**; anular **`workorder:cancel`**; administrar los catálogos
-(tipos/áreas/especialidades) **`workordercatalog:manage`**. Como en todo el sistema, el **alcance de datos por nodo**
+(tipos y especialidades) **`workordercatalog:manage`**. Como en todo el sistema, el **alcance de datos por nodo**
 (y por estructura activa) lo decide el servidor: solo ves y creas OT en los nodos a los que tienes alcance.
 
 **Importante.**
-- El **nodo** es el ancla de ubicación **y** de seguridad (alcance por nodo ∩ estructura activa). **Áreas** y
-  **especialidades** son solo clasificación/enrutamiento; no reemplazan al nodo.
+- El **nodo** es el ancla de ubicación **y** de seguridad (alcance por nodo ∩ estructura activa) — la "área/zona" de
+  planta es un **nivel de la estructura**, no un catálogo aparte. La **especialidad** (disciplina) es solo clasificación;
+  no reemplaza al nodo.
 - El **equipo** debe pertenecer al nodo elegido; si cambias de nodo, se limpia la selección de equipo.
 - La solicitud nace **abierta**. El **folio oficial**, el flujo de **aprobación** (con firma), los **checklists/PTW**,
   el **plan de actividades** y el **cierre** llegan en las Sesiones 2–5 del módulo.
 - Una **incidencia** podrá generar una OT (enlace bidireccional) en una entrega posterior.
 
-### Órdenes de trabajo ▸ Catálogos (tipos, áreas y especialidades)  [Admin]
+### Órdenes de trabajo ▸ Catálogos (tipos y especialidades)  [Admin]
 
 **Para qué sirve.** Definir las **opciones** que aparecen al crear una solicitud: los **tipos de OT** (correctiva,
-preventiva, predictiva, PTW de alto riesgo…), las **áreas** (zonas de planta: Chancado, Molienda, Flotación…) y las
-**especialidades/disciplinas** (mecánica, eléctrica, instrumentación…). Vienen con un **catálogo de arranque realista de
-la industria** (alineado a CMMS/EAM tipo SAP PM / Maximo) que puedes ajustar a tu operación.
+preventiva, predictiva, PTW de alto riesgo…) y las **especialidades/disciplinas** (mecánica, eléctrica,
+instrumentación, soldadura…). Vienen con un **catálogo de arranque realista de la industria** (alineado a CMMS/EAM tipo
+SAP PM / Maximo) que puedes ajustar a tu operación. *(La "área/zona" de planta NO es un catálogo: es un nivel de la
+estructura organizacional — el nodo — igual que en los EAM líderes.)*
 
 **Cómo se usa.**
 1. En **Órdenes de trabajo**, pulsa **«Catálogos»** (arriba a la derecha; solo visible para administradores).
-2. Elige la sub-pestaña **Tipos**, **Áreas** o **Especialidades**. En cada una: busca, filtra por activo/inactivo, ordena,
+2. Elige la sub-pestaña **Tipos** o **Especialidades**. En cada una: busca, filtra por activo/inactivo, ordena,
    y usa el interruptor para **activar/desactivar** una fila.
 3. **«Nuevo…»** abre un formulario con nombre, **clave** (identificador estable, minúsculas/números/guiones, **no se puede
    cambiar** después), descripción y color del chip. En **Tipos** además: flujo por defecto (se usará en la S2), criticidad
@@ -206,7 +208,7 @@ la industria** (alineado a CMMS/EAM tipo SAP PM / Maximo) que puedes ajustar a t
 **Quién puede.** Requiere **`workordercatalog:manage`**. Ver/usar los catálogos al crear una OT no requiere este permiso
 (basta `workorder:create`).
 
-**Importante.** No hay borrado físico: un tipo/área/especialidad se **desactiva**, no se elimina (preserva el historial de
+**Importante.** No hay borrado físico: un tipo/especialidad se **desactiva**, no se elimina (preserva el historial de
 las OT que lo usaron). La **clave** es inmutable; elígela con cuidado. Crear con una clave ya existente se rechaza (evita
 duplicados silenciosos).
 

@@ -2747,28 +2747,10 @@ model WorkOrderType {
   @@index([escalationRoleId])
 }
 
-// Catalogo ligero de AREAS funcionales (zona/area p.ej. "Mina Rajo", "Planta").
-// N:N con la OT. NO sustituye a orgNodeId (que sigue siendo ubicacion + ancla ABAC):
-// es un eje de CLASIFICACION/enrutamiento (reglas de checklist, aprobadores S8).
-model Area {
-  id          String   @id @default(cuid())
-  key         String   @unique
-  name        String
-  description String?
-  color       String?
-  active      Boolean  @default(true)
-  sortOrder   Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  deletedAt   DateTime?
-
-  workOrders WorkOrderArea[]
-
-  @@index([active])
-  @@index([deletedAt])
-}
-
-// Catalogo ligero de ESPECIALIDADES/disciplinas ("Mecanica", "Electrica"...). N:N.
+// Catalogo de ESPECIALIDADES/disciplinas ("Mecanica", "Electrica", "Instrumentacion"...).
+// Equivale al Work Center (SAP PM) / Craft (Maximo): el oficio que ejecuta el trabajo.
+// N:N con la OT. La UBICACION la da orgNodeId (estructura, incluye nivel "Area"), NO
+// un catalogo aparte (como en los EAM lideres). Ver DECISIONS 2026-07-01.
 model Specialty {
   id          String   @id @default(cuid())
   key         String   @unique
@@ -2851,7 +2833,6 @@ model WorkOrder {
   type        WorkOrderType        @relation(fields: [typeId], references: [id], onDelete: Restrict)
   orgNode     OrgNode              @relation(fields: [orgNodeId], references: [id], onDelete: Restrict)
   equipment   Equipment?           @relation(fields: [equipmentId], references: [id], onDelete: SetNull)
-  areas       WorkOrderArea[]
   specialties WorkOrderSpecialty[]
 
   @@index([typeId])
@@ -2867,19 +2848,7 @@ model WorkOrder {
   @@index([createdAt, id])
 }
 
-// Enlace N:N OT <-> Area (clasificacion).
-model WorkOrderArea {
-  workOrderId String
-  areaId      String
-
-  workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
-  area      Area      @relation(fields: [areaId], references: [id], onDelete: Restrict)
-
-  @@id([workOrderId, areaId])
-  @@index([areaId])
-}
-
-// Enlace N:N OT <-> Especialidad (clasificacion).
+// Enlace N:N OT <-> Especialidad (clasificacion / disciplina = Work Center/Craft).
 model WorkOrderSpecialty {
   workOrderId String
   specialtyId String

@@ -12,7 +12,6 @@ import {
   type CancelWorkOrderRequest,
   type CreateWorkOrderRequest,
   type UpdateWorkOrderRequest,
-  type UpsertAreaRequest,
   type UpsertSpecialtyRequest,
   type UpsertWorkOrderTypeRequest,
   type WorkOrderListQuery,
@@ -44,23 +43,6 @@ export class WorkOrdersController {
     @Query("create") create?: string,
   ) {
     return this.workOrders.upsertType(dto, this.ctx(user, req), create === "true");
-  }
-
-  @Get("areas")
-  @RequirePermission("workorder:view")
-  listAreas(@Query("includeInactive") includeInactive?: string) {
-    return this.workOrders.listAreas(includeInactive === "true");
-  }
-
-  @Post("areas")
-  @RequirePermission("workordercatalog:manage")
-  upsertArea(
-    @Body(new ZodValidationPipe(upsertWorkOrderTagRequestSchema)) dto: UpsertAreaRequest,
-    @CurrentUser() user: RequestUser,
-    @Req() req: FastifyRequest,
-    @Query("create") create?: string,
-  ) {
-    return this.workOrders.upsertArea(dto, this.ctx(user, req), create === "true");
   }
 
   @Get("specialties")

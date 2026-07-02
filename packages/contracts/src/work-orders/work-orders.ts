@@ -65,7 +65,7 @@ export const workOrderTypeSchema = z.object({
 });
 export type WorkOrderTypeDto = z.infer<typeof workOrderTypeSchema>;
 
-/** Catálogo ligero (Área o Especialidad — mismo shape). */
+/** Catálogo de Especialidad/disciplina (Work Center/Craft en los EAM líderes). */
 export const workOrderTagSchema = z.object({
   id: z.string(),
   key: z.string(),
@@ -75,10 +75,9 @@ export const workOrderTagSchema = z.object({
   active: z.boolean(),
   sortOrder: z.number().int(),
 });
-export type AreaDto = z.infer<typeof workOrderTagSchema>;
 export type SpecialtyDto = z.infer<typeof workOrderTagSchema>;
 
-/** Referencia liviana a un catálogo N:N asociado (para chips en lista/detalle). */
+/** Referencia liviana a una especialidad asociada (para chips en lista/detalle). */
 export const workOrderTagRefSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -113,7 +112,6 @@ export const workOrderListItemSchema = z.object({
   ownerName: z.string().nullable(),
   requesterId: z.string().nullable(),
   requesterName: z.string().nullable(),
-  areas: z.array(workOrderTagRefSchema),
   specialties: z.array(workOrderTagRefSchema),
   dueAt: z.string().nullable(),
   createdAt: z.string(),
@@ -154,7 +152,6 @@ export const createWorkOrderRequestSchema = z.object({
   orgNodeId: z.string().min(1),
   equipmentId: z.string().min(1).nullable().optional(),
   locationDetail: z.string().trim().max(200).nullable().optional(),
-  areaIds: z.array(z.string().min(1)).max(50).optional(),
   specialtyIds: z.array(z.string().min(1)).max(50).optional(),
   ownerId: z.string().min(1).nullable().optional(),
   detectedAt: z.string().datetime().nullable().optional(),
@@ -180,7 +177,6 @@ export const updateWorkOrderRequestSchema = z.object({
   riskConsequence: z.number().int().min(1).max(7).nullable().optional(),
   equipmentId: z.string().min(1).nullable().optional(),
   locationDetail: z.string().trim().max(200).nullable().optional(),
-  areaIds: z.array(z.string().min(1)).max(50).optional(),
   specialtyIds: z.array(z.string().min(1)).max(50).optional(),
   detectedAt: z.string().datetime().nullable().optional(),
   plannedStart: z.string().datetime().nullable().optional(),
@@ -218,7 +214,6 @@ export const workOrderListQuerySchema = z.object({
   orgNodeIds: csv().optional(),
   equipmentId: z.string().optional(),
   ownerId: z.string().optional(),
-  areaId: z.string().optional(),
   specialtyId: z.string().optional(),
   requiresPtw: z.coerce.boolean().optional(),
   /** Solo las MÍAS (solicitante o responsable). */
@@ -270,7 +265,7 @@ export const upsertWorkOrderTypeRequestSchema = z.object({
 });
 export type UpsertWorkOrderTypeRequest = z.infer<typeof upsertWorkOrderTypeRequestSchema>;
 
-/** Upsert de un catálogo ligero (Área o Especialidad — mismo shape). */
+/** Upsert de una Especialidad/disciplina. */
 export const upsertWorkOrderTagRequestSchema = z.object({
   key: workOrderCatalogKeySchema,
   name: z.string().trim().min(1).max(120),
@@ -279,7 +274,6 @@ export const upsertWorkOrderTagRequestSchema = z.object({
   active: z.boolean().optional(),
   sortOrder: z.number().int().min(0).max(9999).optional(),
 });
-export type UpsertAreaRequest = z.infer<typeof upsertWorkOrderTagRequestSchema>;
 export type UpsertSpecialtyRequest = z.infer<typeof upsertWorkOrderTagRequestSchema>;
 
 // === Helpers PUROS (autoritativos back↔front) ================================

@@ -2,13 +2,11 @@ import { BadRequestException, ConflictException, ForbiddenException, Injectable,
 import type { Prisma } from "@prisma/client";
 import {
   workOrderCode,
-  type AreaDto,
   type AssignWorkOrderRequest,
   type CancelWorkOrderRequest,
   type CreateWorkOrderRequest,
   type SpecialtyDto,
   type UpdateWorkOrderRequest,
-  type UpsertAreaRequest,
   type UpsertSpecialtyRequest,
   type UpsertWorkOrderTypeRequest,
   type WorkOrderDetail,
@@ -111,8 +109,7 @@ export class WorkOrdersService {
 
     if (dto.equipmentId) await this.assertEquipmentInNode(dto.equipmentId, dto.orgNodeId);
     if (dto.ownerId) await this.assertUserExists(dto.ownerId);
-    const areaIds = await this.assertTagsActive("area", dto.areaIds);
-    const specialtyIds = await this.assertTagsActive("specialty", dto.specialtyIds);
+    const specialtyIds = await this.assertSpecialtiesActive(dto.specialtyIds);
 
     // Origen: la incidencia manda sobre la excepción; si no, DIRECT (bitácora se liga
     // por ref. blanda pero no cambia el origen — no hay LOG_ENTRY en el enum de OT).
@@ -146,7 +143,6 @@ export class WorkOrdersService {
         originExceptionId: dto.originExceptionId ?? null,
         createdById: userId,
         updatedById: userId,
-        areas: { create: areaIds.map((areaId) => ({ areaId })) },
         specialties: { create: specialtyIds.map((specialtyId) => ({ specialtyId })) },
       },
     });
@@ -167,8 +163,7 @@ export class WorkOrdersService {
       if (!type || !type.active) throw new BadRequestException("El tipo de OT no existe o está inactivo");
     }
     if (dto.equipmentId) await this.assertEquipmentInNode(dto.equipmentId, before.orgNodeId);
-    const areaIds = dto.areaIds !== undefined ? await this.assertTagsActive("area", dto.areaIds) : undefined;
-    const specialtyIds = dto.specialtyIds !== undefined ? await this.assertTagsActive("specialty", dto.specialtyIds) : undefined;
+    const specialtyIds = dto.specialtyIds !== undefined ? await this.assertSpecialtiesActive(dto.specialtyIds) : undefined;
 
     await this.prisma.$transaction(async (tx) => {
       await tx.workOrder.update({
@@ -191,11 +186,7 @@ export class WorkOrdersService {
           updatedById: userId,
         },
       });
-      // N:N: reemplazo total cuando se envía la lista (patrón set).
-      if (areaIds !== undefined) {
-        await tx.workOrderArea.deleteMany({ where: { workOrderId: id } });
-        if (areaIds.length) await tx.workOrderArea.createMany({ data: areaIds.map((areaId) => ({ workOrderId: id, areaId })) });
-      }
+      // N:N de especialidades: reemplazo total cuando se envía la lista (patrón set).
       if (specialtyIds !== undefined) {
         await tx.workOrderSpecialty.deleteMany({ where: { workOrderId: id } });
         if (specialtyIds.length) await tx.workOrderSpecialty.createMany({ data: specialtyIds.map((specialtyId) => ({ workOrderId: id, specialtyId })) });
@@ -282,31 +273,12 @@ export class WorkOrdersService {
     return (await this.listTypes(true)).find((t) => t.id === row.id)!;
   }
 
-  async listAreas(includeInactive = false): Promise<AreaDto[]> {
-    const rows = await this.prisma.area.findMany({
-      where: { deletedAt: null, ...(includeInactive ? {} : { active: true }) },
-      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-    });
-    return rows.map((r) => ({ id: r.id, key: r.key, name: r.name, description: r.description, color: r.color, active: r.active, sortOrder: r.sortOrder }));
-  }
-
   async listSpecialties(includeInactive = false): Promise<SpecialtyDto[]> {
     const rows = await this.prisma.specialty.findMany({
       where: { deletedAt: null, ...(includeInactive ? {} : { active: true }) },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     });
     return rows.map((r) => ({ id: r.id, key: r.key, name: r.name, description: r.description, color: r.color, active: r.active, sortOrder: r.sortOrder }));
-  }
-
-  async upsertArea(dto: UpsertAreaRequest, ctx: AuditContext, failIfExists = false): Promise<AreaDto> {
-    if (failIfExists) {
-      const existing = await this.prisma.area.findUnique({ where: { key: dto.key } });
-      if (existing) throw new ConflictException(`Ya existe un área con la clave "${dto.key}".`);
-    }
-    const data = { name: dto.name, description: dto.description ?? null, color: dto.color ?? null, active: dto.active ?? true, sortOrder: dto.sortOrder ?? 0 };
-    const row = await this.prisma.area.upsert({ where: { key: dto.key }, create: { key: dto.key, ...data }, update: data });
-    await this.audit.record({ ...ctx, action: "workorderarea.upserted", entityType: "Area", entityId: row.id, after: { key: row.key, name: row.name } });
-    return { id: row.id, key: row.key, name: row.name, description: row.description, color: row.color, active: row.active, sortOrder: row.sortOrder };
   }
 
   async upsertSpecialty(dto: UpsertSpecialtyRequest, ctx: AuditContext, failIfExists = false): Promise<SpecialtyDto> {
@@ -347,7 +319,6 @@ export class WorkOrdersService {
     type: { select: { name: true, color: true } },
     orgNode: { select: { name: true } },
     equipment: { select: { tag: true } },
-    areas: { include: { area: { select: { id: true, name: true, color: true } } } },
     specialties: { include: { specialty: { select: { id: true, name: true, color: true } } } },
   } satisfies Prisma.WorkOrderInclude;
 
@@ -389,7 +360,6 @@ export class WorkOrdersService {
       ...(q.originType ? { originType: q.originType } : {}),
       ...(q.equipmentId ? { equipmentId: q.equipmentId } : {}),
       ...(q.ownerId ? { ownerId: q.ownerId } : {}),
-      ...(q.areaId ? { areas: { some: { areaId: q.areaId } } } : {}),
       ...(q.specialtyId ? { specialties: { some: { specialtyId: q.specialtyId } } } : {}),
       ...(q.requiresPtw ? { requiresPtw: true } : {}),
       ...(q.unassignedOnly ? { ownerId: null } : {}),
@@ -440,7 +410,6 @@ export class WorkOrdersService {
       ownerName: r.ownerId ? userNames.get(r.ownerId) ?? null : null,
       requesterId: r.requesterId,
       requesterName: r.requesterId ? userNames.get(r.requesterId) ?? null : null,
-      areas: r.areas.map((a) => ({ id: a.area.id, name: a.area.name, color: a.area.color })),
       specialties: r.specialties.map((s) => ({ id: s.specialty.id, name: s.specialty.name, color: s.specialty.color })),
       dueAt: r.dueAt?.toISOString() ?? null,
       createdAt: r.createdAt.toISOString(),
@@ -478,16 +447,13 @@ export class WorkOrdersService {
     if (!u) throw new BadRequestException("El usuario indicado no existe");
   }
 
-  /** Valida que los ids de Área/Especialidad existan y estén activos; devuelve la lista deduplicada. */
-  private async assertTagsActive(kind: "area" | "specialty", ids: string[] | undefined): Promise<string[]> {
+  /** Valida que los ids de Especialidad existan y estén activos; devuelve la lista deduplicada. */
+  private async assertSpecialtiesActive(ids: string[] | undefined): Promise<string[]> {
     if (!ids || ids.length === 0) return [];
     const unique = [...new Set(ids)];
-    const found =
-      kind === "area"
-        ? await this.prisma.area.findMany({ where: { id: { in: unique }, deletedAt: null, active: true }, select: { id: true } })
-        : await this.prisma.specialty.findMany({ where: { id: { in: unique }, deletedAt: null, active: true }, select: { id: true } });
+    const found = await this.prisma.specialty.findMany({ where: { id: { in: unique }, deletedAt: null, active: true }, select: { id: true } });
     if (found.length !== unique.length) {
-      throw new BadRequestException(kind === "area" ? "Alguna área no existe o está inactiva" : "Alguna especialidad no existe o está inactiva");
+      throw new BadRequestException("Alguna especialidad no existe o está inactiva");
     }
     return unique;
   }
@@ -503,7 +469,6 @@ type WorkOrderRow = Prisma.WorkOrderGetPayload<{
     type: { select: { name: true; color: true } };
     orgNode: { select: { name: true } };
     equipment: { select: { tag: true } };
-    areas: { include: { area: { select: { id: true; name: true; color: true } } } };
     specialties: { include: { specialty: { select: { id: true; name: true; color: true } } } };
   };
 }>;
