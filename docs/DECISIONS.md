@@ -4,6 +4,19 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-02 · OT — UX: llenar el checklist en un MODAL embebido (no salir de la OT)
+El dueño pidió que llenar un checklist **no lo saque** de la pantalla de la OT (hoy «Llenar» navegaba a
+`/nueva-entrada/:id`, otra pantalla). *Decisión:* **reutilizar `EntryFillPage` en MODO EMBEBIDO** con props OPCIONALES
+(`embedded`/`entryId`/`onClose`). **La ruta normal de Bitácoras NO cambia**: sin props ⇒ página completa + "Volver" (el
+default está intacto; era el requisito "sin afectar a las entradas normales"). Desde la pestaña «Permiso» de la OT,
+«Llenar»/«Ver» abren el registro (`LogEntry`) en un **modal grande** sobre la OT, y el "Volver" pasa a **"Cerrar"** (las
+navegaciones internas de volver/anular también cierran el modal). Al cerrar se **invalida** el estado del checklist (p. ej.
+tras sellar, habilita "Enviar a revisión"). Viable porque **sellar NO navega** (solo toast) ⇒ el ciclo llenar→sellar vive
+dentro del modal; los sub-diálogos de firma se **apilan** (z-index compartido del portal; doble backdrop, aceptado).
+`embedded` usa `entryId` en vez del parámetro de ruta (la ruta activa es la de la OT). typecheck/lint(0 err)/build verdes.
+
+---
+
 ### 2026-07-02 · OT — UX: el detalle pasa de DRAWER lateral a PÁGINA dedicada (Object Page)
 El dueño observó que el **drawer lateral** (680px) comprime la OT justo cuando más espacio necesita (objeto denso: 4 puertas
 + folio + checklists + plan + baseline + firmas + timeline). *Decisión (con su visto bueno, 2 opciones):* reemplazar el

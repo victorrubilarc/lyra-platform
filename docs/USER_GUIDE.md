@@ -247,8 +247,9 @@ lista de texto suelta. La OT **no puede pasar la Puerta 2** mientras quede un pe
    no se pueden quitar. También puedes **«Agregar»** manualmente otro checklist, o pulsar **«Sugerir aplicables»** para
    re-derivar la lista.
 2. **El ejecutor** pulsa **«Iniciar»** en un checklist: se crea el **registro** (queda como responsable) y con **«Llenar»**
-   abre el formulario, lo completa y lo **sella** (firma según lo exija la plantilla). Luego pulsa **«Enviar a revisión»**
-   (habilitado solo cuando el registro está sellado).
+   abre el formulario **en una ventana (modal) sobre la misma OT** —sin salir de la pantalla—, lo completa y lo **sella**
+   (firma según lo exija la plantilla); cierra con **«Cerrar»**. Luego pulsa **«Enviar a revisión»** (habilitado solo cuando
+   el registro está sellado). *(«Ver» abre el registro sellado en la misma ventana.)*
 3. **El revisor** —**una persona distinta del que lo completó** (segregación de funciones)— abre **«Revisar»** y
    **Aprueba** o **Rechaza** (con motivo). Un checklist rechazado puede **«Rehacer»** (abre un registro nuevo).
 4. Cuando **todos los obligatorios están Aprobados**, el responsable ejecuta la transición **«Autorizar permiso»**

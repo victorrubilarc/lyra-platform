@@ -16,6 +16,7 @@ import {
   TimerOff,
   TriangleAlert,
   Wrench,
+  X,
 } from "lucide-react";
 import { DeferralModal } from "./DeferralModal.js";
 import { VoidEntryModal } from "./VoidEntryModal.js";
@@ -86,7 +87,19 @@ function apiErrorText(e: unknown, fallback: string): string {
   return fallback;
 }
 
-export function EntryFillPage() {
+export interface EntryFillPageProps {
+  /**
+   * Modo EMBEBIDO (dentro de un modal, p. ej. el checklist de una OT): usa `entryId`
+   * en vez del parámetro de ruta, el "Volver" pasa a ser "Cerrar" (llama `onClose`) y
+   * las navegaciones internas (volver/anular) se resuelven cerrando el modal. Por
+   * defecto (sin props) el comportamiento es el de SIEMPRE: página completa + "Volver".
+   */
+  embedded?: boolean;
+  entryId?: string;
+  onClose?: () => void;
+}
+
+export function EntryFillPage({ embedded = false, entryId, onClose }: EntryFillPageProps = {}) {
   const { t } = useTranslation();
   const params = useParams();
   const location = useLocation();
@@ -96,8 +109,9 @@ export function EntryFillPage() {
 
   // Dos rutas comparten esta pantalla: COMPOSE (`/nueva-entrada/comenzar/:templateId`,
   // entrada NUEVA aún sin crear, 2.8.2) y EDICIÓN (`/nueva-entrada/:id`, entrada real).
-  const composeTemplateId = params.templateId ?? null;
-  const routeId = params.id ?? "";
+  const composeTemplateId = embedded ? null : params.templateId ?? null;
+  // En modo embebido el id llega por prop (la ruta es la de la OT, no la de la entrada).
+  const routeId = entryId ?? params.id ?? "";
   const compose = !!composeTemplateId;
 
   const navState = (location.state ?? {}) as {
@@ -240,7 +254,8 @@ export function EntryFillPage() {
         onSuccess: () => {
           setVoidOpen(false);
           toast.success(t("logbook.void.done"));
-          navigate(backTo ?? "/bitacoras");
+          if (embedded) onClose?.();
+          else navigate(backTo ?? "/bitacoras");
         },
         onError: (e) => toast.error(apiErrorText(e, t("logbook.void.error"))),
       },
@@ -506,10 +521,12 @@ export function EntryFillPage() {
           variant="secondary"
           className={styles.backBtn}
           onClick={() =>
-            navigate(backTo ?? (composeActive ? "/nueva-entrada" : editingExisting ? `/bitacoras/${routeId}` : "/bitacoras"))
+            embedded
+              ? onClose?.()
+              : navigate(backTo ?? (composeActive ? "/nueva-entrada" : editingExisting ? `/bitacoras/${routeId}` : "/bitacoras"))
           }
         >
-          <ArrowLeft size={15} /> {backLabel ?? t("logbook.fill.back")}
+          {embedded ? <><X size={15} /> Cerrar</> : <><ArrowLeft size={15} /> {backLabel ?? t("logbook.fill.back")}</>}
         </Button>
         {canVoid && (
           <Button variant="danger" onClick={() => setVoidOpen(true)}>
