@@ -704,6 +704,19 @@ nunca queda más de una sesión atrás.
       especialidad/monto/riesgo, reusa el motor de reglas); dependencias/ruta crítica; costos/HH + reportes/export;
       escalamiento multinivel. Puede subdividirse al llegar.
 
+### 🟡 DEUDA TRANSVERSAL — Vistas guardadas (`SavedView`) para Incidencias **y** Órdenes de Trabajo (~15–20 HH)
+> **Decisión del dueño (2026-07-01): DEJAR PENDIENTE para AMBOS módulos** (no hacerlo solo para OT). Hoy `SavedView`
+> (vistas guardadas: filtros + búsqueda + orden + columnas + densidad, ownership-gated, con vistas de sistema en código)
+> **solo está cableado en Bitácoras** (`SAVED_VIEW_MODULES = ["LOGBOOK"]`). Ni Incidencias ni OT lo tienen; construirlo
+> solo para OT rompería la paridad con su módulo hermano. Cuando se aborde, hacerlo **de una vez para los dos**:
+> - Agregar `"INCIDENTS"` y `"WORK_ORDERS"` al enum `SavedViewModule` (`packages/contracts/src/saved-views/saved-views.ts`).
+> - Reusar `SavedViewsService` tal cual (genérico por `module`, cero cambios de backend) — patrón ya probado en Bitácoras.
+> - En cada grilla (`IncidentsPage`, `WorkOrdersPage`): `ViewBar` (selector + guardar/actualizar/eliminar + default),
+>   serializar la query actual → `config.filters` y rehidratarla al aplicar; opcional gestor de columnas/densidad.
+> - Definir 2–3 **vistas de sistema** por módulo (ej. OT: "Mías", "Sin responsable", "Requieren PTW"; Incidencias:
+>   "Críticas abiertas", "Plazo vencido").
+> Hoy las grillas ya filtran/ordenan/paginan/facetan; lo que falta es **persistir la combinación con nombre**. NO bloquea el MVP.
+
 ### 🔴 MÓDULO CANDIDATO #1 (decidido 2026-06-22) — Corrección / Anulación GxP de registros SELLADOS
 > **Recomendado como el PRÓXIMO módulo tras la ronda de prueba manual (antes de Fase 3/6).** Es el pendiente
 > de auditoría más serio: hoy un registro **SELLADO** (firmado, inmutable) no tiene una vía gobernada de
