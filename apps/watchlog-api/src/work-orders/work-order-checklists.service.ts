@@ -2,8 +2,11 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import type { Prisma } from "@prisma/client";
 import {
   applicableChecklistRules,
+  applicableExecutionRulesForActivity,
   blockingChecklistsForMoment,
+  blockingExecutionChecklistsForActivity,
   formatEntryFolio,
+  DEFAULT_WORK_ORDER_CHECKLIST_SUGGEST_STATE_KEY,
   DEFAULT_WORK_ORDER_CLOSURE_CHECKLIST_SUGGEST_STATE_KEY,
   DEFAULT_WORK_ORDER_EXECUTE_STATE_KEY,
   type AddWorkOrderChecklistRequest,
@@ -101,22 +104,56 @@ export class WorkOrderChecklistsService {
 
   /**
    * Endpoint de re-derivación manual: sugiere (materializa) los checklists aplicables
-   * al MOMENTO del estado ACTUAL de la OT que aún no existan. ABAC + idempotente. Así,
-   * en preparación re-deriva los de autorización y en revisión de cierre los de cierre.
+   * al ESTADO ACTUAL de la OT que aún no existan. ABAC + idempotente. Reusa la MISMA
+   * orquestación que el ejecutor de flujo (`materializeForState`): en preparación deriva
+   * los de autorización + el SET de ejecución por actividad; en revisión de cierre, los de cierre.
    */
   async suggest(userId: string, workOrderId: string, ctx: AuditContext): Promise<WorkOrderChecklistDto[]> {
     const wo = await this.loadWorkOrder(workOrderId);
     await this.assertNodeAccess(userId, wo.orgNodeId);
-    const moment = await this.momentForCurrentState(workOrderId);
-    await this.materializeForWorkOrder(workOrderId, moment, ctx.actorId ?? userId);
+    const state = await this.prisma.workOrder.findFirst({ where: { id: workOrderId }, select: { currentStateKey: true } });
+    if (state?.currentStateKey) await this.materializeForState(workOrderId, state.currentStateKey, ctx.actorId ?? userId);
     return this.loadChecklistDtos(workOrderId);
   }
 
   /**
-   * Deriva el MOMENTO de checklist que corresponde al estado ACTUAL de la OT según las
-   * claves data-driven del tipo (paridad con folioOnStateKey). Default AUTHORIZATION.
+   * Orquesta la materialización de checklists que corresponde a un ESTADO del flujo
+   * (data-driven por las claves del tipo, paridad con folioOnStateKey). Lo invocan tanto
+   * el ejecutor de flujo (al ENTRAR a un estado) como `suggest()` (re-derivación manual):
+   *  - estado de preparación (`checklistSuggestStateKey`) ⇒ AUTORIZACIÓN + SET de EJECUCIÓN
+   *    por actividad (Slice B; solo si el plan está congelado, así hay actividades fijas);
+   *  - estado de ejecución (`executeStateKey`) ⇒ re-deriva el SET de ejecución (idempotente);
+   *  - estado de revisión de cierre (`closureChecklistSuggestStateKey`) ⇒ CIERRE.
    */
-  private async momentForCurrentState(workOrderId: string): Promise<WorkOrderChecklistMoment> {
+  async materializeForState(workOrderId: string, stateKey: string, actorId: string | null): Promise<void> {
+    const wo = await this.prisma.workOrder.findFirst({ where: { id: workOrderId }, select: { typeId: true, planFrozenAt: true } });
+    if (!wo) return;
+    const type = await this.prisma.workOrderType.findUnique({
+      where: { id: wo.typeId },
+      select: { checklistSuggestStateKey: true, executeStateKey: true, closureChecklistSuggestStateKey: true },
+    });
+    const suggestKey = type?.checklistSuggestStateKey ?? DEFAULT_WORK_ORDER_CHECKLIST_SUGGEST_STATE_KEY;
+    const executeKey = type?.executeStateKey ?? DEFAULT_WORK_ORDER_EXECUTE_STATE_KEY;
+    const closureKey = type?.closureChecklistSuggestStateKey ?? DEFAULT_WORK_ORDER_CLOSURE_CHECKLIST_SUGGEST_STATE_KEY;
+    if (stateKey === closureKey) {
+      await this.materializeForWorkOrder(workOrderId, "CLOSURE", actorId);
+      return;
+    }
+    if (stateKey === suggestKey) {
+      await this.materializeForWorkOrder(workOrderId, "AUTHORIZATION", actorId);
+      if (wo.planFrozenAt) await this.materializeExecutionSet(workOrderId, actorId);
+      return;
+    }
+    if (stateKey === executeKey && wo.planFrozenAt) {
+      await this.materializeExecutionSet(workOrderId, actorId);
+    }
+  }
+
+  /**
+   * Deriva el MOMENTO de checklist a nivel-OT que corresponde al estado ACTUAL (para el
+   * momento por defecto de un checklist manual). Data-driven por las claves del tipo.
+   */
+  private async momentForState(workOrderId: string): Promise<WorkOrderChecklistMoment> {
     const wo = await this.prisma.workOrder.findFirst({ where: { id: workOrderId }, select: { currentStateKey: true, typeId: true } });
     const type = wo ? await this.prisma.workOrderType.findUnique({ where: { id: wo.typeId }, select: { checklistSuggestStateKey: true, executeStateKey: true, closureChecklistSuggestStateKey: true } }) : null;
     const state = wo?.currentStateKey;
@@ -142,7 +179,9 @@ export class WorkOrderChecklistsService {
       rules,
     );
     if (applicable.length === 0) return 0;
-    const existing = await this.prisma.workOrderChecklist.findMany({ where: { workOrderId }, select: { templateId: true } });
+    // Dedup sólo contra checklists de NIVEL-OT (workActivityId null): los de ejecución
+    // (que cuelgan de una actividad) pueden usar la misma plantilla sin colisionar.
+    const existing = await this.prisma.workOrderChecklist.findMany({ where: { workOrderId, workActivityId: null }, select: { templateId: true } });
     const have = new Set(existing.map((c) => c.templateId));
     let created = 0;
     for (const rule of applicable) {
@@ -157,6 +196,47 @@ export class WorkOrderChecklistsService {
     return created;
   }
 
+  /**
+   * Materializa el SET de checklists de EJECUCIÓN por ACTIVIDAD (Slice B, §11.4.2): para
+   * cada actividad NO cancelada del plan congelado, crea una fila por cada regla EXECUTION
+   * que matchee (aplicabilidad de OT ∩ especialidad de la actividad; regla sin especialidad
+   * = todas). Idempotente por (plantilla, actividad). Los controles de terreno (LOTO físico,
+   * toma-5) se aplican por tarea. Devuelve cuántos se crearon.
+   */
+  async materializeExecutionSet(workOrderId: string, actorId: string | null): Promise<number> {
+    const wo = await this.prisma.workOrder.findFirst({
+      where: { id: workOrderId, deletedAt: null },
+      select: { id: true, typeId: true, criticality: true, requiresPtw: true },
+    });
+    if (!wo) return 0;
+    const [rules, activities, existing] = await Promise.all([
+      this.prisma.workOrderChecklistRule.findMany({ where: { deletedAt: null, active: true, moment: "EXECUTION" } }),
+      this.prisma.workActivity.findMany({ where: { workOrderId, status: { not: "CANCELED" } }, select: { id: true, specialtyId: true } }),
+      this.prisma.workOrderChecklist.findMany({ where: { workOrderId, moment: "EXECUTION" }, select: { templateId: true, workActivityId: true } }),
+    ]);
+    if (rules.length === 0 || activities.length === 0) return 0;
+    // Clave de dedup por (plantilla, actividad): un checklist de terreno por regla y tarea.
+    const have = new Set(existing.map((c) => `${c.templateId}::${c.workActivityId ?? ""}`));
+    let created = 0;
+    for (const activity of activities) {
+      const applicable = applicableExecutionRulesForActivity({ typeId: wo.typeId, criticality: wo.criticality, requiresPtw: wo.requiresPtw }, activity, rules);
+      for (const rule of applicable) {
+        const key = `${rule.templateId}::${activity.id}`;
+        if (have.has(key)) continue;
+        have.add(key);
+        const row = await this.prisma.workOrderChecklist.create({
+          data: { workOrderId, templateId: rule.templateId, moment: "EXECUTION", workActivityId: activity.id, sourceRuleId: rule.id, mandatory: rule.mandatory, status: "PENDING", addedById: actorId },
+        });
+        await this.addEvent(workOrderId, "CHECKLIST_ADDED", `Verificación de ejecución sugerida: ${rule.name}${rule.mandatory ? " (obligatoria)" : ""}`, actorId, { checklistId: row.id, sourceRuleId: rule.id, mandatory: rule.mandatory, moment: "EXECUTION", workActivityId: activity.id });
+        created++;
+      }
+    }
+    // Si el set cambió (se agregaron filas obligatorias), invalida una confirmación previa
+    // para forzar que el aprobador re-confirme "lo aplicado = lo autorizado".
+    if (created > 0) await this.clearExecutionConfirmation(workOrderId, actorId);
+    return created;
+  }
+
   /** Agrega manualmente un checklist (plantilla) a la OT (no obligatorio, sin regla). */
   async addManual(userId: string, workOrderId: string, dto: AddWorkOrderChecklistRequest, ctx: AuditContext): Promise<WorkOrderChecklistDto> {
     const wo = await this.loadWorkOrder(workOrderId);
@@ -165,15 +245,21 @@ export class WorkOrderChecklistsService {
     const template = await this.prisma.template.findFirst({ where: { id: dto.templateId, deletedAt: null }, select: { id: true, name: true, status: true } });
     if (!template) throw new BadRequestException("La plantilla indicada no existe");
     if (template.status !== "PUBLISHED") throw new BadRequestException("La plantilla del checklist debe estar publicada");
-    const dup = await this.prisma.workOrderChecklist.findFirst({ where: { workOrderId, templateId: dto.templateId }, select: { id: true } });
-    if (dup) throw new BadRequestException("Esta OT ya tiene ese checklist");
-    // El manual hereda el momento indicado, o el del estado actual de la OT (los manuales
-    // son SIEMPRE opcionales; la obligatoriedad vive en la regla).
-    const moment = dto.moment ?? (await this.momentForCurrentState(workOrderId));
+    // Actividad destino (checklists de EJECUCIÓN, Slice B): debe pertenecer a la OT.
+    if (dto.workActivityId) {
+      const act = await this.prisma.workActivity.findFirst({ where: { id: dto.workActivityId, workOrderId }, select: { id: true } });
+      if (!act) throw new BadRequestException("La actividad indicada no pertenece a esta orden de trabajo");
+    }
+    // El manual hereda el momento indicado; si se ancla a una actividad, es EJECUCIÓN. Si no,
+    // el del estado actual (los manuales son SIEMPRE opcionales; la obligatoriedad vive en la regla).
+    const moment = dto.workActivityId ? "EXECUTION" : dto.moment ?? (await this.momentForState(workOrderId));
+    const dup = await this.prisma.workOrderChecklist.findFirst({ where: { workOrderId, templateId: dto.templateId, workActivityId: dto.workActivityId ?? null }, select: { id: true } });
+    if (dup) throw new BadRequestException("Esta OT ya tiene ese checklist en esa actividad");
     const row = await this.prisma.workOrderChecklist.create({
-      data: { workOrderId, templateId: dto.templateId, moment, sourceRuleId: null, mandatory: false, status: "PENDING", addedById: userId },
+      data: { workOrderId, templateId: dto.templateId, moment, workActivityId: dto.workActivityId ?? null, sourceRuleId: null, mandatory: false, status: "PENDING", addedById: userId },
     });
-    await this.addEvent(workOrderId, "CHECKLIST_ADDED", `Checklist agregado: ${template.name}`, userId, { checklistId: row.id, manual: true });
+    await this.addEvent(workOrderId, "CHECKLIST_ADDED", `Checklist agregado: ${template.name}`, userId, { checklistId: row.id, manual: true, ...(dto.workActivityId ? { workActivityId: dto.workActivityId } : {}) });
+    if (moment === "EXECUTION") await this.clearExecutionConfirmation(workOrderId, userId);
     await this.audit.record({ ...ctx, action: "workorderchecklist.added", entityType: "WorkOrder", entityId: workOrderId, after: { checklistId: row.id, templateId: dto.templateId } });
     return (await this.loadChecklistDtos(workOrderId)).find((c) => c.id === row.id)!;
   }
@@ -186,6 +272,8 @@ export class WorkOrderChecklistsService {
     if (cl.mandatory) throw new BadRequestException("Un checklist obligatorio no puede quitarse");
     await this.prisma.workOrderChecklist.delete({ where: { id: checklistId } });
     await this.addEvent(workOrderId, "CHECKLIST_REMOVED", `Checklist quitado`, userId, { checklistId });
+    // Curar el set de ejecución invalida una confirmación previa (Gobierno 2).
+    if (cl.moment === "EXECUTION") await this.clearExecutionConfirmation(workOrderId, userId);
     await this.audit.record({ ...ctx, action: "workorderchecklist.removed", entityType: "WorkOrder", entityId: workOrderId, after: { checklistId } });
   }
 
@@ -279,6 +367,68 @@ export class WorkOrderChecklistsService {
     }
   }
 
+  // === Gobierno 2 — set de EJECUCIÓN (Slice B) ================================
+
+  /**
+   * El aprobador CONFIRMA (Gobierno 2) el set de verificaciones de EJECUCIÓN que se
+   * exigirá en terreno (derivado de las reglas EXECUTION, curable). Sella
+   * `executionSetConfirmedAt/ById` ⇒ trazabilidad "lo aplicado = lo autorizado". Exige el
+   * plan congelado y ≥1 checklist de ejecución (materializado). ABAC por nodo heredado.
+   */
+  async confirmExecutionSet(userId: string, workOrderId: string, ctx: AuditContext): Promise<WorkOrderChecklistDto[]> {
+    const wo = await this.loadWorkOrder(workOrderId);
+    await this.assertNodeAccess(userId, wo.orgNodeId);
+    this.assertActive(wo);
+    const full = await this.prisma.workOrder.findUnique({ where: { id: workOrderId }, select: { planFrozenAt: true } });
+    if (!full?.planFrozenAt) throw new BadRequestException("El plan aún no está autorizado: no hay set de ejecución que confirmar");
+    const count = await this.prisma.workOrderChecklist.count({ where: { workOrderId, moment: "EXECUTION" } });
+    if (count === 0) throw new BadRequestException("No hay verificaciones de ejecución para confirmar");
+    const now = new Date();
+    await this.prisma.workOrder.update({ where: { id: workOrderId }, data: { executionSetConfirmedAt: now, executionSetConfirmedById: userId } });
+    await this.addEvent(workOrderId, "EXECUTION_SET_CONFIRMED", `Set de verificaciones de ejecución confirmado (${count})`, userId, { count });
+    await this.audit.record({ ...ctx, action: "workorder.execution_set.confirmed", entityType: "WorkOrder", entityId: workOrderId, after: { count } });
+    return this.loadChecklistDtos(workOrderId);
+  }
+
+  /** Invalida una confirmación previa del set de ejecución cuando el set cambia (curación). */
+  private async clearExecutionConfirmation(workOrderId: string, actorId: string | null): Promise<void> {
+    const wo = await this.prisma.workOrder.findUnique({ where: { id: workOrderId }, select: { executionSetConfirmedAt: true } });
+    if (!wo?.executionSetConfirmedAt) return;
+    await this.prisma.workOrder.update({ where: { id: workOrderId }, data: { executionSetConfirmedAt: null, executionSetConfirmedById: null } });
+    await this.addEvent(workOrderId, "EXECUTION_SET_CHANGED", "El set de verificaciones de ejecución cambió: requiere volver a confirmarse", actorId);
+  }
+
+  /**
+   * GATE de autorización del permiso (Gobierno 2): si la OT tiene verificaciones de
+   * EJECUCIÓN materializadas, el aprobador debe haber CONFIRMADO el set antes de autorizar.
+   * Sin reglas de ejecución ⇒ no exige nada (retrocompatible).
+   */
+  async assertExecutionSetConfirmed(workOrderId: string): Promise<void> {
+    const count = await this.prisma.workOrderChecklist.count({ where: { workOrderId, moment: "EXECUTION" } });
+    if (count === 0) return;
+    const wo = await this.prisma.workOrder.findUnique({ where: { id: workOrderId }, select: { executionSetConfirmedAt: true } });
+    if (!wo?.executionSetConfirmedAt) {
+      throw new BadRequestException("Antes de autorizar el permiso, confirme el set de verificaciones de ejecución que se aplicará en terreno.");
+    }
+  }
+
+  /**
+   * GATE por actividad (Slice B): no se puede marcar una actividad DONE si tiene
+   * verificaciones de EJECUCIÓN obligatorias sin aprobar (LOTO físico, toma-5). Lo invoca
+   * `WorkActivitiesService.recordProgress` al completar. Mensaje que EXPLICA qué falta.
+   */
+  async assertActivityExecutionComplete(workOrderId: string, workActivityId: string): Promise<void> {
+    const checklists = await this.prisma.workOrderChecklist.findMany({
+      where: { workOrderId, workActivityId, moment: "EXECUTION", mandatory: true },
+      include: { template: { select: { name: true } } },
+    });
+    const blocking = blockingExecutionChecklistsForActivity(checklists, workActivityId);
+    if (blocking.length > 0) {
+      const names = blocking.map((c) => c.template?.name ?? "verificación").join(", ");
+      throw new BadRequestException(`No se puede completar la actividad: falta aprobar ${blocking.length} verificación(es) de ejecución obligatoria(s): ${names}.`);
+    }
+  }
+
   // === Helpers ================================================================
 
   private async toRuleDtos(rows: Prisma.WorkOrderChecklistRuleGetPayload<object>[]): Promise<WorkOrderChecklistRuleDto[]> {
@@ -318,6 +468,7 @@ export class WorkOrderChecklistsService {
         template: { select: { name: true } },
         rule: { select: { name: true } },
         logEntry: { select: { entryNumber: true, status: true } },
+        workActivity: { select: { title: true, sequence: true } },
       },
       orderBy: [{ mandatory: "desc" }, { createdAt: "asc" }],
     });
@@ -328,6 +479,8 @@ export class WorkOrderChecklistsService {
       templateId: r.templateId,
       templateName: r.template?.name ?? null,
       moment: r.moment,
+      workActivityId: r.workActivityId,
+      workActivityTitle: r.workActivity?.title ?? null,
       logEntryId: r.logEntryId,
       logEntryCode: r.logEntry ? formatEntryFolio(r.logEntry.entryNumber) : null,
       logEntrySealed: r.logEntry?.status === "SUBMITTED",

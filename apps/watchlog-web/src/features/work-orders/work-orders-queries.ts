@@ -19,6 +19,7 @@ import type {
 } from "@lyra/contracts";
 import {
   addWorkOrderChecklist,
+  confirmWorkOrderExecutionSet,
   assignWorkOrder,
   cancelWorkOrder,
   createWorkOrder,
@@ -200,6 +201,11 @@ function invalidateChecklists(qc: ReturnType<typeof useQueryClient>, id: string)
 export function useSuggestWorkOrderChecklists(id: string) {
   const qc = useQueryClient();
   return useMutation({ mutationFn: () => suggestWorkOrderChecklists(id), onSuccess: () => invalidateChecklists(qc, id) });
+}
+
+export function useConfirmWorkOrderExecutionSet(id: string) {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: () => confirmWorkOrderExecutionSet(id), onSuccess: () => invalidateChecklists(qc, id) });
 }
 
 export function useAddWorkOrderChecklist(id: string) {

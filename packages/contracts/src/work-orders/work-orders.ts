@@ -226,6 +226,10 @@ export const workOrderDetailSchema = workOrderListItemSchema.extend({
   folioIssuedAt: z.string().nullable(),
   /** Puerta 3 (S4): instante en que se autorizó/congeló la baseline del plan (null = plan no congelado). */
   planFrozenAt: z.string().nullable(),
+  /** Gobierno 2 (S5b): confirmación del set de verificaciones de EJECUCIÓN (null = sin confirmar). */
+  executionSetConfirmedAt: z.string().nullable(),
+  executionSetConfirmedById: z.string().nullable(),
+  executionSetConfirmedByName: z.string().nullable(),
   rejectedAt: z.string().nullable(),
   rejectReason: z.string().nullable(),
   closedAt: z.string().nullable(),

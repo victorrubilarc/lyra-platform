@@ -67,6 +67,10 @@ CHECKLIST_TEMPLATE = "Permiso de Trabajo — Aislación de energías (LOTO)"
 # smoke (la del seed aplica solo al tipo ptw-alto-riesgo; el smoke usa su tipo propio).
 CLOSURE_TEMPLATE = "Cierre de permiso — Retiro de bloqueos y reenergización"
 CLOSURE_RULE_NAME = "Cierre smoke — retiro de bloqueos"
+# Plantilla de EJECUCIÓN sembrada (S5b Slice B, momento EXECUTION) + una regla obligatoria
+# propia del smoke ACOTADA por especialidad (matchea SOLO las actividades de esa disciplina).
+EXEC_TEMPLATE = "Aplicación de controles en terreno — Bloqueo físico y toma-5 (LOTO)"
+EXEC_RULE_NAME = "Ejecución smoke — bloqueo físico por actividad"
 
 
 def call(method, path, tok=None, body=None):
@@ -117,8 +121,8 @@ def cleanup():
         f"WHERE \"logEntryId\" IS NOT NULL AND \"workOrderId\" IN (SELECT id FROM \"WorkOrder\" WHERE title = '{WO_TITLE}'));"
     )
     sql(f"DELETE FROM \"WorkOrder\" WHERE title = '{WO_TITLE}';")
-    # Regla de checklist de CIERRE propia del smoke (S5b).
-    sql(f"DELETE FROM \"WorkOrderChecklistRule\" WHERE name = '{CLOSURE_RULE_NAME}';")
+    # Reglas de checklist propias del smoke (CIERRE + EJECUCIÓN, S5b).
+    sql(f"DELETE FROM \"WorkOrderChecklistRule\" WHERE name IN ('{CLOSURE_RULE_NAME}', '{EXEC_RULE_NAME}');")
     sql(f"DELETE FROM \"WorkOrderType\" WHERE key = '{TYPE_KEY}';")
     sql(f"DELETE FROM \"Specialty\" WHERE key = '{SPEC_KEY}';")
     # Reviewer temporal (Puerta 2).
@@ -381,6 +385,17 @@ def main():
     s, acts = call("GET", f"/work-orders/{wid4}/activities", admin)
     check("listar actividades → 2 en el plan", isinstance(acts, list) and len(acts) == 2, str(len(acts) if isinstance(acts, list) else s))
 
+    # Regla de EJECUCIÓN (S5b Slice B) ACOTADA por especialidad: matchea SOLO la actividad
+    # 1 (que tiene la especialidad del smoke); la actividad 2 (sin especialidad) NO recibe
+    # verificación de ejecución. Se crea ANTES de `preparar` para que el set se materialice.
+    exec_tpl_id = sql(f"SELECT id FROM \"Template\" WHERE name = '{EXEC_TEMPLATE}' AND \"deletedAt\" IS NULL LIMIT 1;").strip()
+    check("plantilla de EJECUCIÓN sembrada existe", bool(exec_tpl_id), exec_tpl_id or "no encontrada")
+    s, _ = call("POST", "/work-orders/checklist-rules", admin, {
+        "name": EXEC_RULE_NAME, "templateId": exec_tpl_id, "moment": "EXECUTION",
+        "mandatory": True, "appliesToTypeIds": [tid], "specialtyId": spec_id, "sortOrder": 15,
+    })
+    check("crear regla de checklist EXECUTION (por especialidad) → 2xx", s in (200, 201), str(s))
+
     # Seguimiento (S5): NO se registra avance antes de autorizar el plan (baseline sin congelar) → 400
     s, _ = call("POST", f"/work-orders/{wid4}/activities/{aid1}/progress", admin, {"status": "IN_PROGRESS", "progressPct": 20})
     check("avance ANTES de autorizar el plan (baseline sin congelar) → 400", s == 400, str(s))
@@ -420,6 +435,18 @@ def main():
     _, det4 = call("GET", f"/work-orders/{wid4}", admin)
     check("timeline: evento CHECKLIST_ADDED",
           isinstance(det4, dict) and any(e.get("kind") == "CHECKLIST_ADDED" for e in det4.get("events", [])))
+
+    # SET de EJECUCIÓN (S5b Slice B): materializado POR ACTIVIDAD al preparar. La regla EXEC
+    # está acotada por especialidad ⇒ SÓLO la actividad 1 (con especialidad) recibe verificación.
+    exec_cls = [c for c in cls if c.get("moment") == "EXECUTION"] if isinstance(cls, list) else []
+    exec_a1 = next((c for c in exec_cls if c.get("workActivityId") == aid1), None)
+    exec_a2 = next((c for c in exec_cls if c.get("workActivityId") == aid2), None)
+    check("set de ejecución: verificación materializada en la actividad 1 (obligatoria, PENDING)",
+          exec_a1 is not None and exec_a1.get("mandatory") is True and exec_a1.get("status") == "PENDING",
+          json.dumps(exec_a1) if exec_a1 else str(exec_cls))
+    check("match por especialidad: la actividad 2 (sin especialidad) NO recibe verificación de ejecución",
+          exec_a2 is None, json.dumps(exec_a2) if exec_a2 else "ok")
+    exec_cid = exec_a1.get("id") if exec_a1 else None
 
     # Gate de Puerta 2: revisar_checklists con obligatorio PENDIENTE (firma válida) → 400
     s, _ = call("POST", f"/work-orders/{wid4}/transitions", admin, {"transitionKey": "revisar_checklists", "password": PASS})
@@ -465,9 +492,38 @@ def main():
         s, r = call("POST", f"/work-orders/{wid4}/checklists/{cid}/review", reviewer, {"decision": "APPROVE"})
         check("revisor (≠ responsable) aprueba → 200 + APPROVED", s == 200 and isinstance(r, dict) and r.get("status") == "APPROVED", str(s))
 
-    # Con el obligatorio APROBADO, la Puerta 2 abre: revisar_checklists → checklists_ok
+    # GOBIERNO 2 (S5b Slice B): aun con el permiso de AUTORIZACIÓN aprobado, la autorización
+    # SIGUE bloqueada hasta que el aprobador CONFIRME el set de verificaciones de ejecución.
+    s, _ = call("POST", f"/work-orders/{wid4}/transitions", admin, {"transitionKey": "revisar_checklists", "password": PASS})
+    check("Gobierno 2 BLOQUEA: autorizar sin confirmar el set de ejecución → 400", s == 400, str(s))
+
+    # Gate 403 del operador sobre confirmar el set (sin workorder:checklist:manage)
+    if operador:
+        s, _ = call("POST", f"/work-orders/{wid4}/checklists/execution-set/confirm", operador)
+        check("operador POST execution-set/confirm → 403", s == 403, str(s))
+
+    # El aprobador CONFIRMA el set de ejecución → sella executionSetConfirmedAt
+    s, _ = call("POST", f"/work-orders/{wid4}/checklists/execution-set/confirm", admin)
+    check("confirmar set de ejecución → 2xx", s in (200, 201), str(s))
+    _, det_c = call("GET", f"/work-orders/{wid4}", admin)
+    check("detalle: executionSetConfirmedAt sellado + confirmante",
+          isinstance(det_c, dict) and bool(det_c.get("executionSetConfirmedAt")) and bool(det_c.get("executionSetConfirmedById")),
+          json.dumps({k: det_c.get(k) for k in ("executionSetConfirmedAt", "executionSetConfirmedById")}) if isinstance(det_c, dict) else str(s))
+
+    # Curar el set (agregar una verificación de ejecución manual a la actividad 2) INVALIDA
+    # la confirmación previa ⇒ Gobierno 2 exige re-confirmar (trazabilidad "lo aplicado = lo autorizado").
+    s, _ = call("POST", f"/work-orders/{wid4}/checklists", admin, {"templateId": exec_tpl_id, "workActivityId": aid2})
+    check("agregar verificación de ejecución manual a la actividad 2 → 2xx", s in (200, 201), str(s))
+    _, det_c2 = call("GET", f"/work-orders/{wid4}", admin)
+    check("curar el set limpia la confirmación (executionSetConfirmedAt = null)",
+          isinstance(det_c2, dict) and det_c2.get("executionSetConfirmedAt") is None, str(det_c2.get("executionSetConfirmedAt") if isinstance(det_c2, dict) else s))
+    s, _ = call("POST", f"/work-orders/{wid4}/transitions", admin, {"transitionKey": "revisar_checklists", "password": PASS})
+    check("Gobierno 2 vuelve a BLOQUEAR tras cambiar el set → 400", s == 400, str(s))
+    call("POST", f"/work-orders/{wid4}/checklists/execution-set/confirm", admin)  # re-confirmar
+
+    # Con el permiso aprobado Y el set confirmado, la autorización abre: revisar_checklists → checklists_ok
     s, r = call("POST", f"/work-orders/{wid4}/transitions", admin, {"transitionKey": "revisar_checklists", "password": PASS})
-    check("Puerta 2 ABIERTA: revisar_checklists con obligatorio aprobado → 200 + checklists_ok",
+    check("Gobierno 2 ABRE: permiso aprobado + set confirmado → 200 + checklists_ok",
           s == 200 and isinstance(r, dict) and r.get("currentStateKey") == "checklists_ok", str(s))
 
     # Ejecución: guard "no ejecuta sin plan" PASA porque la baseline está congelada
@@ -526,11 +582,22 @@ def main():
     s, _ = call("POST", f"/work-orders/{wid4}/transitions", admin, {"transitionKey": "cerrar", "password": PASS, "closureSummary": "cierre prematuro"})
     check("Puerta 4 BLOQUEADA: cerrar con obligatorias abiertas → 400", s == 400, str(s))
 
-    # Completar las 2 actividades obligatorias (DONE fuerza 100%)
-    s, r = call("POST", f"/work-orders/{wid4}/activities/{aid1}/progress", admin, {"status": "DONE", "note": "Cero energía verificado"})
-    check("marcar actividad 1 DONE → 200 + 100%", s in (200, 201) and isinstance(r, dict) and r.get("status") == "DONE" and r.get("progressPct") == 100, str(s))
+    # GATE por actividad (S5b Slice B): la actividad 1 NO puede completarse mientras su
+    # verificación de EJECUCIÓN obligatoria no esté aprobada (LOTO físico, toma-5).
+    s, _ = call("POST", f"/work-orders/{wid4}/activities/{aid1}/progress", admin, {"status": "DONE", "note": "intento prematuro"})
+    check("gate por actividad: DONE con verificación de ejecución sin aprobar → 400", s == 400, str(s))
+
+    # La actividad 2 (sin verificación de ejecución obligatoria) SÍ puede completarse libremente
     s, r = call("POST", f"/work-orders/{wid4}/activities/{aid2}/progress", admin, {"status": "DONE"})
-    check("marcar actividad 2 DONE → 200 + 100%", s in (200, 201) and isinstance(r, dict) and r.get("status") == "DONE" and r.get("progressPct") == 100, str(s))
+    check("marcar actividad 2 DONE (sin verif. obligatoria) → 200 + 100%", s in (200, 201) and isinstance(r, dict) and r.get("status") == "DONE" and r.get("progressPct") == 100, str(s))
+
+    # Aprobar la verificación de EJECUCIÓN de la actividad 1 (instanciar→sellar→enviar→revisor)
+    st = complete_checklist(admin, reviewer, wid4, exec_cid) if (exec_cid and reviewer) else None
+    check("verificación de ejecución de la actividad 1 aprobada → APPROVED", st == "APPROVED", str(st))
+
+    # Ahora sí: la actividad 1 puede completarse (DONE fuerza 100%)
+    s, r = call("POST", f"/work-orders/{wid4}/activities/{aid1}/progress", admin, {"status": "DONE", "note": "Cero energía verificado"})
+    check("marcar actividad 1 DONE tras aprobar su verificación → 200 + 100%", s in (200, 201) and isinstance(r, dict) and r.get("status") == "DONE" and r.get("progressPct") == 100, str(s))
 
     # Puerta 4 SIGUE BLOQUEADA por el checklist de CIERRE obligatorio sin aprobar (S5b)
     s, _ = call("POST", f"/work-orders/{wid4}/transitions", admin, {"transitionKey": "cerrar", "password": PASS, "closureSummary": "sin cerrar el permiso"})

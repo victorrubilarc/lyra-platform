@@ -118,6 +118,10 @@ export const workOrderChecklistSchema = z.object({
   templateName: z.string().nullable(),
   /** Momento del ciclo (congelado al materializar/agregar); agrupa la UI y decide el guard. */
   moment: workOrderChecklistMomentSchema,
+  /** Actividad a la que aplica (SOLO checklists de EJECUCIÓN, Slice B); null = a nivel de OT. */
+  workActivityId: z.string().nullable(),
+  /** Título de la actividad (para agrupar/mostrar el set de ejecución por tarea). */
+  workActivityTitle: z.string().nullable(),
   /** Instancia viva (LogEntry) — null hasta iniciarla. */
   logEntryId: z.string().nullable(),
   /** Folio humano del LogEntry (para deep-link al llenado). */
@@ -148,6 +152,8 @@ export const addWorkOrderChecklistRequestSchema = z.object({
   templateId: z.string().min(1),
   /** Momento del ciclo; omitido = el del estado actual de la OT (backend lo deriva). */
   moment: workOrderChecklistMomentSchema.optional(),
+  /** Actividad a la que se agrega (checklists de EJECUCIÓN, Slice B); omitido = a nivel de OT. */
+  workActivityId: z.string().min(1).optional(),
 });
 export type AddWorkOrderChecklistRequest = z.infer<typeof addWorkOrderChecklistRequestSchema>;
 
@@ -212,6 +218,51 @@ export function blockingChecklistsForMoment<T extends { moment: WorkOrderCheckli
   moment: WorkOrderChecklistMoment,
 ): T[] {
   return checklists.filter((c) => c.moment === moment && c.mandatory && c.status !== "APPROVED");
+}
+
+/**
+ * Reglas de EJECUCIÓN (moment EXECUTION) que aplican a UNA actividad concreta del plan
+ * (Slice B, §11.4.2). Los controles de terreno (LOTO físico, toma-5) se aplican POR TAREA:
+ * la aplicabilidad a nivel de OT (tipo/criticidad/PTW) se hereda, pero el eje de
+ * DISCIPLINA se resuelve contra la especialidad de la ACTIVIDAD (no de la OT). Regla sin
+ * especialidad = aplica a TODAS las actividades (p. ej. un toma-5/LMRA genérico).
+ */
+export function applicableExecutionRulesForActivity<
+  T extends {
+    moment: WorkOrderChecklistMoment;
+    appliesToTypeIds: ReadonlyArray<string>;
+    minCriticality: number | null;
+    specialtyId: string | null;
+    requiresPtw: boolean | null;
+    active: boolean;
+  },
+>(
+  ctx: { typeId: string; criticality: number; requiresPtw: boolean },
+  activity: { specialtyId: string | null },
+  rules: ReadonlyArray<T>,
+): T[] {
+  return rules.filter((r) => {
+    if (!r.active || r.moment !== "EXECUTION") return false;
+    if (r.appliesToTypeIds.length > 0 && !r.appliesToTypeIds.includes(ctx.typeId)) return false;
+    if (r.minCriticality != null && ctx.criticality < r.minCriticality) return false;
+    if (r.requiresPtw != null && r.requiresPtw !== ctx.requiresPtw) return false;
+    // Eje disciplina = especialidad de la ACTIVIDAD (null en la regla = todas las actividades).
+    if (r.specialtyId != null && r.specialtyId !== activity.specialtyId) return false;
+    return true;
+  });
+}
+
+/**
+ * Checklists de EJECUCIÓN obligatorios de UNA actividad que aún no están `APPROVED`
+ * (Slice B). El backend lo usa para gatear el marcar la actividad DONE: no se puede
+ * completar una tarea sin haber aprobado sus verificaciones de terreno obligatorias.
+ */
+export function blockingExecutionChecklistsForActivity<
+  T extends { moment: WorkOrderChecklistMoment; workActivityId: string | null; mandatory: boolean; status: WorkOrderChecklistStatus },
+>(checklists: ReadonlyArray<T>, workActivityId: string): T[] {
+  return checklists.filter(
+    (c) => c.moment === "EXECUTION" && c.workActivityId === workActivityId && c.mandatory && c.status !== "APPROVED",
+  );
 }
 
 /** Resumen de progreso de checklists para KPI/chip (total, aprobados, bloqueantes). */

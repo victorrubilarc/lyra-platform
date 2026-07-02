@@ -226,6 +226,15 @@ export class WorkOrdersController {
     return this.checklists.suggest(user.id, id, this.ctx(user, req));
   }
 
+  // Gobierno 2 (S5b): el aprobador CONFIRMA el set de verificaciones de EJECUCIÓN antes de
+  // autorizar el permiso. Ruta literal ANTES de `:cid` para no colisionar con el param.
+  @Post(":id/checklists/execution-set/confirm")
+  @HttpCode(200)
+  @RequirePermission("workorder:checklist:manage")
+  confirmExecutionSet(@Param("id") id: string, @CurrentUser() user: RequestUser, @Req() req: FastifyRequest) {
+    return this.checklists.confirmExecutionSet(user.id, id, this.ctx(user, req));
+  }
+
   @Post(":id/checklists")
   @RequirePermission("workorder:checklist:manage")
   addChecklist(

@@ -1,5 +1,32 @@
 # Progreso — Lyra WatchLog
 
+**2026-07-02 — 🔧 OT · Sesión 5b · Slice B · Checklists de EJECUCIÓN por actividad + Gobierno 2 ✅ → COMPLETA el modelo §11 de checklists** (`feat/ot-ejecucion-gobierno2`).
+Cierra el modelo GENERALIZADO de checklists del §11: los controles de terreno (LOTO físico, energía cero, toma-5/LMRA)
+se aplican **POR ACTIVIDAD** y el aprobador **cura y confirma el set** que se exigirá antes de autorizar el permiso.
+**Datos** (migr. aditiva `20260702220000_add_execution_checklists`): `WorkOrderChecklist.workActivityId` (→ `WorkActivity`
+SetNull; SOLO los de EJECUCIÓN cuelgan de una tarea, el resto null=nivel-OT) + el `@@unique` pasa a
+`(workOrderId, templateId, workActivityId)` (Postgres trata NULL como distinto ⇒ el anti-duplicado de los de nivel-OT
+sigue siendo el guard de código, documentado); `WorkOrder.executionSetConfirmedAt/ById` (sello de Gobierno 2). **Backend:**
+`materializeExecutionSet(woId, actor)` crea una fila por **cada actividad × regla EXECUTION que matchee** (aplicabilidad de
+OT ∩ **especialidad de la ACTIVIDAD**; regla sin especialidad = todas — helper puro `applicableExecutionRulesForActivity`,
++3 specs); orquestador `materializeForState(woId, stateKey, actor)` (reusado por `transition()` y `suggest()`) materializa
+AUTORIZACIÓN + SET de EJECUCIÓN al ENTRAR a `en_preparacion` (plan ya congelado ⇒ actividades fijas). **Gobierno 2:**
+`confirmExecutionSet` sella el set (`workorder:checklist:manage`, sin permiso nuevo) + **gate al autorizar el permiso**
+(`assertExecutionSetConfirmed`: si hay reglas EXECUTION, exige el set confirmado) + **auto-limpieza** de la confirmación al
+curar el set (agregar/quitar EJECUCIÓN ⇒ re-confirmar; trazabilidad "lo aplicado = lo autorizado"). **Gate por actividad:**
+no se marca una actividad **DONE** con su verificación de EJECUCIÓN obligatoria sin aprobar (`assertActivityExecutionComplete`,
+helper puro `blockingExecutionChecklistsForActivity`) + **backstop al cierre** (`assertChecklistsCompleteForMoment(EXECUTION)`).
+**Web:** pestaña «Verificaciones» — grupo EJECUCIÓN **sub-agrupado por actividad** (cada tarea con sus controles) + banner/botón
+**«Confirmar set de ejecución»** de Gobierno 2 (chip verde "confirmado por X" tras sellar) + «Agregar» por actividad; pestaña
+«Plan» gana un **indicador de solo lectura** por fila ("N verificaciones de ejecución pendiente(s) — ver «Verificaciones»").
+Tokens DS claro/oscuro, sin jerga «Puerta N». **Seed:** +1 plantilla «Aplicación de controles en terreno — Bloqueo físico y
+toma-5» (`purpose:"CHECKLIST"`) + regla `EXECUTION, mandatory` (ptw-alto-riesgo). **SIN permiso nuevo, SIN FLUSHALL** (102
+permisos sin cambio). Verde: typecheck (7) · lint 0 err · build (contracts+web) · **contracts 433** (+6) · **API 252** ·
+`smoke-workorders.py` **108/108** (+13: regla EXECUTION → materialización por actividad + match por especialidad → Gobierno 2
+bloquea autorizar sin confirmar → confirmar/curar-limpia-confirmación/re-confirmar → gate DONE por actividad → aprobar verif.
+→ DONE OK → cierre) + regresión **incidencias 32/32**. Ver DECISIONS 2026-07-02 (Slice B). **Pendiente:** smoke VISUAL en
+navegador (dueño). **Siguiente = OT S6 (SLA/semáforos) o S7 (dashboard OT + Incidencia→OT).**
+
 **2026-07-02 — 🔧 OT · Sesión 5b · Slice A · Eje `momento` de checklists + checklist de CIERRE ✅** (`feat/ot-checklists-momento`).
 Completa el primer tramo del modelo GENERALIZADO de checklists del §11: hasta ayer el motor solo conocía **un** momento
 (AUTORIZACIÓN, S3); ahora los checklists tienen un **eje `momento`** (REQUEST/PLANNING/AUTHORIZATION/EXECUTION/CLOSURE) como DATO

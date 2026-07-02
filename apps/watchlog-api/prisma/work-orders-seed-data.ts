@@ -170,6 +170,24 @@ export const WORK_ORDER_CHECKLIST_TEMPLATES: ChecklistTemplateSeed[] = [
     ],
   },
   {
+    // EJECUCIÓN en terreno (S5b Slice B, momento EXECUTION): aplicación FÍSICA de los
+    // controles POR ACTIVIDAD (candados, energía cero, toma-5/LMRA) al momento de ejecutar
+    // cada tarea. Se materializa una instancia por actividad del plan congelado y BLOQUEA
+    // marcar la actividad DONE si es obligatoria y no está aprobada.
+    name: "Aplicación de controles en terreno — Bloqueo físico y toma-5 (LOTO)",
+    description:
+      "EJECUCIÓN en terreno, POR ACTIVIDAD: colocación física de candados/tarjetas, verificación de energía cero, y evaluación de última hora (toma-5 / LMRA) ANTES de intervenir. Se aplica por cada tarea del plan al momento de ejecutarla.",
+    sectionKey: "ejecucion_loto",
+    sectionTitle: "Aplicación de controles en terreno (por actividad)",
+    fields: [
+      { key: "candados_colocados", type: "BOOLEAN", dataType: "BOOLEAN", label: "¿Se colocaron los candados/tarjetas de bloqueo en todos los puntos de aislación?", order: 10 },
+      { key: "energia_cero_verificada", type: "BOOLEAN", dataType: "BOOLEAN", label: "¿Se verificó energía cero (prueba de ausencia de tensión/presión) antes de intervenir?", order: 20 },
+      { key: "toma5_realizada", type: "BOOLEAN", dataType: "BOOLEAN", label: "¿Se realizó la evaluación de última hora (toma-5 / LMRA) con el equipo de trabajo?", order: 30 },
+      { key: "epp_verificado", type: "BOOLEAN", dataType: "BOOLEAN", label: "¿El personal cuenta con el EPP requerido y las herramientas en buen estado?", order: 40 },
+      { key: "observaciones_terreno", type: "TEXTAREA", dataType: "STRING", label: "Observaciones de terreno (condiciones, desvíos, controles adicionales)", order: 50 },
+    ],
+  },
+  {
     // CIERRE del permiso (S5b, momento CLOSURE): retiro de controles, reenergización, sitio
     // seguro. Se sugiere al ENTRAR a la revisión de cierre y BLOQUEA el cierre si es obligatorio.
     name: "Cierre de permiso — Retiro de bloqueos y reenergización",
@@ -196,6 +214,15 @@ export const WORK_ORDER_CHECKLIST_RULES: ChecklistRuleSeed[] = [
     appliesToTypeKeys: [], // transversal: aplica a toda OT que llegue a preparación
     requiresPtw: null,
     sortOrder: 10,
+  },
+  {
+    name: "Ejecución obligatoria — Bloqueo físico y toma-5 (por actividad)",
+    templateName: "Aplicación de controles en terreno — Bloqueo físico y toma-5 (LOTO)",
+    moment: "EXECUTION",
+    mandatory: true,
+    appliesToTypeKeys: ["ptw-alto-riesgo"], // controles de terreno exigidos en OT con PTW
+    requiresPtw: true, // sin specialtyId ⇒ aplica a TODAS las actividades del plan
+    sortOrder: 15,
   },
   {
     name: "Cierre obligatorio — Retiro de bloqueos y reenergización",

@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   applicableChecklistRules,
+  applicableExecutionRulesForActivity,
   blockingChecklistsForClose,
   blockingChecklistsForMoment,
+  blockingExecutionChecklistsForActivity,
   summarizeChecklists,
   type WorkOrderChecklistMoment,
   type WorkOrderChecklistStatus,
@@ -91,6 +93,59 @@ describe("blockingChecklistsForMoment", () => {
 
   it("un CLOSURE aprobado no bloquea el cierre", () => {
     expect(blockingChecklistsForMoment([cl("CLOSURE", true, "APPROVED")], "CLOSURE")).toHaveLength(0);
+  });
+});
+
+describe("applicableExecutionRulesForActivity", () => {
+  const execRule = (over: Partial<Parameters<typeof applicableExecutionRulesForActivity>[2][number]> = {}) => ({
+    moment: "EXECUTION" as WorkOrderChecklistMoment,
+    appliesToTypeIds: [] as string[],
+    minCriticality: null as number | null,
+    specialtyId: null as string | null,
+    requiresPtw: null as boolean | null,
+    active: true,
+    ...over,
+  });
+  const octx = { typeId: "t1", criticality: 4, requiresPtw: true };
+
+  it("sólo considera reglas de momento EXECUTION", () => {
+    const auth = { ...execRule(), moment: "AUTHORIZATION" as WorkOrderChecklistMoment };
+    expect(applicableExecutionRulesForActivity(octx, { specialtyId: "mec" }, [auth])).toHaveLength(0);
+    expect(applicableExecutionRulesForActivity(octx, { specialtyId: "mec" }, [execRule()])).toHaveLength(1);
+  });
+
+  it("matchea por la especialidad de la ACTIVIDAD (regla sin especialidad = todas)", () => {
+    expect(applicableExecutionRulesForActivity(octx, { specialtyId: "elec" }, [execRule()])).toHaveLength(1); // null = todas
+    expect(applicableExecutionRulesForActivity(octx, { specialtyId: "elec" }, [execRule({ specialtyId: "elec" })])).toHaveLength(1);
+    expect(applicableExecutionRulesForActivity(octx, { specialtyId: "mec" }, [execRule({ specialtyId: "elec" })])).toHaveLength(0);
+    expect(applicableExecutionRulesForActivity(octx, { specialtyId: null }, [execRule({ specialtyId: "elec" })])).toHaveLength(0);
+  });
+
+  it("hereda la aplicabilidad de OT (tipo/criticidad/PTW)", () => {
+    expect(applicableExecutionRulesForActivity(octx, { specialtyId: "mec" }, [execRule({ appliesToTypeIds: ["t2"] })])).toHaveLength(0);
+    expect(applicableExecutionRulesForActivity(octx, { specialtyId: "mec" }, [execRule({ minCriticality: 5 })])).toHaveLength(0);
+    expect(applicableExecutionRulesForActivity({ ...octx, requiresPtw: false }, { specialtyId: "mec" }, [execRule({ requiresPtw: true })])).toHaveLength(0);
+  });
+});
+
+describe("blockingExecutionChecklistsForActivity", () => {
+  const cl = (workActivityId: string | null, mandatory: boolean, status: WorkOrderChecklistStatus) => ({
+    moment: "EXECUTION" as WorkOrderChecklistMoment,
+    workActivityId,
+    mandatory,
+    status,
+  });
+
+  it("bloquea sólo obligatorios EXECUTION no aprobados de ESA actividad", () => {
+    const list = [
+      cl("a1", true, "PENDING"), // bloquea a1
+      cl("a1", true, "APPROVED"),
+      cl("a1", false, "PENDING"),
+      cl("a2", true, "PENDING"), // de otra actividad
+    ];
+    expect(blockingExecutionChecklistsForActivity(list, "a1")).toHaveLength(1);
+    expect(blockingExecutionChecklistsForActivity(list, "a2")).toHaveLength(1);
+    expect(blockingExecutionChecklistsForActivity(list, "a3")).toHaveLength(0);
   });
 });
 
