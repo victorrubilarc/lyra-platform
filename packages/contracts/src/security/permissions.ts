@@ -700,12 +700,13 @@ export const PERMISSION_CATALOG = [
       "Construir, editar y publicar paletas de tema, y elegir la paleta por defecto del sistema.",
   },
 
-  // --- Órdenes de Trabajo / Work Orders (OT / PTW) — Sesión 1: CIMIENTOS -------
-  // Espejo de Incidencias. El ciclo de vida (S2+) reutilizará WorkflowDefinition:
+  // --- Órdenes de Trabajo / Work Orders (OT / PTW) ------------------------------
+  // Espejo de Incidencias. El ciclo de vida (S2, Puerta 1) reutiliza WorkflowDefinition:
   // QUIÉN puede ejecutar cada puerta/transición es DATO (roles por transición del
-  // flujo), NO 4 permisos fijos de puerta (fork W2 aprobado). Estas claves gobiernan
-  // el módulo y las acciones de alto nivel; el alcance de datos (nodo) lo resuelve
-  // el ScopeService (ABAC). `workorder:transition` (dim. WORKFLOW) llega en S2.
+  // flujo), NO 4 permisos fijos de puerta (fork W2 aprobado): un ÚNICO
+  // `workorder:transition` (dim. WORKFLOW) + WorkflowTransitionRole. Estas claves
+  // gobiernan el módulo y las acciones de alto nivel; el alcance de datos (nodo) lo
+  // resuelve el ScopeService (ABAC).
   {
     key: "module:workorders:view",
     dimension: "MODULE",
@@ -741,6 +742,13 @@ export const PERMISSION_CATALOG = [
     dimension: "ACTION",
     group: "workorders",
     description: "Agregar comentarios de gestión a una orden de trabajo.",
+  },
+  {
+    key: "workorder:transition",
+    dimension: "WORKFLOW",
+    group: "workorders",
+    description:
+      "Ejecutar transiciones del flujo de una OT (enviar, aprobar/rechazar y demás puertas) y firmar cuando la transición lo exige. QUIÉN puede cada puerta es DATO (roles por transición del flujo).",
   },
   {
     key: "workorder:cancel",

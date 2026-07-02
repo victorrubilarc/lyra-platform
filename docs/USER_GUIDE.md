@@ -10,7 +10,7 @@
 > funcionalidades existentes** aunque su detalle aún esté por redactar (✍️): así nada se
 > olvida; el backfill de lo ya construido se llena de a poco (incremental).
 >
-> Última actualización: **2026-07-01** (Órdenes de trabajo — crear y listar solicitudes, S1 Cimientos).
+> Última actualización: **2026-07-01** (Órdenes de trabajo — Puerta 1: aprobación con firma + folio oficial al aprobar, S2).
 
 ## Convención de cada sección
 Cada funcionalidad se documenta con estas cuatro partes fijas:
@@ -142,8 +142,8 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 
 ### 18. Órdenes de trabajo (OT / PTW)  [todos los roles operativos]
 - ✅ **Crear y listar solicitudes de trabajo** (asistente de 2 pasos, grilla con filtros/facetas, detalle con reasignar/prioridad/anular) (§ Órdenes de trabajo)
+- ✅ **Enviar, aprobar (con firma y folio oficial) o rechazar la solicitud — Puerta 1** (flujo de estados con stepper, firma electrónica, folio OT-AAAA-#### emitido al aprobar, rechazo con motivo, historial) (§ Órdenes de trabajo ▸ Aprobación)
 - ✅ **Administrar los catálogos** (tipos de OT y especialidades) (§ Órdenes de trabajo ▸ Catálogos) [solo administrador]
-- ✍️ Aprobación y folio al aprobar (Puerta 1 — Sesión 2)
 - ✍️ Checklists / permisos de trabajo, plan de actividades y cierre (Puertas 2–4 — Sesiones 3–5)
 
 ---
@@ -153,9 +153,9 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 **Para qué sirve.** Registrar y hacer seguimiento de **trabajos** sobre los activos e instalaciones: una reparación,
 un mantenimiento preventivo, una mejora o un **trabajo de alto riesgo con Permiso de Trabajo (PTW)**. Es el equivalente
 a la "orden de trabajo" de un CMMS (SAP PM / Maximo), pero integrado con la estructura, los equipos y la seguridad de
-Lyra WatchLog. En esta primera entrega puedes **crear la solicitud** y **gestionarla en una lista**; la aprobación con
-**folio oficial**, los **checklists/PTW**, el **plan de actividades** y el **cierre por etapas** llegan en las siguientes
-entregas del módulo.
+Lyra WatchLog. Hoy puedes **crear la solicitud**, **gestionarla en una lista** y llevarla por su **flujo de
+aprobación** (enviar → aprobar con firma y **folio oficial** / rechazar con motivo — ver § Aprobación); los
+**checklists/PTW**, el **plan de actividades** y el **cierre por etapas** llegan en las siguientes entregas del módulo.
 
 **Cómo se usa.**
 1. Entra a **Órdenes de trabajo** en el menú (grupo Operación). Arriba ves **indicadores** (borradores, abiertas,
@@ -166,26 +166,65 @@ entregas del módulo.
    - **Paso 2 · Ubicación y clasificación:** **nodo** (obligatorio; define dónde y a la vez el alcance de datos),
      **equipo** del nodo (opcional), **detalle de ubicación**, **especialidades** (disciplinas; puedes elegir
      varias), y una **fecha límite** opcional.
-3. Al crear, la solicitud aparece en la lista con un **código provisional "SOL-######"** (el folio oficial se emite
-   al aprobarla, en una entrega posterior).
-4. Haz clic en una fila para abrir el **detalle**: ahí puedes **reasignar el responsable**, cambiar la **prioridad** o
-   **anular** la solicitud con un motivo (queda auditado; no se borra).
+3. Al crear, la solicitud nace **en borrador** con un **código provisional "SOL-######"** (el folio oficial se emite
+   recién **al aprobarla** — ver § Aprobación). Cuando esté lista, **envíala** desde el detalle.
+4. Haz clic en una fila para abrir el **detalle**: arriba ves el **estado del flujo** y el recorrido completo
+   (stepper); ahí puedes **avanzar el flujo** (enviar/aprobar/rechazar), **reasignar el responsable**, cambiar la
+   **prioridad** o **anular** la solicitud con un motivo (queda auditado; no se borra). La pestaña **Actividad**
+   muestra el historial completo (quién hizo qué y cuándo).
 5. Filtra la lista por estado, tipo, criticidad, prioridad, especialidad o por "Mías / Sin responsable /
    Requieren PTW", y busca por folio, título o descripción.
 
 **Quién puede.** Ver el módulo requiere **`module:workorders:view`**; crear **`workorder:create`**; editar
-**`workorder:edit`**; reasignar **`workorder:assign`**; anular **`workorder:cancel`**; administrar los catálogos
-(tipos y especialidades) **`workordercatalog:manage`**. Como en todo el sistema, el **alcance de datos por nodo**
-(y por estructura activa) lo decide el servidor: solo ves y creas OT en los nodos a los que tienes alcance.
+**`workorder:edit`**; reasignar **`workorder:assign`**; **avanzar el flujo (enviar/aprobar/rechazar)
+`workorder:transition`**; anular **`workorder:cancel`**; administrar los catálogos (tipos y especialidades)
+**`workordercatalog:manage`**. Como en todo el sistema, el **alcance de datos por nodo** (y por estructura activa)
+lo decide el servidor: solo ves y creas OT en los nodos a los que tienes alcance.
 
 **Importante.**
 - El **nodo** es el ancla de ubicación **y** de seguridad (alcance por nodo ∩ estructura activa) — la "área/zona" de
   planta es un **nivel de la estructura**, no un catálogo aparte. La **especialidad** (disciplina) es solo clasificación;
   no reemplaza al nodo.
 - El **equipo** debe pertenecer al nodo elegido; si cambias de nodo, se limpia la selección de equipo.
-- La solicitud nace **abierta**. El **folio oficial**, el flujo de **aprobación** (con firma), los **checklists/PTW**,
-  el **plan de actividades** y el **cierre** llegan en las Sesiones 2–5 del módulo.
+- La solicitud nace **en borrador** y avanza por un **flujo de aprobación configurable** (ver § Aprobación). Los
+  **checklists/PTW**, el **plan de actividades** y el **cierre por etapas** llegan en las Sesiones 3–5 del módulo.
 - Una **incidencia** podrá generar una OT (enlace bidireccional) en una entrega posterior.
+
+### Órdenes de trabajo ▸ Aprobación de la solicitud y folio oficial (Puerta 1)  [aprobadores]
+
+**Para qué sirve.** Gobernar el **ciclo de vida** de la solicitud con un **flujo de aprobación real**: la solicitud se
+**envía**, alguien autorizado la **aprueba con firma electrónica** (y recién ahí nace el **folio oficial**, p. ej.
+`OT-2026-0001`) o la **rechaza con motivo**. Así no se "queman" folios con solicitudes duplicadas o mal planteadas: el
+correlativo oficial es **continuo y sin huecos** (auditable) y solo existe para trabajo aprobado.
+
+**Cómo se usa** (caso típico, dos personas):
+1. **El solicitante** crea la solicitud (nace **Borrador**) y, cuando está completa, abre el detalle y pulsa
+   **«Enviar solicitud»** → pasa a **Solicitada** (queda en la cola de aprobación).
+2. **El aprobador** abre la solicitud y ve dos botones: **«Aprobar solicitud»** y **«Rechazar solicitud»**.
+   - **Aprobar** pide la **firma electrónica** (tu contraseña; y tu código MFA si la transición lo exige). Al
+     confirmar: la OT queda **Aprobada**, se registra quién y cuándo aprobó, y el sistema **emite el folio oficial**
+     (`OT-2026-0001`) — desde ese momento la OT se identifica por su folio en la lista, el detalle y las búsquedas.
+   - **Rechazar** exige un **motivo** (obligatorio). La solicitud queda **Rechazada** (terminada, sin folio) y el
+     motivo queda visible en el detalle y en el historial.
+3. El **stepper** del detalle muestra el recorrido completo del flujo (Borrador → Solicitada → Aprobada →
+   … → Cerrada) y en qué paso está la OT; la pestaña **Actividad** registra cada paso (envío, aprobación con el
+   nombre del firmante, emisión del folio, rechazo con motivo).
+
+**Quién puede.** Avanzar el flujo requiere **`workorder:transition`**. Además, cada **transición** del flujo puede
+restringirse a **roles específicos** (dato configurable en el flujo, igual que en Incidencias): así "aprobar" puede
+quedar solo en manos del jefe de área aunque más personas tengan el permiso base. La firma exige **re-autenticarte**
+(contraseña, y MFA si está configurado): firmar es un acto personal e intransferible (Part 11).
+
+**Importante.**
+- **El folio se emite SOLO al aprobar** y es **inmutable**: antes de eso la solicitud usa el código provisional
+  `SOL-######`. El correlativo por defecto es **por tipo de OT y por año** (`OT-2026-0001`, `OT-2026-0002`…; se
+  reinicia cada año); el esquema es configurable por tipo.
+- El flujo **"OT — 4 puertas PTW"** viene sembrado como punto de partida (borrador → solicitada → aprobada →
+  preparación → checklists → planificación → ejecución → revisión → cerrada, con firmas en las puertas). Es **dato
+  configurable**: un administrador puede clonarlo y simplificarlo (p. ej. a una sola puerta). Las etapas posteriores a
+  la aprobación (checklists, plan, cierre) se habilitan con guards en las Sesiones 3–5.
+- Una solicitud **rechazada** queda terminada (no se reabre); si el trabajo sí se necesita, se crea una nueva
+  solicitud. **Anular** (con motivo) sigue disponible en cualquier momento para solicitudes mal creadas o duplicadas.
 
 ### Órdenes de trabajo ▸ Catálogos (tipos y especialidades)  [Admin]
 
@@ -200,8 +239,9 @@ estructura organizacional — el nodo — igual que en los EAM líderes.)*
 2. Elige la sub-pestaña **Tipos** o **Especialidades**. En cada una: busca, filtra por activo/inactivo, ordena,
    y usa el interruptor para **activar/desactivar** una fila.
 3. **«Nuevo…»** abre un formulario con nombre, **clave** (identificador estable, minúsculas/números/guiones, **no se puede
-   cambiar** después), descripción y color del chip. En **Tipos** además: flujo por defecto (se usará en la S2), criticidad
-   sugerida y si **requiere PTW** por defecto.
+   cambiar** después), descripción y color del chip. En **Tipos** además: **flujo por defecto** (el que se congela al crear
+   una OT del tipo; vacío = el flujo global "OT — 4 puertas PTW"), criticidad sugerida y si **requiere PTW** por defecto.
+   *(El esquema del folio por tipo — prefijo/alcance/reinicio — es configurable por API; su editor visual está pendiente.)*
 4. Al **editar**, la clave queda bloqueada (es la identidad del catálogo). Desactivar un elemento lo **saca de los
    desplegables** del alta pero **no lo borra** (sigue visible aquí con el filtro «Inactivos»).
 

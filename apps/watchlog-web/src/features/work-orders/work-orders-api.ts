@@ -8,6 +8,7 @@ import {
   type CancelWorkOrderRequest,
   type CreateWorkOrderRequest,
   type SpecialtyDto,
+  type TransitionWorkOrderRequest,
   type UpdateWorkOrderRequest,
   type UpsertSpecialtyRequest,
   type UpsertWorkOrderTypeRequest,
@@ -104,4 +105,9 @@ export function assignWorkOrder(id: string, dto: AssignWorkOrderRequest): Promis
 
 export function cancelWorkOrder(id: string, dto: CancelWorkOrderRequest): Promise<WorkOrderDetail> {
   return apiJson(`/work-orders/${id}/cancel`, workOrderDetailSchema, { method: "POST", body: dto });
+}
+
+/** Ejecuta una transición del flujo (Puerta 1: enviar / aprobar [firma] / rechazar). */
+export function transitionWorkOrder(id: string, dto: TransitionWorkOrderRequest): Promise<WorkOrderDetail> {
+  return apiJson(`/work-orders/${id}/transitions`, workOrderDetailSchema, { method: "POST", body: dto });
 }

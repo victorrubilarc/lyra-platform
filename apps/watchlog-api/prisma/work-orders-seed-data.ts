@@ -6,6 +6,58 @@
  * un punto de partida operable y profesional.
  */
 
+/**
+ * Flujo por defecto "OT — 4 puertas PTW" (fork W6): SE SIEMBRA COMO DATO
+ * (WorkflowDefinition publicada), clonable y simplificable por el admin (una PYME
+ * lo reduce a 1 puerta). S2 cablea el ejecutor + la PUERTA 1 (enviar → aprobar
+ * [emite folio, firma Part 11] / rechazar [motivo obligatorio]); los estados y
+ * transiciones de las Puertas 2–4 EXISTEN como dato desde ya, pero sus guards
+ * (checklists/baseline/cierre) llegan en S3–S5.
+ *
+ * NOTA: la ANULACIÓN no es un estado del flujo — es el endpoint `cancel` con motivo
+ * (lifecycle CANCELED), espejo exacto de Incidencias: el motor exige `fromStateId`
+ * por transición, y "cancelar desde casi cualquier estado" se modela mejor como
+ * acción transversal auditada (ver DECISIONS 2026-07-01 S2).
+ */
+export const WORK_ORDER_WORKFLOW = {
+  key: "ot-4-puertas",
+  name: "OT — 4 puertas PTW",
+  description:
+    "Ciclo de vida estándar de una orden de trabajo con permiso de trabajo: solicitud → aprobación (P1, emite folio) → preparación/checklists (P2) → planificación (P3) → ejecución → revisión y cierre (P4).",
+  states: [
+    { key: "borrador", name: "Borrador", order: 0, isInitial: true, isFinal: false, color: "#9AA3B8" },
+    { key: "solicitada", name: "Solicitada", order: 1, isInitial: false, isFinal: false, color: "#6366F1" },
+    { key: "aprobada", name: "Aprobada", order: 2, isInitial: false, isFinal: false, color: "#06B6D4" },
+    { key: "en_preparacion", name: "En preparación", order: 3, isInitial: false, isFinal: false, color: "#EAB308" },
+    { key: "checklists_ok", name: "Checklists OK", order: 4, isInitial: false, isFinal: false, color: "#84CC16" },
+    { key: "en_planificacion", name: "En planificación", order: 5, isInitial: false, isFinal: false, color: "#EAB308" },
+    { key: "plan_aprobado", name: "Plan aprobado", order: 6, isInitial: false, isFinal: false, color: "#06B6D4" },
+    { key: "en_ejecucion", name: "En ejecución", order: 7, isInitial: false, isFinal: false, color: "#F97316" },
+    { key: "en_revision_cierre", name: "En revisión de cierre", order: 8, isInitial: false, isFinal: false, color: "#84CC16" },
+    { key: "cerrada", name: "Cerrada", order: 9, isInitial: false, isFinal: true, color: "#22C55E" },
+    { key: "rechazada", name: "Rechazada", order: 10, isInitial: false, isFinal: true, color: "#EF4444" },
+  ],
+  transitions: [
+    { key: "enviar", label: "Enviar solicitud", from: "borrador", to: "solicitada", requireSignature: false, signatureMeaning: null },
+    // PUERTA 1: aprobar EMITE EL FOLIO (folioOnStateKey del tipo, default "aprobada") y exige firma.
+    { key: "aprobar", label: "Aprobar solicitud", from: "solicitada", to: "aprobada", requireSignature: true, signatureMeaning: "Aprobación de la solicitud de trabajo (emisión de folio)" },
+    { key: "rechazar", label: "Rechazar solicitud", from: "solicitada", to: "rechazada", requireSignature: false, signatureMeaning: null },
+    { key: "preparar", label: "Iniciar preparación", from: "aprobada", to: "en_preparacion", requireSignature: false, signatureMeaning: null },
+    // PUERTA 2 (guard de checklists en S3).
+    { key: "revisar_checklists", label: "Aprobar checklists", from: "en_preparacion", to: "checklists_ok", requireSignature: true, signatureMeaning: "Revisión y aprobación de checklists / permisos de trabajo" },
+    { key: "devolver", label: "Devolver a aprobada", from: "en_preparacion", to: "aprobada", requireSignature: false, signatureMeaning: null },
+    { key: "planificar", label: "Iniciar planificación", from: "checklists_ok", to: "en_planificacion", requireSignature: false, signatureMeaning: null },
+    // PUERTA 3 (congela baseline en S4; firma opcional por diseño — el admin la activa).
+    { key: "autorizar_plan", label: "Autorizar plan", from: "en_planificacion", to: "plan_aprobado", requireSignature: false, signatureMeaning: null },
+    { key: "devolver_plan", label: "Devolver plan", from: "en_planificacion", to: "en_preparacion", requireSignature: false, signatureMeaning: null },
+    { key: "ejecutar", label: "Iniciar ejecución", from: "plan_aprobado", to: "en_ejecucion", requireSignature: false, signatureMeaning: null },
+    { key: "solicitar_cierre", label: "Solicitar cierre", from: "en_ejecucion", to: "en_revision_cierre", requireSignature: false, signatureMeaning: null },
+    // PUERTA 4 (guards de cierre en S5).
+    { key: "cerrar", label: "Cerrar OT", from: "en_revision_cierre", to: "cerrada", requireSignature: true, signatureMeaning: "Cierre de la orden de trabajo" },
+    { key: "reabrir", label: "Volver a ejecución", from: "en_revision_cierre", to: "en_ejecucion", requireSignature: false, signatureMeaning: null },
+  ],
+} as const;
+
 export interface WorkOrderTypeSeed {
   key: string;
   name: string;

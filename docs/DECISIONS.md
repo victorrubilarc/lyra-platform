@@ -4,6 +4,42 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-01 · OT — Sesión 2 (Puerta 1): decisiones de implementación
+Al dar vida al ciclo de la solicitud (`feat/ot-puerta1`: workflow congelado + ejecutor + `FolioCounter` + firma) se
+tomaron 6 decisiones no explícitas en el diseño:
+1. **Firma Part 11 = ESPEJO EXACTO de Incidencias (re-auth exigida y verificada; SIN registro criptográfico aún).**
+   `ReauthService.verifyForSignature` gatea la transición ANTES de mutar (§11.200), pero NO se crea la fila
+   `LogEntrySignature` (el `payloadHash`). *Motivo:* Incidencias —el módulo hermano— tiene exactamente esa deuda; crear
+   el registro solo para OT rompería la paridad y duplicaría el trabajo cuando se cierre la deuda PARA AMBOS.
+   `WorkOrderTransition.signatureId` queda como ref. blanda lista (columna ya creada). La deuda "payloadHash de firmas
+   de transición (Incidencias + OT)" queda en BACKLOG.
+2. **Aprobación/rechazo/cierre = semántica DATA-DRIVEN, sin claves de estado en duro.** Aprobación = ENTRAR al estado
+   `WorkOrderType.folioOnStateKey` (default `"aprobada"`, constante compartida en contracts) — ahí se fijan
+   `approvedAt/approvedById` y se emite el folio (si aún no existe). Rechazo = llegar a un estado FINAL **sin haber sido
+   aprobada nunca** ⇒ motivo OBLIGATORIO (400 si falta), `rejectedAt/rejectReason`, lifecycle `CANCELED` (la solicitud
+   murió sin ser trabajo). Estado final TRAS la aprobación = cierre (`closedAt`, `CLOSED`). *Motivo:* funciona con
+   cualquier flujo que arme el admin (1 puerta o 4) sin comparar contra claves "rechazada"/"cerrada" hardcodeadas.
+   `deriveWorkOrderLifecycle` (contracts) codifica la regla; `availableTransitions[].requiresReason` la expone a la UI.
+3. **La ANULACIÓN no es un estado del flujo sembrado** (el diseño §3 dibujaba `cancelada` con "cancelar desde casi
+   cualquier estado"). *Motivo:* el motor exige `fromStateId` por transición (habría que sembrar N transiciones), e
+   Incidencias ya modela anular como ACCIÓN transversal auditada (`POST :id/cancel` + lifecycle `CANCELED` + motivo)
+   desde cualquier estado. Paridad > literalidad del diagrama. El flujo sembrado queda con 11 estados.
+4. **`FolioCounter.sequenceKey` es la PK (sin `id cuid`).** *Motivo:* la asignación atómica es un `INSERT … ON CONFLICT
+   … RETURNING` CRUDO y el default `cuid()` de Prisma se genera en el CLIENTE (no existe en la DDL) — un upsert SQL no
+   puede poblarlo. Para una tabla-contador, la clave natural ES la identidad. `FolioService.next(tx, key, start)` recibe
+   la transacción del LLAMADOR: si la transición hace rollback, el correlativo no se quema (gapless de verdad). El año
+   del reinicio anual se calcula con `PLANT_TIME_ZONE` (misma decisión que el dashboard).
+5. **`folioSchemeSchema` sin `.default()` de Zod** — campos opcionales + `resolveFolioScheme()` aplica los defaults
+   (prefix OT · padding 4 · scope type · reset annual). *Motivo:* gotcha conocido TS2719 (los `.default()` en schemas
+   embebidos en DTOs rompen la web). `folioScheme`/`folioOnStateKey` son configurables por API desde ya; el **editor UI
+   en el mantenedor de tipos queda como deuda** (BACKLOG) — el default OT cubre el caso de uso aprobado (W4).
+6. **La grilla de OT deja de filtrar "Abiertas" por defecto** (pasa a "Todos los estados"). *Motivo:* desde S2 la
+   solicitud NACE en `borrador` (DRAFT); con el filtro anterior, lo recién creado desaparecía de la vista.
+Verde + `smoke-workorders.py` **51/51** (ciclo enviar→aprobar[folio OT-2026-0001+firma]/rechazar[motivo]→gapless 0002 +
+gates) + regresión incidencias 32/32.
+
+---
+
 ### 2026-07-01 · OT — Se ELIMINA el catálogo `Area` (alineación con EAM líderes)
 Tras revisar cómo lo modelan los grandes (SAP PM, IBM Maximo, Infor EAM), se **elimina** el catálogo plano `Area`
 (tabla + `WorkOrderArea` + relación + seed + UI + filtros + contrato), introducido horas antes en el anexo de S1.

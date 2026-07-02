@@ -702,11 +702,12 @@ Incident(resuelta) ──> KnowledgeArticle
 - Índices previstos: FKs, `OrgNode.parentId`, `Entry(templateId, createdAt)`, `Incident(status, severity)`, GIN en `tsvector` de KB y en `JSONB` consultable.
 - El esquema vive en `apps/watchlog-api/prisma/schema.prisma`; migraciones versionadas con `prisma migrate`.
 
-### Órdenes de Trabajo / Work Orders (OT / PTW) — Sesión 1: Cimientos *(implementado)*
-Migración `20260701180000_add_work_orders`. Entidad NUEVA `WorkOrder`, **espejo de `Incident`** (DECISIONS 2026-07-01,
-forks W1–W8). En S1 solo vive la SOLICITUD (crear/listar/editar/asignar/anular con ABAC por nodo ∩ estructura); los
-campos de FOLIO y WORKFLOW existen pero **INERTES** (se activan en S2). Sin borrado físico (`deletedAt` + anulación
-lifecycle `CANCELED`).
+### Órdenes de Trabajo / Work Orders (OT / PTW) — S1 Cimientos + S2 Puerta 1 *(implementado)*
+Migraciones `20260701180000_add_work_orders` (S1) y `20260701210000_add_work_order_workflow_folio` (S2). Entidad NUEVA
+`WorkOrder`, **espejo de `Incident`** (DECISIONS 2026-07-01, forks W1–W8). Desde S2 el ciclo de la solicitud está VIVO
+hasta la Puerta 1: workflow congelado al crear + ejecutor de transiciones (permiso `workorder:transition`, dim. WORKFLOW)
++ folio gapless emitido al aprobar + firma Part 11 opt-in. ABAC por nodo ∩ estructura; sin borrado físico (`deletedAt` +
+anulación lifecycle `CANCELED`).
 
 - **WorkOrder** — la orden/solicitud de trabajo. `number` (autoincrement, correlativo interno) → código provisional
   **"SOL-######"** hasta que se emite el `folio` oficial (`OT-2026-0001`, único, null hasta la aprobación en S2).
@@ -715,14 +716,33 @@ lifecycle `CANCELED`).
   riesgo ISO 31000 (`riskProbability`/`riskConsequence`), ubicación (`orgNodeId` → **OrgNode** Restrict = ancla ABAC;
   `equipmentId` → **Equipment** SetNull; `locationDetail`; `shiftCode`), personas (`requesterId`/`ownerId`, refs blandas),
   fechas (`requestedAt`/`detectedAt`/`plannedStart`/`plannedEnd`/`dueAt`), `lifecycle` (enum `WorkOrderLifecycle`:
-  DRAFT|OPEN|CLOSED|CANCELED; en S1 nace **OPEN**). Campos **inertes S1** (para no re-migrar): `folioSeqKey`/
-  `folioIssuedAt`, `workflowDefinitionId`/`workflowDefinitionVersionId`/`currentStateKey`/`currentStateSince`, aprobación
-  (`approvedAt`/`approvedById`/`rejectedAt`/`rejectReason`/`rejectedById`), cierre (`closedAt`/`closedById`/
-  `closureSummary`), origen bidireccional (`originIncidentId`/`originLogEntryId`/`originExceptionId`, refs blandas).
+  DRAFT|OPEN|CLOSED|CANCELED). **Desde S2 el workflow está VIVO**: al crear se CONGELA una versión de flujo
+  (`workflowDefinitionId`/`workflowDefinitionVersionId`, la del tipo o la global `ot-4-puertas`) y la solicitud **nace en
+  el estado inicial `borrador` (lifecycle DRAFT)** con `currentStateKey`/`currentStateSince`; el lifecycle se DERIVA del
+  estado (final tras aprobación ⇒ CLOSED; final sin aprobación = rechazo ⇒ CANCELED; anulación por endpoint ⇒ CANCELED).
+  Puerta 1: aprobación (`approvedAt`/`approvedById`; al ENTRAR al estado `folioOnStateKey` se emite el `folio` +
+  `folioSeqKey`/`folioIssuedAt`), rechazo (`rejectedAt`/`rejectReason`/`rejectedById`, motivo obligatorio), cierre
+  (`closedAt`/`closedById`/`closureSummary`), origen bidireccional (`originIncidentId`/`originLogEntryId`/
+  `originExceptionId`, refs blandas).
+- **WorkOrderTransition** *(S2)* — historial de transiciones ejecutadas (espejo de `IncidentTransition`):
+  `workflowDefinitionVersionId` + `transitionKey`/`fromStateKey`/`toStateKey`, actor (`actorId`/`actorEmail`), `reason`,
+  `signatureId` (ref. blanda a `LogEntrySignature`, hoy null — deuda payloadHash compartida con Incidencias), `occurredAt`.
+  Cascade desde `WorkOrder`; índice `(workOrderId, occurredAt)`.
+- **WorkOrderEvent** *(S2)* — timeline APPEND-ONLY (espejo de `IncidentActivity`; se llama "Event" para no chocar con
+  `WorkActivity` de S4). `kind` clasifica: CREATED|SENT|APPROVED|REJECTED|FOLIO_ISSUED|TRANSITION|ASSIGNED|CLOSED|CANCELED.
+  `summary`, actor, `metadata` Json, `occurredAt`. Cascade; índice `(workOrderId, occurredAt)`.
+- **FolioCounter** *(S2, fork W4)* — motor de folio gapless configurable, REUTILIZABLE (sirve al folio-por-plantilla,
+  BACKLOG 2026-06-30). Una fila por secuencia: `sequenceKey` **PK** (codifica entidad+scope+período, ej.
+  `workorder|type:<id>|2026`) + `lastValue`. Asignación ATÓMICA `INSERT … ON CONFLICT … DO UPDATE … RETURNING`
+  (`FolioService.next(tx, …)`, dentro de la transacción del llamador ⇒ rollback no quema folio). El formateo es PURO en
+  `@lyra/contracts` (`work-orders/folio.ts`: `folioSchemeSchema` {prefix,mask,padding,start,scope,reset} +
+  `resolveFolioScheme`/`buildFolioSeqKey`/`renderFolio`; default OT = por-tipo + reinicio anual ⇒ `OT-2026-0001`).
 - **WorkOrderType** — catálogo configurable de tipos (espejo de `IncidentType`). `key` única, `name`/`description`/`color`,
-  `defaultWorkflowId` (ref. blanda, S2), `requiresPtwDefault`, `criticalityDefault`, `folioScheme` (Json) + `folioOnStateKey`
-  (inertes S1, para el folio configurable de S2), SLA light (`resolutionDueMinutes`/`escalationAfterMinutes`/
-  `escalationRoleId` → **Role** SetNull, relación `WorkOrderTypeEscalationRole`), `active`/`sortOrder`.
+  `defaultWorkflowId` (ref. blanda; flujo que se CONGELA al crear una OT del tipo), `requiresPtwDefault`,
+  `criticalityDefault`, **`folioScheme` (Json validado por `folioSchemeSchema`) + `folioOnStateKey`** (S2: estado al que,
+  al ENTRAR, se emite el folio; null = "aprobada"; configurables por API — editor UI pendiente), SLA light
+  (`resolutionDueMinutes`/`escalationAfterMinutes`/`escalationRoleId` → **Role** SetNull, relación
+  `WorkOrderTypeEscalationRole`), `active`/`sortOrder`.
 - **Specialty** — catálogo de disciplina/oficio (`key` única, `name`/`description`/`color`, `active`/`sortOrder`).
   Equivale al **Work Center (SAP PM) / Craft (Maximo)**. N:N con la OT. La **ubicación** la da `orgNodeId` (estructura,
   que puede tener un nivel "Área"), **no** un catálogo aparte.
@@ -731,6 +751,8 @@ lifecycle `CANCELED`).
 - **`Area` / `WorkOrderArea` — ELIMINADOS (2026-07-01, migración `20260701190000_drop_work_order_area`).** Duplicaban la
   jerarquía de ubicación (`OrgNode`); los EAM líderes usan la jerarquía de ubicación para la "área/zona". Ver DECISIONS.
 
-**Pendiente (S2–S5):** `FolioCounter` (folio gapless al aprobar), `WorkOrderTransition`/`WorkOrderEvent`/`WorkOrderComment`
-(satélites de workflow), `WorkOrderChecklistRule`/`WorkOrderChecklist` (checklists sobre Form Builder), `WorkActivity`/
-`WorkActivityUpdate` (plan de actividades). Ver `docs/design/OT_DESIGN_ARCHITECTURE.md`.
+**Implementado en S2** (migración `20260701210000_add_work_order_workflow_folio`): `FolioCounter`, `WorkOrderTransition`,
+`WorkOrderEvent`, flujo sembrado "OT — 4 puertas PTW" (`ot-4-puertas`, 11 estados; la anulación NO es estado — es el
+endpoint `cancel`, espejo Incidencias). **Pendiente (S3–S5):** `WorkOrderComment`, `WorkOrderChecklistRule`/
+`WorkOrderChecklist` (checklists sobre Form Builder), `WorkActivity`/`WorkActivityUpdate` (plan de actividades).
+Ver `docs/design/OT_DESIGN_ARCHITECTURE.md`.

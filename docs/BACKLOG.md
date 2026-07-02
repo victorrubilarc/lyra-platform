@@ -5,7 +5,16 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-07-01** — **🔧 OT · Sesión 1 · CIMIENTOS ✅** (`feat/ot-cimientos`): `WorkOrder`+`WorkOrderType`+
+> actualización: **2026-07-01** — **🔧 OT · Sesión 2 · PUERTA 1 ✅** (`feat/ot-puerta1`): workflow CONGELADO al crear
+> (flujo sembrado **"OT — 4 puertas PTW"** como DATO; la solicitud nace `borrador`/DRAFT) + ejecutor de transiciones
+> espejo de Incidencias (permiso NUEVO **`workorder:transition`** dim. WORKFLOW, rol-dato, **firma Part 11**
+> re-autenticada) + **`FolioCounter` gapless** (atómico `ON CONFLICT…RETURNING` dentro de la tx; folio **SOLO al
+> aprobar** = entrar a `folioOnStateKey`; default por-tipo+anual ⇒ **OT-2026-0001**; formateo puro en contracts
+> `folio.ts`) + rechazo con motivo OBLIGATORIO (final sin aprobación ⇒ CANCELED) + satélites
+> `WorkOrderTransition`/`WorkOrderEvent` (timeline) + web (stepper, botones, modal de firma, timeline, folio/estado en
+> grilla). verde (contracts **403** · API 252 · web 6) + `smoke-workorders.py` **51/51** + regresión incidencias 32/32.
+> **DEUDA nueva:** editor UI de `folioScheme` (hoy API-only). **Siguiente: OT Sesión 3 (Puerta 2 — checklists con Form
+> Builder).** Antes (mismo día): **🔧 OT · Sesión 1 · CIMIENTOS ✅** (`feat/ot-cimientos`): `WorkOrder`+`WorkOrderType`+
 > `Area`/`Specialty` (N:N), 8 permisos grupo `workorders`, backend CRUD+ABAC, web `/ordenes-trabajo` (grilla+wizard),
 > seed de arranque; folio/workflow INERTES (S2). **+ Anexo post-S1 ✅** (`feat/ot-catalogos`): mantenedor de catálogos
 > `/ordenes-trabajo/catalogos` + seed realista CMMS/EAM. **+ Ajuste ✅** (`feat/ot-quitar-area`): se **ELIMINÓ el catálogo
@@ -694,8 +703,19 @@ nunca queda más de una sesión atrás.
             planificador). Se evalúa cuando exista workflow/alertas/dashboard (S6–S8), solo si aporta.
       - [x] **Responsive (post-S1) — grillas OT + Incidencias en tablet/móvil ✅ 2026-07-01** (`feat/ot-responsive`):
             filtros que envuelven, selects full-width <900px, área táctil 44px; tabla con scroll horizontal. Solo CSS.
-- [ ] **Sesión 2 — Aprobación inicial + folio al aprobar / Puerta 1 (~35 HH):** workflow congelado, aprobar/rechazar
-      (**motivo obligatorio**), `FolioCounter` gapless (emite folio **SOLO al aprobar**), firma Part 11 + timeline.
+- [x] **Sesión 2 — Aprobación inicial + folio al aprobar / Puerta 1 (~35 HH):** ✅ **CERRADA 2026-07-01**
+      (`feat/ot-puerta1`). Workflow CONGELADO al crear (flujo del tipo o global **"OT — 4 puertas PTW"** sembrado como
+      DATO, fork W6; 11 estados — la anulación NO es estado, es el endpoint `cancel`); la solicitud **nace `borrador`/
+      DRAFT** (reemplaza el "nace OPEN" de S1). Ejecutor `transition()` espejo de Incidencias (rol-dato + firma Part 11
+      re-autenticada; **permiso NUEVO `workorder:transition`** dim. WORKFLOW, catálogo → 100). **`FolioCounter`** (PK
+      `sequenceKey`) + `FolioService.next(tx,…)` atómico `ON CONFLICT … RETURNING` + formateo puro en contracts
+      (`folio.ts`; default por-tipo + anual ⇒ **OT-2026-0001**, gapless verificado …-0002). Semántica data-driven:
+      aprobación = entrar a `folioOnStateKey` (default "aprobada") ⇒ folio+`approvedAt`; **rechazo = final sin aprobación
+      ⇒ motivo OBLIGATORIO** + CANCELED. Satélites `WorkOrderTransition`+`WorkOrderEvent` (migración
+      `20260701210000_add_work_order_workflow_folio`). Web: stepper + botones + modal firma + rechazo + timeline; grilla
+      con estado del flujo y folio. verde + smoke **51/51** + regresión incidencias 32/32. Ver DECISIONS 2026-07-01 S2.
+      **DEUDAS registradas:** editor UI de `folioScheme`/`folioOnStateKey` en el mantenedor de tipos (hoy API-only, §3) ·
+      payloadHash de firmas de transición = deuda compartida con Incidencias (ya listada). **Siguiente = Sesión 3.**
 - [ ] **Sesión 3 — Motor de checklists ligados / Puerta 2 (~45 HH):** tabla enlace `WorkOrderChecklist` + reglas de
       aplicabilidad en `WorkOrderType` (tipo/criticidad/especialidad/riesgo); sugerencia automática + selección manual +
       instanciación (reusa Form Builder / `LogEntry`); guard "obligatorios completos + aprobados" con rol revisor distinto.
@@ -1809,6 +1829,14 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
 ## 3. Deuda técnica / seguridad REGISTRADA (no perder)
 
 > Items con fundamento ya discutidos; aquí para que no se diluyan en `DECISIONS.md`.
+
+### OT · S2 — Editor UI del esquema de folio (`folioScheme` / `folioOnStateKey`) (2026-07-01, ~4–6 HH)
+- [ ] Hoy `WorkOrderType.folioScheme` ({prefix, mask, padding, start, scope, reset}, Zod `folioSchemeSchema`) y
+      `folioOnStateKey` son **configurables solo por API** (`POST /work-orders/types`); el `WorkOrderTypeModal` del
+      mantenedor no los expone. El default OT (por-tipo + reinicio anual ⇒ `OT-2026-0001`) cubre el caso aprobado (W4),
+      así que no bloquea. Al abordarlo: sección "Folio" en el modal (prefijo/relleno/alcance/reinicio + estado emisor
+      con las claves del flujo del tipo) + vista previa `renderFolio`. **El motor (`FolioCounter`/`FolioService` +
+      formateo puro en contracts) ya está listo y sirve también al folio-por-plantilla del dueño (§2 2026-06-30).**
 
 ### Despliegue AWS — blindaje de deploys continuos (2026-06-22) — ver `docs/DEPLOYMENT.md`
 > WatchLog **EN VIVO** en `lyra.watchlog.itesicws.com`, en el EC2 compartido con Lyra Pass.
