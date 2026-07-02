@@ -34,12 +34,37 @@ export const workOrderChecklistStatusSchema = z.enum(WORK_ORDER_CHECKLIST_STATUS
 export type WorkOrderChecklistStatus = (typeof WORK_ORDER_CHECKLIST_STATUSES)[number];
 
 /**
+ * MOMENTO del ciclo de la OT en que vive un checklist (S5b, §11.2). Cada checklist se
+ * exige en un momento distinto, llenado por roles distintos: la solicitud (triage), la
+ * planificación (evaluación de riesgo del plan), la AUTORIZACIÓN del permiso (Puerta 2),
+ * la EJECUCIÓN en terreno (LOTO físico/toma-5, por actividad) y el CIERRE del permiso
+ * (retiro de controles, reenergizar). El TIPO/flujo declara qué estado corresponde a cada
+ * momento como DATO. Hoy se cablean AUTHORIZATION (S3) y CLOSURE (S5b Slice A); EXECUTION
+ * por actividad + Gobierno 2 = Slice B; REQUEST/PLANNING existen sin guard propio aún.
+ */
+export const WORK_ORDER_CHECKLIST_MOMENTS = ["REQUEST", "PLANNING", "AUTHORIZATION", "EXECUTION", "CLOSURE"] as const;
+export const workOrderChecklistMomentSchema = z.enum(WORK_ORDER_CHECKLIST_MOMENTS);
+export type WorkOrderChecklistMoment = (typeof WORK_ORDER_CHECKLIST_MOMENTS)[number];
+
+/** Metadatos de presentación de cada momento (etiqueta legible + orden cronológico). */
+export const WORK_ORDER_CHECKLIST_MOMENT_META: Record<WorkOrderChecklistMoment, { label: string; hint: string; order: number }> = {
+  REQUEST: { label: "Solicitud", hint: "Al solicitar la OT (triage, categorización de riesgo)", order: 1 },
+  PLANNING: { label: "Planificación", hint: "Al planificar (evaluación de riesgo del plan, ITP)", order: 2 },
+  AUTHORIZATION: { label: "Autorización", hint: "Al autorizar el permiso, antes de ejecutar (documental)", order: 3 },
+  EXECUTION: { label: "Ejecución", hint: "En terreno al ejecutar cada actividad (LOTO físico, toma-5)", order: 4 },
+  CLOSURE: { label: "Cierre", hint: "Al cerrar el permiso (retiro de controles, reenergizar, sitio seguro)", order: 5 },
+};
+
+/**
  * Claves de estado data-driven (paridad con `DEFAULT_WORK_ORDER_FOLIO_STATE_KEY`):
  * el TIPO puede declarar otras vía `checklistSuggestStateKey`/`checklistGateStateKey`;
- * estos defaults corresponden al flujo sembrado "ot-4-puertas".
+ * estos defaults corresponden al flujo sembrado "ot-4-puertas". El momento AUTHORIZATION
+ * usa suggest/gate; el momento CLOSURE usa su propio suggest + el guard de cierre
+ * (`becomesFinal`); EXECUTION reusa `executeStateKey` (Slice B).
  */
 export const DEFAULT_WORK_ORDER_CHECKLIST_SUGGEST_STATE_KEY = "en_preparacion";
 export const DEFAULT_WORK_ORDER_CHECKLIST_GATE_STATE_KEY = "checklists_ok";
+export const DEFAULT_WORK_ORDER_CLOSURE_CHECKLIST_SUGGEST_STATE_KEY = "en_revision_cierre";
 
 // === DTO: regla de checklist (Capa A · catálogo) ==============================
 
@@ -49,7 +74,9 @@ export const workOrderChecklistRuleSchema = z.object({
   /** Plantilla del Form Builder a instanciar como checklist. */
   templateId: z.string(),
   templateName: z.string().nullable(),
-  /** Obligatorio ⇒ no removible de la OT y bloquea la Puerta 2 si no está aprobado. */
+  /** Momento del ciclo en que se exige (default AUTHORIZATION). */
+  moment: workOrderChecklistMomentSchema,
+  /** Obligatorio ⇒ no removible de la OT y bloquea la puerta de su momento si no está aprobado. */
   mandatory: z.boolean(),
   /** Tipos de OT a los que aplica. Vacío = TODOS los tipos. */
   appliesToTypeIds: z.array(z.string()),
@@ -71,6 +98,7 @@ export const upsertWorkOrderChecklistRuleRequestSchema = z.object({
   id: z.string().min(1).optional(),
   name: z.string().trim().min(1).max(120),
   templateId: z.string().min(1),
+  moment: workOrderChecklistMomentSchema.optional(),
   mandatory: z.boolean().optional(),
   appliesToTypeIds: z.array(z.string().min(1)).max(100).optional(),
   minCriticality: z.number().int().min(1).max(5).nullable().optional(),
@@ -88,6 +116,8 @@ export const workOrderChecklistSchema = z.object({
   workOrderId: z.string(),
   templateId: z.string(),
   templateName: z.string().nullable(),
+  /** Momento del ciclo (congelado al materializar/agregar); agrupa la UI y decide el guard. */
+  moment: workOrderChecklistMomentSchema,
   /** Instancia viva (LogEntry) — null hasta iniciarla. */
   logEntryId: z.string().nullable(),
   /** Folio humano del LogEntry (para deep-link al llenado). */
@@ -116,6 +146,8 @@ export type WorkOrderChecklistDto = z.infer<typeof workOrderChecklistSchema>;
 /** Agregar manualmente un checklist (plantilla) a la OT. */
 export const addWorkOrderChecklistRequestSchema = z.object({
   templateId: z.string().min(1),
+  /** Momento del ciclo; omitido = el del estado actual de la OT (backend lo deriva). */
+  moment: workOrderChecklistMomentSchema.optional(),
 });
 export type AddWorkOrderChecklistRequest = z.infer<typeof addWorkOrderChecklistRequestSchema>;
 
@@ -160,13 +192,26 @@ export function applicableChecklistRules<
 }
 
 /**
- * Checklists que BLOQUEAN la Puerta 2 (o el cierre): obligatorios que aún no están
- * `APPROVED`. Lógica autoritativa compartida (espejo de `blockingActionsForClose`).
+ * Checklists obligatorios que aún no están `APPROVED` (moment-blind): indicador general
+ * de "algo pendiente" para la cabecera de la UI. Lógica autoritativa compartida (espejo
+ * de `blockingActionsForClose`).
  */
 export function blockingChecklistsForClose<T extends { mandatory: boolean; status: WorkOrderChecklistStatus }>(
   checklists: ReadonlyArray<T>,
 ): T[] {
   return checklists.filter((c) => c.mandatory && c.status !== "APPROVED");
+}
+
+/**
+ * Checklists que BLOQUEAN la puerta de UN momento concreto (S5b): obligatorios de ese
+ * momento que aún no están `APPROVED`. El backend lo usa como guard data-driven —
+ * AUTHORIZATION al ENTRAR al estado-puerta, CLOSURE al CERRAR (`becomesFinal`).
+ */
+export function blockingChecklistsForMoment<T extends { moment: WorkOrderChecklistMoment; mandatory: boolean; status: WorkOrderChecklistStatus }>(
+  checklists: ReadonlyArray<T>,
+  moment: WorkOrderChecklistMoment,
+): T[] {
+  return checklists.filter((c) => c.moment === moment && c.mandatory && c.status !== "APPROVED");
 }
 
 /** Resumen de progreso de checklists para KPI/chip (total, aprobados, bloqueantes). */

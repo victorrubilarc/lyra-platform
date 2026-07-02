@@ -1,5 +1,29 @@
 # Progreso — Lyra WatchLog
 
+**2026-07-02 — 🔧 OT · Sesión 5b · Slice A · Eje `momento` de checklists + checklist de CIERRE ✅** (`feat/ot-checklists-momento`).
+Completa el primer tramo del modelo GENERALIZADO de checklists del §11: hasta ayer el motor solo conocía **un** momento
+(AUTORIZACIÓN, S3); ahora los checklists tienen un **eje `momento`** (REQUEST/PLANNING/AUTHORIZATION/EXECUTION/CLOSURE) como DATO
+y queda cableado el momento de **CIERRE** del permiso. **Datos** (migr. aditiva `20260702210000_add_checklist_moment`): enum
+`WorkOrderChecklistMoment` + columna `moment` en `WorkOrderChecklistRule` **y** `WorkOrderChecklist` (**default AUTHORIZATION ⇒
+100% retrocompatible**; congelado al materializar; índice `(workOrderId, moment)`) + `WorkOrderType.closureChecklistSuggestStateKey`
+(default `en_revision_cierre`, data-driven, paridad `folioOnStateKey`). **Backend:** `materializeForWorkOrder(woId, moment, actor)`
+filtra reglas por momento; `suggest()` deriva el momento del estado actual (`momentForCurrentState`); guard genérico
+`assertChecklistsCompleteForMoment` + helper puro `blockingChecklistsForMoment` (contracts, +2 specs). En `transition()`:
+AUTHORIZATION al ENTRAR al estado-puerta (S3 intacto) + **CLOSURE per-OT** = sugerido al ENTRAR a `en_revision_cierre` y
+**BLOQUEA el cierre** (junto al guard de actividades) si un CLOSURE obligatorio no está APPROVED, con bloqueo EXPLICADO (nombra
+la plantilla). **CIERRE per-OT** (no per-actividad) por ser el cierre formal del permiso UN acto — barato y valida la maquinaria
+de punta a punta; la EJECUCIÓN por actividad va en Slice B. **Permiso:** reusa `workorder:checklist:manage` (**sin permiso nuevo,
+sin FLUSHALL**; 102 permisos sin cambio; el seed se re-corre solo por la nueva plantilla/regla). **Web:** editor de la regla con
+**Combobox «Momento»** (+hint) — no `<select>` nativo; pestaña «Verificaciones» **agrupada por momento** (subtítulos
+Autorización·Ejecución·Cierre en orden cronológico) para leer "dónde va cada checklist" de un vistazo; columna «Momento» en la
+grilla de reglas del catálogo; sin jerga «Puerta N», tokens DS claro/oscuro. **Seed:** +plantilla «Cierre de permiso — Retiro de
+bloqueos y reenergización» + regla `CLOSURE, mandatory` (ptw-alto-riesgo); LOTO marcada `AUTHORIZATION`. Verde: typecheck (7) ·
+lint 0 err · build exit 0 · API 252 · web · contracts (checklists.spec 11); `smoke-workorders.py` **95/95** (+5: regla CLOSURE →
+materialización → cierre bloqueado sin aprobar → aprobar → cerrar OK) + regresión **incidencias 32/32**. Ver DECISIONS 2026-07-02.
+**Diferido a S5b Slice B:** checklists de EJECUCIÓN por actividad (`WorkOrderChecklist.workActivityId`, guard por actividad) +
+**Gobierno 2** (visibilidad/confirmación del set de ejecución en la autorización, `executionSetConfirmedAt`). **Siguiente = OT
+S5b Slice B (ejecución por actividad + Gobierno 2) o S6 (SLA/semáforos).**
+
 **2026-07-02 — 🔧 OT · Sesión 5a · PUERTA 4 (seguimiento vivo del avance + cierre) ✅ → CIERRA EL MVP del ciclo Solicitud→Cierre**
 (`feat/ot-seguimiento-cierre`). Con la baseline congelada (S4), la **ejecución** ahora se registra encima: el plan es inmutable
 pero cada actividad acumula **avance** hasta cerrarse, y la OT se **cierra** punta a punta con los guards ya cableados en S4.

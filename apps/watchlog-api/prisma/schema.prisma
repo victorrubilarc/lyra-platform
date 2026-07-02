@@ -2749,6 +2749,8 @@ model WorkOrderType {
   // --- Plan / Puerta 3 (S4): claves de estado data-driven (default por constante) --------
   planFreezeStateKey String? // estado al que, al ENTRAR, se CONGELA la baseline del plan (default "plan_aprobado")
   executeStateKey    String? // estado de ejecución: sólo se ENTRA con la baseline del plan congelada (default "en_ejecucion")
+  // --- Checklists de CIERRE / Puerta 4 (S5b): momento CLOSURE data-driven (default constante) --
+  closureChecklistSuggestStateKey String? // estado que dispara la sugerencia de checklists de CIERRE (default "en_revision_cierre")
   // --- SLA light (S6, espejo IncidentType) ----------------------------------------
   resolutionDueMinutes   Int?
   escalationAfterMinutes Int?
@@ -2952,6 +2954,19 @@ enum WorkOrderChecklistStatus {
   REJECTED
 }
 
+// MOMENTO del ciclo de la OT en que vive un checklist (S5b, generalizacion del §11.2).
+// El tipo/flujo declara QUE estado corresponde a cada momento como DATO (paridad con
+// folioOnStateKey/checklistGateStateKey). Hoy (Slice A) se cablean AUTHORIZATION (Puerta 2,
+// S3) y CLOSURE (Puerta 4); EXECUTION por actividad + Gobierno 2 = Slice B. REQUEST/PLANNING
+// existen en el enum pero aun no tienen guard propio (materializan como el momento por defecto).
+enum WorkOrderChecklistMoment {
+  REQUEST
+  PLANNING
+  AUTHORIZATION
+  EXECUTION
+  CLOSURE
+}
+
 // Capa A - DISENO (admin): regla de APLICABILIDAD de un checklist (fork W5). El
 // checklist ES una plantilla del Form Builder (`Template`); la regla define a que
 // OT se sugiere (patron appliesToTypeIds/minSeverity de ReportingObligation). NO
@@ -2960,7 +2975,10 @@ model WorkOrderChecklistRule {
   id               String   @id @default(cuid())
   name             String
   templateId       String // -> Template (checklist a instanciar; Restrict)
-  mandatory        Boolean  @default(false) // obligatorio => no removible, bloquea Puerta 2
+  // MOMENTO del ciclo en que se exige (S5b). Default AUTHORIZATION = comportamiento S3
+  // (retrocompatible: las reglas existentes se leen como de autorizacion).
+  moment           WorkOrderChecklistMoment @default(AUTHORIZATION)
+  mandatory        Boolean  @default(false) // obligatorio => no removible, bloquea la puerta de su momento
   // Aplicabilidad (todo vacio/null = aplica a todas las OT):
   appliesToTypeIds String[] @default([]) // WorkOrderType.id (vacio = todos los tipos)
   minCriticality   Int? // criticidad minima (null = cualquiera)
@@ -2990,6 +3008,9 @@ model WorkOrderChecklist {
   id                String                   @id @default(cuid())
   workOrderId       String
   templateId        String // que checklist (plantilla)
+  // MOMENTO congelado al materializar/agregar (denormalizado desde la regla; los manuales
+  // heredan el momento en curso). Agrupa la UI y decide que guard aplica (S5b).
+  moment            WorkOrderChecklistMoment @default(AUTHORIZATION)
   logEntryId        String? // instancia viva (null hasta iniciarla) -> LogEntry
   sourceRuleId      String? // regla que lo sugirio (null = agregado manual)
   mandatory         Boolean                  @default(false)
@@ -3010,6 +3031,7 @@ model WorkOrderChecklist {
 
   @@unique([workOrderId, templateId]) // MVP: 1 instancia por (OT, plantilla)
   @@index([workOrderId])
+  @@index([workOrderId, moment])
   @@index([status])
   @@index([logEntryId])
 }

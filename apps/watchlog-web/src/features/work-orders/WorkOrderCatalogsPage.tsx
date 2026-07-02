@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, ClipboardCheck, Lock, Pencil, Plus, Search, Tags, Trash2 } from "lucide-react";
-import type { SpecialtyDto, WorkOrderChecklistRuleDto, WorkOrderTypeDto } from "@lyra/contracts";
+import { WORK_ORDER_CHECKLIST_MOMENT_META, type SpecialtyDto, type WorkOrderChecklistRuleDto, type WorkOrderTypeDto } from "@lyra/contracts";
 import { Button, Chip, EmptyState, GridPager, Input, Select, Spinner, Toggle, useToast } from "@lyra/ui";
 import { usePermissions } from "../../auth/use-permissions.js";
 import {
@@ -299,13 +299,14 @@ function ChecklistRulesTab() {
             <div className={styles.tableCard}>
               <table className={styles.table}>
                 <thead><tr>
-                  <th>Regla</th><th>Plantilla</th><th>Aplica a</th><th>Obligatorio</th><th className={styles.num}>Orden</th><th>Estado</th><th></th>
+                  <th>Regla</th><th>Plantilla</th><th>Momento</th><th>Aplica a</th><th>Obligatorio</th><th className={styles.num}>Orden</th><th>Estado</th><th></th>
                 </tr></thead>
                 <tbody>
                   {pageRows.map((r) => (
                     <tr key={r.id} className={r.active ? undefined : styles.inactiveRow}>
                       <td><span className={styles.nameCell}>{r.name}</span></td>
                       <td>{r.templateName ?? <span className={styles.muted}>—</span>}</td>
+                      <td>{WORK_ORDER_CHECKLIST_MOMENT_META[r.moment].label}</td>
                       <td>
                         {r.appliesToTypeNames.length > 0 ? r.appliesToTypeNames.join(", ") : <span className={styles.muted}>Todos los tipos</span>}
                         {r.minCriticality != null && <div className={styles.cellDesc}>Criticidad ≥ {r.minCriticality}</div>}

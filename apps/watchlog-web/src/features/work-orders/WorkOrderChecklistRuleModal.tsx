@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import type { WorkOrderChecklistRuleDto } from "@lyra/contracts";
+import {
+  WORK_ORDER_CHECKLIST_MOMENTS,
+  WORK_ORDER_CHECKLIST_MOMENT_META,
+  type WorkOrderChecklistMoment,
+  type WorkOrderChecklistRuleDto,
+} from "@lyra/contracts";
 import { Button, Combobox, Input, Modal, MultiSelect, Select, Toggle, useToast } from "@lyra/ui";
 import {
   usePublishedTemplateOptions,
@@ -23,6 +28,7 @@ export function WorkOrderChecklistRuleModal({ open, onClose, rule }: { open: boo
 
   const [name, setName] = useState("");
   const [templateId, setTemplateId] = useState("");
+  const [moment, setMoment] = useState<WorkOrderChecklistMoment>("AUTHORIZATION");
   const [mandatory, setMandatory] = useState(false);
   const [appliesToTypeIds, setAppliesToTypeIds] = useState<string[]>([]);
   const [minCriticality, setMinCriticality] = useState<string>("");
@@ -36,6 +42,7 @@ export function WorkOrderChecklistRuleModal({ open, onClose, rule }: { open: boo
     if (!open) return;
     setName(rule?.name ?? "");
     setTemplateId(rule?.templateId ?? "");
+    setMoment(rule?.moment ?? "AUTHORIZATION");
     setMandatory(rule?.mandatory ?? false);
     setAppliesToTypeIds(rule?.appliesToTypeIds ?? []);
     setMinCriticality(rule?.minCriticality != null ? String(rule.minCriticality) : "");
@@ -64,6 +71,13 @@ export function WorkOrderChecklistRuleModal({ open, onClose, rule }: { open: boo
     () => [...types].sort((a, b) => a.name.localeCompare(b.name)).map((t) => ({ value: t.id, label: t.name })),
     [types],
   );
+  const momentOptions = useMemo(
+    () =>
+      [...WORK_ORDER_CHECKLIST_MOMENTS]
+        .sort((a, b) => WORK_ORDER_CHECKLIST_MOMENT_META[a].order - WORK_ORDER_CHECKLIST_MOMENT_META[b].order)
+        .map((m) => ({ value: m, label: WORK_ORDER_CHECKLIST_MOMENT_META[m].label })),
+    [],
+  );
 
   function save() {
     upsert.mutate(
@@ -71,6 +85,7 @@ export function WorkOrderChecklistRuleModal({ open, onClose, rule }: { open: boo
         id: rule?.id,
         name: name.trim(),
         templateId,
+        moment,
         mandatory,
         appliesToTypeIds,
         minCriticality: minCriticality ? Number(minCriticality) : null,
@@ -115,6 +130,14 @@ export function WorkOrderChecklistRuleModal({ open, onClose, rule }: { open: boo
               <span>Ver todas las plantillas (no solo las de tipo checklist)</span>
             </label>
           )}
+        </div>
+
+        <div className={styles.field}>
+          <span className={styles.fieldLabel}>Momento del ciclo *</span>
+          {/* En qué momento de la OT se exige el checklist (Combobox buscable, no select nativo).
+              Autorización = permiso antes de ejecutar; Cierre = retiro de controles al cerrar. */}
+          <Combobox options={momentOptions} value={moment} onChange={(v) => setMoment(v as WorkOrderChecklistMoment)} placeholder="Selecciona…" searchPlaceholder="Buscar momento…" />
+          <span className={styles.hint}>{WORK_ORDER_CHECKLIST_MOMENT_META[moment].hint}</span>
         </div>
 
         <label className={styles.checkboxRow}>

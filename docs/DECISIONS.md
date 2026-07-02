@@ -4,6 +4,47 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-02 · OT S5b Slice A — Eje `momento` de checklists + checklist de CIERRE (generalización §11.2/§11.4.3)
+Con visto bueno del dueño (4 decisiones vía preguntas) se partió S5b en **Slice A (backbone del eje `momento` + CIERRE
+per-OT, ESTA sesión)** y **Slice B (EJECUCIÓN por actividad + Gobierno 2, sesión siguiente)** — respeta "un objetivo por
+sesión". Decisiones aprobadas y fijadas:
+1. **Eje `momento` como DATO** (`feat/ot-checklists-momento`). Enum `WorkOrderChecklistMoment`
+   (REQUEST|PLANNING|AUTHORIZATION|EXECUTION|CLOSURE) en `WorkOrderChecklistRule` **y** en `WorkOrderChecklist`
+   (denormalizado/congelado al materializar; los manuales heredan el momento del estado actual). **Default AUTHORIZATION ⇒
+   100% retrocompatible** (las reglas/checklists de S3 se leen como de autorización, sin cambio de comportamiento). El
+   TIPO/flujo declara qué estado corresponde a cada momento (paridad `folioOnStateKey`): AUTHORIZATION reusa
+   `checklistSuggestStateKey`/`checklistGateStateKey`; **CLOSURE** = nueva clave `WorkOrderType.closureChecklistSuggestStateKey`
+   (default `en_revision_cierre`) + el guard de cierre (`becomesFinal`); EXECUTION reusará `executeStateKey` (Slice B). Migración
+   aditiva `20260702210000_add_checklist_moment` (`migrate diff` live→datamodel + `db:deploy`; drift ajeno descartado:
+   `LogEntry_currentStateSince_idx` + `OrgStructure.updatedAt`; node de :3000 detenido antes de `prisma generate` por EPERM).
+2. **CIERRE per-OT (no per-actividad)** para el Slice A. *Motivo:* el cierre formal del PERMISO es UN acto (retiro de controles,
+   reenergizar, sitio seguro) — modelarlo per-OT es fiel y **barato**, y valida toda la maquinaria de momentos de punta a punta
+   sin la complejidad per-actividad (que sí exige la EJECUCIÓN, Slice B). Se sugiere al ENTRAR a `en_revision_cierre` y **BLOQUEA
+   el cierre** si un checklist CLOSURE obligatorio no está APPROVED (guard `assertChecklistsCompleteForMoment(id, "CLOSURE")`
+   junto al `assertActivitiesComplete` ya existente). Bloqueo EXPLICADO (nombra la plantilla que falta).
+3. **Materialización y gates POR MOMENTO.** `materializeForWorkOrder(woId, moment, actor)` filtra reglas por momento y congela
+   el momento en la fila; `suggest()` (re-derivación manual) deriva el momento del estado actual (`momentForCurrentState`).
+   Guard genérico `assertChecklistsCompleteForMoment` + helper puro `blockingChecklistsForMoment` (contracts, +2 specs). El
+   `blockingChecklistsForClose` legado se conserva moment-blind como indicador general de cabecera en la UI.
+4. **SIN permiso nuevo** (reusa `workorder:checklist:manage` para curar y `workordercatalog:manage` para las reglas). *Motivo:*
+   el diseño §5 ya cubre estos actos; un permiso propio contradiría el catálogo aprobado ⇒ **sin db:seed/FLUSHALL** por permisos
+   (el seed se re-corre solo por la nueva plantilla/regla de cierre; 102 permisos sin cambio).
+5. **UX (visto bueno del dueño):** editor de la regla con **Combobox «Momento»** (no `<select>` nativo) + hint por momento;
+   pestaña «Verificaciones» de la OT **agrupada por momento** (subtítulos Autorización·Ejecución·Cierre en orden cronológico,
+   con su hint) para leer "dónde va cada checklist" de un vistazo; columna «Momento» en la grilla de reglas del catálogo. Sin
+   jerga «Puerta N» en textos visibles; tokens del DS (claro/oscuro), ≥44px.
+6. **Seed:** +1 plantilla-checklist «Cierre de permiso — Retiro de bloqueos y reenergización» (`purpose:"CHECKLIST"`) + regla
+   `moment:CLOSURE, mandatory` acotada a `ptw-alto-riesgo`+`requiresPtw:true`; la regla LOTO existente se marca `AUTHORIZATION`.
+Verde: typecheck (7 proyectos) · lint 0 errores · build exit 0 · **contracts** (checklists.spec 11) · API 252 · web ·
+`smoke-workorders.py` **95/95** (ciclo de cierre por momento: regla CLOSURE → materialización al entrar a revisión de cierre →
+cierre BLOQUEADO con checklist obligatorio sin aprobar → aprobar (instanciar→sellar→enviar→revisor) → **cerrar OK**) +
+regresión **incidencias 32/32**. **Diferido a S5b Slice B:** EJECUCIÓN por actividad (`WorkOrderChecklist.workActivityId`,
+unique `(workOrderId, templateId, workActivityId)`, guard por actividad al marcar DONE) + **Gobierno 2** (el aprobador ve/cura/
+confirma el set de ejecución en la autorización, `executionSetConfirmedAt`; reusa `workorder:checklist:manage`). Ver
+`docs/design/OT_DESIGN_ARCHITECTURE.md §11`.
+
+---
+
 ### 2026-07-02 · OT S5a — Puerta 4: seguimiento vivo del avance + cierre (CIERRA EL MVP Solicitud→Cierre)
 Objetivo aprobado por el dueño: partir S5 en **5a (seguimiento + cierre "core", esta sesión)** y **5b (checklists por
 `momento` + Gobierno 2, sesión siguiente)**. *Decisiones tomadas:*

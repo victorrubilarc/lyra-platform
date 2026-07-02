@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   applicableChecklistRules,
   blockingChecklistsForClose,
+  blockingChecklistsForMoment,
   summarizeChecklists,
+  type WorkOrderChecklistMoment,
   type WorkOrderChecklistStatus,
 } from "./checklists.js";
 
@@ -69,6 +71,26 @@ describe("blockingChecklistsForClose", () => {
 
   it("no bloquea si todos los obligatorios están APPROVED", () => {
     expect(blockingChecklistsForClose([cl(true, "APPROVED"), cl(false, "PENDING")])).toHaveLength(0);
+  });
+});
+
+describe("blockingChecklistsForMoment", () => {
+  const cl = (moment: WorkOrderChecklistMoment, mandatory: boolean, status: WorkOrderChecklistStatus) => ({ moment, mandatory, status });
+
+  it("sólo bloquea obligatorios no APPROVED DEL momento pedido", () => {
+    const list = [
+      cl("AUTHORIZATION", true, "PENDING"), // bloquea autorización
+      cl("AUTHORIZATION", true, "APPROVED"),
+      cl("CLOSURE", true, "PENDING"), // bloquea cierre, NO autorización
+      cl("CLOSURE", false, "PENDING"),
+    ];
+    expect(blockingChecklistsForMoment(list, "AUTHORIZATION")).toHaveLength(1);
+    expect(blockingChecklistsForMoment(list, "CLOSURE")).toHaveLength(1);
+    expect(blockingChecklistsForMoment(list, "EXECUTION")).toHaveLength(0);
+  });
+
+  it("un CLOSURE aprobado no bloquea el cierre", () => {
+    expect(blockingChecklistsForMoment([cl("CLOSURE", true, "APPROVED")], "CLOSURE")).toHaveLength(0);
   });
 });
 

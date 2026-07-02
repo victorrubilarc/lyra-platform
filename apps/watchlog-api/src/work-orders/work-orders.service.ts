@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import {
   DEFAULT_WORK_ORDER_CHECKLIST_GATE_STATE_KEY,
   DEFAULT_WORK_ORDER_CHECKLIST_SUGGEST_STATE_KEY,
+  DEFAULT_WORK_ORDER_CLOSURE_CHECKLIST_SUGGEST_STATE_KEY,
   DEFAULT_WORK_ORDER_EXECUTE_STATE_KEY,
   DEFAULT_WORK_ORDER_FOLIO_STATE_KEY,
   DEFAULT_WORK_ORDER_PLAN_FREEZE_STATE_KEY,
@@ -324,18 +325,19 @@ export class WorkOrdersService {
     // Puerta 2 — claves data-driven de sugerencia/puerta de checklists (S3).
     const type = await this.prisma.workOrderType.findUnique({
       where: { id: row.typeId },
-      select: { folioScheme: true, folioOnStateKey: true, checklistSuggestStateKey: true, checklistGateStateKey: true, planFreezeStateKey: true, executeStateKey: true },
+      select: { folioScheme: true, folioOnStateKey: true, checklistSuggestStateKey: true, checklistGateStateKey: true, planFreezeStateKey: true, executeStateKey: true, closureChecklistSuggestStateKey: true },
     });
     const folioStateKey = type?.folioOnStateKey ?? DEFAULT_WORK_ORDER_FOLIO_STATE_KEY;
     const checklistGateStateKey = type?.checklistGateStateKey ?? DEFAULT_WORK_ORDER_CHECKLIST_GATE_STATE_KEY;
     const checklistSuggestStateKey = type?.checklistSuggestStateKey ?? DEFAULT_WORK_ORDER_CHECKLIST_SUGGEST_STATE_KEY;
     const planFreezeStateKey = type?.planFreezeStateKey ?? DEFAULT_WORK_ORDER_PLAN_FREEZE_STATE_KEY;
     const executeStateKey = type?.executeStateKey ?? DEFAULT_WORK_ORDER_EXECUTE_STATE_KEY;
+    const closureSuggestStateKey = type?.closureChecklistSuggestStateKey ?? DEFAULT_WORK_ORDER_CLOSURE_CHECKLIST_SUGGEST_STATE_KEY;
 
-    // GUARD Puerta 2: sólo se ENTRA al estado-puerta con los checklists obligatorios
-    // APROBADOS (espejo de assertNoBlockingActions de Incidencias; ANTES de mutar).
+    // GUARD Puerta 2 (momento AUTHORIZATION): sólo se ENTRA al estado-puerta con los
+    // checklists obligatorios de AUTORIZACIÓN aprobados (espejo de assertNoBlockingActions).
     if (toState.key === checklistGateStateKey) {
-      await this.checklists.assertChecklistsComplete(id);
+      await this.checklists.assertChecklistsCompleteForMoment(id, "AUTHORIZATION");
     }
     // GUARD Puerta 3: sólo se autoriza el plan (se CONGELA la baseline) con ≥1 actividad.
     const isPlanFreeze = toState.key === planFreezeStateKey && !row.planFrozenAt;
@@ -348,9 +350,11 @@ export class WorkOrdersService {
     if (toState.key === executeStateKey && planNotFrozen(row)) {
       throw new BadRequestException("No se puede ejecutar: el plan de trabajo aún no ha sido autorizado (baseline sin congelar).");
     }
-    // GUARD Puerta 4: no se cierra con actividades obligatorias del plan abiertas.
+    // GUARD Puerta 4: no se cierra con actividades obligatorias del plan abiertas NI con
+    // checklists de CIERRE obligatorios sin aprobar (retiro de controles, reenergizar).
     if (becomesFinal && row.approvedAt) {
       await this.activities.assertActivitiesComplete(id);
+      await this.checklists.assertChecklistsCompleteForMoment(id, "CLOSURE");
     }
     const isApproval = toState.key === folioStateKey && !row.approvedAt;
     const isRejection = becomesFinal && !row.approvedAt && !isApproval;
@@ -460,11 +464,14 @@ export class WorkOrdersService {
         });
       }
     });
-    // SUGERENCIA Puerta 2 (S3): al ENTRAR al estado de preparación, materializa los
-    // checklists cuyas reglas matchean (idempotente). Fuera de la tx de la transición:
-    // si la sugerencia fallara no revierte una transición ya válida.
+    // SUGERENCIA por MOMENTO (idempotente, fuera de la tx: si fallara no revierte una
+    // transición ya válida). AUTORIZACIÓN al ENTRAR a preparación (S3); CIERRE al ENTRAR
+    // a la revisión de cierre (S5b) — así el checklist de cierre aparece a tiempo.
     if (toState.key === checklistSuggestStateKey) {
-      await this.checklists.materializeForWorkOrder(id, userId);
+      await this.checklists.materializeForWorkOrder(id, "AUTHORIZATION", userId);
+    }
+    if (toState.key === closureSuggestStateKey) {
+      await this.checklists.materializeForWorkOrder(id, "CLOSURE", userId);
     }
     await this.audit.record({
       ...ctx,
@@ -583,6 +590,7 @@ export class WorkOrdersService {
       checklistGateStateKey: r.checklistGateStateKey,
       planFreezeStateKey: r.planFreezeStateKey,
       executeStateKey: r.executeStateKey,
+      closureChecklistSuggestStateKey: r.closureChecklistSuggestStateKey,
       active: r.active,
       sortOrder: r.sortOrder,
     }));
@@ -612,6 +620,7 @@ export class WorkOrdersService {
       checklistGateStateKey: dto.checklistGateStateKey ?? null,
       planFreezeStateKey: dto.planFreezeStateKey ?? null,
       executeStateKey: dto.executeStateKey ?? null,
+      closureChecklistSuggestStateKey: dto.closureChecklistSuggestStateKey ?? null,
       active: dto.active ?? true,
       sortOrder: dto.sortOrder ?? 0,
     };

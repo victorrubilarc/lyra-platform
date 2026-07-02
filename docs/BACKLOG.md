@@ -5,7 +5,17 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-07-02** — **🔧 OT · Sesión 5a · PUERTA 4 (seguimiento vivo del avance + cierre) ✅ → CIERRA EL MVP
+> actualización: **2026-07-02** — **🔧 OT · Sesión 5b · Slice A · Eje `momento` de checklists + checklist de CIERRE ✅**
+> (`feat/ot-checklists-momento`): eje **`momento`** (REQUEST/PLANNING/AUTHORIZATION/EXECUTION/CLOSURE) como DATO en
+> `WorkOrderChecklistRule` y `WorkOrderChecklist` (default AUTHORIZATION ⇒ retrocompatible; migr. aditiva
+> `20260702210000`) + `WorkOrderType.closureChecklistSuggestStateKey` (data-driven); materialización y guard **por momento**
+> (AUTHORIZATION = S3 intacto; **CLOSURE per-OT**: sugerido al entrar a `en_revision_cierre`, BLOQUEA el cierre si obligatorio
+> sin aprobar) + helper puro `blockingChecklistsForMoment`. Web: Combobox «Momento» en el editor de la regla + pestaña
+> «Verificaciones» AGRUPADA por momento + columna «Momento» en el catálogo. **Sin permiso nuevo** (reusa
+> `workorder:checklist:manage`, sin FLUSHALL) + seed (plantilla/regla de CIERRE). verde + `smoke-workorders.py` **95/95** +
+> regresión incidencias 32/32. **Movido a S5b Slice B:** checklists de EJECUCIÓN por actividad
+> (`WorkOrderChecklist.workActivityId`, guard por actividad) + **Gobierno 2** (confirmación del set de ejecución en la
+> autorización, `executionSetConfirmedAt`). Antes (2026-07-02): **🔧 OT · Sesión 5a · PUERTA 4 (seguimiento vivo del avance + cierre) ✅ → CIERRA EL MVP
 > Solicitud→Cierre** (`feat/ot-seguimiento-cierre`): entidad NUEVA **`WorkActivityUpdate`** (avance append-only, migr.
 > `20260702200000`) + `WorkActivitiesService.recordProgress`/`listUpdates` (foto vigente denormalizada + evento
 > `ACTIVITY_PROGRESS`/`_DONE`/`_BLOCKED` + `assertProgressable` = plan congelado + OT abierta) + helpers puros
@@ -784,12 +794,19 @@ nunca queda más de una sesión atrás.
       `planNotFrozen` + firma Part 11 + `closureSummary` ya de S4; bloqueos EXPLICADOS). Reusa `workorder:activity:manage`.
       Web: pestaña «Plan» viva (columna Avance + modal «Registrar avance» + historial expandible). smoke-workorders **90/90**
       + incidencias 32/32.
-- [ ] **Sesión 5b — Checklists por `momento` + Gobierno 2 (~20–25 HH):** (b) eje `momento` en `WorkOrderChecklistRule`
-      (REQUEST/PLANNING/AUTHORIZATION/EXECUTION/CLOSURE, mapeado a estados por dato como `folioOnStateKey`, §11.2);
-      (c) checklists de **EJECUCIÓN** por actividad (candados/energía cero/LMRA en terreno, ligados a `WorkActivity`, §11.4.2);
-      **+ checklist de CIERRE del permiso** (retirar controles/candados, reenergizar, sitio seguro, §11.4.3); (d) **Gobierno 2**
-      (en la autorización del permiso el aprobador VE y CONFIRMA en solo-lectura el set de checklists de ejecución que se
-      exigirá, con agregar/quitar, §11.5). DECISIONS 2026-07-02.
+- [~] **Sesión 5b — Checklists por `momento` + Gobierno 2 (~20–25 HH):** partida en 2 slices (visto bueno del dueño).
+  - [x] **Slice A ✅ (2026-07-02, `feat/ot-checklists-momento`):** (b) eje `momento` en `WorkOrderChecklistRule` **y**
+        `WorkOrderChecklist` (default AUTHORIZATION, retrocompatible; §11.2) mapeado a estados por dato
+        (`closureChecklistSuggestStateKey`, paridad `folioOnStateKey`); **+ checklist de CIERRE del permiso per-OT** (§11.4.3):
+        sugerido al entrar a `en_revision_cierre`, BLOQUEA el cierre si obligatorio sin aprobar (guard
+        `assertChecklistsCompleteForMoment`/`blockingChecklistsForMoment`). UI: Combobox «Momento» + «Verificaciones» agrupada
+        por momento + columna en catálogo. Sin permiso nuevo. `smoke-workorders.py` 95/95 + incidencias 32/32.
+  - [ ] **Slice B (sesión siguiente):** (c) checklists de **EJECUCIÓN** por actividad (candados/energía cero/LMRA en terreno,
+        ligados a `WorkActivity` vía `WorkOrderChecklist.workActivityId`; unique `(workOrderId, templateId, workActivityId)`;
+        guard por actividad al marcar DONE + backstop al cierre, §11.4.2); (d) **Gobierno 2** (en la autorización del permiso el
+        aprobador VE/CURA/CONFIRMA en solo-lectura el set de checklists de EJECUCIÓN que se exigirá — filas concretas por
+        actividad —, con agregar/quitar/rechazar + sello `WorkOrder.executionSetConfirmedAt`; reusa `workorder:checklist:manage`,
+        §11.5). DECISIONS 2026-07-02.
 - [ ] **Sesión 6 — Alertas, SLA y semáforos / "vigía digital" (~40 HH):** eventos `workorder.overdue`/`.activity.overdue`/
       `.stalled`/`.sla.breached`; curva de alerta (esperado vs real / incoherencia); escalamiento democratizado; semáforos
       + panel de seguimiento activo. Reusa Bloque N + `findBreaches`.
