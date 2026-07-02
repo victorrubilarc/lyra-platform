@@ -10,7 +10,7 @@
 > funcionalidades existentes** aunque su detalle aún esté por redactar (✍️): así nada se
 > olvida; el backfill de lo ya construido se llena de a poco (incremental).
 >
-> Última actualización: **2026-07-02** (Órdenes de trabajo — Puerta 2: checklists / permisos de trabajo ligados al constructor de formularios, S3).
+> Última actualización: **2026-07-02** (Órdenes de trabajo — Puerta 3: plan de actividades + asistente guiado + congelar línea base, y reorden del flujo al estándar planificar→autorizar→ejecutar, S4).
 
 ## Convención de cada sección
 Cada funcionalidad se documenta con estas cuatro partes fijas:
@@ -144,8 +144,9 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 - ✅ **Crear y listar solicitudes de trabajo** (asistente de 2 pasos, grilla con filtros/facetas, detalle con reasignar/prioridad/anular) (§ Órdenes de trabajo)
 - ✅ **Enviar, aprobar (con firma y folio oficial) o rechazar la solicitud — Puerta 1** (flujo de estados con stepper, firma electrónica, folio OT-AAAA-#### emitido al aprobar, rechazo con motivo, historial) (§ Órdenes de trabajo ▸ Aprobación)
 - ✅ **Checklists / permisos de trabajo — Puerta 2** (reglas configurables, sugerencia automática al preparar, llenado como registro del constructor de formularios, revisión con segregación revisor≠responsable, bloqueo hasta aprobar los obligatorios) (§ Órdenes de trabajo ▸ Checklists y permisos de trabajo)
+- ✅ **Plan de actividades y autorización del plan — Puerta 3** (armar el plan con grilla o **asistente guiado**, congelar la línea base al autorizar, desviación plan-vs-real) (§ Órdenes de trabajo ▸ Plan de actividades)
 - ✅ **Administrar los catálogos** (tipos de OT, especialidades y reglas de checklist) (§ Órdenes de trabajo ▸ Catálogos) [solo administrador]
-- ✍️ Plan de actividades y cierre (Puertas 3–4 — Sesiones 4–5)
+- ✍️ Seguimiento vivo y cierre (Puerta 4 — Sesión 5)
 
 ---
 
@@ -250,9 +251,9 @@ lista de texto suelta. La OT **no puede pasar la Puerta 2** mientras quede un pe
    (habilitado solo cuando el registro está sellado).
 3. **El revisor** —**una persona distinta del que lo completó** (segregación de funciones)— abre **«Revisar»** y
    **Aprueba** o **Rechaza** (con motivo). Un checklist rechazado puede **«Rehacer»** (abre un registro nuevo).
-4. Cuando **todos los obligatorios están Aprobados**, el responsable ejecuta la transición **«Aprobar checklists»**
-   (Puerta 2, con firma) y la OT avanza a **Checklists OK** → planificación. Si falta alguno, la transición se **bloquea**
-   con un aviso.
+4. Cuando **todos los obligatorios están Aprobados**, el responsable ejecuta la transición **«Autorizar permiso»**
+   (Puerta 2, con firma) y la OT avanza a **Permiso autorizado** → ejecución. Si falta alguno, la transición se **bloquea**
+   con un aviso. *(Recuerda el orden nuevo: la **planificación** ya ocurrió antes de esta puerta.)*
 
 **Quién puede.** Gestionar/instanciar/revisar checklists requiere **`workorder:checklist:manage`**. Avanzar la Puerta 2
 (la transición firmada) requiere **`workorder:transition`**. El **revisor debe ser distinto del responsable** que completó
@@ -265,6 +266,46 @@ el checklist (lo valida el sistema, no es una convención).
 - Las **reglas** de qué checklist se sugiere y a qué OT son **100% configurables** (ver Catálogos ▸ Reglas de checklist);
   los contenidos (LOTO, altura, etc.) son **plantillas** que diseñas en el constructor de formularios, nunca están
   "quemados" en el código.
+
+### Órdenes de trabajo ▸ Plan de actividades y autorización del plan (Puerta 3)  [Planificador]
+
+**Para qué sirve.** Definir **qué hay que hacer** (las tareas del trabajo), **quién** las ejecuta, **cuándo** y en **qué
+orden**, y luego **autorizar el plan**. Al autorizar se **congela la línea base** (baseline): las fechas planificadas
+quedan grabadas como referencia, y de ahí en adelante el sistema compara el avance real contra esa línea base para medir
+**desviación**. Es el equivalente a las *operaciones* de una orden de trabajo en un CMMS (SAP PM / Maximo).
+
+> **Orden estándar (nuevo).** El flujo va **Aprobar → Planificar → Autorizar el permiso → Ejecutar**: primero se define
+> el plan y **después** se autoriza el permiso de trabajo, porque los peligros a controlar **dependen de las tareas** que
+> se van a hacer. (Las órdenes que ya estaban en curso conservan su recorrido original.)
+
+**Cómo se usa.**
+1. Con la solicitud **aprobada**, pulsa **«Iniciar planificación»** (pestaña Resumen). La OT pasa a **En planificación**.
+2. Abre la pestaña **«Plan»**. Un aviso te dice **dónde estás** y **qué falta** para autorizar (por ejemplo, «agrega al
+   menos una actividad»).
+3. Arma el plan de una de dos formas:
+   - **Asistente guiado** (recomendado si partes de cero): te lleva paso a paso — **Tareas** (enumera qué hay que hacer,
+     una por línea) → **Equipo** (responsable y especialidad por defecto) → **Fechas** (ventana de trabajo) → **Orden**
+     (revisa la secuencia y **Genera el plan**). Toma valores por defecto de la propia OT para que escribas lo mínimo.
+   - **Grilla** (para el experto): agrega actividades una a una con todos sus campos, **reordénalas** con las flechas
+     ▲▼, **edítalas** o **elimínalas**. Puedes fijar dependencias («depende de…») y marcar cuáles son **obligatorias**.
+4. Cuando el plan esté listo, vuelve a **Resumen** y pulsa **«Autorizar plan»**. El sistema exige **al menos una
+   actividad**; al confirmar, **congela la línea base** (la OT pasa a **Plan aprobado**) y registra el hito en el
+   historial. A partir de ahí el plan queda **bloqueado** (no se puede editar): es la referencia contra la que se medirá
+   la ejecución. Si algo no cuadra, usa **«Devolver plan»** para volver a planificación.
+5. Con el plan aprobado, la OT sigue a **preparación/permiso** (Puerta 2) y luego a **ejecución**. La grilla del plan
+   muestra, cuando corresponda, la **desviación** de cada actividad respecto a su línea base (p. ej. `+3d`).
+
+**Quién puede.** Gestionar el plan (crear/editar/reordenar/eliminar actividades y usar el asistente) requiere
+**`workorder:activity:manage`**. Autorizar el plan (la transición) requiere **`workorder:transition`** y que el rol esté
+habilitado para esa puerta.
+
+**Importante.**
+- **Un plan sin tareas no se puede autorizar.** Es a propósito: sin actividades no hay nada que ejecutar ni medir.
+- **La línea base se congela una sola vez.** Tras autorizar, el plan es de solo lectura; los cambios de alcance
+  posteriores se gestionan como parte de la ejecución/cierre (Sesión 5) y el control de cambios (más adelante).
+- **No se puede ejecutar sin un plan autorizado.** El sistema lo impide aunque se intente saltar pasos.
+- El **avance real** de cada actividad (marcar progreso, fechas reales, evidencias) y el **cierre** llegan en la etapa
+  siguiente (Puerta 4).
 
 ### Órdenes de trabajo ▸ Catálogos (tipos, especialidades y reglas de checklist)  [Admin]
 

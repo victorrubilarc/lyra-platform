@@ -1,5 +1,30 @@
 # Progreso — Lyra WatchLog
 
+**2026-07-02 — 🔧 OT · Sesión 4 · PUERTA 3 (plan de actividades + congelar baseline) + reorden del flujo ✅**
+(`feat/ot-puerta3`). La fase **Planificación** está VIVA. **Reorden al estándar EAM (§11.3):** el flujo `ot-4-puertas`
+pasa a **planificar → autorizar el permiso → ejecutar** (los peligros dependen de las tareas). Nuevo orden:
+`borrador → solicitada → aprobada → en_planificacion → plan_aprobado (P3) → en_preparacion → checklists_ok (P2, "Permiso
+autorizado") → en_ejecucion → en_revision_cierre → cerrada`. Solo cambian `from/to/order`; el flujo es DATO INMUTABLE
+versionado y el seed **republica una versión NUEVA (v2)** al detectar el cambio (firma de contenido) — los OT en curso
+conservan su versión CONGELADA. **`WorkActivity`** (entidad PROPIA, fork W1): title/desc/sequence/responsable/especialidad/
+plannedStart-End/**baselineStart-End**/actualStart-End/progressPct/status(PENDING|IN_PROGRESS|BLOCKED|DONE|CANCELED)/
+mandatory/dependsOnId(self, ruta crítica S8)/priority + columnas reservadas (HH S8, evidence). Migración
+`20260702180000_add_work_order_activities` (`migrate diff`+`db:deploy`, drift ajeno descartado) + `WorkOrder.planFrozenAt/
+planFrozenById`. **Puerta 3 (`autorizar_plan`)**: exige **≥1 actividad** (guard puro `planReadyToFreeze`), **CONGELA la
+baseline** (copia `planned*→baseline*` dentro de la tx, idempotente) + `planFrozenAt` + evento `PLAN_FROZEN`; tras congelar
+el plan es **inmutable** (mutaciones → 400). **Guard "no ejecuta sin plan"** (`planNotFrozen`, puro) al ENTRAR a
+`executeStateKey`; **guard de cierre** `blockingActivitiesForClose` (mandatory abierta) al cerrar. **Claves data-driven**
+nuevas en `WorkOrderType`: `planFreezeStateKey`(def. `plan_aprobado`)/`executeStateKey`(def. `en_ejecucion`) (paridad
+`folioOnStateKey`). **Permiso NUEVO `workorder:activity:manage`** (catálogo 101→**102**; db:seed+FLUSHALL hechos). **Web:**
+pestaña **"Plan"** en el drawer (`WorkOrderPlanBlock`): banner de etapa que EXPLICA la próxima acción y bloqueos + **grilla**
+(reordenar ▲▼/editar/eliminar, desviación plan-vs-baseline +Xd tras congelar) + **asistente guiado** (`Stepper`, 4 pasos
+Tareas→Equipo→Fechas→Orden, defaults desde la OT, genera en lote `/activities/batch`; arranca cuando no hay actividades).
+Guards PUROS en `contracts/work-orders/activities.ts` (+`activities.spec.ts` 8). typecheck(0)/lint(0 err)/build/test verdes;
+**contracts 421** · API 252 · web 6; `smoke-workorders.py` **78/78** (pipeline planificar→autorizar_plan[baseline==planned]→
+plan inmutable→preparar→checklists→ejecutar + Puerta 3 sin actividades bloqueada + gates 403 del permiso nuevo) + regresión
+incidencias 32/32. **Diferido a S5:** checklists de EJECUCIÓN/CIERRE por actividad, eje `momento`, confirmación del set en
+Puerta 2 (§11.5), `WorkActivityUpdate`. Ver DECISIONS 2026-07-02. **Siguiente = OT S5 (Puerta 4 — seguimiento vivo + cierre).**
+
 **2026-07-02 — 🐞 FIX OT · folio = serie ÚNICA GLOBAL** (`fix/ot-folio-global`). *Síntoma reportado por el dueño:*
 aprobar una 2.ª OT (de otro tipo) daba **Internal Error** (500 `Unique constraint failed: folio`). *Causa:* el default
 `folioScheme` era **scope `type`** (contador por tipo) pero el folio renderizado (`OT-2026-0001`) NO lleva el tipo y

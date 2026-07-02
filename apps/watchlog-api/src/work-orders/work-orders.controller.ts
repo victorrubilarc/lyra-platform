@@ -4,9 +4,13 @@ import {
   addWorkOrderChecklistRequestSchema,
   assignWorkOrderRequestSchema,
   cancelWorkOrderRequestSchema,
+  createWorkActivitiesBatchRequestSchema,
+  createWorkActivityRequestSchema,
   createWorkOrderRequestSchema,
+  reorderWorkActivitiesRequestSchema,
   reviewWorkOrderChecklistRequestSchema,
   transitionWorkOrderRequestSchema,
+  updateWorkActivityRequestSchema,
   updateWorkOrderRequestSchema,
   upsertWorkOrderChecklistRuleRequestSchema,
   upsertWorkOrderTagRequestSchema,
@@ -15,9 +19,13 @@ import {
   type AddWorkOrderChecklistRequest,
   type AssignWorkOrderRequest,
   type CancelWorkOrderRequest,
+  type CreateWorkActivitiesBatchRequest,
+  type CreateWorkActivityRequest,
   type CreateWorkOrderRequest,
+  type ReorderWorkActivitiesRequest,
   type ReviewWorkOrderChecklistRequest,
   type TransitionWorkOrderRequest,
+  type UpdateWorkActivityRequest,
   type UpdateWorkOrderRequest,
   type UpsertSpecialtyRequest,
   type UpsertWorkOrderChecklistRuleRequest,
@@ -30,12 +38,14 @@ import { CurrentUser, RequirePermission } from "../authz/authz.decorators";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { WorkOrdersService } from "./work-orders.service";
 import { WorkOrderChecklistsService } from "./work-order-checklists.service";
+import { WorkActivitiesService } from "./work-activities.service";
 
 @Controller("work-orders")
 export class WorkOrdersController {
   constructor(
     private readonly workOrders: WorkOrdersService,
     private readonly checklists: WorkOrderChecklistsService,
+    private readonly activities: WorkActivitiesService,
   ) {}
 
   // --- Catálogos (antes de :id para no chocar) -------------------------------
@@ -257,6 +267,69 @@ export class WorkOrdersController {
     @Req() req: FastifyRequest,
   ) {
     return this.checklists.review(user.id, id, cid, dto, this.ctx(user, req));
+  }
+
+  // --- Plan de actividades de una OT (Puerta 3, S4) --------------------------
+
+  @Get(":id/activities")
+  @RequirePermission("workorder:view")
+  listActivities(@Param("id") id: string, @CurrentUser() user: RequestUser) {
+    return this.activities.listForWorkOrder(user.id, id);
+  }
+
+  @Post(":id/activities")
+  @RequirePermission("workorder:activity:manage")
+  createActivity(
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(createWorkActivityRequestSchema)) dto: CreateWorkActivityRequest,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.activities.create(user.id, id, dto, this.ctx(user, req));
+  }
+
+  // Alta en lote (lo usa el asistente guiado que genera el plan completo).
+  @Post(":id/activities/batch")
+  @HttpCode(200)
+  @RequirePermission("workorder:activity:manage")
+  createActivitiesBatch(
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(createWorkActivitiesBatchRequestSchema)) dto: CreateWorkActivitiesBatchRequest,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.activities.createBatch(user.id, id, dto, this.ctx(user, req));
+  }
+
+  @Post(":id/activities/reorder")
+  @HttpCode(200)
+  @RequirePermission("workorder:activity:manage")
+  reorderActivities(
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(reorderWorkActivitiesRequestSchema)) dto: ReorderWorkActivitiesRequest,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.activities.reorder(user.id, id, dto, this.ctx(user, req));
+  }
+
+  @Patch(":id/activities/:aid")
+  @RequirePermission("workorder:activity:manage")
+  updateActivity(
+    @Param("id") id: string,
+    @Param("aid") aid: string,
+    @Body(new ZodValidationPipe(updateWorkActivityRequestSchema)) dto: UpdateWorkActivityRequest,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.activities.update(user.id, id, aid, dto, this.ctx(user, req));
+  }
+
+  @Delete(":id/activities/:aid")
+  @HttpCode(204)
+  @RequirePermission("workorder:activity:manage")
+  async removeActivity(@Param("id") id: string, @Param("aid") aid: string, @CurrentUser() user: RequestUser, @Req() req: FastifyRequest) {
+    await this.activities.remove(user.id, id, aid, this.ctx(user, req));
   }
 
   private ctx(user: RequestUser, req: FastifyRequest): AuditContext {

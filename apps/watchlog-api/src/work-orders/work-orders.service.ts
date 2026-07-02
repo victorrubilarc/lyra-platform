@@ -3,7 +3,10 @@ import type { Prisma } from "@prisma/client";
 import {
   DEFAULT_WORK_ORDER_CHECKLIST_GATE_STATE_KEY,
   DEFAULT_WORK_ORDER_CHECKLIST_SUGGEST_STATE_KEY,
+  DEFAULT_WORK_ORDER_EXECUTE_STATE_KEY,
   DEFAULT_WORK_ORDER_FOLIO_STATE_KEY,
+  DEFAULT_WORK_ORDER_PLAN_FREEZE_STATE_KEY,
+  planNotFrozen,
   buildFolioSeqKey,
   deriveWorkOrderLifecycle,
   renderFolio,
@@ -33,6 +36,7 @@ import { ScopeService } from "../authz/scope.service";
 import { ReauthService } from "../auth/reauth.service";
 import { FolioService } from "../folio/folio.service";
 import { WorkOrderChecklistsService } from "./work-order-checklists.service";
+import { WorkActivitiesService } from "./work-activities.service";
 
 /** Clave del flujo global por defecto de OT (seed fork W6; el tipo puede declarar otro). */
 const WORK_ORDER_WORKFLOW_KEY = "ot-4-puertas";
@@ -74,6 +78,7 @@ export class WorkOrdersService {
     private readonly reauth: ReauthService,
     private readonly folio: FolioService,
     private readonly checklists: WorkOrderChecklistsService,
+    private readonly activities: WorkActivitiesService,
   ) {}
 
   // === Listado / KPIs ========================================================
@@ -177,6 +182,7 @@ export class WorkOrdersService {
       })),
       approvedAt: row.approvedAt?.toISOString() ?? null,
       folioIssuedAt: row.folioIssuedAt?.toISOString() ?? null,
+      planFrozenAt: row.planFrozenAt?.toISOString() ?? null,
       rejectedAt: row.rejectedAt?.toISOString() ?? null,
       rejectReason: row.rejectReason,
       closedAt: row.closedAt?.toISOString() ?? null,
@@ -316,16 +322,33 @@ export class WorkOrdersService {
     // Puerta 2 — claves data-driven de sugerencia/puerta de checklists (S3).
     const type = await this.prisma.workOrderType.findUnique({
       where: { id: row.typeId },
-      select: { folioScheme: true, folioOnStateKey: true, checklistSuggestStateKey: true, checklistGateStateKey: true },
+      select: { folioScheme: true, folioOnStateKey: true, checklistSuggestStateKey: true, checklistGateStateKey: true, planFreezeStateKey: true, executeStateKey: true },
     });
     const folioStateKey = type?.folioOnStateKey ?? DEFAULT_WORK_ORDER_FOLIO_STATE_KEY;
     const checklistGateStateKey = type?.checklistGateStateKey ?? DEFAULT_WORK_ORDER_CHECKLIST_GATE_STATE_KEY;
     const checklistSuggestStateKey = type?.checklistSuggestStateKey ?? DEFAULT_WORK_ORDER_CHECKLIST_SUGGEST_STATE_KEY;
+    const planFreezeStateKey = type?.planFreezeStateKey ?? DEFAULT_WORK_ORDER_PLAN_FREEZE_STATE_KEY;
+    const executeStateKey = type?.executeStateKey ?? DEFAULT_WORK_ORDER_EXECUTE_STATE_KEY;
 
     // GUARD Puerta 2: sólo se ENTRA al estado-puerta con los checklists obligatorios
     // APROBADOS (espejo de assertNoBlockingActions de Incidencias; ANTES de mutar).
     if (toState.key === checklistGateStateKey) {
       await this.checklists.assertChecklistsComplete(id);
+    }
+    // GUARD Puerta 3: sólo se autoriza el plan (se CONGELA la baseline) con ≥1 actividad.
+    const isPlanFreeze = toState.key === planFreezeStateKey && !row.planFrozenAt;
+    if (isPlanFreeze) {
+      await this.activities.assertPlanReadyToFreeze(id);
+    }
+    // GUARD "no se ejecuta sin plan aprobado": sólo se ENTRA a ejecución con la baseline
+    // congelada (planNotFrozen puro). El grafo del flujo ya fuerza el orden; esto es la
+    // red de seguridad ante un flujo mal configurado (atajo que salte la Puerta 3).
+    if (toState.key === executeStateKey && planNotFrozen(row)) {
+      throw new BadRequestException("No se puede ejecutar: el plan de trabajo aún no ha sido autorizado (baseline sin congelar).");
+    }
+    // GUARD Puerta 4: no se cierra con actividades obligatorias del plan abiertas.
+    if (becomesFinal && row.approvedAt) {
+      await this.activities.assertActivitiesComplete(id);
     }
     const isApproval = toState.key === folioStateKey && !row.approvedAt;
     const isRejection = becomesFinal && !row.approvedAt && !isApproval;
@@ -341,7 +364,11 @@ export class WorkOrdersService {
     });
 
     let issuedFolio: string | null = null;
+    let frozenCount = 0;
     await this.prisma.$transaction(async (tx) => {
+      // Puerta 3 (S4): CONGELA la baseline del plan (planned* → baseline*) dentro de la
+      // misma transacción de la transición, antes de escribir el nuevo estado.
+      if (isPlanFreeze) frozenCount = await this.activities.freezeBaselineWithinTx(tx, id);
       // FOLIO gapless (fork W4): se emite al ENTRAR al estado emisor, DENTRO de la
       // transacción y ANTES de escribir el nuevo estado (si algo falla, no se quema).
       let folioFields: Prisma.WorkOrderUpdateInput = {};
@@ -380,6 +407,7 @@ export class WorkOrdersService {
           lifecycle: lifecycleAfter,
           updatedById: userId,
           ...(isApproval ? { approvedAt: now, approvedById: userId } : {}),
+          ...(isPlanFreeze ? { planFrozenAt: now, planFrozenById: userId } : {}),
           ...(isRejection ? { rejectedAt: now, rejectedById: userId, rejectReason: dto.reason!.trim() } : {}),
           ...(becomesFinal && !isRejection
             ? { closedAt: now, closedById: userId, closureSummary: dto.closureSummary ?? null }
@@ -414,6 +442,18 @@ export class WorkOrdersService {
             actorId: userId,
             actorName: signerName,
             metadata: { folio: issuedFolio },
+          },
+        });
+      }
+      if (isPlanFreeze) {
+        await tx.workOrderEvent.create({
+          data: {
+            workOrderId: id,
+            kind: "PLAN_FROZEN",
+            summary: `Plan autorizado: baseline congelada (${frozenCount} actividad${frozenCount === 1 ? "" : "es"})`,
+            actorId: userId,
+            actorName: signerName,
+            metadata: { frozenActivities: frozenCount },
           },
         });
       }
@@ -539,6 +579,8 @@ export class WorkOrdersService {
       folioOnStateKey: r.folioOnStateKey,
       checklistSuggestStateKey: r.checklistSuggestStateKey,
       checklistGateStateKey: r.checklistGateStateKey,
+      planFreezeStateKey: r.planFreezeStateKey,
+      executeStateKey: r.executeStateKey,
       active: r.active,
       sortOrder: r.sortOrder,
     }));
@@ -566,6 +608,8 @@ export class WorkOrdersService {
       folioOnStateKey: dto.folioOnStateKey ?? null,
       checklistSuggestStateKey: dto.checklistSuggestStateKey ?? null,
       checklistGateStateKey: dto.checklistGateStateKey ?? null,
+      planFreezeStateKey: dto.planFreezeStateKey ?? null,
+      executeStateKey: dto.executeStateKey ?? null,
       active: dto.active ?? true,
       sortOrder: dto.sortOrder ?? 0,
     };

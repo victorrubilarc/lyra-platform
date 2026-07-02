@@ -764,6 +764,13 @@ export const PERMISSION_CATALOG = [
       "Agregar/quitar/instanciar checklists (permisos de trabajo) en una OT y revisarlos (Puerta 2). La segregación revisor≠responsable se aplica en el backend.",
   },
   {
+    key: "workorder:activity:manage",
+    dimension: "ACTION",
+    group: "workorders",
+    description:
+      "Gestionar el plan de actividades de una OT (crear/editar/reordenar/eliminar) y autorizar el plan (Puerta 3, congela la baseline).",
+  },
+  {
     key: "workordercatalog:manage",
     dimension: "ACTION",
     group: "workorders",

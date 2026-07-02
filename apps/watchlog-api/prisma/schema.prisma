@@ -2736,6 +2736,9 @@ model WorkOrderType {
   // --- Checklists / Puerta 2 (S3): claves de estado data-driven (default por constante) ---
   checklistSuggestStateKey String? // estado que dispara la sugerencia de checklists (default "en_preparacion")
   checklistGateStateKey    String? // estado-puerta: sólo se ENTRA con checklists obligatorios APROBADOS (default "checklists_ok")
+  // --- Plan / Puerta 3 (S4): claves de estado data-driven (default por constante) --------
+  planFreezeStateKey String? // estado al que, al ENTRAR, se CONGELA la baseline del plan (default "plan_aprobado")
+  executeStateKey    String? // estado de ejecución: sólo se ENTRA con la baseline del plan congelada (default "en_ejecucion")
   // --- SLA light (S6, espejo IncidentType) ----------------------------------------
   resolutionDueMinutes   Int?
   escalationAfterMinutes Int?
@@ -2772,6 +2775,7 @@ model Specialty {
 
   workOrders     WorkOrderSpecialty[]
   checklistRules WorkOrderChecklistRule[]
+  activities     WorkActivity[]          @relation("WorkActivitySpecialty")
 
   @@index([active])
   @@index([deletedAt])
@@ -2815,6 +2819,9 @@ model WorkOrder {
   plannedStart DateTime? // tentativa (baseline se congela en Puerta 3 - S4)
   plannedEnd   DateTime?
   dueAt        DateTime? // SLA de resolucion (S6)
+  // --- Puerta 3 (S4): baseline del plan congelada -----------------------------------
+  planFrozenAt   DateTime? // cuando se autorizo/congelo el plan (Puerta 3)
+  planFrozenById String?
   // --- Puerta 1 (aprobacion de la solicitud) - INERTE en S1 ------------------------
   approvedAt   DateTime?
   approvedById String?
@@ -2843,6 +2850,7 @@ model WorkOrder {
   equipment   Equipment?            @relation(fields: [equipmentId], references: [id], onDelete: SetNull)
   specialties WorkOrderSpecialty[]
   checklists  WorkOrderChecklist[]
+  activities  WorkActivity[]
   transitions WorkOrderTransition[]
   events      WorkOrderEvent[]
 
@@ -2994,4 +3002,71 @@ model WorkOrderChecklist {
   @@index([workOrderId])
   @@index([status])
   @@index([logEntryId])
+}
+
+// Estado de una actividad/tarea del plan (Puerta 3 - S4). Base conceptual de
+// IncidentAction pero con planificacion (progressPct/baseline/dependencias). BLOCKED
+// = detenida por dependencia o impedimento; DONE/CANCELED = cerrada (no bloquea el
+// cierre de la OT). El avance real (WorkActivityUpdate append-only) llega en S5.
+enum WorkActivityStatus {
+  PENDING
+  IN_PROGRESS
+  BLOCKED
+  DONE
+  CANCELED
+}
+
+// ACTIVIDAD / tarea del plan de trabajo de la OT (fork W1: entidad PROPIA, NO se
+// fusiona con IncidentAction). El plan se arma en la fase Planificacion; al autorizar
+// el plan (Puerta 3) se CONGELA la baseline (planned* -> baseline*) para medir
+// desviacion. Una actividad `mandatory` abierta bloquea el cierre (Puerta 4, S5, via
+// blockingActivitiesForClose). `dependsOnId` = predecesora (ruta critica = S8, hoy
+// solo la columna). ABAC heredado de la OT (por nodo). Sin borrado fisico (CANCELED).
+model WorkActivity {
+  id                String  @id @default(cuid())
+  workOrderId       String
+  title             String
+  description       String?
+  sequence          Int     @default(0) // orden en el plan
+  responsibleId     String? // ref. blanda
+  responsibleRoleId String?
+  specialtyId       String? // disciplina (SetNull)
+  // --- Planificacion (baseline congelada en Puerta 3) -----------------------------
+  plannedStart  DateTime? // plan VIVO (editable hasta congelar)
+  plannedEnd    DateTime?
+  baselineStart DateTime? // congelado al autorizar el plan => mide desviacion
+  baselineEnd   DateTime?
+  actualStart   DateTime? // avance real (S5)
+  actualEnd     DateTime?
+  estimatedHours Decimal? @db.Decimal(10, 2) // reservado (S8)
+  actualHours    Decimal? @db.Decimal(10, 2) // reservado (S8)
+  progressPct   Int                @default(0) // 0..100
+  status        WorkActivityStatus @default(PENDING)
+  mandatory     Boolean            @default(true) // abierta => bloquea cierre (Puerta 4)
+  dependsOnId   String? // predecesora (self, SetNull) - ruta critica (S8)
+  priority      WorkOrderPriority?
+  delayReason   String?
+  completedAt    DateTime?
+  completedById  String?
+  completionNote String?
+  canceledAt   DateTime?
+  cancelReason String?
+  canceledById String?
+  evidence     Json? // reservado (descriptores Ola 3)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workOrder  WorkOrder      @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  specialty  Specialty?     @relation("WorkActivitySpecialty", fields: [specialtyId], references: [id], onDelete: SetNull)
+  dependsOn  WorkActivity?  @relation("WorkActivityDeps", fields: [dependsOnId], references: [id], onDelete: SetNull)
+  dependents WorkActivity[] @relation("WorkActivityDeps")
+
+  @@index([workOrderId, sequence])
+  @@index([status])
+  @@index([responsibleId])
+  @@index([mandatory, status])
+  @@index([specialtyId])
+  @@index([dependsOnId])
 }

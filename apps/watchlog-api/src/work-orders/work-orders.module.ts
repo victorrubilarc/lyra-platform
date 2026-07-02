@@ -5,6 +5,7 @@ import { LogEntriesModule } from "../log-entries/log-entries.module";
 import { WorkOrdersController } from "./work-orders.controller";
 import { WorkOrdersService } from "./work-orders.service";
 import { WorkOrderChecklistsService } from "./work-order-checklists.service";
+import { WorkActivitiesService } from "./work-activities.service";
 
 /**
  * Órdenes de Trabajo / Work Orders (OT / PTW) — S1 cimientos + S2 Puerta 1 + S3
@@ -16,7 +17,7 @@ import { WorkOrderChecklistsService } from "./work-order-checklists.service";
 @Module({
   imports: [AuthModule, FolioModule, LogEntriesModule],
   controllers: [WorkOrdersController],
-  providers: [WorkOrdersService, WorkOrderChecklistsService],
-  exports: [WorkOrdersService, WorkOrderChecklistsService],
+  providers: [WorkOrdersService, WorkOrderChecklistsService, WorkActivitiesService],
+  exports: [WorkOrdersService, WorkOrderChecklistsService, WorkActivitiesService],
 })
 export class WorkOrdersModule {}

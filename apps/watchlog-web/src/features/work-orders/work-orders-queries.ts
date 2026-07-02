@@ -3,9 +3,13 @@ import type {
   AddWorkOrderChecklistRequest,
   AssignWorkOrderRequest,
   CancelWorkOrderRequest,
+  CreateWorkActivitiesBatchRequest,
+  CreateWorkActivityRequest,
   CreateWorkOrderRequest,
+  ReorderWorkActivitiesRequest,
   ReviewWorkOrderChecklistRequest,
   TransitionWorkOrderRequest,
+  UpdateWorkActivityRequest,
   UpdateWorkOrderRequest,
   UpsertSpecialtyRequest,
   UpsertWorkOrderChecklistRuleRequest,
@@ -17,7 +21,10 @@ import {
   assignWorkOrder,
   cancelWorkOrder,
   createWorkOrder,
+  createWorkOrderActivitiesBatch,
+  createWorkOrderActivity,
   deleteWorkOrderChecklistRule,
+  fetchWorkOrderActivities,
   fetchWorkOrderAssignableUsers,
   fetchWorkOrderChecklistRules,
   fetchWorkOrderChecklists,
@@ -28,12 +35,15 @@ import {
   fetchWorkOrderTypes,
   fetchWorkOrders,
   instantiateWorkOrderChecklist,
+  removeWorkOrderActivity,
   removeWorkOrderChecklist,
+  reorderWorkOrderActivities,
   reviewWorkOrderChecklist,
   submitWorkOrderChecklist,
   suggestWorkOrderChecklists,
   transitionWorkOrder,
   updateWorkOrder,
+  updateWorkOrderActivity,
   upsertWorkOrderChecklistRule,
   upsertWorkOrderSpecialty,
   upsertWorkOrderType,
@@ -215,4 +225,45 @@ export function useReviewWorkOrderChecklist(id: string) {
     mutationFn: ({ cid, dto }: { cid: string; dto: ReviewWorkOrderChecklistRequest }) => reviewWorkOrderChecklist(id, cid, dto),
     onSuccess: () => invalidateChecklists(qc, id),
   });
+}
+
+// === Plan de actividades / Puerta 3 (S4) =====================================
+
+export const WORK_ORDER_ACTIVITY_KEYS = {
+  forWorkOrder: (id: string) => ["work-orders", "activities", id] as const,
+};
+
+/** Invalida el plan de la OT + su detalle (eventos del timeline + estado del plan). */
+function invalidateActivities(qc: ReturnType<typeof useQueryClient>, id: string): void {
+  qc.invalidateQueries({ queryKey: WORK_ORDER_ACTIVITY_KEYS.forWorkOrder(id) });
+  qc.invalidateQueries({ queryKey: WORK_ORDER_KEYS.detail(id) });
+}
+
+export function useWorkOrderActivities(id: string | null) {
+  return useQuery({ queryKey: WORK_ORDER_ACTIVITY_KEYS.forWorkOrder(id ?? ""), queryFn: () => fetchWorkOrderActivities(id!), enabled: !!id });
+}
+
+export function useCreateWorkOrderActivity(id: string) {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (dto: CreateWorkActivityRequest) => createWorkOrderActivity(id, dto), onSuccess: () => invalidateActivities(qc, id) });
+}
+
+export function useCreateWorkOrderActivitiesBatch(id: string) {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (dto: CreateWorkActivitiesBatchRequest) => createWorkOrderActivitiesBatch(id, dto), onSuccess: () => invalidateActivities(qc, id) });
+}
+
+export function useUpdateWorkOrderActivity(id: string) {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: ({ aid, dto }: { aid: string; dto: UpdateWorkActivityRequest }) => updateWorkOrderActivity(id, aid, dto), onSuccess: () => invalidateActivities(qc, id) });
+}
+
+export function useRemoveWorkOrderActivity(id: string) {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (aid: string) => removeWorkOrderActivity(id, aid), onSuccess: () => invalidateActivities(qc, id) });
+}
+
+export function useReorderWorkOrderActivities(id: string) {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (dto: ReorderWorkActivitiesRequest) => reorderWorkOrderActivities(id, dto), onSuccess: () => invalidateActivities(qc, id) });
 }
