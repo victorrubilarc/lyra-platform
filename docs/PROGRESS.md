@@ -1,5 +1,36 @@
 # Progreso — Lyra WatchLog
 
+**2026-07-01 — 🔧 OT · Sesión 2 · PUERTA 1 (aprobación + folio al aprobar) ✅** (`feat/ot-puerta1`). El ciclo de la
+solicitud está VIVO hasta aprobar/rechazar, espejo del ejecutor de Incidencias. **Workflow:** al crear una OT se
+**CONGELA** la versión del flujo (el del `WorkOrderType.defaultWorkflowId` o el global sembrado **"OT — 4 puertas PTW"**,
+clave `ot-4-puertas`, fork W6: 11 estados/13 transiciones COMO DATO, clonable; Puertas 2–4 existen como dato, sus guards
+llegan en S3–S5) y la solicitud **nace en `borrador` (lifecycle DRAFT)** — reemplaza el "nace OPEN" provisional de S1.
+**Ejecutor** `WorkOrdersService.transition()` (espejo `IncidentsService.transition`): estado actual → transición válida,
+**rol-dato** (`WorkflowTransitionRole`, vacío = abierta al permiso), **firma Part 11 opt-in** re-autenticada
+(`ReauthService`; el registro criptográfico payloadHash = deuda COMPARTIDA con Incidencias, decisión en DECISIONS),
+semántica **data-driven** de Puerta 1: aprobación = entrar a `folioOnStateKey` (default "aprobada") ⇒ `approvedAt` +
+**FOLIO**; rechazo = estado final sin aprobación ⇒ motivo OBLIGATORIO + lifecycle CANCELED; final tras aprobación =
+cierre. **Folio gapless (fork W4):** modelo **`FolioCounter`** (PK `sequenceKey`) + `FolioService.next(tx,…)` atómico
+(`INSERT … ON CONFLICT … RETURNING`, DENTRO de la tx de la transición ⇒ rollback no quema folio; año por
+`PLANT_TIME_ZONE`) + formateo PURO en contracts (`work-orders/folio.ts`: `folioSchemeSchema`
+{prefix,mask,padding,start,scope,reset} sin `.default()` [gotcha TS2719] + `resolveFolioScheme`/`buildFolioSeqKey`/
+`renderFolio`; default OT = por-tipo + anual ⇒ **OT-2026-0001**; motor reutilizable para el folio-por-plantilla del
+dueño). `WorkOrderType.folioScheme/folioOnStateKey` configurables por API (editor UI = deuda). **Satélites** (migración
+`20260701210000_add_work_order_workflow_folio`, `migrate diff`+`db:deploy`, drift ajeno descartado):
+`WorkOrderTransition` (espejo IncidentTransition, `signatureId` ref. blanda lista) + `WorkOrderEvent` (timeline
+append-only; kinds CREATED|SENT|APPROVED|REJECTED|FOLIO_ISSUED|TRANSITION|ASSIGNED|CANCELED|CLOSED). **Permiso NUEVO
+`workorder:transition`** (dim. WORKFLOW, grupo workorders, fork W2 — catálogo 99→**100**; `db:seed`+FLUSHALL hechos).
+**Backend:** `POST /work-orders/:id/transitions` (gate + rol-dato + firma); detalle expone `states` +
+`availableTransitions` (con `requiresReason` derivado) + `events`; lista trae `currentStateName/Color`. **Web:** drawer
+con pestañas Resumen|Actividad + **stepper** del flujo + botones de transición + **modal de firma** (contraseña/MFA) +
+**rechazo con motivo obligatorio** + timeline; grilla muestra el estado del flujo y el folio (SOL-###### → OT-2026-0001
+al aprobar); filtro por defecto pasa a "Todos" (lo creado nace DRAFT). **La anulación NO es estado del flujo** (endpoint
+`cancel` transversal, espejo Incidencias — DECISIONS). typecheck(0)/lint(0 errores)/build/test (**contracts 403** [+11
+folio] · API 252 · web 6) verdes; `smoke-workorders.py` **51/51** (nace DRAFT/borrador · enviar→OPEN · aprobar sin firma
+401 · con firma → **folio OT-2026-0001** + APPROVED/FOLIO_ISSUED · rechazar sin motivo 400 / con motivo → CANCELED ·
+**gapless por tipo …-0002** · 403 operador) + regresión `smoke-incidencias.py` 32/32. **Siguiente: OT Sesión 3 (Puerta 2 —
+checklists/PTW ligados con Form Builder).**
+
 **2026-07-01 — 🔧 OT · S1 · ajuste · ELIMINADO el catálogo `Area` (alineación con EAM líderes) ✅** (`feat/ot-quitar-area`).
 Tras revisar SAP PM / Maximo / Infor EAM: en los grandes **no hay un catálogo "Área" aparte** — la zona/área **es la
 jerarquía de ubicación** (Functional Location / Location), que en Lyra ya es el **`OrgNode`** (la estructura tiene un nivel

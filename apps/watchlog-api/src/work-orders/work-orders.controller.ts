@@ -4,6 +4,7 @@ import {
   assignWorkOrderRequestSchema,
   cancelWorkOrderRequestSchema,
   createWorkOrderRequestSchema,
+  transitionWorkOrderRequestSchema,
   updateWorkOrderRequestSchema,
   upsertWorkOrderTagRequestSchema,
   upsertWorkOrderTypeRequestSchema,
@@ -11,6 +12,7 @@ import {
   type AssignWorkOrderRequest,
   type CancelWorkOrderRequest,
   type CreateWorkOrderRequest,
+  type TransitionWorkOrderRequest,
   type UpdateWorkOrderRequest,
   type UpsertSpecialtyRequest,
   type UpsertWorkOrderTypeRequest,
@@ -133,6 +135,21 @@ export class WorkOrdersController {
     @Req() req: FastifyRequest,
   ) {
     return this.workOrders.assign(user.id, id, dto, this.ctx(user, req));
+  }
+
+  // Puerta 1 (S2): ejecutar una transición del flujo congelado. El gate base es
+  // `workorder:transition` (dim. WORKFLOW, fork W2); QUIÉN puede cada puerta es DATO
+  // (WorkflowTransitionRole) y lo re-verifica el servicio, junto con la firma Part 11.
+  @Post(":id/transitions")
+  @HttpCode(200)
+  @RequirePermission("workorder:transition")
+  transition(
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(transitionWorkOrderRequestSchema)) dto: TransitionWorkOrderRequest,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.workOrders.transition(user.id, id, dto, this.ctx(user, req));
   }
 
   @Post(":id/cancel")

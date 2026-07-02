@@ -16,7 +16,7 @@ import { REFERENCE_LISTS } from "./reference-data-seed.js";
 import { DEMO_CALENDAR, DEMO_FISCAL_CALENDAR } from "./operational-calendar-seed.js";
 import { NOTIFICATION_TEMPLATE_SEEDS } from "./notification-templates-seed.js";
 import { INCIDENT_WORKFLOW, INCIDENT_TYPES, INCIDENT_CATEGORIES, REPORTING_OBLIGATIONS } from "./incidents-seed-data.js";
-import { WORK_ORDER_TYPES, WORK_ORDER_SPECIALTIES } from "./work-orders-seed-data.js";
+import { WORK_ORDER_TYPES, WORK_ORDER_SPECIALTIES, WORK_ORDER_WORKFLOW } from "./work-orders-seed-data.js";
 
 const prisma = new PrismaClient();
 
@@ -549,6 +549,64 @@ async function seedIncidentCatalog(): Promise<void> {
   );
 }
 
+// Flujo por defecto de OT "OT — 4 puertas PTW" (fork W6, S2). Espejo de
+// seedIncidentWorkflow: definición + UNA versión PUBLICADA con estados y
+// transiciones (incl. firma Part 11 en aprobar/revisar checklists/cerrar).
+// Idempotente: si ya existe la definición por clave, no la recrea (el admin
+// puede haberla clonado/simplificado — es DATO suyo).
+async function seedWorkOrderWorkflow(): Promise<void> {
+  const existing = await prisma.workflowDefinition.findFirst({ where: { key: WORK_ORDER_WORKFLOW.key } });
+  if (existing) {
+    console.log(`• Flujo de OT "${WORK_ORDER_WORKFLOW.key}" ya existe: no se recrea`);
+    return;
+  }
+  const def = await prisma.workflowDefinition.create({
+    data: { key: WORK_ORDER_WORKFLOW.key, name: WORK_ORDER_WORKFLOW.name, description: WORK_ORDER_WORKFLOW.description, status: "PUBLISHED" },
+  });
+  const version = await prisma.workflowDefinitionVersion.create({
+    data: {
+      workflowDefinitionId: def.id,
+      versionNumber: 1,
+      status: "PUBLISHED",
+      name: WORK_ORDER_WORKFLOW.name,
+      description: WORK_ORDER_WORKFLOW.description,
+      publishedAt: new Date(),
+    },
+  });
+  const stateIdByKey = new Map<string, string>();
+  for (const s of WORK_ORDER_WORKFLOW.states) {
+    const row = await prisma.workflowState.create({
+      data: {
+        workflowDefinitionVersionId: version.id,
+        key: s.key,
+        name: s.name,
+        order: s.order,
+        isInitial: s.isInitial,
+        isFinal: s.isFinal,
+        color: s.color,
+      },
+    });
+    stateIdByKey.set(s.key, row.id);
+  }
+  let order = 0;
+  for (const t of WORK_ORDER_WORKFLOW.transitions) {
+    await prisma.workflowTransition.create({
+      data: {
+        workflowDefinitionVersionId: version.id,
+        key: t.key,
+        label: t.label,
+        fromStateId: stateIdByKey.get(t.from)!,
+        toStateId: stateIdByKey.get(t.to)!,
+        order: order++,
+        requireSignature: t.requireSignature,
+        signatureMeaning: t.signatureMeaning,
+      },
+    });
+  }
+  await prisma.workflowDefinition.update({ where: { id: def.id }, data: { currentVersionId: version.id } });
+  console.log(`✔ Flujo de OT "${WORK_ORDER_WORKFLOW.key}" publicado (${WORK_ORDER_WORKFLOW.states.length} estados, 4 puertas)`);
+}
+
 // Catálogo de arranque de Órdenes de Trabajo (OT / PTW) — tipos + áreas +
 // especialidades. Configurable desde la UI; upsert idempotente por clave.
 async function seedWorkOrderCatalog(): Promise<void> {
@@ -593,6 +651,7 @@ async function main(): Promise<void> {
   await seedOperationalCalendar();
   await seedIncidentWorkflow();
   await seedIncidentCatalog();
+  await seedWorkOrderWorkflow();
   await seedWorkOrderCatalog();
 }
 

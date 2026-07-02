@@ -2830,10 +2830,12 @@ model WorkOrder {
   updatedAt    DateTime @updatedAt
   deletedAt    DateTime?
 
-  type        WorkOrderType        @relation(fields: [typeId], references: [id], onDelete: Restrict)
-  orgNode     OrgNode              @relation(fields: [orgNodeId], references: [id], onDelete: Restrict)
-  equipment   Equipment?           @relation(fields: [equipmentId], references: [id], onDelete: SetNull)
+  type        WorkOrderType         @relation(fields: [typeId], references: [id], onDelete: Restrict)
+  orgNode     OrgNode               @relation(fields: [orgNodeId], references: [id], onDelete: Restrict)
+  equipment   Equipment?            @relation(fields: [equipmentId], references: [id], onDelete: SetNull)
   specialties WorkOrderSpecialty[]
+  transitions WorkOrderTransition[]
+  events      WorkOrderEvent[]
 
   @@index([typeId])
   @@index([orgNodeId])
@@ -2846,6 +2848,58 @@ model WorkOrder {
   @@index([originIncidentId])
   @@index([currentStateKey])
   @@index([createdAt, id])
+}
+
+// Historial de transiciones de flujo de la OT (espejo de IncidentTransition).
+// `signatureId` = ref. blanda a LogEntrySignature (firma Part 11) — hoy la firma
+// se EXIGE y re-verifica (ReauthService) sin registro criptografico, igual que
+// Incidencias (deuda payloadHash compartida; ver DECISIONS 2026-07-01 S2).
+model WorkOrderTransition {
+  id                          String   @id @default(cuid())
+  workOrderId                 String
+  workflowDefinitionVersionId String
+  transitionKey               String
+  fromStateKey                String
+  toStateKey                  String
+  actorId                     String?
+  actorEmail                  String?
+  reason                      String?
+  signatureId                 String?
+  occurredAt                  DateTime @default(now())
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+
+  @@index([workOrderId, occurredAt])
+}
+
+// Timeline APPEND-ONLY de la OT (espejo de IncidentActivity; se llama "Event" para
+// no chocar con WorkActivity = tareas del plan, S4). `kind` clasifica:
+// CREATED|SENT|APPROVED|REJECTED|FOLIO_ISSUED|TRANSITION|ASSIGNED|CLOSED|CANCELED|...
+model WorkOrderEvent {
+  id          String   @id @default(cuid())
+  workOrderId String
+  kind        String
+  summary     String
+  actorId     String?
+  actorName   String?
+  metadata    Json?
+  occurredAt  DateTime @default(now())
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+
+  @@index([workOrderId, occurredAt])
+}
+
+// Motor de FOLIO gapless configurable (fork W4). Una fila por secuencia; la clave
+// codifica scope y periodo (ej. "workorder|type:<id>|2026"). La asignacion es
+// ATOMICA via INSERT ... ON CONFLICT ... RETURNING (FolioService) — sin SELECT
+// max+1 de carrera. `sequenceKey` es la PK (el upsert crudo no puede generar cuid
+// de cliente). Reutilizable por el folio-por-plantilla (BACKLOG 2026-06-30).
+model FolioCounter {
+  sequenceKey String   @id
+  lastValue   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 // Enlace N:N OT <-> Especialidad (clasificacion / disciplina = Work Center/Craft).

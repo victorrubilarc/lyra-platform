@@ -3,6 +3,7 @@ import type {
   AssignWorkOrderRequest,
   CancelWorkOrderRequest,
   CreateWorkOrderRequest,
+  TransitionWorkOrderRequest,
   UpdateWorkOrderRequest,
   UpsertSpecialtyRequest,
   UpsertWorkOrderTypeRequest,
@@ -19,6 +20,7 @@ import {
   fetchWorkOrderStats,
   fetchWorkOrderTypes,
   fetchWorkOrders,
+  transitionWorkOrder,
   updateWorkOrder,
   upsertWorkOrderSpecialty,
   upsertWorkOrderType,
@@ -115,4 +117,9 @@ export function useAssignWorkOrder() {
 export function useCancelWorkOrder() {
   const qc = useQueryClient();
   return useMutation({ mutationFn: ({ id, dto }: { id: string; dto: CancelWorkOrderRequest }) => cancelWorkOrder(id, dto), onSuccess: () => invalidate(qc) });
+}
+
+export function useTransitionWorkOrder() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: ({ id, dto }: { id: string; dto: TransitionWorkOrderRequest }) => transitionWorkOrder(id, dto), onSuccess: () => invalidate(qc) });
 }

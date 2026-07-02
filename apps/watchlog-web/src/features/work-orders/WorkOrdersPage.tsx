@@ -20,7 +20,9 @@ export function WorkOrdersPage() {
   const [createOpen, setCreateOpen] = useState(false);
 
   const [search, setSearch] = useState("");
-  const [lifecycle, setLifecycle] = useState<WorkOrderListQuery["lifecycle"] | "">("OPEN");
+  // Sin filtro por defecto: desde S2 la solicitud NACE en borrador (DRAFT) y debe
+  // verse recién creada; "OPEN" como default la ocultaría.
+  const [lifecycle, setLifecycle] = useState<WorkOrderListQuery["lifecycle"] | "">("");
   const [typeId, setTypeId] = useState("");
   const [criticality, setCriticality] = useState("");
   const [priority, setPriority] = useState<WorkOrderListQuery["priority"] | "">("");
@@ -146,7 +148,13 @@ export function WorkOrdersPage() {
                     <td>{w.typeName ?? "—"}</td>
                     <td><span className={styles.sevDot} style={{ background: criticalityColor(w.criticality) }} title={`Criticidad ${w.criticality}`} /> {w.criticality}</td>
                     <td><span className={styles.priText} style={{ color: PRIORITY_META[w.priority].color }}>{PRIORITY_META[w.priority].label}</span></td>
-                    <td><span className={styles.lifeChip} style={{ color: LIFECYCLE_META[w.lifecycle].color }}>{LIFECYCLE_META[w.lifecycle].label}</span></td>
+                    <td>
+                      {w.currentStateName ? (
+                        <span className={styles.lifeChip} style={{ color: w.currentStateColor ?? undefined }}>{w.currentStateName}</span>
+                      ) : (
+                        <span className={styles.lifeChip} style={{ color: LIFECYCLE_META[w.lifecycle].color }}>{LIFECYCLE_META[w.lifecycle].label}</span>
+                      )}
+                    </td>
                     <td>{w.orgNodeName ?? "—"}</td>
                     <td>{w.ownerName ?? <span className={styles.muted}>sin asignar</span>}</td>
                     <td>

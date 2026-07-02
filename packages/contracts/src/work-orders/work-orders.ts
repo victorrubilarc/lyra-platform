@@ -1,18 +1,22 @@
 import { z } from "zod";
+import { folioSchemeSchema } from "./folio.js";
 
 /**
- * Órdenes de Trabajo / Work Orders (OT / PTW) — Sesión 1: CIMIENTOS.
+ * Órdenes de Trabajo / Work Orders (OT / PTW) — S1 cimientos + S2 Puerta 1.
  * Contratos compartidos back↔front. ESPEJO de `incidents/incidents.ts`.
  *
  * Una OT modela el flujo industrial Solicitud de Trabajo → Orden de Trabajo con
- * Permiso de Trabajo (PTW). En S1 solo vive la SOLICITUD: crear + listar (lifecycle
- * DRAFT/OPEN) con ABAC por nodo ∩ estructura (single-tenant). El WORKFLOW (4 puertas
- * configurables), el FOLIO gapless (emitido al aprobar), los CHECKLISTS (Form Builder)
- * y las ACTIVIDADES llegan en S2–S5. Ver docs/design/OT_DESIGN_ARCHITECTURE.md.
+ * Permiso de Trabajo (PTW). Desde S2 la solicitud VIVE en el flujo configurable
+ * "OT — 4 puertas PTW" (WorkflowDefinition congelada al crear, nace en `borrador`):
+ * enviar → aprobar (EMITE FOLIO gapless + firma Part 11) / rechazar (motivo
+ * obligatorio). Los CHECKLISTS (Form Builder) y las ACTIVIDADES llegan en S3–S5.
+ * Ver docs/design/OT_DESIGN_ARCHITECTURE.md §3–§4.
  *
  * Diseño congelado por los forks W1–W8 (DECISIONS 2026-07-01):
- *  - W2: un único `workorder:transition` (dim. WORKFLOW, S2); roles por transición = DATO.
- *  - W3: `Area`/`Specialty` son catálogos separados (N:N); `orgNodeId` = ubicación + ancla ABAC.
+ *  - W2: un único `workorder:transition` (dim. WORKFLOW); QUIÉN ejecuta cada puerta =
+ *    DATO (`WorkflowTransitionRole`), no permisos fijos de puerta.
+ *  - W4: folio gapless configurable (`folio.ts`): scope por-tipo + reinicio anual.
+ *  - W6: el flujo de 4 puertas es SEED (dato clonable/simplificable), no código.
  *  - La criticidad es la escala 1..5 del ecosistema; el riesgo reusa la matriz ISO 31000.
  */
 
@@ -60,6 +64,10 @@ export const workOrderTypeSchema = z.object({
   requiresPtwDefault: z.boolean(),
   /** Criticidad 1..5 sugerida al crear (null = sin sugerencia). */
   criticalityDefault: z.number().int().nullable(),
+  /** Esquema de folio configurable (fork W4; null = default OT por-tipo + anual). */
+  folioScheme: folioSchemeSchema.nullable(),
+  /** Estado del flujo al que, al ENTRAR, se emite el folio (null = "aprobada"). */
+  folioOnStateKey: z.string().nullable(),
   active: z.boolean(),
   sortOrder: z.number().int(),
 });
@@ -103,7 +111,10 @@ export const workOrderListItemSchema = z.object({
   requiresPtw: z.boolean(),
   originType: workOrderOriginSchema,
   lifecycle: workOrderLifecycleSchema,
+  /** Estado del flujo congelado (clave + nombre + color, para el chip). */
   currentStateKey: z.string().nullable(),
+  currentStateName: z.string().nullable(),
+  currentStateColor: z.string().nullable(),
   orgNodeId: z.string(),
   orgNodeName: z.string().nullable(),
   equipmentId: z.string().nullable(),
@@ -119,6 +130,48 @@ export const workOrderListItemSchema = z.object({
 });
 export type WorkOrderListItem = z.infer<typeof workOrderListItemSchema>;
 
+/** Estado del flujo congelado (para el stepper del detalle). */
+export const workOrderStateSchema = z.object({
+  key: z.string(),
+  name: z.string(),
+  order: z.number().int(),
+  isFinal: z.boolean(),
+  color: z.string().nullable(),
+});
+export type WorkOrderStateDto = z.infer<typeof workOrderStateSchema>;
+
+/** Transición disponible desde el estado actual (para los botones del detalle). */
+export const workOrderAvailableTransitionSchema = z.object({
+  key: z.string(),
+  label: z.string(),
+  toStateKey: z.string(),
+  toStateName: z.string(),
+  toStateIsFinal: z.boolean(),
+  requireSignature: z.boolean(),
+  requireMfa: z.boolean(),
+  signatureMeaning: z.string().nullable(),
+  /** Roles autorizados (nombres) — informativo para la UI. */
+  roleNames: z.array(z.string()),
+  /**
+   * ¿Exige MOTIVO obligatorio? Derivado en el server: una transición a estado FINAL
+   * de una OT que NUNCA fue aprobada es un RECHAZO (motivo obligatorio, Puerta 1).
+   */
+  requiresReason: z.boolean(),
+});
+export type WorkOrderAvailableTransition = z.infer<typeof workOrderAvailableTransitionSchema>;
+
+/** Evento del timeline append-only (espejo de incidentActivitySchema). */
+export const workOrderEventSchema = z.object({
+  id: z.string(),
+  kind: z.string(),
+  summary: z.string(),
+  actorId: z.string().nullable(),
+  actorName: z.string().nullable(),
+  occurredAt: z.string(),
+  metadata: z.record(z.unknown()).nullable(),
+});
+export type WorkOrderEventDto = z.infer<typeof workOrderEventSchema>;
+
 export const workOrderDetailSchema = workOrderListItemSchema.extend({
   description: z.string().nullable(),
   criticalityDefault: z.number().int().nullable(),
@@ -133,6 +186,20 @@ export const workOrderDetailSchema = workOrderListItemSchema.extend({
   originIncidentId: z.string().nullable(),
   originLogEntryId: z.string().nullable(),
   originExceptionId: z.string().nullable(),
+  /** Flujo congelado (S2): grafo para el stepper + transiciones ejecutables. */
+  workflowDefinitionId: z.string().nullable(),
+  workflowDefinitionVersionId: z.string().nullable(),
+  states: z.array(workOrderStateSchema),
+  availableTransitions: z.array(workOrderAvailableTransitionSchema),
+  /** Timeline append-only (WorkOrderEvent). */
+  events: z.array(workOrderEventSchema),
+  /** Puerta 1: aprobación (emite folio) / rechazo (motivo obligatorio). */
+  approvedAt: z.string().nullable(),
+  folioIssuedAt: z.string().nullable(),
+  rejectedAt: z.string().nullable(),
+  rejectReason: z.string().nullable(),
+  closedAt: z.string().nullable(),
+  closureSummary: z.string().nullable(),
   canceledAt: z.string().nullable(),
   cancelReason: z.string().nullable(),
 });
@@ -195,6 +262,19 @@ export const cancelWorkOrderRequestSchema = z.object({
   reason: z.string().trim().min(5).max(1000),
 });
 export type CancelWorkOrderRequest = z.infer<typeof cancelWorkOrderRequestSchema>;
+
+/** Ejecutar una transición de flujo (mismo patrón que Incidencias). */
+export const transitionWorkOrderRequestSchema = z.object({
+  transitionKey: z.string().min(1),
+  /** Comentario/motivo. OBLIGATORIO si la transición es un rechazo (`requiresReason`). */
+  reason: z.string().trim().max(1000).optional(),
+  /** Resumen de cierre (si la transición lleva a un estado final tras la aprobación). */
+  closureSummary: z.string().trim().max(5000).optional(),
+  /** Re-auth para transiciones que exigen firma (Part 11). */
+  password: z.string().optional(),
+  mfaCode: z.string().optional(),
+});
+export type TransitionWorkOrderRequest = z.infer<typeof transitionWorkOrderRequestSchema>;
 
 // --- Listado / filtros / paginación ------------------------------------------
 
@@ -260,6 +340,10 @@ export const upsertWorkOrderTypeRequestSchema = z.object({
   defaultWorkflowId: z.string().min(1).nullable().optional(),
   requiresPtwDefault: z.boolean().optional(),
   criticalityDefault: z.number().int().min(1).max(5).nullable().optional(),
+  /** Esquema de folio (fork W4). null/omitido = default OT (por tipo + anual). */
+  folioScheme: folioSchemeSchema.nullable().optional(),
+  /** Estado emisor del folio. null/omitido = "aprobada". */
+  folioOnStateKey: z.string().trim().min(1).max(64).nullable().optional(),
   active: z.boolean().optional(),
   sortOrder: z.number().int().min(0).max(9999).optional(),
 });
@@ -288,13 +372,21 @@ export function workOrderCode(folio: string | null, number: number): string {
   return folio ?? workOrderProvisionalCode(number);
 }
 
-/** Resuelve el lifecycle derivado a partir del estado del flujo (S2+). En S1 se pasa directo. */
+/**
+ * Resuelve el lifecycle derivado del estado del flujo (S2, Puerta 1):
+ *  - anulada (endpoint cancel) ⇒ CANCELED;
+ *  - estado FINAL alcanzado TRAS la aprobación ⇒ CLOSED (trabajo terminado);
+ *  - estado FINAL alcanzado SIN aprobación (nunca hubo folio) ⇒ CANCELED (la
+ *    solicitud murió rechazada — regla data-driven, sin claves de estado en duro);
+ *  - si no, el fallback (DRAFT mientras está en el estado inicial, OPEN después).
+ */
 export function deriveWorkOrderLifecycle(opts: {
   canceledAt: Date | null;
   currentStateIsFinal: boolean;
+  approvedAt: Date | null;
   fallback: WorkOrderLifecycle;
 }): WorkOrderLifecycle {
   if (opts.canceledAt) return "CANCELED";
-  if (opts.currentStateIsFinal) return "CLOSED";
+  if (opts.currentStateIsFinal) return opts.approvedAt ? "CLOSED" : "CANCELED";
   return opts.fallback;
 }

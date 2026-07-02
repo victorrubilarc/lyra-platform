@@ -95,5 +95,6 @@ export * from "./theme/contrast.js";
 export * from "./theme/palette.js";
 export * from "./theme/presets.js";
 
-// Órdenes de Trabajo / Work Orders (OT / PTW) — Sesión 1: Cimientos
+// Órdenes de Trabajo / Work Orders (OT / PTW) — S1 cimientos + S2 Puerta 1
+export * from "./work-orders/folio.js";
 export * from "./work-orders/work-orders.js";

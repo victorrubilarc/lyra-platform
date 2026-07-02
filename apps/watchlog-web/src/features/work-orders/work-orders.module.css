@@ -59,6 +59,32 @@
 .dangerZone { border-top: 1px solid var(--color-border-subtle); padding-top: var(--space-3); }
 .sectionTitle { font-family: var(--font-brand); font-weight: 700; font-size: var(--text-body-sm-size); }
 
+/* Pestañas del drawer (S2, patrón Incidencias) */
+.drawerTabs { display: flex; gap: 2px; border-bottom: 1px solid var(--color-border-subtle); margin-bottom: var(--space-1); overflow-x: auto; }
+.drawerTab, .drawerTabActive {
+  display: flex; align-items: center; gap: 6px; padding: var(--space-2) var(--space-3); min-height: 44px;
+  background: transparent; border: none; border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap;
+  color: var(--color-text-secondary); font-family: var(--font-brand); font-weight: 600; font-size: var(--text-body-sm-size);
+}
+.drawerTab:hover { color: var(--color-text-primary); }
+.drawerTabActive { color: var(--color-accent-primary); border-bottom-color: var(--color-accent-primary); }
+.tabBadge { font-size: var(--text-caption-size); font-weight: 700; background: var(--color-bg-surface-2); border-radius: 999px; padding: 0 6px; min-width: 18px; text-align: center; }
+
+/* Stepper de estados del flujo congelado (S2, patrón Incidencias) */
+.stepper { display: flex; gap: var(--space-2); flex-wrap: wrap; padding: var(--space-3); background: var(--color-bg-surface-2); border-radius: var(--radius-md); }
+.step { display: flex; align-items: center; gap: 6px; }
+.stepDot { width: 12px; height: 12px; border-radius: var(--radius-full); border: 2px solid; flex: none; }
+.stepLabel { font-size: var(--text-caption-size); color: var(--color-text-muted); }
+.stepLabelActive { font-size: var(--text-caption-size); color: var(--color-text-primary); font-weight: 700; }
+
+/* Rechazo (Puerta 1) + timeline + modal de transición/firma */
+.rejectBox { display: flex; align-items: center; gap: 6px; color: var(--color-error); font-size: var(--text-body-sm-size); margin: 0; }
+.timeline { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.timeline li { font-size: var(--text-body-sm-size); color: var(--color-text-secondary); padding: 6px 0; border-bottom: 1px solid var(--color-border-subtle); }
+.modalBody { display: flex; flex-direction: column; gap: var(--space-3); }
+.signBox { background: var(--color-bg-surface-2); border-radius: var(--radius-md); padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
+.signTitle { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: var(--text-body-sm-size); color: var(--color-accent-secondary); }
+
 /* Formulario de creación / modales */
 .form { display: flex; flex-direction: column; gap: var(--space-3); }
 .formRow { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--space-3); }
