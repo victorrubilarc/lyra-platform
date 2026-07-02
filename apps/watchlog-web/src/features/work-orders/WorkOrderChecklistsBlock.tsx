@@ -58,7 +58,7 @@ export function WorkOrderChecklistsBlock({ workOrderId, isLive }: { workOrderId:
   return (
     <>
       <div className={styles.sectionTitle}>
-        <ClipboardCheck size={15} /> Checklists / Permisos de trabajo
+        <ClipboardCheck size={15} /> Verificaciones (checklists / permisos de trabajo)
       </div>
 
       {blocking.length > 0 && (
