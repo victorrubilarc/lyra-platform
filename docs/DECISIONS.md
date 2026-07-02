@@ -16,6 +16,17 @@ estado/responsable/prioridad/metadatos). Responsive: el panel baja debajo en pan
 el alta redirige al detalle. `WorkOrderPlanBlock`/`WorkOrderChecklistsBlock`/`TransitionModal` se **reutilizan tal cual**.
 **Alcance (decisión del dueño):** **solo OT ahora**; **Incidencias usa el mismo drawer** → alinear al Object Page queda
 como **deuda en BACKLOG** (slice aparte, para no tocar dos módulos a la vez). typecheck/lint(0 err)/build web verdes.
+**Refinamientos (mismo día, feedback del dueño):** (1) **ancho completo alineado a la izquierda** (sin centrar); (2) botón
+«volver» **visible** (antes `.back` no tenía estilo en este CSS module); (3) la **fila consultada se resalta al volver**
+del detalle + scroll a ella (memoria de posición vía `sessionStorage`); (4) stepper con **glow SOBRIO** en la etapa actual
+(anillo + pulsación leve, respeta `prefers-reduced-motion`); (5) **pestaña «Flujo»** que **reutiliza el `WorkflowDiagram`
+de Bitácoras** (grafo + recorrido real + banner **«Estás en …»** + nodo actual con glow + tooltips al pasar por encima) —
+para ello `WorkOrderDetail` expone ahora `workflow` (grafo completo + transiciones ejecutadas, en los shapes de contrato de
+Bitácoras: `workflowStateSchema`/`workflowTransitionSchema`/`logEntryTransitionSchema`; `buildWorkflowView` en el servicio);
+(6) **Resumen** rehecho profesional y **COMPLETO**: Descripción SIEMPRE visible (placeholder si vacía) + grupos con
+encabezado (Clasificación [incl. PTW y riesgo ISO 31000 P×C] · Ubicación y alcance [incl. turno] · Personas · Fechas [incl.
+detectada y fechas planificadas] · Origen ligado con enlaces). **Deuda:** extraer `WorkflowDiagram` a `packages/ui` (hoy
+import cross-feature desde `features/logbook`).
 
 ---
 

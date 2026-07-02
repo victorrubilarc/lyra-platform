@@ -817,6 +817,9 @@ nunca queda más de una sesión atrás.
 > `/incidencias/:id` + `IncidentDetailPage` (reusar el layout de `WorkOrderDetailPage`: header + CTA de etapa + stepper +
 > 2 columnas), `IncidentsPage` navega con `useNavigate`, eliminar el drawer. Se dejó para una sesión aparte (no tocar dos
 > módulos a la vez). *(Si conviene, extraer un `ObjectPageLayout` reutilizable en `packages/ui` al hacerlo.)*
+> **+ Deuda relacionada:** el **`WorkflowDiagram`** (diagrama gráfico del flujo) vive en `features/logbook` y ahora la
+> página de OT lo importa **cross-feature**. Cuando se toque, **extraerlo a `packages/ui`** (es presentacional puro:
+> depende solo de contracts + i18n + `lib/format`) para que OT/Incidencias/Bitácoras lo compartan sin acoplarse entre features.
 
 ### 🟡 DEUDA TRANSVERSAL — Vistas guardadas (`SavedView`) para Incidencias **y** Órdenes de Trabajo (~15–20 HH)
 > **Decisión del dueño (2026-07-01): DEJAR PENDIENTE para AMBOS módulos** (no hacerlo solo para OT). Hoy `SavedView`

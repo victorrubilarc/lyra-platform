@@ -14,7 +14,14 @@ type FlagKey = "" | "mine" | "unassignedOnly" | "requiresPtw";
 export function WorkOrdersPage() {
   const { can } = usePermissions();
   const navigate = useNavigate();
-  const openDetail = (id: string) => navigate(`/ordenes-trabajo/${id}`);
+  // Recordar la ÚLTIMA OT consultada: al volver del detalle se resalta su fila y se
+  // hace scroll a ella, para saber "dónde estabas" (sobrevive el desmontaje de la lista).
+  const [lastViewed, setLastViewed] = useState<string | null>(() => sessionStorage.getItem("wo:lastViewed"));
+  const openDetail = (id: string) => {
+    sessionStorage.setItem("wo:lastViewed", id);
+    setLastViewed(id);
+    navigate(`/ordenes-trabajo/${id}`);
+  };
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [createOpen, setCreateOpen] = useState(false);
@@ -142,7 +149,12 @@ export function WorkOrdersPage() {
               </thead>
               <tbody>
                 {items.map((w) => (
-                  <tr key={w.id} className={styles.row} onClick={() => openDetail(w.id)}>
+                  <tr
+                    key={w.id}
+                    className={w.id === lastViewed ? `${styles.row} ${styles.rowActive}` : styles.row}
+                    onClick={() => openDetail(w.id)}
+                    ref={w.id === lastViewed ? (el) => el?.scrollIntoView({ block: "center" }) : undefined}
+                  >
                     <td className={styles.mono}>{w.code}</td>
                     <td className={styles.titleCell}>{w.title}{w.requiresPtw && <span className={styles.ptwTag}>PTW</span>}</td>
                     <td>{w.typeName ?? "—"}</td>

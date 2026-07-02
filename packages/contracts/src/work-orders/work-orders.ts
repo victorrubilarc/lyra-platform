@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { folioSchemeSchema } from "./folio.js";
+import { workflowStateSchema, workflowTransitionSchema } from "../workflows/workflows.js";
+import { logEntryTransitionSchema } from "../log-entries/log-entries.js";
 
 /**
  * Órdenes de Trabajo / Work Orders (OT / PTW) — S1 cimientos + S2 Puerta 1.
@@ -180,6 +182,20 @@ export const workOrderEventSchema = z.object({
 });
 export type WorkOrderEventDto = z.infer<typeof workOrderEventSchema>;
 
+/**
+ * Vista COMPLETA del flujo congelado de la OT para el diagrama gráfico (reusa el
+ * `WorkflowDiagram` de Bitácoras): grafo (estados + transiciones) + recorrido REAL
+ * ejecutado. Espejo de `LogEntry.workflowVersion` + `transitions` — mismos shapes de
+ * contrato ⇒ el mismo componente lo pinta sin adaptadores. null si la OT no tiene flujo.
+ */
+export const workOrderWorkflowViewSchema = z.object({
+  states: z.array(workflowStateSchema),
+  transitions: z.array(workflowTransitionSchema),
+  /** Transiciones YA ejecutadas (recorrido real), en el shape de `LogEntryTransitionDto`. */
+  executed: z.array(logEntryTransitionSchema),
+});
+export type WorkOrderWorkflowView = z.infer<typeof workOrderWorkflowViewSchema>;
+
 export const workOrderDetailSchema = workOrderListItemSchema.extend({
   description: z.string().nullable(),
   criticalityDefault: z.number().int().nullable(),
@@ -199,6 +215,8 @@ export const workOrderDetailSchema = workOrderListItemSchema.extend({
   workflowDefinitionVersionId: z.string().nullable(),
   states: z.array(workOrderStateSchema),
   availableTransitions: z.array(workOrderAvailableTransitionSchema),
+  /** Vista completa del flujo (grafo + recorrido) para el diagrama gráfico. null = sin flujo. */
+  workflow: workOrderWorkflowViewSchema.nullable(),
   /** Timeline append-only (WorkOrderEvent). */
   events: z.array(workOrderEventSchema),
   /** Puerta 1: aprobación (emite folio) / rechazo (motivo obligatorio). */

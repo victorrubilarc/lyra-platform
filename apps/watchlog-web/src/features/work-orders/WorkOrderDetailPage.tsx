@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { Activity, ArrowLeft, ArrowRight, ClipboardCheck, Info, ListChecks, ShieldCheck, XCircle } from "lucide-react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { Activity, ArrowLeft, ArrowRight, ClipboardCheck, Info, ListChecks, ShieldCheck, Waypoints, XCircle } from "lucide-react";
 import type { WorkOrderAvailableTransition, WorkOrderPriority } from "@lyra/contracts";
 import { Button, Input, Modal, Select, Spinner, Textarea, useToast } from "@lyra/ui";
 import { usePermissions } from "../../auth/use-permissions.js";
@@ -16,6 +16,7 @@ import {
 import { LIFECYCLE_META, ORIGIN_META, PRIORITY_META, criticalityColor, criticalityLabel } from "./work-orders-presentation.js";
 import { WorkOrderChecklistsBlock } from "./WorkOrderChecklistsBlock.js";
 import { WorkOrderPlanBlock } from "./WorkOrderPlanBlock.js";
+import { WorkflowDiagram } from "../logbook/WorkflowDiagram.js";
 import styles from "./work-orders.module.css";
 
 /**
@@ -42,7 +43,7 @@ export function WorkOrderDetailPage() {
   const [cancelReason, setCancelReason] = useState("");
   const [showCancel, setShowCancel] = useState(false);
   const [pending, setPending] = useState<WorkOrderAvailableTransition | null>(null);
-  const [tab, setTab] = useState<"resumen" | "plan" | "checklists" | "actividad">("resumen");
+  const [tab, setTab] = useState<"resumen" | "plan" | "checklists" | "flujo" | "actividad">("resumen");
 
   const back = () => navigate("/ordenes-trabajo");
 
@@ -111,7 +112,10 @@ export function WorkOrderDetailPage() {
             const passed = currentOrder >= s.order;
             return (
               <div key={s.key} className={styles.step} title={s.name}>
-                <span className={styles.stepDot} style={{ background: passed ? s.color ?? "#6366F1" : "transparent", borderColor: s.color ?? "#6366F1" }} />
+                <span
+                  className={active ? `${styles.stepDot} ${styles.stepDotCurrent}` : styles.stepDot}
+                  style={{ background: passed ? s.color ?? "#6366F1" : "transparent", borderColor: s.color ?? "#6366F1" }}
+                />
                 <span className={active ? styles.stepLabelActive : styles.stepLabel}>{s.name}</span>
               </div>
             );
@@ -132,6 +136,9 @@ export function WorkOrderDetailPage() {
             <button role="tab" aria-selected={tab === "checklists"} className={tab === "checklists" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setTab("checklists")}>
               <ClipboardCheck size={14} /> Permiso
             </button>
+            <button role="tab" aria-selected={tab === "flujo"} className={tab === "flujo" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setTab("flujo")}>
+              <Waypoints size={14} /> Flujo
+            </button>
             <button role="tab" aria-selected={tab === "actividad"} className={tab === "actividad" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setTab("actividad")}>
               <Activity size={14} /> Actividad
               {wo.events.length > 0 && <span className={styles.tabBadge}>{wo.events.length}</span>}
@@ -139,32 +146,112 @@ export function WorkOrderDetailPage() {
           </div>
 
           {tab === "resumen" && (
-            <>
-              {wo.description && <p className={styles.desc}>{wo.description}</p>}
+            <div className={styles.summary}>
+              {/* Descripción — SIEMPRE visible (con placeholder si está vacía) */}
+              <section className={styles.summaryGroup}>
+                <div className={styles.summaryGroupTitle}>Descripción</div>
+                {wo.description
+                  ? <p className={styles.summaryDesc}>{wo.description}</p>
+                  : <p className={`${styles.summaryDesc} ${styles.summaryDescEmpty}`}>Sin descripción registrada.</p>}
+              </section>
+
               {wo.rejectedAt && (
                 <p className={styles.rejectBox}>
                   <XCircle size={15} /> Rechazada el {formatDateTime(wo.rejectedAt)} · Motivo: {wo.rejectReason ?? "—"}
                 </p>
               )}
-              <dl className={styles.kv}>
-                <dt>Tipo</dt><dd>{wo.typeName ?? "—"}</dd>
-                <dt>Criticidad</dt>
-                <dd><span className={styles.sevDot} style={{ background: criticalityColor(wo.criticality) }} /> {wo.criticality} · {criticalityLabel(wo.criticality)}</dd>
-                <dt>Origen</dt><dd>{ORIGIN_META[wo.originType].label}</dd>
-                <dt>Nodo</dt><dd>{wo.orgNodeName ?? "—"}</dd>
-                {wo.equipmentTag && (<><dt>Equipo</dt><dd>{wo.equipmentTag}</dd></>)}
-                {wo.locationDetail && (<><dt>Ubicación</dt><dd>{wo.locationDetail}</dd></>)}
-                {wo.specialties.length > 0 && (<><dt>Especialidades</dt><dd>{wo.specialties.map((s) => s.name).join(", ")}</dd></>)}
-                <dt>Solicitante</dt><dd>{wo.requesterName ?? "—"}</dd>
-                <dt>Creada</dt><dd>{formatDate(wo.createdAt)}</dd>
-                {wo.closedAt && (<><dt>Cerrada</dt><dd>{formatDateTime(wo.closedAt)}</dd></>)}
-                {wo.canceledAt && (<><dt>Anulada</dt><dd>{formatDateTime(wo.canceledAt)} · {wo.cancelReason}</dd></>)}
-              </dl>
-            </>
+              {wo.closureSummary && (
+                <p className={styles.closureBox}>
+                  <Info size={15} /> <span><strong>Resumen de cierre:</strong> {wo.closureSummary}</span>
+                </p>
+              )}
+
+              {/* Clasificación */}
+              <section className={styles.summaryGroup}>
+                <div className={styles.summaryGroupTitle}>Clasificación</div>
+                <dl className={styles.kv}>
+                  <dt>Tipo</dt><dd>{wo.typeName ?? "—"}</dd>
+                  <dt>Criticidad</dt>
+                  <dd><span className={styles.sevDot} style={{ background: criticalityColor(wo.criticality) }} /> {wo.criticality} · {criticalityLabel(wo.criticality)}</dd>
+                  <dt>Prioridad</dt><dd style={{ color: PRIORITY_META[wo.priority].color, fontWeight: 600 }}>{PRIORITY_META[wo.priority].label}</dd>
+                  <dt>Origen</dt><dd>{ORIGIN_META[wo.originType].label}</dd>
+                  <dt>Permiso de trabajo (PTW)</dt><dd>{wo.requiresPtw ? "Sí" : "No"}</dd>
+                  {wo.riskProbability != null && wo.riskConsequence != null && (
+                    <><dt>Riesgo (ISO 31000)</dt><dd>Probabilidad {wo.riskProbability} · Consecuencia {wo.riskConsequence}</dd></>
+                  )}
+                  {wo.specialties.length > 0 && (<><dt>Especialidades</dt><dd>{wo.specialties.map((s) => s.name).join(", ")}</dd></>)}
+                </dl>
+              </section>
+
+              {/* Ubicación y alcance */}
+              <section className={styles.summaryGroup}>
+                <div className={styles.summaryGroupTitle}>Ubicación y alcance</div>
+                <dl className={styles.kv}>
+                  <dt>Nodo</dt><dd>{wo.orgNodeName ?? "—"}</dd>
+                  {wo.equipmentTag && (<><dt>Equipo</dt><dd>{wo.equipmentTag}</dd></>)}
+                  {wo.locationDetail && (<><dt>Ubicación (detalle)</dt><dd>{wo.locationDetail}</dd></>)}
+                  {wo.shiftCode && (<><dt>Turno</dt><dd>{wo.shiftCode}</dd></>)}
+                </dl>
+              </section>
+
+              {/* Personas */}
+              <section className={styles.summaryGroup}>
+                <div className={styles.summaryGroupTitle}>Personas</div>
+                <dl className={styles.kv}>
+                  <dt>Solicitante</dt><dd>{wo.requesterName ?? "—"}</dd>
+                  <dt>Responsable</dt><dd>{wo.ownerName ?? <span className={styles.muted}>sin asignar</span>}</dd>
+                </dl>
+              </section>
+
+              {/* Fechas */}
+              <section className={styles.summaryGroup}>
+                <div className={styles.summaryGroupTitle}>Fechas</div>
+                <dl className={styles.kv}>
+                  {wo.detectedAt && (<><dt>Detectada</dt><dd>{formatDateTime(wo.detectedAt)}</dd></>)}
+                  {wo.plannedStart && (<><dt>Inicio planificado</dt><dd>{formatDate(wo.plannedStart)}</dd></>)}
+                  {wo.plannedEnd && (<><dt>Fin planificado</dt><dd>{formatDate(wo.plannedEnd)}</dd></>)}
+                  {wo.dueAt && (<><dt>Fecha límite</dt><dd>{formatDate(wo.dueAt)}</dd></>)}
+                  <dt>Creada</dt><dd>{formatDateTime(wo.createdAt)}</dd>
+                  <dt>Última actualización</dt><dd>{formatDateTime(wo.updatedAt)}</dd>
+                  {wo.closedAt && (<><dt>Cerrada</dt><dd>{formatDateTime(wo.closedAt)}</dd></>)}
+                  {wo.canceledAt && (<><dt>Anulada</dt><dd>{formatDateTime(wo.canceledAt)} · {wo.cancelReason}</dd></>)}
+                </dl>
+              </section>
+
+              {/* Origen ligado (trazabilidad) */}
+              {(wo.originIncidentId || wo.originExceptionId || wo.originLogEntryId) && (
+                <section className={styles.summaryGroup}>
+                  <div className={styles.summaryGroupTitle}>Origen ligado</div>
+                  <dl className={styles.kv}>
+                    {wo.originIncidentId && (<><dt>Incidencia</dt><dd><Link to={`/incidencias/${wo.originIncidentId}`}>Ver incidencia de origen</Link></dd></>)}
+                    {wo.originLogEntryId && (<><dt>Bitácora</dt><dd><Link to={`/bitacoras/${wo.originLogEntryId}`}>Ver entrada de origen</Link></dd></>)}
+                    {wo.originExceptionId && (<><dt>Excepción</dt><dd className={styles.mono}>{wo.originExceptionId}</dd></>)}
+                  </dl>
+                </section>
+              )}
+            </div>
           )}
 
           {tab === "plan" && <WorkOrderPlanBlock wo={wo} isLive={isLive} />}
           {tab === "checklists" && <WorkOrderChecklistsBlock workOrderId={wo.id} isLive={isLive} />}
+
+          {tab === "flujo" && (
+            wo.workflow && wo.workflow.states.length > 0 ? (
+              <WorkflowDiagram
+                states={wo.workflow.states}
+                transitions={wo.workflow.transitions}
+                record={{
+                  executed: wo.workflow.executed,
+                  currentStateKey: wo.currentStateKey,
+                  recordedAt: wo.createdAt,
+                  // El diagrama trata "DRAFT" = en curso; para la OT, "en curso" = viva.
+                  status: isLive ? "DRAFT" : "CLOSED",
+                }}
+              />
+            ) : (
+              <p className={styles.muted}>Esta orden de trabajo no tiene un flujo configurado.</p>
+            )
+          )}
 
           {tab === "actividad" && (
             <>
