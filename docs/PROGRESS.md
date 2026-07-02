@@ -1,5 +1,11 @@
 # Progreso — Lyra WatchLog
 
+**2026-07-02 — 🎨 OT · UX: llenar el checklist en MODAL embebido** (`feat/ot-checklist-modal`). Llenar/ver un checklist de
+la OT ya no saca de la pantalla: reutiliza `EntryFillPage` en **modo embebido** (props opcionales `embedded`/`entryId`/
+`onClose`; **la ruta normal de Bitácoras NO cambia**) abierto en un **modal** sobre la OT, con **"Cerrar"** en vez de
+"Volver"; al cerrar refresca el estado del checklist. Viable porque sellar no navega. typecheck/lint(0 err)/build verdes.
+Ver DECISIONS 2026-07-02.
+
 **2026-07-02 — 🎨 OT · UX: detalle DRAWER → PÁGINA dedicada (Object Page)** (`feat/ot-detalle-pagina`). El detalle de la
 OT deja de ser un drawer lateral (680px, comprimía el objeto) y pasa a una **página dedicada** con ruta propia
 `/ordenes-trabajo/:id` (deep-linkable), estándar SAP Fiori Object Page / Maximo. Cabecera con folio+estado + **CTA primario

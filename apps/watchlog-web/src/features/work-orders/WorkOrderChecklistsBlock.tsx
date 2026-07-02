@@ -1,12 +1,16 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { CheckCircle2, ClipboardCheck, ExternalLink, Lightbulb, Plus, ShieldAlert, Trash2, XCircle } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { CheckCircle2, ClipboardCheck, Eye, Lightbulb, PenLine, Plus, ShieldAlert, Trash2, XCircle } from "lucide-react";
 import { blockingChecklistsForClose, type WorkOrderChecklistDto } from "@lyra/contracts";
 import { Button, Modal, Select, Textarea, useToast } from "@lyra/ui";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { formatDateTime } from "../../lib/format.js";
+import { EntryFillPage } from "../log-entries/EntryFillPage.js";
 import { CHECKLIST_STATUS_META } from "./work-orders-presentation.js";
 import {
+  WORK_ORDER_CHECKLIST_KEYS,
+  WORK_ORDER_KEYS,
   useAddWorkOrderChecklist,
   useInstantiateWorkOrderChecklist,
   useRemoveWorkOrderChecklist,
@@ -37,6 +41,16 @@ export function WorkOrderChecklistsBlock({ workOrderId, isLive }: { workOrderId:
 
   const [addOpen, setAddOpen] = useState(false);
   const [reviewing, setReviewing] = useState<WorkOrderChecklistDto | null>(null);
+  // Llenar/ver el checklist SIN salir de la OT: se abre su registro (LogEntry) en un
+  // MODAL embebido (reusa EntryFillPage en modo embebido). Al cerrar, refresca el
+  // estado del checklist (p. ej. tras sellar, habilita "Enviar a revisión").
+  const qc = useQueryClient();
+  const [fillId, setFillId] = useState<string | null>(null);
+  const closeFill = () => {
+    setFillId(null);
+    qc.invalidateQueries({ queryKey: WORK_ORDER_CHECKLIST_KEYS.forWorkOrder(workOrderId) });
+    qc.invalidateQueries({ queryKey: WORK_ORDER_KEYS.detail(workOrderId) });
+  };
 
   const blocking = blockingChecklistsForClose(checklists);
   const err = (e: unknown) => toast.error((e as Error).message);
@@ -95,7 +109,7 @@ export function WorkOrderChecklistsBlock({ workOrderId, isLive }: { workOrderId:
                       </Button>
                     )}
                     {c.logEntryId && c.status === "IN_PROGRESS" && (
-                      <Link to={`/nueva-entrada/${c.logEntryId}`}><Button variant="secondary" leftIcon={<ExternalLink size={14} />}>Llenar</Button></Link>
+                      <Button variant="secondary" leftIcon={<PenLine size={14} />} onClick={() => setFillId(c.logEntryId)}>Llenar</Button>
                     )}
                     {c.status === "IN_PROGRESS" && (
                       <Button variant="secondary" disabled={!c.logEntrySealed} title={c.logEntrySealed ? undefined : "Complete y selle el registro primero"}
@@ -109,7 +123,7 @@ export function WorkOrderChecklistsBlock({ workOrderId, isLive }: { workOrderId:
                       </>
                     )}
                     {c.logEntryId && (c.status === "SUBMITTED" || c.status === "APPROVED") && (
-                      <Link to={`/bitacoras/${c.logEntryId}`}><Button variant="secondary" leftIcon={<ExternalLink size={14} />}>Ver</Button></Link>
+                      <Button variant="secondary" leftIcon={<Eye size={14} />} onClick={() => setFillId(c.logEntryId)}>Ver</Button>
                     )}
                     {!c.mandatory && c.status === "PENDING" && (
                       <Button variant="secondary" leftIcon={<Trash2 size={14} />} onClick={() => remove.mutate(c.id, { onError: err })}>Quitar</Button>
@@ -124,6 +138,13 @@ export function WorkOrderChecklistsBlock({ workOrderId, isLive }: { workOrderId:
 
       {addOpen && <AddChecklistModal workOrderId={workOrderId} present={checklists} onClose={() => setAddOpen(false)} />}
       {reviewing && <ReviewChecklistModal workOrderId={workOrderId} checklist={reviewing} onClose={() => setReviewing(null)} />}
+      {fillId && (
+        <Modal open onClose={closeFill} size="xl" title="Checklist / permiso de trabajo">
+          {/* Reusa el motor de llenado del constructor de formularios en MODO EMBEBIDO:
+              se llena/sella aquí mismo sin salir de la OT; "Cerrar" vuelve al detalle. */}
+          <EntryFillPage embedded entryId={fillId} onClose={closeFill} />
+        </Modal>
+      )}
     </>
   );
 }
