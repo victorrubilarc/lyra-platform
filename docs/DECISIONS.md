@@ -4,6 +4,23 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-02 · OT — UX: pickers buscables, quitar "Puerta N" de la UI, botón «volver» coherente
+Más pulido "pensando en quien tiene poco tiempo" (feedback del dueño):
+1. **Pickers buscables** en «Nueva regla de checklist»: el picker de **tipos de OT** pasa a `MultiSelect` (búsqueda +
+   chips + ordenado alfabético) y el de **plantilla** a `Combobox` (búsqueda al escribir) — **componentes YA existentes en
+   `packages/ui`** (reuso, no reinvento). Escala bien con muchos tipos/plantillas y siempre muestra lo elegido.
+2. **"Puerta 1/2/3/4" es JERGA INTERNA** (el dueño: "ese término es para nosotros") → se **quita de todos los textos
+   VISIBLES** (front + un mensaje de error del backend que salía en toast): "Puerta 2 bloqueada" → "No se puede avanzar:
+   N verificación(es) obligatoria(s) sin aprobar"; "(Puerta 3)"/"bloquea la Puerta 2" reformulados sin el término. Los
+   **comentarios de código** conservan "Puerta N" (ahí SÍ es para nosotros).
+3. **Botón «volver» coherente**: en Catálogos era un link de texto plano y en el detalle un botón con borde → se unifican
+   al mismo estilo y rótulo («‹ Órdenes de trabajo»).
+**Pendiente (inquietud del dueño):** filtrar la lista de plantillas a **solo las de tipo checklist** = requiere el marcador
+`Template.purpose` (fork **W5**, diferido en S3) — toca el Form Builder + migración; se PROPONE como slice aparte.
+typecheck/lint(0 err)/build verdes.
+
+---
+
 ### 2026-07-02 · OT — UX enterprise: modo claro, grilla del plan y picker de tipos (feedback del dueño)
 Tres correcciones de calidad "como los grandes":
 1. **Modo claro roto** en la lista de Verificaciones y en el modal «Nueva regla de checklist»: usaban colores en

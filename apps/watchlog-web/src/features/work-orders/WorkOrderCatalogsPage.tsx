@@ -42,7 +42,7 @@ export function WorkOrderCatalogsPage() {
     <div className={styles.page}>
       <header className={styles.header}>
         <div>
-          <Link to="/ordenes-trabajo" className={styles.back}><ArrowLeft size={14} /> Volver a órdenes de trabajo</Link>
+          <Link to="/ordenes-trabajo" className={styles.back}><ArrowLeft size={15} /> Órdenes de trabajo</Link>
           <h1 className={styles.h1}><Tags size={22} /> Catálogos de órdenes de trabajo</h1>
           <p className={styles.sub}>Administra los tipos de OT y las especialidades (disciplinas) disponibles al crear una solicitud. La ubicación la define la estructura organizacional (nodo).</p>
         </div>
