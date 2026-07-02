@@ -20,7 +20,7 @@ import type {
   ThresholdBand,
   TimelineQuery,
 } from "@lyra/contracts";
-import { canonicalSignaturePayload, formatEntryFolio, resolveSortKeys, upgradeFieldConfig } from "@lyra/contracts";
+import { canonicalSignaturePayload, entryFolioLabel, resolveSortKeys, upgradeFieldConfig } from "@lyra/contracts";
 import { Prisma } from "@prisma/client";
 import { AuditService, type AuditContext } from "../audit/audit.service";
 import { ScopeService } from "../authz/scope.service";
@@ -292,7 +292,7 @@ export class LogbookQueryService {
     const csv = toCsv(
       items,
       [
-        { header: "Folio", value: (r) => formatEntryFolio(r.entryNumber) },
+        { header: "Folio", value: (r) => entryFolioLabel(r) },
         { header: "Plantilla", value: (r) => r.templateName },
         { header: "Versión", value: (r) => r.templateVersionNumber },
         { header: "Nodo", value: (r) => r.orgNodeName },

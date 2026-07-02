@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { Button, Card, Chip, EmptyState, Spinner, useToast } from "@lyra/ui";
 import {
-  formatEntryFolio,
+  entryFolioLabel,
   isFieldVisible,
   thresholdBandFor,
   type LogEntryDetail,
@@ -291,7 +291,7 @@ function RelatedGroup({ title, items }: { title: string; items: LogEntryListItem
         {items.map((r) => (
           <button key={r.id} type="button" className={styles.relatedItem} onClick={() => navigate(`/bitacoras/${r.id}`)}>
             <span>
-              <span className={styles.folio}>{formatEntryFolio(r.entryNumber)}</span>
+              <span className={styles.folio}>{entryFolioLabel(r)}</span>
               <span style={{ marginLeft: 10 }}>{r.templateName}</span>
             </span>
             <span className={styles.cellSub}>
@@ -397,7 +397,7 @@ export function EntryViewerPage() {
       <Card className={styles.viewerHeader}>
         <div className={styles.viewerTopRow}>
           <div>
-            <span className={styles.viewerFolio}>{formatEntryFolio(entry.entryNumber)}</span>
+            <span className={styles.viewerFolio}>{entryFolioLabel(entry)}</span>
             <div className={styles.viewerName}>{entry.templateName}</div>
             <div className={fillStyles.entryNode}>{entry.orgNodePath ?? "—"}</div>
           </div>

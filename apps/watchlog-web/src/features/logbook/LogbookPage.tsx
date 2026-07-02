@@ -22,8 +22,8 @@ import {
 import { usePermissions } from "../../auth/use-permissions.js";
 import { useAuth } from "../../auth/use-auth.js";
 import {
+  entryFolioLabel,
   evaluateSla,
-  formatEntryFolio,
   LOG_ENTRY_SORT_FIELDS,
   type LogEntryListItem,
   type LogEntrySortField,
@@ -568,7 +568,7 @@ export function LogbookPage() {
       header: t("logbook.list.folio"),
       sortable: true,
       width: 110,
-      render: (r) => <span className={styles.folio}>{formatEntryFolio(r.entryNumber)}</span>,
+      render: (r) => <span className={styles.folio}>{entryFolioLabel(r)}</span>,
     },
     {
       key: "template",

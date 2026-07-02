@@ -5,6 +5,7 @@ import { FiscalCalendarModule } from "../fiscal-calendar/fiscal-calendar.module"
 import { OperationalPeriodModule } from "../operational-periods/operational-periods.module";
 import { SettingsModule } from "../settings/settings.module";
 import { TemplatesModule } from "../templates/templates.module";
+import { FolioModule } from "../folio/folio.module";
 import { LogEntriesController } from "./log-entries.controller";
 import { LogEntriesService } from "./log-entries.service";
 import { LogbookQueryService } from "./logbook-query.service";
@@ -21,7 +22,7 @@ import { LogbookQueryService } from "./logbook-query.service";
  * `EncryptionService` (hash del payload firmado) viene del CryptoModule global.
  */
 @Module({
-  imports: [OperationalCalendarModule, FiscalCalendarModule, OperationalPeriodModule, AuthModule, SettingsModule, TemplatesModule],
+  imports: [OperationalCalendarModule, FiscalCalendarModule, OperationalPeriodModule, AuthModule, SettingsModule, TemplatesModule, FolioModule],
   controllers: [LogEntriesController],
   providers: [LogEntriesService, LogbookQueryService],
   exports: [LogEntriesService],

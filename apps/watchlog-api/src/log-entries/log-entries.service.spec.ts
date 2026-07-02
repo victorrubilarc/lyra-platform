@@ -71,6 +71,9 @@ function makeService(
   } = {},
 ) {
   const tx = {
+    // Por defecto la plantilla NO define folioScheme ⇒ issueFolioWithinTx no emite folio.
+    template: { findUnique: vi.fn().mockResolvedValue({ folioScheme: null }) },
+    orgNode: { findUnique: vi.fn().mockResolvedValue({ structureId: null }) },
     logEntryValue: { upsert: vi.fn().mockResolvedValue({}), findUnique: vi.fn().mockResolvedValue(null) },
     logEntryFieldChange: { create: vi.fn().mockResolvedValue({}) },
     logEntrySection: { update: vi.fn().mockResolvedValue({}), updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
@@ -147,8 +150,12 @@ function makeService(
   const ruleActions = {
     emit: vi.fn().mockResolvedValue(undefined),
   } as unknown as import("../rule-actions/rule-action-emitter.service").RuleActionEmitterService;
+  const folio = {
+    next: vi.fn().mockResolvedValue(1),
+    plantYear: vi.fn().mockReturnValue(2026),
+  } as unknown as import("../folio/folio.service").FolioService;
   return {
-    service: new LogEntriesService(prisma, audit, scope, shiftResolver, fiscalResolver, reauth, enc, periods, permissions, settings, storage, notifications, exceptionGenerator, ruleActions),
+    service: new LogEntriesService(prisma, audit, scope, shiftResolver, fiscalResolver, reauth, enc, periods, permissions, settings, storage, notifications, exceptionGenerator, ruleActions, folio),
     prisma,
     audit,
     shiftResolver,

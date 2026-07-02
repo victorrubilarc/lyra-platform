@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-  DEFAULT_WORK_ORDER_FOLIO_SCHEME,
-  buildFolioSeqKey,
-  folioSchemeSchema,
-  renderFolio,
-  resolveFolioScheme,
-} from "./folio.js";
+import { buildFolioSeqKey, folioSchemeSchema, renderFolio } from "../shared/folio.js";
+import { DEFAULT_WORK_ORDER_FOLIO_SCHEME, resolveFolioScheme } from "./folio.js";
 
 describe("resolveFolioScheme", () => {
   it("null/undefined caen al default OT (por tipo + anual, OT-####)", () => {

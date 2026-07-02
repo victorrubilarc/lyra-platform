@@ -705,6 +705,7 @@ hoy el selector ofrece todas las plantillas publicadas. Ver DECISIONS 2026-07-02
   - Qué campos salen como **columnas de resumen** en la grilla (`gridFieldKeys`).
   - **Modo de equipo** (ninguno/opcional/sugerido/requerido).
   - **Ventana de edición** (plazo para corregir).
+  - **Folio del documento** (numeración propia de la plantilla; ver §4.4).
   - **Alcance** por nodo y por plantilla; asignación a nodos.
 
 ### 4.2 Alcance (quién ve/usa qué) — resumen
@@ -717,6 +718,21 @@ hoy el selector ofrece todas las plantillas publicadas. Ver DECISIONS 2026-07-02
   vencido, solo con permiso explícito **y motivo auditado** (opcional MFA).
 - **Períodos contables**: si el período está CERRADO/BLOQUEADO, no se escribe.
 - Detalle en `USER_GUIDE.md` / `DECISIONS.md`.
+
+### 4.4 Folio del documento (numeración propia por plantilla) — gobernanza viva
+- **Qué es.** Cada plantilla puede tener su **propio correlativo de documento** (ej. `RT-2026-0001`) en
+  vez del correlativo general del sistema (`BIT-000123`). Se configura con el **mismo editor visual** que
+  el folio de los **tipos de OT** (`FolioSchemeEditor`): prefijo · ámbito de la serie (por plantilla /
+  nodo / estructura / global) · reinicio (nunca / anual) · relleno · número inicial · máscara opcional
+  con tokens `{PREFIX}`/`{YYYY}`/`{SEQ}` · **vista previa en vivo** + aviso de colisiones.
+- **Vive en el contenedor MUTABLE** (`Template.folioScheme`), no en la versión inmutable: cambiar el
+  prefijo NO obliga a republicar (patrón SAP *number range* / NetSuite *auto-numbering* por tipo de doc).
+- **Se emite al SELLAR** (no al abrir el borrador) ⇒ los borradores abandonados/anulados no gastan número
+  y la serie queda **sin huecos** (gapless). En OT, se emite al aprobar (o el estado que elija el tipo).
+- **Opcional con fallback**: sin esquema, la entrada usa el correlativo global (`entryNumber`); cero
+  regresión. Una vez emitido, el folio es **inmutable** y aparece en grilla/visor/exportaciones. El motor
+  (contador atómico gapless) es **compartido** con las OT — *cero reinvención*.
+- Detalle de uso paso a paso en `USER_GUIDE.md` ▸ *Plantillas ▸ Folio del documento por plantilla*.
 
 ---
 

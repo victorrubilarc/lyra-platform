@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ExternalLink, Maximize2, Minimize2 } from "lucide-react";
 import { Button, Modal, Spinner } from "@lyra/ui";
-import { formatEntryFolio } from "@lyra/contracts";
+import { entryFolioLabel } from "@lyra/contracts";
 import { useLogEntry } from "../log-entries/log-entries-queries.js";
 import { WorkflowDiagram } from "./WorkflowDiagram.js";
 import styles from "./Logbook.module.css";
@@ -29,7 +29,7 @@ export function FlowModal({ entryId, onClose, onOpenFull }: Props) {
       open={entryId !== null}
       onClose={onClose}
       size={expanded ? "xl" : "lg"}
-      title={entry ? `${t("logbook.diagram.title")} · ${formatEntryFolio(entry.entryNumber)}` : t("logbook.diagram.title")}
+      title={entry ? `${t("logbook.diagram.title")} · ${entryFolioLabel(entry)}` : t("logbook.diagram.title")}
       footer={
         <div className={styles.flowModalFooter}>
           <Button

@@ -41,6 +41,7 @@ import type {
 import {
   acceptMatches,
   availableTransitionsFor,
+  buildFolioSeqKey,
   canonicalSignaturePayload,
   collectVarRefs,
   editWindowDeadline,
@@ -55,7 +56,9 @@ import {
   maxAttachmentBytes,
   pruneEmptyTableRows,
   recomputeComputedValues,
+  renderFolio,
   requiredFieldError,
+  resolveLogEntryFolioScheme,
   ruleHasAction,
   resolveEditWindow,
   resolveEffectiveAt,
@@ -80,6 +83,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { SettingsService } from "../settings/settings.service";
 import { NotificationEmitterService } from "../notifications/notification-emitter.service";
 import { RuleActionEmitterService } from "../rule-actions/rule-action-emitter.service";
+import { FolioService } from "../folio/folio.service";
 import {
   ExceptionGeneratorService,
   type ExceptionEntryContext,
@@ -131,6 +135,7 @@ export type EntrySource = Pick<
   LogEntryRow,
   | "id"
   | "entryNumber"
+  | "folio"
   | "templateId"
   | "templateVersionId"
   | "workflowDefinitionId"
@@ -239,6 +244,7 @@ export class LogEntriesService {
     private readonly notifications: NotificationEmitterService,
     private readonly exceptionGenerator: ExceptionGeneratorService,
     private readonly ruleActions: RuleActionEmitterService,
+    private readonly folio: FolioService,
   ) {}
 
   // --- Crear (abrir) una entrada ---------------------------------------------
@@ -445,6 +451,7 @@ export class LogEntriesService {
     const synthetic: EntrySource = {
       id: "",
       entryNumber: 0,
+      folio: null,
       templateId: template.id,
       templateVersionId: version.id,
       workflowDefinitionId: version.workflowDefinitionId,
@@ -1060,9 +1067,18 @@ export class LogEntriesService {
       // Estampa los formulados (última vez) ANTES de congelar: la entrada aún no
       // está sellada en este punto, así DB == valores validados al sellar.
       await this.stampComputedValues(tx, id, version, valuesByKey, userId, sealedAt);
+      // FOLIO-por-plantilla: sellar = commit GxP ⇒ se emite (una vez, gapless) el folio
+      // propio si la plantilla lo configura. DENTRO de la tx: si algo falla, no se quema.
+      const folioIssued = await this.issueFolioWithinTx(tx, entry, sealedAt);
       await tx.logEntry.update({
         where: { id },
-        data: { status: "SUBMITTED", sealedAt, ...seal, updatedById: userId },
+        data: {
+          status: "SUBMITTED",
+          sealedAt,
+          ...seal,
+          ...(folioIssued ? { folio: folioIssued.folio, folioSeqKey: folioIssued.seqKey } : {}),
+          updatedById: userId,
+        },
       });
       // Ronda programada (2.3): si esta entrada cumple una ocurrencia, márcala CUMPLIDA.
       await tx.roundOccurrence.updateMany({ where: { logEntryId: id, status: "PENDING" }, data: { status: "COMPLETED" } });
@@ -1723,6 +1739,8 @@ export class LogEntriesService {
         }
       }
 
+      // FOLIO-por-plantilla: se emite en el mismo gesto que SELLA (1ª salida del inicial).
+      const folioIssued = seal ? await this.issueFolioWithinTx(tx, entry, now) : null;
       await tx.logEntry.update({
         where: { id },
         data: {
@@ -1732,6 +1750,7 @@ export class LogEntriesService {
           status: nextStatus,
           updatedById: userId,
           ...(seal ? { sealedAt: now, ...seal } : {}),
+          ...(folioIssued ? { folio: folioIssued.folio, folioSeqKey: folioIssued.seqKey } : {}),
         },
       });
       // Ronda programada (2.3): la transición que SELLA cumple la ocurrencia ligada.
@@ -1804,6 +1823,40 @@ export class LogEntriesService {
     const entry = await this.prisma.logEntry.findFirst({ where: { id, deletedAt: null } });
     if (!entry) throw new NotFoundException("Entrada no encontrada");
     return entry;
+  }
+
+  /**
+   * FOLIO-por-plantilla (folio-por-plantilla del dueño, 2026-07-02): emite el folio
+   * propio de la entrada SI su plantilla define `folioScheme`, dentro de la tx del
+   * SELLADO (commit GxP). Devuelve `null` sin esquema (⇒ la entrada conserva `folio`
+   * null y la UI cae al correlativo global `entryNumber`). Gapless: el contador sólo se
+   * consume si la tx del llamador COMMITEA (`FolioService.next` recibe `tx`). El `typeId`
+   * de la clave de secuencia = la PLANTILLA (cada plantilla es su propia serie).
+   */
+  private async issueFolioWithinTx(
+    tx: Prisma.TransactionClient,
+    entry: Pick<LogEntryRow, "id" | "templateId" | "orgNodeId" | "folio">,
+    now: Date,
+  ): Promise<{ folio: string; seqKey: string } | null> {
+    if (entry.folio) return null; // ya emitido (defensa; el sellado ocurre una sola vez)
+    const tmpl = await tx.template.findUnique({ where: { id: entry.templateId }, select: { folioScheme: true } });
+    if (!tmpl?.folioScheme) return null; // plantilla sin esquema ⇒ correlativo global
+    const scheme = resolveLogEntryFolioScheme(tmpl.folioScheme);
+    let structureId: string | null = null;
+    if (scheme.scope === "structure") {
+      const node = await tx.orgNode.findUnique({ where: { id: entry.orgNodeId }, select: { structureId: true } });
+      structureId = node?.structureId ?? null;
+    }
+    const year = this.folio.plantYear(now);
+    const seqKey = buildFolioSeqKey(scheme, {
+      entity: "logentry",
+      typeId: entry.templateId,
+      orgNodeId: entry.orgNodeId,
+      structureId,
+      year,
+    });
+    const seq = await this.folio.next(tx, seqKey, scheme.start);
+    return { folio: renderFolio(scheme, seq, { year }), seqKey };
   }
 
   /** Interno: versión de plantilla congelada con su grafo completo. */
@@ -2565,6 +2618,7 @@ export class LogEntriesService {
     return {
       id: e.id,
       entryNumber: e.entryNumber,
+      folio: e.folio ?? null,
       templateId: e.templateId,
       templateVersionId: e.templateVersionId,
       workflowDefinitionId: e.workflowDefinitionId,

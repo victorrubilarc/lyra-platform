@@ -22,9 +22,10 @@ import {
   Trash2,
 } from "lucide-react";
 import { Button, Card, Checkbox, Chip, Drawer, FormField, Input, Modal, Select, Textarea, useToast } from "@lyra/ui";
-import { GRID_FIELD_KEYS_MAX } from "@lyra/contracts";
+import { DEFAULT_LOG_ENTRY_FOLIO_SCHEME, GRID_FIELD_KEYS_MAX } from "@lyra/contracts";
 import type { EquipmentMode, FieldType, TemplateDetail, TemplatePurpose } from "@lyra/contracts";
 import { usePermissions } from "../../auth/use-permissions.js";
+import { FolioSchemeEditor } from "../shared/FolioSchemeEditor.js";
 import { EditWindowDurationField } from "../settings/EditWindowDurationField.js";
 import { fetchRoles } from "../security/security-api.js";
 import { ScopeTreePicker } from "../security/ScopeTreePicker.js";
@@ -889,6 +890,24 @@ function ConfigView({
                   <option value="">General</option>
                   <option value="CHECKLIST">Checklist / permiso de trabajo</option>
                 </Select>
+              )}
+            </FormField>
+            {/* Folio de documento CONFIGURABLE por plantilla (folio-por-plantilla) */}
+            <FormField
+              label="Folio del documento"
+              hint="Numeración propia para las entradas de esta plantilla (ej. RT-2026-0001). Se emite al SELLAR. Sin personalizar, usan el correlativo global de bitácora."
+            >
+              {() => (
+                <FolioSchemeEditor
+                  entity="logentry"
+                  uniquenessDomain="per-type"
+                  defaultScheme={DEFAULT_LOG_ENTRY_FOLIO_SCHEME}
+                  value={state.folioScheme}
+                  onChange={(v) => patchConfig({ ...state, folioScheme: v })}
+                  disabled={!canEdit}
+                  enableLabel="Folio propio para esta plantilla"
+                  fallbackHint="Sin folio propio, las entradas usan el correlativo global de bitácora (ej. BIT-000123)."
+                />
               )}
             </FormField>
           </Card>
