@@ -702,7 +702,7 @@ Incident(resuelta) ──> KnowledgeArticle
 - Índices previstos: FKs, `OrgNode.parentId`, `Entry(templateId, createdAt)`, `Incident(status, severity)`, GIN en `tsvector` de KB y en `JSONB` consultable.
 - El esquema vive en `apps/watchlog-api/prisma/schema.prisma`; migraciones versionadas con `prisma migrate`.
 
-### Órdenes de Trabajo / Work Orders (OT / PTW) — S1 Cimientos + S2 Puerta 1 *(implementado)*
+### Órdenes de Trabajo / Work Orders (OT / PTW) — S1 Cimientos + S2 Puerta 1 + S3 Puerta 2 *(implementado)*
 Migraciones `20260701180000_add_work_orders` (S1) y `20260701210000_add_work_order_workflow_folio` (S2). Entidad NUEVA
 `WorkOrder`, **espejo de `Incident`** (DECISIONS 2026-07-01, forks W1–W8). Desde S2 el ciclo de la solicitud está VIVO
 hasta la Puerta 1: workflow congelado al crear + ejecutor de transiciones (permiso `workorder:transition`, dim. WORKFLOW)
@@ -740,9 +740,22 @@ anulación lifecycle `CANCELED`).
 - **WorkOrderType** — catálogo configurable de tipos (espejo de `IncidentType`). `key` única, `name`/`description`/`color`,
   `defaultWorkflowId` (ref. blanda; flujo que se CONGELA al crear una OT del tipo), `requiresPtwDefault`,
   `criticalityDefault`, **`folioScheme` (Json validado por `folioSchemeSchema`) + `folioOnStateKey`** (S2: estado al que,
-  al ENTRAR, se emite el folio; null = "aprobada"; configurables por API — editor UI pendiente), SLA light
+  al ENTRAR, se emite el folio; null = "aprobada"; configurables por API — editor UI pendiente),
+  **`checklistSuggestStateKey`/`checklistGateStateKey`** (S3: estados data-driven que disparan la sugerencia de checklists
+  y la Puerta 2; null = "en_preparacion"/"checklists_ok"), SLA light
   (`resolutionDueMinutes`/`escalationAfterMinutes`/`escalationRoleId` → **Role** SetNull, relación
   `WorkOrderTypeEscalationRole`), `active`/`sortOrder`.
+- **WorkOrderChecklistRule** *(S3, fork W5 — Capa A diseño)* — regla de aplicabilidad de un checklist. `templateId`
+  (→ **Template**, Restrict; la plantilla del Form Builder que se instancia), `mandatory` (obligatorio ⇒ no removible +
+  bloquea Puerta 2), aplicabilidad `appliesToTypeIds String[]` (vacío = todos)/`minCriticality`/`specialtyId`
+  (→ **Specialty** SetNull)/`requiresPtw` (null = no discrimina), `active`/`sortOrder`, `deletedAt`. Helper puro
+  `applicableChecklistRules` (contracts) decide el match (espejo de `applicableObligationsFor`).
+- **WorkOrderChecklist** *(S3, fork W5 — Capa B operación)* — enlace **(OT, plantilla)** con `@@unique([workOrderId,
+  templateId])`. `logEntryId` (→ **LogEntry** SetNull; instancia viva, null hasta iniciar), `sourceRuleId`
+  (→ WorkOrderChecklistRule SetNull; null = agregado manual), `mandatory`, `status` (enum **WorkOrderChecklistStatus**:
+  PENDING|IN_PROGRESS|SUBMITTED|APPROVED|REJECTED), `responsibleId`/`responsibleRoleId`, `reviewerId`/`reviewedAt`/
+  `rejectReason` (segregación: revisor ≠ responsable), `addedById`. `onDelete: Cascade` desde `WorkOrder`. Guard PURO
+  `blockingChecklistsForClose` (obligatorio no APPROVED) = Puerta 2.
 - **Specialty** — catálogo de disciplina/oficio (`key` única, `name`/`description`/`color`, `active`/`sortOrder`).
   Equivale al **Work Center (SAP PM) / Craft (Maximo)**. N:N con la OT. La **ubicación** la da `orgNodeId` (estructura,
   que puede tener un nivel "Área"), **no** un catálogo aparte.
@@ -753,6 +766,8 @@ anulación lifecycle `CANCELED`).
 
 **Implementado en S2** (migración `20260701210000_add_work_order_workflow_folio`): `FolioCounter`, `WorkOrderTransition`,
 `WorkOrderEvent`, flujo sembrado "OT — 4 puertas PTW" (`ot-4-puertas`, 11 estados; la anulación NO es estado — es el
-endpoint `cancel`, espejo Incidencias). **Pendiente (S3–S5):** `WorkOrderComment`, `WorkOrderChecklistRule`/
-`WorkOrderChecklist` (checklists sobre Form Builder), `WorkActivity`/`WorkActivityUpdate` (plan de actividades).
+endpoint `cancel`, espejo Incidencias). **Implementado en S3** (migración `20260702120000_add_work_order_checklists`):
+`WorkOrderChecklistRule` + `WorkOrderChecklist` + enum `WorkOrderChecklistStatus` + 2 columnas data-driven en
+`WorkOrderType`; seed de plantilla LOTO publicada + regla obligatoria. **🔴 Bug abierto (folio cross-tipo, ver BACKLOG §2 +
+DECISIONS 2026-07-02).** **Pendiente (S4–S5):** `WorkOrderComment`, `WorkActivity`/`WorkActivityUpdate` (plan de actividades).
 Ver `docs/design/OT_DESIGN_ARCHITECTURE.md`.

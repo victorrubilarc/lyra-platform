@@ -4,6 +4,40 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-02 · OT — Sesión 3 (Puerta 2 · checklists / PTW): decisiones de implementación
+Al dar vida a la fase Preparación (`feat/ot-puerta2`: reglas + checklists + instanciación LogEntry + guard) se tomaron
+las siguientes decisiones no explícitas en el diseño (§2.4 / fork W5):
+1. **Claves de estado de checklist DATA-DRIVEN en `WorkOrderType`** (`checklistSuggestStateKey` ≈ `en_preparacion`,
+   `checklistGateStateKey` ≈ `checklists_ok`), con defaults por CONSTANTE en contracts. *Motivo:* paridad con la
+   decisión S2 de `folioOnStateKey` — así "qué estado sugiere" y "qué estado es la Puerta 2" son DATO, no claves en duro;
+   un cliente que reduzca el flujo apunta esas claves donde corresponda. El ejecutor `transition()` corre el guard cuando
+   `toState.key === checklistGateStateKey` (espejo de `assertNoBlockingActions` de Incidencias) y la sugerencia cuando
+   `toState.key === checklistSuggestStateKey`. Editor UI de esas claves = diferido junto al de `folioScheme` (deuda S2).
+2. **La sugerencia se materializa al ENTRAR a preparación** (no al aprobar). *Motivo:* los checklists son de la fase
+   Preparación; materializar al aprobar los mostraría antes de tiempo. Es **idempotente** (@@unique OT×plantilla +
+   chequeo previo, espejo de `materializeForIncident`) y hay endpoint de re-derivación manual (`/checklists/suggest`).
+3. **`Template.purpose` (fork W5) DIFERIDO.** El marcador opcional null|CHECKLIST era SOLO filtro UX del picker. *Motivo:*
+   aditivo pero inerte sin su propia UI en el Form Builder ("no construir lo que no se usa"). El picker de reglas ofrece
+   **todas las plantillas PUBLICADAS**. Registrado en BACKLOG para cuando el catálogo crezca.
+4. **Instanciación = `LogEntry` real vía `LogEntriesService.create`** (no una copia del motor). El checklist se llena y
+   **sella** con el flujo existente del Form Builder; "enviar a revisión" exige el LogEntry `SUBMITTED` (sellado). No se
+   propaga el equipo de la OT al LogEntry (el nodo carga el ABAC; la plantilla de checklist se siembra `equipmentMode NONE`).
+   Re-instanciar un checklist RECHAZADO abre un LogEntry nuevo (recuperación).
+5. **Segregación de funciones en la revisión** (revisor ≠ responsable) se aplica en el backend (403), NO como permiso
+   separado. *Motivo:* el diseño §5 sólo define `workorder:checklist:manage`; un 2.º permiso de "revisar" contradiría el
+   alcance aprobado. La segregación por identidad (responsibleId ≠ userId) es suficiente y auditable.
+6. **🔴 BUG descubierto (defecto de S2): el folio de OT colisiona entre TIPOS.** `folioScheme` default scope `type`
+   (contador por tipo) + `renderFolio` sin el tipo en el string (`OT-2026-0001`) + `WorkOrder.folio` @unique GLOBAL ⇒ la
+   2.ª OT-tipo que apruebe choca (500). Es un defecto de uso normal (>1 tipo). NO se corrige en S3 (toca el default
+   aprobado W4 + datos existentes ⇒ necesita tu visto bueno + migración). Recomendación: default scope **`global`** (una
+   serie anual, estándar SAP/Maximo, folio EXACTO `OT-2026-0001` global-único). El smoke de OT usa prefijo propio `OTSMK`
+   para no chocar con datos reales. Registrado en BACKLOG §2.
+Verde (typecheck/lint/build/test) + contracts **412** (incl. `checklists.spec.ts` 9) + `smoke-workorders.py` **65/65**
+(ciclo: sugerencia auto → gate bloqueado 400 → instanciar LogEntry → sellar → enviar a revisión → segregación 403 →
+aprobar → `revisar_checklists` OK; + gates 403) + regresión incidencias 32/32.
+
+---
+
 ### 2026-07-01 · OT — Sesión 2 (Puerta 1): decisiones de implementación
 Al dar vida al ciclo de la solicitud (`feat/ot-puerta1`: workflow congelado + ejecutor + `FolioCounter` + firma) se
 tomaron 6 decisiones no explícitas en el diseño:

@@ -1,17 +1,24 @@
 import {
+  workOrderChecklistRuleSchema,
+  workOrderChecklistSchema,
   workOrderDetailSchema,
   workOrderListResponseSchema,
   workOrderStatsSchema,
   workOrderTypeSchema,
   workOrderTagSchema,
+  type AddWorkOrderChecklistRequest,
   type AssignWorkOrderRequest,
   type CancelWorkOrderRequest,
   type CreateWorkOrderRequest,
+  type ReviewWorkOrderChecklistRequest,
   type SpecialtyDto,
   type TransitionWorkOrderRequest,
   type UpdateWorkOrderRequest,
   type UpsertSpecialtyRequest,
+  type UpsertWorkOrderChecklistRuleRequest,
   type UpsertWorkOrderTypeRequest,
+  type WorkOrderChecklistDto,
+  type WorkOrderChecklistRuleDto,
   type WorkOrderDetail,
   type WorkOrderListQuery,
   type WorkOrderListResponse,
@@ -110,4 +117,48 @@ export function cancelWorkOrder(id: string, dto: CancelWorkOrderRequest): Promis
 /** Ejecuta una transición del flujo (Puerta 1: enviar / aprobar [firma] / rechazar). */
 export function transitionWorkOrder(id: string, dto: TransitionWorkOrderRequest): Promise<WorkOrderDetail> {
   return apiJson(`/work-orders/${id}/transitions`, workOrderDetailSchema, { method: "POST", body: dto });
+}
+
+// === Checklists / Puerta 2 (S3) ==============================================
+
+/** Reglas de checklist (Capa A · catálogo). */
+export function fetchWorkOrderChecklistRules(includeInactive = false): Promise<WorkOrderChecklistRuleDto[]> {
+  return apiJson(`/work-orders/checklist-rules${includeInactive ? "?includeInactive=true" : ""}`, z.array(workOrderChecklistRuleSchema));
+}
+
+export function upsertWorkOrderChecklistRule(dto: UpsertWorkOrderChecklistRuleRequest): Promise<WorkOrderChecklistRuleDto> {
+  return apiJson("/work-orders/checklist-rules", workOrderChecklistRuleSchema, { method: "POST", body: dto });
+}
+
+export function deleteWorkOrderChecklistRule(ruleId: string): Promise<void> {
+  return apiJson(`/work-orders/checklist-rules/${ruleId}`, z.unknown(), { method: "DELETE" }).then(() => undefined);
+}
+
+/** Checklists de una OT (Capa B · operación). */
+export function fetchWorkOrderChecklists(id: string): Promise<WorkOrderChecklistDto[]> {
+  return apiJson(`/work-orders/${id}/checklists`, z.array(workOrderChecklistSchema));
+}
+
+export function suggestWorkOrderChecklists(id: string): Promise<WorkOrderChecklistDto[]> {
+  return apiJson(`/work-orders/${id}/checklists/suggest`, z.array(workOrderChecklistSchema), { method: "POST" });
+}
+
+export function addWorkOrderChecklist(id: string, dto: AddWorkOrderChecklistRequest): Promise<WorkOrderChecklistDto> {
+  return apiJson(`/work-orders/${id}/checklists`, workOrderChecklistSchema, { method: "POST", body: dto });
+}
+
+export function removeWorkOrderChecklist(id: string, cid: string): Promise<void> {
+  return apiJson(`/work-orders/${id}/checklists/${cid}`, z.unknown(), { method: "DELETE" }).then(() => undefined);
+}
+
+export function instantiateWorkOrderChecklist(id: string, cid: string): Promise<WorkOrderChecklistDto> {
+  return apiJson(`/work-orders/${id}/checklists/${cid}/instantiate`, workOrderChecklistSchema, { method: "POST" });
+}
+
+export function submitWorkOrderChecklist(id: string, cid: string): Promise<WorkOrderChecklistDto> {
+  return apiJson(`/work-orders/${id}/checklists/${cid}/submit`, workOrderChecklistSchema, { method: "POST" });
+}
+
+export function reviewWorkOrderChecklist(id: string, cid: string, dto: ReviewWorkOrderChecklistRequest): Promise<WorkOrderChecklistDto> {
+  return apiJson(`/work-orders/${id}/checklists/${cid}/review`, workOrderChecklistSchema, { method: "POST", body: dto });
 }

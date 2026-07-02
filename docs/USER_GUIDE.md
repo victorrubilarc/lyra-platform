@@ -10,7 +10,7 @@
 > funcionalidades existentes** aunque su detalle aún esté por redactar (✍️): así nada se
 > olvida; el backfill de lo ya construido se llena de a poco (incremental).
 >
-> Última actualización: **2026-07-01** (Órdenes de trabajo — Puerta 1: aprobación con firma + folio oficial al aprobar, S2).
+> Última actualización: **2026-07-02** (Órdenes de trabajo — Puerta 2: checklists / permisos de trabajo ligados al constructor de formularios, S3).
 
 ## Convención de cada sección
 Cada funcionalidad se documenta con estas cuatro partes fijas:
@@ -143,8 +143,9 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 ### 18. Órdenes de trabajo (OT / PTW)  [todos los roles operativos]
 - ✅ **Crear y listar solicitudes de trabajo** (asistente de 2 pasos, grilla con filtros/facetas, detalle con reasignar/prioridad/anular) (§ Órdenes de trabajo)
 - ✅ **Enviar, aprobar (con firma y folio oficial) o rechazar la solicitud — Puerta 1** (flujo de estados con stepper, firma electrónica, folio OT-AAAA-#### emitido al aprobar, rechazo con motivo, historial) (§ Órdenes de trabajo ▸ Aprobación)
-- ✅ **Administrar los catálogos** (tipos de OT y especialidades) (§ Órdenes de trabajo ▸ Catálogos) [solo administrador]
-- ✍️ Checklists / permisos de trabajo, plan de actividades y cierre (Puertas 2–4 — Sesiones 3–5)
+- ✅ **Checklists / permisos de trabajo — Puerta 2** (reglas configurables, sugerencia automática al preparar, llenado como registro del constructor de formularios, revisión con segregación revisor≠responsable, bloqueo hasta aprobar los obligatorios) (§ Órdenes de trabajo ▸ Checklists y permisos de trabajo)
+- ✅ **Administrar los catálogos** (tipos de OT, especialidades y reglas de checklist) (§ Órdenes de trabajo ▸ Catálogos) [solo administrador]
+- ✍️ Plan de actividades y cierre (Puertas 3–4 — Sesiones 4–5)
 
 ---
 
@@ -226,7 +227,41 @@ quedar solo en manos del jefe de área aunque más personas tengan el permiso ba
 - Una solicitud **rechazada** queda terminada (no se reabre); si el trabajo sí se necesita, se crea una nueva
   solicitud. **Anular** (con motivo) sigue disponible en cualquier momento para solicitudes mal creadas o duplicadas.
 
-### Órdenes de trabajo ▸ Catálogos (tipos y especialidades)  [Admin]
+### Órdenes de trabajo ▸ Checklists y permisos de trabajo (Puerta 2)  [Supervisor/Ejecutor + Revisor]
+
+**Para qué sirve.** Asegura que **antes de planificar y ejecutar** una OT se completen los **checklists / permisos de
+trabajo** obligatorios (p. ej. **bloqueo de energías — LOTO**, trabajo en altura, espacio confinado, ART). Cada checklist
+es un **formulario del constructor de formularios** que se **llena, firma y sella** como cualquier registro de bitácora —
+no es una lista de texto suelta, sino un registro trazable. La OT **no puede pasar la Puerta 2** mientras quede un
+checklist **obligatorio** sin **aprobar**.
+
+**Cómo se usa** (en el detalle de la OT, pestaña **«Checklists»**):
+1. Al **iniciar la preparación** de la OT (transición «Iniciar preparación»), el sistema **sugiere automáticamente** los
+   checklists cuyas **reglas** coinciden con la OT (por tipo, criticidad, especialidad o si exige PTW). Los **obligatorios**
+   no se pueden quitar. También puedes **«Agregar»** manualmente otro checklist, o pulsar **«Sugerir aplicables»** para
+   re-derivar la lista.
+2. **El ejecutor** pulsa **«Iniciar»** en un checklist: se crea el **registro** (queda como responsable) y con **«Llenar»**
+   abre el formulario, lo completa y lo **sella** (firma según lo exija la plantilla). Luego pulsa **«Enviar a revisión»**
+   (habilitado solo cuando el registro está sellado).
+3. **El revisor** —**una persona distinta del que lo completó** (segregación de funciones)— abre **«Revisar»** y
+   **Aprueba** o **Rechaza** (con motivo). Un checklist rechazado puede **«Rehacer»** (abre un registro nuevo).
+4. Cuando **todos los obligatorios están Aprobados**, el responsable ejecuta la transición **«Aprobar checklists»**
+   (Puerta 2, con firma) y la OT avanza a **Checklists OK** → planificación. Si falta alguno, la transición se **bloquea**
+   con un aviso.
+
+**Quién puede.** Gestionar/instanciar/revisar checklists requiere **`workorder:checklist:manage`**. Avanzar la Puerta 2
+(la transición firmada) requiere **`workorder:transition`**. El **revisor debe ser distinto del responsable** que completó
+el checklist (lo valida el sistema, no es una convención).
+
+**Importante.**
+- Los checklists **obligatorios bloquean la Puerta 2** hasta estar **Aprobados** — no hay "botón de pánico".
+- Cada checklist vive como un **registro real** (con su folio `BIT-…`), auditable y firmable; puedes abrirlo desde el
+  enlace del checklist.
+- Las **reglas** de qué checklist se sugiere y a qué OT son **100% configurables** (ver Catálogos ▸ Reglas de checklist);
+  los contenidos (LOTO, altura, etc.) son **plantillas** que diseñas en el constructor de formularios, nunca están
+  "quemados" en el código.
+
+### Órdenes de trabajo ▸ Catálogos (tipos, especialidades y reglas de checklist)  [Admin]
 
 **Para qué sirve.** Definir las **opciones** que aparecen al crear una solicitud: los **tipos de OT** (correctiva,
 preventiva, predictiva, PTW de alto riesgo…) y las **especialidades/disciplinas** (mecánica, eléctrica,
@@ -236,8 +271,12 @@ estructura organizacional — el nodo — igual que en los EAM líderes.)*
 
 **Cómo se usa.**
 1. En **Órdenes de trabajo**, pulsa **«Catálogos»** (arriba a la derecha; solo visible para administradores).
-2. Elige la sub-pestaña **Tipos** o **Especialidades**. En cada una: busca, filtra por activo/inactivo, ordena,
-   y usa el interruptor para **activar/desactivar** una fila.
+2. Elige la sub-pestaña **Tipos**, **Especialidades** o **Reglas de checklist**. En cada una: busca, filtra, ordena,
+   y (en Tipos/Especialidades) usa el interruptor para **activar/desactivar** una fila.
+   - **Reglas de checklist:** cada regla vincula una **plantilla publicada** (el checklist) con las condiciones para
+     **sugerirla** a una OT: tipos de OT (vacío = todos), **criticidad mínima**, **especialidad**, si la OT **exige PTW**,
+     y si es **obligatoria** (bloquea la Puerta 2). Diseña primero el checklist como plantilla en el constructor de
+     formularios y publícala; luego créale una regla aquí.
 3. **«Nuevo…»** abre un formulario con nombre, **clave** (identificador estable, minúsculas/números/guiones, **no se puede
    cambiar** después), descripción y color del chip. En **Tipos** además: **flujo por defecto** (el que se congela al crear
    una OT del tipo; vacío = el flujo global "OT — 4 puertas PTW"), criticidad sugerida y si **requiere PTW** por defecto.

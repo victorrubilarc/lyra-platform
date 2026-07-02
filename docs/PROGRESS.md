@@ -1,5 +1,34 @@
 # Progreso — Lyra WatchLog
 
+**2026-07-02 — 🔧 OT · Sesión 3 · PUERTA 2 (checklists / permisos de trabajo) ✅** (`feat/ot-puerta2`). La fase
+**Preparación** está VIVA: se diseñan reglas de checklist, se sugieren/agregan a una OT, se instancian como `LogEntry`
+vivos (Form Builder) y la Puerta 2 se bloquea si falta un obligatorio sin aprobar. **NO se reinventó el motor de
+checklists** — cada checklist ES una plantilla del Form Builder instanciada como `LogEntry` (fork W5). **2 capas:**
+**Capa A (diseño)** `WorkOrderChecklistRule` = `templateId` (→ Template) + reglas de aplicabilidad
+`appliesToTypeIds`/`minCriticality`/`specialtyId`/`requiresPtw` (patrón `ReportingObligation`; helper puro
+`applicableChecklistRules`), `mandatory`; gate `workordercatalog:manage`. **Capa B (operación)** `WorkOrderChecklist` =
+enlace **(OT, plantilla)** `@@unique` con `logEntryId` (instancia viva), `sourceRuleId` (null = manual), `status`
+(PENDING|IN_PROGRESS|SUBMITTED|APPROVED|REJECTED), responsable/revisor; gate **permiso NUEVO `workorder:checklist:manage`**
+(catálogo 100→**101**; `db:seed`+FLUSHALL hechos). **Flujo operativo:** al ENTRAR al estado de preparación el ejecutor
+`transition()` **SUGIERE automáticamente** los checklists cuyas reglas matchean (idempotente, `materializeForWorkOrder`) +
+agregado manual; **instanciar** crea un `LogEntry` vía `LogEntriesService.create` (responsable = actor, IN_PROGRESS); se
+llena/**sella** con el Form Builder; **enviar a revisión** exige el LogEntry SUBMITTED; **revisar** aprueba/rechaza con
+**segregación (revisor ≠ responsable, 403)**. **Guard Puerta 2** `assertChecklistsComplete` (PURO `blockingChecklistsForClose`
+en contracts, espejo `assertNoBlockingActions`) bloquea `revisar_checklists` si hay obligatorio no APPROVED; se dispara
+cuando `toState.key === checklistGateStateKey`. **Claves de estado DATA-DRIVEN** en `WorkOrderType`
+(`checklistSuggestStateKey`≈`en_preparacion`, `checklistGateStateKey`≈`checklists_ok`, defaults por constante — paridad con
+`folioOnStateKey`). **Migración** `20260702120000_add_work_order_checklists` (`migrate diff`+`db:deploy`, drift ajeno
+descartado). **Seed:** plantilla LOTO publicada (equipmentMode NONE, campos opcionales) + regla obligatoria transversal.
+**Web:** pestaña **"Checklists"** en el drawer (`WorkOrderChecklistsBlock`: sugerir/agregar/iniciar/llenar[link a
+`/nueva-entrada/:id`]/enviar/revisar + aviso de Puerta 2 bloqueada) + sub-tab **"Reglas de checklist"** en
+`/ordenes-trabajo/catalogos` (`WorkOrderChecklistRuleModal`). typecheck(0)/lint(0 errores)/build/test verdes; **contracts
+412** (+9 `checklists.spec.ts`) · API 252 · web 6; `smoke-workorders.py` **65/65** (sugerencia auto → gate 400 → instanciar
+LogEntry → sellar → enviar → segregación 403 → aprobar → `revisar_checklists` OK; + gates 403) + regresión incidencias
+32/32. **🔴 BUG descubierto (defecto de S2): el folio de OT colisiona entre TIPOS** (scope `type` + string sin tipo +
+`folio` @unique global) — requiere decisión del dueño + migración; el smoke usa prefijo `OTSMK` para aislarse (ver
+DECISIONS/BACKLOG 2026-07-02). **DEUDAS:** `Template.purpose` (W5) diferido; editor UI de `folioScheme`. **Siguiente: OT
+Sesión 4 (Puerta 3 — plan de actividades + congelar baseline).**
+
 **2026-07-01 — 🔧 OT · Sesión 2 · PUERTA 1 (aprobación + folio al aprobar) ✅** (`feat/ot-puerta1`). El ciclo de la
 solicitud está VIVO hasta aprobar/rechazar, espejo del ejecutor de Incidencias. **Workflow:** al crear una OT se
 **CONGELA** la versión del flujo (el del `WorkOrderType.defaultWorkflowId` o el global sembrado **"OT — 4 puertas PTW"**,

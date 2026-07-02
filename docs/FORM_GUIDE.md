@@ -70,6 +70,17 @@ previa es exactamente lo que verá el operador**. No hay tres pantallas que se d
 - Hay cosas que **no** se congelan y se cambian "en vivo" sin republicar (la *gobernanza* de
   la plantilla: alcance, ventana de edición, qué columnas salen en la grilla…). Ver §4.1.
 
+### 1.4 Una plantilla puede ser un CHECKLIST de otro módulo (consumidores externos)
+El motor del formulario no es exclusivo de las bitácoras. Desde **Órdenes de Trabajo · Puerta 2**
+(2026-07-02, fork W5) una **plantilla publicada** puede usarse como **checklist / permiso de
+trabajo** (LOTO, altura, espacio confinado, ART): la OT crea una **entrada (`LogEntry`) real**
+de esa plantilla, se **llena y sella** con este mismo motor (mismas secciones, firmas,
+validaciones), y la OT la **revisa/aprueba** (segregación revisor ≠ responsable). No se creó
+ningún objeto de formulario nuevo ni un "modo checklist": es el **Form Builder tal cual**,
+instanciado por otro módulo. *(Nota: se evaluó un marcador opcional `Template.purpose`=CHECKLIST
+solo para filtrar el selector de plantillas del catálogo de reglas de OT; quedó **diferido** —
+hoy el selector ofrece todas las plantillas publicadas. Ver DECISIONS 2026-07-02.)*
+
 ---
 
 ## 2. Catálogo de objetos

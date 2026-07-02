@@ -1,6 +1,8 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
 import {
+  DEFAULT_WORK_ORDER_CHECKLIST_GATE_STATE_KEY,
+  DEFAULT_WORK_ORDER_CHECKLIST_SUGGEST_STATE_KEY,
   DEFAULT_WORK_ORDER_FOLIO_STATE_KEY,
   buildFolioSeqKey,
   deriveWorkOrderLifecycle,
@@ -30,6 +32,7 @@ import { AuditService, type AuditContext } from "../audit/audit.service";
 import { ScopeService } from "../authz/scope.service";
 import { ReauthService } from "../auth/reauth.service";
 import { FolioService } from "../folio/folio.service";
+import { WorkOrderChecklistsService } from "./work-order-checklists.service";
 
 /** Clave del flujo global por defecto de OT (seed fork W6; el tipo puede declarar otro). */
 const WORK_ORDER_WORKFLOW_KEY = "ot-4-puertas";
@@ -70,6 +73,7 @@ export class WorkOrdersService {
     private readonly scope: ScopeService,
     private readonly reauth: ReauthService,
     private readonly folio: FolioService,
+    private readonly checklists: WorkOrderChecklistsService,
   ) {}
 
   // === Listado / KPIs ========================================================
@@ -309,11 +313,20 @@ export class WorkOrdersService {
     const becomesFinal = toState.isFinal;
 
     // Puerta 1 — semántica data-driven de aprobación/rechazo/folio.
+    // Puerta 2 — claves data-driven de sugerencia/puerta de checklists (S3).
     const type = await this.prisma.workOrderType.findUnique({
       where: { id: row.typeId },
-      select: { folioScheme: true, folioOnStateKey: true },
+      select: { folioScheme: true, folioOnStateKey: true, checklistSuggestStateKey: true, checklistGateStateKey: true },
     });
     const folioStateKey = type?.folioOnStateKey ?? DEFAULT_WORK_ORDER_FOLIO_STATE_KEY;
+    const checklistGateStateKey = type?.checklistGateStateKey ?? DEFAULT_WORK_ORDER_CHECKLIST_GATE_STATE_KEY;
+    const checklistSuggestStateKey = type?.checklistSuggestStateKey ?? DEFAULT_WORK_ORDER_CHECKLIST_SUGGEST_STATE_KEY;
+
+    // GUARD Puerta 2: sólo se ENTRA al estado-puerta con los checklists obligatorios
+    // APROBADOS (espejo de assertNoBlockingActions de Incidencias; ANTES de mutar).
+    if (toState.key === checklistGateStateKey) {
+      await this.checklists.assertChecklistsComplete(id);
+    }
     const isApproval = toState.key === folioStateKey && !row.approvedAt;
     const isRejection = becomesFinal && !row.approvedAt && !isApproval;
     if (isRejection && !dto.reason?.trim()) {
@@ -405,6 +418,12 @@ export class WorkOrdersService {
         });
       }
     });
+    // SUGERENCIA Puerta 2 (S3): al ENTRAR al estado de preparación, materializa los
+    // checklists cuyas reglas matchean (idempotente). Fuera de la tx de la transición:
+    // si la sugerencia fallara no revierte una transición ya válida.
+    if (toState.key === checklistSuggestStateKey) {
+      await this.checklists.materializeForWorkOrder(id, userId);
+    }
     await this.audit.record({
       ...ctx,
       action: "workorder.transition.executed",
@@ -518,6 +537,8 @@ export class WorkOrdersService {
       criticalityDefault: r.criticalityDefault,
       folioScheme: (r.folioScheme as FolioScheme | null) ?? null,
       folioOnStateKey: r.folioOnStateKey,
+      checklistSuggestStateKey: r.checklistSuggestStateKey,
+      checklistGateStateKey: r.checklistGateStateKey,
       active: r.active,
       sortOrder: r.sortOrder,
     }));
@@ -543,6 +564,8 @@ export class WorkOrdersService {
       // Folio configurable (fork W4): el Zod del pipe ya validó el esquema.
       folioScheme: (dto.folioScheme ?? null) as Prisma.InputJsonValue,
       folioOnStateKey: dto.folioOnStateKey ?? null,
+      checklistSuggestStateKey: dto.checklistSuggestStateKey ?? null,
+      checklistGateStateKey: dto.checklistGateStateKey ?? null,
       active: dto.active ?? true,
       sortOrder: dto.sortOrder ?? 0,
     };

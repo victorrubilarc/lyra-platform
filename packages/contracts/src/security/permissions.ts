@@ -757,10 +757,17 @@ export const PERMISSION_CATALOG = [
     description: "Anular (cancelar) una orden de trabajo con motivo auditado (sin borrado físico).",
   },
   {
+    key: "workorder:checklist:manage",
+    dimension: "ACTION",
+    group: "workorders",
+    description:
+      "Agregar/quitar/instanciar checklists (permisos de trabajo) en una OT y revisarlos (Puerta 2). La segregación revisor≠responsable se aplica en el backend.",
+  },
+  {
     key: "workordercatalog:manage",
     dimension: "ACTION",
     group: "workorders",
-    description: "Administrar el catálogo de tipos de OT, áreas y especialidades.",
+    description: "Administrar el catálogo de tipos de OT, especialidades y reglas de checklist.",
   },
 ] as const satisfies readonly PermissionDef[];
 
