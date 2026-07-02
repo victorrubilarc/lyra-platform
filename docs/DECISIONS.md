@@ -25,6 +25,15 @@ ARCHIVED, sin borrar por si hay una OT en curso que la referencia; `LEGACY_CHECK
 smoke 65/65. **S4 incorporará:** reordenar el flujo (planificación antes del permiso) + `WorkActivity` + **checklists de
 EJECUCIÓN por actividad**; **S5:** checklist de **cierre** del permiso. *(Principio del dueño: implementar el estándar de
 la industria, sin engendros.)*
+**Ampliación consolidada (misma fecha, tras conversación con el dueño) → ver `docs/design/OT_DESIGN_ARCHITECTURE.md §11`
+(FUENTE DE VERDAD para S4–S5):** (1) el motor de checklists es **genérico**, NO PTW — cubre calidad/ITP, GMP/Part 11,
+readiness/PSSR, rondas, SOP, cierre (§11.1); (2) se agrega el **eje `momento`** (REQUEST/PLANNING/AUTHORIZATION/EXECUTION/
+CLOSURE) a las reglas, mapeado a estados por dato (§11.2); (3) **orden correcto planificar→autorizar→ejecutar**, se reordena
+el flujo en S4 (§11.3); (4) **hueco detectado por el dueño**: el aprobador no ve los checklists de ejecución → en Puerta 2
+debe **ver y confirmar (solo lectura) el set de ejecución** que se exigirá (Gobierno 2), separado de la **gobernanza del
+instrumento** a nivel de plantilla/HSE (Gobierno 1) (§11.5); (5) "exigir o no" = 3 niveles: flujo (¿hay puerta?) + regla
+(`mandatory` + aplicabilidad) + manual siempre opcional (§11.6); (6) patrones avanzados (puntos de espera de calidad, doble
+inspección/RII aviación, requisitos condicionales) **diferidos** hasta caso real (§11.7).
 
 ---
 

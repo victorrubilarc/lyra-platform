@@ -744,11 +744,22 @@ nunca queda más de una sesión atrás.
       Ver DECISIONS 2026-07-02. **Siguiente = Sesión 4.**
 - [ ] **Sesión 4 — Plan de actividades / Puerta 3 (~40 HH):** `WorkActivity` (base `IncidentAction` + `progressPct`,
       `plannedStart/End`, `actualStart/End`, `dependsOnId`); enviar/aprobar/rechazar plan → **congelar baseline**; guard
-      "no ejecuta sin plan aprobado". **+ Realineación PTW al estándar (DECISIONS 2026-07-02):** (a) **reordenar el flujo
-      sembrado** para que **planificación vaya ANTES de la autorización del permiso** (los peligros dependen de las tareas;
-      hoy los checklists van antes de planificar, al revés) — es cambio de DATO del flujo, actualizar seed + smoke;
-      (b) **checklists de EJECUCIÓN ligados a `WorkActivity`** (aplicación física en terreno: poner candados/energía cero,
-      LMRA/toma-5), que se completan al ejecutar cada actividad — distinto de la AUTORIZACIÓN documental de la Puerta 2.
+      "no ejecuta sin plan aprobado". **+ Realineación del motor de checklists al estándar — FUENTE DE VERDAD:
+      `docs/design/OT_DESIGN_ARCHITECTURE.md §11` (adenda 2026-07-02) + DECISIONS 2026-07-02.** Incorpora:
+      (a) **reordenar el flujo sembrado**: planificación ANTES de la autorización del permiso (los peligros dependen de las
+      tareas; hoy va al revés) — cambio de DATO del flujo, actualizar seed + smoke (§11.3);
+      (b) **eje `momento`** en `WorkOrderChecklistRule` (enum REQUEST/PLANNING/AUTHORIZATION/EXECUTION/CLOSURE, mapeado a
+      estados por dato) — generaliza "autorización vs ejecución"; el motor NO es PTW-específico, cubre calidad/ITP, GMP,
+      readiness, rondas, etc. (§11.1–11.2);
+      (c) **checklists de EJECUCIÓN ligados a `WorkActivity`** (aplicación física en terreno: candados/energía cero,
+      LMRA/toma-5), completados al ejecutar cada actividad — distinto de la AUTORIZACIÓN documental de la Puerta 2 (§11.4);
+      (d) **visibilidad del aprobador (Gobierno 2)**: en la Puerta 2 el autorizador **ve y confirma (solo lectura, sin
+      rellenar)** la LISTA de checklists de ejecución que se exigirán, y puede agregar/quitar/rechazar → valida la
+      adecuación del set; trazabilidad aplicado=autorizado (§11.5).
+      **Diferido a S5:** checklist de **CLOSURE** (retiro de controles/reenergización) — ver S5.
+      **Diferido a backlog (solo con caso real, §11.7):** puntos de espera/testigo de calidad (guard por actividad);
+      inspección independiente/doble firma (aviación RII); requisitos condicionales por reglas; y **gobernanza de aprobación
+      de plantillas de checklist** (Gobierno 1, §11.5: hoy = publicar en el Form Builder; formalizar si se pide).
 - [ ] **Sesión 5 — Seguimiento vivo + cierre / Puerta 4 (~35 HH) → CIERRA EL MVP:** `WorkActivityUpdate` (append-only:
       % avance, fechas reales, evidencias, desviaciones, costos/HH opcionales); solicitud de cierre + revisión final +
       guards de cierre. **+ Checklist de CIERRE del permiso** (retirar controles/candados, reenergizar, sitio seguro) como

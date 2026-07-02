@@ -550,3 +550,83 @@ S6–S7; S8 opcional.**
 
 > **Próximo paso:** requiere tu **visto bueno explícito** de los forks W1–W8 (y del enfoque general) antes
 > de la Sesión 1. Al aprobar, las decisiones se consolidan en `docs/DECISIONS.md` y arranca S1 (Cimientos).
+
+---
+
+## 11. ADENDA (2026-07-02) — Modelo de checklists/permisos GENERALIZADO (realineación al estándar)
+
+> Anexo posterior a la aprobación de los forks. Consolida lo conversado con el dueño tras S3: el módulo **NO es un
+> "módulo PTW"** sino un **motor genérico de checklists/formularios sobre la OT**; PTW es una configuración. Esta adenda
+> es la **fuente de verdad para S4–S5** en materia de checklists. Ver DECISIONS 2026-07-02.
+
+### 11.1 Principio: cualquier plantilla del Form Builder es un checklist de la OT
+La OT **acumula formularios/checklists de distintos TIPOS, en distintos MOMENTOS, llenados por distintos ROLES**. El
+motor construido en S3 (Template + `WorkOrderChecklistRule` + `WorkOrderChecklist` + segregación + sellado Part 11) es
+genérico. **No debe especializarse a PTW.** Tipos que cubre (todos = plantillas configurables, cero hardcode):
+
+| Tipo | Ejemplos | Verticales |
+|---|---|---|
+| Permiso de trabajo (PTW) | LOTO/bloqueo, trabajo en caliente, altura, espacio confinado, excavación | Minería, O&G, construcción, energía |
+| Evaluación de riesgo de tarea | JSA/AST, ART, Take-5 / LMRA (toma-5) | Transversal (fuerte en minería, DS132/ICMM) |
+| Calidad / inspección | ITP (plan de inspección y ensayo), puntos de espera/testigo, first-article, dimensional | Manufactura, construcción, aeroespacial |
+| Regulatorio / cumplimiento | Registro de lote GMP, calibración, HACCP (PCC), ambiental | Farma, alimentos, químicos |
+| Puesta en marcha / readiness | PSSR (revisión pre-arranque), completamiento mecánico, punch list, entrega | O&G, power, procesos |
+| Procedimiento de tarea (SOP) | Task cards / job plan con firma por paso | Todo mantenimiento |
+| Inspección de equipo/uso | Pre-uso grúa/montacargas/vehículo, rutas de lubricación | Logística, minería |
+| Cierre / restauración | Prueba funcional, retorno a servicio, retiro de bloqueos, limpieza | Transversal |
+
+### 11.2 El eje "MOMENTO" (generalización de "autorización vs ejecución")
+Cada checklist vive en un **momento** del ciclo de la OT. Se agrega un **momento** a `WorkOrderChecklistRule` (enum), y el
+**tipo/flujo declara qué estado corresponde a cada momento** (dato, igual que `folioOnStateKey`/`checklistGateStateKey` hoy):
+
+| Momento | Quién | Ejemplos | ¿Bloquea? | Estado (default seed) |
+|---|---|---|---|---|
+| `REQUEST` | Solicitante | triage, categorización de riesgo | rara vez | `solicitada` |
+| `PLANNING` | Planificador | evaluación de riesgo del plan, definir ITP | a veces | `en_planificacion` |
+| `AUTHORIZATION` | Autorizador/HSE | emitir permiso, PSSR, readiness | **sí (Puerta 2)** | `en_preparacion`→`checklists_ok` |
+| `EXECUTION` | Ejecutor + inspector | SOP/pasos, toma-5, **aplicar LOTO**, puntos de espera de calidad | **sí (por actividad)** | por `WorkActivity` |
+| `CLOSURE` | Ejecutor + verificador | prueba funcional, retorno a servicio, retiro de bloqueos | **sí (Puerta 4)** | `en_revision_cierre`→`cerrada` |
+
+Hoy (S3) solo existe el momento **AUTHORIZATION** (Puerta 2). **S4** agrega PLANNING/EXECUTION; **S5** agrega CLOSURE.
+
+### 11.3 Orden correcto del flujo (corrige el sembrado actual)
+El estándar es **planificar → autorizar el permiso → ejecutar** (los peligros dependen de las tareas). El flujo sembrado
+`ot-4-puertas` hoy pone la Puerta 2 (checklists) **antes** de la planificación — al revés. Como el flujo es **dato**, en
+**S4 se reordena el seed** (y el smoke): `aprobada → en_planificacion → (autorización del permiso) → en_ejecucion → cierre`.
+No se hizo en S3 para no dejar estados a medio construir; va con la construcción de `WorkActivity`.
+
+### 11.4 Los TRES momentos del Permiso de Trabajo (caso PTW/LOTO concreto)
+1. **Autorizar** (documental, antes de ejecutar) = Puerta 2 [S3 ✅, plantilla ya redactada en modo autorización].
+2. **Aplicar/aceptar controles en terreno** (físico, al ejecutar, **por actividad**): candados, energía cero, toma-5 = checklists `EXECUTION` ligados a `WorkActivity` [S4/S5].
+3. **Cerrar el permiso** (retirar controles, reenergizar, sitio seguro) = checklist `CLOSURE` en Puerta 4 [S5].
+
+### 11.5 Visibilidad del aprobador (hueco detectado por el dueño) — DOS gobiernos
+- **Gobierno 1 — ¿el instrumento (el checklist) es adecuado?** Se gobierna a **nivel de plantilla** (Form Builder): quién
+  crea/revisa/publica/versiona la biblioteca de checklists. En la industria la aprueba HSE **una vez**, centralizada. El
+  aprobador de una OT **confía** en la biblioteca; no re-audita cada pregunta por trabajo. *(Posible futuro: paso de
+  aprobación/gobernanza de plantillas; hoy = publicación en el Form Builder. Registrar como deuda si se pide formal.)*
+- **Gobierno 2 — ¿se seleccionó el set CORRECTO y COMPLETO para ESTE trabajo?** Es tarea del autorizador, y **hoy no
+  puede** porque en Puerta 2 no ve los checklists de EJECUCIÓN que se aplicarán. **Fix (S4/S5):** en la Puerta 2 el
+  aprobador **ve y confirma (solo lectura, sin rellenar)** la LISTA de checklists de ejecución que se exigirán (derivada de
+  las reglas `EXECUTION`), puede **agregar/quitar/rechazar**, y así valida la adecuación del set. **Trazabilidad:** lo
+  aplicado en terreno = lo autorizado.
+
+### 11.6 Dónde se configura "exigir o no" (documentación de la mecánica)
+Tres niveles, todos dato: (a) **¿existe la puerta?** = el **flujo** (un cliente con 1 puerta no tiene control de checklist);
+(b) **¿qué checklist, a qué OT, obligatorio?** = **`WorkOrderChecklistRule`** (toggle `mandatory` + aplicabilidad
+`appliesToTypeIds`/`minCriticality`/`specialtyId`/`requiresPtw` [+ `momento` en S4]); (c) en la OT, los `mandatory` no se
+quitan y los agregados **manuales son siempre opcionales** (la obligatoriedad vive en la regla, gobernable/auditable).
+Gate del catálogo: `workordercatalog:manage`.
+
+### 11.7 Patrones avanzados — DIFERIDOS hasta un caso real (no construir por especular)
+- **Puntos de espera / testigo (calidad):** el trabajo se detiene a mitad de ejecución hasta que un inspector firma → guard
+  **por actividad** (extiende los checklists `EXECUTION`).
+- **Inspección independiente / doble firma (aviación, RII):** dos firmas independientes → extiende la segregación
+  (revisor + 2.º verificador).
+- **Requisitos condicionales** ("si hay riesgo X → exigir permiso Y") → extiende las reglas / el motor de reglas (Req-7).
+
+### 11.8 Impacto en las sesiones (checklist de "nada queda atrás")
+- **S4 (Puerta 3 + realineación):** `WorkActivity`; **reordenar flujo** (§11.3); **eje `momento`** en reglas (§11.2);
+  checklists `EXECUTION` por actividad (§11.4.2); **vista/confirmación del set de ejecución en Puerta 2** (§11.5 Gob. 2).
+- **S5 (Puerta 4):** checklist `CLOSURE` (§11.4.3); guards de cierre ya previstos (§3).
+- **Backlog (cuando haya caso):** gobernanza de aprobación de plantillas (§11.5 Gob. 1); patrones avanzados (§11.7).
