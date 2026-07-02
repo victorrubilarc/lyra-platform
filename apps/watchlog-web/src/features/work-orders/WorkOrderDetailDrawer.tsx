@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Activity, ArrowRight, Info, ShieldCheck, XCircle } from "lucide-react";
+import { Activity, ArrowRight, ClipboardCheck, Info, ShieldCheck, XCircle } from "lucide-react";
 import type { WorkOrderAvailableTransition, WorkOrderPriority } from "@lyra/contracts";
 import { Button, Drawer, Input, Modal, Select, Spinner, Textarea, useToast } from "@lyra/ui";
 import { usePermissions } from "../../auth/use-permissions.js";
@@ -13,6 +13,7 @@ import {
   useWorkOrderDetail,
 } from "./work-orders-queries.js";
 import { LIFECYCLE_META, ORIGIN_META, PRIORITY_META, criticalityColor, criticalityLabel } from "./work-orders-presentation.js";
+import { WorkOrderChecklistsBlock } from "./WorkOrderChecklistsBlock.js";
 import styles from "./work-orders.module.css";
 
 interface Props {
@@ -39,7 +40,7 @@ export function WorkOrderDetailDrawer({ workOrderId, onClose }: Props) {
   const [cancelReason, setCancelReason] = useState("");
   const [showCancel, setShowCancel] = useState(false);
   const [pending, setPending] = useState<WorkOrderAvailableTransition | null>(null);
-  const [tab, setTab] = useState<"resumen" | "actividad">("resumen");
+  const [tab, setTab] = useState<"resumen" | "checklists" | "actividad">("resumen");
 
   useEffect(() => {
     setCancelReason("");
@@ -71,6 +72,9 @@ export function WorkOrderDetailDrawer({ workOrderId, onClose }: Props) {
           <div className={styles.drawerTabs} role="tablist">
             <button role="tab" aria-selected={tab === "resumen"} className={tab === "resumen" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setTab("resumen")}>
               <Info size={14} /> Resumen
+            </button>
+            <button role="tab" aria-selected={tab === "checklists"} className={tab === "checklists" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setTab("checklists")}>
+              <ClipboardCheck size={14} /> Checklists
             </button>
             <button role="tab" aria-selected={tab === "actividad"} className={tab === "actividad" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setTab("actividad")}>
               <Activity size={14} /> Actividad
@@ -208,6 +212,8 @@ export function WorkOrderDetailDrawer({ workOrderId, onClose }: Props) {
             </div>
           )}
           </>)}
+
+          {tab === "checklists" && <WorkOrderChecklistsBlock workOrderId={wo.id} isLive={!!isLive} />}
 
           {tab === "actividad" && (
             <>

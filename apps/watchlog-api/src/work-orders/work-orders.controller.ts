@@ -1,20 +1,26 @@
-import { Body, Controller, Get, HttpCode, Param, Patch, Post, Query, Req } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query, Req } from "@nestjs/common";
 import type { FastifyRequest } from "fastify";
 import {
+  addWorkOrderChecklistRequestSchema,
   assignWorkOrderRequestSchema,
   cancelWorkOrderRequestSchema,
   createWorkOrderRequestSchema,
+  reviewWorkOrderChecklistRequestSchema,
   transitionWorkOrderRequestSchema,
   updateWorkOrderRequestSchema,
+  upsertWorkOrderChecklistRuleRequestSchema,
   upsertWorkOrderTagRequestSchema,
   upsertWorkOrderTypeRequestSchema,
   workOrderListQuerySchema,
+  type AddWorkOrderChecklistRequest,
   type AssignWorkOrderRequest,
   type CancelWorkOrderRequest,
   type CreateWorkOrderRequest,
+  type ReviewWorkOrderChecklistRequest,
   type TransitionWorkOrderRequest,
   type UpdateWorkOrderRequest,
   type UpsertSpecialtyRequest,
+  type UpsertWorkOrderChecklistRuleRequest,
   type UpsertWorkOrderTypeRequest,
   type WorkOrderListQuery,
 } from "@lyra/contracts";
@@ -23,10 +29,14 @@ import type { RequestUser } from "../authz/auth-user";
 import { CurrentUser, RequirePermission } from "../authz/authz.decorators";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { WorkOrdersService } from "./work-orders.service";
+import { WorkOrderChecklistsService } from "./work-order-checklists.service";
 
 @Controller("work-orders")
 export class WorkOrdersController {
-  constructor(private readonly workOrders: WorkOrdersService) {}
+  constructor(
+    private readonly workOrders: WorkOrdersService,
+    private readonly checklists: WorkOrderChecklistsService,
+  ) {}
 
   // --- Catálogos (antes de :id para no chocar) -------------------------------
 
@@ -62,6 +72,31 @@ export class WorkOrdersController {
     @Query("create") create?: string,
   ) {
     return this.workOrders.upsertSpecialty(dto, this.ctx(user, req), create === "true");
+  }
+
+  // --- Reglas de checklist (Capa A · catálogo; antes de :id) -----------------
+
+  @Get("checklist-rules")
+  @RequirePermission("workorder:view")
+  listChecklistRules(@Query("includeInactive") includeInactive?: string) {
+    return this.checklists.listRules(includeInactive === "true");
+  }
+
+  @Post("checklist-rules")
+  @RequirePermission("workordercatalog:manage")
+  upsertChecklistRule(
+    @Body(new ZodValidationPipe(upsertWorkOrderChecklistRuleRequestSchema)) dto: UpsertWorkOrderChecklistRuleRequest,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.checklists.upsertRule(dto, this.ctx(user, req));
+  }
+
+  @Delete("checklist-rules/:ruleId")
+  @HttpCode(204)
+  @RequirePermission("workordercatalog:manage")
+  async deleteChecklistRule(@Param("ruleId") ruleId: string, @CurrentUser() user: RequestUser, @Req() req: FastifyRequest) {
+    await this.checklists.deleteRule(ruleId, this.ctx(user, req));
   }
 
   // --- KPIs / selectores -----------------------------------------------------
@@ -162,6 +197,66 @@ export class WorkOrdersController {
     @Req() req: FastifyRequest,
   ) {
     return this.workOrders.cancel(user.id, id, dto, this.ctx(user, req));
+  }
+
+  // --- Checklists de una OT (Capa B · Puerta 2, S3) --------------------------
+
+  @Get(":id/checklists")
+  @RequirePermission("workorder:view")
+  listChecklists(@Param("id") id: string, @CurrentUser() user: RequestUser) {
+    return this.checklists.listForWorkOrder(user.id, id);
+  }
+
+  @Post(":id/checklists/suggest")
+  @HttpCode(200)
+  @RequirePermission("workorder:checklist:manage")
+  suggestChecklists(@Param("id") id: string, @CurrentUser() user: RequestUser, @Req() req: FastifyRequest) {
+    return this.checklists.suggest(user.id, id, this.ctx(user, req));
+  }
+
+  @Post(":id/checklists")
+  @RequirePermission("workorder:checklist:manage")
+  addChecklist(
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(addWorkOrderChecklistRequestSchema)) dto: AddWorkOrderChecklistRequest,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.checklists.addManual(user.id, id, dto, this.ctx(user, req));
+  }
+
+  @Delete(":id/checklists/:cid")
+  @HttpCode(204)
+  @RequirePermission("workorder:checklist:manage")
+  async removeChecklist(@Param("id") id: string, @Param("cid") cid: string, @CurrentUser() user: RequestUser, @Req() req: FastifyRequest) {
+    await this.checklists.remove(user.id, id, cid, this.ctx(user, req));
+  }
+
+  @Post(":id/checklists/:cid/instantiate")
+  @HttpCode(200)
+  @RequirePermission("workorder:checklist:manage")
+  instantiateChecklist(@Param("id") id: string, @Param("cid") cid: string, @CurrentUser() user: RequestUser, @Req() req: FastifyRequest) {
+    return this.checklists.instantiate(user.id, id, cid, this.ctx(user, req));
+  }
+
+  @Post(":id/checklists/:cid/submit")
+  @HttpCode(200)
+  @RequirePermission("workorder:checklist:manage")
+  submitChecklist(@Param("id") id: string, @Param("cid") cid: string, @CurrentUser() user: RequestUser, @Req() req: FastifyRequest) {
+    return this.checklists.submit(user.id, id, cid, this.ctx(user, req));
+  }
+
+  @Post(":id/checklists/:cid/review")
+  @HttpCode(200)
+  @RequirePermission("workorder:checklist:manage")
+  reviewChecklist(
+    @Param("id") id: string,
+    @Param("cid") cid: string,
+    @Body(new ZodValidationPipe(reviewWorkOrderChecklistRequestSchema)) dto: ReviewWorkOrderChecklistRequest,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.checklists.review(user.id, id, cid, dto, this.ctx(user, req));
   }
 
   private ctx(user: RequestUser, req: FastifyRequest): AuditContext {

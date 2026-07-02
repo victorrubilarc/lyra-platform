@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
-"""Smoke de Órdenes de Trabajo (OT / PTW) — S1 cimientos + S2 PUERTA 1.
+"""Smoke de Órdenes de Trabajo (OT / PTW) — S1 cimientos + S2 PUERTA 1 + S3 PUERTA 2.
+
+Sección 13 (Puerta 2 · checklists/PTW): al ENTRAR a preparación el backend SUGIERE los
+checklists cuyas reglas matchean (la regla LOTO obligatoria sembrada); revisar_checklists
+se BLOQUEA (400) con un obligatorio sin aprobar; se instancia el checklist como LogEntry
+vivo (Form Builder), se sella, se envía a revisión; el responsable NO puede aprobar su
+propio checklist (403, segregación); un revisor ≠ responsable aprueba; con el obligatorio
+aprobado, revisar_checklists → checklists_ok. + gates 403 del operador.
+
 
 Verifica el módulo de OT vía API (server-authoritative):
  1) Catálogos: GET types/specialties → 200 + datos sembrados.
@@ -44,6 +52,11 @@ OK, FAIL = [], []
 TYPE_KEY = "smoke-ot-tipo"
 SPEC_KEY = "smoke-ot-especialidad"
 WO_TITLE = "OT Smoke — reparación de prueba"
+# Reviewer temporal (Puerta 2): revisor ≠ responsable (segregación de funciones).
+REV_USER = "smoke-ot-reviewer-user"
+REV_EMAIL = "smoke-ot-reviewer@watchlog.local"
+# Plantilla de checklist sembrada (LOTO) + su regla obligatoria (S3, seed).
+CHECKLIST_TEMPLATE = "Checklist PTW — Bloqueo de energías (LOTO)"
 
 
 def call(method, path, tok=None, body=None):
@@ -87,9 +100,34 @@ def cleanup():
         "DELETE FROM \"FolioCounter\" WHERE \"sequenceKey\" LIKE 'workorder|type:' || "
         f"(SELECT id FROM \"WorkOrderType\" WHERE key = '{TYPE_KEY}') || '%';"
     )
+    # LogEntries instanciados por checklists de las OT smoke (SetNull no cascada; van
+    # ANTES de borrar la OT, que sí cascada el WorkOrderChecklist).
+    sql(
+        "DELETE FROM \"LogEntry\" WHERE id IN (SELECT \"logEntryId\" FROM \"WorkOrderChecklist\" "
+        f"WHERE \"logEntryId\" IS NOT NULL AND \"workOrderId\" IN (SELECT id FROM \"WorkOrder\" WHERE title = '{WO_TITLE}'));"
+    )
     sql(f"DELETE FROM \"WorkOrder\" WHERE title = '{WO_TITLE}';")
     sql(f"DELETE FROM \"WorkOrderType\" WHERE key = '{TYPE_KEY}';")
     sql(f"DELETE FROM \"Specialty\" WHERE key = '{SPEC_KEY}';")
+    # Reviewer temporal (Puerta 2).
+    sql(f"DELETE FROM \"UserRole\" WHERE \"userId\" = '{REV_USER}';")
+    sql(f"DELETE FROM \"User\" WHERE id = '{REV_USER}';")
+
+
+def setup_reviewer():
+    """Usuario temporal con el rol admin (copia passwordHash del admin demo DENTRO de
+    SQL). Sirve como REVISOR ≠ responsable en la Puerta 2 (segregación de funciones)."""
+    sql(f"DELETE FROM \"UserRole\" WHERE \"userId\" = '{REV_USER}';")
+    sql(f"DELETE FROM \"User\" WHERE id = '{REV_USER}';")
+    sql(
+        "INSERT INTO \"User\" (id,email,\"displayName\",\"passwordHash\",status,\"updatedAt\") "
+        f"SELECT '{REV_USER}','{REV_EMAIL}',u.\"displayName\",u.\"passwordHash\",'ACTIVE',now() "
+        f"FROM \"User\" u WHERE u.email = '{ADMIN}';"
+    )
+    sql(
+        "INSERT INTO \"UserRole\" (\"userId\",\"roleId\",\"assignedAt\") "
+        f"SELECT '{REV_USER}', r.id, now() FROM \"Role\" r WHERE r.key = 'admin';"
+    )
 
 
 def create_request(admin, tid, node, spec_id):
@@ -119,6 +157,9 @@ def main():
     s, r = call("POST", "/work-orders/types?create=true", admin, {
         "key": TYPE_KEY, "name": "Tipo OT Smoke", "color": "#06B6D4",
         "requiresPtwDefault": True, "criticalityDefault": 4, "sortOrder": 99,
+        # Prefijo de folio propio: aísla el smoke de datos reales (evita colisión con
+        # el folio global-único de otras OT; ver BUG folio cross-tipo en BACKLOG).
+        "folioScheme": {"prefix": "OTSMK"},
     })
     check("crear tipo → 2xx + flags", s in (200, 201) and isinstance(r, dict) and r.get("requiresPtwDefault") is True and r.get("criticalityDefault") == 4, str(s))
     tid = r.get("id") if isinstance(r, dict) else None
@@ -131,8 +172,8 @@ def main():
     _, allt = call("GET", "/work-orders/types?includeInactive=true", admin)
     check("tipo inactivo NO en desplegables", not any(t.get("key") == TYPE_KEY for t in active))
     check("tipo inactivo SÍ en ?includeInactive", any(t.get("key") == TYPE_KEY for t in allt))
-    # reactivar para usarlo al crear la OT
-    call("POST", "/work-orders/types", admin, {"key": TYPE_KEY, "name": "Tipo OT Smoke EDIT", "active": True, "criticalityDefault": 4})
+    # reactivar para usarlo al crear la OT (se re-envía folioScheme: el upsert reemplaza todo el registro)
+    call("POST", "/work-orders/types", admin, {"key": TYPE_KEY, "name": "Tipo OT Smoke EDIT", "active": True, "criticalityDefault": 4, "folioScheme": {"prefix": "OTSMK"}})
 
     # 3) Especialidad: crear + colisión + desactivar
     s, r = call("POST", "/work-orders/specialties?create=true", admin, {"key": SPEC_KEY, "name": "Especialidad OT Smoke", "sortOrder": 99})
@@ -217,8 +258,8 @@ def main():
     check("aprobar CON firma → 200 + estado aprobada + approvedAt",
           s == 200 and isinstance(r, dict) and r.get("currentStateKey") == "aprobada" and bool(r.get("approvedAt")),
           str(s) + (json.dumps({k: r.get(k) for k in ("currentStateKey", "approvedAt")}) if isinstance(r, dict) else ""))
-    check("FOLIO emitido al aprobar: OT-YYYY-0001 (gapless por tipo, reinicio anual)",
-          isinstance(folio1, str) and re.fullmatch(r"OT-\d{4}-0001", folio1) is not None, str(folio1))
+    check("FOLIO emitido al aprobar: OTSMK-YYYY-0001 (gapless por tipo, reinicio anual)",
+          isinstance(folio1, str) and re.fullmatch(r"OTSMK-\d{4}-0001", folio1) is not None, str(folio1))
     check("el code humano pasa de SOL-… al folio oficial", isinstance(r, dict) and r.get("code") == folio1)
     check("timeline: eventos APPROVED + FOLIO_ISSUED",
           isinstance(r, dict) and {"APPROVED", "FOLIO_ISSUED"} <= {e.get("kind") for e in r.get("events", [])})
@@ -272,6 +313,80 @@ def main():
         check("operador POST /work-orders → 403", s == 403, str(s))
     else:
         print("  --  (sin usuario operador; se omiten los gates de 403)")
+
+    # 13) PUERTA 2 — checklists / PTW (S3)
+    print("\n— Puerta 2 (checklists / PTW) —")
+    setup_reviewer()
+    reviewer = login(REV_EMAIL)
+    check("reviewer temporal (segregación) logueado", bool(reviewer))
+    # OT nueva: enviar → aprobar (folio) → preparar (dispara la SUGERENCIA automática)
+    s, wo4 = create_request(admin, tid, node, spec_id)
+    wid4 = wo4.get("id") if isinstance(wo4, dict) else None
+    call("POST", f"/work-orders/{wid4}/transitions", admin, {"transitionKey": "enviar"})
+    call("POST", f"/work-orders/{wid4}/transitions", admin, {"transitionKey": "aprobar", "password": PASS})
+    s, r = call("POST", f"/work-orders/{wid4}/transitions", admin, {"transitionKey": "preparar"})
+    check("preparar → en_preparacion (2xx)", s == 200 and isinstance(r, dict) and r.get("currentStateKey") == "en_preparacion", str(s))
+
+    # Sugerencia automática al entrar a preparación (regla obligatoria LOTO sembrada)
+    s, cls = call("GET", f"/work-orders/{wid4}/checklists", admin)
+    loto = next((c for c in cls if c.get("templateName") == CHECKLIST_TEMPLATE), None) if isinstance(cls, list) else None
+    check("sugerencia auto: checklist LOTO obligatorio materializado al preparar",
+          loto is not None and loto.get("mandatory") is True and loto.get("status") == "PENDING",
+          json.dumps(loto) if loto else str(cls))
+    cid = loto.get("id") if loto else None
+    # Evento CHECKLIST_ADDED en el timeline de la OT
+    _, det4 = call("GET", f"/work-orders/{wid4}", admin)
+    check("timeline: evento CHECKLIST_ADDED",
+          isinstance(det4, dict) and any(e.get("kind") == "CHECKLIST_ADDED" for e in det4.get("events", [])))
+
+    # Gate de Puerta 2: revisar_checklists con obligatorio PENDIENTE (firma válida) → 400
+    s, _ = call("POST", f"/work-orders/{wid4}/transitions", admin, {"transitionKey": "revisar_checklists", "password": PASS})
+    check("Puerta 2 BLOQUEADA: revisar_checklists con obligatorio sin aprobar → 400", s == 400, str(s))
+
+    # Gates 403 del operador sobre checklists (sin workorder:checklist:manage)
+    if operador:
+        s, _ = call("POST", f"/work-orders/{wid4}/checklists/suggest", operador)
+        check("operador POST checklists/suggest → 403", s == 403, str(s))
+        s, _ = call("POST", f"/work-orders/{wid4}/checklists/{cid}/instantiate", operador)
+        check("operador POST checklists/instantiate → 403", s == 403, str(s))
+
+    # Instanciar el checklist como LogEntry vivo (reusa el Form Builder)
+    s, r = call("POST", f"/work-orders/{wid4}/checklists/{cid}/instantiate", admin)
+    leid = r.get("logEntryId") if isinstance(r, dict) else None
+    check("instanciar → 200 + LogEntry vivo + IN_PROGRESS + responsable",
+          s == 200 and isinstance(r, dict) and bool(leid) and r.get("status") == "IN_PROGRESS" and bool(r.get("responsibleId")),
+          str(s) + (json.dumps({k: r.get(k) for k in ("status", "logEntryId")}) if isinstance(r, dict) else ""))
+
+    # No se puede enviar a revisión sin sellar el LogEntry
+    s, _ = call("POST", f"/work-orders/{wid4}/checklists/{cid}/submit", admin)
+    check("enviar a revisión SIN sellar el registro → 400", s == 400, str(s))
+
+    # Llenar + sellar el LogEntry (sección con campos opcionales → markComplete + submit)
+    s, le = call("GET", f"/log-entries/{leid}", admin)
+    sec = (le.get("sectionStates") or [{}])[0] if isinstance(le, dict) else {}
+    skey = sec.get("sectionKey")
+    sver = sec.get("version", 0)
+    call("PUT", f"/log-entries/{leid}/sections/{skey}", admin, {"expectedVersion": sver, "values": [], "markComplete": True})
+    s, ledet = call("POST", f"/log-entries/{leid}/submit", admin, {})
+    check("LogEntry del checklist sellado (SUBMITTED)", s in (200, 201) and isinstance(ledet, dict) and ledet.get("status") == "SUBMITTED", str(s))
+
+    # Ahora sí: enviar a revisión → SUBMITTED
+    s, r = call("POST", f"/work-orders/{wid4}/checklists/{cid}/submit", admin)
+    check("enviar a revisión (registro sellado) → 200 + SUBMITTED", s == 200 and isinstance(r, dict) and r.get("status") == "SUBMITTED", str(s))
+
+    # Segregación: el RESPONSABLE (admin) no puede revisar su propio checklist → 403
+    s, _ = call("POST", f"/work-orders/{wid4}/checklists/{cid}/review", admin, {"decision": "APPROVE"})
+    check("segregación: responsable revisa su propio checklist → 403", s == 403, str(s))
+
+    # El revisor (≠ responsable) aprueba → APPROVED
+    if reviewer:
+        s, r = call("POST", f"/work-orders/{wid4}/checklists/{cid}/review", reviewer, {"decision": "APPROVE"})
+        check("revisor (≠ responsable) aprueba → 200 + APPROVED", s == 200 and isinstance(r, dict) and r.get("status") == "APPROVED", str(s))
+
+    # Con el obligatorio APROBADO, la Puerta 2 abre: revisar_checklists → checklists_ok
+    s, r = call("POST", f"/work-orders/{wid4}/transitions", admin, {"transitionKey": "revisar_checklists", "password": PASS})
+    check("Puerta 2 ABIERTA: revisar_checklists con obligatorio aprobado → 200 + checklists_ok",
+          s == 200 and isinstance(r, dict) and r.get("currentStateKey") == "checklists_ok", str(s))
 
     cleanup()
     print(f"\n{len(OK)}/{len(OK)+len(FAIL)} OK" + ("" if not FAIL else f"   FALLARON: {FAIL}"))

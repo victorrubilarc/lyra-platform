@@ -16,7 +16,13 @@ import { REFERENCE_LISTS } from "./reference-data-seed.js";
 import { DEMO_CALENDAR, DEMO_FISCAL_CALENDAR } from "./operational-calendar-seed.js";
 import { NOTIFICATION_TEMPLATE_SEEDS } from "./notification-templates-seed.js";
 import { INCIDENT_WORKFLOW, INCIDENT_TYPES, INCIDENT_CATEGORIES, REPORTING_OBLIGATIONS } from "./incidents-seed-data.js";
-import { WORK_ORDER_TYPES, WORK_ORDER_SPECIALTIES, WORK_ORDER_WORKFLOW } from "./work-orders-seed-data.js";
+import {
+  WORK_ORDER_TYPES,
+  WORK_ORDER_SPECIALTIES,
+  WORK_ORDER_WORKFLOW,
+  WORK_ORDER_CHECKLIST_TEMPLATES,
+  WORK_ORDER_CHECKLIST_RULES,
+} from "./work-orders-seed-data.js";
 
 const prisma = new PrismaClient();
 
@@ -637,6 +643,72 @@ async function seedWorkOrderCatalog(): Promise<void> {
   );
 }
 
+// Checklists / PTW de arranque (S3, Puerta 2): plantillas del Form Builder publicadas
+// + reglas de aplicabilidad. Idempotente por NOMBRE (las plantillas usan cuid). La
+// plantilla se ancla al primer nodo raíz de la demo (subárbol completo) para que
+// cualquier OT de la demo pueda instanciar el checklist.
+async function seedWorkOrderChecklists(): Promise<void> {
+  const rootNode = await prisma.orgNode.findFirst({ where: { deletedAt: null }, orderBy: { createdAt: "asc" }, select: { id: true } });
+  if (!rootNode) {
+    console.log("• Checklists de OT: no hay nodos en la estructura; se omite");
+    return;
+  }
+  for (const tpl of WORK_ORDER_CHECKLIST_TEMPLATES) {
+    let template = await prisma.template.findFirst({ where: { name: tpl.name, deletedAt: null }, select: { id: true } });
+    if (!template) {
+      const created = await prisma.template.create({
+        data: {
+          name: tpl.name,
+          description: tpl.description,
+          status: "PUBLISHED",
+          equipmentMode: "NONE",
+          versions: {
+            create: {
+              versionNumber: 1,
+              status: "PUBLISHED",
+              name: tpl.name,
+              description: tpl.description,
+              publishedAt: new Date(),
+              sections: {
+                create: {
+                  key: tpl.sectionKey,
+                  title: tpl.sectionTitle,
+                  order: 0,
+                  fields: {
+                    create: tpl.fields.map((f) => ({ key: f.key, type: f.type, dataType: f.dataType, label: f.label, required: false, order: f.order })),
+                  },
+                },
+              },
+            },
+          },
+        },
+        include: { versions: { select: { id: true } } },
+      });
+      await prisma.template.update({ where: { id: created.id }, data: { currentVersionId: created.versions[0]!.id } });
+      await prisma.templateNodeAssignment.create({ data: { templateId: created.id, orgNodeId: rootNode.id, includeDescendants: true } });
+      template = { id: created.id };
+    }
+  }
+  // Reglas de checklist (Capa A). Idempotente por NOMBRE.
+  const typeByKey = new Map((await prisma.workOrderType.findMany({ select: { id: true, key: true } })).map((t) => [t.key, t.id]));
+  for (const rule of WORK_ORDER_CHECKLIST_RULES) {
+    const template = await prisma.template.findFirst({ where: { name: rule.templateName, deletedAt: null }, select: { id: true } });
+    if (!template) continue;
+    const exists = await prisma.workOrderChecklistRule.findFirst({ where: { name: rule.name, deletedAt: null }, select: { id: true } });
+    const data = {
+      name: rule.name,
+      templateId: template.id,
+      mandatory: rule.mandatory,
+      appliesToTypeIds: rule.appliesToTypeKeys.map((k) => typeByKey.get(k)).filter((x): x is string => !!x),
+      requiresPtw: rule.requiresPtw,
+      sortOrder: rule.sortOrder,
+    };
+    if (exists) await prisma.workOrderChecklistRule.update({ where: { id: exists.id }, data });
+    else await prisma.workOrderChecklistRule.create({ data });
+  }
+  console.log(`✔ Checklists de OT sembrados: ${WORK_ORDER_CHECKLIST_TEMPLATES.length} plantilla(s) + ${WORK_ORDER_CHECKLIST_RULES.length} regla(s)`);
+}
+
 async function main(): Promise<void> {
   await seedPermissions();
   await seedAdminRole();
@@ -653,6 +725,7 @@ async function main(): Promise<void> {
   await seedIncidentCatalog();
   await seedWorkOrderWorkflow();
   await seedWorkOrderCatalog();
+  await seedWorkOrderChecklists();
 }
 
 main()

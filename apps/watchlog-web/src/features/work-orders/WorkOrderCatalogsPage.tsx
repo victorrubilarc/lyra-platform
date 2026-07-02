@@ -1,17 +1,20 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Lock, Pencil, Plus, Search, Tags } from "lucide-react";
-import type { SpecialtyDto, WorkOrderTypeDto } from "@lyra/contracts";
+import { ArrowLeft, ClipboardCheck, Lock, Pencil, Plus, Search, Tags, Trash2 } from "lucide-react";
+import type { SpecialtyDto, WorkOrderChecklistRuleDto, WorkOrderTypeDto } from "@lyra/contracts";
 import { Button, Chip, EmptyState, GridPager, Input, Select, Spinner, Toggle, useToast } from "@lyra/ui";
 import { usePermissions } from "../../auth/use-permissions.js";
 import {
+  useDeleteWorkOrderChecklistRule,
   useUpsertWorkOrderSpecialty,
   useUpsertWorkOrderType,
+  useWorkOrderChecklistRules,
   useWorkOrderSpecialtiesAdmin,
   useWorkOrderTypesAdmin,
 } from "./work-orders-queries.js";
 import { WorkOrderTypeModal } from "./WorkOrderTypeModal.js";
 import { WorkOrderTagModal } from "./WorkOrderTagModal.js";
+import { WorkOrderChecklistRuleModal } from "./WorkOrderChecklistRuleModal.js";
 import { criticalityLabel } from "./work-orders-presentation.js";
 import styles from "./catalogs.module.css";
 
@@ -25,7 +28,7 @@ type Row = { name: string; key: string; active: boolean; sortOrder: number };
  */
 export function WorkOrderCatalogsPage() {
   const { can } = usePermissions();
-  const [tab, setTab] = useState<"types" | "specialties">("types");
+  const [tab, setTab] = useState<"types" | "specialties" | "checklists">("types");
 
   if (!can("workordercatalog:manage")) {
     return (
@@ -48,9 +51,10 @@ export function WorkOrderCatalogsPage() {
       <div className={styles.tabs} role="tablist">
         <button role="tab" aria-selected={tab === "types"} className={tab === "types" ? styles.tabActive : styles.tab} onClick={() => setTab("types")}>Tipos</button>
         <button role="tab" aria-selected={tab === "specialties"} className={tab === "specialties" ? styles.tabActive : styles.tab} onClick={() => setTab("specialties")}>Especialidades</button>
+        <button role="tab" aria-selected={tab === "checklists"} className={tab === "checklists" ? styles.tabActive : styles.tab} onClick={() => setTab("checklists")}>Reglas de checklist</button>
       </div>
 
-      {tab === "types" ? <TypesTab /> : <SpecialtiesTab />}
+      {tab === "types" ? <TypesTab /> : tab === "specialties" ? <SpecialtiesTab /> : <ChecklistRulesTab />}
     </div>
   );
 }
@@ -247,6 +251,84 @@ function SpecialtiesTab() {
         )}
 
       <WorkOrderTagModal open={open} onClose={() => setOpen(false)} specialty={editing} existingKeys={existingKeys} />
+    </>
+  );
+}
+
+/** Reglas de checklist (Capa A): plantilla + aplicabilidad. Gobierna la Puerta 2. */
+function ChecklistRulesTab() {
+  const toast = useToast();
+  const { data: rules = [], isLoading } = useWorkOrderChecklistRules();
+  const del = useDeleteWorkOrderChecklistRule();
+  const [editing, setEditing] = useState<WorkOrderChecklistRuleDto | null>(null);
+  const [open, setOpen] = useState(false);
+
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(25);
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return rules.filter((r) => !q || r.name.toLowerCase().includes(q) || (r.templateName ?? "").toLowerCase().includes(q));
+  }, [rules, search]);
+  const total = filtered.length;
+  const pageRows = filtered.slice(page * pageSize, page * pageSize + pageSize);
+  const pager = <GridPager page={page} pages={Math.max(1, Math.ceil(total / pageSize))} total={total} pageSize={pageSize} onPage={setPage} onPageSize={(n) => { setPageSize(n); setPage(0); }} />;
+
+  function removeRule(r: WorkOrderChecklistRuleDto) {
+    if (!window.confirm(`¿Eliminar la regla "${r.name}"? Las OT ya materializadas conservan su checklist.`)) return;
+    del.mutate(r.id, { onSuccess: () => toast.success("Regla eliminada"), onError: (e) => toast.error((e as Error).message) });
+  }
+
+  return (
+    <>
+      <div className={styles.toolbar}>
+        <div className={styles.filters}>
+          <div className={styles.searchBox}>
+            <Search size={15} className={styles.searchIcon} />
+            <Input value={search} onChange={(e) => { setSearch(e.target.value); setPage(0); }} placeholder="Buscar por nombre o plantilla…" />
+          </div>
+        </div>
+        <Button variant="primary" leftIcon={<Plus size={16} />} onClick={() => { setEditing(null); setOpen(true); }}>Nueva regla</Button>
+      </div>
+
+      {isLoading ? <div className={styles.center}><Spinner /></div>
+        : total === 0 ? <EmptyState icon={<ClipboardCheck size={32} />} title="Sin reglas de checklist" description="Crea una regla para sugerir checklists (permisos de trabajo) automáticamente al preparar una OT." />
+        : (
+          <>
+            {pager}
+            <div className={styles.tableCard}>
+              <table className={styles.table}>
+                <thead><tr>
+                  <th>Regla</th><th>Plantilla</th><th>Aplica a</th><th>Obligatorio</th><th className={styles.num}>Orden</th><th>Estado</th><th></th>
+                </tr></thead>
+                <tbody>
+                  {pageRows.map((r) => (
+                    <tr key={r.id} className={r.active ? undefined : styles.inactiveRow}>
+                      <td><span className={styles.nameCell}>{r.name}</span></td>
+                      <td>{r.templateName ?? <span className={styles.muted}>—</span>}</td>
+                      <td>
+                        {r.appliesToTypeNames.length > 0 ? r.appliesToTypeNames.join(", ") : <span className={styles.muted}>Todos los tipos</span>}
+                        {r.minCriticality != null && <div className={styles.cellDesc}>Criticidad ≥ {r.minCriticality}</div>}
+                        {r.specialtyName && <div className={styles.cellDesc}>Especialidad: {r.specialtyName}</div>}
+                        {r.requiresPtw != null && <div className={styles.cellDesc}>{r.requiresPtw ? "Solo PTW" : "Solo sin PTW"}</div>}
+                      </td>
+                      <td>{r.mandatory ? <Chip label="Obligatorio" variant="warning" /> : <span className={styles.muted}>Opcional</span>}</td>
+                      <td className={styles.num}>{r.sortOrder}</td>
+                      <td><span className={styles.muted}>{r.active ? "Activa" : "Inactiva"}</span></td>
+                      <td className={styles.actionsCell}>
+                        <Button variant="icon" aria-label="Editar" onClick={() => { setEditing(r); setOpen(true); }}><Pencil size={16} /></Button>
+                        <Button variant="icon" aria-label="Eliminar" onClick={() => removeRule(r)}><Trash2 size={16} /></Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {pager}
+          </>
+        )}
+
+      <WorkOrderChecklistRuleModal open={open} onClose={() => setOpen(false)} rule={editing} />
     </>
   );
 }

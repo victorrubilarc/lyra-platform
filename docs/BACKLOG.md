@@ -5,7 +5,18 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-07-01** — **🔧 OT · Sesión 2 · PUERTA 1 ✅** (`feat/ot-puerta1`): workflow CONGELADO al crear
+> actualización: **2026-07-02** — **🔧 OT · Sesión 3 · PUERTA 2 (checklists / PTW) ✅** (`feat/ot-puerta2`): 2 capas
+> (fork W5) sobre el Form Builder — **`WorkOrderChecklistRule`** (plantilla + reglas de aplicabilidad, gate
+> `workordercatalog:manage`) + **`WorkOrderChecklist`** (enlace OT↔plantilla + `LogEntry` vivo + estado; permiso NUEVO
+> **`workorder:checklist:manage`**). Al preparar la OT el ejecutor **SUGIERE** los aplicables (idempotente) + agregado
+> manual; cada checklist se instancia como **`LogEntry`** (se llena/sella con el Form Builder); **guard Puerta 2**
+> (`assertChecklistsComplete`/`blockingChecklistsForClose` PURO) bloquea `revisar_checklists` con obligatorio no APROBADO;
+> **segregación revisor ≠ responsable**. Claves de estado data-driven en `WorkOrderType` (`checklistSuggestStateKey`/
+> `checklistGateStateKey`). Migración `20260702120000`. Seed: plantilla LOTO + regla obligatoria. Web: pestaña "Checklists"
+> en el drawer + sub-tab "Reglas de checklist" en catálogos. verde + contracts **412** + `smoke-workorders.py` **65/65** +
+> regresión incidencias 32/32. **🔴 BUG descubierto (S2, requiere tu decisión): folio de OT colisiona entre TIPOS** (ver
+> §2 detalle). **DEUDA:** `Template.purpose` (W5) diferido; editor UI de `folioScheme`. **Siguiente: OT Sesión 4 (Puerta 3
+> — plan de actividades + baseline).** Antes (2026-07-01): **🔧 OT · Sesión 2 · PUERTA 1 ✅** (`feat/ot-puerta1`): workflow CONGELADO al crear
 > (flujo sembrado **"OT — 4 puertas PTW"** como DATO; la solicitud nace `borrador`/DRAFT) + ejecutor de transiciones
 > espejo de Incidencias (permiso NUEVO **`workorder:transition`** dim. WORKFLOW, rol-dato, **firma Part 11**
 > re-autenticada) + **`FolioCounter` gapless** (atómico `ON CONFLICT…RETURNING` dentro de la tx; folio **SOLO al
@@ -716,9 +727,20 @@ nunca queda más de una sesión atrás.
       con estado del flujo y folio. verde + smoke **51/51** + regresión incidencias 32/32. Ver DECISIONS 2026-07-01 S2.
       **DEUDAS registradas:** editor UI de `folioScheme`/`folioOnStateKey` en el mantenedor de tipos (hoy API-only, §3) ·
       payloadHash de firmas de transición = deuda compartida con Incidencias (ya listada). **Siguiente = Sesión 3.**
-- [ ] **Sesión 3 — Motor de checklists ligados / Puerta 2 (~45 HH):** tabla enlace `WorkOrderChecklist` + reglas de
-      aplicabilidad en `WorkOrderType` (tipo/criticidad/especialidad/riesgo); sugerencia automática + selección manual +
-      instanciación (reusa Form Builder / `LogEntry`); guard "obligatorios completos + aprobados" con rol revisor distinto.
+- [x] **Sesión 3 — Motor de checklists ligados / Puerta 2 (~45 HH):** ✅ **CERRADA 2026-07-02** (`feat/ot-puerta2`).
+      2 capas (fork W5): **Capa A** `WorkOrderChecklistRule` (plantilla del Form Builder + reglas de aplicabilidad
+      appliesToTypeIds/minCriticality/specialtyId/requiresPtw, patrón `ReportingObligation`; gate `workordercatalog:manage`);
+      **Capa B** `WorkOrderChecklist` (enlace OT↔plantilla + `logEntryId` vivo + estado PENDING/IN_PROGRESS/SUBMITTED/
+      APPROVED/REJECTED; gate **permiso NUEVO `workorder:checklist:manage`**). Al ENTRAR al estado de preparación el ejecutor
+      SUGIERE automáticamente los aplicables (idempotente) + agregado manual. Instanciación = `LogEntry` vivo (reusa
+      `LogEntriesService.create`, se llena/sella con el Form Builder). **Guard Puerta 2** `assertChecklistsComplete` (PURO
+      `blockingChecklistsForClose` en contracts) bloquea `revisar_checklists` si hay obligatorio no APPROVED. **Segregación:**
+      revisor ≠ responsable (403). Claves de estado **data-driven** en `WorkOrderType` (`checklistSuggestStateKey`/
+      `checklistGateStateKey`, default por constante — paridad con `folioOnStateKey`). Migración
+      `20260702120000_add_work_order_checklists`. Seed: plantilla LOTO publicada + regla obligatoria transversal. Web:
+      pestaña "Checklists" en el drawer + sub-tab "Reglas de checklist" en `/ordenes-trabajo/catalogos`. verde
+      (typecheck/lint/build/test) + contracts **412** + smoke-workorders **65/65** + regresión incidencias 32/32.
+      Ver DECISIONS 2026-07-02. **Siguiente = Sesión 4.**
 - [ ] **Sesión 4 — Plan de actividades / Puerta 3 (~40 HH):** `WorkActivity` (base `IncidentAction` + `progressPct`,
       `plannedStart/End`, `actualStart/End`, `dependsOnId`); enviar/aprobar/rechazar plan → **congelar baseline**; guard
       "no ejecuta sin plan aprobado".
@@ -734,6 +756,25 @@ nunca queda más de una sesión atrás.
 - [ ] **Sesión 8 — Enterprise / opcional (~108 HH, Fase 3):** aprobadores dinámicos por reglas (área/criticidad/
       especialidad/monto/riesgo, reusa el motor de reglas); dependencias/ruta crítica; costos/HH + reportes/export;
       escalamiento multinivel. Puede subdividirse al llegar.
+
+> **🔴 BUG descubierto en S3 — folio de OT colisiona entre TIPOS (defecto de S2, requiere tu decisión + migración).**
+> El default de `folioScheme` es **scope `type`** (contador por tipo) pero `renderFolio` produce **`OT-2026-0001`**
+> SIN el tipo en el string, y `WorkOrder.folio` es **@unique GLOBAL**. ⇒ el **segundo TIPO** que apruebe una OT choca
+> con el `OT-2026-0001` del primero (500 `Unique constraint failed: folio`). Se detectó porque un OT de QA
+> (`Solicitud de Prueba`, `OT-2026-0001`) ya ocupaba ese folio. **Es un defecto real de uso normal (>1 tipo).**
+> No se corrige en S3 (toca el default aprobado W4 + datos existentes). **Opciones a decidir contigo:** (a) default
+> scope **`global`** = una sola serie anual de OT (estándar SAP/Maximo, folio EXACTO `OT-2026-0001` global-único) — la más
+> limpia, pero renumera la serie y hay que **migrar** el `folio`/`folioSeqKey` del OT de QA existente; (b) incluir el tipo
+> en la máscara (`OT-<tipo>-2026-0001`) — cambia el formato de folio que ya viste. Recomiendo **(a)**. Mientras tanto la
+> emisión funciona para 1 tipo; el smoke de OT usa un **prefijo propio** (`OTSMK`) para no chocar con datos reales.
+> **Deuda relacionada (de S2, sigue abierta): editor UI de `folioScheme`/`folioOnStateKey`** en el mantenedor de tipos
+> (hoy API-only). Al abrir ese editor, resolver este bug de una vez.
+
+> **DEUDA S3 (menor) — marcador `Template.purpose` (fork W5) DIFERIDO.** El diseño §2.4/W5 contemplaba una columna
+> **opcional** `Template.purpose` (null|CHECKLIST) SOLO como filtro UX del picker de plantillas de checklist. **Se difirió**
+> (aditivo pero inerte sin su propia UI en el Form Builder; "no construir lo que no se usa"). Hoy el picker de reglas ofrece
+> **todas las plantillas PUBLICADAS**. Si el catálogo de plantillas crece y el picker se vuelve ruidoso, agregar `purpose`
+> (columna nullable + selector en el builder + `?purpose=CHECKLIST` en `/templates`). Ver DECISIONS 2026-07-02.
 
 ### 🟡 DEUDA TRANSVERSAL — Vistas guardadas (`SavedView`) para Incidencias **y** Órdenes de Trabajo (~15–20 HH)
 > **Decisión del dueño (2026-07-01): DEJAR PENDIENTE para AMBOS módulos** (no hacerlo solo para OT). Hoy `SavedView`

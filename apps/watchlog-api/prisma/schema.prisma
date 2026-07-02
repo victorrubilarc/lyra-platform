@@ -759,6 +759,8 @@ model Template {
   templateScopes  TemplateScope[]
   nodeAssignments TemplateNodeAssignment[]
   schedules       LogSchedule[]
+  checklistRules     WorkOrderChecklistRule[]
+  workOrderChecklists WorkOrderChecklist[]
 
   @@index([orgNodeId])
   @@index([status])
@@ -1602,6 +1604,8 @@ model LogEntry {
   // El enlace lo posee la ocurrencia (RoundOccurrence.logEntryId @unique); aquí solo
   // la relación inversa, sin columna duplicada.
   roundOccurrence RoundOccurrence?
+  // Checklists de OT que instanciaron esta entrada como su llenado vivo (S3, Puerta 2).
+  workOrderChecklists WorkOrderChecklist[]
 
   @@index([templateId])
   @@index([templateVersionId])
@@ -2729,6 +2733,9 @@ model WorkOrderType {
   // --- Folio (S2: FolioCounter) - esquema configurable, INERTE en S1 --------------
   folioScheme        Json? // {prefix, mask, padding, start, scope, reset}
   folioOnStateKey    String? // estado al que, al ENTRAR, se emite el folio (default "aprobada")
+  // --- Checklists / Puerta 2 (S3): claves de estado data-driven (default por constante) ---
+  checklistSuggestStateKey String? // estado que dispara la sugerencia de checklists (default "en_preparacion")
+  checklistGateStateKey    String? // estado-puerta: sólo se ENTRA con checklists obligatorios APROBADOS (default "checklists_ok")
   // --- SLA light (S6, espejo IncidentType) ----------------------------------------
   resolutionDueMinutes   Int?
   escalationAfterMinutes Int?
@@ -2739,7 +2746,7 @@ model WorkOrderType {
   updatedAt          DateTime @updatedAt
   deletedAt          DateTime?
 
-  escalationRole Role?       @relation("WorkOrderTypeEscalationRole", fields: [escalationRoleId], references: [id], onDelete: SetNull)
+  escalationRole Role?                     @relation("WorkOrderTypeEscalationRole", fields: [escalationRoleId], references: [id], onDelete: SetNull)
   workOrders     WorkOrder[]
 
   @@index([active])
@@ -2763,7 +2770,8 @@ model Specialty {
   updatedAt   DateTime @updatedAt
   deletedAt   DateTime?
 
-  workOrders WorkOrderSpecialty[]
+  workOrders     WorkOrderSpecialty[]
+  checklistRules WorkOrderChecklistRule[]
 
   @@index([active])
   @@index([deletedAt])
@@ -2834,6 +2842,7 @@ model WorkOrder {
   orgNode     OrgNode               @relation(fields: [orgNodeId], references: [id], onDelete: Restrict)
   equipment   Equipment?            @relation(fields: [equipmentId], references: [id], onDelete: SetNull)
   specialties WorkOrderSpecialty[]
+  checklists  WorkOrderChecklist[]
   transitions WorkOrderTransition[]
   events      WorkOrderEvent[]
 
@@ -2912,4 +2921,77 @@ model WorkOrderSpecialty {
 
   @@id([workOrderId, specialtyId])
   @@index([specialtyId])
+}
+
+// Estado de un checklist operativo (Capa B, Puerta 2 - S3). IN_PROGRESS = LogEntry
+// instanciado y en llenado; SUBMITTED = LogEntry sellado, en espera de revision;
+// APPROVED/REJECTED = veredicto del revisor (segregacion revisor != responsable).
+enum WorkOrderChecklistStatus {
+  PENDING
+  IN_PROGRESS
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+// Capa A - DISENO (admin): regla de APLICABILIDAD de un checklist (fork W5). El
+// checklist ES una plantilla del Form Builder (`Template`); la regla define a que
+// OT se sugiere (patron appliesToTypeIds/minSeverity de ReportingObligation). NO
+// hay catalogo "Area" (la ubicacion = OrgNode); el eje de disciplina = Specialty.
+model WorkOrderChecklistRule {
+  id               String   @id @default(cuid())
+  name             String
+  templateId       String // -> Template (checklist a instanciar; Restrict)
+  mandatory        Boolean  @default(false) // obligatorio => no removible, bloquea Puerta 2
+  // Aplicabilidad (todo vacio/null = aplica a todas las OT):
+  appliesToTypeIds String[] @default([]) // WorkOrderType.id (vacio = todos los tipos)
+  minCriticality   Int? // criticidad minima (null = cualquiera)
+  specialtyId      String? // disciplina (null = cualquiera)
+  requiresPtw      Boolean? // solo si el flag PTW de la OT coincide (null = no discrimina)
+  active           Boolean  @default(true)
+  sortOrder        Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  deletedAt        DateTime?
+
+  template  Template   @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  specialty Specialty? @relation(fields: [specialtyId], references: [id], onDelete: SetNull)
+  checklists WorkOrderChecklist[]
+
+  @@index([templateId])
+  @@index([specialtyId])
+  @@index([active])
+  @@index([deletedAt])
+}
+
+// Capa B - OPERACION (en la OT): enlace (OT, plantilla) con su estado y su LogEntry
+// vivo (instancia de llenado). Al ENTRAR al estado de preparacion se SUGIEREN los
+// aplicables (mandatory no removibles); el usuario agrega manuales. `sourceRuleId`
+// null = agregado manual. Guard de Puerta 2 = ningun mandatory sin APPROVED.
+model WorkOrderChecklist {
+  id                String                   @id @default(cuid())
+  workOrderId       String
+  templateId        String // que checklist (plantilla)
+  logEntryId        String? // instancia viva (null hasta iniciarla) -> LogEntry
+  sourceRuleId      String? // regla que lo sugirio (null = agregado manual)
+  mandatory         Boolean                  @default(false)
+  status            WorkOrderChecklistStatus @default(PENDING)
+  responsibleId     String? // quien lo completa (ref. blanda)
+  responsibleRoleId String?
+  reviewerId        String? // quien lo revisa en Puerta 2 (segregacion; ref. blanda)
+  reviewedAt        DateTime?
+  rejectReason      String?
+  addedById         String?
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+
+  workOrder WorkOrder               @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  template  Template                @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  logEntry  LogEntry?               @relation(fields: [logEntryId], references: [id], onDelete: SetNull)
+  rule      WorkOrderChecklistRule? @relation(fields: [sourceRuleId], references: [id], onDelete: SetNull)
+
+  @@unique([workOrderId, templateId]) // MVP: 1 instancia por (OT, plantilla)
+  @@index([workOrderId])
+  @@index([status])
+  @@index([logEntryId])
 }

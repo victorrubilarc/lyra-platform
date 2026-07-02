@@ -113,3 +113,58 @@ export const WORK_ORDER_SPECIALTIES: WorkOrderTagSeed[] = [
   { key: "izaje", name: "Izaje y aparejo (rigging)", description: "Maniobras de izaje, grúas y aparejos.", color: "#F97316", sortOrder: 120 },
   { key: "pintura", name: "Pintura y anticorrosión", description: "Preparación de superficie, pintura y protección anticorrosiva.", color: "#EAB308", sortOrder: 130 },
 ];
+
+/**
+ * Checklists / PTW de arranque (Sesión 3 — Puerta 2). Cada checklist ES una plantilla
+ * del Form Builder (fork W5); aquí sembramos UNA plantilla PTW realista (LOTO) publicada
+ * + una regla OBLIGATORIA transversal, para que la Puerta 2 sea operable/demo día 1.
+ * Campos OPTATIVOS (el operador marca la sección completa y sella sin fricción).
+ */
+export interface ChecklistSeedField {
+  key: string;
+  type: "BOOLEAN" | "TEXTAREA";
+  dataType: "BOOLEAN" | "STRING";
+  label: string;
+  order: number;
+}
+export interface ChecklistTemplateSeed {
+  name: string;
+  description: string;
+  sectionKey: string;
+  sectionTitle: string;
+  fields: ChecklistSeedField[];
+}
+export interface ChecklistRuleSeed {
+  name: string;
+  templateName: string; // enlaza con la plantilla sembrada por nombre
+  mandatory: boolean;
+  appliesToTypeKeys: string[]; // vacío = todos los tipos
+  requiresPtw: boolean | null;
+  sortOrder: number;
+}
+
+export const WORK_ORDER_CHECKLIST_TEMPLATES: ChecklistTemplateSeed[] = [
+  {
+    name: "Checklist PTW — Bloqueo de energías (LOTO)",
+    description: "Permiso de trabajo: bloqueo y etiquetado de energías peligrosas (LOTO) antes de intervenir el equipo.",
+    sectionKey: "loto",
+    sectionTitle: "Bloqueo y verificación",
+    fields: [
+      { key: "energias_identificadas", type: "BOOLEAN", dataType: "BOOLEAN", label: "¿Se identificaron todas las fuentes de energía?", order: 10 },
+      { key: "bloqueo_aplicado", type: "BOOLEAN", dataType: "BOOLEAN", label: "¿Se aplicó bloqueo y etiquetado (candado personal)?", order: 20 },
+      { key: "energia_cero", type: "BOOLEAN", dataType: "BOOLEAN", label: "¿Se verificó energía cero (prueba de arranque)?", order: 30 },
+      { key: "observaciones", type: "TEXTAREA", dataType: "STRING", label: "Observaciones", order: 40 },
+    ],
+  },
+];
+
+export const WORK_ORDER_CHECKLIST_RULES: ChecklistRuleSeed[] = [
+  {
+    name: "PTW obligatorio — Bloqueo de energías (LOTO)",
+    templateName: "Checklist PTW — Bloqueo de energías (LOTO)",
+    mandatory: true,
+    appliesToTypeKeys: [], // transversal: aplica a toda OT que llegue a preparación
+    requiresPtw: null,
+    sortOrder: 10,
+  },
+];

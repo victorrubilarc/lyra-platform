@@ -109,3 +109,48 @@
   .headerActions { width: 100%; }
   .fixedSel, .fixedSelSm { flex: 1 1 100%; }
 }
+
+/* === Checklists / Puerta 2 (S3) ============================================ */
+.checklistList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.checklistItem {
+  border: 1px solid var(--wl-border, rgba(255, 255, 255, 0.08));
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: var(--wl-surface-1, rgba(255, 255, 255, 0.02));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.checklistHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.checklistName {
+  font-weight: 600;
+  color: var(--wl-text, #e7eaf3);
+}
+.checklistMeta {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 0.82rem;
+  color: var(--wl-text-secondary, #9aa3b8);
+}
+.checklistActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.checklistActions a {
+  text-decoration: none;
+}

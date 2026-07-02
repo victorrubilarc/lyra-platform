@@ -68,6 +68,10 @@ export const workOrderTypeSchema = z.object({
   folioScheme: folioSchemeSchema.nullable(),
   /** Estado del flujo al que, al ENTRAR, se emite el folio (null = "aprobada"). */
   folioOnStateKey: z.string().nullable(),
+  /** Estado al que, al ENTRAR, se SUGIEREN los checklists aplicables (null = "en_preparacion"). S3. */
+  checklistSuggestStateKey: z.string().nullable(),
+  /** Estado (Puerta 2) al que sólo se puede ENTRAR con todos los checklists obligatorios APROBADOS (null = "checklists_ok"). S3. */
+  checklistGateStateKey: z.string().nullable(),
   active: z.boolean(),
   sortOrder: z.number().int(),
 });
@@ -344,6 +348,10 @@ export const upsertWorkOrderTypeRequestSchema = z.object({
   folioScheme: folioSchemeSchema.nullable().optional(),
   /** Estado emisor del folio. null/omitido = "aprobada". */
   folioOnStateKey: z.string().trim().min(1).max(64).nullable().optional(),
+  /** Estado que dispara la sugerencia de checklists. null/omitido = "en_preparacion". S3. */
+  checklistSuggestStateKey: z.string().trim().min(1).max(64).nullable().optional(),
+  /** Estado-puerta de checklists (Puerta 2). null/omitido = "checklists_ok". S3. */
+  checklistGateStateKey: z.string().trim().min(1).max(64).nullable().optional(),
   active: z.boolean().optional(),
   sortOrder: z.number().int().min(0).max(9999).optional(),
 });
