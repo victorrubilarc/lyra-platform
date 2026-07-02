@@ -1,5 +1,6 @@
 import {
   workActivitySchema,
+  workActivityUpdateSchema,
   workOrderChecklistRuleSchema,
   workOrderChecklistSchema,
   workOrderDetailSchema,
@@ -13,6 +14,7 @@ import {
   type CreateWorkActivitiesBatchRequest,
   type CreateWorkActivityRequest,
   type CreateWorkOrderRequest,
+  type RecordWorkActivityProgressRequest,
   type ReorderWorkActivitiesRequest,
   type ReviewWorkOrderChecklistRequest,
   type SpecialtyDto,
@@ -23,6 +25,7 @@ import {
   type UpsertWorkOrderChecklistRuleRequest,
   type UpsertWorkOrderTypeRequest,
   type WorkActivityDto,
+  type WorkActivityUpdateDto,
   type WorkOrderChecklistDto,
   type WorkOrderChecklistRuleDto,
   type WorkOrderDetail,
@@ -194,4 +197,16 @@ export function removeWorkOrderActivity(id: string, aid: string): Promise<void> 
 
 export function reorderWorkOrderActivities(id: string, dto: ReorderWorkActivitiesRequest): Promise<WorkActivityDto[]> {
   return apiJson(`/work-orders/${id}/activities/reorder`, z.array(workActivitySchema), { method: "POST", body: dto });
+}
+
+// === Seguimiento del avance / Puerta 4 (S5) ==================================
+
+/** Registra un avance de la actividad (append-only) y devuelve su foto vigente. */
+export function recordWorkOrderActivityProgress(id: string, aid: string, dto: RecordWorkActivityProgressRequest): Promise<WorkActivityDto> {
+  return apiJson(`/work-orders/${id}/activities/${aid}/progress`, workActivitySchema, { method: "POST", body: dto });
+}
+
+/** Historial (append-only) de avance de una actividad. */
+export function fetchWorkOrderActivityUpdates(id: string, aid: string): Promise<WorkActivityUpdateDto[]> {
+  return apiJson(`/work-orders/${id}/activities/${aid}/updates`, z.array(workActivityUpdateSchema));
 }

@@ -354,8 +354,13 @@ def main():
     aid1 = a1.get("id") if isinstance(a1, dict) else None
     s, a2 = call("POST", f"/work-orders/{wid4}/activities", admin, {"title": "Reemplazar rodamiento y montar", "mandatory": True})
     check("crear 2.ª actividad → 2xx + secuencia 1", s in (200, 201) and isinstance(a2, dict) and a2.get("sequence") == 1, str(s))
+    aid2 = a2.get("id") if isinstance(a2, dict) else None
     s, acts = call("GET", f"/work-orders/{wid4}/activities", admin)
     check("listar actividades → 2 en el plan", isinstance(acts, list) and len(acts) == 2, str(len(acts) if isinstance(acts, list) else s))
+
+    # Seguimiento (S5): NO se registra avance antes de autorizar el plan (baseline sin congelar) → 400
+    s, _ = call("POST", f"/work-orders/{wid4}/activities/{aid1}/progress", admin, {"status": "IN_PROGRESS", "progressPct": 20})
+    check("avance ANTES de autorizar el plan (baseline sin congelar) → 400", s == 400, str(s))
 
     # Puerta 3: autorizar_plan → plan_aprobado + planFrozenAt + evento PLAN_FROZEN
     s, r = call("POST", f"/work-orders/{wid4}/transitions", admin, {"transitionKey": "autorizar_plan"})
@@ -446,6 +451,59 @@ def main():
     s, r = call("POST", f"/work-orders/{wid4}/transitions", admin, {"transitionKey": "ejecutar"})
     check("ejecutar → 200 + en_ejecucion (plan congelado ⇒ guard pasa)",
           s == 200 and isinstance(r, dict) and r.get("currentStateKey") == "en_ejecucion", str(s))
+
+    # 14) SEGUIMIENTO DEL AVANCE (S5 — Puerta 4) + CIERRE punta a punta
+    print("\n— Puerta 4 (seguimiento del avance + cierre) —")
+
+    # Registrar avance de la 1.ª actividad (append-only + actualiza la foto vigente)
+    s, r = call("POST", f"/work-orders/{wid4}/activities/{aid1}/progress", admin,
+                {"status": "IN_PROGRESS", "progressPct": 50, "note": "Energías aisladas; falta verificar cero energía"})
+    check("registrar avance → 200 + IN_PROGRESS + 50% + 1 registro",
+          s in (200, 201) and isinstance(r, dict) and r.get("status") == "IN_PROGRESS"
+          and r.get("progressPct") == 50 and r.get("updatesCount") == 1,
+          str(s) + (json.dumps({k: r.get(k) for k in ("status", "progressPct", "updatesCount")}) if isinstance(r, dict) else ""))
+
+    # Avance VACÍO (sin ningún dato) → 400 (refine del contrato)
+    s, _ = call("POST", f"/work-orders/{wid4}/activities/{aid1}/progress", admin, {})
+    check("avance sin ningún dato → 400", s == 400, str(s))
+
+    # Historial append-only (más reciente primero)
+    s, ups = call("GET", f"/work-orders/{wid4}/activities/{aid1}/updates", admin)
+    check("historial de avance → 1 registro append-only", isinstance(ups, list) and len(ups) == 1, str(len(ups) if isinstance(ups, list) else s))
+
+    # Gate 403 del operador sobre el avance (sin workorder:activity:manage)
+    if operador:
+        s, _ = call("POST", f"/work-orders/{wid4}/activities/{aid1}/progress", operador, {"status": "IN_PROGRESS"})
+        check("operador POST activity progress → 403", s == 403, str(s))
+
+    # Solicitar cierre → en_revision_cierre
+    s, r = call("POST", f"/work-orders/{wid4}/transitions", admin, {"transitionKey": "solicitar_cierre"})
+    check("solicitar_cierre → 200 + en_revision_cierre", s == 200 and isinstance(r, dict) and r.get("currentStateKey") == "en_revision_cierre", str(s))
+
+    # Puerta 4 BLOQUEADA: cerrar con actividades obligatorias abiertas → 400 (bloqueo EXPLICADO)
+    s, _ = call("POST", f"/work-orders/{wid4}/transitions", admin, {"transitionKey": "cerrar", "password": PASS, "closureSummary": "cierre prematuro"})
+    check("Puerta 4 BLOQUEADA: cerrar con obligatorias abiertas → 400", s == 400, str(s))
+
+    # Completar las 2 actividades obligatorias (DONE fuerza 100%)
+    s, r = call("POST", f"/work-orders/{wid4}/activities/{aid1}/progress", admin, {"status": "DONE", "note": "Cero energía verificado"})
+    check("marcar actividad 1 DONE → 200 + 100%", s in (200, 201) and isinstance(r, dict) and r.get("status") == "DONE" and r.get("progressPct") == 100, str(s))
+    s, r = call("POST", f"/work-orders/{wid4}/activities/{aid2}/progress", admin, {"status": "DONE"})
+    check("marcar actividad 2 DONE → 200 + 100%", s in (200, 201) and isinstance(r, dict) and r.get("status") == "DONE" and r.get("progressPct") == 100, str(s))
+
+    # Cerrar (firma Part 11) → cerrada + CLOSED + resumen de cierre
+    s, r = call("POST", f"/work-orders/{wid4}/transitions", admin,
+                {"transitionKey": "cerrar", "password": PASS, "closureSummary": "Trabajo ejecutado, equipo probado y devuelto a servicio."})
+    check("cerrar → 200 + cerrada + CLOSED + closureSummary",
+          s == 200 and isinstance(r, dict) and r.get("currentStateKey") == "cerrada"
+          and r.get("lifecycle") == "CLOSED" and bool(r.get("closureSummary")),
+          str(s) + (json.dumps({k: r.get(k) for k in ("currentStateKey", "lifecycle")}) if isinstance(r, dict) else ""))
+    check("timeline: evento CLOSED + ACTIVITY_DONE",
+          isinstance(r, dict) and any(e.get("kind") == "CLOSED" for e in r.get("events", []))
+          and any(e.get("kind") == "ACTIVITY_DONE" for e in r.get("events", [])))
+
+    # OT cerrada ⇒ ya no se registra avance → 400
+    s, _ = call("POST", f"/work-orders/{wid4}/activities/{aid1}/progress", admin, {"status": "IN_PROGRESS"})
+    check("avance tras cerrar la OT → 400", s == 400, str(s))
 
     cleanup()
     print(f"\n{len(OK)}/{len(OK)+len(FAIL)} OK" + ("" if not FAIL else f"   FALLARON: {FAIL}"))

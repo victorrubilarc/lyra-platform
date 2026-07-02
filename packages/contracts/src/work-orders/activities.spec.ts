@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  activityDeviationLabel,
   activityEndDeviationDays,
   blockingActivitiesForClose,
+  effectiveProgressPct,
   planNotFrozen,
   planReadyToFreeze,
+  recordWorkActivityProgressRequestSchema,
   summarizeActivities,
   type WorkActivityStatus,
 } from "./activities.js";
@@ -74,5 +77,39 @@ describe("activityEndDeviationDays", () => {
     expect(
       activityEndDeviationDays({ baselineEnd: "2026-07-10T00:00:00Z", plannedEnd: "2026-07-13T00:00:00Z", actualEnd: "2026-07-08T00:00:00Z" }),
     ).toBe(-2);
+  });
+});
+
+describe("activityDeviationLabel", () => {
+  it("null cuando no hay desviación o falta baseline", () => {
+    expect(activityDeviationLabel({ baselineEnd: null, plannedEnd: "2026-07-10T00:00:00Z", actualEnd: null })).toBeNull();
+    expect(activityDeviationLabel({ baselineEnd: "2026-07-10T00:00:00Z", plannedEnd: "2026-07-10T00:00:00Z", actualEnd: null })).toBeNull();
+  });
+  it("atraso positivo y adelanto negativo, con singular/plural", () => {
+    expect(activityDeviationLabel({ baselineEnd: "2026-07-10T00:00:00Z", plannedEnd: "2026-07-13T00:00:00Z", actualEnd: null })).toBe("+3 días de atraso");
+    expect(activityDeviationLabel({ baselineEnd: "2026-07-10T00:00:00Z", plannedEnd: "2026-07-11T00:00:00Z", actualEnd: null })).toBe("+1 día de atraso");
+    expect(activityDeviationLabel({ baselineEnd: "2026-07-10T00:00:00Z", plannedEnd: null, actualEnd: "2026-07-09T00:00:00Z" })).toBe("1 día de adelanto");
+  });
+});
+
+describe("effectiveProgressPct", () => {
+  it("DONE fuerza 100%", () => {
+    expect(effectiveProgressPct({ status: "DONE" }, 40)).toBe(100);
+    expect(effectiveProgressPct({ status: "DONE", progressPct: 20 }, 40)).toBe(100);
+  });
+  it("usa el % del request o conserva el actual", () => {
+    expect(effectiveProgressPct({ progressPct: 60 }, 40)).toBe(60);
+    expect(effectiveProgressPct({ status: "IN_PROGRESS" }, 40)).toBe(40);
+  });
+});
+
+describe("recordWorkActivityProgressRequestSchema", () => {
+  it("rechaza un avance vacío", () => {
+    expect(recordWorkActivityProgressRequestSchema.safeParse({}).success).toBe(false);
+  });
+  it("acepta si trae al menos un dato de avance", () => {
+    expect(recordWorkActivityProgressRequestSchema.safeParse({ status: "IN_PROGRESS" }).success).toBe(true);
+    expect(recordWorkActivityProgressRequestSchema.safeParse({ progressPct: 50 }).success).toBe(true);
+    expect(recordWorkActivityProgressRequestSchema.safeParse({ note: "avance de terreno" }).success).toBe(true);
   });
 });

@@ -4,6 +4,35 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-02 · OT S5a — Puerta 4: seguimiento vivo del avance + cierre (CIERRA EL MVP Solicitud→Cierre)
+Objetivo aprobado por el dueño: partir S5 en **5a (seguimiento + cierre "core", esta sesión)** y **5b (checklists por
+`momento` + Gobierno 2, sesión siguiente)**. *Decisiones tomadas:*
+- **`WorkActivityUpdate` = entidad append-only** (shape §2.5): cada registro de avance es una fila INMUTABLE; la foto
+  vigente (`status`/`progressPct`/`actual*`) queda DENORMALIZADA en `WorkActivity` para listar sin agregaciones. *Motivo:*
+  rastro auditable del seguimiento en terreno (ALCOA+/GxP) sin perder rendimiento de lectura. `hoursSpent`/`cost`/`evidence`
+  reservados a S8/Ola 3.
+- **Permiso: reusar `workorder:activity:manage`** (NO permiso nuevo). *Motivo:* registrar avance es gestión del plan de
+  actividades; separar "planificar" de "avanzar" sería granularidad sin caso real hoy. Evita `db:seed`+FLUSHALL. Se puede
+  separar más adelante si un cliente lo pide.
+- **Guard de escritura de avance = `assertProgressable`** (plan CONGELADO + OT abierta), espejo INVERSO de `assertEditable`
+  (que bloquea el plan una vez congelado). *Motivo:* el plan es inmutable tras autorizar, pero la EJECUCIÓN se registra
+  encima; no se gatea por un `stateKey` concreto para no acoplarse a un flujo específico (un cliente con 1 puerta sigue
+  funcionando).
+- **Conveniencias server-side:** DONE ⇒ `progressPct` 100 + auto-`actualEnd`; IN_PROGRESS ⇒ auto-`actualStart` (si no se
+  declara). *Motivo:* menos fricción en terreno/tablet. La lógica DONE⇒100 vive en un helper PURO (`effectiveProgressPct`)
+  compartido back↔front (una sola fuente de verdad; el modal muestra el mismo % que persiste el backend).
+- **Cierre (Puerta 4):** NO se construyó nada nuevo — los guards (`assertActivitiesComplete`/`blockingActivitiesForClose`
+  al pasar a estado final + `planNotFrozen` al ejecutar + firma Part 11 + `closureSummary`) ya se cablearon en S4. S5a
+  VERIFICA el ciclo entero punta a punta y **EXPLICA los bloqueos** en la UI (qué actividad obligatoria falta).
+- **UX (con OK previo):** «Registrar avance» = **modal** por fila (chips de estado, slider de %, fechas reales opcionales,
+  contexto baseline+desviación, motivo, nota) + **historial expandible** append-only. Descartado editar inline en celda
+  (peor para nota/motivo/fechas/rastro y para tablet). Reglas de estilo ya aprendidas respetadas (tokens DS, sin jerga
+  «Puerta N» en UI, ≥44px, claro/oscuro).
+- **Diferido a S5b** (§11.8): eje `momento` en `WorkOrderChecklistRule`, checklists de EJECUCIÓN por actividad, checklist
+  de CIERRE, Gobierno 2 (visibilidad/confirmación del set de ejecución en la autorización del permiso).
+*Verificación:* typecheck (6 paq.) · lint 0 err · build web (2996 mód.) · contracts 427 · API 252 · web 6 ·
+`smoke-workorders.py` **90/90** + `smoke-incidencias.py` **32/32**.
+
 ### 2026-07-02 · OT/Form Builder — W5 `Template.purpose`: filtrar el picker a plantillas «checklist»
 Inquietud del dueño: la lista de plantillas del picker de reglas de checklist mezcla TODAS las publicadas (bitácoras,
 rondas, incidencias…) y con muchas se vuelve ruidosa. *Decisión (con su OK):* implementar el fork **W5** que estaba

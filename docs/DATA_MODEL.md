@@ -705,7 +705,7 @@ Incident(resuelta) ──> KnowledgeArticle
 - Índices previstos: FKs, `OrgNode.parentId`, `Entry(templateId, createdAt)`, `Incident(status, severity)`, GIN en `tsvector` de KB y en `JSONB` consultable.
 - El esquema vive en `apps/watchlog-api/prisma/schema.prisma`; migraciones versionadas con `prisma migrate`.
 
-### Órdenes de Trabajo / Work Orders (OT / PTW) — S1 Cimientos + S2 Puerta 1 + S3 Puerta 2 + S4 Puerta 3 *(implementado)*
+### Órdenes de Trabajo / Work Orders (OT / PTW) — S1 Cimientos + S2 Puerta 1 + S3 Puerta 2 + S4 Puerta 3 + S5a Puerta 4 (seguimiento + cierre) *(implementado)*
 Migraciones `20260701180000_add_work_orders` (S1) y `20260701210000_add_work_order_workflow_folio` (S2). Entidad NUEVA
 `WorkOrder`, **espejo de `Incident`** (DECISIONS 2026-07-01, forks W1–W8). Desde S2 el ciclo de la solicitud está VIVO
 hasta la Puerta 1: workflow congelado al crear + ejecutor de transiciones (permiso `workorder:transition`, dim. WORKFLOW)
@@ -733,7 +733,8 @@ anulación lifecycle `CANCELED`).
   `signatureId` (ref. blanda a `LogEntrySignature`, hoy null — deuda payloadHash compartida con Incidencias), `occurredAt`.
   Cascade desde `WorkOrder`; índice `(workOrderId, occurredAt)`.
 - **WorkOrderEvent** *(S2)* — timeline APPEND-ONLY (espejo de `IncidentActivity`; se llama "Event" para no chocar con
-  `WorkActivity` de S4). `kind` clasifica: CREATED|SENT|APPROVED|REJECTED|FOLIO_ISSUED|TRANSITION|ASSIGNED|CLOSED|CANCELED.
+  `WorkActivity` de S4). `kind` clasifica: CREATED|SENT|APPROVED|REJECTED|FOLIO_ISSUED|TRANSITION|ASSIGNED|CLOSED|CANCELED
+  |PLAN_FROZEN|CHECKLIST_ADDED|ACTIVITY_ADDED|ACTIVITY_REMOVED|**ACTIVITY_PROGRESS|ACTIVITY_DONE|ACTIVITY_BLOCKED** (S5).
   `summary`, actor, `metadata` Json, `occurredAt`. Cascade; índice `(workOrderId, occurredAt)`.
 - **FolioCounter** *(S2, fork W4)* — motor de folio gapless configurable, REUTILIZABLE (sirve al folio-por-plantilla,
   BACKLOG 2026-06-30). Una fila por secuencia: `sequenceKey` **PK** (codifica entidad+scope+período, ej.
@@ -773,7 +774,17 @@ anulación lifecycle `CANCELED`).
   RESERVADAS (`estimatedHours`/`actualHours` Decimal S8, `evidence` Json), auditoría (`createdById`/`updatedById`).
   `onDelete: Cascade` desde `WorkOrder`. Guards PUROS (contracts `work-orders/activities.ts`): `planReadyToFreeze` (≥1
   no cancelada, exigido para autorizar el plan), `blockingActivitiesForClose` (mandatory abierta = Puerta 4),
-  `planNotFrozen`, `summarizeActivities`, `activityEndDeviationDays`. **`WorkActivityUpdate` (avance append-only) = S5.**
+  `planNotFrozen`, `summarizeActivities`, `activityEndDeviationDays`, **`effectiveProgressPct`/`activityDeviationLabel`** (S5).
+  **S5:** foto vigente actualizada por cada avance (`status`/`progressPct`/`actual*`/`completed*`); en la lectura el DTO se
+  enriquece con `updatesCount`/`lastProgressAt` (batched). El **guard de escritura de avance** es `assertProgressable`
+  (servicio): exige plan CONGELADO + OT abierta (espejo inverso de `assertEditable` que bloquea el plan tras congelar).
+- **WorkActivityUpdate** *(S5a — entidad NUEVA, migración `20260702200000_add_work_activity_updates`)* — **BITÁCORA
+  append-only del AVANCE** de una `WorkActivity`. Cada registro de avance crea una fila INMUTABLE (jamás se edita/borra):
+  `status` (nullable = sin cambio de estado), `progressPct` (nullable), `actualStart`/`actualEnd` (fechas reales
+  declaradas), `note`, `deviation` (texto de la desviación vs baseline, derivado con `activityDeviationLabel`),
+  `delayReason`, `authorId`/`authorName`, `createdAt`; columnas RESERVADAS S8/Ola 3 (`hoursSpent`/`cost` Decimal,
+  `evidence` Json). `onDelete: Cascade` desde `WorkActivity`; índice `(workActivityId, createdAt)`. La foto vigente vive
+  DENORMALIZADA en `WorkActivity` (este historial explica cómo llegó ahí).
 - **Specialty** — catálogo de disciplina/oficio (`key` única, `name`/`description`/`color`, `active`/`sortOrder`).
   Equivale al **Work Center (SAP PM) / Craft (Maximo)**. N:N con la OT. La **ubicación** la da `orgNodeId` (estructura,
   que puede tener un nivel "Área"), **no** un catálogo aparte.
@@ -790,6 +801,9 @@ endpoint `cancel`, espejo Incidencias). **Implementado en S3** (migración `2026
 día, `fix/ot-folio-global`: default scope `global`.)* **Implementado en S4** (migración
 `20260702180000_add_work_order_activities`): entidad `WorkActivity` + enum `WorkActivityStatus` + `WorkOrder.planFrozenAt/
 planFrozenById` + `WorkOrderType.planFreezeStateKey/executeStateKey`; **REORDEN del flujo** `ot-4-puertas` al estándar
-(planificar→autorizar permiso→ejecutar; seed republica una versión nueva, in-flight intactos). **Pendiente (S5):**
-`WorkOrderComment`, `WorkActivityUpdate` (avance append-only), checklists de EJECUCIÓN/CIERRE + eje `momento`.
+(planificar→autorizar permiso→ejecutar; seed republica una versión nueva, in-flight intactos). **Implementado en S5a**
+(migración `20260702200000_add_work_activity_updates`): entidad **`WorkActivityUpdate`** (avance append-only) + relación
+`WorkActivity.updates` + enriquecimiento del DTO (`updatesCount`/`lastProgressAt`); seguimiento vivo del avance
+(`recordProgress`/`listUpdates`) + cierre punta a punta (guards ya cableados en S4). Reusa `workorder:activity:manage`
+(sin permiso nuevo). **Pendiente (S5b):** `WorkOrderComment`, checklists de EJECUCIÓN/CIERRE + eje `momento` + Gobierno 2.
 Ver `docs/design/OT_DESIGN_ARCHITECTURE.md`.

@@ -1,13 +1,17 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import {
+  activityDeviationLabel,
   blockingActivitiesForClose,
+  effectiveProgressPct,
   planReadyToFreeze,
   type CreateWorkActivitiesBatchRequest,
   type CreateWorkActivityRequest,
+  type RecordWorkActivityProgressRequest,
   type ReorderWorkActivitiesRequest,
   type UpdateWorkActivityRequest,
   type WorkActivityDto,
+  type WorkActivityUpdateDto,
 } from "@lyra/contracts";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuditService, type AuditContext } from "../audit/audit.service";
@@ -15,6 +19,15 @@ import { ScopeService } from "../authz/scope.service";
 
 /** Cliente de transacción (o el prisma normal) para las operaciones que corren dentro de la tx del ejecutor. */
 type Tx = Prisma.TransactionClient | PrismaClient;
+
+/** Etiquetas en español de los estados de actividad (para el resumen del timeline). */
+const ACTIVITY_STATUS_LABELS: Record<string, string> = {
+  PENDING: "Pendiente",
+  IN_PROGRESS: "En curso",
+  BLOCKED: "Bloqueada",
+  DONE: "Completada",
+  CANCELED: "Cancelada",
+};
 
 /**
  * Plan de actividades de una OT (Sesión 4 — Puerta 3). `WorkActivity` es una entidad
@@ -131,6 +144,129 @@ export class WorkActivitiesService {
     return this.loadActivityDtos(workOrderId);
   }
 
+  // === Seguimiento del avance (S5 — Puerta 4) ================================
+
+  /**
+   * Registra el AVANCE de una actividad (append-only) y actualiza su foto vigente.
+   * Solo se permite una vez AUTORIZADO el plan (baseline congelada) y con la OT
+   * abierta — el plan es inmutable, pero la EJECUCIÓN se registra encima. Crea un
+   * `WorkActivityUpdate` inmutable + un evento en el timeline de la OT.
+   */
+  async recordProgress(
+    userId: string,
+    workOrderId: string,
+    activityId: string,
+    dto: RecordWorkActivityProgressRequest,
+    ctx: AuditContext,
+  ): Promise<WorkActivityDto> {
+    const wo = await this.loadWorkOrder(workOrderId);
+    await this.assertNodeAccess(userId, wo.orgNodeId);
+    this.assertProgressable(wo);
+    const before = await this.loadActivity(workOrderId, activityId);
+    if (before.status === "CANCELED") {
+      throw new BadRequestException("No se puede registrar avance de una actividad cancelada");
+    }
+
+    const now = new Date();
+    const nextStatus = dto.status ?? before.status;
+    const nextPct = effectiveProgressPct({ status: dto.status, progressPct: dto.progressPct }, before.progressPct);
+
+    // Fechas reales: se toma lo declarado; si no viene y el estado lo implica, se
+    // rellena con "ahora" (arranque ⇒ actualStart; término ⇒ actualEnd) para no
+    // exigir al operador teclear la fecha en terreno.
+    const actualStart =
+      dto.actualStart !== undefined
+        ? dto.actualStart
+          ? new Date(dto.actualStart)
+          : null
+        : before.actualStart ?? (nextStatus === "IN_PROGRESS" ? now : null);
+    const actualEnd =
+      dto.actualEnd !== undefined
+        ? dto.actualEnd
+          ? new Date(dto.actualEnd)
+          : null
+        : nextStatus === "DONE"
+          ? before.actualEnd ?? now
+          : before.actualEnd;
+
+    const isDone = nextStatus === "DONE";
+    const deviation = activityDeviationLabel({
+      baselineEnd: before.baselineEnd,
+      plannedEnd: before.plannedEnd,
+      actualEnd,
+    });
+    const authorName = (await this.resolveUserNames([userId])).get(userId) ?? null;
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.workActivityUpdate.create({
+        data: {
+          workActivityId: activityId,
+          status: dto.status ?? null,
+          progressPct: dto.progressPct ?? (isDone ? 100 : null),
+          actualStart: dto.actualStart ? new Date(dto.actualStart) : null,
+          actualEnd: dto.actualEnd ? new Date(dto.actualEnd) : null,
+          note: dto.note?.trim() || null,
+          deviation,
+          delayReason: dto.delayReason?.trim() || null,
+          authorId: userId,
+          authorName,
+        },
+      });
+      await tx.workActivity.update({
+        where: { id: activityId },
+        data: {
+          status: nextStatus,
+          progressPct: nextPct,
+          actualStart,
+          actualEnd,
+          delayReason: dto.delayReason === undefined ? undefined : dto.delayReason?.trim() || null,
+          updatedById: userId,
+          ...(isDone
+            ? { completedAt: before.completedAt ?? now, completedById: before.completedById ?? userId, completionNote: dto.note?.trim() || before.completionNote }
+            : { completedAt: null, completedById: null }),
+        },
+      });
+    });
+
+    const kind = isDone ? "ACTIVITY_DONE" : nextStatus === "BLOCKED" ? "ACTIVITY_BLOCKED" : "ACTIVITY_PROGRESS";
+    const summary = `Avance: ${before.title} — ${ACTIVITY_STATUS_LABELS[nextStatus]} · ${nextPct}%${dto.note?.trim() ? ` · ${dto.note.trim()}` : ""}`;
+    await this.addEvent(workOrderId, kind, summary, userId, { activityId, status: nextStatus, progressPct: nextPct });
+    await this.audit.record({
+      ...ctx,
+      action: "workactivity.progress",
+      entityType: "WorkActivity",
+      entityId: activityId,
+      before: { status: before.status, progressPct: before.progressPct },
+      after: { status: nextStatus, progressPct: nextPct },
+    });
+    return (await this.loadActivityDtos(workOrderId)).find((a) => a.id === activityId)!;
+  }
+
+  /** Historial de avance (append-only) de una actividad, más reciente primero. */
+  async listUpdates(userId: string, workOrderId: string, activityId: string): Promise<WorkActivityUpdateDto[]> {
+    const wo = await this.loadWorkOrder(workOrderId);
+    await this.assertNodeAccess(userId, wo.orgNodeId);
+    await this.loadActivity(workOrderId, activityId); // 404 si no pertenece a la OT
+    const rows = await this.prisma.workActivityUpdate.findMany({
+      where: { workActivityId: activityId },
+      orderBy: { createdAt: "desc" },
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      workActivityId: r.workActivityId,
+      status: r.status,
+      progressPct: r.progressPct,
+      actualStart: r.actualStart?.toISOString() ?? null,
+      actualEnd: r.actualEnd?.toISOString() ?? null,
+      note: r.note,
+      deviation: r.deviation,
+      delayReason: r.delayReason,
+      authorId: r.authorId,
+      authorName: r.authorName,
+      createdAt: r.createdAt.toISOString(),
+    }));
+  }
+
   // === Guards + freeze (invocados por el ejecutor de flujo) ==================
 
   /** Puerta 3: exige ≥1 actividad no cancelada antes de autorizar/congelar el plan. */
@@ -193,6 +329,20 @@ export class WorkActivitiesService {
     }
   }
 
+  /**
+   * El seguimiento del avance solo se registra una vez AUTORIZADO el plan (baseline
+   * congelada) y con la OT abierta. El plan es inmutable, pero la ejecución se
+   * registra encima (espejo inverso de `assertEditable`).
+   */
+  private assertProgressable(wo: { lifecycle: string; planFrozenAt: Date | null }): void {
+    if (wo.lifecycle === "CLOSED" || wo.lifecycle === "CANCELED") {
+      throw new BadRequestException("La orden de trabajo ya está cerrada o anulada");
+    }
+    if (!wo.planFrozenAt) {
+      throw new BadRequestException("Aún no se puede registrar avance: el plan de trabajo no ha sido autorizado (baseline sin congelar).");
+    }
+  }
+
   /** Valida responsable/especialidad/dependencia (misma OT, sin auto-referencia). */
   private async validateRefs(workOrderId: string, dto: { responsibleId?: string | null; specialtyId?: string | null; dependsOnId?: string | null }, selfId: string | null): Promise<void> {
     if (dto.responsibleId) {
@@ -230,7 +380,11 @@ export class WorkActivitiesService {
   private async loadActivityDtos(workOrderId: string): Promise<WorkActivityDto[]> {
     const rows = await this.prisma.workActivity.findMany({
       where: { workOrderId },
-      include: { specialty: { select: { name: true } } },
+      include: {
+        specialty: { select: { name: true } },
+        _count: { select: { updates: true } },
+        updates: { select: { createdAt: true }, orderBy: { createdAt: "desc" }, take: 1 },
+      },
       orderBy: [{ sequence: "asc" }, { createdAt: "asc" }],
     });
     const userNames = await this.resolveUserNames(rows.map((r) => r.responsibleId));
@@ -257,6 +411,10 @@ export class WorkActivitiesService {
       dependsOnId: r.dependsOnId,
       priority: r.priority,
       delayReason: r.delayReason,
+      completedAt: r.completedAt?.toISOString() ?? null,
+      completionNote: r.completionNote,
+      updatesCount: r._count.updates,
+      lastProgressAt: r.updates[0]?.createdAt.toISOString() ?? null,
       createdAt: r.createdAt.toISOString(),
       updatedAt: r.updatedAt.toISOString(),
     }));

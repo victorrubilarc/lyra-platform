@@ -5,7 +5,15 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-07-02** — **🔧 OT · Sesión 4 · PUERTA 3 (plan de actividades + congelar baseline) + reorden del
+> actualización: **2026-07-02** — **🔧 OT · Sesión 5a · PUERTA 4 (seguimiento vivo del avance + cierre) ✅ → CIERRA EL MVP
+> Solicitud→Cierre** (`feat/ot-seguimiento-cierre`): entidad NUEVA **`WorkActivityUpdate`** (avance append-only, migr.
+> `20260702200000`) + `WorkActivitiesService.recordProgress`/`listUpdates` (foto vigente denormalizada + evento
+> `ACTIVITY_PROGRESS`/`_DONE`/`_BLOCKED` + `assertProgressable` = plan congelado + OT abierta) + helpers puros
+> `effectiveProgressPct`/`activityDeviationLabel`; **cierre** ya cableado en S4 (guards + firma Part 11 + `closureSummary`),
+> S5a lo VERIFICA punta a punta con bloqueos EXPLICADOS; **reusa `workorder:activity:manage`** (sin permiso nuevo). Web:
+> pestaña «Plan» viva en ejecución (columna Avance + modal «Registrar avance» + historial expandible). verde + contracts
+> **427** + API 252 + web 6 + `smoke-workorders.py` **90/90** + regresión incidencias **32/32**. **Diferido a S5b:** eje
+> `momento`, checklists de EJECUCIÓN/CIERRE, Gobierno 2. Antes (2026-07-02): **🔧 OT · Sesión 4 · PUERTA 3 (plan de actividades + congelar baseline) + reorden del
 > flujo ✅** (`feat/ot-puerta3`): fase Planificación viva — **`WorkActivity`** (entidad propia, fork W1), `autorizar_plan`
 > exige ≥1 actividad + **congela baseline** + `PLAN_FROZEN` + plan inmutable; guards puros `planNotFrozen`/
 > `blockingActivitiesForClose`/`planReadyToFreeze`; permiso **`workorder:activity:manage`** (cat. 102); claves data-driven
@@ -768,13 +776,20 @@ nunca queda más de una sesión atrás.
       **DEUDA fina S4:** editor UI de `planFreezeStateKey`/`executeStateKey` (junto al de `folioScheme`/claves de checklist);
       cronológicamente P3 va antes que P2 (el rótulo "Puerta N" del diseño es solo referencia; la UI muestra nombres de
       etapa). Dependencias/ruta crítica = solo la columna `dependsOnId` (S8).
-- [ ] **Sesión 5 — Seguimiento vivo + cierre / Puerta 4 (~40 HH, sube por lo movido de S4) → CIERRA EL MVP:**
-      `WorkActivityUpdate` (append-only: % avance, fechas reales, evidencias, desviaciones, costos/HH opcionales); solicitud
-      de cierre + revisión final + guards de cierre (el de actividades `blockingActivitiesForClose` ya está cableado; falta
-      el checklist de CIERRE). **+ Lo MOVIDO de S4 (checklists de ejecución):** (b) eje `momento` en `WorkOrderChecklistRule`;
-      (c) checklists de **EJECUCIÓN** por actividad (aplicación física en terreno); (d) **Gobierno 2** (el aprobador ve/confirma
-      el set de ejecución en Puerta 2, §11.5). **+ Checklist de CIERRE del permiso** (retirar controles/candados, reenergizar,
-      sitio seguro) como 3.er momento del PTW (DECISIONS 2026-07-02). **Ciclo completo Solicitud→Cierre punta a punta.**
+- [x] **Sesión 5a — Seguimiento vivo del avance + cierre / Puerta 4 ✅ (2026-07-02, `feat/ot-seguimiento-cierre`) → CIERRA
+      EL MVP Solicitud→Cierre:** `WorkActivityUpdate` (append-only: estado/% avance/fechas reales/nota/desviación/motivo;
+      costos/HH/evidencia reservados S8) + `recordProgress`/`listUpdates` (foto vigente denormalizada + `updatesCount`/
+      `lastProgressAt` + eventos ACTIVITY_PROGRESS/_DONE/_BLOCKED + `assertProgressable`); helpers puros
+      `effectiveProgressPct`/`activityDeviationLabel`; **cierre** verificado punta a punta (guards `blockingActivitiesForClose`/
+      `planNotFrozen` + firma Part 11 + `closureSummary` ya de S4; bloqueos EXPLICADOS). Reusa `workorder:activity:manage`.
+      Web: pestaña «Plan» viva (columna Avance + modal «Registrar avance» + historial expandible). smoke-workorders **90/90**
+      + incidencias 32/32.
+- [ ] **Sesión 5b — Checklists por `momento` + Gobierno 2 (~20–25 HH):** (b) eje `momento` en `WorkOrderChecklistRule`
+      (REQUEST/PLANNING/AUTHORIZATION/EXECUTION/CLOSURE, mapeado a estados por dato como `folioOnStateKey`, §11.2);
+      (c) checklists de **EJECUCIÓN** por actividad (candados/energía cero/LMRA en terreno, ligados a `WorkActivity`, §11.4.2);
+      **+ checklist de CIERRE del permiso** (retirar controles/candados, reenergizar, sitio seguro, §11.4.3); (d) **Gobierno 2**
+      (en la autorización del permiso el aprobador VE y CONFIRMA en solo-lectura el set de checklists de ejecución que se
+      exigirá, con agregar/quitar, §11.5). DECISIONS 2026-07-02.
 - [ ] **Sesión 6 — Alertas, SLA y semáforos / "vigía digital" (~40 HH):** eventos `workorder.overdue`/`.activity.overdue`/
       `.stalled`/`.sla.breached`; curva de alerta (esperado vs real / incoherencia); escalamiento democratizado; semáforos
       + panel de seguimiento activo. Reusa Bloque N + `findBreaches`.

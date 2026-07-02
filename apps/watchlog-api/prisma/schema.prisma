@@ -3072,6 +3072,7 @@ model WorkActivity {
   specialty  Specialty?     @relation("WorkActivitySpecialty", fields: [specialtyId], references: [id], onDelete: SetNull)
   dependsOn  WorkActivity?  @relation("WorkActivityDeps", fields: [dependsOnId], references: [id], onDelete: SetNull)
   dependents WorkActivity[] @relation("WorkActivityDeps")
+  updates    WorkActivityUpdate[]
 
   @@index([workOrderId, sequence])
   @@index([status])
@@ -3079,4 +3080,31 @@ model WorkActivity {
   @@index([mandatory, status])
   @@index([specialtyId])
   @@index([dependsOnId])
+}
+
+// BITACORA append-only del AVANCE de una actividad (Sesion 5 — Puerta 4). Cada
+// registro de avance (cambio de estado / %, fechas reales, nota, desviacion) crea
+// una fila NUEVA (jamas se edita ni borra): rastro auditable del seguimiento en
+// terreno. La foto vigente (status/progressPct/actual*) vive DENORMALIZADA en
+// `WorkActivity`; este historial explica como llego ahi. hoursSpent/cost = S8.
+model WorkActivityUpdate {
+  id             String   @id @default(cuid())
+  workActivityId String
+  status         WorkActivityStatus? // estado declarado en este avance (null = sin cambio)
+  progressPct    Int? // 0..100 declarado (null = sin cambio)
+  actualStart    DateTime? // fechas reales declaradas
+  actualEnd      DateTime?
+  note           String? // nota de avance
+  deviation      String? // desviacion respecto al baseline (texto libre)
+  delayReason    String? // motivo de atraso / bloqueo
+  hoursSpent     Decimal? @db.Decimal(10, 2) // reservado (S8)
+  cost           Decimal? @db.Decimal(14, 2) // reservado (S8)
+  evidence       Json? // reservado (descriptores Ola 3)
+  authorId       String? // ref. blanda
+  authorName     String?
+  createdAt      DateTime @default(now())
+
+  workActivity WorkActivity @relation(fields: [workActivityId], references: [id], onDelete: Cascade)
+
+  @@index([workActivityId, createdAt])
 }

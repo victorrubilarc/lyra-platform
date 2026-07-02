@@ -10,7 +10,7 @@
 > funcionalidades existentes** aunque su detalle aún esté por redactar (✍️): así nada se
 > olvida; el backfill de lo ya construido se llena de a poco (incremental).
 >
-> Última actualización: **2026-07-02** (Órdenes de trabajo — Puerta 3: plan de actividades + asistente guiado + congelar línea base, y reorden del flujo al estándar planificar→autorizar→ejecutar, S4).
+> Última actualización: **2026-07-02** (Órdenes de trabajo — Puerta 4: seguimiento del avance por actividad + historial append-only + cierre con firma, S5a; CIERRA el ciclo Solicitud→Cierre punta a punta).
 
 ## Convención de cada sección
 Cada funcionalidad se documenta con estas cuatro partes fijas:
@@ -145,8 +145,8 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 - ✅ **Enviar, aprobar (con firma y folio oficial) o rechazar la solicitud — Puerta 1** (flujo de estados con stepper, firma electrónica, folio OT-AAAA-#### emitido al aprobar, rechazo con motivo, historial) (§ Órdenes de trabajo ▸ Aprobación)
 - ✅ **Checklists / permisos de trabajo — Puerta 2** (reglas configurables, sugerencia automática al preparar, llenado como registro del constructor de formularios, revisión con segregación revisor≠responsable, bloqueo hasta aprobar los obligatorios) (§ Órdenes de trabajo ▸ Checklists y permisos de trabajo)
 - ✅ **Plan de actividades y autorización del plan — Puerta 3** (armar el plan con grilla o **asistente guiado**, congelar la línea base al autorizar, desviación plan-vs-real) (§ Órdenes de trabajo ▸ Plan de actividades)
+- ✅ **Seguimiento del avance y cierre — Puerta 4** (registrar el avance de cada actividad durante la ejecución, historial de avance, cerrar la OT con firma cuando todo lo obligatorio está completo) (§ Órdenes de trabajo ▸ Seguimiento del avance y cierre)
 - ✅ **Administrar los catálogos** (tipos de OT, especialidades y reglas de checklist) (§ Órdenes de trabajo ▸ Catálogos) [solo administrador]
-- ✍️ Seguimiento vivo y cierre (Puerta 4 — Sesión 5)
 
 ---
 
@@ -302,11 +302,48 @@ habilitado para esa puerta.
 
 **Importante.**
 - **Un plan sin tareas no se puede autorizar.** Es a propósito: sin actividades no hay nada que ejecutar ni medir.
-- **La línea base se congela una sola vez.** Tras autorizar, el plan es de solo lectura; los cambios de alcance
-  posteriores se gestionan como parte de la ejecución/cierre (Sesión 5) y el control de cambios (más adelante).
+- **La línea base se congela una sola vez.** Tras autorizar, el plan es de solo lectura; el **avance** de la ejecución se
+  registra encima (ver la sección siguiente), sin tocar la línea base.
 - **No se puede ejecutar sin un plan autorizado.** El sistema lo impide aunque se intente saltar pasos.
-- El **avance real** de cada actividad (marcar progreso, fechas reales, evidencias) y el **cierre** llegan en la etapa
-  siguiente (Puerta 4).
+
+### Órdenes de trabajo ▸ Seguimiento del avance y cierre (Puerta 4)  [Ejecutor / Supervisor]
+
+**Para qué sirve.** Registrar **cómo avanza el trabajo** en terreno —actividad por actividad— y **cerrar** la orden cuando
+todo lo obligatorio está completo. Con la línea base ya congelada (Puerta 3), el plan no cambia, pero cada tarea acumula un
+**historial de avance** (una bitácora que no se borra ni se edita): qué se hizo, en qué estado quedó, con qué porcentaje y
+en qué fechas reales. Así se ve, de un vistazo, **cuánto falta** y **si vamos atrasados o adelantados** respecto a lo
+comprometido, y queda **trazabilidad** completa para auditoría.
+
+**Cómo se usa.**
+1. Con el permiso autorizado, pulsa **«Iniciar ejecución»** (pestaña Resumen). La OT pasa a **En ejecución**.
+2. Abre la pestaña **«Plan»**. Ahora la grilla muestra una columna **Avance** (barra + porcentaje) por actividad, y el
+   aviso de arriba te dice cuántas llevas completadas y el avance global.
+3. En la fila de una actividad pulsa **«Registrar avance»** (ícono de tendencia). En la ventana:
+   - Elige el **estado**: **En curso**, **Bloqueada** o **Completada**.
+   - Ajusta el **porcentaje** de avance con la barra deslizante (al marcar **Completada** el sistema lo lleva a 100%).
+   - Opcionalmente indica **inicio/término real** (si los dejas en blanco, el sistema completa la fecha que corresponda).
+   - Si hay atraso o la actividad está **Bloqueada**, escribe el **motivo**; agrega una **nota** de avance con lo hecho,
+     hallazgos o pendientes.
+   - La ventana te muestra el **plan comprometido** (línea base) y la **desviación estimada** para que decidas con dato.
+4. Cada registro queda en el **historial de avance** de la actividad: pulsa el ícono de **historial** (reloj) en la fila
+   para desplegarlo (autor, fecha, estado, %, motivo y nota de cada avance, del más reciente al más antiguo).
+5. Cuando el trabajo esté hecho, vuelve a **Resumen** y pulsa **«Solicitar cierre»** (la OT pasa a **En revisión de
+   cierre**) y luego **«Cerrar OT»**. El cierre pide **firma electrónica** y un **resumen de cierre**. Si queda alguna
+   actividad **obligatoria** sin completar, el sistema **no deja cerrar** y te dice cuántas faltan: complétalas (o
+   cancélalas si ya no aplican) y vuelve a intentar. Al cerrar, la OT queda **Cerrada**.
+
+**Quién puede.** Registrar avance requiere **`workorder:activity:manage`** (el mismo permiso del plan). Solicitar cierre y
+cerrar (las transiciones, con firma) requieren **`workorder:transition`** y que el rol esté habilitado para esa puerta.
+
+**Importante.**
+- **El avance solo se registra con el plan ya autorizado y la OT abierta.** Antes de congelar la línea base no hay avance
+  que registrar; después de cerrar la OT, tampoco.
+- **El historial es inmutable (append-only).** No se corrige un registro anterior: se agrega uno nuevo. Es el rastro de
+  auditoría del trabajo real.
+- **Las actividades obligatorias bloquean el cierre** hasta quedar **Completadas** o **Canceladas**. El sistema explica
+  siempre qué falta.
+- **Cerrar exige firma.** El cierre es un acto firmado (Part 11), igual que la aprobación: queda quién, cuándo y con qué
+  resumen.
 
 ### Órdenes de trabajo ▸ Catálogos (tipos, especialidades y reglas de checklist)  [Admin]
 

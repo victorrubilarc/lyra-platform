@@ -68,10 +68,37 @@ export const workActivitySchema = z.object({
   dependsOnId: z.string().nullable(),
   priority: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]).nullable(),
   delayReason: z.string().nullable(),
+  /** Cierre real de la actividad (cuándo/quién declaró DONE). */
+  completedAt: z.string().nullable(),
+  completionNote: z.string().nullable(),
+  /** Seguimiento (S5): cantidad de registros de avance y fecha del último. */
+  updatesCount: z.number().int(),
+  lastProgressAt: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
 export type WorkActivityDto = z.infer<typeof workActivitySchema>;
+
+/**
+ * Registro de AVANCE (append-only, S5) de una actividad. Es la BITÁCORA del
+ * seguimiento en terreno: cada fila es inmutable y explica cómo la actividad
+ * llegó a su estado/avance vigente (denormalizado en `WorkActivityDto`).
+ */
+export const workActivityUpdateSchema = z.object({
+  id: z.string(),
+  workActivityId: z.string(),
+  status: workActivityStatusSchema.nullable(),
+  progressPct: z.number().int().nullable(),
+  actualStart: z.string().nullable(),
+  actualEnd: z.string().nullable(),
+  note: z.string().nullable(),
+  deviation: z.string().nullable(),
+  delayReason: z.string().nullable(),
+  authorId: z.string().nullable(),
+  authorName: z.string().nullable(),
+  createdAt: z.string(),
+});
+export type WorkActivityUpdateDto = z.infer<typeof workActivityUpdateSchema>;
 
 // === Requests =================================================================
 
@@ -120,6 +147,32 @@ export const createWorkActivitiesBatchRequestSchema = z.object({
   activities: z.array(createWorkActivityRequestSchema).min(1).max(100),
 });
 export type CreateWorkActivitiesBatchRequest = z.infer<typeof createWorkActivitiesBatchRequestSchema>;
+
+/**
+ * Registrar AVANCE de una actividad (S5, Puerta 4). Solo se permite una vez
+ * AUTORIZADO el plan (baseline congelada) y con la OT abierta. Crea un
+ * `WorkActivityUpdate` append-only y actualiza la foto vigente de la actividad.
+ * Debe traer al menos un dato de avance (estado, %, fecha real o nota).
+ */
+export const recordWorkActivityProgressRequestSchema = z
+  .object({
+    status: workActivityStatusSchema.optional(),
+    progressPct: z.number().int().min(0).max(100).optional(),
+    actualStart: isoDate(),
+    actualEnd: isoDate(),
+    note: z.string().trim().max(5000).nullable().optional(),
+    delayReason: z.string().trim().max(2000).nullable().optional(),
+  })
+  .refine(
+    (v) =>
+      v.status !== undefined ||
+      v.progressPct !== undefined ||
+      (v.actualStart ?? null) !== null ||
+      (v.actualEnd ?? null) !== null ||
+      !!v.note?.trim(),
+    { message: "Registre al menos un dato de avance (estado, porcentaje, fecha real o nota)." },
+  );
+export type RecordWorkActivityProgressRequest = z.infer<typeof recordWorkActivityProgressRequestSchema>;
 
 // === Helpers PUROS (autoritativos back↔front) ================================
 
@@ -181,4 +234,34 @@ export function activityEndDeviationDays(activity: {
   const base = new Date(activity.baselineEnd).getTime();
   const cur = new Date(target).getTime();
   return Math.round((cur - base) / 86_400_000);
+}
+
+/**
+ * Etiqueta legible de la desviación de fin vs baseline (atraso/adelanto), o null si
+ * no hay baseline/fecha a comparar o coincide. Puro (reusable en UI y al persistir el
+ * `deviation` textual del registro de avance).
+ */
+export function activityDeviationLabel(activity: {
+  baselineEnd: string | Date | null;
+  plannedEnd: string | Date | null;
+  actualEnd: string | Date | null;
+}): string | null {
+  const d = activityEndDeviationDays(activity);
+  if (d == null || d === 0) return null;
+  const n = Math.abs(d);
+  const dias = n === 1 ? "día" : "días";
+  return d > 0 ? `+${n} ${dias} de atraso` : `${n} ${dias} de adelanto`;
+}
+
+/**
+ * % de avance efectivo a persistir dado un registro de avance: DONE ⇒ 100%; si viene
+ * `progressPct` se usa; si no, se conserva el actual. Puro (autoritativo back↔front).
+ */
+export function effectiveProgressPct(
+  req: { status?: WorkActivityStatus; progressPct?: number },
+  currentPct: number,
+): number {
+  if (req.status === "DONE") return 100;
+  if (req.progressPct != null) return req.progressPct;
+  return currentPct;
 }
