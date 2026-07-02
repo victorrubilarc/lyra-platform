@@ -16,6 +16,7 @@ import {
 import { PrismaService } from "../prisma/prisma.service";
 import { AuditService, type AuditContext } from "../audit/audit.service";
 import { ScopeService } from "../authz/scope.service";
+import { WorkOrderChecklistsService } from "./work-order-checklists.service";
 
 /** Cliente de transacción (o el prisma normal) para las operaciones que corren dentro de la tx del ejecutor. */
 type Tx = Prisma.TransactionClient | PrismaClient;
@@ -48,6 +49,7 @@ export class WorkActivitiesService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly scope: ScopeService,
+    private readonly checklists: WorkOrderChecklistsService,
   ) {}
 
   // === Lectura ===============================================================
@@ -169,6 +171,11 @@ export class WorkActivitiesService {
 
     const now = new Date();
     const nextStatus = dto.status ?? before.status;
+    // GATE por actividad (Slice B): no se puede COMPLETAR una tarea sin haber aprobado sus
+    // verificaciones de EJECUCIÓN obligatorias (LOTO físico, toma-5). Data-driven por reglas.
+    if (nextStatus === "DONE" && before.status !== "DONE") {
+      await this.checklists.assertActivityExecutionComplete(workOrderId, activityId);
+    }
     const nextPct = effectiveProgressPct({ status: dto.status, progressPct: dto.progressPct }, before.progressPct);
 
     // Fechas reales: se toma lo declarado; si no viene y el estado lo implica, se

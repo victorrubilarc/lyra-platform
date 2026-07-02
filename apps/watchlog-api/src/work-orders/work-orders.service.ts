@@ -2,8 +2,6 @@ import { BadRequestException, ConflictException, ForbiddenException, Injectable,
 import type { Prisma } from "@prisma/client";
 import {
   DEFAULT_WORK_ORDER_CHECKLIST_GATE_STATE_KEY,
-  DEFAULT_WORK_ORDER_CHECKLIST_SUGGEST_STATE_KEY,
-  DEFAULT_WORK_ORDER_CLOSURE_CHECKLIST_SUGGEST_STATE_KEY,
   DEFAULT_WORK_ORDER_EXECUTE_STATE_KEY,
   DEFAULT_WORK_ORDER_FOLIO_STATE_KEY,
   DEFAULT_WORK_ORDER_PLAN_FREEZE_STATE_KEY,
@@ -129,7 +127,7 @@ export class WorkOrdersService {
     const type = await this.prisma.workOrderType.findUnique({ where: { id: row.typeId }, select: { criticalityDefault: true } });
 
     const events = await this.prisma.workOrderEvent.findMany({ where: { workOrderId: id }, orderBy: { occurredAt: "asc" } });
-    const userNames = await this.resolveUserNames(events.map((e) => e.actorId));
+    const userNames = await this.resolveUserNames([...events.map((e) => e.actorId), row.executionSetConfirmedById]);
 
     const states = graph ? [...graph.states.values()].sort((a, b) => a.order - b.order) : [];
     const availableTransitions: WorkOrderAvailableTransition[] =
@@ -186,6 +184,9 @@ export class WorkOrdersService {
       approvedAt: row.approvedAt?.toISOString() ?? null,
       folioIssuedAt: row.folioIssuedAt?.toISOString() ?? null,
       planFrozenAt: row.planFrozenAt?.toISOString() ?? null,
+      executionSetConfirmedAt: row.executionSetConfirmedAt?.toISOString() ?? null,
+      executionSetConfirmedById: row.executionSetConfirmedById,
+      executionSetConfirmedByName: row.executionSetConfirmedById ? userNames.get(row.executionSetConfirmedById) ?? null : null,
       rejectedAt: row.rejectedAt?.toISOString() ?? null,
       rejectReason: row.rejectReason,
       closedAt: row.closedAt?.toISOString() ?? null,
@@ -325,19 +326,20 @@ export class WorkOrdersService {
     // Puerta 2 — claves data-driven de sugerencia/puerta de checklists (S3).
     const type = await this.prisma.workOrderType.findUnique({
       where: { id: row.typeId },
-      select: { folioScheme: true, folioOnStateKey: true, checklistSuggestStateKey: true, checklistGateStateKey: true, planFreezeStateKey: true, executeStateKey: true, closureChecklistSuggestStateKey: true },
+      select: { folioScheme: true, folioOnStateKey: true, checklistGateStateKey: true, planFreezeStateKey: true, executeStateKey: true },
     });
     const folioStateKey = type?.folioOnStateKey ?? DEFAULT_WORK_ORDER_FOLIO_STATE_KEY;
     const checklistGateStateKey = type?.checklistGateStateKey ?? DEFAULT_WORK_ORDER_CHECKLIST_GATE_STATE_KEY;
-    const checklistSuggestStateKey = type?.checklistSuggestStateKey ?? DEFAULT_WORK_ORDER_CHECKLIST_SUGGEST_STATE_KEY;
     const planFreezeStateKey = type?.planFreezeStateKey ?? DEFAULT_WORK_ORDER_PLAN_FREEZE_STATE_KEY;
     const executeStateKey = type?.executeStateKey ?? DEFAULT_WORK_ORDER_EXECUTE_STATE_KEY;
-    const closureSuggestStateKey = type?.closureChecklistSuggestStateKey ?? DEFAULT_WORK_ORDER_CLOSURE_CHECKLIST_SUGGEST_STATE_KEY;
 
     // GUARD Puerta 2 (momento AUTHORIZATION): sólo se ENTRA al estado-puerta con los
-    // checklists obligatorios de AUTORIZACIÓN aprobados (espejo de assertNoBlockingActions).
+    // checklists obligatorios de AUTORIZACIÓN aprobados (espejo de assertNoBlockingActions)
+    // + Gobierno 2: el aprobador debe haber CONFIRMADO el set de verificaciones de EJECUCIÓN
+    // (§11.5) — así "lo aplicado en terreno = lo autorizado".
     if (toState.key === checklistGateStateKey) {
       await this.checklists.assertChecklistsCompleteForMoment(id, "AUTHORIZATION");
+      await this.checklists.assertExecutionSetConfirmed(id);
     }
     // GUARD Puerta 3: sólo se autoriza el plan (se CONGELA la baseline) con ≥1 actividad.
     const isPlanFreeze = toState.key === planFreezeStateKey && !row.planFrozenAt;
@@ -350,10 +352,12 @@ export class WorkOrdersService {
     if (toState.key === executeStateKey && planNotFrozen(row)) {
       throw new BadRequestException("No se puede ejecutar: el plan de trabajo aún no ha sido autorizado (baseline sin congelar).");
     }
-    // GUARD Puerta 4: no se cierra con actividades obligatorias del plan abiertas NI con
-    // checklists de CIERRE obligatorios sin aprobar (retiro de controles, reenergizar).
+    // GUARD Puerta 4: no se cierra con actividades obligatorias del plan abiertas, ni con
+    // verificaciones de EJECUCIÓN obligatorias sin aprobar (backstop del gate por actividad),
+    // ni con checklists de CIERRE obligatorios sin aprobar (retiro de controles, reenergizar).
     if (becomesFinal && row.approvedAt) {
       await this.activities.assertActivitiesComplete(id);
+      await this.checklists.assertChecklistsCompleteForMoment(id, "EXECUTION");
       await this.checklists.assertChecklistsCompleteForMoment(id, "CLOSURE");
     }
     const isApproval = toState.key === folioStateKey && !row.approvedAt;
@@ -464,15 +468,11 @@ export class WorkOrdersService {
         });
       }
     });
-    // SUGERENCIA por MOMENTO (idempotente, fuera de la tx: si fallara no revierte una
-    // transición ya válida). AUTORIZACIÓN al ENTRAR a preparación (S3); CIERRE al ENTRAR
-    // a la revisión de cierre (S5b) — así el checklist de cierre aparece a tiempo.
-    if (toState.key === checklistSuggestStateKey) {
-      await this.checklists.materializeForWorkOrder(id, "AUTHORIZATION", userId);
-    }
-    if (toState.key === closureSuggestStateKey) {
-      await this.checklists.materializeForWorkOrder(id, "CLOSURE", userId);
-    }
+    // SUGERENCIA por ESTADO (idempotente, fuera de la tx: si fallara no revierte una
+    // transición ya válida). El orquestador materializa lo que corresponde al estado que
+    // se ENTRA: AUTORIZACIÓN + SET de EJECUCIÓN por actividad al preparar (S3+S5b), CIERRE
+    // al entrar a la revisión de cierre (S5b) — así cada checklist aparece a tiempo.
+    await this.checklists.materializeForState(id, toState.key, userId);
     await this.audit.record({
       ...ctx,
       action: "workorder.transition.executed",

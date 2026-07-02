@@ -152,6 +152,11 @@ export function suggestWorkOrderChecklists(id: string): Promise<WorkOrderCheckli
   return apiJson(`/work-orders/${id}/checklists/suggest`, z.array(workOrderChecklistSchema), { method: "POST" });
 }
 
+/** Gobierno 2 (S5b): confirma el set de verificaciones de EJECUCIÓN antes de autorizar el permiso. */
+export function confirmWorkOrderExecutionSet(id: string): Promise<WorkOrderChecklistDto[]> {
+  return apiJson(`/work-orders/${id}/checklists/execution-set/confirm`, z.array(workOrderChecklistSchema), { method: "POST" });
+}
+
 export function addWorkOrderChecklist(id: string, dto: AddWorkOrderChecklistRequest): Promise<WorkOrderChecklistDto> {
   return apiJson(`/work-orders/${id}/checklists`, workOrderChecklistSchema, { method: "POST", body: dto });
 }

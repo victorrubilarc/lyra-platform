@@ -5,7 +5,17 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-07-02** — **🔧 OT · Sesión 5b · Slice A · Eje `momento` de checklists + checklist de CIERRE ✅**
+> actualización: **2026-07-02** — **🔧 OT · Sesión 5b · Slice B · Checklists de EJECUCIÓN por actividad + Gobierno 2 ✅ → COMPLETA el §11**
+> (`feat/ot-ejecucion-gobierno2`): `WorkOrderChecklist.workActivityId` (→ `WorkActivity` SetNull; unique
+> `(workOrderId, templateId, workActivityId)` — NULL distinto ⇒ anti-duplicado de nivel-OT por código) + `WorkOrder.executionSetConfirmedAt/ById`
+> (migr. aditiva `20260702220000`). El **set de EJECUCIÓN** se materializa por actividad al PREPARAR (una fila por actividad ×
+> regla EXECUTION que matchee **por especialidad de la actividad**, `applicableExecutionRulesForActivity`; orquestador
+> `materializeForState`). **Gobierno 2:** `confirmExecutionSet` + **gate al autorizar** `assertExecutionSetConfirmed` + auto-limpieza
+> al curar; **gate por actividad** `assertActivityExecutionComplete` (no DONE sin verificación obligatoria aprobada) + backstop al
+> cierre. Web: «Verificaciones» grupo EJECUCIÓN sub-agrupado por actividad + banner/botón «Confirmar set de ejecución» +
+> indicador en «Plan». **Sin permiso nuevo** (reusa `workorder:checklist:manage`, sin FLUSHALL) + seed (plantilla/regla de
+> EJECUCIÓN). verde + contracts **433** + `smoke-workorders.py` **108/108** + regresión incidencias **32/32**. Pendiente: smoke
+> VISUAL (dueño). Antes: **🔧 OT · Sesión 5b · Slice A · Eje `momento` de checklists + checklist de CIERRE ✅**
 > (`feat/ot-checklists-momento`): eje **`momento`** (REQUEST/PLANNING/AUTHORIZATION/EXECUTION/CLOSURE) como DATO en
 > `WorkOrderChecklistRule` y `WorkOrderChecklist` (default AUTHORIZATION ⇒ retrocompatible; migr. aditiva
 > `20260702210000`) + `WorkOrderType.closureChecklistSuggestStateKey` (data-driven); materialización y guard **por momento**
@@ -801,12 +811,16 @@ nunca queda más de una sesión atrás.
         sugerido al entrar a `en_revision_cierre`, BLOQUEA el cierre si obligatorio sin aprobar (guard
         `assertChecklistsCompleteForMoment`/`blockingChecklistsForMoment`). UI: Combobox «Momento» + «Verificaciones» agrupada
         por momento + columna en catálogo. Sin permiso nuevo. `smoke-workorders.py` 95/95 + incidencias 32/32.
-  - [ ] **Slice B (sesión siguiente):** (c) checklists de **EJECUCIÓN** por actividad (candados/energía cero/LMRA en terreno,
-        ligados a `WorkActivity` vía `WorkOrderChecklist.workActivityId`; unique `(workOrderId, templateId, workActivityId)`;
-        guard por actividad al marcar DONE + backstop al cierre, §11.4.2); (d) **Gobierno 2** (en la autorización del permiso el
-        aprobador VE/CURA/CONFIRMA en solo-lectura el set de checklists de EJECUCIÓN que se exigirá — filas concretas por
-        actividad —, con agregar/quitar/rechazar + sello `WorkOrder.executionSetConfirmedAt`; reusa `workorder:checklist:manage`,
-        §11.5). DECISIONS 2026-07-02.
+  - [x] **Slice B ✅ (2026-07-02, `feat/ot-ejecucion-gobierno2`):** (c) checklists de **EJECUCIÓN** por actividad
+        (`WorkOrderChecklist.workActivityId` → `WorkActivity` SetNull; unique `(workOrderId, templateId, workActivityId)`;
+        materializados al PREPARAR — una fila por actividad × regla EXECUTION que matchee **por especialidad de la actividad**,
+        `applicableExecutionRulesForActivity`; **gate por actividad** `assertActivityExecutionComplete` al marcar DONE + backstop
+        `assertChecklistsCompleteForMoment(EXECUTION)` al cerrar, §11.4.2); (d) **Gobierno 2** (el aprobador VE/CURA/CONFIRMA el set
+        de ejecución — filas por actividad — con agregar/quitar + sello `WorkOrder.executionSetConfirmedAt/ById`, **gate al
+        autorizar** `assertExecutionSetConfirmed` + auto-limpieza al curar; reusa `workorder:checklist:manage`, §11.5). Migr.
+        `20260702220000`. UI: «Verificaciones» grupo EJECUCIÓN sub-agrupado por actividad + banner/botón «Confirmar set de
+        ejecución» + indicador en «Plan». Sin permiso nuevo. `smoke-workorders.py` **108/108** + incidencias 32/32. **Cierra §11.**
+        DECISIONS 2026-07-02 (Slice B).
 - [ ] **Sesión 6 — Alertas, SLA y semáforos / "vigía digital" (~40 HH):** eventos `workorder.overdue`/`.activity.overdue`/
       `.stalled`/`.sla.breached`; curva de alerta (esperado vs real / incoherencia); escalamiento democratizado; semáforos
       + panel de seguimiento activo. Reusa Bloque N + `findBreaches`.

@@ -4,6 +4,44 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-02 · OT S5b Slice B — Checklists de EJECUCIÓN por actividad + Gobierno 2 (completa el §11)
+Cierre del modelo GENERALIZADO de checklists del §11: los controles de terreno se aplican por tarea y el aprobador cura/
+confirma el set. Las 3 decisiones abiertas (a/b/c) se resolvieron con el dueño (visto bueno vía preguntas, con mi
+recomendación) — el resto ya venía fijado en «Slice A». Decisiones aprobadas:
+1. **Materialización del SET de EJECUCIÓN al PREPARAR** (decisión (a)). Se materializa (una fila por **actividad × regla
+   EXECUTION que matchee**) al ENTRAR al estado de preparación (reusa `checklistSuggestStateKey`, el mismo disparo que la
+   AUTORIZACIÓN), **solo si el plan está congelado** — así el aprobador ve FILAS CONCRETAS por actividad para curar/confirmar
+   en la autorización. *Motivo:* el plan se congela ANTES de preparar (reorden EAM S4: `autorizar_plan → preparar`), las
+   actividades son fijas; materializar en ejecución dejaría a Gobierno 2 sin filas concretas que confirmar (contradice §11.5).
+   Sin clave data-driven nueva; orquestador `materializeForState(woId, stateKey, actor)` reusado por `transition()` y `suggest()`.
+2. **Match regla EXECUTION ↔ actividad POR ESPECIALIDAD** (decisión (b)). La aplicabilidad de OT (tipo/criticidad/PTW) se
+   hereda, pero el eje DISCIPLINA se resuelve contra la especialidad de la **ACTIVIDAD** (no de la OT); regla sin especialidad
+   = aplica a TODAS las actividades (p. ej. toma-5/LMRA genérico). *Motivo:* fiel al estándar (LOTO→eléctrica/mecánica, trabajo
+   en caliente→soldadura), **reutiliza el campo `specialtyId` existente** en la regla (cero config/migración nueva), degradación
+   limpia. Helper puro `applicableExecutionRulesForActivity` (+specs). Descartado "a todas siempre" (ruidoso) y "configurable
+   por regla" (superficie/migración sin caso real hoy).
+3. **Gobierno 2 = curar filas concretas + sello** (decisión (c) + §11.5). El aprobador VE el set de EJECUCIÓN (filas por
+   actividad, derivadas de las reglas), puede **agregar/quitar** y **CONFIRMA** → sella `WorkOrder.executionSetConfirmedAt/ById`.
+   **Gate al autorizar el permiso** (`assertExecutionSetConfirmed` en el estado-puerta `checklistGateStateKey`, junto al de
+   AUTORIZACIÓN): si hay reglas EXECUTION, exige el set confirmado. **Auto-limpieza:** curar el set (agregar/quitar EJECUCIÓN)
+   invalida una confirmación previa ⇒ re-confirmar (trazabilidad "lo aplicado en terreno = lo autorizado"). UX en «Verificaciones»,
+   grupo EJECUCIÓN sub-agrupado por actividad; en «Plan», solo un indicador de solo lectura (qué bloquea el DONE).
+4. **Datos** (migr. aditiva `20260702220000_add_execution_checklists`): `WorkOrderChecklist.workActivityId` (SetNull; SOLO
+   EJECUCIÓN cuelga de una tarea, resto null=nivel-OT) + `@@unique` a `(workOrderId, templateId, workActivityId)`. **Postgres
+   trata NULL como DISTINTO** ⇒ el unique NO protege los de nivel-OT (workActivityId null); su anti-duplicado sigue siendo el
+   **guard de código** (dedup en `materializeForWorkOrder`/`addManual` filtrando `workActivityId: null`). Documentado en el schema.
+5. **Gate por actividad al COMPLETAR + backstop al cierre.** No se marca una actividad DONE con su verificación de EJECUCIÓN
+   obligatoria sin aprobar (`assertActivityExecutionComplete` en `recordProgress`, helper puro `blockingExecutionChecklistsForActivity`);
+   backstop `assertChecklistsCompleteForMoment(EXECUTION)` al cerrar (por si una tarea no obligatoria queda con verificación pendiente).
+6. **SIN permiso nuevo** (reusa `workorder:checklist:manage` para curar/confirmar) ⇒ **sin db:seed/FLUSHALL** por permisos (102
+   sin cambio; el seed se re-corre solo por la nueva plantilla/regla EXECUTION). *Motivo:* el §5 ya cubre estos actos.
+Verde: typecheck (7) · lint 0 err · build (contracts+web) · **contracts 433** (+6) · **API 252** · `smoke-workorders.py`
+**108/108** (+13) + regresión `smoke-incidencias.py` **32/32**. **Cierra §11.8 (S4/S5 checklists).** Ver
+`docs/design/OT_DESIGN_ARCHITECTURE.md §11`. Pendiente: smoke VISUAL (dueño). **Diferido (§11.7, sin caso real):** puntos de
+espera/testigo, doble firma RII, condicionales por reglas; Gobierno 1 (gobernanza formal de plantillas).
+
+---
+
 ### 2026-07-02 · OT S5b Slice A — Eje `momento` de checklists + checklist de CIERRE (generalización §11.2/§11.4.3)
 Con visto bueno del dueño (4 decisiones vía preguntas) se partió S5b en **Slice A (backbone del eje `momento` + CIERRE
 per-OT, ESTA sesión)** y **Slice B (EJECUCIÓN por actividad + Gobierno 2, sesión siguiente)** — respeta "un objetivo por

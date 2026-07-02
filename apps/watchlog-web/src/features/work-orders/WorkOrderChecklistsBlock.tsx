@@ -1,12 +1,13 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, ClipboardCheck, Eye, Lightbulb, PenLine, Plus, ShieldAlert, Trash2, XCircle } from "lucide-react";
+import { CheckCircle2, ClipboardCheck, Eye, Lightbulb, Lock, PenLine, Plus, ShieldAlert, ShieldCheck, Trash2, XCircle } from "lucide-react";
 import {
   WORK_ORDER_CHECKLIST_MOMENTS,
   WORK_ORDER_CHECKLIST_MOMENT_META,
   blockingChecklistsForClose,
   type WorkOrderChecklistDto,
+  type WorkOrderDetail,
 } from "@lyra/contracts";
 import { Button, Modal, Select, Textarea, useToast } from "@lyra/ui";
 import { usePermissions } from "../../auth/use-permissions.js";
@@ -17,6 +18,7 @@ import {
   WORK_ORDER_CHECKLIST_KEYS,
   WORK_ORDER_KEYS,
   useAddWorkOrderChecklist,
+  useConfirmWorkOrderExecutionSet,
   useInstantiateWorkOrderChecklist,
   useRemoveWorkOrderChecklist,
   useReviewWorkOrderChecklist,
@@ -28,13 +30,16 @@ import {
 import styles from "./work-orders.module.css";
 
 /**
- * Bloque de Checklists / PTW de una OT (Puerta 2, S3). Espejo de IncidentReportsBlock:
- * lista los checklists sugeridos/agregados, su estado y las acciones (iniciar → llenar
- * el LogEntry → enviar a revisión → aprobar/rechazar). El botón "Sugerir" re-deriva los
- * aplicables; "Agregar" ofrece plantillas de checklist no presentes. La segregación
- * (revisor ≠ responsable) y el bloqueo de la Puerta 2 los decide el backend.
+ * Bloque de Checklists / PTW de una OT. Espejo de IncidentReportsBlock: lista los
+ * checklists sugeridos/agregados AGRUPADOS por MOMENTO del ciclo (Autorización · Ejecución
+ * · Cierre…), su estado y las acciones (iniciar → llenar el LogEntry → enviar a revisión →
+ * aprobar/rechazar). El grupo de EJECUCIÓN (Slice B) se sub-agrupa por ACTIVIDAD del plan
+ * (LOTO físico/toma-5 se aplican por tarea) e incluye el GOBIERNO 2: el aprobador cura y
+ * CONFIRMA el set de ejecución que se exigirá en terreno ANTES de autorizar el permiso. La
+ * segregación (revisor ≠ responsable) y los bloqueos de puerta los decide el backend.
  */
-export function WorkOrderChecklistsBlock({ workOrderId, isLive }: { workOrderId: string; isLive: boolean }) {
+export function WorkOrderChecklistsBlock({ wo, isLive }: { wo: WorkOrderDetail; isLive: boolean }) {
+  const workOrderId = wo.id;
   const { can } = usePermissions();
   const toast = useToast();
   const manage = can("workorder:checklist:manage");
@@ -43,8 +48,9 @@ export function WorkOrderChecklistsBlock({ workOrderId, isLive }: { workOrderId:
   const instantiate = useInstantiateWorkOrderChecklist(workOrderId);
   const submit = useSubmitWorkOrderChecklist(workOrderId);
   const remove = useRemoveWorkOrderChecklist(workOrderId);
+  const confirmExec = useConfirmWorkOrderExecutionSet(workOrderId);
 
-  const [addOpen, setAddOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState<{ activityId: string | null } | null>(null);
   const [reviewing, setReviewing] = useState<WorkOrderChecklistDto | null>(null);
   // Llenar/ver el checklist SIN salir de la OT: se abre su registro (LogEntry) en un
   // MODAL embebido (reusa EntryFillPage en modo embebido). Al cerrar, refresca el
@@ -115,6 +121,57 @@ export function WorkOrderChecklistsBlock({ workOrderId, isLive }: { workOrderId:
     );
   };
 
+  // Grupo de EJECUCIÓN: sub-agrupado por ACTIVIDAD del plan (los controles de terreno se
+  // aplican por tarea). Incluye el Gobierno 2 (confirmar el set) en su cabecera.
+  const renderExecutionGroup = (items: WorkOrderChecklistDto[]) => {
+    const byActivity = new Map<string, { title: string; items: WorkOrderChecklistDto[] }>();
+    for (const c of items) {
+      const key = c.workActivityId ?? "__none__";
+      const g = byActivity.get(key) ?? { title: c.workActivityTitle ?? "Sin actividad", items: [] };
+      g.items.push(c);
+      byActivity.set(key, g);
+    }
+    const activityGroups = [...byActivity.entries()].sort((a, b) => a[1].title.localeCompare(b[1].title));
+    const confirmed = !!wo.executionSetConfirmedAt;
+    return (
+      <>
+        {isLive && manage && (
+          confirmed ? (
+            <p className={styles.planBannerOk}>
+              <ShieldCheck size={15} />
+              Set de verificaciones de ejecución confirmado{wo.executionSetConfirmedByName ? ` por ${wo.executionSetConfirmedByName}` : ""}
+              {wo.executionSetConfirmedAt ? ` · ${formatDateTime(wo.executionSetConfirmedAt)}` : ""}. Lo aplicado en terreno = lo autorizado.
+            </p>
+          ) : (
+            <div className={styles.planBannerWarn}>
+              <ShieldAlert size={15} />
+              <span style={{ flex: 1 }}>Revisa y confirma el set de verificaciones que se exigirá en terreno antes de autorizar el permiso.</span>
+              <Button variant="primary" leftIcon={<Lock size={14} />} loading={confirmExec.isPending}
+                onClick={() => confirmExec.mutate(undefined, { onSuccess: () => toast.success("Set de ejecución confirmado"), onError: err })}>
+                Confirmar set de ejecución
+              </Button>
+            </div>
+          )
+        )}
+        <div className={styles.execActivities}>
+          {activityGroups.map(([key, g]) => (
+            <section key={key} className={styles.execActivity}>
+              <div className={styles.execActivityHead}>
+                <span className={styles.execActivityTitle}>{g.title}</span>
+                {isLive && manage && (
+                  <Button variant="secondary" leftIcon={<Plus size={13} />} onClick={() => setAddOpen({ activityId: key === "__none__" ? null : key })}>
+                    Agregar
+                  </Button>
+                )}
+              </div>
+              <ul className={styles.checklistList}>{g.items.map(renderItem)}</ul>
+            </section>
+          ))}
+        </div>
+      </>
+    );
+  };
+
   return (
     <>
       <div className={styles.sectionTitle}>
@@ -133,7 +190,7 @@ export function WorkOrderChecklistsBlock({ workOrderId, isLive }: { workOrderId:
             onClick={() => suggest.mutate(undefined, { onSuccess: (r) => toast.success(`Checklists sugeridos (${r.length})`), onError: err })}>
             Sugerir aplicables
           </Button>
-          <Button variant="secondary" leftIcon={<Plus size={15} />} onClick={() => setAddOpen(true)}>Agregar</Button>
+          <Button variant="secondary" leftIcon={<Plus size={15} />} onClick={() => setAddOpen({ activityId: null })}>Agregar</Button>
         </div>
       )}
 
@@ -149,13 +206,20 @@ export function WorkOrderChecklistsBlock({ workOrderId, isLive }: { workOrderId:
                 <span className={styles.checklistGroupTitle}>{WORK_ORDER_CHECKLIST_MOMENT_META[g.moment].label}</span>
                 <span className={styles.checklistGroupHint}>{WORK_ORDER_CHECKLIST_MOMENT_META[g.moment].hint}</span>
               </div>
-              <ul className={styles.checklistList}>{g.items.map(renderItem)}</ul>
+              {g.moment === "EXECUTION" ? renderExecutionGroup(g.items) : <ul className={styles.checklistList}>{g.items.map(renderItem)}</ul>}
             </section>
           ))}
         </div>
       )}
 
-      {addOpen && <AddChecklistModal workOrderId={workOrderId} present={checklists} onClose={() => setAddOpen(false)} />}
+      {addOpen && (
+        <AddChecklistModal
+          workOrderId={workOrderId}
+          present={checklists}
+          activityId={addOpen.activityId}
+          onClose={() => setAddOpen(null)}
+        />
+      )}
       {reviewing && <ReviewChecklistModal workOrderId={workOrderId} checklist={reviewing} onClose={() => setReviewing(null)} />}
       {fillId && (
         <Modal open onClose={closeFill} size="xl" title="Checklist / permiso de trabajo">
@@ -168,27 +232,44 @@ export function WorkOrderChecklistsBlock({ workOrderId, isLive }: { workOrderId:
   );
 }
 
-/** Modal para agregar manualmente un checklist: ofrece plantillas de checklist no presentes. */
-function AddChecklistModal({ workOrderId, present, onClose }: { workOrderId: string; present: WorkOrderChecklistDto[]; onClose: () => void }) {
+/**
+ * Modal para agregar manualmente un checklist: ofrece plantillas de checklist no presentes.
+ * Si se abre desde una actividad (`activityId`), agrega una verificación de EJECUCIÓN a esa
+ * tarea y filtra las plantillas a las reglas de momento EJECUCIÓN.
+ */
+function AddChecklistModal({ workOrderId, present, activityId, onClose }: {
+  workOrderId: string;
+  present: WorkOrderChecklistDto[];
+  activityId: string | null;
+  onClose: () => void;
+}) {
   const toast = useToast();
   const { data: rules = [] } = useWorkOrderChecklistRules();
   const add = useAddWorkOrderChecklist(workOrderId);
   const [templateId, setTemplateId] = useState("");
+  const isExecution = activityId !== null;
 
   const options = useMemo(() => {
-    const presentTemplateIds = new Set(present.map((c) => c.templateId));
+    // Al agregar a una actividad, no repetir la plantilla YA presente en ESA actividad.
+    const presentTemplateIds = new Set(
+      present.filter((c) => (isExecution ? c.workActivityId === activityId : c.workActivityId === null)).map((c) => c.templateId),
+    );
     const seen = new Set<string>();
     return rules
-      .filter((r) => r.active && !presentTemplateIds.has(r.templateId) && !seen.has(r.templateId) && seen.add(r.templateId))
+      .filter((r) => r.active && (isExecution ? r.moment === "EXECUTION" : r.moment !== "EXECUTION"))
+      .filter((r) => !presentTemplateIds.has(r.templateId) && !seen.has(r.templateId) && seen.add(r.templateId))
       .map((r) => ({ id: r.templateId, name: r.templateName ?? r.name, moment: r.moment }));
-  }, [rules, present]);
+  }, [rules, present, isExecution, activityId]);
 
   return (
-    <Modal open onClose={onClose} title="Agregar checklist" size="sm" footer={
+    <Modal open onClose={onClose} title={isExecution ? "Agregar verificación de ejecución" : "Agregar checklist"} size="sm" footer={
       <>
         <Button variant="secondary" onClick={onClose}>Cancelar</Button>
         <Button variant="primary" loading={add.isPending} disabled={!templateId}
-          onClick={() => add.mutate({ templateId, moment: options.find((o) => o.id === templateId)?.moment }, { onSuccess: () => { toast.success("Checklist agregado"); onClose(); }, onError: (e) => toast.error((e as Error).message) })}>
+          onClick={() => add.mutate(
+            { templateId, moment: options.find((o) => o.id === templateId)?.moment, ...(activityId ? { workActivityId: activityId } : {}) },
+            { onSuccess: () => { toast.success("Checklist agregado"); onClose(); }, onError: (e) => toast.error((e as Error).message) },
+          )}>
           Agregar
         </Button>
       </>

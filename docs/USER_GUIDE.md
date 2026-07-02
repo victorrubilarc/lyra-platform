@@ -10,7 +10,7 @@
 > funcionalidades existentes** aunque su detalle aún esté por redactar (✍️): así nada se
 > olvida; el backfill de lo ya construido se llena de a poco (incremental).
 >
-> Última actualización: **2026-07-02** (Órdenes de trabajo — Puerta 4: seguimiento del avance por actividad + historial append-only + cierre con firma, S5a; CIERRA el ciclo Solicitud→Cierre punta a punta).
+> Última actualización: **2026-07-02** (Órdenes de trabajo — verificaciones de EJECUCIÓN por actividad + confirmación del aprobador «Gobierno 2», S5b Slice B; COMPLETA el modelo de checklists por momento del permiso de trabajo).
 
 ## Convención de cada sección
 Cada funcionalidad se documenta con estas cuatro partes fijas:
@@ -144,6 +144,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 - ✅ **Crear y listar solicitudes de trabajo** (asistente de 2 pasos, grilla con filtros/facetas, detalle con reasignar/prioridad/anular) (§ Órdenes de trabajo)
 - ✅ **Enviar, aprobar (con firma y folio oficial) o rechazar la solicitud — Puerta 1** (flujo de estados con stepper, firma electrónica, folio OT-AAAA-#### emitido al aprobar, rechazo con motivo, historial) (§ Órdenes de trabajo ▸ Aprobación)
 - ✅ **Checklists / permisos de trabajo por MOMENTO** (verificaciones **agrupadas por momento del ciclo**: Autorización·Ejecución·Cierre; reglas configurables con campo «Momento», sugerencia automática, llenado como registro del constructor de formularios, revisión con segregación revisor≠responsable, bloqueo hasta aprobar los obligatorios) (§ Órdenes de trabajo ▸ Checklists y permisos de trabajo)
+- ✅ **Verificaciones de EJECUCIÓN por actividad + confirmación del aprobador (Gobierno 2)** (controles de terreno —LOTO físico, energía cero, toma-5— que cuelgan de cada tarea del plan por especialidad; el aprobador **confirma el set** antes de autorizar el permiso; no se completa una tarea sin aprobar su verificación obligatoria) (§ Órdenes de trabajo ▸ Verificaciones de ejecución por actividad)
 - ✅ **Plan de actividades y autorización del plan — Puerta 3** (armar el plan con grilla o **asistente guiado**, congelar la línea base al autorizar, desviación plan-vs-real) (§ Órdenes de trabajo ▸ Plan de actividades)
 - ✅ **Seguimiento del avance y cierre — Puerta 4** (registrar el avance de cada actividad durante la ejecución, historial de avance; **verificación de cierre del permiso** que bloquea el cierre hasta aprobarla; cerrar la OT con firma cuando todo lo obligatorio está completo) (§ Órdenes de trabajo ▸ Seguimiento del avance y cierre · Verificación de cierre del permiso)
 - ✅ **Administrar los catálogos** (tipos de OT, especialidades y **reglas de checklist con su momento**) (§ Órdenes de trabajo ▸ Catálogos) [solo administrador]
@@ -239,9 +240,9 @@ lista de texto suelta. La OT **no puede pasar la Puerta 2** mientras quede un pe
 > **Cada checklist tiene un «Momento».** Un mismo trabajo acumula verificaciones en **distintos momentos** del ciclo:
 > **Autorización** (el permiso, documental, antes de ejecutar), **Ejecución** (aplicación física en terreno, por actividad)
 > y **Cierre** (retiro de controles al terminar) — además de Solicitud y Planificación. La pestaña **«Verificaciones»**
-> **agrupa** los checklists por ese momento, para que se vea de un vistazo *cuándo* va cada uno. Hoy están activos los
-> momentos de **Autorización** (esta puerta) y **Cierre** (ver más abajo); la **Ejecución por actividad** llega en la
-> siguiente entrega. *(Alineado al estándar PTW / ISO 45001 / LOTO.)*
+> **agrupa** los checklists por ese momento, para que se vea de un vistazo *cuándo* va cada uno. Están activos los
+> momentos de **Autorización** (esta puerta), **Ejecución por actividad** (controles de terreno, ver más abajo) y
+> **Cierre** (retiro de controles, ver más abajo). *(Alineado al estándar PTW / ISO 45001 / LOTO.)*
 
 **Cómo se usa** (en el detalle de la OT, pestaña **«Verificaciones»**, agrupada por momento):
 1. Al **iniciar la preparación** de la OT (transición «Iniciar preparación»), el sistema **sugiere automáticamente** los
@@ -269,6 +270,48 @@ el checklist (lo valida el sistema, no es una convención).
 - Las **reglas** de qué checklist se sugiere, **en qué momento** y a qué OT son **100% configurables** (ver Catálogos ▸
   Reglas de checklist: cada regla tiene un campo **«Momento»**); los contenidos (LOTO, altura, etc.) son **plantillas** que
   diseñas en el constructor de formularios, nunca están "quemados" en el código.
+
+### Órdenes de trabajo ▸ Verificaciones de ejecución por actividad + confirmación del aprobador  [Aprobador + Ejecutor]
+
+**Para qué sirve.** Es la **aplicación FÍSICA de los controles en terreno**, tarea por tarea: colocar los **candados/tarjetas
+de bloqueo**, verificar **energía cero**, hacer la **evaluación de última hora (toma-5 / LMRA)** antes de intervenir. A
+diferencia del permiso de **Autorización** (que es documental y va a nivel de toda la OT), estas verificaciones **cuelgan de
+cada actividad del plan**, porque los controles dependen de la tarea concreta. Y para que el aprobador no autorice "a ciegas",
+antes de emitir el permiso **ve y confirma el conjunto (set) de verificaciones de ejecución** que se exigirá — así **lo que se
+aplica en terreno es exactamente lo que se autorizó**.
+
+**Cómo se usa.**
+
+*Cuando el aprobador prepara la OT (confirmar el set — «Gobierno 2»):*
+1. Al **preparar** la OT (tras autorizar el plan), el sistema **materializa el set de ejecución**: por cada **actividad** del
+   plan, crea las verificaciones cuyas **reglas de ejecución** coinciden (por tipo, criticidad, PTW y **especialidad de la
+   actividad**; una regla sin especialidad aplica a todas las tareas).
+2. En la pestaña **«Verificaciones»**, el grupo **«Ejecución»** muestra esas verificaciones **agrupadas por actividad**. El
+   aprobador **revisa el set**: puede **«Agregar»** una verificación extra a una tarea o **quitar** las opcionales.
+3. Cuando el set está correcto, pulsa **«Confirmar set de ejecución»**. Queda **sellado** (con quién y cuándo) y aparece el
+   aviso verde *«Set de verificaciones de ejecución confirmado por … — lo aplicado en terreno = lo autorizado»*.
+4. **Solo entonces** se puede ejecutar la transición **«Autorizar permiso»**: si hay verificaciones de ejecución y **no** se
+   confirmó el set, la autorización se **bloquea** con un aviso. Si después cambias el set (agregas/quitas), la confirmación
+   se **borra sola** y hay que **volver a confirmar** (para no autorizar algo distinto de lo que se aplicará).
+
+*Cuando el equipo ejecuta en terreno (llenar por actividad):*
+5. Durante la **ejecución**, para cada actividad se **inicia → llena → sella → envía a revisión → aprueba** su verificación de
+   ejecución, igual que cualquier checklist (con la misma **segregación revisor ≠ responsable**).
+6. Una actividad **no se puede marcar «Completada» (DONE)** mientras su verificación de ejecución **obligatoria** no esté
+   **Aprobada**: el sistema **bloquea** el avance con un aviso que dice qué verificación falta. En la pestaña **«Plan»**, cada
+   fila muestra un indicador de solo lectura (*«N verificaciones de ejecución pendiente(s)»*) que apunta a «Verificaciones».
+
+**Quién puede.** Materializar/curar/confirmar el set y gestionar/revisar las verificaciones requiere
+**`workorder:checklist:manage`** (el mismo permiso que las demás verificaciones). Ejecutar la transición «Autorizar permiso»
+requiere **`workorder:transition`**.
+
+**Importante.**
+- La **confirmación del set** es el control del aprobador («¿se eligió el conjunto correcto y completo para ESTE trabajo?»).
+  Es distinta de confiar en que cada plantilla esté bien hecha (eso se gobierna una vez, en el constructor de formularios).
+- El match **por especialidad de la actividad** es lo que hace que, por ejemplo, un **bloqueo eléctrico** aparezca solo en las
+  tareas eléctricas y no en todas. Una regla **sin especialidad** aplica a **todas** las actividades (p. ej. un toma-5 genérico).
+- Todo es **configurable por reglas** (momento «Ejecución»): una faena chica puede no exigir verificaciones de ejecución y una
+  minera exigirlas por disciplina. Nada está "quemado" en el código.
 
 ### Órdenes de trabajo ▸ Verificación de cierre del permiso (Puerta 4)  [Ejecutor + Verificador]
 

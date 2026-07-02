@@ -2834,6 +2834,12 @@ model WorkOrder {
   // --- Puerta 3 (S4): baseline del plan congelada -----------------------------------
   planFrozenAt   DateTime? // cuando se autorizo/congelo el plan (Puerta 3)
   planFrozenById String?
+  // --- Gobierno 2 (S5b Slice B): confirmacion del SET de verificaciones de EJECUCION ----
+  // El aprobador cura y CONFIRMA (solo lectura) el set de checklists de ejecucion por
+  // actividad ANTES de autorizar el permiso => trazabilidad "lo aplicado = lo autorizado".
+  // Se limpia si el set cambia despues (agregar/quitar). Gate en la autorizacion del permiso.
+  executionSetConfirmedAt   DateTime?
+  executionSetConfirmedById String?
   // --- Puerta 1 (aprobacion de la solicitud) - INERTE en S1 ------------------------
   approvedAt   DateTime?
   approvedById String?
@@ -3011,6 +3017,11 @@ model WorkOrderChecklist {
   // MOMENTO congelado al materializar/agregar (denormalizado desde la regla; los manuales
   // heredan el momento en curso). Agrupa la UI y decide que guard aplica (S5b).
   moment            WorkOrderChecklistMoment @default(AUTHORIZATION)
+  // Actividad a la que se aplica (Slice B): SOLO los checklists de EJECUCION (LOTO fisico,
+  // toma-5) cuelgan de UNA actividad concreta del plan. null = a nivel de OT (AUTHORIZATION/
+  // CLOSURE/etc.). Postgres trata NULL como distinto en el unique, por eso el anti-duplicado
+  // de los de nivel-OT sigue siendo el guard de codigo (materialize/addManual).
+  workActivityId    String?
   logEntryId        String? // instancia viva (null hasta iniciarla) -> LogEntry
   sourceRuleId      String? // regla que lo sugirio (null = agregado manual)
   mandatory         Boolean                  @default(false)
@@ -3024,14 +3035,16 @@ model WorkOrderChecklist {
   createdAt         DateTime                 @default(now())
   updatedAt         DateTime                 @updatedAt
 
-  workOrder WorkOrder               @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
-  template  Template                @relation(fields: [templateId], references: [id], onDelete: Restrict)
-  logEntry  LogEntry?               @relation(fields: [logEntryId], references: [id], onDelete: SetNull)
-  rule      WorkOrderChecklistRule? @relation(fields: [sourceRuleId], references: [id], onDelete: SetNull)
+  workOrder    WorkOrder               @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  template     Template                @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  logEntry     LogEntry?               @relation(fields: [logEntryId], references: [id], onDelete: SetNull)
+  rule         WorkOrderChecklistRule? @relation(fields: [sourceRuleId], references: [id], onDelete: SetNull)
+  workActivity WorkActivity?           @relation(fields: [workActivityId], references: [id], onDelete: SetNull)
 
-  @@unique([workOrderId, templateId]) // MVP: 1 instancia por (OT, plantilla)
+  @@unique([workOrderId, templateId, workActivityId]) // 1 instancia por (OT, plantilla, actividad); NULL = nivel-OT
   @@index([workOrderId])
   @@index([workOrderId, moment])
+  @@index([workActivityId])
   @@index([status])
   @@index([logEntryId])
 }
@@ -3095,6 +3108,7 @@ model WorkActivity {
   dependsOn  WorkActivity?  @relation("WorkActivityDeps", fields: [dependsOnId], references: [id], onDelete: SetNull)
   dependents WorkActivity[] @relation("WorkActivityDeps")
   updates    WorkActivityUpdate[]
+  executionChecklists WorkOrderChecklist[] // checklists de EJECUCION ligados a esta actividad (Slice B)
 
   @@index([workOrderId, sequence])
   @@index([status])

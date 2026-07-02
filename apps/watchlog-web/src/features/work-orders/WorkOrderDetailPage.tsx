@@ -233,7 +233,7 @@ export function WorkOrderDetailPage() {
           )}
 
           {tab === "plan" && <WorkOrderPlanBlock wo={wo} isLive={isLive} />}
-          {tab === "checklists" && <WorkOrderChecklistsBlock workOrderId={wo.id} isLive={isLive} />}
+          {tab === "checklists" && <WorkOrderChecklistsBlock wo={wo} isLive={isLive} />}
 
           {tab === "flujo" && (
             wo.workflow && wo.workflow.states.length > 0 ? (

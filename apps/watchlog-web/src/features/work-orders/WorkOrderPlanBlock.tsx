@@ -1,5 +1,5 @@
 import { Fragment, useMemo, useState } from "react";
-import { CalendarClock, ChevronDown, ChevronUp, History, ListChecks, Lock, Pencil, Plus, ShieldAlert, Sparkles, TrendingUp, Trash2, Wand2 } from "lucide-react";
+import { CalendarClock, ChevronDown, ChevronUp, History, ListChecks, Lock, Pencil, Plus, ShieldAlert, ShieldCheck, Sparkles, TrendingUp, Trash2, Wand2 } from "lucide-react";
 import {
   activityDeviationLabel,
   activityEndDeviationDays,
@@ -26,6 +26,7 @@ import {
   useWorkOrderActivities,
   useWorkOrderActivityUpdates,
   useWorkOrderAssignableUsers,
+  useWorkOrderChecklists,
   useWorkOrderSpecialties,
 } from "./work-orders-queries.js";
 import styles from "./work-orders.module.css";
@@ -54,7 +55,21 @@ export function WorkOrderPlanBlock({ wo, isLive }: { wo: WorkOrderDetail; isLive
   const { can } = usePermissions();
   const manage = can("workorder:activity:manage");
   const { data: activities = [], isLoading } = useWorkOrderActivities(wo.id);
+  const { data: checklists = [] } = useWorkOrderChecklists(wo.id);
   const frozen = !!wo.planFrozenAt;
+  // Verificaciones de EJECUCIÓN por actividad (Slice B): indicador de solo lectura de qué
+  // bloquea el DONE de cada tarea (la gestión vive en la pestaña «Verificaciones»).
+  const execByActivity = useMemo(() => {
+    const map = new Map<string, { total: number; pending: number }>();
+    for (const c of checklists) {
+      if (c.moment !== "EXECUTION" || !c.workActivityId) continue;
+      const e = map.get(c.workActivityId) ?? { total: 0, pending: 0 };
+      e.total += 1;
+      if (c.mandatory && c.status !== "APPROVED") e.pending += 1;
+      map.set(c.workActivityId, e);
+    }
+    return map;
+  }, [checklists]);
   const summary = useMemo(() => summarizeActivities(activities), [activities]);
   const canEdit = isLive && manage && !frozen;
   // Tras autorizar el plan (baseline congelada) el plan es inmutable, pero la
@@ -97,6 +112,7 @@ export function WorkOrderPlanBlock({ wo, isLive }: { wo: WorkOrderDetail; isLive
         <ActivityGrid
           wo={wo}
           activities={activities}
+          execByActivity={execByActivity}
           canEdit={canEdit}
           canProgress={canProgress}
           frozen={frozen}
@@ -160,6 +176,7 @@ function PlanStageBanner({ wo, activities, frozen }: { wo: WorkOrderDetail; acti
 function ActivityGrid({
   wo,
   activities,
+  execByActivity,
   canEdit,
   canProgress,
   frozen,
@@ -170,6 +187,7 @@ function ActivityGrid({
 }: {
   wo: WorkOrderDetail;
   activities: WorkActivityDto[];
+  execByActivity: Map<string, { total: number; pending: number }>;
   canEdit: boolean;
   canProgress: boolean;
   frozen: boolean;
@@ -247,6 +265,19 @@ function ActivityGrid({
                       {a.mandatory && <span className={styles.clMandatory}>Obligatoria</span>}
                     </div>
                     {a.description && <div className={styles.planCellSub}>{a.description}</div>}
+                    {(() => {
+                      const ex = execByActivity.get(a.id);
+                      if (!ex || ex.total === 0) return null;
+                      return ex.pending > 0 ? (
+                        <div className={styles.planCellSub} style={{ color: "var(--color-warning)" }}>
+                          <ShieldAlert size={12} /> {ex.pending} verificación(es) de ejecución pendiente(s) — ver «Verificaciones»
+                        </div>
+                      ) : (
+                        <div className={styles.planCellSub} style={{ color: "var(--color-success)" }}>
+                          <ShieldCheck size={12} /> Verificaciones de ejecución aprobadas
+                        </div>
+                      );
+                    })()}
                   </td>
                   <td>{a.responsibleName ?? <span className={styles.muted}>—</span>}</td>
                   <td>{a.specialtyName ?? <span className={styles.muted}>—</span>}</td>
