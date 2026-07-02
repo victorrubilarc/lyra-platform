@@ -5,9 +5,14 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-07-01** (planificación, SIN código) — **📋 ROADMAP MÓDULO ÓRDENES DE TRABAJO (OT / PTW)
-> registrado** en §2 (épico nuevo, 8 sesiones S0–S8, ~397 HH; oportunidad real de cliente minero; **entitlements de
-> módulo DIFERIDOS** al épico de licenciamiento §2(1)). Ver DECISIONS 2026-07-01 y memoria `work-orders-module-plan`.
+> actualización: **2026-07-01** — **🔧 OT · Sesión 1 · CIMIENTOS ✅** (`feat/ot-cimientos`): `WorkOrder`+`WorkOrderType`+
+> `Area`/`Specialty` (N:N), 8 permisos grupo `workorders`, backend CRUD+ABAC, web `/ordenes-trabajo` (grilla+wizard),
+> seed de arranque; folio/workflow INERTES (S2); verde + `smoke-workorders.py` **31/31**. **DEUDA nueva:** SavedView de OT
+> (+ Incidencias) como slice transversal, y pantalla de mantenedor de catálogos de OT — ambos pendientes. **Siguiente:
+> OT Sesión 2 (Puerta 1 + `FolioCounter`).** Antes (2026-07-01, SIN código): **📋 ROADMAP MÓDULO ÓRDENES DE TRABAJO
+> (OT / PTW) registrado** en §2 (épico nuevo, 8 sesiones S0–S8, ~397 HH; oportunidad real de cliente minero;
+> **entitlements de módulo DIFERIDOS** al épico de licenciamiento §2(1)). Ver DECISIONS 2026-07-01 y memoria
+> `work-orders-module-plan`.
 > Última sesión de CÓDIGO: **2026-06-24** (**🎨 TEMAS FASE 2A · Plantillas de inicio + Duplicar ✅** —
 > `feat/temas-plantillas`: catálogo CURADO de **10 plantillas de arranque** (constantes en `@lyra/contracts`
 > `theme/presets.ts`: Grafito/Cobre/Acero/Medianoche/Bosque/Solar/Índigo/Cobalto/Magma/Salitre; prístinas, NO BD, NO
@@ -662,9 +667,17 @@ nunca queda más de una sesión atrás.
       (DECISIONS 2026-07-01). **Deuda anotada:** extraer un `WorkflowExecutorService` compartido (LogEntry/Incident/
       WorkOrder = 3.ª copia del ejecutor de transición) = sesión dedicada con tests, NO dentro de OT. **← Sesión 1 arranca
       en sesión NUEVA.**
-- [ ] **Sesión 1 — Cimientos (~40 HH):** entidad `WorkOrder` + catálogos `WorkOrderType`, `Area`/`Specialty` (N:N);
-      permisos nuevos; crear/listar solicitud (BORRADOR/INGRESADA) con ABAC nodo ∩ estructura; web `/ordenes-trabajo`
-      (grilla con convenciones de filtro/paginación + wizard de nueva solicitud). Sin workflow/folio/checklists/actividades.
+- [x] **Sesión 1 — Cimientos (~40 HH):** ✅ **CERRADA 2026-07-01** (`feat/ot-cimientos`). Entidad `WorkOrder` (+ enums
+      Origin/Priority/Lifecycle) + catálogos `WorkOrderType`, `Area`/`Specialty` (N:N `WorkOrderArea`/`WorkOrderSpecialty`);
+      migración `20260701180000_add_work_orders`; back-relations en OrgNode/Equipment/Role. **Folio/workflow INERTES**
+      (campos presentes, se activan en S2); `WorkOrder.number` → handle provisional "SOL-######". 8 permisos grupo
+      `workorders`. Contratos `packages/contracts/src/work-orders/`. Backend CRUD catálogos + create/list/detail/update/
+      assign/cancel con ABAC nodo ∩ estructura (`?structureId=`), auditoría, sin borrado físico. Seed (5 tipos/4 áreas/5
+      especialidades). Web `/ordenes-trabajo` (grilla+facetas+paginación arriba/abajo + wizard 2 pasos + drawer detalle).
+      verde (typecheck/lint/build/test) + `smoke-workorders.py` **31/31**. **La solicitud nace OPEN** (DRAFT reservado
+      para el estado `borrador` del flujo, S2). **DEUDA registrada:** SavedView de OT (y de Incidencias) = slice
+      transversal pendiente — ver §3; el mantenedor de catálogos de OT (pantalla `/ordenes-trabajo/catalogos`) tampoco
+      se construyó (los catálogos se administran hoy por API/seed) → pendiente. **Siguiente = Sesión 2.**
 - [ ] **Sesión 2 — Aprobación inicial + folio al aprobar / Puerta 1 (~35 HH):** workflow congelado, aprobar/rechazar
       (**motivo obligatorio**), `FolioCounter` gapless (emite folio **SOLO al aprobar**), firma Part 11 + timeline.
 - [ ] **Sesión 3 — Motor de checklists ligados / Puerta 2 (~45 HH):** tabla enlace `WorkOrderChecklist` + reglas de

@@ -121,6 +121,7 @@ model Role {
   responsibleSchedules    LogSchedule[]
   incidentActions         IncidentAction[]
   incidentTypeEscalations IncidentType[]           @relation("IncidentTypeEscalationRole")
+  workOrderTypeEscalations WorkOrderType[]         @relation("WorkOrderTypeEscalationRole")
 }
 
 model Permission {
@@ -459,6 +460,7 @@ model OrgNode {
   logEntries              LogEntry[]
   schedules               LogSchedule[]
   incidents               Incident[]
+  workOrders              WorkOrder[]
   shiftHandovers          ShiftHandover[]
   operationalCalendar     OperationalCalendar?     @relation(fields: [operationalCalendarId], references: [id], onDelete: SetNull)
   fiscalCalendar          FiscalCalendar?          @relation(fields: [fiscalCalendarId], references: [id], onDelete: SetNull)
@@ -522,6 +524,7 @@ model Equipment {
   logEntries   LogEntry[]
   schedules    LogSchedule[]
   incidents    Incident[]
+  workOrders   WorkOrder[]
 
   @@index([orgNodeId])
   @@index([categoryId])
@@ -2671,4 +2674,219 @@ model ShiftHandoverActivity {
   handover ShiftHandover @relation(fields: [handoverId], references: [id], onDelete: Cascade)
 
   @@index([handoverId, occurredAt])
+}
+
+// ===========================================================================
+//  Órdenes de Trabajo / Work Orders (OT / PTW) — Sesión 1: CIMIENTOS
+// ===========================================================================
+//
+// Entidad NUEVA `WorkOrder`, ESPEJO de `Incident` (DECISIONS 2026-07-01). Absorbe
+// el flujo industrial Solicitud de Trabajo -> Orden de Trabajo con Permiso de
+// Trabajo (PTW) reutilizando ~70% de la maquinaria transversal (workflow, form
+// builder, CAPA, Bloque N, dashboard, RBAC/ABAC, auditoria, firmas Part 11).
+//
+// En S1 solo vive la SOLICITUD: crear + listar (lifecycle DRAFT/OPEN) con ABAC por
+// nodo x estructura. Los campos de FOLIO y WORKFLOW existen pero INERTES (se activan
+// en S2: FolioCounter + puertas). Las tablas satelite (checklists, actividades,
+// transiciones, comentarios, eventos) llegan en S2-S5. Ver docs/design/OT_DESIGN_ARCHITECTURE.md.
+
+enum WorkOrderOrigin {
+  DIRECT // creada manualmente
+  RULE // desde el motor de reglas (S6+)
+  EXCEPTION // desde una excepcion operacional
+  PLANNED // trabajo planificado/programado
+  INCIDENT // gatillada desde una incidencia (enlace bidireccional, S7)
+}
+
+enum WorkOrderPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+// Estado de alto nivel DERIVADO/denormalizado (para filtros/KPIs sin leer el flujo).
+// En S1 la solicitud vive en DRAFT (borrador) u OPEN (enviada). CLOSED/CANCELED = S2+.
+enum WorkOrderLifecycle {
+  DRAFT
+  OPEN
+  CLOSED
+  CANCELED
+}
+
+// Catalogo configurable de TIPOS de OT (espejo de IncidentType). El flujo por
+// defecto y el esquema de folio se congelan/leen al operar; ref. blandas.
+model WorkOrderType {
+  id                 String  @id @default(cuid())
+  key                String  @unique
+  name               String
+  description        String?
+  color              String? // token del DS para el chip
+  // --- Workflow (S2): flujo por defecto que se congela al crear (ref. blanda) -----
+  defaultWorkflowId  String?
+  requiresPtwDefault Boolean @default(false)
+  criticalityDefault Int? // 1..5 sugerida al crear
+  // --- Folio (S2: FolioCounter) - esquema configurable, INERTE en S1 --------------
+  folioScheme        Json? // {prefix, mask, padding, start, scope, reset}
+  folioOnStateKey    String? // estado al que, al ENTRAR, se emite el folio (default "aprobada")
+  // --- SLA light (S6, espejo IncidentType) ----------------------------------------
+  resolutionDueMinutes   Int?
+  escalationAfterMinutes Int?
+  escalationRoleId       String?
+  active             Boolean  @default(true)
+  sortOrder          Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  deletedAt          DateTime?
+
+  escalationRole Role?       @relation("WorkOrderTypeEscalationRole", fields: [escalationRoleId], references: [id], onDelete: SetNull)
+  workOrders     WorkOrder[]
+
+  @@index([active])
+  @@index([deletedAt])
+  @@index([escalationRoleId])
+}
+
+// Catalogo ligero de AREAS funcionales (zona/area p.ej. "Mina Rajo", "Planta").
+// N:N con la OT. NO sustituye a orgNodeId (que sigue siendo ubicacion + ancla ABAC):
+// es un eje de CLASIFICACION/enrutamiento (reglas de checklist, aprobadores S8).
+model Area {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  name        String
+  description String?
+  color       String?
+  active      Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  workOrders WorkOrderArea[]
+
+  @@index([active])
+  @@index([deletedAt])
+}
+
+// Catalogo ligero de ESPECIALIDADES/disciplinas ("Mecanica", "Electrica"...). N:N.
+model Specialty {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  name        String
+  description String?
+  color       String?
+  active      Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  workOrders WorkOrderSpecialty[]
+
+  @@index([active])
+  @@index([deletedAt])
+}
+
+model WorkOrder {
+  id          String  @id @default(cuid())
+  // Correlativo interno provisional (patron Incident.number): da a la SOLICITUD un
+  // handle humano estable "SOL-######" ANTES de tener folio oficial. El FOLIO oficial
+  // gapless (OT-2026-0001) se emite SOLO al aprobar (S2, FolioCounter) -> folio inerte aqui.
+  number      Int     @unique @default(autoincrement())
+  folio       String? @unique // "OT-2026-0001" (humano, inmutable; null hasta aprobacion - S2)
+  folioSeqKey String? // clave de secuencia usada (auditoria del contador - S2)
+  folioIssuedAt DateTime?
+  title       String
+  description String?
+  typeId      String
+  originType  WorkOrderOrigin   @default(DIRECT)
+  criticality Int // 1..5 (tokens severidad; significado operacional)
+  priority    WorkOrderPriority @default(MEDIUM)
+  // Riesgo ISO 31000 (ejes de la matriz; nivel se deriva con riskLevelFor).
+  riskProbability Int?
+  riskConsequence Int?
+  requiresPtw     Boolean @default(false) // exige permiso de trabajo? (default del tipo, override)
+  // --- Ubicacion / alcance (orgNode = ancla ABAC; location = detalle libre) --------
+  orgNodeId      String
+  equipmentId    String?
+  locationDetail String?
+  shiftCode      String?
+  // --- Workflow congelado (denormalizado, patron Incident) - INERTE en S1 ----------
+  workflowDefinitionId        String?
+  workflowDefinitionVersionId String?
+  currentStateKey             String?
+  currentStateSince           DateTime @default(now())
+  lifecycle                   WorkOrderLifecycle @default(DRAFT)
+  // --- Personas / fechas -----------------------------------------------------------
+  requesterId String? // solicitante (ref. blanda)
+  ownerId     String? // responsable de la OT
+  requestedAt DateTime  @default(now())
+  detectedAt  DateTime?
+  plannedStart DateTime? // tentativa (baseline se congela en Puerta 3 - S4)
+  plannedEnd   DateTime?
+  dueAt        DateTime? // SLA de resolucion (S6)
+  // --- Puerta 1 (aprobacion de la solicitud) - INERTE en S1 ------------------------
+  approvedAt   DateTime?
+  approvedById String?
+  rejectedAt   DateTime?
+  rejectReason String?
+  rejectedById String?
+  // --- Cierre / anulacion (sin borrado fisico) -------------------------------------
+  closedAt      DateTime?
+  closedById    String?
+  closureSummary String?
+  canceledAt    DateTime?
+  cancelReason  String?
+  canceledById  String?
+  // --- Origen / ligazon bidireccional (refs blandas) -------------------------------
+  originIncidentId  String?
+  originLogEntryId  String?
+  originExceptionId String?
+  createdById  String?
+  updatedById  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  deletedAt    DateTime?
+
+  type        WorkOrderType        @relation(fields: [typeId], references: [id], onDelete: Restrict)
+  orgNode     OrgNode              @relation(fields: [orgNodeId], references: [id], onDelete: Restrict)
+  equipment   Equipment?           @relation(fields: [equipmentId], references: [id], onDelete: SetNull)
+  areas       WorkOrderArea[]
+  specialties WorkOrderSpecialty[]
+
+  @@index([typeId])
+  @@index([orgNodeId])
+  @@index([equipmentId])
+  @@index([lifecycle])
+  @@index([priority])
+  @@index([criticality])
+  @@index([ownerId])
+  @@index([originType])
+  @@index([originIncidentId])
+  @@index([currentStateKey])
+  @@index([createdAt, id])
+}
+
+// Enlace N:N OT <-> Area (clasificacion).
+model WorkOrderArea {
+  workOrderId String
+  areaId      String
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  area      Area      @relation(fields: [areaId], references: [id], onDelete: Restrict)
+
+  @@id([workOrderId, areaId])
+  @@index([areaId])
+}
+
+// Enlace N:N OT <-> Especialidad (clasificacion).
+model WorkOrderSpecialty {
+  workOrderId String
+  specialtyId String
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  specialty Specialty @relation(fields: [specialtyId], references: [id], onDelete: Restrict)
+
+  @@id([workOrderId, specialtyId])
+  @@index([specialtyId])
 }

@@ -1,5 +1,29 @@
 # Progreso — Lyra WatchLog
 
+**2026-07-01 — 🔧 OT · Sesión 1 · CIMIENTOS ✅** (`feat/ot-cimientos`). Primer código del módulo de Órdenes de
+Trabajo (OT/PTW), espejo de Incidencias. Levanta el esqueleto hasta **crear y listar una SOLICITUD** — sin workflow,
+folio, checklists ni actividades (esos son S2–S5). **Schema** (migración `20260701180000_add_work_orders`): entidades
+NUEVAS `WorkOrder` (+ enums `WorkOrderOrigin`/`WorkOrderPriority`/`WorkOrderLifecycle`), `WorkOrderType`, catálogos
+ligeros `Area`/`Specialty` con enlaces N:N `WorkOrderArea`/`WorkOrderSpecialty`; back-relations en `OrgNode`/`Equipment`/
+`Role`. Los campos de **FOLIO y WORKFLOW existen pero INERTES** (se activan en S2). `WorkOrder.number` = correlativo
+interno provisional → handle humano **"SOL-######"** antes del folio oficial (que se emite al aprobar en S2). **Permisos**
+grupo nuevo `workorders` (8 claves: `module:workorders:view` + `workorder:view/create/edit/assign/comment/cancel` +
+`workordercatalog:manage`; `workorder:transition` dim. WORKFLOW llega en S2 por fork W2). **Contratos**
+`packages/contracts/src/work-orders/` (DTOs + Zod + list query con facetas + helpers puros `workOrderCode`/
+`deriveWorkOrderLifecycle`). **Backend** `apps/watchlog-api/src/work-orders/` (`WorkOrdersService`+controller+module,
+registrado en `app.module`): CRUD de catálogos (tipos/áreas/especialidades, upsert con `?create=true`→409) +
+create/list/detail/update/assign/cancel de solicitudes con `buildWhere` **ABAC por nodo ∩ estructura** (`?structureId=`),
+auditoría inmutable, sin borrado físico. **Seed** de arranque (5 tipos incl. PTW alto riesgo, 4 áreas, 5 especialidades).
+**Web** `/ordenes-trabajo` (gate `module:workorders:view`, sidebar grupo Operación): grilla con convenciones (KPIs
+clicables, filtros en 1 línea + facetas tipo/criticidad/prioridad/área/especialidad, paginación arriba/abajo) + **wizard
+de 2 pasos** (trabajo → ubicación/clasificación, `Stepper` del DS) + drawer de detalle (reasignar/prioridad/anular);
+identidad Lyra (tokens, sin hex nuevos). **Objeción registrada:** SavedView NO se cableó — Incidencias tampoco lo tiene
+(solo Bitácoras); es slice transversal pendiente (BACKLOG). typecheck(0)/lint(0 errores)/build/test (252 api + 6 web + 11
+llm + contracts) **verdes**; `scripts/smoke-workorders.py` **31/31** (catálogos+CRUD+filtros+ABAC+gates 403). Migración
+generada con `migrate diff`+`db:deploy` (gotcha EPERM Windows: se detuvo la API para `prisma generate`); `db:seed`+Redis
+FLUSHALL por los permisos nuevos. **Siguiente: OT Sesión 2 (Puerta 1 — aprobación inicial + folio al aprobar,
+`FolioCounter`).**
+
 **2026-07-01 — 🏗️ OT · Sesión 0 · DISEÑO FORMAL entregado (sin código).** Se produjo
 `docs/design/OT_DESIGN_ARCHITECTURE.md`, anexo técnico del módulo de Órdenes de Trabajo (OT/PTW) para la propuesta
 comercial. Grounding **verificado contra el repo** (no redescubierto): motor de workflow (`WorkflowDefinition`/

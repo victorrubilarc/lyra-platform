@@ -16,6 +16,7 @@ import { REFERENCE_LISTS } from "./reference-data-seed.js";
 import { DEMO_CALENDAR, DEMO_FISCAL_CALENDAR } from "./operational-calendar-seed.js";
 import { NOTIFICATION_TEMPLATE_SEEDS } from "./notification-templates-seed.js";
 import { INCIDENT_WORKFLOW, INCIDENT_TYPES, INCIDENT_CATEGORIES, REPORTING_OBLIGATIONS } from "./incidents-seed-data.js";
+import { WORK_ORDER_TYPES, WORK_ORDER_AREAS, WORK_ORDER_SPECIALTIES } from "./work-orders-seed-data.js";
 
 const prisma = new PrismaClient();
 
@@ -548,6 +549,43 @@ async function seedIncidentCatalog(): Promise<void> {
   );
 }
 
+// Catálogo de arranque de Órdenes de Trabajo (OT / PTW) — tipos + áreas +
+// especialidades. Configurable desde la UI; upsert idempotente por clave.
+async function seedWorkOrderCatalog(): Promise<void> {
+  for (const t of WORK_ORDER_TYPES) {
+    await prisma.workOrderType.upsert({
+      where: { key: t.key },
+      create: {
+        key: t.key,
+        name: t.name,
+        description: t.description,
+        color: t.color,
+        requiresPtwDefault: t.requiresPtwDefault,
+        criticalityDefault: t.criticalityDefault,
+        sortOrder: t.sortOrder,
+      },
+      update: { name: t.name, description: t.description, color: t.color, requiresPtwDefault: t.requiresPtwDefault, criticalityDefault: t.criticalityDefault, sortOrder: t.sortOrder },
+    });
+  }
+  for (const a of WORK_ORDER_AREAS) {
+    await prisma.area.upsert({
+      where: { key: a.key },
+      create: { key: a.key, name: a.name, description: a.description, color: a.color, sortOrder: a.sortOrder },
+      update: { name: a.name, description: a.description, color: a.color, sortOrder: a.sortOrder },
+    });
+  }
+  for (const s of WORK_ORDER_SPECIALTIES) {
+    await prisma.specialty.upsert({
+      where: { key: s.key },
+      create: { key: s.key, name: s.name, description: s.description, color: s.color, sortOrder: s.sortOrder },
+      update: { name: s.name, description: s.description, color: s.color, sortOrder: s.sortOrder },
+    });
+  }
+  console.log(
+    `✔ Catálogo de OT sincronizado: ${WORK_ORDER_TYPES.length} tipos, ${WORK_ORDER_AREAS.length} áreas, ${WORK_ORDER_SPECIALTIES.length} especialidades`,
+  );
+}
+
 async function main(): Promise<void> {
   await seedPermissions();
   await seedAdminRole();
@@ -562,6 +600,7 @@ async function main(): Promise<void> {
   await seedOperationalCalendar();
   await seedIncidentWorkflow();
   await seedIncidentCatalog();
+  await seedWorkOrderCatalog();
 }
 
 main()
