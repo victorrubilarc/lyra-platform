@@ -83,22 +83,40 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 0.88rem;
-  color: var(--wl-text-secondary, #9aa3b8);
+  font-size: var(--text-body-sm-size);
+  color: var(--color-text-secondary);
   cursor: pointer;
 }
-.multiSelect {
-  width: 100%;
-  min-height: 96px;
-  border-radius: 10px;
-  border: 1px solid var(--wl-border, rgba(255, 255, 255, 0.12));
-  background: var(--wl-surface-2, rgba(255, 255, 255, 0.03));
-  color: var(--wl-text, #e7eaf3);
-  padding: 6px 8px;
-  font: inherit;
+/* Selección de tipos de OT como CHECKBOXES (reemplaza el multi-select nativo: un clic
+   alterna un tipo, nunca borra la selección; tokens del DS ⇒ correcto en claro y oscuro). */
+.typePicker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 6px;
+  max-height: 200px;
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface-2);
 }
+.typeOption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 9px;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-body-sm-size);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  border: 1px solid transparent;
+}
+.typeOption:hover { background: var(--color-hover); }
+.typeOptionOn { background: color-mix(in srgb, var(--color-accent-primary) 12%, transparent); border-color: var(--color-border-active); }
+.typeOption input { accent-color: var(--color-accent-primary); width: 16px; height: 16px; flex: none; }
 .hint {
-  font-size: 0.78rem;
-  color: var(--wl-text-muted, #6b7280);
+  font-size: var(--text-caption-size);
+  color: var(--color-text-muted);
   margin-top: 4px;
 }

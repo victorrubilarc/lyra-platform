@@ -4,6 +4,24 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-02 · OT — UX enterprise: modo claro, grilla del plan y picker de tipos (feedback del dueño)
+Tres correcciones de calidad "como los grandes":
+1. **Modo claro roto** en la lista de Verificaciones y en el modal «Nueva regla de checklist»: usaban colores en
+   duro con fallback OSCURO (`var(--wl-text, #e7eaf3)` etc.) ⇒ texto casi invisible sobre fondo claro. **Fix:** migrar a
+   **tokens del DS** (`--color-text-primary/-secondary/-muted`, `--color-border-subtle`, `--color-bg-surface-*`) — correcto
+   en claro y oscuro. La lista de verificaciones se rehízo como **tarjetas enterprise** (barra de acento por estado,
+   píldora de estado con fondo suave, chip "Obligatorio" ámbar).
+2. **Multi-select nativo de "tipos de OT" ELIMINADO** (en la regla de checklist): un clic al vacío **borraba toda la
+   selección** (inaceptable) y se veía lavado. **Reemplazado por una lista de CHECKBOXES** (clic = alterna, nunca pierde lo
+   elegido; contador "N tipo(s) seleccionado(s)"; grid responsive `auto-fill`).
+3. **Pestaña «Plan de actividades»**: se quita el modo asistente-inline (estaba SIEMPRE presente). Ahora la vista principal
+   es SIEMPRE la **GRILLA (tabla) con todas las actividades y su información** (#, actividad+desc, responsable, especialidad,
+   prioridad, plan+desviación, estado, acciones), estilo SAP PM/Maximo. **Agregar** abre un **MODAL**: «Agregar actividad»
+   (formulario) o **«Asistente guiado»** (Stepper, en modal). Estado vacío profesional con ambas vías. typecheck/lint(0 err)/
+   build verdes. *(Principio del dueño: profesional, intuitivo y fácil, como los líderes.)*
+
+---
+
 ### 2026-07-02 · OT — UX: nombres de pestañas del detalle (coherencia con el modelo genérico)
 El dueño observó que **«Permiso»** alude solo a permisos de trabajo, pero el motor de checklists es **GENÉRICO**
 (OT_DESIGN §11.1: cubre PTW, JSA/ART, ITP de calidad, GMP, PSSR/readiness, SOP, inspección, cierre). *Decisiones de

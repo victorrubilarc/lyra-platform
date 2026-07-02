@@ -91,13 +91,33 @@ export function WorkOrderChecklistRuleModal({ open, onClose, rule }: { open: boo
           <span>Obligatorio (bloquea la Puerta 2 hasta ser aprobado; no removible)</span>
         </label>
 
-        <label className={styles.field}>
+        <div className={styles.field}>
           <span className={styles.fieldLabel}>Aplica a tipos de OT (vacío = todos)</span>
-          <select multiple value={appliesToTypeIds} className={styles.multiSelect}
-            onChange={(e) => setAppliesToTypeIds(Array.from(e.target.selectedOptions).map((o) => o.value))}>
-            {types.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
-        </label>
+          {/* Lista de checkboxes: clic = alterna; nunca se pierde la selección (a diferencia
+              del multi-select nativo, donde un clic al vacío borraba todo). */}
+          <div className={styles.typePicker}>
+            {types.map((t) => {
+              const checked = appliesToTypeIds.includes(t.id);
+              return (
+                <label key={t.id} className={checked ? `${styles.typeOption} ${styles.typeOptionOn}` : styles.typeOption}>
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() =>
+                      setAppliesToTypeIds((prev) => (checked ? prev.filter((id) => id !== t.id) : [...prev, t.id]))
+                    }
+                  />
+                  <span>{t.name}</span>
+                </label>
+              );
+            })}
+          </div>
+          <span className={styles.hint}>
+            {appliesToTypeIds.length === 0
+              ? "Aplica a TODOS los tipos de OT."
+              : `${appliesToTypeIds.length} tipo(s) seleccionado(s).`}
+          </span>
+        </div>
 
         <div className={styles.formRow}>
           <label className={styles.field}>

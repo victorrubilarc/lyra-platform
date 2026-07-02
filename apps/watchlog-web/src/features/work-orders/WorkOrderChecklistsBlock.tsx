@@ -86,11 +86,11 @@ export function WorkOrderChecklistsBlock({ workOrderId, isLive }: { workOrderId:
           {checklists.map((c) => {
             const meta = CHECKLIST_STATUS_META[c.status];
             return (
-              <li key={c.id} className={styles.checklistItem}>
+              <li key={c.id} className={styles.checklistItem} style={{ ["--cl" as string]: meta.color }}>
                 <div className={styles.checklistHead}>
                   <span className={styles.checklistName}>{c.templateName ?? "Checklist"}</span>
-                  {c.mandatory && <span className={styles.ptwTag}>Obligatorio</span>}
-                  <span className={styles.lifeChip} style={{ color: meta.color, marginLeft: "auto" }}>{meta.label}</span>
+                  {c.mandatory && <span className={styles.clMandatory}>Obligatorio</span>}
+                  <span className={styles.clStatus} style={{ marginLeft: "auto" }}>{meta.label}</span>
                 </div>
                 <div className={styles.checklistMeta}>
                   {c.logEntryCode && <span className={styles.mono}>{c.logEntryCode}</span>}

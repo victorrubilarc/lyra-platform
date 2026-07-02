@@ -134,49 +134,37 @@
 }
 
 /* === Checklists / Puerta 2 (S3) ============================================ */
-.checklistList {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
+/* Verificaciones (checklists/permisos) — tarjetas ENTERPRISE, tokens del DS (claro+oscuro). */
+.checklistList { list-style: none; margin: var(--space-2) 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .checklistItem {
-  border: 1px solid var(--wl-border, rgba(255, 255, 255, 0.08));
-  border-radius: 12px;
-  padding: 12px 14px;
-  background: var(--wl-surface-1, rgba(255, 255, 255, 0.02));
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  position: relative;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding: 14px 16px 14px 18px;
+  background: var(--color-bg-surface-1);
+  display: flex; flex-direction: column; gap: 10px;
+  transition: var(--transition-fast);
+  overflow: hidden;
 }
-.checklistHead {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.checklistName {
-  font-weight: 600;
-  color: var(--wl-text, #e7eaf3);
-}
-.checklistMeta {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  font-size: 0.82rem;
-  color: var(--wl-text-secondary, #9aa3b8);
-}
-.checklistActions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  align-items: center;
-}
-.checklistActions a {
-  text-decoration: none;
-}
+/* Barra de acento a la izquierda con el color del estado (scan rápido). */
+.checklistItem::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--cl, var(--color-accent-primary)); opacity: 0.85; }
+.checklistItem:hover { border-color: var(--color-border-active); }
+.checklistHead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.checklistName { font-weight: 600; color: var(--color-text-primary); font-size: var(--text-body-size); }
+.checklistMeta { display: flex; gap: 16px; flex-wrap: wrap; font-size: var(--text-body-sm-size); color: var(--color-text-secondary); align-items: center; }
+.checklistActions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding-top: 2px; }
+.checklistActions a { text-decoration: none; }
+/* Píldora de estado con fondo suave del color del estado (más enterprise que solo texto). */
+.clStatus { font-size: 0.72rem; font-weight: 600; padding: 2px 10px; border-radius: var(--radius-full); background: color-mix(in srgb, var(--cl, var(--color-accent-primary)) 15%, transparent); color: var(--cl, var(--color-accent-primary)); white-space: nowrap; }
+/* Chip "Obligatorio/Obligatoria" — ámbar neutro (no rojo). Reusado en el plan. */
+.clMandatory { font-size: 0.7rem; font-weight: 600; padding: 1px 8px; border-radius: var(--radius-full); background: color-mix(in srgb, var(--color-warning) 16%, transparent); color: var(--color-warning); white-space: nowrap; }
+
+/* Grilla del plan (tabla enterprise) + estado vacío + acciones de fila. */
+.rowActions { display: flex; gap: 2px; align-items: center; justify-content: flex-end; }
+.planCellTitle { display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--color-text-primary); }
+.planCellSub { font-size: var(--text-body-sm-size); color: var(--color-text-secondary); margin-top: 3px; max-width: 480px; line-height: 1.45; }
+.planEmpty { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; padding: var(--space-5) var(--space-3); border: 1px dashed var(--color-border-subtle); border-radius: var(--radius-md); color: var(--color-text-muted); }
+.planEmptyTitle { font-weight: 700; color: var(--color-text-primary); margin: 0; font-size: var(--text-body-size); }
 
 /* === Plan de actividades / asistente (Puerta 3, S4) === */
 .formRow2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
