@@ -36,6 +36,7 @@ OK, FAIL = [], []
 
 TYPE_KEY = "smoke-ot-tipo"
 AREA_KEY = "smoke-ot-area"
+SPEC_KEY = "smoke-ot-especialidad"
 WO_TITLE = "OT Smoke — reparación de prueba"
 
 
@@ -78,6 +79,7 @@ def cleanup():
     sql(f"DELETE FROM \"WorkOrder\" WHERE title = '{WO_TITLE}';")
     sql(f"DELETE FROM \"WorkOrderType\" WHERE key = '{TYPE_KEY}';")
     sql(f"DELETE FROM \"Area\" WHERE key = '{AREA_KEY}';")
+    sql(f"DELETE FROM \"Specialty\" WHERE key = '{SPEC_KEY}';")
 
 
 def main():
@@ -121,6 +123,18 @@ def main():
     aid = r.get("id") if isinstance(r, dict) else None
     s, _ = call("POST", "/work-orders/areas?create=true", admin, {"key": AREA_KEY, "name": "dup"})
     check("crear área con key existente → 409", s == 409, str(s))
+    # 3b) Área: desactivar → fuera de la lista por defecto, dentro de ?includeInactive
+    call("POST", "/work-orders/areas", admin, {"key": AREA_KEY, "name": "Área OT Smoke", "active": False})
+    _, aActive = call("GET", "/work-orders/areas", admin)
+    _, aAll = call("GET", "/work-orders/areas?includeInactive=true", admin)
+    check("área inactiva NO en desplegables", not any(a.get("key") == AREA_KEY for a in aActive))
+    check("área inactiva SÍ en ?includeInactive", any(a.get("key") == AREA_KEY for a in aAll))
+    call("POST", "/work-orders/areas", admin, {"key": AREA_KEY, "name": "Área OT Smoke", "active": True})
+    # 3c) Especialidad: crear + colisión
+    s, r = call("POST", "/work-orders/specialties?create=true", admin, {"key": SPEC_KEY, "name": "Especialidad OT Smoke", "sortOrder": 99})
+    check("crear especialidad → 2xx", s in (200, 201), str(s))
+    s, _ = call("POST", "/work-orders/specialties?create=true", admin, {"key": SPEC_KEY, "name": "dup"})
+    check("crear especialidad con key existente → 409", s == 409, str(s))
 
     # nodo + especialidad reales
     node = sql("SELECT id FROM \"OrgNode\" WHERE \"deletedAt\" IS NULL ORDER BY \"createdAt\" LIMIT 1;")

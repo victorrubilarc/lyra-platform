@@ -144,6 +144,16 @@ export const ROUTES: readonly NavRoute[] = [
     inSidebar: true,
     group: "operation",
   },
+  // Mantenedor de catálogos de OT (tipos/áreas/especialidades). Sub-ruta de
+  // /ordenes-trabajo: NO va en el sidebar (evita doble-resaltado del padre, igual
+  // que /incidencias/catalogos); se accede por el botón del header de /ordenes-trabajo.
+  {
+    path: "/ordenes-trabajo/catalogos",
+    labelKey: "nav.workOrderCatalogs",
+    icon: Tags,
+    permission: "workordercatalog:manage",
+    inSidebar: false,
+  },
   // Mantenedor de catálogos (tipos/categorías) del módulo de incidencias.
   // Sub-ruta de /incidencias: NO va en el sidebar (evita doble-resaltado del
   // padre, igual que /seguridad/*); se accede por el botón del header de
