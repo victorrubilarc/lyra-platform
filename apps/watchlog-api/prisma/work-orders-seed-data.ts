@@ -147,6 +147,7 @@ export interface ChecklistTemplateSeed {
 export interface ChecklistRuleSeed {
   name: string;
   templateName: string; // enlaza con la plantilla sembrada por nombre
+  moment: "REQUEST" | "PLANNING" | "AUTHORIZATION" | "EXECUTION" | "CLOSURE"; // momento del ciclo (S5b)
   mandatory: boolean;
   appliesToTypeKeys: string[]; // vacío = todos los tipos
   requiresPtw: boolean | null;
@@ -168,16 +169,42 @@ export const WORK_ORDER_CHECKLIST_TEMPLATES: ChecklistTemplateSeed[] = [
       { key: "peligros_controles", type: "TEXTAREA", dataType: "STRING", label: "Peligros identificados y controles requeridos", order: 50 },
     ],
   },
+  {
+    // CIERRE del permiso (S5b, momento CLOSURE): retiro de controles, reenergización, sitio
+    // seguro. Se sugiere al ENTRAR a la revisión de cierre y BLOQUEA el cierre si es obligatorio.
+    name: "Cierre de permiso — Retiro de bloqueos y reenergización",
+    description:
+      "CIERRE del permiso de trabajo: retiro de candados/tarjetas, reenergización controlada, prueba funcional y verificación de sitio seguro ANTES de dar por cerrada la OT.",
+    sectionKey: "cierre_permiso",
+    sectionTitle: "Cierre del permiso (retiro de controles)",
+    fields: [
+      { key: "personal_retirado", type: "BOOLEAN", dataType: "BOOLEAN", label: "¿Todo el personal se retiró de la zona de riesgo y se notificó el fin del trabajo?", order: 10 },
+      { key: "bloqueos_retirados", type: "BOOLEAN", dataType: "BOOLEAN", label: "¿Se retiraron todos los candados/tarjetas de bloqueo colocados?", order: 20 },
+      { key: "reenergizacion_controlada", type: "BOOLEAN", dataType: "BOOLEAN", label: "¿Se reenergizó de forma controlada y se verificó la operación normal del equipo?", order: 30 },
+      { key: "sitio_seguro", type: "BOOLEAN", dataType: "BOOLEAN", label: "¿El sitio quedó limpio, ordenado y en condición segura?", order: 40 },
+      { key: "observaciones_cierre", type: "TEXTAREA", dataType: "STRING", label: "Observaciones del cierre (pendientes, condiciones residuales)", order: 50 },
+    ],
+  },
 ];
 
 export const WORK_ORDER_CHECKLIST_RULES: ChecklistRuleSeed[] = [
   {
     name: "Permiso obligatorio — Aislación de energías (LOTO)",
     templateName: "Permiso de Trabajo — Aislación de energías (LOTO)",
+    moment: "AUTHORIZATION",
     mandatory: true,
     appliesToTypeKeys: [], // transversal: aplica a toda OT que llegue a preparación
     requiresPtw: null,
     sortOrder: 10,
+  },
+  {
+    name: "Cierre obligatorio — Retiro de bloqueos y reenergización",
+    templateName: "Cierre de permiso — Retiro de bloqueos y reenergización",
+    moment: "CLOSURE",
+    mandatory: true,
+    appliesToTypeKeys: ["ptw-alto-riesgo"], // el cierre formal del permiso se exige en OT con PTW
+    requiresPtw: true,
+    sortOrder: 20,
   },
 ];
 

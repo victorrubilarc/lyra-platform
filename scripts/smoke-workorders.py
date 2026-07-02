@@ -63,6 +63,10 @@ REV_USER = "smoke-ot-reviewer-user"
 REV_EMAIL = "smoke-ot-reviewer@watchlog.local"
 # Plantilla de PERMISO sembrada (autorización LOTO) + su regla obligatoria (S3, seed).
 CHECKLIST_TEMPLATE = "Permiso de Trabajo — Aislación de energías (LOTO)"
+# Plantilla de CIERRE sembrada (S5b, momento CLOSURE) + una regla obligatoria propia del
+# smoke (la del seed aplica solo al tipo ptw-alto-riesgo; el smoke usa su tipo propio).
+CLOSURE_TEMPLATE = "Cierre de permiso — Retiro de bloqueos y reenergización"
+CLOSURE_RULE_NAME = "Cierre smoke — retiro de bloqueos"
 
 
 def call(method, path, tok=None, body=None):
@@ -113,6 +117,8 @@ def cleanup():
         f"WHERE \"logEntryId\" IS NOT NULL AND \"workOrderId\" IN (SELECT id FROM \"WorkOrder\" WHERE title = '{WO_TITLE}'));"
     )
     sql(f"DELETE FROM \"WorkOrder\" WHERE title = '{WO_TITLE}';")
+    # Regla de checklist de CIERRE propia del smoke (S5b).
+    sql(f"DELETE FROM \"WorkOrderChecklistRule\" WHERE name = '{CLOSURE_RULE_NAME}';")
     sql(f"DELETE FROM \"WorkOrderType\" WHERE key = '{TYPE_KEY}';")
     sql(f"DELETE FROM \"Specialty\" WHERE key = '{SPEC_KEY}';")
     # Reviewer temporal (Puerta 2).
@@ -143,6 +149,23 @@ def create_request(admin, tid, node, spec_id):
         "criticality": 4, "priority": "HIGH", "requiresPtw": True,
         "orgNodeId": node, "specialtyIds": [spec_id] if spec_id else [],
     })
+
+
+def complete_checklist(admin, reviewer, wid, cid):
+    """Instancia → llena/sella el LogEntry → envía a revisión → el revisor aprueba.
+    Devuelve el status final del checklist (esperado APPROVED). Reusa el Form Builder."""
+    _, r = call("POST", f"/work-orders/{wid}/checklists/{cid}/instantiate", admin)
+    leid = r.get("logEntryId") if isinstance(r, dict) else None
+    if not leid:
+        return None
+    _, le = call("GET", f"/log-entries/{leid}", admin)
+    sec = (le.get("sectionStates") or [{}])[0] if isinstance(le, dict) else {}
+    call("PUT", f"/log-entries/{leid}/sections/{sec.get('sectionKey')}", admin,
+         {"expectedVersion": sec.get("version", 0), "values": [], "markComplete": True})
+    call("POST", f"/log-entries/{leid}/submit", admin, {})
+    call("POST", f"/work-orders/{wid}/checklists/{cid}/submit", admin)
+    _, r = call("POST", f"/work-orders/{wid}/checklists/{cid}/review", reviewer, {"decision": "APPROVE"})
+    return r.get("status") if isinstance(r, dict) else None
 
 
 def main():
@@ -452,6 +475,17 @@ def main():
     check("ejecutar → 200 + en_ejecucion (plan congelado ⇒ guard pasa)",
           s == 200 and isinstance(r, dict) and r.get("currentStateKey") == "en_ejecucion", str(s))
 
+    # --- Checklist de CIERRE (S5b, momento CLOSURE) --------------------------------
+    # Registra una regla CLOSURE obligatoria para el tipo smoke (la del seed aplica a
+    # ptw-alto-riesgo). Se sugerirá al ENTRAR a la revisión de cierre y bloqueará el cierre.
+    closure_tpl_id = sql(f"SELECT id FROM \"Template\" WHERE name = '{CLOSURE_TEMPLATE}' AND \"deletedAt\" IS NULL LIMIT 1;").strip()
+    check("plantilla de CIERRE sembrada existe", bool(closure_tpl_id), closure_tpl_id or "no encontrada")
+    s, _ = call("POST", "/work-orders/checklist-rules", admin, {
+        "name": CLOSURE_RULE_NAME, "templateId": closure_tpl_id, "moment": "CLOSURE",
+        "mandatory": True, "appliesToTypeIds": [tid], "sortOrder": 20,
+    })
+    check("crear regla de checklist CLOSURE (momento CLOSURE) → 2xx", s in (200, 201), str(s))
+
     # 14) SEGUIMIENTO DEL AVANCE (S5 — Puerta 4) + CIERRE punta a punta
     print("\n— Puerta 4 (seguimiento del avance + cierre) —")
 
@@ -476,9 +510,17 @@ def main():
         s, _ = call("POST", f"/work-orders/{wid4}/activities/{aid1}/progress", operador, {"status": "IN_PROGRESS"})
         check("operador POST activity progress → 403", s == 403, str(s))
 
-    # Solicitar cierre → en_revision_cierre
+    # Solicitar cierre → en_revision_cierre (dispara la SUGERENCIA del checklist de CIERRE)
     s, r = call("POST", f"/work-orders/{wid4}/transitions", admin, {"transitionKey": "solicitar_cierre"})
     check("solicitar_cierre → 200 + en_revision_cierre", s == 200 and isinstance(r, dict) and r.get("currentStateKey") == "en_revision_cierre", str(s))
+
+    # Sugerencia automática del checklist de CIERRE al entrar a la revisión de cierre (S5b)
+    s, cls_c = call("GET", f"/work-orders/{wid4}/checklists", admin)
+    closure_cl = next((c for c in cls_c if c.get("moment") == "CLOSURE"), None) if isinstance(cls_c, list) else None
+    check("sugerencia auto: checklist de CIERRE materializado (moment CLOSURE, obligatorio)",
+          closure_cl is not None and closure_cl.get("mandatory") is True and closure_cl.get("status") == "PENDING",
+          json.dumps(closure_cl) if closure_cl else str(cls_c))
+    ccid = closure_cl.get("id") if closure_cl else None
 
     # Puerta 4 BLOQUEADA: cerrar con actividades obligatorias abiertas → 400 (bloqueo EXPLICADO)
     s, _ = call("POST", f"/work-orders/{wid4}/transitions", admin, {"transitionKey": "cerrar", "password": PASS, "closureSummary": "cierre prematuro"})
@@ -489,6 +531,14 @@ def main():
     check("marcar actividad 1 DONE → 200 + 100%", s in (200, 201) and isinstance(r, dict) and r.get("status") == "DONE" and r.get("progressPct") == 100, str(s))
     s, r = call("POST", f"/work-orders/{wid4}/activities/{aid2}/progress", admin, {"status": "DONE"})
     check("marcar actividad 2 DONE → 200 + 100%", s in (200, 201) and isinstance(r, dict) and r.get("status") == "DONE" and r.get("progressPct") == 100, str(s))
+
+    # Puerta 4 SIGUE BLOQUEADA por el checklist de CIERRE obligatorio sin aprobar (S5b)
+    s, _ = call("POST", f"/work-orders/{wid4}/transitions", admin, {"transitionKey": "cerrar", "password": PASS, "closureSummary": "sin cerrar el permiso"})
+    check("Puerta 4 BLOQUEADA: cerrar con checklist de CIERRE obligatorio sin aprobar → 400", s == 400, str(s))
+
+    # Aprobar el checklist de CIERRE (instanciar → sellar → enviar → revisor aprueba)
+    st = complete_checklist(admin, reviewer, wid4, ccid) if (ccid and reviewer) else None
+    check("checklist de CIERRE aprobado (instanciar→sellar→enviar→revisor) → APPROVED", st == "APPROVED", str(st))
 
     # Cerrar (firma Part 11) → cerrada + CLOSED + resumen de cierre
     s, r = call("POST", f"/work-orders/{wid4}/transitions", admin,

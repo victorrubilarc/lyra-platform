@@ -135,6 +135,12 @@
 
 /* === Checklists / Puerta 2 (S3) ============================================ */
 /* Verificaciones (checklists/permisos) — tarjetas ENTERPRISE, tokens del DS (claro+oscuro). */
+/* Grupos por MOMENTO del ciclo (Autorización · Ejecución · Cierre…), S5b. */
+.checklistGroups { display: flex; flex-direction: column; gap: var(--space-4); margin-top: var(--space-2); }
+.checklistGroup { display: flex; flex-direction: column; gap: 2px; }
+.checklistGroupHead { display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap; padding-bottom: 4px; border-bottom: 1px solid var(--color-border-subtle); }
+.checklistGroupTitle { font-family: var(--font-brand); font-weight: 700; font-size: var(--text-caption-size); text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-text-primary); }
+.checklistGroupHint { font-size: var(--text-caption-size); color: var(--color-text-secondary); }
 .checklistList { list-style: none; margin: var(--space-2) 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .checklistItem {
   position: relative;

@@ -753,16 +753,19 @@ anulación lifecycle `CANCELED`).
   (`resolutionDueMinutes`/`escalationAfterMinutes`/`escalationRoleId` → **Role** SetNull, relación
   `WorkOrderTypeEscalationRole`), `active`/`sortOrder`.
 - **WorkOrderChecklistRule** *(S3, fork W5 — Capa A diseño)* — regla de aplicabilidad de un checklist. `templateId`
-  (→ **Template**, Restrict; la plantilla del Form Builder que se instancia), `mandatory` (obligatorio ⇒ no removible +
-  bloquea Puerta 2), aplicabilidad `appliesToTypeIds String[]` (vacío = todos)/`minCriticality`/`specialtyId`
+  (→ **Template**, Restrict; la plantilla del Form Builder que se instancia), **`moment` (enum `WorkOrderChecklistMoment`:
+  REQUEST|PLANNING|AUTHORIZATION|EXECUTION|CLOSURE, default AUTHORIZATION — S5b)**, `mandatory` (obligatorio ⇒ no removible +
+  bloquea la puerta de su momento), aplicabilidad `appliesToTypeIds String[]` (vacío = todos)/`minCriticality`/`specialtyId`
   (→ **Specialty** SetNull)/`requiresPtw` (null = no discrimina), `active`/`sortOrder`, `deletedAt`. Helper puro
   `applicableChecklistRules` (contracts) decide el match (espejo de `applicableObligationsFor`).
 - **WorkOrderChecklist** *(S3, fork W5 — Capa B operación)* — enlace **(OT, plantilla)** con `@@unique([workOrderId,
-  templateId])`. `logEntryId` (→ **LogEntry** SetNull; instancia viva, null hasta iniciar), `sourceRuleId`
+  templateId])`. **`moment` (enum `WorkOrderChecklistMoment`, congelado al materializar/agregar; denormalizado desde la regla —
+  S5b; índice `(workOrderId, moment)`)**, `logEntryId` (→ **LogEntry** SetNull; instancia viva, null hasta iniciar), `sourceRuleId`
   (→ WorkOrderChecklistRule SetNull; null = agregado manual), `mandatory`, `status` (enum **WorkOrderChecklistStatus**:
   PENDING|IN_PROGRESS|SUBMITTED|APPROVED|REJECTED), `responsibleId`/`responsibleRoleId`, `reviewerId`/`reviewedAt`/
-  `rejectReason` (segregación: revisor ≠ responsable), `addedById`. `onDelete: Cascade` desde `WorkOrder`. Guard PURO
-  `blockingChecklistsForClose` (obligatorio no APPROVED) = Puerta 2.
+  `rejectReason` (segregación: revisor ≠ responsable), `addedById`. `onDelete: Cascade` desde `WorkOrder`. Guards PUROS
+  `blockingChecklistsForClose` (obligatorio no APPROVED, moment-blind = indicador general) y **`blockingChecklistsForMoment`
+  (obligatorio no APPROVED de UN momento — S5b): AUTHORIZATION al ENTRAR al estado-puerta, CLOSURE al CERRAR**.
 - **WorkActivity** *(S4, fork W1 — entidad PROPIA, NO se fusiona con `IncidentAction`)* — actividad/tarea del plan de
   trabajo. `title`/`description`, `sequence` (orden en el plan), `responsibleId`/`responsibleRoleId` (refs blandas),
   `specialtyId` (→ **Specialty** SetNull, relación `WorkActivitySpecialty`), planificación
@@ -805,5 +808,12 @@ planFrozenById` + `WorkOrderType.planFreezeStateKey/executeStateKey`; **REORDEN 
 (migración `20260702200000_add_work_activity_updates`): entidad **`WorkActivityUpdate`** (avance append-only) + relación
 `WorkActivity.updates` + enriquecimiento del DTO (`updatesCount`/`lastProgressAt`); seguimiento vivo del avance
 (`recordProgress`/`listUpdates`) + cierre punta a punta (guards ya cableados en S4). Reusa `workorder:activity:manage`
-(sin permiso nuevo). **Pendiente (S5b):** `WorkOrderComment`, checklists de EJECUCIÓN/CIERRE + eje `momento` + Gobierno 2.
-Ver `docs/design/OT_DESIGN_ARCHITECTURE.md`.
+(sin permiso nuevo). **Implementado en S5b Slice A** (migración `20260702210000_add_checklist_moment`): enum
+**`WorkOrderChecklistMoment`** + columna `moment` en `WorkOrderChecklistRule` y `WorkOrderChecklist` (default AUTHORIZATION,
+retrocompatible) + índice `(workOrderId, moment)` + **`WorkOrderType.closureChecklistSuggestStateKey`** (default
+`en_revision_cierre`, data-driven, paridad `folioOnStateKey`); materialización y guard **por momento** (AUTHORIZATION = S3
+intacto; **CLOSURE per-OT**: sugerido al ENTRAR a la revisión de cierre, BLOQUEA el cierre si obligatorio no APPROVED);
+helper puro `blockingChecklistsForMoment`; seed +plantilla/regla de CIERRE. Reusa `workorder:checklist:manage` (sin permiso
+nuevo). **Pendiente (S5b Slice B):** checklists de **EJECUCIÓN por actividad** (`WorkOrderChecklist.workActivityId`) +
+**Gobierno 2** (visibilidad/confirmación del set de ejecución, `WorkOrder.executionSetConfirmedAt`); y `WorkOrderComment`.
+Ver `docs/design/OT_DESIGN_ARCHITECTURE.md §11`.

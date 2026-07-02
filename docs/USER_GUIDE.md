@@ -143,10 +143,10 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 ### 18. Órdenes de trabajo (OT / PTW)  [todos los roles operativos]
 - ✅ **Crear y listar solicitudes de trabajo** (asistente de 2 pasos, grilla con filtros/facetas, detalle con reasignar/prioridad/anular) (§ Órdenes de trabajo)
 - ✅ **Enviar, aprobar (con firma y folio oficial) o rechazar la solicitud — Puerta 1** (flujo de estados con stepper, firma electrónica, folio OT-AAAA-#### emitido al aprobar, rechazo con motivo, historial) (§ Órdenes de trabajo ▸ Aprobación)
-- ✅ **Checklists / permisos de trabajo — Puerta 2** (reglas configurables, sugerencia automática al preparar, llenado como registro del constructor de formularios, revisión con segregación revisor≠responsable, bloqueo hasta aprobar los obligatorios) (§ Órdenes de trabajo ▸ Checklists y permisos de trabajo)
+- ✅ **Checklists / permisos de trabajo por MOMENTO** (verificaciones **agrupadas por momento del ciclo**: Autorización·Ejecución·Cierre; reglas configurables con campo «Momento», sugerencia automática, llenado como registro del constructor de formularios, revisión con segregación revisor≠responsable, bloqueo hasta aprobar los obligatorios) (§ Órdenes de trabajo ▸ Checklists y permisos de trabajo)
 - ✅ **Plan de actividades y autorización del plan — Puerta 3** (armar el plan con grilla o **asistente guiado**, congelar la línea base al autorizar, desviación plan-vs-real) (§ Órdenes de trabajo ▸ Plan de actividades)
-- ✅ **Seguimiento del avance y cierre — Puerta 4** (registrar el avance de cada actividad durante la ejecución, historial de avance, cerrar la OT con firma cuando todo lo obligatorio está completo) (§ Órdenes de trabajo ▸ Seguimiento del avance y cierre)
-- ✅ **Administrar los catálogos** (tipos de OT, especialidades y reglas de checklist) (§ Órdenes de trabajo ▸ Catálogos) [solo administrador]
+- ✅ **Seguimiento del avance y cierre — Puerta 4** (registrar el avance de cada actividad durante la ejecución, historial de avance; **verificación de cierre del permiso** que bloquea el cierre hasta aprobarla; cerrar la OT con firma cuando todo lo obligatorio está completo) (§ Órdenes de trabajo ▸ Seguimiento del avance y cierre · Verificación de cierre del permiso)
+- ✅ **Administrar los catálogos** (tipos de OT, especialidades y **reglas de checklist con su momento**) (§ Órdenes de trabajo ▸ Catálogos) [solo administrador]
 
 ---
 
@@ -236,16 +236,18 @@ identificar peligros, definir el plan de aislación/controles, confirmar persona
 **formulario del constructor de formularios** que se **llena, firma y sella** como cualquier registro — trazable, no una
 lista de texto suelta. La OT **no puede pasar la Puerta 2** mientras quede un permiso **obligatorio** sin **aprobar**.
 
-> **Autorizar ≠ aplicar.** La Puerta 2 es la **autorización** del permiso (¿está todo listo y autorizado para empezar?).
-> La **aplicación física de los controles** en terreno —poner los candados, verificar energía cero, el *toma-5*— se
-> registra **al EJECUTAR cada actividad** (checklists de ejecución ligados a la actividad), no aquí. Ese segundo momento
-> llega con la planificación/ejecución de actividades (Sesiones 4–5). *(Alineado al estándar PTW / ISO 45001 / LOTO.)*
+> **Cada checklist tiene un «Momento».** Un mismo trabajo acumula verificaciones en **distintos momentos** del ciclo:
+> **Autorización** (el permiso, documental, antes de ejecutar), **Ejecución** (aplicación física en terreno, por actividad)
+> y **Cierre** (retiro de controles al terminar) — además de Solicitud y Planificación. La pestaña **«Verificaciones»**
+> **agrupa** los checklists por ese momento, para que se vea de un vistazo *cuándo* va cada uno. Hoy están activos los
+> momentos de **Autorización** (esta puerta) y **Cierre** (ver más abajo); la **Ejecución por actividad** llega en la
+> siguiente entrega. *(Alineado al estándar PTW / ISO 45001 / LOTO.)*
 
-**Cómo se usa** (en el detalle de la OT, pestaña **«Verificaciones»**):
+**Cómo se usa** (en el detalle de la OT, pestaña **«Verificaciones»**, agrupada por momento):
 1. Al **iniciar la preparación** de la OT (transición «Iniciar preparación»), el sistema **sugiere automáticamente** los
-   checklists cuyas **reglas** coinciden con la OT (por tipo, criticidad, especialidad o si exige PTW). Los **obligatorios**
-   no se pueden quitar. También puedes **«Agregar»** manualmente otro checklist, o pulsar **«Sugerir aplicables»** para
-   re-derivar la lista.
+   checklists de **Autorización** cuyas **reglas** coinciden con la OT (por tipo, criticidad, especialidad o si exige PTW).
+   Los **obligatorios** no se pueden quitar. También puedes **«Agregar»** manualmente otro checklist, o pulsar **«Sugerir
+   aplicables»** para re-derivar la lista del momento actual.
 2. **El ejecutor** pulsa **«Iniciar»** en un checklist: se crea el **registro** (queda como responsable) y con **«Llenar»**
    abre el formulario **en una ventana (modal) sobre la misma OT** —sin salir de la pantalla—, lo completa y lo **sella**
    (firma según lo exija la plantilla); cierra con **«Cerrar»**. Luego pulsa **«Enviar a revisión»** (habilitado solo cuando
@@ -264,9 +266,34 @@ el checklist (lo valida el sistema, no es una convención).
 - Los checklists **obligatorios bloquean la Puerta 2** hasta estar **Aprobados** — no hay "botón de pánico".
 - Cada checklist vive como un **registro real** (con su folio `BIT-…`), auditable y firmable; puedes abrirlo desde el
   enlace del checklist.
-- Las **reglas** de qué checklist se sugiere y a qué OT son **100% configurables** (ver Catálogos ▸ Reglas de checklist);
-  los contenidos (LOTO, altura, etc.) son **plantillas** que diseñas en el constructor de formularios, nunca están
-  "quemados" en el código.
+- Las **reglas** de qué checklist se sugiere, **en qué momento** y a qué OT son **100% configurables** (ver Catálogos ▸
+  Reglas de checklist: cada regla tiene un campo **«Momento»**); los contenidos (LOTO, altura, etc.) son **plantillas** que
+  diseñas en el constructor de formularios, nunca están "quemados" en el código.
+
+### Órdenes de trabajo ▸ Verificación de cierre del permiso (Puerta 4)  [Ejecutor + Verificador]
+
+**Para qué sirve.** Es el **cierre formal del permiso de trabajo**: antes de dar la OT por cerrada hay que **retirar los
+controles** (candados/tarjetas de bloqueo), **reenergizar de forma controlada**, hacer la **prueba funcional** y confirmar
+que el **sitio quedó seguro**. Es un checklist del momento **«Cierre»** — el espejo, al final, del permiso que se autorizó
+al principio.
+
+**Cómo se usa** (en el detalle de la OT, pestaña **«Verificaciones»**, grupo **«Cierre»**):
+1. Al **solicitar el cierre** (transición «Solicitar cierre»), el sistema **sugiere automáticamente** el/los checklists de
+   **Cierre** cuyas reglas coinciden con la OT (p. ej. «Cierre de permiso — retiro de bloqueos y reenergización»).
+2. Se **inicia, llena, sella, envía a revisión y aprueba** igual que cualquier otro checklist (con la misma segregación
+   revisor ≠ responsable).
+3. Cuando **todas las actividades obligatorias están terminadas** *y* **todos los checklists de Cierre obligatorios están
+   Aprobados**, la transición **«Cerrar»** (con firma) da la OT por **Cerrada**. Si falta alguno, la transición se **bloquea
+   con un aviso que dice exactamente qué checklist de cierre falta aprobar**.
+
+**Quién puede.** Gestionar/instanciar/revisar los checklists de cierre requiere **`workorder:checklist:manage`** (el mismo
+que los de autorización); ejecutar la transición «Cerrar» (firmada) requiere **`workorder:transition`**.
+
+**Importante.**
+- El checklist de **Cierre obligatorio bloquea el cierre** de la OT hasta estar **Aprobado**, además del requisito de que
+  las actividades obligatorias estén terminadas. Los dos guardas conviven.
+- Que exista o no la exigencia de cierre es **configurable por reglas** (momento «Cierre»); una PYME puede no usarla y una
+  minera exigirla en las OT con permiso.
 
 ### Órdenes de trabajo ▸ Plan de actividades y autorización del plan (Puerta 3)  [Planificador]
 

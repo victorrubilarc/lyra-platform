@@ -759,6 +759,7 @@ async function seedWorkOrderChecklists(): Promise<void> {
     const data = {
       name: rule.name,
       templateId: template.id,
+      moment: rule.moment,
       mandatory: rule.mandatory,
       appliesToTypeIds: rule.appliesToTypeKeys.map((k) => typeByKey.get(k)).filter((x): x is string => !!x),
       requiresPtw: rule.requiresPtw,

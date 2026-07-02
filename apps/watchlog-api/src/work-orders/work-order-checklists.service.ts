@@ -2,12 +2,15 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import type { Prisma } from "@prisma/client";
 import {
   applicableChecklistRules,
-  blockingChecklistsForClose,
+  blockingChecklistsForMoment,
   formatEntryFolio,
+  DEFAULT_WORK_ORDER_CLOSURE_CHECKLIST_SUGGEST_STATE_KEY,
+  DEFAULT_WORK_ORDER_EXECUTE_STATE_KEY,
   type AddWorkOrderChecklistRequest,
   type ReviewWorkOrderChecklistRequest,
   type UpsertWorkOrderChecklistRuleRequest,
   type WorkOrderChecklistDto,
+  type WorkOrderChecklistMoment,
   type WorkOrderChecklistRuleDto,
 } from "@lyra/contracts";
 import { PrismaService } from "../prisma/prisma.service";
@@ -65,6 +68,7 @@ export class WorkOrderChecklistsService {
     const data = {
       name: dto.name,
       templateId: dto.templateId,
+      moment: dto.moment ?? "AUTHORIZATION",
       mandatory: dto.mandatory ?? false,
       appliesToTypeIds: dto.appliesToTypeIds ?? [],
       minCriticality: dto.minCriticality ?? null,
@@ -97,27 +101,42 @@ export class WorkOrderChecklistsService {
 
   /**
    * Endpoint de re-derivación manual: sugiere (materializa) los checklists aplicables
-   * a la OT que aún no existan. ABAC + idempotente. Devuelve la lista completa.
+   * al MOMENTO del estado ACTUAL de la OT que aún no existan. ABAC + idempotente. Así,
+   * en preparación re-deriva los de autorización y en revisión de cierre los de cierre.
    */
   async suggest(userId: string, workOrderId: string, ctx: AuditContext): Promise<WorkOrderChecklistDto[]> {
     const wo = await this.loadWorkOrder(workOrderId);
     await this.assertNodeAccess(userId, wo.orgNodeId);
-    await this.materializeForWorkOrder(workOrderId, ctx.actorId ?? userId);
+    const moment = await this.momentForCurrentState(workOrderId);
+    await this.materializeForWorkOrder(workOrderId, moment, ctx.actorId ?? userId);
     return this.loadChecklistDtos(workOrderId);
   }
 
   /**
-   * Materializa (crea) los `WorkOrderChecklist` de las reglas APLICABLES que aún no
-   * existan en la OT. Idempotente (no duplica por el @@unique OT×plantilla). SIN ABAC
-   * (lo llama el ejecutor de flujo, que ya autorizó). Devuelve cuántos se crearon.
+   * Deriva el MOMENTO de checklist que corresponde al estado ACTUAL de la OT según las
+   * claves data-driven del tipo (paridad con folioOnStateKey). Default AUTHORIZATION.
    */
-  async materializeForWorkOrder(workOrderId: string, actorId: string | null): Promise<number> {
+  private async momentForCurrentState(workOrderId: string): Promise<WorkOrderChecklistMoment> {
+    const wo = await this.prisma.workOrder.findFirst({ where: { id: workOrderId }, select: { currentStateKey: true, typeId: true } });
+    const type = wo ? await this.prisma.workOrderType.findUnique({ where: { id: wo.typeId }, select: { checklistSuggestStateKey: true, executeStateKey: true, closureChecklistSuggestStateKey: true } }) : null;
+    const state = wo?.currentStateKey;
+    if (state && state === (type?.closureChecklistSuggestStateKey ?? DEFAULT_WORK_ORDER_CLOSURE_CHECKLIST_SUGGEST_STATE_KEY)) return "CLOSURE";
+    if (state && state === (type?.executeStateKey ?? DEFAULT_WORK_ORDER_EXECUTE_STATE_KEY)) return "EXECUTION";
+    return "AUTHORIZATION";
+  }
+
+  /**
+   * Materializa (crea) los `WorkOrderChecklist` de las reglas APLICABLES DE UN MOMENTO
+   * que aún no existan en la OT. Idempotente (no duplica por el @@unique OT×plantilla).
+   * SIN ABAC (lo llama el ejecutor de flujo, que ya autorizó). Devuelve cuántos se crearon.
+   */
+  async materializeForWorkOrder(workOrderId: string, moment: WorkOrderChecklistMoment, actorId: string | null): Promise<number> {
     const wo = await this.prisma.workOrder.findFirst({
       where: { id: workOrderId, deletedAt: null },
       select: { id: true, typeId: true, criticality: true, requiresPtw: true, specialties: { select: { specialtyId: true } } },
     });
     if (!wo) return 0;
-    const rules = await this.prisma.workOrderChecklistRule.findMany({ where: { deletedAt: null, active: true } });
+    const rules = await this.prisma.workOrderChecklistRule.findMany({ where: { deletedAt: null, active: true, moment } });
     const applicable = applicableChecklistRules(
       { typeId: wo.typeId, criticality: wo.criticality, requiresPtw: wo.requiresPtw, specialtyIds: wo.specialties.map((s) => s.specialtyId) },
       rules,
@@ -130,9 +149,9 @@ export class WorkOrderChecklistsService {
       if (have.has(rule.templateId)) continue;
       have.add(rule.templateId);
       const row = await this.prisma.workOrderChecklist.create({
-        data: { workOrderId, templateId: rule.templateId, sourceRuleId: rule.id, mandatory: rule.mandatory, status: "PENDING", addedById: actorId },
+        data: { workOrderId, templateId: rule.templateId, moment, sourceRuleId: rule.id, mandatory: rule.mandatory, status: "PENDING", addedById: actorId },
       });
-      await this.addEvent(workOrderId, "CHECKLIST_ADDED", `Checklist sugerido: ${rule.name}${rule.mandatory ? " (obligatorio)" : ""}`, actorId, { checklistId: row.id, sourceRuleId: rule.id, mandatory: rule.mandatory });
+      await this.addEvent(workOrderId, "CHECKLIST_ADDED", `Checklist sugerido: ${rule.name}${rule.mandatory ? " (obligatorio)" : ""}`, actorId, { checklistId: row.id, sourceRuleId: rule.id, mandatory: rule.mandatory, moment });
       created++;
     }
     return created;
@@ -148,8 +167,11 @@ export class WorkOrderChecklistsService {
     if (template.status !== "PUBLISHED") throw new BadRequestException("La plantilla del checklist debe estar publicada");
     const dup = await this.prisma.workOrderChecklist.findFirst({ where: { workOrderId, templateId: dto.templateId }, select: { id: true } });
     if (dup) throw new BadRequestException("Esta OT ya tiene ese checklist");
+    // El manual hereda el momento indicado, o el del estado actual de la OT (los manuales
+    // son SIEMPRE opcionales; la obligatoriedad vive en la regla).
+    const moment = dto.moment ?? (await this.momentForCurrentState(workOrderId));
     const row = await this.prisma.workOrderChecklist.create({
-      data: { workOrderId, templateId: dto.templateId, sourceRuleId: null, mandatory: false, status: "PENDING", addedById: userId },
+      data: { workOrderId, templateId: dto.templateId, moment, sourceRuleId: null, mandatory: false, status: "PENDING", addedById: userId },
     });
     await this.addEvent(workOrderId, "CHECKLIST_ADDED", `Checklist agregado: ${template.name}`, userId, { checklistId: row.id, manual: true });
     await this.audit.record({ ...ctx, action: "workorderchecklist.added", entityType: "WorkOrder", entityId: workOrderId, after: { checklistId: row.id, templateId: dto.templateId } });
@@ -237,14 +259,23 @@ export class WorkOrderChecklistsService {
     return (await this.loadChecklistDtos(workOrderId)).find((c) => c.id === checklistId)!;
   }
 
-  // === Guard de Puerta 2 (lo invoca el ejecutor de flujo) ====================
+  // === Guard de puerta por MOMENTO (lo invoca el ejecutor de flujo, S5b) ======
 
-  /** Impide entrar al estado-puerta si hay checklists OBLIGATORIOS sin APROBAR. */
-  async assertChecklistsComplete(workOrderId: string): Promise<void> {
-    const checklists = await this.prisma.workOrderChecklist.findMany({ where: { workOrderId, mandatory: true }, select: { mandatory: true, status: true } });
-    const blocking = blockingChecklistsForClose(checklists);
+  /**
+   * Impide cruzar la puerta de un MOMENTO si hay checklists OBLIGATORIOS de ESE momento
+   * sin APROBAR. AUTHORIZATION → al ENTRAR al estado-puerta (Puerta 2); CLOSURE → al
+   * CERRAR (Puerta 4). Mensaje que EXPLICA qué falta (nombre de la plantilla). Data-driven.
+   */
+  async assertChecklistsCompleteForMoment(workOrderId: string, moment: WorkOrderChecklistMoment): Promise<void> {
+    const checklists = await this.prisma.workOrderChecklist.findMany({
+      where: { workOrderId, moment, mandatory: true },
+      include: { template: { select: { name: true } } },
+    });
+    const blocking = blockingChecklistsForMoment(checklists, moment);
     if (blocking.length > 0) {
-      throw new BadRequestException(`No se puede avanzar: ${blocking.length} verificación(es) obligatoria(s) sin aprobar.`);
+      const names = blocking.map((c) => c.template?.name ?? "verificación").join(", ");
+      const label = moment === "CLOSURE" ? "cerrar" : "avanzar";
+      throw new BadRequestException(`No se puede ${label}: falta aprobar ${blocking.length} verificación(es) obligatoria(s): ${names}.`);
     }
   }
 
@@ -267,6 +298,7 @@ export class WorkOrderChecklistsService {
       name: r.name,
       templateId: r.templateId,
       templateName: tName.get(r.templateId) ?? null,
+      moment: r.moment,
       mandatory: r.mandatory,
       appliesToTypeIds: r.appliesToTypeIds,
       appliesToTypeNames: r.appliesToTypeIds.map((id) => tyName.get(id)).filter((n): n is string => !!n),
@@ -295,6 +327,7 @@ export class WorkOrderChecklistsService {
       workOrderId: r.workOrderId,
       templateId: r.templateId,
       templateName: r.template?.name ?? null,
+      moment: r.moment,
       logEntryId: r.logEntryId,
       logEntryCode: r.logEntry ? formatEntryFolio(r.logEntry.entryNumber) : null,
       logEntrySealed: r.logEntry?.status === "SUBMITTED",

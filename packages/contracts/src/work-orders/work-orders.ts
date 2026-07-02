@@ -78,6 +78,8 @@ export const workOrderTypeSchema = z.object({
   planFreezeStateKey: z.string().nullable(),
   /** Estado de ejecución al que sólo se ENTRA con la baseline del plan congelada (null = "en_ejecucion"). S4. */
   executeStateKey: z.string().nullable(),
+  /** Estado al que, al ENTRAR, se SUGIEREN los checklists de CIERRE (null = "en_revision_cierre"). S5b. */
+  closureChecklistSuggestStateKey: z.string().nullable(),
   active: z.boolean(),
   sortOrder: z.number().int(),
 });
@@ -380,6 +382,8 @@ export const upsertWorkOrderTypeRequestSchema = z.object({
   planFreezeStateKey: z.string().trim().min(1).max(64).nullable().optional(),
   /** Estado de ejecución (guard "no ejecuta sin plan"). null/omitido = "en_ejecucion". S4. */
   executeStateKey: z.string().trim().min(1).max(64).nullable().optional(),
+  /** Estado que dispara la sugerencia de checklists de CIERRE. null/omitido = "en_revision_cierre". S5b. */
+  closureChecklistSuggestStateKey: z.string().trim().min(1).max(64).nullable().optional(),
   active: z.boolean().optional(),
   sortOrder: z.number().int().min(0).max(9999).optional(),
 });

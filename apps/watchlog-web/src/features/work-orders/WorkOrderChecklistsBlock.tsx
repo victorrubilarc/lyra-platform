@@ -2,7 +2,12 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, ClipboardCheck, Eye, Lightbulb, PenLine, Plus, ShieldAlert, Trash2, XCircle } from "lucide-react";
-import { blockingChecklistsForClose, type WorkOrderChecklistDto } from "@lyra/contracts";
+import {
+  WORK_ORDER_CHECKLIST_MOMENTS,
+  WORK_ORDER_CHECKLIST_MOMENT_META,
+  blockingChecklistsForClose,
+  type WorkOrderChecklistDto,
+} from "@lyra/contracts";
 import { Button, Modal, Select, Textarea, useToast } from "@lyra/ui";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { formatDateTime } from "../../lib/format.js";
@@ -55,6 +60,61 @@ export function WorkOrderChecklistsBlock({ workOrderId, isLive }: { workOrderId:
   const blocking = blockingChecklistsForClose(checklists);
   const err = (e: unknown) => toast.error((e as Error).message);
 
+  // Agrupa por MOMENTO del ciclo (Autorización · Ejecución · Cierre…) en orden cronológico,
+  // para que cada checklist se lea "dónde va" de un vistazo (el de cierre aparece en su lugar).
+  const groups = WORK_ORDER_CHECKLIST_MOMENTS.map((m) => ({ moment: m, items: checklists.filter((c) => c.moment === m) })).filter(
+    (g) => g.items.length > 0,
+  );
+
+  const renderItem = (c: WorkOrderChecklistDto) => {
+    const meta = CHECKLIST_STATUS_META[c.status];
+    return (
+      <li key={c.id} className={styles.checklistItem} style={{ ["--cl" as string]: meta.color }}>
+        <div className={styles.checklistHead}>
+          <span className={styles.checklistName}>{c.templateName ?? "Checklist"}</span>
+          {c.mandatory && <span className={styles.clMandatory}>Obligatorio</span>}
+          <span className={styles.clStatus} style={{ marginLeft: "auto" }}>{meta.label}</span>
+        </div>
+        <div className={styles.checklistMeta}>
+          {c.logEntryCode && <span className={styles.mono}>{c.logEntryCode}</span>}
+          {c.responsibleName && <span>Responsable: {c.responsibleName}</span>}
+          {c.reviewerName && <span>Revisor: {c.reviewerName}</span>}
+          {c.reviewedAt && <span className={styles.muted}>{formatDateTime(c.reviewedAt)}</span>}
+        </div>
+        {c.status === "REJECTED" && c.rejectReason && (
+          <p className={styles.rejectBox}><XCircle size={14} /> Motivo: {c.rejectReason}</p>
+        )}
+        {isLive && manage && (
+          <div className={styles.checklistActions}>
+            {(c.status === "PENDING" || c.status === "REJECTED") && (
+              <Button variant="primary" onClick={() => instantiate.mutate(c.id, { onError: err })}>
+                {c.status === "REJECTED" ? "Rehacer" : "Iniciar"}
+              </Button>
+            )}
+            {c.logEntryId && c.status === "IN_PROGRESS" && (
+              <Button variant="secondary" leftIcon={<PenLine size={14} />} onClick={() => setFillId(c.logEntryId)}>Llenar</Button>
+            )}
+            {c.status === "IN_PROGRESS" && (
+              <Button variant="secondary" disabled={!c.logEntrySealed} title={c.logEntrySealed ? undefined : "Complete y selle el registro primero"}
+                onClick={() => submit.mutate(c.id, { onError: err })}>
+                Enviar a revisión
+              </Button>
+            )}
+            {c.status === "SUBMITTED" && (
+              <Button variant="primary" leftIcon={<CheckCircle2 size={14} />} onClick={() => setReviewing(c)}>Revisar</Button>
+            )}
+            {c.logEntryId && (c.status === "SUBMITTED" || c.status === "APPROVED") && (
+              <Button variant="secondary" leftIcon={<Eye size={14} />} onClick={() => setFillId(c.logEntryId)}>Ver</Button>
+            )}
+            {!c.mandatory && c.status === "PENDING" && (
+              <Button variant="secondary" leftIcon={<Trash2 size={14} />} onClick={() => remove.mutate(c.id, { onError: err })}>Quitar</Button>
+            )}
+          </div>
+        )}
+      </li>
+    );
+  };
+
   return (
     <>
       <div className={styles.sectionTitle}>
@@ -82,58 +142,17 @@ export function WorkOrderChecklistsBlock({ workOrderId, isLive }: { workOrderId:
       ) : checklists.length === 0 ? (
         <p className={styles.muted}>Sin checklists. Usa «Sugerir aplicables» al preparar la OT.</p>
       ) : (
-        <ul className={styles.checklistList}>
-          {checklists.map((c) => {
-            const meta = CHECKLIST_STATUS_META[c.status];
-            return (
-              <li key={c.id} className={styles.checklistItem} style={{ ["--cl" as string]: meta.color }}>
-                <div className={styles.checklistHead}>
-                  <span className={styles.checklistName}>{c.templateName ?? "Checklist"}</span>
-                  {c.mandatory && <span className={styles.clMandatory}>Obligatorio</span>}
-                  <span className={styles.clStatus} style={{ marginLeft: "auto" }}>{meta.label}</span>
-                </div>
-                <div className={styles.checklistMeta}>
-                  {c.logEntryCode && <span className={styles.mono}>{c.logEntryCode}</span>}
-                  {c.responsibleName && <span>Responsable: {c.responsibleName}</span>}
-                  {c.reviewerName && <span>Revisor: {c.reviewerName}</span>}
-                  {c.reviewedAt && <span className={styles.muted}>{formatDateTime(c.reviewedAt)}</span>}
-                </div>
-                {c.status === "REJECTED" && c.rejectReason && (
-                  <p className={styles.rejectBox}><XCircle size={14} /> Motivo: {c.rejectReason}</p>
-                )}
-                {isLive && manage && (
-                  <div className={styles.checklistActions}>
-                    {(c.status === "PENDING" || c.status === "REJECTED") && (
-                      <Button variant="primary" onClick={() => instantiate.mutate(c.id, { onError: err })}>
-                        {c.status === "REJECTED" ? "Rehacer" : "Iniciar"}
-                      </Button>
-                    )}
-                    {c.logEntryId && c.status === "IN_PROGRESS" && (
-                      <Button variant="secondary" leftIcon={<PenLine size={14} />} onClick={() => setFillId(c.logEntryId)}>Llenar</Button>
-                    )}
-                    {c.status === "IN_PROGRESS" && (
-                      <Button variant="secondary" disabled={!c.logEntrySealed} title={c.logEntrySealed ? undefined : "Complete y selle el registro primero"}
-                        onClick={() => submit.mutate(c.id, { onError: err })}>
-                        Enviar a revisión
-                      </Button>
-                    )}
-                    {c.status === "SUBMITTED" && (
-                      <>
-                        <Button variant="primary" leftIcon={<CheckCircle2 size={14} />} onClick={() => setReviewing(c)}>Revisar</Button>
-                      </>
-                    )}
-                    {c.logEntryId && (c.status === "SUBMITTED" || c.status === "APPROVED") && (
-                      <Button variant="secondary" leftIcon={<Eye size={14} />} onClick={() => setFillId(c.logEntryId)}>Ver</Button>
-                    )}
-                    {!c.mandatory && c.status === "PENDING" && (
-                      <Button variant="secondary" leftIcon={<Trash2 size={14} />} onClick={() => remove.mutate(c.id, { onError: err })}>Quitar</Button>
-                    )}
-                  </div>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+        <div className={styles.checklistGroups}>
+          {groups.map((g) => (
+            <section key={g.moment} className={styles.checklistGroup}>
+              <div className={styles.checklistGroupHead}>
+                <span className={styles.checklistGroupTitle}>{WORK_ORDER_CHECKLIST_MOMENT_META[g.moment].label}</span>
+                <span className={styles.checklistGroupHint}>{WORK_ORDER_CHECKLIST_MOMENT_META[g.moment].hint}</span>
+              </div>
+              <ul className={styles.checklistList}>{g.items.map(renderItem)}</ul>
+            </section>
+          ))}
+        </div>
       )}
 
       {addOpen && <AddChecklistModal workOrderId={workOrderId} present={checklists} onClose={() => setAddOpen(false)} />}
@@ -161,7 +180,7 @@ function AddChecklistModal({ workOrderId, present, onClose }: { workOrderId: str
     const seen = new Set<string>();
     return rules
       .filter((r) => r.active && !presentTemplateIds.has(r.templateId) && !seen.has(r.templateId) && seen.add(r.templateId))
-      .map((r) => ({ id: r.templateId, name: r.templateName ?? r.name }));
+      .map((r) => ({ id: r.templateId, name: r.templateName ?? r.name, moment: r.moment }));
   }, [rules, present]);
 
   return (
@@ -169,7 +188,7 @@ function AddChecklistModal({ workOrderId, present, onClose }: { workOrderId: str
       <>
         <Button variant="secondary" onClick={onClose}>Cancelar</Button>
         <Button variant="primary" loading={add.isPending} disabled={!templateId}
-          onClick={() => add.mutate({ templateId }, { onSuccess: () => { toast.success("Checklist agregado"); onClose(); }, onError: (e) => toast.error((e as Error).message) })}>
+          onClick={() => add.mutate({ templateId, moment: options.find((o) => o.id === templateId)?.moment }, { onSuccess: () => { toast.success("Checklist agregado"); onClose(); }, onError: (e) => toast.error((e as Error).message) })}>
           Agregar
         </Button>
       </>
