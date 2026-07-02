@@ -4,6 +4,23 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-02 · OT — FIX: folio de OT = serie ÚNICA GLOBAL (corrige colisión entre tipos)
+El bug de folio cross-tipo detectado al cerrar S3 (ver abajo, decisión #6) se **corrigió el mismo día** porque bloqueaba
+al dueño (aprobar una 2.ª OT de otro tipo → Internal Error 500). *Decisión:* el default de `folioScheme` pasa de
+**scope `type`** a **scope `global`** (`DEFAULT_WORK_ORDER_FOLIO_SCHEME` en `packages/contracts/src/work-orders/folio.ts`).
+*Motivo:* el folio renderizado (`OT-2026-0001`) NO incluye el tipo y `WorkOrder.folio` es único GLOBAL; con contador por
+tipo, dos tipos distintos generaban el mismo string y colisionaban. `global` = **una sola serie anual de número de OT**
+(estándar SAP PM / Maximo: un único rango de WO number), siempre única, conservando EXACTO el formato `OT-2026-0001`
+aprobado. Si un cliente quiere serie por tipo, usa una `mask` con el tipo en el `folioScheme` del `WorkOrderType`. Se
+agregó **reconciliación idempotente** en `seed.ts` (`reconcileWorkOrderFolioCounters`): fija `workorder|global|<año>` al
+mayor número de folio ya emitido ese año, para no re-emitir un folio existente (los OT de QA `OT-2026-0001`/`0002` quedan
+intactos; el siguiente correlativo es `0003`). Esto **reinterpreta** el literal de W4 ("por tipo"), que era
+auto-contradictorio con el string sin tipo — es el tipo de corrección con fundamento que el dueño pide. `folio.spec.ts`
+actualizado (default global + caso type opt-in); contracts **413**, smoke-workorders **65/65** (el smoke usa
+`folioScheme {prefix:"OTSMK", scope:"type"}` para aislar su serie), aprobación real verificada (`OT-2026-0003`).
+
+---
+
 ### 2026-07-02 · OT — Sesión 3 (Puerta 2 · checklists / PTW): decisiones de implementación
 Al dar vida a la fase Preparación (`feat/ot-puerta2`: reglas + checklists + instanciación LogEntry + guard) se tomaron
 las siguientes decisiones no explícitas en el diseño (§2.4 / fork W5):

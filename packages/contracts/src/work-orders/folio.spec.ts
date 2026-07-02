@@ -30,9 +30,14 @@ describe("resolveFolioScheme", () => {
 describe("buildFolioSeqKey", () => {
   const year = 2026;
 
-  it("scope=type + reset=annual (default OT): entidad|type:id|año", () => {
+  it("default OT (scope=global + reset=annual): entidad|global|año", () => {
     const key = buildFolioSeqKey(DEFAULT_WORK_ORDER_FOLIO_SCHEME, { entity: "workorder", typeId: "t1", year });
-    expect(key).toBe("workorder|type:t1|2026");
+    expect(key).toBe("workorder|global|2026");
+  });
+
+  it("scope=type + reset=annual (opt-in por tipo): entidad|type:id|año", () => {
+    const scheme = resolveFolioScheme({ scope: "type" });
+    expect(buildFolioSeqKey(scheme, { entity: "workorder", typeId: "t1", year })).toBe("workorder|type:t1|2026");
   });
 
   it("scope=global sin reinicio: sin id ni año", () => {
