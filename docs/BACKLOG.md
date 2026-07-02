@@ -7,9 +7,10 @@
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
 > actualización: **2026-07-01** — **🔧 OT · Sesión 1 · CIMIENTOS ✅** (`feat/ot-cimientos`): `WorkOrder`+`WorkOrderType`+
 > `Area`/`Specialty` (N:N), 8 permisos grupo `workorders`, backend CRUD+ABAC, web `/ordenes-trabajo` (grilla+wizard),
-> seed de arranque; folio/workflow INERTES (S2); verde + `smoke-workorders.py` **31/31**. **DEUDA nueva:** SavedView de OT
-> (+ Incidencias) como slice transversal, y pantalla de mantenedor de catálogos de OT — ambos pendientes. **Siguiente:
-> OT Sesión 2 (Puerta 1 + `FolioCounter`).** Antes (2026-07-01, SIN código): **📋 ROADMAP MÓDULO ÓRDENES DE TRABAJO
+> seed de arranque; folio/workflow INERTES (S2); verde + `smoke-workorders.py` **35/35**. **+ Anexo post-S1 ✅**
+> (`feat/ot-catalogos`): mantenedor de catálogos `/ordenes-trabajo/catalogos` (Tipos/Áreas/Especialidades) + seed realista
+> CMMS/EAM (10 tipos, 11 áreas de planta minera, 13 disciplinas). **DEUDA que queda:** SavedView de OT (+ Incidencias) =
+> slice transversal pendiente. **Siguiente: OT Sesión 2 (Puerta 1 + `FolioCounter`).** Antes (2026-07-01, SIN código): **📋 ROADMAP MÓDULO ÓRDENES DE TRABAJO
 > (OT / PTW) registrado** en §2 (épico nuevo, 8 sesiones S0–S8, ~397 HH; oportunidad real de cliente minero;
 > **entitlements de módulo DIFERIDOS** al épico de licenciamiento §2(1)). Ver DECISIONS 2026-07-01 y memoria
 > `work-orders-module-plan`.
@@ -676,8 +677,12 @@ nunca queda más de una sesión atrás.
       especialidades). Web `/ordenes-trabajo` (grilla+facetas+paginación arriba/abajo + wizard 2 pasos + drawer detalle).
       verde (typecheck/lint/build/test) + `smoke-workorders.py` **31/31**. **La solicitud nace OPEN** (DRAFT reservado
       para el estado `borrador` del flujo, S2). **DEUDA registrada:** SavedView de OT (y de Incidencias) = slice
-      transversal pendiente — ver §3; el mantenedor de catálogos de OT (pantalla `/ordenes-trabajo/catalogos`) tampoco
-      se construyó (los catálogos se administran hoy por API/seed) → pendiente. **Siguiente = Sesión 2.**
+      transversal pendiente — ver §3. **Siguiente = Sesión 2.**
+      - [x] **Anexo (post-S1) — Mantenedor de catálogos de OT + seed de industria ✅ 2026-07-01** (`feat/ot-catalogos`):
+            pantalla `/ordenes-trabajo/catalogos` (3 sub-pestañas Tipos/Áreas/Especialidades, gate `workordercatalog:manage`,
+            botón en header, `inSidebar:false`) + seed realista CMMS/EAM (10 tipos, 11 áreas de planta, 13 especialidades;
+            retira mecánica/eléctrica como «áreas» → son disciplinas, guardado sin borrar en uso). smoke **35/35**. Sin
+            schema/permiso/contrato nuevos. **Cierra la deuda del mantenedor de catálogos de OT.**
 - [ ] **Sesión 2 — Aprobación inicial + folio al aprobar / Puerta 1 (~35 HH):** workflow congelado, aprobar/rechazar
       (**motivo obligatorio**), `FolioCounter` gapless (emite folio **SOLO al aprobar**), firma Part 11 + timeline.
 - [ ] **Sesión 3 — Motor de checklists ligados / Puerta 2 (~45 HH):** tabla enlace `WorkOrderChecklist` + reglas de

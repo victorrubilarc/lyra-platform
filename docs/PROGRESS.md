@@ -1,5 +1,23 @@
 # Progreso — Lyra WatchLog
 
+**2026-07-01 — 🔧 OT · S1 · anexo · Mantenedor de catálogos + seed de industria ✅** (`feat/ot-catalogos`). Cierra
+una deuda que quedó abierta en S1: los catálogos de OT (Tipos/Áreas/Especialidades) ya se administran **desde la app**,
+no solo por API/seed. **Web**: pantalla `/ordenes-trabajo/catalogos` (gate `workordercatalog:manage`, botón «Catálogos»
+en el header de `/ordenes-trabajo`, sub-ruta `inSidebar:false` para no doblar el resaltado — patrón de Incidencias) con
+3 sub-pestañas (Tipos · Áreas · Especialidades), cada una con buscador + filtro activo/inactivo + orden + paginación
+arriba/abajo + toggle activar/desactivar + crear/editar en modal (colisión de key → 409, key inmutable al editar,
+swatches de color del DS). Componentes: `WorkOrderCatalogsPage`, `WorkOrderTypeModal`, `WorkOrderTagModal` (Área y
+Especialidad comparten un modal parametrizado por `kind`); queries admin (`…Admin` con `includeInactive`) + mutaciones
+upsert. **Seed enriquecido con datos reales de industria (CMMS/EAM: SAP PM order types, Maximo work types, ISO 14224)**:
+10 tipos (correctiva, correctiva de emergencia, preventiva, predictiva, inspección, lubricación, calibración, overhaul,
+mejora, PTW alto riesgo), 11 áreas de planta minera (Mina/Rajo, Chancado, Molienda, Flotación, Espesamiento y relaves,
+Correas, Servicios/Utilidades, Puerto, Planta de procesos, Taller, Obras civiles), 13 especialidades/disciplinas
+(mecánica, eléctrica, instrumentación, automatización PLC/DCS, soldadura, hidráulica, neumática, lubricación, HVAC,
+piping, estructuras, izaje/rigging, pintura); las 2 «áreas» iniciales que en realidad eran disciplinas (mecánica/
+eléctrica) se retiran del catálogo de áreas SOLO si ninguna OT las referencia (guardado). typecheck(0)/lint(0 errores)/
+build verdes; `scripts/smoke-workorders.py` ampliado a **35/35** (catálogos tipos+áreas+especialidades + activar/
+desactivar). **No** hubo cambio de schema/permiso/contrato. **Cierra la deuda "mantenedor de catálogos de OT" de S1.**
+
 **2026-07-01 — 🔧 OT · Sesión 1 · CIMIENTOS ✅** (`feat/ot-cimientos`). Primer código del módulo de Órdenes de
 Trabajo (OT/PTW), espejo de Incidencias. Levanta el esqueleto hasta **crear y listar una SOLICITUD** — sin workflow,
 folio, checklists ni actividades (esos son S2–S5). **Schema** (migración `20260701180000_add_work_orders`): entidades

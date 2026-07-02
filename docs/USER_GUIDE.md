@@ -142,6 +142,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 
 ### 18. Órdenes de trabajo (OT / PTW)  [todos los roles operativos]
 - ✅ **Crear y listar solicitudes de trabajo** (asistente de 2 pasos, grilla con filtros/facetas, detalle con reasignar/prioridad/anular) (§ Órdenes de trabajo)
+- ✅ **Administrar los catálogos** (tipos de OT, áreas y especialidades) (§ Órdenes de trabajo ▸ Catálogos) [solo administrador]
 - ✍️ Aprobación y folio al aprobar (Puerta 1 — Sesión 2)
 - ✍️ Checklists / permisos de trabajo, plan de actividades y cierre (Puertas 2–4 — Sesiones 3–5)
 
@@ -184,6 +185,30 @@ entregas del módulo.
 - La solicitud nace **abierta**. El **folio oficial**, el flujo de **aprobación** (con firma), los **checklists/PTW**,
   el **plan de actividades** y el **cierre** llegan en las Sesiones 2–5 del módulo.
 - Una **incidencia** podrá generar una OT (enlace bidireccional) en una entrega posterior.
+
+### Órdenes de trabajo ▸ Catálogos (tipos, áreas y especialidades)  [Admin]
+
+**Para qué sirve.** Definir las **opciones** que aparecen al crear una solicitud: los **tipos de OT** (correctiva,
+preventiva, predictiva, PTW de alto riesgo…), las **áreas** (zonas de planta: Chancado, Molienda, Flotación…) y las
+**especialidades/disciplinas** (mecánica, eléctrica, instrumentación…). Vienen con un **catálogo de arranque realista de
+la industria** (alineado a CMMS/EAM tipo SAP PM / Maximo) que puedes ajustar a tu operación.
+
+**Cómo se usa.**
+1. En **Órdenes de trabajo**, pulsa **«Catálogos»** (arriba a la derecha; solo visible para administradores).
+2. Elige la sub-pestaña **Tipos**, **Áreas** o **Especialidades**. En cada una: busca, filtra por activo/inactivo, ordena,
+   y usa el interruptor para **activar/desactivar** una fila.
+3. **«Nuevo…»** abre un formulario con nombre, **clave** (identificador estable, minúsculas/números/guiones, **no se puede
+   cambiar** después), descripción y color del chip. En **Tipos** además: flujo por defecto (se usará en la S2), criticidad
+   sugerida y si **requiere PTW** por defecto.
+4. Al **editar**, la clave queda bloqueada (es la identidad del catálogo). Desactivar un elemento lo **saca de los
+   desplegables** del alta pero **no lo borra** (sigue visible aquí con el filtro «Inactivos»).
+
+**Quién puede.** Requiere **`workordercatalog:manage`**. Ver/usar los catálogos al crear una OT no requiere este permiso
+(basta `workorder:create`).
+
+**Importante.** No hay borrado físico: un tipo/área/especialidad se **desactiva**, no se elimina (preserva el historial de
+las OT que lo usaron). La **clave** es inmutable; elígela con cuidado. Crear con una clave ya existente se rechaza (evita
+duplicados silenciosos).
 
 ---
 

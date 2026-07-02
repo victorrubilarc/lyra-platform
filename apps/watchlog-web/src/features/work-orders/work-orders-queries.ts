@@ -4,6 +4,9 @@ import type {
   CancelWorkOrderRequest,
   CreateWorkOrderRequest,
   UpdateWorkOrderRequest,
+  UpsertAreaRequest,
+  UpsertSpecialtyRequest,
+  UpsertWorkOrderTypeRequest,
   WorkOrderListQuery,
 } from "@lyra/contracts";
 import {
@@ -19,6 +22,9 @@ import {
   fetchWorkOrderTypes,
   fetchWorkOrders,
   updateWorkOrder,
+  upsertWorkOrderArea,
+  upsertWorkOrderSpecialty,
+  upsertWorkOrderType,
 } from "./work-orders-api.js";
 import { useActiveStructureId } from "../structure/structure-queries.js";
 
@@ -56,6 +62,43 @@ export function useWorkOrderAreas() {
 
 export function useWorkOrderSpecialties() {
   return useQuery({ queryKey: WORK_ORDER_KEYS.specialties(), queryFn: () => fetchWorkOrderSpecialties() });
+}
+
+/** Variantes para el MANTENEDOR: incluyen inactivos (key distinto, no contamina los desplegables del alta). */
+export function useWorkOrderTypesAdmin() {
+  return useQuery({ queryKey: [...WORK_ORDER_KEYS.types(), "admin"], queryFn: () => fetchWorkOrderTypes(true) });
+}
+
+export function useWorkOrderAreasAdmin() {
+  return useQuery({ queryKey: [...WORK_ORDER_KEYS.areas(), "admin"], queryFn: () => fetchWorkOrderAreas(true) });
+}
+
+export function useWorkOrderSpecialtiesAdmin() {
+  return useQuery({ queryKey: [...WORK_ORDER_KEYS.specialties(), "admin"], queryFn: () => fetchWorkOrderSpecialties(true) });
+}
+
+export function useUpsertWorkOrderType() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ dto, create }: { dto: UpsertWorkOrderTypeRequest; create?: boolean }) => upsertWorkOrderType(dto, create),
+    onSuccess: () => qc.invalidateQueries({ queryKey: WORK_ORDER_KEYS.types() }),
+  });
+}
+
+export function useUpsertWorkOrderArea() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ dto, create }: { dto: UpsertAreaRequest; create?: boolean }) => upsertWorkOrderArea(dto, create),
+    onSuccess: () => qc.invalidateQueries({ queryKey: WORK_ORDER_KEYS.areas() }),
+  });
+}
+
+export function useUpsertWorkOrderSpecialty() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ dto, create }: { dto: UpsertSpecialtyRequest; create?: boolean }) => upsertWorkOrderSpecialty(dto, create),
+    onSuccess: () => qc.invalidateQueries({ queryKey: WORK_ORDER_KEYS.specialties() }),
+  });
 }
 
 export function useWorkOrderAssignableUsers() {
