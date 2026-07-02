@@ -4,6 +4,35 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-02 · Editor visual de FOLIO configurable (reutilizable) + folio-por-plantilla de bitácora
+Cierra la deuda "editor UI de `folioScheme`" (OT, desde S2) y el requerimiento del dueño de "correlativo propio por
+plantilla" (BACKLOG 2026-06-30), con UN componente compartido y reusando el motor gapless de OT. El dueño aprobó las
+4 decisiones (vía 4 preguntas, con mi recomendación fundada, contrastando SAP PM SNRO / Maximo / NetSuite):
+1. **Dónde vive el esquema en bitácora = `Template` (contenedor MUTABLE), NO `TemplateVersion`** (decisión (a)). Es config
+   de gobernanza/display, igual que `editWindowMinutes`/`equipmentMode`/`gridFieldKeys` — no parte de la MMR inmutable Part 11.
+   En SAP (SNRO number ranges) y NetSuite (auto-numbering por record type) la numeración se asigna por *tipo de documento*
+   como config mutable, jamás dentro de la definición versionada; poner el prefijo en la versión forzaría republicar una
+   versión controlada por un cambio de "RT-". Los folios ya emitidos son strings inmutables en el `LogEntry` (cero
+   retro-alteración). **Herencia por nodo/estructura: NO** (especulativo) — el eje `scope=node|structure` DENTRO del esquema
+   ya da series separadas por nodo/estructura sin heredar el esquema.
+2. **Cuándo se emite = al SELLAR (commit GxP), fijo** (decisión (b)). Emitir al crear el borrador quemaría un número por cada
+   borrador abandonado/anulado (VOID) ⇒ huecos inexplicables en la serie humana (los auditores GxP los rechazan). Paridad
+   conceptual con `folioOnStateKey` de OT ("folio sólo al aprobar"). El borrador ya tiene `id`+`entryNumber` como handle;
+   el folio configurable es el *número de documento humano* del registro comprometido. No configurable (evito parametrizar
+   por parametrizar) — si un cliente pide "al crear", se agrega un toggle.
+3. **Optativo por plantilla + fallback** (decisión (c)). Sin esquema ⇒ correlativo global actual (`entryNumber`/"BIT-######",
+   cero regresión, deep-links intactos); con esquema ⇒ folio propio gapless. Gobernanza = reusa `template:edit` (parte de
+   "Guardar configuración" del Form Builder). **Sin permiso nuevo.**
+4. **Componente compartido en `features/shared` + motor en `contracts/src/shared/folio.ts`** (decisión (d)). El `FolioSchemeEditor`
+   es *domain-aware* (importa los helpers de `@lyra/contracts`) ⇒ NO va en `packages/ui` (design-system presentacional, no debe
+   depender de contracts). Vive en una feature web compartida, usa primitivos Input/Select/Toggle de `@lyra/ui`, y lo reusan el
+   `WorkOrderTypeModal` (OT) y el `TemplateBuilder` (bitácora). El motor puro se **movió** de `work-orders/folio.ts` a
+   `shared/folio.ts` (ya no es "de OT"): `resolveFolioSchemeWith(raw, defaults)` se parametrizó por entidad, `work-orders/folio.ts`
+   conserva el default OT + `resolveFolioScheme` de 1-arg (cero churn de imports), y `log-entries` aporta su propio default.
+   Se añadió `folioSchemeWarnings(scheme, domain)` (avisos de colisión scope/mask, codifica el aprendizaje del `fix/ot-folio-global`:
+   bajo unicidad `global` un scope no-global colisiona salvo prefijo distinto por tipo; bajo `per-type` cada plantilla es su serie).
+   **`LogEntry.folio` NO es único global** a propósito (la unicidad la garantiza el contador por serie).
+
 ### 2026-07-02 · OT S6 — SLA, avisos de plazo, escalamiento y semáforos ("vigía digital")
 ESPEJO de la Fase 4.4 de Incidencias (se clonó `IncidentSlaService`/resolvers/helpers, no se reinventó). El dueño aprobó
 las 4 decisiones (vía preguntas, con mi recomendación fundada):

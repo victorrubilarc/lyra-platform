@@ -35,6 +35,7 @@ export * from "./reference-data/reference-data.js";
 
 // Utilidades de fecha compartidas (eje turno + eje período)
 export * from "./shared/date-utils.js";
+export * from "./shared/folio.js";
 
 // Calendario operacional (turnos + día operacional) (Fase 2.3.0)
 export * from "./operational-calendar/operational-calendar.js";

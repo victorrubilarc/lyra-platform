@@ -177,8 +177,12 @@ function makeServices(prismaOver: Record<string, unknown> = {}, scopeOver: Parti
   const ruleActions = {
     emit: vi.fn().mockResolvedValue(undefined),
   } as unknown as import("../rule-actions/rule-action-emitter.service").RuleActionEmitterService;
+  const folio = {
+    next: vi.fn().mockResolvedValue(1),
+    plantYear: vi.fn().mockReturnValue(2026),
+  } as unknown as import("../folio/folio.service").FolioService;
 
-  const entries = new LogEntriesService(prisma, audit, scope, shiftResolver, fiscalResolver, reauth, enc, periods, permissions, settings, storage, notifications, exceptionGenerator, ruleActions);
+  const entries = new LogEntriesService(prisma, audit, scope, shiftResolver, fiscalResolver, reauth, enc, periods, permissions, settings, storage, notifications, exceptionGenerator, ruleActions, folio);
   const logbook = new LogbookQueryService(prisma, scope, audit, enc, entries, shiftResolver);
   return { logbook, entries, prisma, audit, scope, shiftResolver };
 }

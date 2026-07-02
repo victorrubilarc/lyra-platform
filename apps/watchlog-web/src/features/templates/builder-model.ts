@@ -51,6 +51,7 @@ import type {
   CrossRule,
   EditWindowAnchor,
   EquipmentMode,
+  FolioScheme,
   TemplatePurpose,
   FieldSemanticRole,
   FieldType,
@@ -442,6 +443,9 @@ export interface EditState {
   /** Campos de resumen en la grilla de Bitácoras (2.8.1a) — pool ORDENADO de `key`,
    * gobernanza viva del contenedor. "El diseñador ofrece, el usuario dispone." */
   gridFieldKeys: string[];
+  /** Folio de documento CONFIGURABLE por plantilla (folio-por-plantilla), gobernanza
+   * viva del contenedor. null = sin esquema propio (usa el correlativo global). */
+  folioScheme: FolioScheme | null;
   /** Reglas de validación CRUZADA (Req-7), parte de la versión INMUTABLE. */
   rules: CrossRule[];
   sections: EditSection[];
@@ -504,6 +508,7 @@ export function detailToEditState(detail: TemplateDetail): EditState {
     editWindowMinutes: detail.editWindowMinutes,
     equipmentMode: detail.equipmentMode,
     gridFieldKeys: detail.gridFieldKeys,
+    folioScheme: detail.folioScheme,
     rules: detail.version.rules.map((r) => ({ ...r })),
     sections: detail.version.sections.map((s) => {
       // Geometría: si ALGÚN campo no la trae (plantilla legacy), se deriva TODA la
@@ -633,6 +638,8 @@ export function editStateToConfigRequest(state: EditState): UpdateTemplateReques
     // Campos de resumen de grilla (2.8.1a): solo keys que aún existen en la versión
     // (poda de huérfanos al guardar). El backend revalida; el cap (6) lo cuida la UI.
     gridFieldKeys: state.gridFieldKeys.filter((k) => collectFieldKeys(state).has(k)),
+    // Folio-por-plantilla (gobernanza viva): null = sin esquema propio.
+    folioScheme: state.folioScheme,
   };
 }
 

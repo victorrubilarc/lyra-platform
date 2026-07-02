@@ -20,6 +20,7 @@ import {
   validateRulesDesign,
   type FieldForRules,
 } from "../rules/rules.js";
+import { folioSchemeSchema } from "../shared/folio.js";
 
 /**
  * Plantillas / Form Builder (Fase 2.1) — contratos compartidos.
@@ -230,6 +231,14 @@ export const templateSchema = z.object({
    * por el `key` ESTABLE del campo (no la versión inmutable): se aplica sin republicar.
    */
   gridFieldKeys: z.array(z.string()),
+  /**
+   * Folio de documento CONFIGURABLE por plantilla (folio-por-plantilla, 2026-07-02) —
+   * GOBERNANZA VIVA en el contenedor mutable (mismo patrón que editWindow/equipmentMode:
+   * SAP PM number range / NetSuite auto-numbering por tipo de documento, NO en la versión
+   * inmutable). null = sin esquema propio ⇒ la entrada usa el correlativo global
+   * `entryNumber` ("BIT-######"). Con esquema ⇒ folio propio emitido al SELLAR.
+   */
+  folioScheme: folioSchemeSchema.nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -286,6 +295,8 @@ export const createTemplateRequestSchema = z.object({
   equipmentMode: equipmentModeSchema.optional(),
   /** Campos de resumen de grilla (2.8.1a). Si se envía, REEMPLAZA el set. Omitido = []. */
   gridFieldKeys: gridFieldKeysSchema.optional(),
+  /** Folio propio (folio-por-plantilla). null = sin esquema; omitido = default (sin folio). */
+  folioScheme: folioSchemeSchema.nullable().optional(),
 });
 export type CreateTemplateRequest = z.infer<typeof createTemplateRequestSchema>;
 
@@ -304,6 +315,8 @@ export const updateTemplateRequestSchema = z.object({
   equipmentMode: equipmentModeSchema.optional(),
   /** Campos de resumen de grilla (2.8.1a). Si se envía, REEMPLAZA el set. Omitido = sin cambio. */
   gridFieldKeys: gridFieldKeysSchema.optional(),
+  /** Folio propio (folio-por-plantilla). Enviar null = quitar esquema; omitido = sin cambio. */
+  folioScheme: folioSchemeSchema.nullable().optional(),
 });
 export type UpdateTemplateRequest = z.infer<typeof updateTemplateRequestSchema>;
 

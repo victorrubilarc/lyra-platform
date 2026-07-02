@@ -1,5 +1,42 @@
 # Progreso — Lyra WatchLog
 
+**2026-07-02 — 🔢 Editor visual de FOLIO configurable (reutilizable) + folio-por-plantilla de bitácora ✅** (`feat/folio-editor-y-plantillas`).
+Cierra DOS deudas de una: (A) el **editor UI de `folioScheme`/`folioOnStateKey`** que faltaba en el mantenedor de tipos de OT
+(hoy era API-only, deuda desde S2) y (B) el requerimiento del dueño (BACKLOG 2026-06-30) de **correlativo/folio PROPIO por
+plantilla** de bitácora — ambos con el MISMO componente compartido y **cero reinvención** (reusan el motor gapless
+`FolioCounter`/`FolioService` + `folio.ts` ya existentes de OT). **4 decisiones aprobadas por el dueño con mi recomendación**
+(vía 4 preguntas, contrastando SAP PM SNRO / Maximo / NetSuite): (a) el esquema vive en **`Template` (contenedor MUTABLE)** con
+fallback global, NO en `TemplateVersion` (es config de gobernanza como editWindow/equipmentMode; en SAP/NetSuite la numeración
+por tipo de documento es config mutable, no parte de la definición versionada); (b) el folio se emite **al SELLAR** (commit GxP),
+NO al crear el borrador (borradores abandonados dejarían huecos en la serie humana; paridad con `folioOnStateKey` de OT); (c)
+**optativo por plantilla + fallback** (sin esquema ⇒ correlativo global `entryNumber`/"BIT-######", cero regresión, deep-links
+intactos; con esquema ⇒ folio propio); (d) componente **`FolioSchemeEditor` en `features/shared`** (domain-aware, usa primitivos
+de `@lyra/ui`, NO va en el design-system) + el motor puro se **movió** a `packages/contracts/src/shared/folio.ts` (ya no es "de
+OT"). **Contracts:** `shared/folio.ts` = motor NEUTRAL (`folioSchemeSchema`, scopes/resets, `buildFolioSeqKey` con
+`entity:"logentry"`, `renderFolio`, `resolveFolioSchemeWith(raw, defaults)` parametrizado + **`folioSchemeWarnings(scheme,
+domain)`** que avisa de colisiones scope/mask — codifica el aprendizaje del `fix/ot-folio-global`); `work-orders/folio.ts` conserva
+los defaults OT + `resolveFolioScheme` de 1-arg (cero churn); `log-entries/log-entries.ts` gana `DEFAULT_LOG_ENTRY_FOLIO_SCHEME`
+(scope=type = **por plantilla**, anual, prefijo "DOC"), `resolveLogEntryFolioScheme`, `LogEntry.folio` (nullable) y el helper
+**`entryFolioLabel(entry)`** (fuente única del rótulo: folio propio ?? "BIT-######"); `Template.folioScheme` en el DTO/create/update.
+**Migración aditiva `20260702230000_add_template_folio`** (`Template.folioScheme` Json? + `LogEntry.folio`/`folioSeqKey` TEXT;
+drift ajeno `LogEntry_currentStateSince_idx`+`OrgStructure.updatedAt` descartado a mano; node de :3000 detenido por EPERM). **Backend:**
+`TemplatesService` persiste/expone `folioScheme` (create/updateMeta/DTO/audit); `LogEntriesService` inyecta `FolioService`
+(vía `FolioModule`) y **emite el folio DENTRO de la tx del sellado** (helper `issueFolioWithinTx`, llamado en `submit()` y en
+`executeTransition()` cuando `seal`; scope=type ⇒ `typeId`=`templateId`, gapless; sin esquema ⇒ folio null); `logbook-query`
+expone `folio` en grilla/CSV via `entryFolioLabel`. **`folio` NO es único global** a propósito (dos plantillas pueden compartir
+prefijo bajo scope=type; la unicidad la garantiza el contador por serie; `entryNumber` sigue siendo el handle interno). **Web:**
+`FolioSchemeEditor` compartido (toggle activar + prefijo/ámbito/reinicio/relleno/inicio/máscara + **vista previa EN VIVO** de 2
+folios + clave de secuencia + avisos), reusado por **`WorkOrderTypeModal`** (entity `workorder`, dominio `global`, + picker "¿cuándo
+se emite?" con los estados del flujo) y por **`TemplateBuilder`** (entity `logentry`, dominio `per-type`, sub-pestaña "Identidad y
+gobernanza"); grilla/visor/peek/flow de bitácoras muestran `entryFolioLabel` (folio propio con fallback). **SIN permiso nuevo**
+(OT=`workordercatalog:manage`, plantilla=`template:edit`) ⇒ **sin db:seed/FLUSHALL**. Verde: typecheck (7) · lint 0 err · build
+(contracts+web) · **contracts 459** (+11 `shared/folio.spec`) · **API 252** · web 6 · **smoke-folio.py 13/13** (OT máscara
+`PTWSMK/AAAA/0001` gapless por tipo + bitácora sin esquema⇒folio null + con esquema⇒`RTSMK-AAAA-0001` gapless por plantilla + serie
+independiente por plantilla + listado expone el folio) + regresión **smoke-workorders 122/122** + **incidencias 32/32**. Ver
+DECISIONS 2026-07-02 (Folio editor). **Pendiente:** smoke VISUAL del dueño (crear tipo OT con folio `PTW/{YYYY}/{SEQ}` y ver la
+vista previa; crear plantilla con folio propio y sellar una entrada para ver el folio real). **Siguiente = OT S7 (Dashboard de OT
++ integración Incidencia→OT).**
+
 **2026-07-02 — 🔧 OT · Sesión 6 · SLA, avisos de plazo, escalamiento y semáforos ("vigía digital") ✅** (`feat/ot-sla-semaforos`).
 ESPEJO de la Fase 4.4 de Incidencias (se clonó `IncidentSlaService`/resolvers/helpers; nada reinventado). **SIN migración**
 (las columnas `WorkOrderType.resolutionDueMinutes/escalationAfterMinutes/escalationRoleId`, `WorkOrder.dueAt` y

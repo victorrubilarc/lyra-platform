@@ -1438,7 +1438,15 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
 ### Requerimientos del dueño 2026-06-14 (registrados, sin planificar fecha) 🆕
 > Capturados el 2026-06-14. Pendientes de plan/aprobación por sesión. Análisis y referencias de industria abajo.
 
-- [ ] **Correlativo/folio PROPIO por plantilla, definible por el constructor (registrado 2026-06-30) 🆕.** El dueño pide
+- [x] **✅ Correlativo/folio PROPIO por plantilla — HECHO 2026-07-02** (`feat/folio-editor-y-plantillas`). Implementado
+      EXACTAMENTE con el enfoque acordado (un esquema configurable + contador atómico genérico): `Template.folioScheme`
+      (Json, gobernanza VIVA del contenedor, migr. `20260702230000_add_template_folio`) editable en el Form Builder con el
+      **`FolioSchemeEditor` compartido** (mismo componente que el folio de OT) + vista previa en vivo; `LogEntry.folio`
+      (nullable, ADITIVO — `entryNumber` global intacto) **emitido al SELLAR** vía `FolioService`/`FolioCounter` gapless
+      (scope `type`=por plantilla, `node`/`structure` disponibles, reinicio `never`/`annual`); sin esquema ⇒ fallback al
+      correlativo global (`entryFolioLabel`); folio en grilla/visor/peek/CSV. MVP entregado + máscara con tokens. Referencia
+      cumplida (SAP number range / NetSuite auto-numbering por tipo de doc). *(Detalle histórico del enfoque, abajo.)*
+- [ ] ~~**Correlativo/folio PROPIO por plantilla, definible por el constructor (registrado 2026-06-30)**~~ El dueño pide
       que cada **plantilla/formulario tenga su PROPIO correlativo** y que el **constructor de la plantilla lo defina**:
       prefijo (p. ej. `PT-`, `OT-`, `RONDA-`), formato/relleno de ceros y **desde qué número empieza** (número inicial).
       **INVESTIGADO 2026-06-30 — HOY NO EXISTE:** el folio de una entrada es `LogEntry.entryNumber Int @unique
@@ -1991,13 +1999,12 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
 
 > Items con fundamento ya discutidos; aquí para que no se diluyan en `DECISIONS.md`.
 
-### OT · S2 — Editor UI del esquema de folio (`folioScheme` / `folioOnStateKey`) (2026-07-01, ~4–6 HH)
-- [ ] Hoy `WorkOrderType.folioScheme` ({prefix, mask, padding, start, scope, reset}, Zod `folioSchemeSchema`) y
-      `folioOnStateKey` son **configurables solo por API** (`POST /work-orders/types`); el `WorkOrderTypeModal` del
-      mantenedor no los expone. El default OT (por-tipo + reinicio anual ⇒ `OT-2026-0001`) cubre el caso aprobado (W4),
-      así que no bloquea. Al abordarlo: sección "Folio" en el modal (prefijo/relleno/alcance/reinicio + estado emisor
-      con las claves del flujo del tipo) + vista previa `renderFolio`. **El motor (`FolioCounter`/`FolioService` +
-      formateo puro en contracts) ya está listo y sirve también al folio-por-plantilla del dueño (§2 2026-06-30).**
+### OT · S2 — Editor UI del esquema de folio (`folioScheme` / `folioOnStateKey`) — ✅ HECHO 2026-07-02
+- [x] **✅ HECHO 2026-07-02** (`feat/folio-editor-y-plantillas`). El `WorkOrderTypeModal` gana la sección "Folio de la
+      orden" con el **`FolioSchemeEditor` compartido** (prefijo/ámbito/reinicio/relleno/inicio/máscara + **vista previa en
+      vivo** de 2 folios + clave de secuencia + avisos de colisión scope/mask) + picker "¿cuándo se emite?" poblado con los
+      estados del flujo del tipo (o el global OT). Reutiliza el mismo componente que el folio-por-plantilla de bitácora. El
+      motor puro se movió a `packages/contracts/src/shared/folio.ts` (ya no es "de OT"). Sin permiso nuevo.
 
 ### Despliegue AWS — blindaje de deploys continuos (2026-06-22) — ver `docs/DEPLOYMENT.md`
 > WatchLog **EN VIVO** en `lyra.watchlog.itesicws.com`, en el EC2 compartido con Lyra Pass.

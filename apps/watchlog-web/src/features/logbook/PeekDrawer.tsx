@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { ExternalLink, GitBranch, History, Lock, PenLine, TriangleAlert } from "lucide-react";
 import { Button, Chip, Drawer } from "@lyra/ui";
-import { formatEntryFolio, type LogEntryListItem } from "@lyra/contracts";
+import { entryFolioLabel, type LogEntryListItem } from "@lyra/contracts";
 import { formatDateTime } from "../../lib/format.js";
 import { formatSummaryValue } from "./logbook-cells.js";
 import styles from "./Logbook.module.css";
@@ -27,7 +27,7 @@ export function PeekDrawer({ row, onClose, onOpenFull, onEdit, onViewFlow, canEd
     <Drawer
       open={row !== null}
       onClose={onClose}
-      title={row ? formatEntryFolio(row.entryNumber) : ""}
+      title={row ? entryFolioLabel(row) : ""}
       footer={
         row ? (
           <div className={styles.peekFooter}>

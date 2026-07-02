@@ -442,6 +442,21 @@
   republicar. Validación: cap **6** + sin duplicados (contrato `gridFieldKeysSchema`); cada key debe existir en alguna versión
   de la plantilla (`assertGridFieldKeysExist`, tolera cross-versión; key órfano se ignora). Auditado before/after en
   `template.updated`. **"El diseñador ofrece (showInGrid), el usuario dispone"** (la elección por usuario llega en 2.8.1b/SavedView).
+- **`Template.folioScheme`** (`Json?`, migr. `20260702230000_add_template_folio`) *(folio-por-plantilla, 2026-07-02)* — esquema
+  de folio de documento CONFIGURABLE por plantilla (`{prefix, mask, padding, start, scope, reset}`, Zod `folioSchemeSchema` en
+  `packages/contracts/src/shared/folio.ts` — motor NEUTRAL reusado por OT y bitácora). Vive en el **contenedor MUTABLE**
+  (gobernanza VIVA, espejo de `equipmentMode`/`editWindow*`/`gridFieldKeys`), editable con el **`FolioSchemeEditor` compartido**
+  en el Form Builder (`PATCH /templates/:id`). `null` = sin esquema propio ⇒ la entrada usa el correlativo global `entryNumber`
+  ("BIT-######"). Default (cuando el esquema existe pero omite ejes) = `DEFAULT_LOG_ENTRY_FOLIO_SCHEME` (scope `type`=**por
+  plantilla**, anual, prefijo "DOC"). Emitido al SELLAR (ver `LogEntry.folio`). NO es parte de la versión inmutable (SAP number
+  range / NetSuite auto-numbering: la numeración por tipo de doc es config mutable, no de la definición). Auditado before/after.
+- **`LogEntry.folio` / `LogEntry.folioSeqKey`** (`String?`, misma migración) — folio HUMANO de documento propio de la plantilla
+  (`folio`) + clave de secuencia usada (`folioSeqKey`, auditoría del contador). Se emite **al SELLAR** (`submit()` sin flujo o
+  1ª salida del estado inicial en `executeTransition()`), DENTRO de la tx (gapless: `FolioService.next(tx, seqKey)`), sólo si
+  `Template.folioScheme != null`. **NO es único global** a propósito (dos plantillas pueden compartir prefijo bajo scope=type;
+  la unicidad la garantiza el contador por serie `logentry|type:<templateId>|<año>`). `entryNumber` sigue siendo el handle
+  interno estable; el folio es un string humano ADICIONAL nullable. La UI (grilla/visor/peek/CSV) muestra `entryFolioLabel(entry)`
+  = `folio ?? formatEntryFolio(entryNumber)` (fuente única del rótulo, cero regresión para plantillas sin esquema).
 - **Exposición en el listado** — `LogEntryListItem.summaryValues[]` (`{fieldKey,label,dataType,value,unit?,optionLabel?,
   thresholdBand}`) + `equipmentTag`. `LogbookQueryService.buildSummaries` los arma BATCHED por página (cero N+1): valores de
   `LogEntryValue` acotados a los candidatos + meta de campo CONGELADA por versión (label/unidad/optionSource) + resolución

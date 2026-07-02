@@ -10,7 +10,7 @@
 > funcionalidades existentes** aunque su detalle aún esté por redactar (✍️): así nada se
 > olvida; el backfill de lo ya construido se llena de a poco (incremental).
 >
-> Última actualización: **2026-07-02** (Órdenes de trabajo — verificaciones de EJECUCIÓN por actividad + confirmación del aprobador «Gobierno 2», S5b Slice B; COMPLETA el modelo de checklists por momento del permiso de trabajo).
+> Última actualización: **2026-07-02** (Folio del documento configurable por plantilla de bitácora y por tipo de OT — editor visual con vista previa en vivo, opcional con fallback al correlativo global).
 
 ## Convención de cada sección
 Cada funcionalidad se documenta con estas cuatro partes fijas:
@@ -70,6 +70,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 - ✍️ Alcance de estructura (en qué nodos vive la plantilla)
 - ✍️ Alcance por plantilla (quién ve qué plantillas) y acceso por rol
 - ✅ Modo de equipo (ninguno/opcional/sugerido/requerido) (§ Plantillas ▸ Modo de equipo en la entrada)
+- ✅ **Folio del documento por plantilla** (numeración propia opcional, ej. `RT-2026-0001`, con vista previa en vivo; sin configurar usa el correlativo global) (§ Plantillas ▸ Folio del documento por plantilla)
 - ✍️ Ventana de edición (plazo para corregir)
 - ✍️ Campos del resumen en la grilla
 - ✍️ Motor de reglas: campos calculados y validaciones cruzadas
@@ -142,6 +143,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 
 ### 18. Órdenes de trabajo (OT / PTW)  [todos los roles operativos]
 - ✅ **Crear y listar solicitudes de trabajo** (asistente de 2 pasos, grilla con filtros/facetas, detalle con reasignar/prioridad/anular) (§ Órdenes de trabajo)
+- ✅ **Personalizar el folio del tipo de OT** (prefijo/ámbito/reinicio/máscara + vista previa en vivo + elegir en qué estado se emite; en el mantenedor de tipos) (§ Plantillas ▸ Folio del documento por plantilla)
 - ✅ **Enviar, aprobar (con firma y folio oficial) o rechazar la solicitud — Puerta 1** (flujo de estados con stepper, firma electrónica, folio OT-AAAA-#### emitido al aprobar, rechazo con motivo, historial) (§ Órdenes de trabajo ▸ Aprobación)
 - ✅ **Checklists / permisos de trabajo por MOMENTO** (verificaciones **agrupadas por momento del ciclo**: Autorización·Ejecución·Cierre; reglas configurables con campo «Momento», sugerencia automática, llenado como registro del constructor de formularios, revisión con segregación revisor≠responsable, bloqueo hasta aprobar los obligatorios) (§ Órdenes de trabajo ▸ Checklists y permisos de trabajo)
 - ✅ **Verificaciones de EJECUCIÓN por actividad + confirmación del aprobador (Gobierno 2)** (controles de terreno —LOTO físico, energía cero, toma-5— que cuelgan de cada tarea del plan por especialidad; el aprobador **confirma el set** antes de autorizar el permiso; no se completa una tarea sin aprobar su verificación obligatoria) (§ Órdenes de trabajo ▸ Verificaciones de ejecución por actividad)
@@ -1134,6 +1136,46 @@ configuración* (no exige republicar la versión).
 - El cumplimiento del modo se decide **en el servidor** (Requerido sin equipo ⇒ se rechaza; Ninguno con
   equipo ⇒ se rechaza), no solo en pantalla.
 - Una vez elegido, el equipo se muestra en la cabecera del llenado y del visor, y en la grilla de Bitácoras.
+
+---
+
+## Plantillas ▸ Folio del documento por plantilla  [Configurador]
+
+**Para qué sirve.** Darle a una plantilla su **propia numeración de documento** (por ejemplo
+`RT-2026-0001` para un «Reporte de turno») en lugar del correlativo general del sistema. Es la
+numeración de documentos que usan los sistemas industriales (SAP PM *number ranges*, NetSuite
+*auto-numbering* por tipo de documento): un prefijo con sentido para terreno + un año + un número
+correlativo **sin huecos**. El **mismo editor** se usa para el folio de los **tipos de OT** (en su
+mantenedor).
+
+**Cómo se usa.** En la configuración de la plantilla (*Identidad y gobernanza* del Form Builder),
+activa **«Folio propio para esta plantilla»** y ajusta:
+- **Prefijo** — el texto inicial (ej. `RT`, `PT`, `RONDA`).
+- **Ámbito de la serie** — una serie **por plantilla** (lo habitual: cada plantilla numera aparte),
+  o **por nodo** / **por estructura** (una serie distinta por planta/área) o una **serie única global**.
+- **Reinicio** — **anual** (el número vuelve a 1 cada año, ej. `RT-2026-0001`, `RT-2027-0001`) o **sin
+  reinicio** (crece para siempre).
+- **Relleno** de ceros y **correlativo inicial** (empezar en 1, 500, 1000…).
+- **Máscara** (opcional) para un formato a medida con los tokens `{PREFIX}` `{YYYY}` `{SEQ}`
+  (ej. `{PREFIX}/{YYYY}/{SEQ}` → `RT/2026/0001`).
+La **vista previa en vivo** muestra cómo quedarán los dos primeros folios mientras editas, y avisa si
+la combinación elegida podría **repetir** folios.
+
+**Quién puede.** El **Configurador** de plantillas (`template:edit`) para el folio de bitácoras; el
+administrador del **catálogo de OT** (`workordercatalog:manage`) para el folio de los tipos de OT. En
+ambos casos es **gobernanza viva** (se guarda sin republicar la plantilla) y **no** requiere un permiso
+nuevo.
+
+**Importante.**
+- El folio se **emite al SELLAR** la entrada (no al abrir el borrador): así un borrador que se abandona
+  o se anula **no gasta** un número, y la serie humana queda **sin huecos** (lo que exigen las auditorías).
+  En las OT, el folio se emite al **aprobar** la solicitud (o en el estado que elijas).
+- Es **opcional**: si no configuras un folio propio, las entradas siguen usando el **correlativo global**
+  del sistema (`BIT-000123`) — sin cambios ni para las plantillas existentes ni para los enlaces guardados.
+- Una vez emitido, el folio **no cambia** (queda impreso en el registro, en la grilla, el visor y las
+  exportaciones). El número interno estable de la entrada se conserva aparte.
+- La numeración es **por serie**: dos plantillas distintas con el mismo prefijo llevan **contadores
+  separados** (cada una arranca en su `…-0001`).
 
 ---
 

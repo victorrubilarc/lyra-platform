@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import type {
   CrossRule,
   CreateTemplateRequest,
+  FolioScheme,
   PublishTemplateRequest,
   SaveTemplateDraftRequest,
   TemplateDetail,
@@ -201,6 +202,7 @@ export class TemplatesService {
         editWindowMinutes: t.editWindowMinutes,
         equipmentMode: t.equipmentMode,
         gridFieldKeys: t.gridFieldKeys,
+        folioScheme: (t.folioScheme as FolioScheme | null) ?? null,
         createdAt: t.createdAt.toISOString(),
         updatedAt: t.updatedAt.toISOString(),
         orgNodePath: t.orgNodeId ? (nodePaths.get(t.orgNodeId) ?? null) : null,
@@ -312,6 +314,7 @@ export class TemplatesService {
       editWindowMinutes: template.editWindowMinutes,
       equipmentMode: template.equipmentMode,
       gridFieldKeys: template.gridFieldKeys,
+      folioScheme: (template.folioScheme as FolioScheme | null) ?? null,
       createdAt: template.createdAt.toISOString(),
       updatedAt: template.updatedAt.toISOString(),
       version: this.mapVersion(version),
@@ -339,6 +342,8 @@ export class TemplatesService {
         editWindowMinutes: dto.editWindowMinutes ?? null,
         equipmentMode: dto.equipmentMode ?? undefined, // undefined ⇒ default OPTIONAL del schema
         gridFieldKeys: dto.gridFieldKeys ?? undefined, // undefined ⇒ default [] del schema
+        // Folio-por-plantilla (gobernanza viva): null/omitido = sin esquema propio.
+        folioScheme: (dto.folioScheme ?? Prisma.DbNull) as Prisma.InputJsonValue,
         createdById: userId,
         updatedById: userId,
         nodeAssignments: {
@@ -390,6 +395,11 @@ export class TemplatesService {
           equipmentMode: dto.equipmentMode === undefined ? undefined : dto.equipmentMode,
           // Campos de resumen de grilla (2.8.1a): gobernanza viva, editable sin republicar.
           gridFieldKeys: dto.gridFieldKeys === undefined ? undefined : dto.gridFieldKeys,
+          // Folio-por-plantilla: gobernanza viva. undefined = sin cambio; null = quitar esquema.
+          folioScheme:
+            dto.folioScheme === undefined
+              ? undefined
+              : ((dto.folioScheme ?? Prisma.DbNull) as Prisma.InputJsonValue),
           updatedById: userId,
         },
       });
@@ -421,6 +431,7 @@ export class TemplatesService {
         editWindowMinutes: before.editWindowMinutes,
         equipmentMode: before.equipmentMode,
         gridFieldKeys: before.gridFieldKeys,
+        folioScheme: before.folioScheme ?? null,
       },
       after: {
         name: updated.name,
@@ -430,6 +441,7 @@ export class TemplatesService {
         editWindowMinutes: updated.editWindowMinutes,
         equipmentMode: updated.equipmentMode,
         gridFieldKeys: updated.gridFieldKeys,
+        folioScheme: updated.folioScheme ?? null,
       },
     });
     return this.getDetail(userId, id);

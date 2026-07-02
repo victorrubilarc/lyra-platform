@@ -7,6 +7,7 @@ import {
   type TemplateFieldDto,
   type TemplateSectionDto,
 } from "../templates/templates.js";
+import { resolveFolioSchemeWith, type ResolvedFolioScheme } from "../shared/folio.js";
 import {
   fieldDataTypeSchema,
   CONFORMITY_CODES,
@@ -231,6 +232,10 @@ export const logEntrySchema = z.object({
   id: z.string(),
   /** Folio humano correlativo (Fase 2.6): referencia estable de auditoría/terreno. */
   entryNumber: z.number().int(),
+  /** Folio de documento CONFIGURABLE por plantilla (folio-por-plantilla, 2026-07-02).
+   * null = la plantilla no define esquema ⇒ la UI cae al correlativo global
+   * `formatEntryFolio(entryNumber)`. Se emite (inmutable) al SELLAR. */
+  folio: z.string().nullable(),
   templateId: z.string(),
   templateVersionId: z.string(),
   // Flujo DENORMALIZADO (copiado al crear). null = plantilla sin flujo (form simple).
@@ -1483,6 +1488,37 @@ function worseBand(a: ThresholdBand | null, b: ThresholdBand | null): ThresholdB
 /** Folio legible de una entrada (referencia humana estable, ej. "BIT-000123"). */
 export function formatEntryFolio(entryNumber: number, prefix = "BIT"): string {
   return `${prefix}-${String(entryNumber).padStart(6, "0")}`;
+}
+
+/**
+ * Default del folio-por-plantilla de bitácora (2026-07-02): serie propia POR PLANTILLA
+ * con reinicio anual → "DOC-2026-0001". El scope `type` mapea a `Template.id` (cada
+ * plantilla = su propia serie de documento, estilo SAP PM number range por tipo de doc /
+ * NetSuite auto-numbering por record type). Sólo se USA cuando la plantilla DEFINE un
+ * `folioScheme`; sin esquema, la entrada NO recibe folio propio (fallback al correlativo
+ * global `entryNumber`). El admin normalmente sobrescribe el prefijo (ej. "RT").
+ */
+export const DEFAULT_LOG_ENTRY_FOLIO_SCHEME: ResolvedFolioScheme = {
+  prefix: "DOC",
+  mask: null,
+  padding: 4,
+  start: 1,
+  scope: "type",
+  reset: "annual",
+};
+
+/** Resuelve el `folioScheme` de una plantilla aplicando el default de bitácora. */
+export function resolveLogEntryFolioScheme(raw: unknown): ResolvedFolioScheme {
+  return resolveFolioSchemeWith(raw, DEFAULT_LOG_ENTRY_FOLIO_SCHEME);
+}
+
+/**
+ * Folio a MOSTRAR de una entrada: el folio propio de la plantilla si existe, o el
+ * correlativo global "BIT-######" como fallback (cero regresión para plantillas sin
+ * esquema). Fuente única back↔front del rótulo de folio.
+ */
+export function entryFolioLabel(entry: { folio?: string | null; entryNumber: number }): string {
+  return entry.folio ?? formatEntryFolio(entry.entryNumber);
 }
 
 /**

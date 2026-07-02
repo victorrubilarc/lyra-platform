@@ -755,6 +755,12 @@ model Template {
   // aplica en vivo a todas las entradas sin republicar (PATCH "Guardar configuración").
   // Tope 6 (validado en contrato/backend). Key huérfano (campo eliminado) = se ignora.
   gridFieldKeys     String[]          @default([])
+  // --- Folio de documento CONFIGURABLE por plantilla (folio-por-plantilla, 2026-07-02) ---
+  // GOBERNANZA VIVA en el contenedor mutable (mismo patrón que editWindow/equipmentMode;
+  // NO en la versión inmutable). null = sin esquema propio ⇒ la entrada usa el correlativo
+  // global entryNumber ("BIT-######"). Con esquema ⇒ folio propio emitido al SELLAR vía
+  // FolioService (motor gapless compartido con OT). {prefix, mask, padding, start, scope, reset}.
+  folioScheme       Json?
   // Autoría (referencia blanda, sin FK: el usuario pudo borrarse — igual que AuditLog).
   createdById       String?
   updatedById       String?
@@ -1545,6 +1551,14 @@ model LogEntry {
   // (patrón WO number de Maximo / document number de Veeva). Lo asigna la BD; el
   // backfill de la migración lo asignó en orden de recordedAt.
   entryNumber                 Int            @unique @default(autoincrement())
+  // Folio de documento CONFIGURABLE por plantilla (folio-por-plantilla, 2026-07-02): se
+  // EMITE al SELLAR sólo si la plantilla define `folioScheme`; inmutable una vez emitido.
+  // null = sin esquema propio ⇒ la UI cae al correlativo global entryNumber ("BIT-######").
+  // NO es único global a propósito (dos plantillas pueden compartir prefijo bajo scope=type;
+  // la unicidad la garantiza el contador gapless por serie). `entryNumber` sigue siendo el
+  // handle interno estable. `folioSeqKey` = clave de secuencia usada (auditoría del contador).
+  folio                       String?
+  folioSeqKey                 String?
   templateId                  String
   // Versión congelada que se está llenando (inmutable; integridad histórica).
   templateVersionId           String

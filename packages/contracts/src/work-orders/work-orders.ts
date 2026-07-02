@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { folioSchemeSchema } from "./folio.js";
+import { folioSchemeSchema } from "../shared/folio.js";
 import { workOrderTrafficLightSchema } from "./sla.js";
 import { workflowStateSchema, workflowTransitionSchema } from "../workflows/workflows.js";
 import { logEntryTransitionSchema } from "../log-entries/log-entries.js";

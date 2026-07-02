@@ -1,9 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
-import type { UpsertWorkOrderTypeRequest, WorkOrderTypeDto } from "@lyra/contracts";
+import {
+  DEFAULT_WORK_ORDER_FOLIO_SCHEME,
+  renderFolio,
+  type FolioScheme,
+  type UpsertWorkOrderTypeRequest,
+  type WorkOrderTypeDto,
+} from "@lyra/contracts";
 import { Button, Input, Modal, Select, Textarea, Toggle, useToast } from "@lyra/ui";
-import { useWorkflows } from "../workflows/workflows-queries.js";
+import { useWorkflow, useWorkflows } from "../workflows/workflows-queries.js";
 import { useRoles } from "../security/security-queries.js";
 import { SlaDurationField } from "../workflows/SlaDurationField.js";
+import { FolioSchemeEditor } from "../shared/FolioSchemeEditor.js";
 import { useUpsertWorkOrderType } from "./work-orders-queries.js";
 import { CATALOG_COLOR_SWATCHES, criticalityLabel } from "./work-orders-presentation.js";
 import styles from "./catalogs.module.css";
@@ -18,6 +25,8 @@ interface Props {
 }
 
 const KEY_RE = /^[a-z0-9-]+$/;
+/** Clave del flujo OT global sembrado (para poblar el picker de estado emisor del folio). */
+const GLOBAL_OT_WORKFLOW_KEY = "ot-4-puertas";
 
 /** Crear / editar un TIPO de orden de trabajo (catálogo configurable). */
 export function WorkOrderTypeModal({ open, onClose, type, existingKeys }: Props) {
@@ -38,6 +47,8 @@ export function WorkOrderTypeModal({ open, onClose, type, existingKeys }: Props)
   const [escalationAfterMinutes, setEscalationAfterMinutes] = useState<number | null>(null);
   const [escalationRoleId, setEscalationRoleId] = useState("");
   const [sortOrder, setSortOrder] = useState(0);
+  const [folioScheme, setFolioScheme] = useState<FolioScheme | null>(null);
+  const [folioOnStateKey, setFolioOnStateKey] = useState("");
 
   useEffect(() => {
     if (!open) return;
@@ -47,12 +58,20 @@ export function WorkOrderTypeModal({ open, onClose, type, existingKeys }: Props)
       setCriticalityDefault(type.criticalityDefault != null ? String(type.criticalityDefault) : ""); setSortOrder(type.sortOrder);
       setResolutionDueMinutes(type.resolutionDueMinutes); setEscalationAfterMinutes(type.escalationAfterMinutes);
       setEscalationRoleId(type.escalationRoleId ?? "");
+      setFolioScheme(type.folioScheme ?? null); setFolioOnStateKey(type.folioOnStateKey ?? "");
     } else {
       setName(""); setKey(""); setDescription(""); setColor(""); setDefaultWorkflowId("");
       setRequiresPtwDefault(false); setCriticalityDefault(""); setSortOrder(0);
       setResolutionDueMinutes(null); setEscalationAfterMinutes(null); setEscalationRoleId("");
+      setFolioScheme(null); setFolioOnStateKey("");
     }
   }, [open, type]);
+
+  // Estados del flujo emisor del folio (el del tipo, o el global OT) para el picker "estado emisor".
+  const effectiveWorkflowId = defaultWorkflowId || workflows.find((w) => w.key === GLOBAL_OT_WORKFLOW_KEY)?.id || "";
+  const { data: folioWorkflow } = useWorkflow(open ? effectiveWorkflowId || null : null);
+  const folioStates = folioWorkflow?.version.states ?? [];
+  const defaultFolioSample = renderFolio(DEFAULT_WORK_ORDER_FOLIO_SCHEME, 1, { year: new Date().getFullYear() });
 
   const keyTaken = useMemo(
     () => !isEdit && key.trim().length > 0 && existingKeys.includes(key.trim().toLowerCase()),
@@ -74,6 +93,8 @@ export function WorkOrderTypeModal({ open, onClose, type, existingKeys }: Props)
       resolutionDueMinutes: resolutionDueMinutes ?? null,
       escalationAfterMinutes: escalationAfterMinutes ?? null,
       escalationRoleId: escalationRoleId || null,
+      folioScheme,
+      folioOnStateKey: folioOnStateKey || null,
       sortOrder,
     };
     upsert.mutate(
@@ -173,6 +194,27 @@ export function WorkOrderTypeModal({ open, onClose, type, existingKeys }: Props)
             <span className={styles.muted}>Recibe el aviso de plazo cuando se supera el tiempo de escalamiento.</span>
           </label>
         </div>
+
+        {/* FOLIO configurable (número de OT/requerimiento) — editor visual + vista previa */}
+        <div className={styles.field}><span className={styles.fieldLabel}>Folio de la orden</span>
+          <FolioSchemeEditor
+            entity="workorder"
+            uniquenessDomain="global"
+            defaultScheme={DEFAULT_WORK_ORDER_FOLIO_SCHEME}
+            value={folioScheme}
+            onChange={setFolioScheme}
+            enableLabel="Personalizar el folio de este tipo"
+            fallbackHint={`Sin personalizar, usa la serie por defecto de OT (ej. ${defaultFolioSample}).`}
+          />
+        </div>
+
+        <label className={styles.field}><span className={styles.fieldLabel}>¿Cuándo se emite el folio?</span>
+          <Select value={folioOnStateKey} onChange={(e) => setFolioOnStateKey(e.target.value)}>
+            <option value="">Al aprobar la solicitud (por defecto)</option>
+            {folioStates.map((s) => <option key={s.key} value={s.key}>Al entrar a «{s.name}»</option>)}
+          </Select>
+          <span className={styles.muted}>El folio se emite (una sola vez, sin huecos) al ENTRAR al estado elegido del flujo.</span>
+        </label>
       </div>
     </Modal>
   );
