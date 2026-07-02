@@ -701,3 +701,33 @@ Incident(resuelta) ──> KnowledgeArticle
   `dataType`; validado contra la `TemplateVersion` (Zod en backend, `validateFieldValue`).
 - Índices previstos: FKs, `OrgNode.parentId`, `Entry(templateId, createdAt)`, `Incident(status, severity)`, GIN en `tsvector` de KB y en `JSONB` consultable.
 - El esquema vive en `apps/watchlog-api/prisma/schema.prisma`; migraciones versionadas con `prisma migrate`.
+
+### Órdenes de Trabajo / Work Orders (OT / PTW) — Sesión 1: Cimientos *(implementado)*
+Migración `20260701180000_add_work_orders`. Entidad NUEVA `WorkOrder`, **espejo de `Incident`** (DECISIONS 2026-07-01,
+forks W1–W8). En S1 solo vive la SOLICITUD (crear/listar/editar/asignar/anular con ABAC por nodo ∩ estructura); los
+campos de FOLIO y WORKFLOW existen pero **INERTES** (se activan en S2). Sin borrado físico (`deletedAt` + anulación
+lifecycle `CANCELED`).
+
+- **WorkOrder** — la orden/solicitud de trabajo. `number` (autoincrement, correlativo interno) → código provisional
+  **"SOL-######"** hasta que se emite el `folio` oficial (`OT-2026-0001`, único, null hasta la aprobación en S2).
+  Atributos: `title`/`description`, `typeId` (→ **WorkOrderType**, Restrict), `originType` (enum `WorkOrderOrigin`:
+  DIRECT|RULE|EXCEPTION|PLANNED|INCIDENT), `criticality` (1..5), `priority` (enum `WorkOrderPriority`), `requiresPtw`,
+  riesgo ISO 31000 (`riskProbability`/`riskConsequence`), ubicación (`orgNodeId` → **OrgNode** Restrict = ancla ABAC;
+  `equipmentId` → **Equipment** SetNull; `locationDetail`; `shiftCode`), personas (`requesterId`/`ownerId`, refs blandas),
+  fechas (`requestedAt`/`detectedAt`/`plannedStart`/`plannedEnd`/`dueAt`), `lifecycle` (enum `WorkOrderLifecycle`:
+  DRAFT|OPEN|CLOSED|CANCELED; en S1 nace **OPEN**). Campos **inertes S1** (para no re-migrar): `folioSeqKey`/
+  `folioIssuedAt`, `workflowDefinitionId`/`workflowDefinitionVersionId`/`currentStateKey`/`currentStateSince`, aprobación
+  (`approvedAt`/`approvedById`/`rejectedAt`/`rejectReason`/`rejectedById`), cierre (`closedAt`/`closedById`/
+  `closureSummary`), origen bidireccional (`originIncidentId`/`originLogEntryId`/`originExceptionId`, refs blandas).
+- **WorkOrderType** — catálogo configurable de tipos (espejo de `IncidentType`). `key` única, `name`/`description`/`color`,
+  `defaultWorkflowId` (ref. blanda, S2), `requiresPtwDefault`, `criticalityDefault`, `folioScheme` (Json) + `folioOnStateKey`
+  (inertes S1, para el folio configurable de S2), SLA light (`resolutionDueMinutes`/`escalationAfterMinutes`/
+  `escalationRoleId` → **Role** SetNull, relación `WorkOrderTypeEscalationRole`), `active`/`sortOrder`.
+- **Area** / **Specialty** — catálogos ligeros independientes (mismo shape: `key` única, `name`/`description`/`color`,
+  `active`/`sortOrder`). Son ejes de CLASIFICACIÓN/enrutamiento, **NO** sustituyen a `orgNodeId` (fork W3).
+- **WorkOrderArea** / **WorkOrderSpecialty** — enlaces N:N (`@@id([workOrderId, <tag>Id])`); `onDelete: Cascade` desde
+  `WorkOrder`, `Restrict` desde el catálogo (no se borra un área en uso).
+
+**Pendiente (S2–S5):** `FolioCounter` (folio gapless al aprobar), `WorkOrderTransition`/`WorkOrderEvent`/`WorkOrderComment`
+(satélites de workflow), `WorkOrderChecklistRule`/`WorkOrderChecklist` (checklists sobre Form Builder), `WorkActivity`/
+`WorkActivityUpdate` (plan de actividades). Ver `docs/design/OT_DESIGN_ARCHITECTURE.md`.

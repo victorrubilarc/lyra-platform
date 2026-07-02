@@ -156,6 +156,7 @@ export const esCL = {
     incidentCatalogs: "Catálogos de incidencias",
     incidentDashboard: "Dashboard de incidencias",
     shiftHandover: "Cambio de turno",
+    workOrders: "Órdenes de trabajo",
   },
   panorama: {
     title: "Panorama",
@@ -2227,6 +2228,7 @@ export const esCL = {
       incidents: "Incidencias",
       handover: "Cambio de turno",
       ai: "Inteligencia Artificial",
+      workorders: "Órdenes de trabajo",
     },
     users: {
       title: "Usuarios",

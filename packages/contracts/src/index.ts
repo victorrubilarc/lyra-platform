@@ -94,3 +94,6 @@ export * from "./ai/ai.js";
 export * from "./theme/contrast.js";
 export * from "./theme/palette.js";
 export * from "./theme/presets.js";
+
+// Órdenes de Trabajo / Work Orders (OT / PTW) — Sesión 1: Cimientos
+export * from "./work-orders/work-orders.js";

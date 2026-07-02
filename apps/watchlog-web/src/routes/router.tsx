@@ -37,6 +37,7 @@ import { PanoramaPage } from "../features/dashboards/PanoramaPage.js";
 import { CatalogsPage } from "../features/incidents/CatalogsPage.js";
 import { ExceptionsPage } from "../features/exceptions/ExceptionsPage.js";
 import { ShiftHandoverPage } from "../features/shift-handover/ShiftHandoverPage.js";
+import { WorkOrdersPage } from "../features/work-orders/WorkOrdersPage.js";
 
 /**
  * Mapa de rutas. `/login` es pública; todo lo demás cuelga de `ProtectedRoute`
@@ -74,6 +75,7 @@ export const router = createBrowserRouter([
           { path: "/incidencias/catalogos", element: <CatalogsPage /> },
           { path: "/excepciones", element: <ExceptionsPage /> },
           { path: "/cambio-turno", element: <ShiftHandoverPage /> },
+          { path: "/ordenes-trabajo", element: <WorkOrdersPage /> },
           { path: "/notificaciones", element: <NotificationsPage /> },
           { path: "/mis-notificaciones", element: <MyNotificationsPage /> },
           { path: "/bitacoras/:id", element: <EntryViewerPage /> },

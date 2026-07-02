@@ -10,7 +10,7 @@
 > funcionalidades existentes** aunque su detalle aún esté por redactar (✍️): así nada se
 > olvida; el backfill de lo ya construido se llena de a poco (incremental).
 >
-> Última actualización: **2026-06-24** (Apariencia / Temas — plantillas de inicio + duplicar).
+> Última actualización: **2026-07-01** (Órdenes de trabajo — crear y listar solicitudes, S1 Cimientos).
 
 ## Convención de cada sección
 Cada funcionalidad se documenta con estas cuatro partes fijas:
@@ -139,6 +139,51 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 - ✅ **Entregar y recibir el turno** (cockpit auto-compilado por área y turno, entrega firmada de dos partes, pendientes que ruedan, historial) (§ Cambio de turno)
 - ✅ **Resumen de turno por IA EN VIVO** (botón "Generar con IA": el brief se escribe palabra por palabra, cancelable; grounded al turno, revisable; el crudo determinista siempre visible; la firma sigue siendo tuya) (§ Cambio de turno)
 - ✅ **Descargar el acta de entrega (PDF)** (documento de grado auditoría desde una entrega firmada: identidad Lyra, snapshot congelado, dos firmas Part 11, folio + hash verificable; on-premise) (§ Cambio de turno ▸ Descargar el acta)
+
+### 18. Órdenes de trabajo (OT / PTW)  [todos los roles operativos]
+- ✅ **Crear y listar solicitudes de trabajo** (asistente de 2 pasos, grilla con filtros/facetas, detalle con reasignar/prioridad/anular) (§ Órdenes de trabajo)
+- ✍️ Aprobación y folio al aprobar (Puerta 1 — Sesión 2)
+- ✍️ Checklists / permisos de trabajo, plan de actividades y cierre (Puertas 2–4 — Sesiones 3–5)
+
+---
+
+## Órdenes de trabajo (OT / PTW)  [todos los roles operativos]
+
+**Para qué sirve.** Registrar y hacer seguimiento de **trabajos** sobre los activos e instalaciones: una reparación,
+un mantenimiento preventivo, una mejora o un **trabajo de alto riesgo con Permiso de Trabajo (PTW)**. Es el equivalente
+a la "orden de trabajo" de un CMMS (SAP PM / Maximo), pero integrado con la estructura, los equipos y la seguridad de
+Lyra WatchLog. En esta primera entrega puedes **crear la solicitud** y **gestionarla en una lista**; la aprobación con
+**folio oficial**, los **checklists/PTW**, el **plan de actividades** y el **cierre por etapas** llegan en las siguientes
+entregas del módulo.
+
+**Cómo se usa.**
+1. Entra a **Órdenes de trabajo** en el menú (grupo Operación). Arriba ves **indicadores** (borradores, abiertas,
+   críticas, sin responsable, con PTW) que al hacer clic filtran la lista.
+2. Pulsa **«Nueva solicitud»**. El asistente tiene **dos pasos**:
+   - **Paso 1 · Trabajo:** título, descripción, **tipo** (correctiva, preventiva, predictiva, mejora, permiso de alto
+     riesgo…), **criticidad** (1–5), **prioridad** y si **requiere PTW** (se prellena según el tipo).
+   - **Paso 2 · Ubicación y clasificación:** **nodo** (obligatorio; define dónde y a la vez el alcance de datos),
+     **equipo** del nodo (opcional), **detalle de ubicación**, **áreas** y **especialidades** (etiquetas de
+     clasificación, puedes elegir varias), y una **fecha límite** opcional.
+3. Al crear, la solicitud aparece en la lista con un **código provisional "SOL-######"** (el folio oficial se emite
+   al aprobarla, en una entrega posterior).
+4. Haz clic en una fila para abrir el **detalle**: ahí puedes **reasignar el responsable**, cambiar la **prioridad** o
+   **anular** la solicitud con un motivo (queda auditado; no se borra).
+5. Filtra la lista por estado, tipo, criticidad, prioridad, área, especialidad o por "Mías / Sin responsable /
+   Requieren PTW", y busca por folio, título o descripción.
+
+**Quién puede.** Ver el módulo requiere **`module:workorders:view`**; crear **`workorder:create`**; editar
+**`workorder:edit`**; reasignar **`workorder:assign`**; anular **`workorder:cancel`**; administrar los catálogos
+(tipos/áreas/especialidades) **`workordercatalog:manage`**. Como en todo el sistema, el **alcance de datos por nodo**
+(y por estructura activa) lo decide el servidor: solo ves y creas OT en los nodos a los que tienes alcance.
+
+**Importante.**
+- El **nodo** es el ancla de ubicación **y** de seguridad (alcance por nodo ∩ estructura activa). **Áreas** y
+  **especialidades** son solo clasificación/enrutamiento; no reemplazan al nodo.
+- El **equipo** debe pertenecer al nodo elegido; si cambias de nodo, se limpia la selección de equipo.
+- La solicitud nace **abierta**. El **folio oficial**, el flujo de **aprobación** (con firma), los **checklists/PTW**,
+  el **plan de actividades** y el **cierre** llegan en las Sesiones 2–5 del módulo.
+- Una **incidencia** podrá generar una OT (enlace bidireccional) en una entrega posterior.
 
 ---
 

@@ -1,4 +1,4 @@
-import { AlertOctagon, AlertTriangle, ArrowLeftRight, BarChart3, Bell, BookOpenCheck, CalendarClock, CalendarRange, FilePlus2, Gauge, GitBranch, LayoutDashboard, Layers, ListChecks, ListTodo, Network, Route, Settings, ShieldCheck, Tags, UserCog, type LucideIcon } from "lucide-react";
+import { AlertOctagon, AlertTriangle, ArrowLeftRight, BarChart3, Bell, BookOpenCheck, CalendarClock, CalendarRange, ClipboardList, FilePlus2, Gauge, GitBranch, LayoutDashboard, Layers, ListChecks, ListTodo, Network, Route, Settings, ShieldCheck, Tags, UserCog, type LucideIcon } from "lucide-react";
 import type { Permission } from "@lyra/permissions";
 
 /**
@@ -132,6 +132,15 @@ export const ROUTES: readonly NavRoute[] = [
     labelKey: "nav.shiftHandover",
     icon: ArrowLeftRight,
     permission: "module:handover:view",
+    inSidebar: true,
+    group: "operation",
+  },
+  // Órdenes de Trabajo / Work Orders (OT / PTW) — S1: solicitudes + lista.
+  {
+    path: "/ordenes-trabajo",
+    labelKey: "nav.workOrders",
+    icon: ClipboardList,
+    permission: "module:workorders:view",
     inSidebar: true,
     group: "operation",
   },

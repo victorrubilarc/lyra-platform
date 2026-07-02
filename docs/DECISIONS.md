@@ -4,6 +4,28 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-01 · OT — Sesión 1 (Cimientos): decisiones de implementación
+Al construir el esqueleto de OT (`feat/ot-cimientos`, espejo de Incidencias) se tomaron 4 decisiones no explícitas en
+el diseño:
+1. **`WorkOrder.number` (autoincrement) NUEVO además del `folio`.** *Motivo:* el diseño emite el `folio` oficial SOLO al
+   aprobar (S2), pero una solicitud necesita un **handle humano estable desde que nace** (para la grilla, búsqueda,
+   soporte). Se deriva **"SOL-######"** del `number` (mismo patrón que `Incident.number`); el `folio` gapless (OT-2026-0001)
+   sigue siendo el correlativo oficial que se emite al aprobar. `workOrderCode(folio, number)` = folio ?? SOL-###### .
+2. **La solicitud nace `lifecycle = OPEN`, no DRAFT.** *Motivo:* en S1 aún no existe el workflow (estado `borrador`), así
+   que DRAFT no tendría forma de avanzar. Se reserva DRAFT para cuando el flujo configurable (S2) tenga su estado inicial
+   `borrador`. Los KPIs ya contemplan ambos.
+3. **SavedView de OT NO se cableó.** *Objeción fundada:* el enum `SAVED_VIEW_MODULES` solo tiene `LOGBOOK`; **Incidencias
+   tampoco usa SavedView**. Construirlo solo para OT rompería la paridad con el módulo hermano y excede "cimientos". Queda
+   como **slice transversal** (para OT e Incidencias a la vez) en `BACKLOG`. La grilla de S1 sí cumple las convenciones
+   (filtros en 1 línea + facetas + paginación arriba/abajo).
+4. **Campos de folio/workflow presentes pero INERTES desde S1.** *Motivo:* incluirlos en la migración inicial evita
+   re-migrar `WorkOrder` en cada sesión (S2 solo agrega tablas satélite + `FolioCounter`, no columnas a `WorkOrder`).
+   La migración se generó con `prisma migrate diff` + `db:deploy` (no `migrate dev`) por el EPERM de Windows, **descartando
+   drift preexistente ajeno** (`LogEntry_currentStateSince_idx`, default de `OrgStructure.updatedAt`) para que la
+   migración toque SOLO DDL de OT.
+
+---
+
 ### 2026-07-01 · OT — Forks W1–W8 APROBADOS por el dueño (diseño congelado para la Sesión 1)
 El dueño dio el **visto bueno explícito** al diseño de `docs/design/OT_DESIGN_ARCHITECTURE.md`. Decisiones DEFINITIVAS:
 1. **W1** — `WorkActivity` = **entidad propia** (base conceptual `IncidentAction`, pero con `progressPct`/baseline/

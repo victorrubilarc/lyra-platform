@@ -699,6 +699,61 @@ export const PERMISSION_CATALOG = [
     description:
       "Construir, editar y publicar paletas de tema, y elegir la paleta por defecto del sistema.",
   },
+
+  // --- Órdenes de Trabajo / Work Orders (OT / PTW) — Sesión 1: CIMIENTOS -------
+  // Espejo de Incidencias. El ciclo de vida (S2+) reutilizará WorkflowDefinition:
+  // QUIÉN puede ejecutar cada puerta/transición es DATO (roles por transición del
+  // flujo), NO 4 permisos fijos de puerta (fork W2 aprobado). Estas claves gobiernan
+  // el módulo y las acciones de alto nivel; el alcance de datos (nodo) lo resuelve
+  // el ScopeService (ABAC). `workorder:transition` (dim. WORKFLOW) llega en S2.
+  {
+    key: "module:workorders:view",
+    dimension: "MODULE",
+    group: "workorders",
+    description: "Ver el módulo de órdenes de trabajo (solicitudes, lista y detalle).",
+  },
+  {
+    key: "workorder:view",
+    dimension: "ACTION",
+    group: "workorders",
+    description: "Listar y ver órdenes de trabajo.",
+  },
+  {
+    key: "workorder:create",
+    dimension: "ACTION",
+    group: "workorders",
+    description: "Crear solicitudes de orden de trabajo (manual o desde incidencia/excepción/bitácora/planificada).",
+  },
+  {
+    key: "workorder:edit",
+    dimension: "ACTION",
+    group: "workorders",
+    description: "Editar atributos de una OT (criticidad, prioridad, área, especialidad, fechas).",
+  },
+  {
+    key: "workorder:assign",
+    dimension: "ACTION",
+    group: "workorders",
+    description: "Asignar o cambiar el responsable de una orden de trabajo.",
+  },
+  {
+    key: "workorder:comment",
+    dimension: "ACTION",
+    group: "workorders",
+    description: "Agregar comentarios de gestión a una orden de trabajo.",
+  },
+  {
+    key: "workorder:cancel",
+    dimension: "ACTION",
+    group: "workorders",
+    description: "Anular (cancelar) una orden de trabajo con motivo auditado (sin borrado físico).",
+  },
+  {
+    key: "workordercatalog:manage",
+    dimension: "ACTION",
+    group: "workorders",
+    description: "Administrar el catálogo de tipos de OT, áreas y especialidades.",
+  },
 ] as const satisfies readonly PermissionDef[];
 
 /** Unión literal de todas las claves de permiso conocidas. */
