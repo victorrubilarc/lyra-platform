@@ -7,6 +7,7 @@ import {
   createWorkActivitiesBatchRequestSchema,
   createWorkActivityRequestSchema,
   createWorkOrderRequestSchema,
+  recordWorkActivityProgressRequestSchema,
   reorderWorkActivitiesRequestSchema,
   reviewWorkOrderChecklistRequestSchema,
   transitionWorkOrderRequestSchema,
@@ -22,6 +23,7 @@ import {
   type CreateWorkActivitiesBatchRequest,
   type CreateWorkActivityRequest,
   type CreateWorkOrderRequest,
+  type RecordWorkActivityProgressRequest,
   type ReorderWorkActivitiesRequest,
   type ReviewWorkOrderChecklistRequest,
   type TransitionWorkOrderRequest,
@@ -330,6 +332,28 @@ export class WorkOrdersController {
   @RequirePermission("workorder:activity:manage")
   async removeActivity(@Param("id") id: string, @Param("aid") aid: string, @CurrentUser() user: RequestUser, @Req() req: FastifyRequest) {
     await this.activities.remove(user.id, id, aid, this.ctx(user, req));
+  }
+
+  // === Seguimiento del avance (S5 — Puerta 4) ================================
+
+  /** Historial (append-only) de avance de una actividad. Solo lectura + ABAC. */
+  @Get(":id/activities/:aid/updates")
+  @RequirePermission("workorder:view")
+  listActivityUpdates(@Param("id") id: string, @Param("aid") aid: string, @CurrentUser() user: RequestUser) {
+    return this.activities.listUpdates(user.id, id, aid);
+  }
+
+  /** Registra un avance de la actividad (crea un registro append-only + actualiza la foto vigente). */
+  @Post(":id/activities/:aid/progress")
+  @RequirePermission("workorder:activity:manage")
+  recordActivityProgress(
+    @Param("id") id: string,
+    @Param("aid") aid: string,
+    @Body(new ZodValidationPipe(recordWorkActivityProgressRequestSchema)) dto: RecordWorkActivityProgressRequest,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.activities.recordProgress(user.id, id, aid, dto, this.ctx(user, req));
   }
 
   private ctx(user: RequestUser, req: FastifyRequest): AuditContext {

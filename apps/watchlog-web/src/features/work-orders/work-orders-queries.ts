@@ -6,6 +6,7 @@ import type {
   CreateWorkActivitiesBatchRequest,
   CreateWorkActivityRequest,
   CreateWorkOrderRequest,
+  RecordWorkActivityProgressRequest,
   ReorderWorkActivitiesRequest,
   ReviewWorkOrderChecklistRequest,
   TransitionWorkOrderRequest,
@@ -25,6 +26,7 @@ import {
   createWorkOrderActivity,
   deleteWorkOrderChecklistRule,
   fetchWorkOrderActivities,
+  fetchWorkOrderActivityUpdates,
   fetchWorkOrderAssignableUsers,
   fetchWorkOrderChecklistRules,
   fetchWorkOrderChecklists,
@@ -37,6 +39,7 @@ import {
   instantiateWorkOrderChecklist,
   removeWorkOrderActivity,
   removeWorkOrderChecklist,
+  recordWorkOrderActivityProgress,
   reorderWorkOrderActivities,
   reviewWorkOrderChecklist,
   submitWorkOrderChecklist,
@@ -266,4 +269,26 @@ export function useRemoveWorkOrderActivity(id: string) {
 export function useReorderWorkOrderActivities(id: string) {
   const qc = useQueryClient();
   return useMutation({ mutationFn: (dto: ReorderWorkActivitiesRequest) => reorderWorkOrderActivities(id, dto), onSuccess: () => invalidateActivities(qc, id) });
+}
+
+// === Seguimiento del avance / Puerta 4 (S5) ==================================
+
+/** Historial (append-only) de avance de una actividad; se carga al expandir la fila. */
+export function useWorkOrderActivityUpdates(id: string, aid: string | null) {
+  return useQuery({
+    queryKey: ["work-orders", "activity-updates", id, aid ?? ""],
+    queryFn: () => fetchWorkOrderActivityUpdates(id, aid!),
+    enabled: !!aid,
+  });
+}
+
+export function useRecordWorkOrderActivityProgress(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ aid, dto }: { aid: string; dto: RecordWorkActivityProgressRequest }) => recordWorkOrderActivityProgress(id, aid, dto),
+    onSuccess: (_r, { aid }) => {
+      invalidateActivities(qc, id);
+      qc.invalidateQueries({ queryKey: ["work-orders", "activity-updates", id, aid] });
+    },
+  });
 }

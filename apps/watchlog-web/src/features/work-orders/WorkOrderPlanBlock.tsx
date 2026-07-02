@@ -1,25 +1,30 @@
-import { useMemo, useState } from "react";
-import { CalendarClock, ChevronDown, ChevronUp, ListChecks, Lock, Pencil, Plus, ShieldAlert, Sparkles, Trash2, Wand2 } from "lucide-react";
+import { Fragment, useMemo, useState } from "react";
+import { CalendarClock, ChevronDown, ChevronUp, History, ListChecks, Lock, Pencil, Plus, ShieldAlert, Sparkles, TrendingUp, Trash2, Wand2 } from "lucide-react";
 import {
+  activityDeviationLabel,
   activityEndDeviationDays,
+  effectiveProgressPct,
   planReadyToFreeze,
   summarizeActivities,
   type CreateWorkActivityRequest,
+  type RecordWorkActivityProgressRequest,
   type WorkActivityDto,
   type WorkActivityStatus,
   type WorkOrderDetail,
 } from "@lyra/contracts";
 import { Button, Input, Modal, Select, Stepper, Textarea, useToast, type Step } from "@lyra/ui";
 import { usePermissions } from "../../auth/use-permissions.js";
-import { formatDate } from "../../lib/format.js";
+import { formatDate, formatDateTime } from "../../lib/format.js";
 import { ACTIVITY_STATUS_META, PRIORITY_META } from "./work-orders-presentation.js";
 import {
   useCreateWorkOrderActivitiesBatch,
   useCreateWorkOrderActivity,
+  useRecordWorkOrderActivityProgress,
   useRemoveWorkOrderActivity,
   useReorderWorkOrderActivities,
   useUpdateWorkOrderActivity,
   useWorkOrderActivities,
+  useWorkOrderActivityUpdates,
   useWorkOrderAssignableUsers,
   useWorkOrderSpecialties,
 } from "./work-orders-queries.js";
@@ -52,10 +57,14 @@ export function WorkOrderPlanBlock({ wo, isLive }: { wo: WorkOrderDetail; isLive
   const frozen = !!wo.planFrozenAt;
   const summary = useMemo(() => summarizeActivities(activities), [activities]);
   const canEdit = isLive && manage && !frozen;
+  // Tras autorizar el plan (baseline congelada) el plan es inmutable, pero la
+  // EJECUCIÓN se registra encima: se puede marcar avance por actividad.
+  const canProgress = isLive && manage && frozen;
 
   // `null` = sin modal; "new" = agregar (formulario); una actividad = editar.
   const [editing, setEditing] = useState<WorkActivityDto | "new" | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [progressing, setProgressing] = useState<WorkActivityDto | null>(null);
 
   return (
     <>
@@ -89,8 +98,10 @@ export function WorkOrderPlanBlock({ wo, isLive }: { wo: WorkOrderDetail; isLive
           wo={wo}
           activities={activities}
           canEdit={canEdit}
+          canProgress={canProgress}
           frozen={frozen}
           onEdit={(a) => setEditing(a)}
+          onProgress={(a) => setProgressing(a)}
           onAdd={() => setEditing("new")}
           onWizard={() => setWizardOpen(true)}
         />
@@ -98,6 +109,9 @@ export function WorkOrderPlanBlock({ wo, isLive }: { wo: WorkOrderDetail; isLive
 
       {editing && (
         <ActivityModal wo={wo} activity={editing === "new" ? undefined : editing} onClose={() => setEditing(null)} />
+      )}
+      {progressing && (
+        <ProgressModal wo={wo} activity={progressing} onClose={() => setProgressing(null)} />
       )}
       {wizardOpen && (
         <Modal open onClose={() => setWizardOpen(false)} size="xl" title="Asistente de plan de actividades">
@@ -111,9 +125,14 @@ export function WorkOrderPlanBlock({ wo, isLive }: { wo: WorkOrderDetail; isLive
 /** Banner de etapa: explica dónde está la OT en el plan y la próxima acción esperada. */
 function PlanStageBanner({ wo, activities, frozen }: { wo: WorkOrderDetail; activities: WorkActivityDto[]; frozen: boolean }) {
   if (frozen) {
+    const inExecution = wo.currentStateKey === "en_ejecucion" || wo.currentStateKey === "en_revision_cierre";
+    const summary = summarizeActivities(activities);
     return (
       <p className={styles.planBannerOk}>
-        <Lock size={15} /> Plan autorizado — baseline congelada el {formatDate(wo.planFrozenAt!)}. La ejecución se compara contra esta línea base.
+        <Lock size={15} />
+        {inExecution
+          ? `Plan autorizado — registra el avance de cada actividad (${summary.done}/${summary.total} completadas · ${summary.progressPct}%). Las obligatorias deben cerrarse para poder cerrar la OT.`
+          : `Plan autorizado — baseline congelada el ${formatDate(wo.planFrozenAt!)}. La ejecución se compara contra esta línea base.`}
       </p>
     );
   }
@@ -142,16 +161,20 @@ function ActivityGrid({
   wo,
   activities,
   canEdit,
+  canProgress,
   frozen,
   onEdit,
+  onProgress,
   onAdd,
   onWizard,
 }: {
   wo: WorkOrderDetail;
   activities: WorkActivityDto[];
   canEdit: boolean;
+  canProgress: boolean;
   frozen: boolean;
   onEdit: (a: WorkActivityDto) => void;
+  onProgress: (a: WorkActivityDto) => void;
   onAdd: () => void;
   onWizard: () => void;
 }) {
@@ -159,6 +182,7 @@ function ActivityGrid({
   const remove = useRemoveWorkOrderActivity(wo.id);
   const reorder = useReorderWorkOrderActivities(wo.id);
   const err = (e: unknown) => toast.error((e as Error).message);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const move = (index: number, dir: -1 | 1) => {
     const target = index + dir;
@@ -187,6 +211,11 @@ function ActivityGrid({
     );
   }
 
+  const anyHistory = activities.some((a) => a.updatesCount > 0);
+  const showActions = canEdit || canProgress || anyHistory;
+  // # + Actividad + Responsable + Especialidad + Prioridad + Plan + Estado (+ Avance si frozen) (+ Acciones)
+  const totalCols = 7 + (frozen ? 1 : 0) + (showActions ? 1 : 0);
+
   return (
     <div className={styles.tableCard}>
       <table className={styles.table}>
@@ -199,53 +228,262 @@ function ActivityGrid({
             <th>Prioridad</th>
             <th>Plan</th>
             <th>Estado</th>
-            {canEdit && <th style={{ width: 140, textAlign: "right" }}>Acciones</th>}
+            {frozen && <th style={{ width: 150 }}>Avance</th>}
+            {showActions && <th style={{ width: 170, textAlign: "right" }}>Acciones</th>}
           </tr>
         </thead>
         <tbody>
           {activities.map((a, i) => {
             const meta = ACTIVITY_STATUS_META[a.status];
             const dev = activityEndDeviationDays(a);
+            const expanded = expandedId === a.id;
             return (
-              <tr key={a.id}>
-                <td className={styles.mono}>{i + 1}</td>
-                <td className={styles.titleCell}>
-                  <div className={styles.planCellTitle}>
-                    {a.title}
-                    {a.mandatory && <span className={styles.clMandatory}>Obligatoria</span>}
-                  </div>
-                  {a.description && <div className={styles.planCellSub}>{a.description}</div>}
-                </td>
-                <td>{a.responsibleName ?? <span className={styles.muted}>—</span>}</td>
-                <td>{a.specialtyName ?? <span className={styles.muted}>—</span>}</td>
-                <td>{a.priority ? <span style={{ color: PRIORITY_META[a.priority].color, fontWeight: 600 }}>{PRIORITY_META[a.priority].label}</span> : <span className={styles.muted}>—</span>}</td>
-                <td>
-                  {a.plannedStart ? (
-                    <>{formatDate(a.plannedStart)}{a.plannedEnd ? ` → ${formatDate(a.plannedEnd)}` : ""}</>
-                  ) : (
-                    <span className={styles.muted}>—</span>
-                  )}
-                  {frozen && dev != null && dev !== 0 && (
-                    <span className={dev > 0 ? styles.devLate : styles.devEarly}> · {dev > 0 ? `+${dev}d` : `${dev}d`}</span>
-                  )}
-                </td>
-                <td><span className={styles.lifeChip} style={{ color: meta.color }}>{meta.label}</span></td>
-                {canEdit && (
-                  <td>
-                    <div className={styles.rowActions}>
-                      <Button variant="icon" leftIcon={<ChevronUp size={14} />} disabled={i === 0} onClick={() => move(i, -1)} aria-label="Subir" title="Subir" />
-                      <Button variant="icon" leftIcon={<ChevronDown size={14} />} disabled={i === activities.length - 1} onClick={() => move(i, 1)} aria-label="Bajar" title="Bajar" />
-                      <Button variant="icon" leftIcon={<Pencil size={14} />} onClick={() => onEdit(a)} aria-label="Editar" title="Editar" />
-                      <Button variant="icon" leftIcon={<Trash2 size={14} />} onClick={() => remove.mutate(a.id, { onError: err })} aria-label="Eliminar" title="Eliminar" />
+              <Fragment key={a.id}>
+                <tr>
+                  <td className={styles.mono}>{i + 1}</td>
+                  <td className={styles.titleCell}>
+                    <div className={styles.planCellTitle}>
+                      {a.title}
+                      {a.mandatory && <span className={styles.clMandatory}>Obligatoria</span>}
                     </div>
+                    {a.description && <div className={styles.planCellSub}>{a.description}</div>}
                   </td>
+                  <td>{a.responsibleName ?? <span className={styles.muted}>—</span>}</td>
+                  <td>{a.specialtyName ?? <span className={styles.muted}>—</span>}</td>
+                  <td>{a.priority ? <span style={{ color: PRIORITY_META[a.priority].color, fontWeight: 600 }}>{PRIORITY_META[a.priority].label}</span> : <span className={styles.muted}>—</span>}</td>
+                  <td>
+                    {a.plannedStart ? (
+                      <>{formatDate(a.plannedStart)}{a.plannedEnd ? ` → ${formatDate(a.plannedEnd)}` : ""}</>
+                    ) : (
+                      <span className={styles.muted}>—</span>
+                    )}
+                    {frozen && dev != null && dev !== 0 && (
+                      <span className={dev > 0 ? styles.devLate : styles.devEarly}> · {dev > 0 ? `+${dev}d` : `${dev}d`}</span>
+                    )}
+                  </td>
+                  <td><span className={styles.lifeChip} style={{ color: meta.color }}>{meta.label}</span></td>
+                  {frozen && (
+                    <td>
+                      <div className={styles.progressCell}>
+                        <div className={styles.progressBarTrack}>
+                          <div className={styles.progressBarFill} style={{ width: `${a.progressPct}%`, background: meta.color }} />
+                        </div>
+                        <div className={styles.progressMeta}>
+                          <span className={styles.progressPct}>{a.progressPct}%</span>
+                          {a.lastProgressAt && <span className={styles.progressLastAt}>· {formatDate(a.lastProgressAt)}</span>}
+                        </div>
+                      </div>
+                    </td>
+                  )}
+                  {showActions && (
+                    <td>
+                      <div className={styles.rowActions}>
+                        {canProgress && (
+                          <Button
+                            variant="icon"
+                            leftIcon={<TrendingUp size={14} />}
+                            disabled={a.status === "CANCELED"}
+                            onClick={() => onProgress(a)}
+                            aria-label="Registrar avance"
+                            title={a.status === "CANCELED" ? "Actividad cancelada" : "Registrar avance"}
+                          />
+                        )}
+                        {a.updatesCount > 0 && (
+                          <Button
+                            variant="icon"
+                            leftIcon={<History size={14} />}
+                            onClick={() => setExpandedId(expanded ? null : a.id)}
+                            aria-label="Ver historial de avance"
+                            title={`Historial de avance (${a.updatesCount})`}
+                          />
+                        )}
+                        {canEdit && (
+                          <>
+                            <Button variant="icon" leftIcon={<ChevronUp size={14} />} disabled={i === 0} onClick={() => move(i, -1)} aria-label="Subir" title="Subir" />
+                            <Button variant="icon" leftIcon={<ChevronDown size={14} />} disabled={i === activities.length - 1} onClick={() => move(i, 1)} aria-label="Bajar" title="Bajar" />
+                            <Button variant="icon" leftIcon={<Pencil size={14} />} onClick={() => onEdit(a)} aria-label="Editar" title="Editar" />
+                            <Button variant="icon" leftIcon={<Trash2 size={14} />} onClick={() => remove.mutate(a.id, { onError: err })} aria-label="Eliminar" title="Eliminar" />
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  )}
+                </tr>
+                {expanded && (
+                  <tr className={styles.historyRow}>
+                    <td colSpan={totalCols}>
+                      <ActivityHistory workOrderId={wo.id} activity={a} />
+                    </td>
+                  </tr>
                 )}
-              </tr>
+              </Fragment>
             );
           })}
         </tbody>
       </table>
     </div>
+  );
+}
+
+// === Historial de avance (append-only) de una actividad ========================
+
+function ActivityHistory({ workOrderId, activity }: { workOrderId: string; activity: WorkActivityDto }) {
+  const { data: updates = [], isLoading } = useWorkOrderActivityUpdates(workOrderId, activity.id);
+  return (
+    <div>
+      <p className={styles.historyTitle}>Historial de avance — {activity.title}</p>
+      {isLoading ? (
+        <p className={styles.muted}>Cargando…</p>
+      ) : updates.length === 0 ? (
+        <p className={styles.historyEmpty}>Sin registros de avance.</p>
+      ) : (
+        <ul className={styles.historyList}>
+          {updates.map((u) => {
+            const statusMeta = u.status ? ACTIVITY_STATUS_META[u.status] : null;
+            return (
+              <li key={u.id} className={styles.historyItem}>
+                <div className={styles.historyItemHead}>
+                  {statusMeta && <span className={styles.lifeChip} style={{ color: statusMeta.color }}>{statusMeta.label}</span>}
+                  {u.progressPct != null && <span className={styles.progressPct}>{u.progressPct}%</span>}
+                  {u.deviation && <span className={styles.devLate}>{u.deviation}</span>}
+                </div>
+                {u.note && <p className={styles.historyItemNote}>{u.note}</p>}
+                {u.delayReason && <p className={styles.historyItemNote}>Motivo: {u.delayReason}</p>}
+                <span className={styles.historyItemMeta}>{u.authorName ?? "—"} · {formatDateTime(u.createdAt)}</span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// === Modal de registrar avance (Puerta 4, S5) ==================================
+
+/** Estados que se pueden declarar al registrar avance (CANCELED es acción de plan, no avance). */
+const PROGRESS_STATUSES: WorkActivityStatus[] = ["IN_PROGRESS", "BLOCKED", "DONE"];
+
+function ProgressModal({ wo, activity, onClose }: { wo: WorkOrderDetail; activity: WorkActivityDto; onClose: () => void }) {
+  const toast = useToast();
+  const record = useRecordWorkOrderActivityProgress(wo.id);
+
+  const [status, setStatus] = useState<WorkActivityStatus>(
+    activity.status === "PENDING" || activity.status === "CANCELED" ? "IN_PROGRESS" : activity.status,
+  );
+  const [progressPct, setProgressPct] = useState(activity.progressPct);
+  const [note, setNote] = useState("");
+  const [delayReason, setDelayReason] = useState("");
+  const [actualStart, setActualStart] = useState(toLocalInput(activity.actualStart));
+  const [actualEnd, setActualEnd] = useState(toLocalInput(activity.actualEnd));
+
+  // % efectivo: DONE ⇒ 100 (fuente única compartida con el backend).
+  const effPct = effectiveProgressPct({ status, progressPct }, activity.progressPct);
+  const isDone = status === "DONE";
+  const isBlocked = status === "BLOCKED";
+  const devLabel = activityDeviationLabel({
+    baselineEnd: activity.baselineEnd,
+    plannedEnd: activity.plannedEnd,
+    actualEnd: isoOrNull(actualEnd) ?? activity.actualEnd,
+  });
+
+  const err = (e: unknown) => toast.error((e as Error).message);
+  const save = () => {
+    const dto: RecordWorkActivityProgressRequest = {
+      status,
+      progressPct: effPct,
+      note: note.trim() || null,
+      delayReason: delayReason.trim() || null,
+      ...(actualStart ? { actualStart: isoOrNull(actualStart) } : {}),
+      ...(actualEnd ? { actualEnd: isoOrNull(actualEnd) } : {}),
+    };
+    record.mutate(
+      { aid: activity.id, dto },
+      { onSuccess: () => { toast.success("Avance registrado"); onClose(); }, onError: err },
+    );
+  };
+
+  return (
+    <Modal open onClose={onClose} title="Registrar avance" size="md" footer={
+      <>
+        <Button variant="secondary" onClick={onClose}>Cancelar</Button>
+        <Button variant="primary" leftIcon={<TrendingUp size={15} />} loading={record.isPending} onClick={save}>Registrar</Button>
+      </>
+    }>
+      <div className={styles.modalBody}>
+        <div className={styles.planCellTitle}>{activity.title}</div>
+
+        {/* Contexto: baseline y desviación (para decidir con dato) */}
+        <div className={styles.progressContext}>
+          <div className={styles.progressContextRow}>
+            <span>Plan comprometido (baseline)</span>
+            <span>{activity.baselineEnd ? formatDate(activity.baselineEnd) : "—"}</span>
+          </div>
+          {devLabel && (
+            <div className={styles.progressContextRow}>
+              <span>Desviación estimada</span>
+              <span className={styles.devLate}>{devLabel}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Estado */}
+        <label className={styles.field}>
+          <span className={styles.fieldLabel}>Estado</span>
+          <div className={styles.statusPicker}>
+            {PROGRESS_STATUSES.map((s) => (
+              <button
+                key={s}
+                type="button"
+                className={s === status ? `${styles.statusOption} ${styles.statusOptionActive}` : styles.statusOption}
+                onClick={() => setStatus(s)}
+              >
+                <span style={{ color: ACTIVITY_STATUS_META[s].color }}>●</span> {ACTIVITY_STATUS_META[s].label}
+              </button>
+            ))}
+          </div>
+        </label>
+
+        {/* Porcentaje de avance */}
+        <label className={styles.field}>
+          <span className={styles.fieldLabel}>Avance: {effPct}%</span>
+          <div className={styles.rangeRow}>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={5}
+              value={effPct}
+              disabled={isDone}
+              onChange={(e) => setProgressPct(Number(e.target.value))}
+            />
+          </div>
+          {isDone && <span className={styles.muted}>Al completar, el avance queda en 100%.</span>}
+        </label>
+
+        {/* Fechas reales (opcionales; el sistema completa la fecha faltante) */}
+        <div className={styles.formRow2}>
+          <label className={styles.field}><span className={styles.fieldLabel}>Inicio real</span>
+            <Input type="datetime-local" value={actualStart} onChange={(e) => setActualStart(e.target.value)} />
+          </label>
+          <label className={styles.field}><span className={styles.fieldLabel}>Término real</span>
+            <Input type="datetime-local" value={actualEnd} onChange={(e) => setActualEnd(e.target.value)} />
+          </label>
+        </div>
+
+        {/* Motivo de atraso/bloqueo */}
+        <label className={styles.field}>
+          <span className={styles.fieldLabel}>{isBlocked ? "Motivo del bloqueo" : "Motivo de atraso (opcional)"}</span>
+          <Input value={delayReason} onChange={(e) => setDelayReason(e.target.value)} placeholder={isBlocked ? "¿Qué impide continuar?" : "Solo si hay desviación"} />
+        </label>
+
+        {/* Nota de avance */}
+        <label className={styles.field}>
+          <span className={styles.fieldLabel}>Nota de avance</span>
+          <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="Qué se hizo, hallazgos, pendientes…" />
+        </label>
+      </div>
+    </Modal>
   );
 }
 

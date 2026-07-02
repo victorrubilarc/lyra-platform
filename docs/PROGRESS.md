@@ -1,5 +1,34 @@
 # Progreso — Lyra WatchLog
 
+**2026-07-02 — 🔧 OT · Sesión 5a · PUERTA 4 (seguimiento vivo del avance + cierre) ✅ → CIERRA EL MVP del ciclo Solicitud→Cierre**
+(`feat/ot-seguimiento-cierre`). Con la baseline congelada (S4), la **ejecución** ahora se registra encima: el plan es inmutable
+pero cada actividad acumula **avance** hasta cerrarse, y la OT se **cierra** punta a punta con los guards ya cableados en S4.
+**`WorkActivityUpdate`** (entidad NUEVA, append-only §2.5): por cada registro de avance una fila inmutable
+(`status`/`progressPct`/`actualStart`-`End`/`note`/`deviation`/`delayReason`; `hoursSpent`/`cost`/`evidence` reservados S8) +
+`authorId`/`authorName`; cascade desde `WorkActivity`, índice `(workActivityId, createdAt)`. Migración
+`20260702200000_add_work_activity_updates` (`migrate diff` live→datamodel + `db:deploy`, **drift ajeno descartado**:
+`LogEntry_currentStateSince_idx` + `OrgStructure.updatedAt`; node de :3000 detenido antes de `prisma generate` por el EPERM).
+**Seguimiento vivo:** `WorkActivitiesService.recordProgress()` crea el update append-only + actualiza la **foto vigente** de la
+`WorkActivity` (status/%/actual\*/`completedAt`; DONE ⇒ 100% y auto-`actualEnd`, IN_PROGRESS ⇒ auto-`actualStart`) + evento
+`ACTIVITY_PROGRESS`/`ACTIVITY_DONE`/`ACTIVITY_BLOCKED` + auditoría; guard `assertProgressable` (espejo inverso de `assertEditable`:
+exige **plan congelado + OT abierta**). `listUpdates()` = historial más reciente primero. `WorkActivityDto` enriquecido con
+`completedAt`/`completionNote`/`updatesCount`/`lastProgressAt` (batched, sin N+1). Helpers PUROS nuevos en
+`contracts/work-orders/activities.ts`: `effectiveProgressPct` (DONE⇒100), `activityDeviationLabel` (atraso/adelanto legible) —
+fuente única back↔front. Contrato `recordWorkActivityProgressRequestSchema` (refine: exige ≥1 dato de avance). **Cierre (Puerta 4):**
+los guards ya estaban cableados en S4 (`assertActivitiesComplete`/`blockingActivitiesForClose` al pasar a estado final +
+`planNotFrozen` al ejecutar); esta sesión verifica el ciclo entero y lo EXPLICA en la UI. **Permiso:** reusa
+`workorder:activity:manage` (avance = gestión del plan; **sin permiso nuevo, sin db:seed/FLUSHALL**). **Web:** pestaña «Plan de
+actividades» viva en ejecución — columna **Avance** (barra + % + fecha) tras congelar, botón **«Registrar avance»** por fila
+(`ProgressModal`: chips de estado IN_PROGRESS/BLOCKED/DONE, slider de %, fechas reales opcionales, contexto baseline+desviación,
+motivo de atraso/bloqueo, nota) + **historial expandible** append-only por actividad (`ActivityHistory`); banner de etapa guía la
+ejecución («N/M completadas · X%»). Reglas de estilo respetadas (tokens DS, sin jerga «Puerta N», ≥44px, claro/oscuro). Verde:
+typecheck (6 paquetes) · lint (0 errores) · build web (2996 módulos) · **contracts 427** (+6 specs) · API 252 · web 6;
+`smoke-workorders.py` **90/90** (avance append-only → gate 403 operador → avance vacío 400 → **cierre BLOQUEADO con obligatorias
+abiertas 400** → DONE ambas → **cerrar con firma → cerrada/CLOSED/closureSummary** + eventos ACTIVITY_DONE/CLOSED → avance tras
+cerrar 400 + avance antes de congelar 400) + regresión **incidencias 32/32**. Ver DECISIONS 2026-07-02. **Diferido a S5b:** eje
+`momento` en reglas de checklist (§11.2), checklists de EJECUCIÓN por actividad (§11.4.2), checklist de CIERRE (§11.4.3),
+Gobierno 2 (§11.5). **Siguiente = OT S5b (checklists por momento + Gobierno 2) o S6 (SLA/semáforos).**
+
 **2026-07-02 — 🔧 OT/Form Builder · W5 `Template.purpose` (filtrar plantillas a «checklist»)** (`feat/ot-template-purpose`).
 A pedido del dueño (la lista de plantillas mezclaba todo). Marcador **`Template.purpose`** (`TemplatePurpose?`, hoy
 `CHECKLIST`; null=general; migr. `20260702190000`) + contrato + servicio + **selector «Propósito» en el Form Builder**
