@@ -1,12 +1,18 @@
 #!/usr/bin/env python3
-"""Smoke de Órdenes de Trabajo (OT / PTW) — S1 cimientos + S2 PUERTA 1 + S3 PUERTA 2.
+"""Smoke de Órdenes de Trabajo (OT / PTW) — S1 cimientos + S2 PUERTA 1 + S3 PUERTA 2 + S4 PUERTA 3.
 
-Sección 13 (Puerta 2 · checklists/PTW): al ENTRAR a preparación el backend SUGIERE los
-checklists cuyas reglas matchean (la regla LOTO obligatoria sembrada); revisar_checklists
-se BLOQUEA (400) con un obligatorio sin aprobar; se instancia el checklist como LogEntry
-vivo (Form Builder), se sella, se envía a revisión; el responsable NO puede aprobar su
-propio checklist (403, segregación); un revisor ≠ responsable aprueba; con el obligatorio
-aprobado, revisar_checklists → checklists_ok. + gates 403 del operador.
+Sección 13 (pipeline P3→P2→ejecución, orden ESTÁNDAR reordenado en S4:
+planificar → autorizar el permiso → ejecutar): tras aprobar, `planificar` → en_planificacion;
+`autorizar_plan` SIN actividades se BLOQUEA (400, Puerta 3 exige ≥1 actividad); se crean
+actividades (operador sin permiso → 403); `autorizar_plan` → plan_aprobado + planFrozenAt +
+evento PLAN_FROZEN + BASELINE CONGELADA (baseline* == planned*); modificar el plan tras
+congelar → 400. Luego `preparar` → en_preparacion (SUGIERE los checklists cuyas reglas
+matchean: la regla LOTO obligatoria sembrada); revisar_checklists se BLOQUEA (400) con un
+obligatorio sin aprobar; se instancia el checklist como LogEntry vivo (Form Builder), se
+sella, se envía a revisión; el responsable NO puede aprobar su propio checklist (403,
+segregación); un revisor ≠ responsable aprueba; con el obligatorio aprobado,
+revisar_checklists → checklists_ok; `ejecutar` → en_ejecucion (guard "no ejecuta sin plan"
+pasa porque la baseline está congelada). + gates 403 del operador.
 
 
 Verifica el módulo de OT vía API (server-authoritative):
@@ -314,16 +320,64 @@ def main():
     else:
         print("  --  (sin usuario operador; se omiten los gates de 403)")
 
-    # 13) PUERTA 2 — checklists / PTW (S3)
-    print("\n— Puerta 2 (checklists / PTW) —")
+    # 13) PIPELINE P3 (plan) → P2 (permiso) → ejecución (orden estándar reordenado en S4)
+    print("\n— Puerta 3 (plan de actividades) + Puerta 2 (permiso) + ejecución —")
     setup_reviewer()
     reviewer = login(REV_EMAIL)
     check("reviewer temporal (segregación) logueado", bool(reviewer))
-    # OT nueva: enviar → aprobar (folio) → preparar (dispara la SUGERENCIA automática)
+    # OT nueva: enviar → aprobar (folio) → planificar
     s, wo4 = create_request(admin, tid, node, spec_id)
     wid4 = wo4.get("id") if isinstance(wo4, dict) else None
     call("POST", f"/work-orders/{wid4}/transitions", admin, {"transitionKey": "enviar"})
     call("POST", f"/work-orders/{wid4}/transitions", admin, {"transitionKey": "aprobar", "password": PASS})
+    s, r = call("POST", f"/work-orders/{wid4}/transitions", admin, {"transitionKey": "planificar"})
+    check("planificar → en_planificacion (2xx)", s == 200 and isinstance(r, dict) and r.get("currentStateKey") == "en_planificacion", str(s))
+
+    # Puerta 3 GUARD: autorizar_plan SIN actividades → 400 (exige ≥1 actividad)
+    s, _ = call("POST", f"/work-orders/{wid4}/transitions", admin, {"transitionKey": "autorizar_plan"})
+    check("Puerta 3 BLOQUEADA: autorizar_plan sin actividades → 400", s == 400, str(s))
+
+    # Gates 403 del operador sobre actividades (sin workorder:activity:manage)
+    if operador:
+        s, _ = call("POST", f"/work-orders/{wid4}/activities", operador, {"title": "intento del operador"})
+        check("operador POST activities → 403", s == 403, str(s))
+        s, _ = call("POST", f"/work-orders/{wid4}/activities/reorder", operador, {"orderedIds": ["x"]})
+        check("operador POST activities/reorder → 403", s == 403, str(s))
+
+    # Crear actividades del plan (una obligatoria con fechas para verificar la baseline)
+    PS, PE = "2026-08-01T08:00:00.000Z", "2026-08-05T17:00:00.000Z"
+    s, a1 = call("POST", f"/work-orders/{wid4}/activities", admin, {
+        "title": "Aislar energías y verificar cero energía", "responsibleId": me,
+        "specialtyId": spec_id, "plannedStart": PS, "plannedEnd": PE, "mandatory": True,
+    })
+    check("crear actividad → 2xx + PENDING + secuencia 0", s in (200, 201) and isinstance(a1, dict) and a1.get("status") == "PENDING" and a1.get("sequence") == 0, str(s))
+    aid1 = a1.get("id") if isinstance(a1, dict) else None
+    s, a2 = call("POST", f"/work-orders/{wid4}/activities", admin, {"title": "Reemplazar rodamiento y montar", "mandatory": True})
+    check("crear 2.ª actividad → 2xx + secuencia 1", s in (200, 201) and isinstance(a2, dict) and a2.get("sequence") == 1, str(s))
+    s, acts = call("GET", f"/work-orders/{wid4}/activities", admin)
+    check("listar actividades → 2 en el plan", isinstance(acts, list) and len(acts) == 2, str(len(acts) if isinstance(acts, list) else s))
+
+    # Puerta 3: autorizar_plan → plan_aprobado + planFrozenAt + evento PLAN_FROZEN
+    s, r = call("POST", f"/work-orders/{wid4}/transitions", admin, {"transitionKey": "autorizar_plan"})
+    check("autorizar_plan → 200 + plan_aprobado + planFrozenAt",
+          s == 200 and isinstance(r, dict) and r.get("currentStateKey") == "plan_aprobado" and bool(r.get("planFrozenAt")),
+          str(s) + (json.dumps({k: r.get(k) for k in ("currentStateKey", "planFrozenAt")}) if isinstance(r, dict) else ""))
+    check("timeline: evento PLAN_FROZEN", isinstance(r, dict) and any(e.get("kind") == "PLAN_FROZEN" for e in r.get("events", [])))
+
+    # Baseline CONGELADA: baseline* == planned* (mide desviación en la ejecución)
+    s, acts2 = call("GET", f"/work-orders/{wid4}/activities", admin)
+    a1f = next((a for a in acts2 if a.get("id") == aid1), None) if isinstance(acts2, list) else None
+    check("baseline congelada: baselineStart/End == plannedStart/End",
+          a1f is not None and a1f.get("baselineStart") == PS and a1f.get("baselineEnd") == PE,
+          json.dumps({k: a1f.get(k) for k in ("plannedStart", "baselineStart", "plannedEnd", "baselineEnd")}) if a1f else str(acts2))
+
+    # Plan congelado ⇒ no se modifica (crear/editar/eliminar) → 400
+    s, _ = call("POST", f"/work-orders/{wid4}/activities", admin, {"title": "tarde para el plan"})
+    check("crear actividad con plan congelado → 400", s == 400, str(s))
+    s, _ = call("PATCH", f"/work-orders/{wid4}/activities/{aid1}", admin, {"title": "editar tras congelar el plan"})
+    check("editar actividad con plan congelado → 400", s == 400, str(s))
+
+    # Puerta 2 (permiso) DESPUÉS del plan: preparar → en_preparacion (dispara la sugerencia)
     s, r = call("POST", f"/work-orders/{wid4}/transitions", admin, {"transitionKey": "preparar"})
     check("preparar → en_preparacion (2xx)", s == 200 and isinstance(r, dict) and r.get("currentStateKey") == "en_preparacion", str(s))
 
@@ -387,6 +441,11 @@ def main():
     s, r = call("POST", f"/work-orders/{wid4}/transitions", admin, {"transitionKey": "revisar_checklists", "password": PASS})
     check("Puerta 2 ABIERTA: revisar_checklists con obligatorio aprobado → 200 + checklists_ok",
           s == 200 and isinstance(r, dict) and r.get("currentStateKey") == "checklists_ok", str(s))
+
+    # Ejecución: guard "no ejecuta sin plan" PASA porque la baseline está congelada
+    s, r = call("POST", f"/work-orders/{wid4}/transitions", admin, {"transitionKey": "ejecutar"})
+    check("ejecutar → 200 + en_ejecucion (plan congelado ⇒ guard pasa)",
+          s == 200 and isinstance(r, dict) and r.get("currentStateKey") == "en_ejecucion", str(s))
 
     cleanup()
     print(f"\n{len(OK)}/{len(OK)+len(FAIL)} OK" + ("" if not FAIL else f"   FALLARON: {FAIL}"))

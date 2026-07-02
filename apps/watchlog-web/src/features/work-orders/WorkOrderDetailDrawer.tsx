@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Activity, ArrowRight, ClipboardCheck, Info, ShieldCheck, XCircle } from "lucide-react";
+import { Activity, ArrowRight, ClipboardCheck, Info, ListChecks, ShieldCheck, XCircle } from "lucide-react";
 import type { WorkOrderAvailableTransition, WorkOrderPriority } from "@lyra/contracts";
 import { Button, Drawer, Input, Modal, Select, Spinner, Textarea, useToast } from "@lyra/ui";
 import { usePermissions } from "../../auth/use-permissions.js";
@@ -14,6 +14,7 @@ import {
 } from "./work-orders-queries.js";
 import { LIFECYCLE_META, ORIGIN_META, PRIORITY_META, criticalityColor, criticalityLabel } from "./work-orders-presentation.js";
 import { WorkOrderChecklistsBlock } from "./WorkOrderChecklistsBlock.js";
+import { WorkOrderPlanBlock } from "./WorkOrderPlanBlock.js";
 import styles from "./work-orders.module.css";
 
 interface Props {
@@ -40,7 +41,7 @@ export function WorkOrderDetailDrawer({ workOrderId, onClose }: Props) {
   const [cancelReason, setCancelReason] = useState("");
   const [showCancel, setShowCancel] = useState(false);
   const [pending, setPending] = useState<WorkOrderAvailableTransition | null>(null);
-  const [tab, setTab] = useState<"resumen" | "checklists" | "actividad">("resumen");
+  const [tab, setTab] = useState<"resumen" | "plan" | "checklists" | "actividad">("resumen");
 
   useEffect(() => {
     setCancelReason("");
@@ -73,8 +74,11 @@ export function WorkOrderDetailDrawer({ workOrderId, onClose }: Props) {
             <button role="tab" aria-selected={tab === "resumen"} className={tab === "resumen" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setTab("resumen")}>
               <Info size={14} /> Resumen
             </button>
+            <button role="tab" aria-selected={tab === "plan"} className={tab === "plan" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setTab("plan")}>
+              <ListChecks size={14} /> Plan
+            </button>
             <button role="tab" aria-selected={tab === "checklists"} className={tab === "checklists" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setTab("checklists")}>
-              <ClipboardCheck size={14} /> Checklists
+              <ClipboardCheck size={14} /> Permiso
             </button>
             <button role="tab" aria-selected={tab === "actividad"} className={tab === "actividad" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setTab("actividad")}>
               <Activity size={14} /> Actividad
@@ -212,6 +216,8 @@ export function WorkOrderDetailDrawer({ workOrderId, onClose }: Props) {
             </div>
           )}
           </>)}
+
+          {tab === "plan" && <WorkOrderPlanBlock wo={wo} isLive={!!isLive} />}
 
           {tab === "checklists" && <WorkOrderChecklistsBlock workOrderId={wo.id} isLive={!!isLive} />}
 

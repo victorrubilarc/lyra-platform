@@ -562,30 +562,29 @@ async function seedIncidentCatalog(): Promise<void> {
 // transiciones (incl. firma Part 11 en aprobar/revisar checklists/cerrar).
 // Idempotente: si ya existe la definición por clave, no la recrea (el admin
 // puede haberla clonado/simplificado — es DATO suyo).
-async function seedWorkOrderWorkflow(): Promise<void> {
-  const existing = await prisma.workflowDefinition.findFirst({ where: { key: WORK_ORDER_WORKFLOW.key } });
-  if (existing) {
-    console.log(`• Flujo de OT "${WORK_ORDER_WORKFLOW.key}" ya existe: no se recrea`);
-    return;
-  }
-  const def = await prisma.workflowDefinition.create({
-    data: { key: WORK_ORDER_WORKFLOW.key, name: WORK_ORDER_WORKFLOW.name, description: WORK_ORDER_WORKFLOW.description, status: "PUBLISHED" },
-  });
-  const version = await prisma.workflowDefinitionVersion.create({
-    data: {
-      workflowDefinitionId: def.id,
-      versionNumber: 1,
-      status: "PUBLISHED",
-      name: WORK_ORDER_WORKFLOW.name,
-      description: WORK_ORDER_WORKFLOW.description,
-      publishedAt: new Date(),
-    },
-  });
+/**
+ * Firma de contenido del flujo (estados + transiciones ordenados) para detectar cambios
+ * de forma determinista. Igual firma ⇒ no se republica; distinta ⇒ versión nueva.
+ */
+function workOrderWorkflowSignature(
+  states: ReadonlyArray<{ key: string; name: string; order: number; isInitial: boolean; isFinal: boolean }>,
+  transitions: ReadonlyArray<{ key: string; from: string; to: string; requireSignature: boolean }>,
+): string {
+  const s = [...states]
+    .map((x) => `${x.key}:${x.name}:${x.order}:${x.isInitial ? 1 : 0}:${x.isFinal ? 1 : 0}`)
+    .sort()
+    .join("|");
+  const t = [...transitions].map((x) => `${x.key}:${x.from}>${x.to}:${x.requireSignature ? 1 : 0}`).sort().join("|");
+  return `S[${s}]T[${t}]`;
+}
+
+/** Crea estados + transiciones de una versión a partir del seed (helper compartido). */
+async function writeWorkOrderWorkflowVersion(versionId: string): Promise<void> {
   const stateIdByKey = new Map<string, string>();
   for (const s of WORK_ORDER_WORKFLOW.states) {
     const row = await prisma.workflowState.create({
       data: {
-        workflowDefinitionVersionId: version.id,
+        workflowDefinitionVersionId: versionId,
         key: s.key,
         name: s.name,
         order: s.order,
@@ -600,7 +599,7 @@ async function seedWorkOrderWorkflow(): Promise<void> {
   for (const t of WORK_ORDER_WORKFLOW.transitions) {
     await prisma.workflowTransition.create({
       data: {
-        workflowDefinitionVersionId: version.id,
+        workflowDefinitionVersionId: versionId,
         key: t.key,
         label: t.label,
         fromStateId: stateIdByKey.get(t.from)!,
@@ -611,8 +610,64 @@ async function seedWorkOrderWorkflow(): Promise<void> {
       },
     });
   }
-  await prisma.workflowDefinition.update({ where: { id: def.id }, data: { currentVersionId: version.id } });
-  console.log(`✔ Flujo de OT "${WORK_ORDER_WORKFLOW.key}" publicado (${WORK_ORDER_WORKFLOW.states.length} estados, 4 puertas)`);
+}
+
+/**
+ * Siembra/actualiza el flujo de OT. El flujo es DATO versionado e INMUTABLE: si el
+ * contenido del seed difiere de la versión actual publicada, se crea una VERSIÓN NUEVA
+ * (versionNumber = max+1) y se repunta `currentVersionId` — los OT en curso conservan su
+ * versión CONGELADA (no se rompen), los nuevos usan la reordenada. Igual contenido = no-op.
+ */
+async function seedWorkOrderWorkflow(): Promise<void> {
+  const seedSig = workOrderWorkflowSignature(WORK_ORDER_WORKFLOW.states, WORK_ORDER_WORKFLOW.transitions);
+  const existing = await prisma.workflowDefinition.findFirst({ where: { key: WORK_ORDER_WORKFLOW.key } });
+
+  if (!existing) {
+    const def = await prisma.workflowDefinition.create({
+      data: { key: WORK_ORDER_WORKFLOW.key, name: WORK_ORDER_WORKFLOW.name, description: WORK_ORDER_WORKFLOW.description, status: "PUBLISHED" },
+    });
+    const version = await prisma.workflowDefinitionVersion.create({
+      data: { workflowDefinitionId: def.id, versionNumber: 1, status: "PUBLISHED", name: WORK_ORDER_WORKFLOW.name, description: WORK_ORDER_WORKFLOW.description, publishedAt: new Date() },
+    });
+    await writeWorkOrderWorkflowVersion(version.id);
+    await prisma.workflowDefinition.update({ where: { id: def.id }, data: { currentVersionId: version.id } });
+    console.log(`✔ Flujo de OT "${WORK_ORDER_WORKFLOW.key}" publicado (${WORK_ORDER_WORKFLOW.states.length} estados, 4 puertas)`);
+    return;
+  }
+
+  // ¿La versión actual ya coincide con el seed? Entonces no hay nada que hacer.
+  if (existing.currentVersionId) {
+    const current = await prisma.workflowDefinitionVersion.findUnique({
+      where: { id: existing.currentVersionId },
+      include: {
+        states: { select: { key: true, name: true, order: true, isInitial: true, isFinal: true } },
+        transitions: { include: { fromState: { select: { key: true } }, toState: { select: { key: true } } } },
+      },
+    });
+    if (current) {
+      const currentSig = workOrderWorkflowSignature(
+        current.states,
+        current.transitions.map((t) => ({ key: t.key, from: t.fromState.key, to: t.toState.key, requireSignature: t.requireSignature })),
+      );
+      if (currentSig === seedSig) {
+        console.log(`• Flujo de OT "${WORK_ORDER_WORKFLOW.key}" ya está al día (v${current.versionNumber}): no se recrea`);
+        return;
+      }
+    }
+  }
+
+  // Contenido distinto ⇒ nueva versión INMUTABLE (los OT en curso conservan la anterior).
+  const maxVersion = await prisma.workflowDefinitionVersion.aggregate({ where: { workflowDefinitionId: existing.id }, _max: { versionNumber: true } });
+  const nextNumber = (maxVersion._max.versionNumber ?? 0) + 1;
+  const version = await prisma.workflowDefinitionVersion.create({
+    data: { workflowDefinitionId: existing.id, versionNumber: nextNumber, status: "PUBLISHED", name: WORK_ORDER_WORKFLOW.name, description: WORK_ORDER_WORKFLOW.description, publishedAt: new Date() },
+  });
+  await writeWorkOrderWorkflowVersion(version.id);
+  await prisma.workflowDefinition.update({
+    where: { id: existing.id },
+    data: { currentVersionId: version.id, name: WORK_ORDER_WORKFLOW.name, description: WORK_ORDER_WORKFLOW.description, status: "PUBLISHED" },
+  });
+  console.log(`✔ Flujo de OT "${WORK_ORDER_WORKFLOW.key}" REPUBLICADO v${nextNumber} (reorden estándar planificar→autorizar→ejecutar). Los OT en curso conservan su versión congelada.`);
 }
 
 // Catálogo de arranque de Órdenes de Trabajo (OT / PTW) — tipos + áreas +

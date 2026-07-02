@@ -4,6 +4,51 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-02 · OT — Sesión 4 (Puerta 3 · plan de actividades + congelar baseline + reorden del flujo)
+Se dio vida a la fase Planificación (`feat/ot-puerta3`). Con visto bueno explícito del dueño (3 preguntas):
+1. **REORDEN del flujo `ot-4-puertas` al estándar EAM** (§11.3): **planificar → autorizar el permiso → ejecutar**
+   (los peligros dependen de las tareas). Nuevo orden: `borrador → solicitada → aprobada → en_planificacion →
+   plan_aprobado (P3, congela baseline) → en_preparacion → checklists_ok (P2, permiso) → en_ejecucion →
+   en_revision_cierre → cerrada`. **Solo cambian `from/to/order`**; se conservan las claves de estado y de
+   transición (y sus guards data-driven). El flujo es DATO versionado e **INMUTABLE**: el seed ahora detecta el
+   cambio (firma de contenido) y **republica una versión NUEVA** (`v2`), repuntando `currentVersionId` — los OT en
+   curso conservan su versión CONGELADA (no se rompen). El estado `checklists_ok` se renombró a "Permiso autorizado"
+   (display). En la UI se muestran NOMBRES de etapa, no "Puerta N" (cronológicamente P3 va antes que P2, pero el
+   usuario no ve numeración).
+2. **`WorkActivity` = entidad PROPIA** (fork W1), shape de §2.5. **NO** se construyó `WorkActivityUpdate` (avance
+   append-only) — difiere a S5 por acotación del prompt. Incluye columnas reservadas (estimatedHours/actualHours S8,
+   evidence, dependsOnId para ruta crítica S8 = solo la columna). Migración `20260702180000_add_work_order_activities`
+   vía `migrate diff` + `db:deploy` (drift ajeno descartado, patrón S1). + `WorkOrder.planFrozenAt/planFrozenById`.
+3. **Puerta 3 exige ≥1 actividad** para `autorizar_plan` (decisión del dueño: un plan sin tareas no es un plan;
+   estándar SAP PM/Maximo ≥1 operación). Guard puro `planReadyToFreeze`. Al autorizar se **CONGELA la baseline**
+   (copia `planned* → baseline*` de cada actividad no cancelada, dentro de la MISMA tx de la transición, idempotente)
+   + `planFrozenAt` + evento `PLAN_FROZEN`. El plan queda **inmutable** tras congelar (crear/editar/reordenar/eliminar
+   → 400).
+4. **Semántica data-driven** (paridad `folioOnStateKey`/`checklistGateStateKey`): 2 claves nuevas en `WorkOrderType`
+   — `planFreezeStateKey` (def. `plan_aprobado`, dispara el congelamiento) y `executeStateKey` (def. `en_ejecucion`,
+   dispara el guard "no ejecuta sin plan"). Editor UI de estas claves = diferido con el resto (deuda S2/S3).
+5. **Guards PUROS en contracts** (`activities.ts`, espejo de `blockingChecklistsForClose`): `planNotFrozen(wo)`,
+   `blockingActivitiesForClose(activities)` (mandatory abierta), `planReadyToFreeze`, `summarizeActivities`,
+   `activityEndDeviationDays`. `planNotFrozen` se cablea al ENTRAR a `executeStateKey`; `blockingActivitiesForClose`
+   se cablea al CERRAR (becomesFinal && approvedAt) — Puerta 4 de actividades ya viva (S5 sumará el checklist de
+   CIERRE). **Nota:** en el flujo estándar `en_ejecucion` sólo se alcanza tras `plan_aprobado`, así que el guard
+   `planNotFrozen` es DEFENSA (contra un flujo mal configurado); el gate operativo real de "sin plan no se avanza" es
+   `autorizar_plan` (≥1 actividad). Ambos con test unitario en `activities.spec.ts` (8).
+6. **Permiso NUEVO `workorder:activity:manage`** (dim. ACTION, grupo workorders; catálogo 101→**102**; db:seed +
+   FLUSHALL). Listar el plan = `workorder:view`; gestionarlo/generarlo = el permiso nuevo.
+7. **UX (visto bueno del dueño):** pestaña **"Plan"** en el drawer con DOS formas: (a) **grilla** (secuencia/responsable/
+   especialidad/fechas/estado, reordenar ▲▼, editar, eliminar, desviación plan-vs-baseline con chips +Xd tras congelar);
+   (b) **asistente guiado** (`Stepper` de packages/ui, 4 pasos: Tareas → Equipo → Fechas → Orden/revisar) con defaults
+   inteligentes (responsable/fechas desde la OT) que genera las filas en lote (`POST :id/activities/batch`). Cuando la
+   OT no tiene actividades, arranca el asistente (decisión del dueño). Banner de etapa que EXPLICA la próxima acción y
+   los bloqueos. La autorización del plan (transición firmada opcional) sigue el patrón único de transiciones (Resumen).
+Verde: typecheck/lint/build + test (contracts **421** incl. activities 8 · api 252 · web 6) + `smoke-workorders.py`
+**78/78** (pipeline planificar→autorizar_plan[baseline==planned]→plan inmutable→preparar→checklists→ejecutar + guards
++ gates 403) + regresión incidencias 32/32. **Diferido a S5:** checklists de EJECUCIÓN/CIERRE por actividad, eje
+`momento`, confirmación del set de ejecución en Puerta 2 (§11.5 Gob. 2), `WorkActivityUpdate`.
+
+---
+
 ### 2026-07-02 · OT — Realineación PTW al estándar: el PERMISO tiene 3 momentos (no uno)
 El dueño cuestionó (con razón) que la Puerta 2 pidiera "aplicar el bloqueo / verificar energía cero" durante la
 **preparación**, cuando el bloqueo de energías (LOTO) se aplica **físicamente en terreno al momento de ejecutar**, no en la

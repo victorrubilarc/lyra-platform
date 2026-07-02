@@ -72,6 +72,10 @@ export const workOrderTypeSchema = z.object({
   checklistSuggestStateKey: z.string().nullable(),
   /** Estado (Puerta 2) al que sólo se puede ENTRAR con todos los checklists obligatorios APROBADOS (null = "checklists_ok"). S3. */
   checklistGateStateKey: z.string().nullable(),
+  /** Estado (Puerta 3) al que, al ENTRAR, se CONGELA la baseline del plan (null = "plan_aprobado"). S4. */
+  planFreezeStateKey: z.string().nullable(),
+  /** Estado de ejecución al que sólo se ENTRA con la baseline del plan congelada (null = "en_ejecucion"). S4. */
+  executeStateKey: z.string().nullable(),
   active: z.boolean(),
   sortOrder: z.number().int(),
 });
@@ -200,6 +204,8 @@ export const workOrderDetailSchema = workOrderListItemSchema.extend({
   /** Puerta 1: aprobación (emite folio) / rechazo (motivo obligatorio). */
   approvedAt: z.string().nullable(),
   folioIssuedAt: z.string().nullable(),
+  /** Puerta 3 (S4): instante en que se autorizó/congeló la baseline del plan (null = plan no congelado). */
+  planFrozenAt: z.string().nullable(),
   rejectedAt: z.string().nullable(),
   rejectReason: z.string().nullable(),
   closedAt: z.string().nullable(),
@@ -352,6 +358,10 @@ export const upsertWorkOrderTypeRequestSchema = z.object({
   checklistSuggestStateKey: z.string().trim().min(1).max(64).nullable().optional(),
   /** Estado-puerta de checklists (Puerta 2). null/omitido = "checklists_ok". S3. */
   checklistGateStateKey: z.string().trim().min(1).max(64).nullable().optional(),
+  /** Estado que congela la baseline del plan (Puerta 3). null/omitido = "plan_aprobado". S4. */
+  planFreezeStateKey: z.string().trim().min(1).max(64).nullable().optional(),
+  /** Estado de ejecución (guard "no ejecuta sin plan"). null/omitido = "en_ejecucion". S4. */
+  executeStateKey: z.string().trim().min(1).max(64).nullable().optional(),
   active: z.boolean().optional(),
   sortOrder: z.number().int().min(0).max(9999).optional(),
 });

@@ -1,4 +1,5 @@
 import {
+  workActivitySchema,
   workOrderChecklistRuleSchema,
   workOrderChecklistSchema,
   workOrderDetailSchema,
@@ -9,14 +10,19 @@ import {
   type AddWorkOrderChecklistRequest,
   type AssignWorkOrderRequest,
   type CancelWorkOrderRequest,
+  type CreateWorkActivitiesBatchRequest,
+  type CreateWorkActivityRequest,
   type CreateWorkOrderRequest,
+  type ReorderWorkActivitiesRequest,
   type ReviewWorkOrderChecklistRequest,
   type SpecialtyDto,
   type TransitionWorkOrderRequest,
+  type UpdateWorkActivityRequest,
   type UpdateWorkOrderRequest,
   type UpsertSpecialtyRequest,
   type UpsertWorkOrderChecklistRuleRequest,
   type UpsertWorkOrderTypeRequest,
+  type WorkActivityDto,
   type WorkOrderChecklistDto,
   type WorkOrderChecklistRuleDto,
   type WorkOrderDetail,
@@ -161,4 +167,31 @@ export function submitWorkOrderChecklist(id: string, cid: string): Promise<WorkO
 
 export function reviewWorkOrderChecklist(id: string, cid: string, dto: ReviewWorkOrderChecklistRequest): Promise<WorkOrderChecklistDto> {
   return apiJson(`/work-orders/${id}/checklists/${cid}/review`, workOrderChecklistSchema, { method: "POST", body: dto });
+}
+
+// === Plan de actividades / Puerta 3 (S4) =====================================
+
+export function fetchWorkOrderActivities(id: string): Promise<WorkActivityDto[]> {
+  return apiJson(`/work-orders/${id}/activities`, z.array(workActivitySchema));
+}
+
+export function createWorkOrderActivity(id: string, dto: CreateWorkActivityRequest): Promise<WorkActivityDto> {
+  return apiJson(`/work-orders/${id}/activities`, workActivitySchema, { method: "POST", body: dto });
+}
+
+/** Alta en lote (lo usa el asistente guiado que genera el plan completo). */
+export function createWorkOrderActivitiesBatch(id: string, dto: CreateWorkActivitiesBatchRequest): Promise<WorkActivityDto[]> {
+  return apiJson(`/work-orders/${id}/activities/batch`, z.array(workActivitySchema), { method: "POST", body: dto });
+}
+
+export function updateWorkOrderActivity(id: string, aid: string, dto: UpdateWorkActivityRequest): Promise<WorkActivityDto> {
+  return apiJson(`/work-orders/${id}/activities/${aid}`, workActivitySchema, { method: "PATCH", body: dto });
+}
+
+export function removeWorkOrderActivity(id: string, aid: string): Promise<void> {
+  return apiJson(`/work-orders/${id}/activities/${aid}`, z.unknown(), { method: "DELETE" }).then(() => undefined);
+}
+
+export function reorderWorkOrderActivities(id: string, dto: ReorderWorkActivitiesRequest): Promise<WorkActivityDto[]> {
+  return apiJson(`/work-orders/${id}/activities/reorder`, z.array(workActivitySchema), { method: "POST", body: dto });
 }

@@ -5,7 +5,14 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-07-02** — **🔧 OT · Sesión 3 · PUERTA 2 (checklists / PTW) ✅** (`feat/ot-puerta2`): 2 capas
+> actualización: **2026-07-02** — **🔧 OT · Sesión 4 · PUERTA 3 (plan de actividades + congelar baseline) + reorden del
+> flujo ✅** (`feat/ot-puerta3`): fase Planificación viva — **`WorkActivity`** (entidad propia, fork W1), `autorizar_plan`
+> exige ≥1 actividad + **congela baseline** + `PLAN_FROZEN` + plan inmutable; guards puros `planNotFrozen`/
+> `blockingActivitiesForClose`/`planReadyToFreeze`; permiso **`workorder:activity:manage`** (cat. 102); claves data-driven
+> `planFreezeStateKey`/`executeStateKey`; **flujo REORDENADO al estándar** (planificar→autorizar permiso→ejecutar, §11.3;
+> seed republica v2, OT en curso intactas); pestaña "Plan" con **grilla + asistente guiado** (`Stepper`). contracts **421**
+> + `smoke-workorders.py` **78/78** + regresión incidencias 32/32. **Movido a S5:** eje `momento`, checklists de EJECUCIÓN/
+> CIERRE, Gobierno 2. Antes (2026-07-02): **🔧 OT · Sesión 3 · PUERTA 2 (checklists / PTW) ✅** (`feat/ot-puerta2`): 2 capas
 > (fork W5) sobre el Form Builder — **`WorkOrderChecklistRule`** (plantilla + reglas de aplicabilidad, gate
 > `workordercatalog:manage`) + **`WorkOrderChecklist`** (enlace OT↔plantilla + `LogEntry` vivo + estado; permiso NUEVO
 > **`workorder:checklist:manage`**). Al preparar la OT el ejecutor **SUGIERE** los aplicables (idempotente) + agregado
@@ -16,8 +23,9 @@
 > en el drawer + sub-tab "Reglas de checklist" en catálogos. verde + contracts **412** + `smoke-workorders.py` **65/65** +
 > regresión incidencias 32/32. **✅ FIX mismo día (`fix/ot-folio-global`): folio de OT = serie ÚNICA GLOBAL** (corrige la
 > colisión entre tipos que daba Internal Error al aprobar; default scope `type`→`global` + reconciliación de contador; ver
-> §2). **DEUDA:** `Template.purpose` (W5) diferido; editor UI de `folioScheme`. **Siguiente: OT Sesión 4 (Puerta 3 — plan
-> de actividades + baseline).** Antes (2026-07-01): **🔧 OT · Sesión 2 · PUERTA 1 ✅** (`feat/ot-puerta1`): workflow CONGELADO al crear
+> §2). **DEUDA:** `Template.purpose` (W5) diferido; editor UI de `folioScheme`/claves de estado. **Siguiente: OT Sesión 5
+> (Puerta 4 — seguimiento vivo + cierre; incluye lo movido de S4: eje `momento`, checklists de EJECUCIÓN/CIERRE, Gobierno 2).**
+> Antes (2026-07-01): **🔧 OT · Sesión 2 · PUERTA 1 ✅** (`feat/ot-puerta1`): workflow CONGELADO al crear
 > (flujo sembrado **"OT — 4 puertas PTW"** como DATO; la solicitud nace `borrador`/DRAFT) + ejecutor de transiciones
 > espejo de Incidencias (permiso NUEVO **`workorder:transition`** dim. WORKFLOW, rol-dato, **firma Part 11**
 > re-autenticada) + **`FolioCounter` gapless** (atómico `ON CONFLICT…RETURNING` dentro de la tx; folio **SOLO al
@@ -742,32 +750,31 @@ nunca queda más de una sesión atrás.
       pestaña "Checklists" en el drawer + sub-tab "Reglas de checklist" en `/ordenes-trabajo/catalogos`. verde
       (typecheck/lint/build/test) + contracts **412** + smoke-workorders **65/65** + regresión incidencias 32/32.
       Ver DECISIONS 2026-07-02. **Siguiente = Sesión 4.**
-- [ ] **Sesión 4 — Plan de actividades / Puerta 3 (~40 HH):** `WorkActivity` (base `IncidentAction` + `progressPct`,
-      `plannedStart/End`, `actualStart/End`, `dependsOnId`); enviar/aprobar/rechazar plan → **congelar baseline**; guard
-      "no ejecuta sin plan aprobado". **+ Realineación del motor de checklists al estándar — FUENTE DE VERDAD:
-      `docs/design/OT_DESIGN_ARCHITECTURE.md §11` (adenda 2026-07-02) + DECISIONS 2026-07-02.** Incorpora:
-      (a) **reordenar el flujo sembrado**: planificación ANTES de la autorización del permiso (los peligros dependen de las
-      tareas; hoy va al revés) — cambio de DATO del flujo, actualizar seed + smoke (§11.3);
-      (b) **eje `momento`** en `WorkOrderChecklistRule` (enum REQUEST/PLANNING/AUTHORIZATION/EXECUTION/CLOSURE, mapeado a
-      estados por dato) — generaliza "autorización vs ejecución"; el motor NO es PTW-específico, cubre calidad/ITP, GMP,
-      readiness, rondas, etc. (§11.1–11.2);
-      (c) **checklists de EJECUCIÓN ligados a `WorkActivity`** (aplicación física en terreno: candados/energía cero,
-      LMRA/toma-5), completados al ejecutar cada actividad — distinto de la AUTORIZACIÓN documental de la Puerta 2 (§11.4);
-      (d) **visibilidad del aprobador (Gobierno 2)**: en la Puerta 2 el autorizador **ve y confirma (solo lectura, sin
-      rellenar)** la LISTA de checklists de ejecución que se exigirán, y puede agregar/quitar/rechazar → valida la
-      adecuación del set; trazabilidad aplicado=autorizado (§11.5).
-      (e) **UX (requisito del dueño):** módulo comprensible y fácil; la densidad se absorbe con UI intuitiva (próxima
-      acción clara por etapa, guards EXPLICADOS, progressive disclosure, responsive/terreno). Armar el plan con **grilla +
-      MODO GUIADO tipo asistente** (reusa `Stepper` de packages/ui: pasos "¿qué?/¿quién?/¿cuándo?/¿orden?/revisar") con
-      defaults inteligentes; proponer el enfoque de UX y esperar OK antes de construir.
-      **Diferido a S5:** checklist de **CLOSURE** (retiro de controles/reenergización) — ver S5.
+- [x] **Sesión 4 — Plan de actividades / Puerta 3 ✅ HECHA 2026-07-02** (`feat/ot-puerta3`; ver PROGRESS + DECISIONS
+      2026-07-02). Entregado: **`WorkActivity`** (entidad propia, fork W1; sin `WorkActivityUpdate`, difiere a S5);
+      **`autorizar_plan`** exige ≥1 actividad + **congela baseline** (`planned*→baseline*`) + `planFrozenAt` + evento
+      `PLAN_FROZEN`; plan **inmutable** tras congelar; guards puros `planNotFrozen`/`blockingActivitiesForClose`/
+      `planReadyToFreeze` en contracts; permiso **`workorder:activity:manage`** (cat. 102); claves data-driven
+      `planFreezeStateKey`/`executeStateKey`; **(a) REORDEN del flujo al estándar** (planificar→autorizar permiso→ejecutar,
+      §11.3; seed republica v2, in-flight intactos); **(e) UX** pestaña "Plan" con **grilla + asistente guiado** (`Stepper`,
+      defaults desde la OT, alta en lote). smoke-workorders **78/78** + regresión incidencias 32/32.
+      **↳ MOVIDO A S5 (acotación del prompt del dueño):** (b) eje `momento` en `WorkOrderChecklistRule`
+      (REQUEST/PLANNING/AUTHORIZATION/EXECUTION/CLOSURE); (c) checklists de **EJECUCIÓN** ligados a `WorkActivity`
+      (candados/energía cero/LMRA en terreno, §11.4); (d) **visibilidad del aprobador (Gobierno 2)** en Puerta 2 (ve/confirma
+      el set de ejecución, §11.5).
       **Diferido a backlog (solo con caso real, §11.7):** puntos de espera/testigo de calidad (guard por actividad);
       inspección independiente/doble firma (aviación RII); requisitos condicionales por reglas; y **gobernanza de aprobación
       de plantillas de checklist** (Gobierno 1, §11.5: hoy = publicar en el Form Builder; formalizar si se pide).
-- [ ] **Sesión 5 — Seguimiento vivo + cierre / Puerta 4 (~35 HH) → CIERRA EL MVP:** `WorkActivityUpdate` (append-only:
-      % avance, fechas reales, evidencias, desviaciones, costos/HH opcionales); solicitud de cierre + revisión final +
-      guards de cierre. **+ Checklist de CIERRE del permiso** (retirar controles/candados, reenergizar, sitio seguro) como
-      3.er momento del PTW (DECISIONS 2026-07-02). **Ciclo completo Solicitud→Cierre punta a punta.**
+      **DEUDA fina S4:** editor UI de `planFreezeStateKey`/`executeStateKey` (junto al de `folioScheme`/claves de checklist);
+      cronológicamente P3 va antes que P2 (el rótulo "Puerta N" del diseño es solo referencia; la UI muestra nombres de
+      etapa). Dependencias/ruta crítica = solo la columna `dependsOnId` (S8).
+- [ ] **Sesión 5 — Seguimiento vivo + cierre / Puerta 4 (~40 HH, sube por lo movido de S4) → CIERRA EL MVP:**
+      `WorkActivityUpdate` (append-only: % avance, fechas reales, evidencias, desviaciones, costos/HH opcionales); solicitud
+      de cierre + revisión final + guards de cierre (el de actividades `blockingActivitiesForClose` ya está cableado; falta
+      el checklist de CIERRE). **+ Lo MOVIDO de S4 (checklists de ejecución):** (b) eje `momento` en `WorkOrderChecklistRule`;
+      (c) checklists de **EJECUCIÓN** por actividad (aplicación física en terreno); (d) **Gobierno 2** (el aprobador ve/confirma
+      el set de ejecución en Puerta 2, §11.5). **+ Checklist de CIERRE del permiso** (retirar controles/candados, reenergizar,
+      sitio seguro) como 3.er momento del PTW (DECISIONS 2026-07-02). **Ciclo completo Solicitud→Cierre punta a punta.**
 - [ ] **Sesión 6 — Alertas, SLA y semáforos / "vigía digital" (~40 HH):** eventos `workorder.overdue`/`.activity.overdue`/
       `.stalled`/`.sla.breached`; curva de alerta (esperado vs real / incoherencia); escalamiento democratizado; semáforos
       + panel de seguimiento activo. Reusa Bloque N + `findBreaches`.

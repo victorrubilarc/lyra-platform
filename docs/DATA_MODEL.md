@@ -702,7 +702,7 @@ Incident(resuelta) ──> KnowledgeArticle
 - Índices previstos: FKs, `OrgNode.parentId`, `Entry(templateId, createdAt)`, `Incident(status, severity)`, GIN en `tsvector` de KB y en `JSONB` consultable.
 - El esquema vive en `apps/watchlog-api/prisma/schema.prisma`; migraciones versionadas con `prisma migrate`.
 
-### Órdenes de Trabajo / Work Orders (OT / PTW) — S1 Cimientos + S2 Puerta 1 + S3 Puerta 2 *(implementado)*
+### Órdenes de Trabajo / Work Orders (OT / PTW) — S1 Cimientos + S2 Puerta 1 + S3 Puerta 2 + S4 Puerta 3 *(implementado)*
 Migraciones `20260701180000_add_work_orders` (S1) y `20260701210000_add_work_order_workflow_folio` (S2). Entidad NUEVA
 `WorkOrder`, **espejo de `Incident`** (DECISIONS 2026-07-01, forks W1–W8). Desde S2 el ciclo de la solicitud está VIVO
 hasta la Puerta 1: workflow congelado al crear + ejecutor de transiciones (permiso `workorder:transition`, dim. WORKFLOW)
@@ -723,7 +723,8 @@ anulación lifecycle `CANCELED`).
   Puerta 1: aprobación (`approvedAt`/`approvedById`; al ENTRAR al estado `folioOnStateKey` se emite el `folio` +
   `folioSeqKey`/`folioIssuedAt`), rechazo (`rejectedAt`/`rejectReason`/`rejectedById`, motivo obligatorio), cierre
   (`closedAt`/`closedById`/`closureSummary`), origen bidireccional (`originIncidentId`/`originLogEntryId`/
-  `originExceptionId`, refs blandas).
+  `originExceptionId`, refs blandas). **S4 (Puerta 3):** `planFrozenAt`/`planFrozenById` = instante en que se autorizó/
+  congeló la baseline del plan (null = plan no congelado; base de `planNotFrozen` y del bloqueo de edición del plan).
 - **WorkOrderTransition** *(S2)* — historial de transiciones ejecutadas (espejo de `IncidentTransition`):
   `workflowDefinitionVersionId` + `transitionKey`/`fromStateKey`/`toStateKey`, actor (`actorId`/`actorEmail`), `reason`,
   `signatureId` (ref. blanda a `LogEntrySignature`, hoy null — deuda payloadHash compartida con Incidencias), `occurredAt`.
@@ -742,7 +743,9 @@ anulación lifecycle `CANCELED`).
   `criticalityDefault`, **`folioScheme` (Json validado por `folioSchemeSchema`) + `folioOnStateKey`** (S2: estado al que,
   al ENTRAR, se emite el folio; null = "aprobada"; configurables por API — editor UI pendiente),
   **`checklistSuggestStateKey`/`checklistGateStateKey`** (S3: estados data-driven que disparan la sugerencia de checklists
-  y la Puerta 2; null = "en_preparacion"/"checklists_ok"), SLA light
+  y la Puerta 2; null = "en_preparacion"/"checklists_ok"), **`planFreezeStateKey`/`executeStateKey`** (S4: estados
+  data-driven que disparan el congelamiento de la baseline [Puerta 3] y el guard "no ejecuta sin plan"; null =
+  "plan_aprobado"/"en_ejecucion"), SLA light
   (`resolutionDueMinutes`/`escalationAfterMinutes`/`escalationRoleId` → **Role** SetNull, relación
   `WorkOrderTypeEscalationRole`), `active`/`sortOrder`.
 - **WorkOrderChecklistRule** *(S3, fork W5 — Capa A diseño)* — regla de aplicabilidad de un checklist. `templateId`
@@ -756,6 +759,18 @@ anulación lifecycle `CANCELED`).
   PENDING|IN_PROGRESS|SUBMITTED|APPROVED|REJECTED), `responsibleId`/`responsibleRoleId`, `reviewerId`/`reviewedAt`/
   `rejectReason` (segregación: revisor ≠ responsable), `addedById`. `onDelete: Cascade` desde `WorkOrder`. Guard PURO
   `blockingChecklistsForClose` (obligatorio no APPROVED) = Puerta 2.
+- **WorkActivity** *(S4, fork W1 — entidad PROPIA, NO se fusiona con `IncidentAction`)* — actividad/tarea del plan de
+  trabajo. `title`/`description`, `sequence` (orden en el plan), `responsibleId`/`responsibleRoleId` (refs blandas),
+  `specialtyId` (→ **Specialty** SetNull, relación `WorkActivitySpecialty`), planificación
+  `plannedStart`/`plannedEnd` (plan VIVO) + **`baselineStart`/`baselineEnd`** (congelados al autorizar el plan ⇒ miden
+  desviación) + `actualStart`/`actualEnd` (avance real, S5), `progressPct` (0..100), `status` (enum **WorkActivityStatus**:
+  PENDING|IN_PROGRESS|BLOCKED|DONE|CANCELED), `mandatory` (abierta ⇒ bloquea cierre, Puerta 4), `dependsOnId` (self,
+  SetNull, relación `WorkActivityDeps` — ruta crítica S8, hoy solo la columna), `priority`, `delayReason`, cierre
+  (`completedAt`/`completedById`/`completionNote`), cancelación (`canceledAt`/`cancelReason`/`canceledById`), columnas
+  RESERVADAS (`estimatedHours`/`actualHours` Decimal S8, `evidence` Json), auditoría (`createdById`/`updatedById`).
+  `onDelete: Cascade` desde `WorkOrder`. Guards PUROS (contracts `work-orders/activities.ts`): `planReadyToFreeze` (≥1
+  no cancelada, exigido para autorizar el plan), `blockingActivitiesForClose` (mandatory abierta = Puerta 4),
+  `planNotFrozen`, `summarizeActivities`, `activityEndDeviationDays`. **`WorkActivityUpdate` (avance append-only) = S5.**
 - **Specialty** — catálogo de disciplina/oficio (`key` única, `name`/`description`/`color`, `active`/`sortOrder`).
   Equivale al **Work Center (SAP PM) / Craft (Maximo)**. N:N con la OT. La **ubicación** la da `orgNodeId` (estructura,
   que puede tener un nivel "Área"), **no** un catálogo aparte.
@@ -768,6 +783,10 @@ anulación lifecycle `CANCELED`).
 `WorkOrderEvent`, flujo sembrado "OT — 4 puertas PTW" (`ot-4-puertas`, 11 estados; la anulación NO es estado — es el
 endpoint `cancel`, espejo Incidencias). **Implementado en S3** (migración `20260702120000_add_work_order_checklists`):
 `WorkOrderChecklistRule` + `WorkOrderChecklist` + enum `WorkOrderChecklistStatus` + 2 columnas data-driven en
-`WorkOrderType`; seed de plantilla LOTO publicada + regla obligatoria. **🔴 Bug abierto (folio cross-tipo, ver BACKLOG §2 +
-DECISIONS 2026-07-02).** **Pendiente (S4–S5):** `WorkOrderComment`, `WorkActivity`/`WorkActivityUpdate` (plan de actividades).
+`WorkOrderType`; seed de plantilla LOTO publicada + regla obligatoria. *(El bug de folio cross-tipo se CORRIGIÓ el mismo
+día, `fix/ot-folio-global`: default scope `global`.)* **Implementado en S4** (migración
+`20260702180000_add_work_order_activities`): entidad `WorkActivity` + enum `WorkActivityStatus` + `WorkOrder.planFrozenAt/
+planFrozenById` + `WorkOrderType.planFreezeStateKey/executeStateKey`; **REORDEN del flujo** `ot-4-puertas` al estándar
+(planificar→autorizar permiso→ejecutar; seed republica una versión nueva, in-flight intactos). **Pendiente (S5):**
+`WorkOrderComment`, `WorkActivityUpdate` (avance append-only), checklists de EJECUCIÓN/CIERRE + eje `momento`.
 Ver `docs/design/OT_DESIGN_ARCHITECTURE.md`.

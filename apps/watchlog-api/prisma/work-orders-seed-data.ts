@@ -23,15 +23,17 @@ export const WORK_ORDER_WORKFLOW = {
   key: "ot-4-puertas",
   name: "OT — 4 puertas PTW",
   description:
-    "Ciclo de vida estándar de una orden de trabajo con permiso de trabajo: solicitud → aprobación (P1, emite folio) → preparación/checklists (P2) → planificación (P3) → ejecución → revisión y cierre (P4).",
+    "Ciclo de vida estándar de una orden de trabajo con permiso de trabajo (orden EAM: planificar → autorizar el permiso → ejecutar): solicitud → aprobación (P1, emite folio) → planificación (P3, congela baseline) → preparación/permiso (P2, checklists) → ejecución → revisión y cierre (P4).",
   states: [
+    // ORDEN ESTÁNDAR (S4, §11.3): planificación ANTES de la autorización del permiso
+    // (los peligros dependen de las tareas). Reordenado respecto al seed S3.
     { key: "borrador", name: "Borrador", order: 0, isInitial: true, isFinal: false, color: "#9AA3B8" },
     { key: "solicitada", name: "Solicitada", order: 1, isInitial: false, isFinal: false, color: "#6366F1" },
     { key: "aprobada", name: "Aprobada", order: 2, isInitial: false, isFinal: false, color: "#06B6D4" },
-    { key: "en_preparacion", name: "En preparación", order: 3, isInitial: false, isFinal: false, color: "#EAB308" },
-    { key: "checklists_ok", name: "Checklists OK", order: 4, isInitial: false, isFinal: false, color: "#84CC16" },
-    { key: "en_planificacion", name: "En planificación", order: 5, isInitial: false, isFinal: false, color: "#EAB308" },
-    { key: "plan_aprobado", name: "Plan aprobado", order: 6, isInitial: false, isFinal: false, color: "#06B6D4" },
+    { key: "en_planificacion", name: "En planificación", order: 3, isInitial: false, isFinal: false, color: "#EAB308" },
+    { key: "plan_aprobado", name: "Plan aprobado", order: 4, isInitial: false, isFinal: false, color: "#06B6D4" },
+    { key: "en_preparacion", name: "En preparación", order: 5, isInitial: false, isFinal: false, color: "#EAB308" },
+    { key: "checklists_ok", name: "Permiso autorizado", order: 6, isInitial: false, isFinal: false, color: "#84CC16" },
     { key: "en_ejecucion", name: "En ejecución", order: 7, isInitial: false, isFinal: false, color: "#F97316" },
     { key: "en_revision_cierre", name: "En revisión de cierre", order: 8, isInitial: false, isFinal: false, color: "#84CC16" },
     { key: "cerrada", name: "Cerrada", order: 9, isInitial: false, isFinal: true, color: "#22C55E" },
@@ -42,17 +44,21 @@ export const WORK_ORDER_WORKFLOW = {
     // PUERTA 1: aprobar EMITE EL FOLIO (folioOnStateKey del tipo, default "aprobada") y exige firma.
     { key: "aprobar", label: "Aprobar solicitud", from: "solicitada", to: "aprobada", requireSignature: true, signatureMeaning: "Aprobación de la solicitud de trabajo (emisión de folio)" },
     { key: "rechazar", label: "Rechazar solicitud", from: "solicitada", to: "rechazada", requireSignature: false, signatureMeaning: null },
-    { key: "preparar", label: "Iniciar preparación", from: "aprobada", to: "en_preparacion", requireSignature: false, signatureMeaning: null },
-    // PUERTA 2 (guard de checklists en S3).
-    { key: "revisar_checklists", label: "Aprobar checklists", from: "en_preparacion", to: "checklists_ok", requireSignature: true, signatureMeaning: "Revisión y aprobación de checklists / permisos de trabajo" },
-    { key: "devolver", label: "Devolver a aprobada", from: "en_preparacion", to: "aprobada", requireSignature: false, signatureMeaning: null },
-    { key: "planificar", label: "Iniciar planificación", from: "checklists_ok", to: "en_planificacion", requireSignature: false, signatureMeaning: null },
-    // PUERTA 3 (congela baseline en S4; firma opcional por diseño — el admin la activa).
+    // PLANIFICACIÓN primero (S4): definir el plan de actividades.
+    { key: "planificar", label: "Iniciar planificación", from: "aprobada", to: "en_planificacion", requireSignature: false, signatureMeaning: null },
+    // PUERTA 3 (S4): autorizar el plan CONGELA la baseline (planFreezeStateKey del tipo,
+    // default "plan_aprobado"); firma opcional por diseño (el admin la activa).
     { key: "autorizar_plan", label: "Autorizar plan", from: "en_planificacion", to: "plan_aprobado", requireSignature: false, signatureMeaning: null },
-    { key: "devolver_plan", label: "Devolver plan", from: "en_planificacion", to: "en_preparacion", requireSignature: false, signatureMeaning: null },
-    { key: "ejecutar", label: "Iniciar ejecución", from: "plan_aprobado", to: "en_ejecucion", requireSignature: false, signatureMeaning: null },
+    { key: "devolver_plan", label: "Devolver plan", from: "en_planificacion", to: "aprobada", requireSignature: false, signatureMeaning: null },
+    // PREPARACIÓN / AUTORIZACIÓN DEL PERMISO después del plan (los peligros dependen de las tareas).
+    { key: "preparar", label: "Preparar permiso", from: "plan_aprobado", to: "en_preparacion", requireSignature: false, signatureMeaning: null },
+    // PUERTA 2 (guard de checklists, S3): autorización documental del permiso.
+    { key: "revisar_checklists", label: "Autorizar permiso", from: "en_preparacion", to: "checklists_ok", requireSignature: true, signatureMeaning: "Revisión y autorización de checklists / permisos de trabajo" },
+    { key: "devolver", label: "Devolver al plan", from: "en_preparacion", to: "plan_aprobado", requireSignature: false, signatureMeaning: null },
+    // EJECUCIÓN: guard "no se ejecuta sin plan congelado" (executeStateKey del tipo, default "en_ejecucion").
+    { key: "ejecutar", label: "Iniciar ejecución", from: "checklists_ok", to: "en_ejecucion", requireSignature: false, signatureMeaning: null },
     { key: "solicitar_cierre", label: "Solicitar cierre", from: "en_ejecucion", to: "en_revision_cierre", requireSignature: false, signatureMeaning: null },
-    // PUERTA 4 (guards de cierre en S5).
+    // PUERTA 4 (guards de cierre en S5; blockingActivitiesForClose ya cableado en S4).
     { key: "cerrar", label: "Cerrar OT", from: "en_revision_cierre", to: "cerrada", requireSignature: true, signatureMeaning: "Cierre de la orden de trabajo" },
     { key: "reabrir", label: "Volver a ejecución", from: "en_revision_cierre", to: "en_ejecucion", requireSignature: false, signatureMeaning: null },
   ],

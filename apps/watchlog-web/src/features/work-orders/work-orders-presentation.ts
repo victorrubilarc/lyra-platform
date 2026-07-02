@@ -1,4 +1,4 @@
-import type { WorkOrderChecklistStatus, WorkOrderLifecycle, WorkOrderOrigin, WorkOrderPriority } from "@lyra/contracts";
+import type { WorkActivityStatus, WorkOrderChecklistStatus, WorkOrderLifecycle, WorkOrderOrigin, WorkOrderPriority } from "@lyra/contracts";
 
 /** Tokens de criticidad 1..5 (misma escala de severidad del DS). */
 const CRITICALITY_COLORS = ["#6B7280", "#22C55E", "#84CC16", "#EAB308", "#F97316", "#EF4444"];
@@ -32,6 +32,15 @@ export const CHECKLIST_STATUS_META: Record<WorkOrderChecklistStatus, { label: st
   SUBMITTED: { label: "En revisión", color: "#EAB308" },
   APPROVED: { label: "Aprobado", color: "#22C55E" },
   REJECTED: { label: "Rechazado", color: "#EF4444" },
+};
+
+/** Estado de una actividad del plan (Puerta 3). */
+export const ACTIVITY_STATUS_META: Record<WorkActivityStatus, { label: string; color: string }> = {
+  PENDING: { label: "Pendiente", color: "#9AA3B8" },
+  IN_PROGRESS: { label: "En curso", color: "#06B6D4" },
+  BLOCKED: { label: "Bloqueada", color: "#F97316" },
+  DONE: { label: "Completada", color: "#22C55E" },
+  CANCELED: { label: "Cancelada", color: "#6B7280" },
 };
 
 export const ORIGIN_META: Record<WorkOrderOrigin, { label: string }> = {
