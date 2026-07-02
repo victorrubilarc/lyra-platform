@@ -4,6 +4,45 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-02 · OT S6 — SLA, avisos de plazo, escalamiento y semáforos ("vigía digital")
+ESPEJO de la Fase 4.4 de Incidencias (se clonó `IncidentSlaService`/resolvers/helpers, no se reinventó). El dueño aprobó
+las 4 decisiones (vía preguntas, con mi recomendación fundada):
+1. **3 eventos SLA, no 4** (decisión (a)). Descarté `workorder.sla.breached` por **redundante**: `resolutionDueMinutes`
+   NO es un evento — es el input que CALCULA `dueAt`; el aviso de plazo es `workorder.overdue` (dueAt < now). Los 3 eventos,
+   todos sobre OT ABIERTA (lifecycle OPEN):
+   - **`workorder.overdue`** — PLAZO de resolución vencido (`dueAt` < now). Re-aviso DIARIO. Escala si `shouldEscalate`.
+   - **`workorder.stalled`** — PERMANENCIA de estado excedida (`maxStayMinutes` del estado actual). Dedupe **1× por
+     ocupación** (clave con `currentStateSince`). *(Nombre `.stalled`, más claro que el legado `incident.sla.breached`.)*
+   - **`workorder.activity.overdue`** — ACTIVIDAD del plan vencida (`baselineEnd`, o `plannedEnd` si sin baseline, < now y
+     no DONE/CANCELED). Re-aviso DIARIO. Espejo de `incident.action.overdue`.
+   **Desambiguación (§21 de Incidencias):** Permanencia (`stalled`) ≠ Plazo (`overdue`) ≠ Actividad vencida. KPIs/semáforo =
+   DERIVADOS read-only sin cron; los avisos = los 3 eventos vía Bloque N.
+2. **`dueAt` se ancla AL APROBAR / emitir folio** (decisión (a·bis), DIVERGE de Incidencias). *Motivo:* la OT tiene fase de
+   SOLICITUD previa; una solicitud en borrador no puede estar "vencida". El reloj del plazo arranca cuando pasa a ser trabajo
+   real (entrada al `folioOnStateKey`, junto a la emisión del folio). `resolutionDueFromType(approvedAtMs, type.resolutionDueMinutes)`;
+   **el override manual (create/update `dueAt`) GANA SIEMPRE** (no se recalcula si ya hay valor). `dueAt` editable con evento
+   `DUE_CHANGED` en el timeline.
+3. **Escalamiento solo por OT, 1 nivel, re-aviso diario** (decisión (b)). Reusa `WorkOrderType.escalationAfterMinutes/
+   escalationRoleId` (ya latentes en el schema desde el diseño). En `workorder.overdue`, si `shouldEscalate(dueAt,
+   escalationAfterMinutes, now)` ⇒ suma el `escalationRole`. La actividad vencida avisa a responsable+owner **sin escalar**
+   (espejo `incident.action.overdue`). Per-actividad multinivel = S8.
+4. **"Panel de seguimiento" = filtro/KPI sobre la grilla existente** (decisión (c)), NO vista nueva ni dashboard (eso es S7).
+   Semáforo `workOrderTrafficLight` (helper PURO): 🔴 vencida o con actividad vencida · 🟡 por vencer (dueAt dentro de ventana
+   `AT_RISK_WINDOW_MINUTES`) · 🟢 en plazo · gris sin dueAt. Columna con punto+tooltip en la grilla + chip en la cabecera del
+   Object Page; KPIs "vencidas / por vencer / estancadas"; filtro `slaStatus` en la línea de filtros. `stalled` (permanencia)
+   = indicador SEPARADO (chip), ortogonal al semáforo de plazo (fiel a §21). Reusa `buildWhere`/`list`.
+**SIN permiso nuevo** (los avisos no gatean acciones; editar SLA del tipo = `workordercatalog:manage`; editar `dueAt` =
+`workorder:edit`, ya existentes) ⇒ **sin db:seed/FLUSHALL por permisos**. **SIN migración** (las columnas `resolutionDueMinutes/
+escalationAfterMinutes/escalationRoleId` en `WorkOrderType`, `WorkOrder.dueAt` y `WorkActivity.baselineEnd/plannedEnd/status`
+YA existían latentes; `WorkOrderEvent.kind` es String libre). Helpers PUROS en `packages/contracts/src/work-orders/sla.ts`
+(`resolutionDueFromType`/`isResolutionOverdue`/`escalationThreshold`/`shouldEscalate`/`workOrderTrafficLight`, espejo de
+`incidents/incidents.ts` + `sla.spec.ts`). 3 eventos nuevos en el catálogo `NOTIFICATION_EVENTS` + `WORKORDER_VARIABLES` +
+plantillas por defecto en el seed. `WorkOrderSlaService.findBreaches()` (dominio) barrido en `NotificationWorkerService.sweep()`;
+resolvers `resolveWorkOrder{Overdue,Stalled,ActivityOverdue}` (owner + roles del estado + escalamiento; ABAC por nodo, espejo).
+Ver `docs/design/OT_DESIGN_ARCHITECTURE.md §7` y Fase 4.4 de Incidencias.
+
+---
+
 ### 2026-07-02 · OT S5b Slice B — Checklists de EJECUCIÓN por actividad + Gobierno 2 (completa el §11)
 Cierre del modelo GENERALIZADO de checklists del §11: los controles de terreno se aplican por tarea y el aprobador cura/
 confirma el set. Las 3 decisiones abiertas (a/b/c) se resolvieron con el dueño (visto bueno vía preguntas, con mi

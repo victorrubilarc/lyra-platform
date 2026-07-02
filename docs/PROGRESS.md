@@ -1,5 +1,40 @@
 # Progreso — Lyra WatchLog
 
+**2026-07-02 — 🔧 OT · Sesión 6 · SLA, avisos de plazo, escalamiento y semáforos ("vigía digital") ✅** (`feat/ot-sla-semaforos`).
+ESPEJO de la Fase 4.4 de Incidencias (se clonó `IncidentSlaService`/resolvers/helpers; nada reinventado). **SIN migración**
+(las columnas `WorkOrderType.resolutionDueMinutes/escalationAfterMinutes/escalationRoleId`, `WorkOrder.dueAt` y
+`WorkActivity.baselineEnd/plannedEnd/status` YA existían latentes; `WorkOrderEvent.kind` es String libre) y **SIN permiso
+nuevo** (avisos no gatean acciones; SLA del tipo = `workordercatalog:manage`, editar plazo = `workorder:edit`) ⇒ **sin
+db:seed/FLUSHALL por permisos** (102 sin cambio; el seed sólo re-corre por las 3 plantillas de notificación nuevas).
+**3 eventos SLA (no 4)** — descarté `workorder.sla.breached` por redundante (`resolutionDueMinutes` NO es un evento: CALCULA
+`dueAt`): `workorder.overdue` (plazo `dueAt` vencido, re-aviso diario, escala si corresponde), `workorder.stalled`
+(permanencia de estado > `maxStayMinutes`, dedupe 1× por ocupación) y `workorder.activity.overdue` (actividad del plan con
+fin baseline/planificado pasado, re-aviso diario). **Desambiguación §21:** Permanencia (`stalled`) ≠ Plazo (`overdue`) ≠
+Actividad vencida. **`dueAt` se ancla AL APROBAR** (no al crear la solicitud): `workOrderDueFromType(approvedAtMs, type.resolutionDueMinutes)`
+en la tx de la transición emisora del folio; el **override manual GANA** (sólo se calcula si `dueAt` está null) + evento
+`DUE_CHANGED`; `dueAt` también editable manual (PATCH) con `DUE_CHANGED`. **Contracts** (`work-orders/sla.ts`, +15 specs):
+helpers PUROS `workOrderDueFromType`/`isWorkOrderOverdue`/`workOrderEscalationThreshold`/`workOrderShouldEscalate` (prefijados
+para no colisionar con los homólogos de Incidencias en el barrel plano) + **semáforo** `workOrderTrafficLight` (🔴 vencida/
+actividad vencida · 🟡 por vencer [`AT_RISK_WINDOW_MINUTES`=48 h] · 🟢 en plazo · ⚪ sin plazo) + `isActivityOverdue`;
+`WorkOrderType` gana los 3 campos SLA (+`escalationRoleName`); `WorkOrderListItem` gana `slaStatus`+`stalled` (DERIVADOS en el
+server, sin cron); `slaStatus` a la query (overdue/atRisk/stalled) + `WorkOrderStats` gana `overdue/atRisk/stalled`; 3 eventos
++ `WORKORDER_VARIABLES` en el catálogo `NOTIFICATION_EVENTS` + `deepLinkForEntity("WorkOrder")`. **Backend:** `WorkOrderSlaService.findBreaches()`
+(dominio, clon de `IncidentSlaService`) barrido en `NotificationWorkerService.sweep()`; resolvers `resolveWorkOrder{Overdue,Stalled,ActivityOverdue}`
+(owner + roles del estado + escalamiento si `workOrderShouldEscalate`, todo `filterByNode`/ABAC, espejo de `incidentRecipients`);
+`stats()` calcula los 3 KPIs; `buildWhere` filtra por `slaStatus` (raw `findStalledIds` para permanencia); `toListItems` deriva
+`slaStatus`+`stalled` (consulta batch de actividades vencidas). **Web:** `WorkOrderTypeModal` gana los campos SLA (reusa
+`SlaDurationField`+`useRoles`); grilla con **columna semáforo** (punto tokenizado + tooltip) + **chip "Estancada"** + 3 KPIs
+(Vencidas/Por vencer/Estancadas, click = faceta del vigía sobre la grilla existente) + filtro `slaStatus`; Object Page con
+**chip de semáforo** en la cabecera + **plazo editable** (`datetime-local`) en el panel. **Colores = TOKENS del DS** (`--color-error/
+-warning/-success/-text-muted`), sin hex/jerga. **Seed:** 3 plantillas de notificación (OT vencida/estancada/actividad vencida)
++ grupo "Órdenes de trabajo" en la UI de notificaciones. Verde: typecheck (7) · lint 0 err · build (contracts+web) · **contracts
+448** (+15) · **API 252** · web 6 · `smoke-workorders.py` **122/122** (+14: SLA persiste en el tipo → auto-dueAt al aprobar/
+override gana → DUE_CHANGED manual → semáforo `red`+KPI `overdue`+filtro → worker detecta `overdue`/`activity.overdue`/
+**escalamiento** con destinatarios + ABAC) + regresión **incidencias 32/32** + **notif-inapp 18/18** + **notif-avanzadas 22/22**.
+*(El smoke base `smoke-notificaciones.py` = 13/18: los 5 fallos son de ENTREGA por correo — SMTP desactivado en dev, sin fila
+`EmailConfig` — preexistentes y ajenos a S6; la maquinaria INAPP/resolvers que S6 reusa está en verde.)* Ver DECISIONS 2026-07-02
+(OT S6). **Pendiente:** smoke VISUAL en navegador (dueño). **Siguiente = OT S7 (Dashboard de OT + integración Incidencia→OT).**
+
 **2026-07-02 — 🔧 OT · Sesión 5b · Slice B · Checklists de EJECUCIÓN por actividad + Gobierno 2 ✅ → COMPLETA el modelo §11 de checklists** (`feat/ot-ejecucion-gobierno2`).
 Cierra el modelo GENERALIZADO de checklists del §11: los controles de terreno (LOTO físico, energía cero, toma-5/LMRA)
 se aplican **POR ACTIVIDAD** y el aprobador **cura y confirma el set** que se exigirá antes de autorizar el permiso.

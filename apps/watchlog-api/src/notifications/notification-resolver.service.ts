@@ -14,6 +14,8 @@ import {
   renderTemplate,
   shouldEscalate,
   transitionNotifyConfigSchema,
+  workOrderCode,
+  workOrderShouldEscalate,
   type TransitionNotifyConfig,
 } from "@lyra/contracts";
 import type { Env } from "../config/env.schema";
@@ -112,6 +114,15 @@ export class NotificationResolverService {
         break;
       case "incident.report.due":
         resolution = await this.resolveIncidentReportDue(payload);
+        break;
+      case "workorder.overdue":
+        resolution = await this.resolveWorkOrderOverdue(payload);
+        break;
+      case "workorder.stalled":
+        resolution = await this.resolveWorkOrderStalled(payload);
+        break;
+      case "workorder.activity.overdue":
+        resolution = await this.resolveWorkOrderActivityOverdue(payload);
         break;
       case "handover.ready":
         resolution = await this.resolveHandoverReady(payload);
@@ -725,6 +736,189 @@ export class NotificationResolverService {
     };
   }
 
+  // --- Resolvers de ÓRDENES DE TRABAJO (OT S6) -------------------------------
+
+  /** Plazo de resolución vencido: responsable + roles del estado + (si aplica) escalamiento. */
+  private async resolveWorkOrderOverdue(payload: Record<string, unknown>): Promise<EventResolution | null> {
+    const workOrderId = String(payload.workOrderId ?? "");
+    if (!workOrderId) return null;
+    const wo = await this.loadWorkOrderForNotification(workOrderId);
+    if (!wo || wo.lifecycle !== "OPEN" || !wo.dueAt || wo.dueAt.getTime() >= Date.now()) return null;
+    const escalate = workOrderShouldEscalate(wo.dueAt, wo.escalationAfterMinutes, Date.now());
+    const userIds = await this.workOrderRecipients(wo, {
+      includeStateRoles: true,
+      escalationRoleId: escalate ? wo.escalationRoleId : null,
+    });
+    const overdueBy = Math.round((Date.now() - wo.dueAt.getTime()) / 60000);
+    return {
+      ...this.baseWorkOrderResolution(wo, workOrderId, userIds),
+      context: {
+        ...this.workOrderContext(wo),
+        "workorder.dueAt": this.formatDateTime(wo.dueAt),
+        "workorder.overdueBy": this.formatDuration(overdueBy),
+      },
+    };
+  }
+
+  /** Permanencia de estado excedida ("estancada"): responsable + roles del estado actual. */
+  private async resolveWorkOrderStalled(payload: Record<string, unknown>): Promise<EventResolution | null> {
+    const workOrderId = String(payload.workOrderId ?? "");
+    const stateKey = String(payload.stateKey ?? "");
+    if (!workOrderId) return null;
+    const wo = await this.loadWorkOrderForNotification(workOrderId);
+    if (!wo || wo.lifecycle !== "OPEN") return null;
+    if (stateKey && wo.currentStateKey !== stateKey) return null; // ya avanzó de estado
+    const userIds = await this.workOrderRecipients(wo, { includeStateRoles: true });
+    const since = wo.currentStateSince ?? new Date();
+    const delayedMin = Math.round((Date.now() - since.getTime()) / 60000) - (wo.currentStateMaxStay ?? 0);
+    return {
+      ...this.baseWorkOrderResolution(wo, workOrderId, userIds),
+      context: {
+        ...this.workOrderContext(wo),
+        "workorder.sla": this.formatDuration(wo.currentStateMaxStay ?? 0),
+        "workorder.delayedBy": this.formatDuration(Math.max(0, delayedMin)),
+      },
+    };
+  }
+
+  /** Actividad del plan vencida: responsable de la actividad (persona+rol) + responsable de la OT. */
+  private async resolveWorkOrderActivityOverdue(payload: Record<string, unknown>): Promise<EventResolution | null> {
+    const workOrderId = String(payload.workOrderId ?? "");
+    const activityId = String(payload.activityId ?? "");
+    if (!workOrderId || !activityId) return null;
+    const wo = await this.loadWorkOrderForNotification(workOrderId);
+    if (!wo || wo.lifecycle !== "OPEN") return null;
+    const activity = await this.prisma.workActivity.findUnique({
+      where: { id: activityId },
+      select: { id: true, title: true, status: true, baselineEnd: true, plannedEnd: true, responsibleId: true, responsibleRoleId: true },
+    });
+    if (!activity || ["DONE", "CANCELED"].includes(activity.status)) return null;
+    const end = activity.baselineEnd ?? activity.plannedEnd;
+    if (!end || end.getTime() >= Date.now()) return null;
+    const candidates = new Set<string>();
+    if (activity.responsibleId) candidates.add(activity.responsibleId);
+    if (activity.responsibleRoleId) for (const u of await this.usersOfRoleIds([activity.responsibleRoleId])) candidates.add(u);
+    if (wo.ownerId) candidates.add(wo.ownerId);
+    const userIds = new Set(await this.filterByNode([...candidates], wo.orgNodeId));
+    const overdueBy = Math.round((Date.now() - end.getTime()) / 60000);
+    return {
+      ...this.baseWorkOrderResolution(wo, workOrderId, userIds),
+      context: {
+        ...this.workOrderContext(wo),
+        "activity.title": activity.title,
+        "activity.dueAt": this.formatDateTime(end),
+        "activity.overdueBy": this.formatDuration(overdueBy),
+      },
+    };
+  }
+
+  /** Parte común de la EventResolution de una OT (orgNode, related, sin templateId/campos). */
+  private baseWorkOrderResolution(wo: LoadedWorkOrder, workOrderId: string, userIds: Set<string>): EventResolution {
+    return {
+      userIds,
+      externalEmails: [],
+      orgNodeId: wo.orgNodeId,
+      templateId: null,
+      relatedEntityType: "WorkOrder",
+      relatedEntityId: workOrderId,
+      context: {},
+    };
+  }
+
+  /**
+   * Destinatarios de una OT: responsable asignado + (opcional) usuarios de los roles
+   * autorizados a actuar desde el estado actual + (opcional) rol de escalamiento. Todo
+   * filtrado por ABAC de NODO (espejo de `incidentRecipients`).
+   */
+  private async workOrderRecipients(
+    wo: LoadedWorkOrder,
+    opts: { includeStateRoles?: boolean; escalationRoleId?: string | null },
+  ): Promise<Set<string>> {
+    const candidates = new Set<string>();
+    if (wo.ownerId) candidates.add(wo.ownerId);
+    if (opts.includeStateRoles && wo.currentStateKey) {
+      const roleIds = new Set<string>();
+      for (const t of wo.transitions) if (t.fromStateKey === wo.currentStateKey) for (const rid of t.roleIds) roleIds.add(rid);
+      for (const u of await this.usersOfRoleIds([...roleIds])) candidates.add(u);
+    }
+    if (opts.escalationRoleId) for (const u of await this.usersOfRoleIds([opts.escalationRoleId])) candidates.add(u);
+    return new Set(await this.filterByNode([...candidates], wo.orgNodeId));
+  }
+
+  private workOrderContext(wo: LoadedWorkOrder): Record<string, string> {
+    return {
+      "workorder.folio": workOrderCode(wo.folio, wo.number),
+      "workorder.title": wo.title,
+      "workorder.type": wo.typeName ?? "—",
+      "workorder.criticality": String(wo.criticality),
+      "workorder.node": wo.nodeName ?? "—",
+      "workorder.state": wo.currentStateName ?? "—",
+      "workorder.owner": wo.ownerName ?? "—",
+      "workorder.url": `${this.appUrl()}/ordenes-trabajo/${wo.id}`,
+    };
+  }
+
+  /** Carga una OT + su versión de flujo congelada (estados + roles de transición). */
+  private async loadWorkOrderForNotification(workOrderId: string): Promise<LoadedWorkOrder | null> {
+    const wo = await this.prisma.workOrder.findUnique({
+      where: { id: workOrderId },
+      select: {
+        id: true,
+        number: true,
+        folio: true,
+        title: true,
+        criticality: true,
+        orgNodeId: true,
+        ownerId: true,
+        lifecycle: true,
+        dueAt: true,
+        currentStateKey: true,
+        currentStateSince: true,
+        workflowDefinitionVersionId: true,
+        type: { select: { name: true, escalationAfterMinutes: true, escalationRoleId: true } },
+        orgNode: { select: { name: true } },
+      },
+    });
+    if (!wo) return null;
+    let currentStateName: string | null = null;
+    let currentStateMaxStay: number | null = null;
+    let transitions: Array<{ fromStateKey: string; roleIds: string[] }> = [];
+    if (wo.workflowDefinitionVersionId) {
+      const wf = await this.prisma.workflowDefinitionVersion.findUnique({
+        where: { id: wo.workflowDefinitionVersionId },
+        include: workflowVersionInclude,
+      });
+      if (wf) {
+        const state = wf.states.find((s) => s.key === wo.currentStateKey);
+        currentStateName = state?.name ?? null;
+        currentStateMaxStay = state?.maxStayMinutes ?? null;
+        transitions = wf.transitions.map((t) => ({ fromStateKey: t.fromState.key, roleIds: t.roles.map((r) => r.roleId) }));
+      }
+    }
+    const ownerName = wo.ownerId ? await this.userName(wo.ownerId) : null;
+    return {
+      id: wo.id,
+      number: wo.number,
+      folio: wo.folio,
+      title: wo.title,
+      criticality: wo.criticality,
+      typeName: wo.type?.name ?? null,
+      orgNodeId: wo.orgNodeId,
+      nodeName: wo.orgNode?.name ?? null,
+      ownerId: wo.ownerId,
+      ownerName,
+      lifecycle: wo.lifecycle,
+      dueAt: wo.dueAt,
+      currentStateKey: wo.currentStateKey,
+      currentStateName,
+      currentStateSince: wo.currentStateSince,
+      currentStateMaxStay,
+      escalationAfterMinutes: wo.type?.escalationAfterMinutes ?? null,
+      escalationRoleId: wo.type?.escalationRoleId ?? null,
+      transitions,
+    };
+  }
+
   // --- Helpers de entrada / workflow -----------------------------------------
 
   private async loadEntryForNotification(entryId: string): Promise<LoadedEntry | null> {
@@ -949,6 +1143,29 @@ interface LoadedIncident {
   number: number;
   title: string;
   severity: number;
+  typeName: string | null;
+  orgNodeId: string;
+  nodeName: string | null;
+  ownerId: string | null;
+  ownerName: string | null;
+  lifecycle: string;
+  dueAt: Date | null;
+  currentStateKey: string | null;
+  currentStateName: string | null;
+  currentStateSince: Date | null;
+  currentStateMaxStay: number | null;
+  escalationAfterMinutes: number | null;
+  escalationRoleId: string | null;
+  transitions: Array<{ fromStateKey: string; roleIds: string[] }>;
+}
+
+/** OT normalizada para resolver destinatarios + contexto de notificación (OT S6). */
+interface LoadedWorkOrder {
+  id: string;
+  number: number;
+  folio: string | null;
+  title: string;
+  criticality: number;
   typeName: string | null;
   orgNodeId: string;
   nodeName: string | null;

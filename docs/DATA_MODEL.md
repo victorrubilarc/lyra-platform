@@ -705,7 +705,19 @@ Incident(resuelta) ──> KnowledgeArticle
 - Índices previstos: FKs, `OrgNode.parentId`, `Entry(templateId, createdAt)`, `Incident(status, severity)`, GIN en `tsvector` de KB y en `JSONB` consultable.
 - El esquema vive en `apps/watchlog-api/prisma/schema.prisma`; migraciones versionadas con `prisma migrate`.
 
-### Órdenes de Trabajo / Work Orders (OT / PTW) — S1 Cimientos + S2 Puerta 1 + S3 Puerta 2 + S4 Puerta 3 + S5a Puerta 4 (seguimiento + cierre) *(implementado)*
+### Órdenes de Trabajo / Work Orders (OT / PTW) — S1 Cimientos + S2 Puerta 1 + S3 Puerta 2 + S4 Puerta 3 + S5 Puerta 4 + S6 SLA/semáforos *(implementado)*
+
+> **S6 (SLA / vigía, `feat/ot-sla-semaforos`, 2026-07-02) — SIN migración** (columnas ya latentes desde el diseño):
+> `WorkOrderType.resolutionDueMinutes?`/`escalationAfterMinutes?`/`escalationRoleId?` (FK Role SetNull) = SLA light espejo de
+> `IncidentType`. `WorkOrder.dueAt` se **auto-fija AL APROBAR** (`resolutionDueFromType(approvedAt,·)`; override manual gana) y es
+> editable (timeline `DUE_CHANGED`). **3 estados DERIVADOS (sin columnas, sin cron):** semáforo de PLAZO (`workOrderTrafficLight`:
+> 🔴 `dueAt<now` o actividad con `baselineEnd`/`plannedEnd`<now no cerrada · 🟡 dentro de `AT_RISK_WINDOW_MINUTES`=48 h · 🟢 en
+> plazo · ⚪ sin plazo) y PERMANENCIA (`stalled` = `now−currentStateSince > WorkflowState.maxStayMinutes`, indicador aparte, §21).
+> **3 eventos derivados del Bloque N** detectados por `WorkOrderSlaService.findBreaches()` (clon de `IncidentSlaService`, barrido
+> en `NotificationWorkerService.sweep()`): `workorder.overdue` (plazo, re-aviso diario, escala si `dueAt+escalationAfterMinutes<now`),
+> `workorder.stalled` (permanencia, dedupe 1× por ocupación), `workorder.activity.overdue` (actividad del plan, re-aviso diario).
+> Resolvers = owner + roles del estado + escalamiento, ABAC por nodo. **Sin permiso nuevo.**
+
 Migraciones `20260701180000_add_work_orders` (S1) y `20260701210000_add_work_order_workflow_folio` (S2). Entidad NUEVA
 `WorkOrder`, **espejo de `Incident`** (DECISIONS 2026-07-01, forks W1–W8). Desde S2 el ciclo de la solicitud está VIVO
 hasta la Puerta 1: workflow congelado al crear + ejecutor de transiciones (permiso `workorder:transition`, dim. WORKFLOW)

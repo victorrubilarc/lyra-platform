@@ -44,6 +44,9 @@
 .sevDot { display: inline-block; width: 10px; height: 10px; border-radius: var(--radius-full); vertical-align: middle; }
 .priText { font-weight: 600; }
 .ptwTag { margin-left: var(--space-2); font-size: 0.7rem; padding: 1px 6px; border-radius: var(--radius-full); background: rgba(239,68,68,.15); color: var(--color-error); }
+.stalledTag { margin-left: var(--space-2); font-size: 0.7rem; padding: 1px 6px; border-radius: var(--radius-full); border: 1px solid var(--color-border-subtle); color: var(--color-text-secondary); }
+.slaDot { display: inline-block; width: 10px; height: 10px; border-radius: var(--radius-full); vertical-align: middle; box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 0%, transparent); }
+.srOnly { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 .tags { display: flex; gap: 4px; flex-wrap: wrap; }
 .tagChip { font-size: 0.7rem; padding: 1px 7px; border-radius: var(--radius-full); border: 1px solid var(--color-border-subtle); color: var(--color-text-secondary); white-space: nowrap; }
 .lifeChip { font-weight: 600; }

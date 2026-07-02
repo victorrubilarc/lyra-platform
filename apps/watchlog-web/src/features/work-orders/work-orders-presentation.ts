@@ -1,4 +1,4 @@
-import type { WorkActivityStatus, WorkOrderChecklistStatus, WorkOrderLifecycle, WorkOrderOrigin, WorkOrderPriority } from "@lyra/contracts";
+import type { WorkActivityStatus, WorkOrderChecklistStatus, WorkOrderLifecycle, WorkOrderOrigin, WorkOrderPriority, WorkOrderTrafficLight } from "@lyra/contracts";
 
 /** Tokens de criticidad 1..5 (misma escala de severidad del DS). */
 const CRITICALITY_COLORS = ["#6B7280", "#22C55E", "#84CC16", "#EAB308", "#F97316", "#EF4444"];
@@ -41,6 +41,17 @@ export const ACTIVITY_STATUS_META: Record<WorkActivityStatus, { label: string; c
   BLOCKED: { label: "Bloqueada", color: "#F97316" },
   DONE: { label: "Completada", color: "#22C55E" },
   CANCELED: { label: "Cancelada", color: "#6B7280" },
+};
+
+/**
+ * Semáforo de PLAZO (S6 — vigía digital). Colores = TOKENS del DS (no hex): se ven
+ * bien en claro y oscuro. `none` = sin plazo que vigilar (o cerrada/anulada).
+ */
+export const SLA_STATUS_META: Record<WorkOrderTrafficLight, { label: string; color: string }> = {
+  red: { label: "Vencida", color: "var(--color-error)" },
+  amber: { label: "Por vencer", color: "var(--color-warning)" },
+  green: { label: "En plazo", color: "var(--color-success)" },
+  none: { label: "Sin plazo", color: "var(--color-text-muted)" },
 };
 
 export const ORIGIN_META: Record<WorkOrderOrigin, { label: string }> = {

@@ -11,6 +11,9 @@ import {
   renderFolio,
   resolveFolioScheme,
   workOrderCode,
+  workOrderDueFromType,
+  workOrderTrafficLight,
+  AT_RISK_WINDOW_MINUTES,
   type AssignWorkOrderRequest,
   type CancelWorkOrderRequest,
   type CreateWorkOrderRequest,
@@ -105,16 +108,32 @@ export class WorkOrdersService {
 
   async stats(userId: string, structureId?: string): Promise<WorkOrderStats> {
     const base = await this.buildWhere(userId, {}, structureId);
-    if (base === null) return { draft: 0, open: 0, critical: 0, unassigned: 0, ptw: 0 };
+    if (base === null) return { draft: 0, open: 0, critical: 0, unassigned: 0, ptw: 0, overdue: 0, atRisk: 0, stalled: 0 };
     const openBase: Prisma.WorkOrderWhereInput = { ...base, lifecycle: "OPEN" };
-    const [draft, open, critical, unassigned, ptw] = await Promise.all([
+    // Vigía (S6): plazo/permanencia sobre OT ABIERTAS. `stalled` reusa la detección de
+    // permanencia (raw), intersectada con el conjunto accesible.
+    const now = new Date();
+    const overdueActivity: Prisma.WorkOrderWhereInput = {
+      activities: {
+        some: {
+          status: { notIn: ["DONE", "CANCELED"] },
+          OR: [{ baselineEnd: { lt: now } }, { AND: [{ baselineEnd: null }, { plannedEnd: { lt: now } }] }],
+        },
+      },
+    };
+    const window = new Date(now.getTime() + AT_RISK_WINDOW_MINUTES * 60_000);
+    const stalledIds = await this.findStalledIds();
+    const [draft, open, critical, unassigned, ptw, overdue, atRisk, stalled] = await Promise.all([
       this.prisma.workOrder.count({ where: { ...base, lifecycle: "DRAFT" } }),
       this.prisma.workOrder.count({ where: openBase }),
       this.prisma.workOrder.count({ where: { ...openBase, criticality: 5 } }),
       this.prisma.workOrder.count({ where: { ...openBase, ownerId: null } }),
       this.prisma.workOrder.count({ where: { ...base, requiresPtw: true, lifecycle: { in: ["DRAFT", "OPEN"] } } }),
+      this.prisma.workOrder.count({ where: { ...openBase, OR: [{ dueAt: { lt: now } }, overdueActivity] } }),
+      this.prisma.workOrder.count({ where: { ...openBase, dueAt: { gte: now, lte: window }, NOT: overdueActivity } }),
+      this.prisma.workOrder.count({ where: { ...openBase, id: { in: stalledIds } } }),
     ]);
-    return { draft, open, critical, unassigned, ptw };
+    return { draft, open, critical, unassigned, ptw, overdue, atRisk, stalled };
   }
 
   // === Detalle ================================================================
@@ -326,7 +345,7 @@ export class WorkOrdersService {
     // Puerta 2 — claves data-driven de sugerencia/puerta de checklists (S3).
     const type = await this.prisma.workOrderType.findUnique({
       where: { id: row.typeId },
-      select: { folioScheme: true, folioOnStateKey: true, checklistGateStateKey: true, planFreezeStateKey: true, executeStateKey: true },
+      select: { folioScheme: true, folioOnStateKey: true, checklistGateStateKey: true, planFreezeStateKey: true, executeStateKey: true, resolutionDueMinutes: true },
     });
     const folioStateKey = type?.folioOnStateKey ?? DEFAULT_WORK_ORDER_FOLIO_STATE_KEY;
     const checklistGateStateKey = type?.checklistGateStateKey ?? DEFAULT_WORK_ORDER_CHECKLIST_GATE_STATE_KEY;
@@ -366,6 +385,10 @@ export class WorkOrdersService {
       throw new BadRequestException("El rechazo exige un motivo");
     }
     const approvedAtAfter = row.approvedAt ?? (isApproval ? now : null);
+    // SLA (S6): al APROBAR se auto-fija el PLAZO de resolución desde el SLA del tipo,
+    // anclado al instante de aprobación (la OT recién pasa a ser trabajo real). El
+    // override manual (dueAt ya fijado en la solicitud) GANA: sólo se calcula si está null.
+    const autoDueAt = isApproval && row.dueAt == null ? workOrderDueFromType(now.getTime(), type?.resolutionDueMinutes ?? null) : null;
     const lifecycleAfter = deriveWorkOrderLifecycle({
       canceledAt: row.canceledAt,
       currentStateIsFinal: becomesFinal,
@@ -417,6 +440,7 @@ export class WorkOrdersService {
           lifecycle: lifecycleAfter,
           updatedById: userId,
           ...(isApproval ? { approvedAt: now, approvedById: userId } : {}),
+          ...(autoDueAt ? { dueAt: autoDueAt } : {}),
           ...(isPlanFreeze ? { planFrozenAt: now, planFrozenById: userId } : {}),
           ...(isRejection ? { rejectedAt: now, rejectedById: userId, rejectReason: dto.reason!.trim() } : {}),
           ...(becomesFinal && !isRejection
@@ -452,6 +476,18 @@ export class WorkOrdersService {
             actorId: userId,
             actorName: signerName,
             metadata: { folio: issuedFolio },
+          },
+        });
+      }
+      if (autoDueAt) {
+        await tx.workOrderEvent.create({
+          data: {
+            workOrderId: id,
+            kind: "DUE_CHANGED",
+            summary: `Plazo de resolución fijado automáticamente: ${autoDueAt.toLocaleString("es-CL")}`,
+            actorId: userId,
+            actorName: signerName,
+            metadata: { dueAt: autoDueAt.toISOString(), source: "auto" },
           },
         });
       }
@@ -531,6 +567,16 @@ export class WorkOrdersService {
       }
     });
     const after = await this.loadWorkOrder(id);
+    // Cambio MANUAL del plazo de resolución (S6) ⇒ evento en el timeline (trazabilidad).
+    if (dto.dueAt !== undefined && (before.dueAt?.getTime() ?? null) !== (after.dueAt?.getTime() ?? null)) {
+      await this.addEvent(
+        id,
+        "DUE_CHANGED",
+        after.dueAt ? `Plazo de resolución actualizado: ${after.dueAt.toLocaleString("es-CL")}` : "Plazo de resolución quitado",
+        ctx,
+        { dueAt: after.dueAt?.toISOString() ?? null, source: "manual" },
+      );
+    }
     await this.audit.record({ ...ctx, action: "workorder.updated", entityType: "WorkOrder", entityId: id, before: this.snapshot(before), after: this.snapshot(after) });
     return this.getDetail(userId, id);
   }
@@ -574,6 +620,10 @@ export class WorkOrdersService {
     const wfNames = wfIds.length
       ? new Map((await this.prisma.workflowDefinition.findMany({ where: { id: { in: wfIds } }, select: { id: true, name: true } })).map((w) => [w.id, w.name]))
       : new Map<string, string>();
+    const roleIds = rows.map((r) => r.escalationRoleId).filter((x): x is string => !!x);
+    const roleNames = roleIds.length
+      ? new Map((await this.prisma.role.findMany({ where: { id: { in: roleIds } }, select: { id: true, name: true } })).map((r) => [r.id, r.name]))
+      : new Map<string, string>();
     return rows.map((r) => ({
       id: r.id,
       key: r.key,
@@ -591,6 +641,10 @@ export class WorkOrdersService {
       planFreezeStateKey: r.planFreezeStateKey,
       executeStateKey: r.executeStateKey,
       closureChecklistSuggestStateKey: r.closureChecklistSuggestStateKey,
+      resolutionDueMinutes: r.resolutionDueMinutes,
+      escalationAfterMinutes: r.escalationAfterMinutes,
+      escalationRoleId: r.escalationRoleId,
+      escalationRoleName: r.escalationRoleId ? roleNames.get(r.escalationRoleId) ?? null : null,
       active: r.active,
       sortOrder: r.sortOrder,
     }));
@@ -605,6 +659,10 @@ export class WorkOrdersService {
       const wf = await this.prisma.workflowDefinition.findFirst({ where: { id: dto.defaultWorkflowId, deletedAt: null } });
       if (!wf) throw new BadRequestException("El flujo por defecto indicado no existe");
       if (wf.status !== "PUBLISHED" || !wf.currentVersionId) throw new BadRequestException("El flujo por defecto debe estar publicado");
+    }
+    if (dto.escalationRoleId) {
+      const role = await this.prisma.role.findFirst({ where: { id: dto.escalationRoleId } });
+      if (!role) throw new BadRequestException("El rol de escalamiento indicado no existe");
     }
     const data = {
       name: dto.name,
@@ -621,6 +679,9 @@ export class WorkOrdersService {
       planFreezeStateKey: dto.planFreezeStateKey ?? null,
       executeStateKey: dto.executeStateKey ?? null,
       closureChecklistSuggestStateKey: dto.closureChecklistSuggestStateKey ?? null,
+      resolutionDueMinutes: dto.resolutionDueMinutes ?? null,
+      escalationAfterMinutes: dto.escalationAfterMinutes ?? null,
+      escalationRoleId: dto.escalationRoleId ?? null,
       active: dto.active ?? true,
       sortOrder: dto.sortOrder ?? 0,
     };
@@ -725,21 +786,63 @@ export class WorkOrdersService {
         ? { createdAt: { ...(q.createdFrom ? { gte: q.createdFrom } : {}), ...(q.createdTo ? { lte: q.createdTo } : {}) } }
         : {}),
     };
+    const and: Prisma.WorkOrderWhereInput[] = [];
     if (q.search && q.search.trim()) {
       const term = q.search.trim();
       const numMatch = term.match(/(\d+)/);
-      where.AND = [
-        {
-          OR: [
-            { title: { contains: term, mode: "insensitive" } },
-            { description: { contains: term, mode: "insensitive" } },
-            { folio: { contains: term, mode: "insensitive" } },
-            ...(numMatch ? [{ number: Number(numMatch[1]) }] : []),
-          ],
-        },
-      ];
+      and.push({
+        OR: [
+          { title: { contains: term, mode: "insensitive" } },
+          { description: { contains: term, mode: "insensitive" } },
+          { folio: { contains: term, mode: "insensitive" } },
+          ...(numMatch ? [{ number: Number(numMatch[1]) }] : []),
+        ],
+      });
     }
+    // Faceta del "vigía" (S6): salud del plazo/permanencia sobre OT ABIERTAS.
+    if (q.slaStatus) {
+      const now = new Date();
+      const overdueActivity: Prisma.WorkOrderWhereInput = {
+        activities: {
+          some: {
+            status: { notIn: ["DONE", "CANCELED"] },
+            OR: [{ baselineEnd: { lt: now } }, { AND: [{ baselineEnd: null }, { plannedEnd: { lt: now } }] }],
+          },
+        },
+      };
+      if (q.slaStatus === "overdue") {
+        and.push({ lifecycle: "OPEN", OR: [{ dueAt: { lt: now } }, overdueActivity] });
+      } else if (q.slaStatus === "atRisk") {
+        const window = new Date(now.getTime() + AT_RISK_WINDOW_MINUTES * 60_000);
+        and.push({ lifecycle: "OPEN", dueAt: { gte: now, lte: window }, NOT: overdueActivity });
+      } else if (q.slaStatus === "stalled") {
+        const ids = await this.findStalledIds();
+        and.push({ id: { in: ids } });
+      }
+    }
+    if (and.length > 0) where.AND = and;
     return where;
+  }
+
+  /**
+   * IDs de OT ABIERTAS con la PERMANENCIA de estado excedida (now − currentStateSince >
+   * maxStayMinutes del estado actual de la versión CONGELADA). Mismo cálculo que el
+   * detector del "vigía" (`WorkOrderSlaService`), aquí para el filtro de la grilla.
+   */
+  private async findStalledIds(): Promise<string[]> {
+    const rows = await this.prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT wo."id"
+      FROM "WorkOrder" wo
+      JOIN "WorkflowState" ws
+        ON ws."workflowDefinitionVersionId" = wo."workflowDefinitionVersionId"
+       AND ws."key" = wo."currentStateKey"
+      WHERE wo."lifecycle" = 'OPEN'
+        AND wo."deletedAt" IS NULL
+        AND wo."currentStateKey" IS NOT NULL
+        AND ws."maxStayMinutes" IS NOT NULL
+        AND wo."currentStateSince" + (ws."maxStayMinutes" * interval '1 minute') < now()
+      LIMIT 1000`;
+    return rows.map((r) => r.id);
   }
 
   private async toListItems(rows: WorkOrderRow[]): Promise<WorkOrderListItem[]> {
@@ -750,9 +853,34 @@ export class WorkOrdersService {
     const graphs = new Map<string, VersionGraph>();
     for (const vid of versionIds) graphs.set(vid, await this.loadVersionGraph(vid));
     const userNames = await this.resolveUserNames(rows.flatMap((r) => [r.ownerId, r.requesterId]));
+    // SEMÁFORO (S6): ¿qué OT de la página tienen ≥1 actividad vencida? (fin baseline, o
+    // planificado si sin baseline, en el pasado y no cerrada). Una sola consulta batch.
+    const now = new Date();
+    const openIds = rows.filter((r) => r.lifecycle === "OPEN").map((r) => r.id);
+    const overdueActivityWoIds = new Set<string>();
+    if (openIds.length > 0) {
+      const acts = await this.prisma.workActivity.findMany({
+        where: {
+          workOrderId: { in: openIds },
+          status: { notIn: ["DONE", "CANCELED"] },
+          OR: [{ baselineEnd: { lt: now } }, { AND: [{ baselineEnd: null }, { plannedEnd: { lt: now } }] }],
+        },
+        select: { workOrderId: true },
+      });
+      for (const a of acts) overdueActivityWoIds.add(a.workOrderId);
+    }
     return rows.map((r) => {
       const graph = r.workflowDefinitionVersionId ? graphs.get(r.workflowDefinitionVersionId) : undefined;
       const state = graph && r.currentStateKey ? graph.states.get(r.currentStateKey) : undefined;
+      // PERMANENCIA de estado excedida (indicador separado del semáforo de plazo, §21).
+      const stalled =
+        r.lifecycle === "OPEN" &&
+        state?.maxStayMinutes != null &&
+        now.getTime() - r.currentStateSince.getTime() > state.maxStayMinutes * 60_000;
+      const slaStatus = workOrderTrafficLight(
+        { dueAt: r.dueAt, lifecycle: r.lifecycle, hasOverdueActivity: overdueActivityWoIds.has(r.id) },
+        now.getTime(),
+      );
       return {
       id: r.id,
       code: workOrderCode(r.folio, r.number),
@@ -779,6 +907,8 @@ export class WorkOrdersService {
       requesterName: r.requesterId ? userNames.get(r.requesterId) ?? null : null,
       specialties: r.specialties.map((s) => ({ id: s.specialty.id, name: s.specialty.name, color: s.specialty.color })),
       dueAt: r.dueAt?.toISOString() ?? null,
+      slaStatus,
+      stalled,
       createdAt: r.createdAt.toISOString(),
       updatedAt: r.updatedAt.toISOString(),
       };

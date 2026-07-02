@@ -285,6 +285,8 @@ export function deepLinkForEntity(type: string | null, id: string | null): strin
       return "/mis-rondas";
     case "Incident":
       return `/incidencias?incidentId=${id}`;
+    case "WorkOrder":
+      return `/ordenes-trabajo/${id}`;
     case "ShiftHandover":
       return `/cambio-turno?handoverId=${id}`;
     default:

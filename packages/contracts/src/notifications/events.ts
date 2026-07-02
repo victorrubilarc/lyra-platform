@@ -82,8 +82,24 @@ const INCIDENT_VARIABLES: readonly NotificationVariableDef[] = [
 ] as const;
 
 /**
- * Catálogo de eventos del MVP (4) + incidencias (4, Fase 4.4). Crece por fase:
- * turnos (Fase 5) añaden sus claves aquí.
+ * Variables compartidas por los eventos ligados a una ORDEN DE TRABAJO (OT S6 — SLA /
+ * avisos de plazo / permanencia / actividad vencida). La campanita navega a la OT vía
+ * `deepLinkForEntity("WorkOrder", id)`.
+ */
+const WORKORDER_VARIABLES: readonly NotificationVariableDef[] = [
+  { name: "workorder.folio", description: "Folio de la OT (o correlativo provisional si aún no se aprueba).", sample: "OT-2026-0007" },
+  { name: "workorder.title", description: "Título de la OT.", sample: "Cambio de sello mecánico bomba 3" },
+  { name: "workorder.type", description: "Tipo de OT.", sample: "Permiso de alto riesgo" },
+  { name: "workorder.criticality", description: "Criticidad (1–5).", sample: "4" },
+  { name: "workorder.node", description: "Nodo (área) de la OT.", sample: "Planta Concentradora ▸ Molienda" },
+  { name: "workorder.state", description: "Estado de flujo actual.", sample: "En ejecución" },
+  { name: "workorder.owner", description: "Responsable asignado (o «—»).", sample: "Ana Pérez" },
+  { name: "workorder.url", description: "Enlace directo a la OT.", sample: "https://watchlog.tuempresa.cl/ordenes-trabajo/abc123" },
+] as const;
+
+/**
+ * Catálogo de eventos del MVP (4) + incidencias (4, Fase 4.4) + órdenes de trabajo (3,
+ * OT S6). Crece por fase.
  */
 export const NOTIFICATION_EVENTS = [
   {
@@ -224,6 +240,49 @@ export const NOTIFICATION_EVENTS = [
       { name: "handover.generalStatus", description: "Estado general declarado al cierre.", sample: "Operativo con observaciones" },
       { name: "handover.openItems", description: "Pendientes que ruedan al turno entrante.", sample: "3" },
       { name: "handover.url", description: "Enlace directo a la entrega.", sample: "https://watchlog.tuempresa.cl/cambio-turno?handoverId=abc123" },
+    ],
+  },
+  {
+    key: "workorder.overdue",
+    group: "workorders",
+    labelKey: "notifications.events.workOrderOverdue",
+    description:
+      "El PLAZO de resolución de una orden de trabajo venció (su «dueAt» pasó y sigue abierta). Avisa al responsable y a los roles del estado; si se configuró escalamiento, también al rol superior.",
+    origin: "derived",
+    variables: [
+      ...COMMON_VARIABLES,
+      ...WORKORDER_VARIABLES,
+      { name: "workorder.dueAt", description: "Plazo de resolución comprometido.", sample: "2 jul 2026, 18:00" },
+      { name: "workorder.overdueBy", description: "Tiempo transcurrido desde el plazo.", sample: "1 d 4 h" },
+    ],
+  },
+  {
+    key: "workorder.stalled",
+    group: "workorders",
+    labelKey: "notifications.events.workOrderStalled",
+    description:
+      "Una orden de trabajo superó el tiempo máximo de permanencia en su estado de flujo (quedó «estancada»). Avisa al responsable y a los roles del estado actual.",
+    origin: "derived",
+    variables: [
+      ...COMMON_VARIABLES,
+      ...WORKORDER_VARIABLES,
+      { name: "workorder.sla", description: "SLA de permanencia del estado.", sample: "8 h" },
+      { name: "workorder.delayedBy", description: "Tiempo de atraso sobre el SLA de permanencia.", sample: "2 h 15 min" },
+    ],
+  },
+  {
+    key: "workorder.activity.overdue",
+    group: "workorders",
+    labelKey: "notifications.events.workOrderActivityOverdue",
+    description:
+      "Una actividad del plan de una orden de trabajo venció su fecha de término (por baseline/planificado) sin completarse. Avisa al responsable de la actividad y al responsable de la OT.",
+    origin: "derived",
+    variables: [
+      ...COMMON_VARIABLES,
+      ...WORKORDER_VARIABLES,
+      { name: "activity.title", description: "Título de la actividad.", sample: "Aislar energías (LOTO)" },
+      { name: "activity.dueAt", description: "Fecha de término planificada de la actividad.", sample: "2 jul 2026, 12:00" },
+      { name: "activity.overdueBy", description: "Tiempo transcurrido desde el término planificado.", sample: "6 h" },
     ],
   },
 ] as const satisfies readonly NotificationEventDef[];

@@ -13,7 +13,7 @@ import {
   useWorkOrderAssignableUsers,
   useWorkOrderDetail,
 } from "./work-orders-queries.js";
-import { LIFECYCLE_META, ORIGIN_META, PRIORITY_META, criticalityColor, criticalityLabel } from "./work-orders-presentation.js";
+import { LIFECYCLE_META, ORIGIN_META, PRIORITY_META, SLA_STATUS_META, criticalityColor, criticalityLabel } from "./work-orders-presentation.js";
 import { WorkOrderChecklistsBlock } from "./WorkOrderChecklistsBlock.js";
 import { WorkOrderPlanBlock } from "./WorkOrderPlanBlock.js";
 import { WorkflowDiagram } from "../logbook/WorkflowDiagram.js";
@@ -28,6 +28,14 @@ import styles from "./work-orders.module.css";
  * stepper del flujo; cuerpo a 2 columnas (pestañas a todo el ancho + panel lateral de
  * estado/responsable/metadatos). Responsive: en pantallas angostas el panel baja debajo.
  */
+/** ISO (UTC) → valor de un <input type="datetime-local"> ("YYYY-MM-DDTHH:mm", hora local). */
+function toLocalInput(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
+}
+
 export function WorkOrderDetailPage() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
@@ -76,6 +84,16 @@ export function WorkOrderDetailPage() {
               <span className={styles.lifeChip} style={{ color: LIFECYCLE_META[wo.lifecycle].color }}>{LIFECYCLE_META[wo.lifecycle].label}</span>
             )}
             {wo.requiresPtw && <span className={styles.ptwTag}>PTW</span>}
+            {wo.slaStatus !== "none" && (
+              <span
+                className={styles.lifeChip}
+                style={{ color: SLA_STATUS_META[wo.slaStatus].color }}
+                title={wo.dueAt ? `Plazo: ${formatDateTime(wo.dueAt)}` : undefined}
+              >
+                ● {SLA_STATUS_META[wo.slaStatus].label}
+              </span>
+            )}
+            {wo.stalled && <span className={styles.stalledTag} title="Lleva demasiado tiempo en su estado actual">Estancada</span>}
           </div>
           <h1 className={styles.detailPageTitle}>{wo.title}</h1>
         </div>
@@ -274,7 +292,6 @@ export function WorkOrderDetailPage() {
               {wo.folio && (<><dt>Folio</dt><dd className={styles.code}>{wo.folio}</dd></>)}
               {wo.approvedAt && (<><dt>Aprobada</dt><dd>{formatDate(wo.approvedAt)}</dd></>)}
               {wo.planFrozenAt && (<><dt>Plan congelado</dt><dd>{formatDate(wo.planFrozenAt)}</dd></>)}
-              {wo.dueAt && (<><dt>Fecha límite</dt><dd>{formatDate(wo.dueAt)}</dd></>)}
             </dl>
 
             {isLive && can("workorder:assign") && (
@@ -292,6 +309,24 @@ export function WorkOrderDetailPage() {
                 <Select value={wo.priority} onChange={(e) => update.mutate({ id: wo.id, dto: { priority: e.target.value as WorkOrderPriority } }, { onError: (err) => toast.error((err as Error).message) })}>
                   {(Object.keys(PRIORITY_META) as WorkOrderPriority[]).map((p) => <option key={p} value={p}>{PRIORITY_META[p].label}</option>)}
                 </Select>
+              </label>
+            )}
+            {isLive && can("workorder:edit") && (
+              <label className={styles.field}>
+                <span className={styles.fieldLabel}>Plazo de resolución</span>
+                <Input
+                  key={wo.dueAt ?? "none"}
+                  type="datetime-local"
+                  defaultValue={toLocalInput(wo.dueAt)}
+                  onChange={(e) => {
+                    const v = e.target.value ? new Date(e.target.value).toISOString() : null;
+                    update.mutate({ id: wo.id, dto: { dueAt: v } }, {
+                      onSuccess: () => toast.success(v ? "Plazo actualizado" : "Plazo quitado"),
+                      onError: (err) => toast.error((err as Error).message),
+                    });
+                  }}
+                />
+                <span className={styles.muted}>Vacío = sin plazo. Se auto-fija al aprobar según el SLA del tipo.</span>
               </label>
             )}
           </div>
