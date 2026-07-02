@@ -19,6 +19,7 @@ import {
   type SpecialtyDto,
   type TransitionWorkOrderRequest,
   type UpdateWorkOrderRequest,
+  type WorkOrderWorkflowView,
   type UpsertSpecialtyRequest,
   type UpsertWorkOrderTypeRequest,
   type WorkOrderAvailableTransition,
@@ -171,6 +172,7 @@ export class WorkOrdersService {
       workflowDefinitionVersionId: row.workflowDefinitionVersionId,
       states: states.map((s) => ({ key: s.key, name: s.name, order: s.order, isFinal: s.isFinal, color: s.color })),
       availableTransitions,
+      workflow: row.workflowDefinitionVersionId ? await this.buildWorkflowView(row.workflowDefinitionVersionId, id) : null,
       events: events.map((e): WorkOrderEventDto => ({
         id: e.id,
         kind: e.kind,
@@ -818,6 +820,75 @@ export class WorkOrdersService {
         signatureMeaning: t.signatureMeaning,
         roleIds: t.roles.map((r) => r.roleId),
         roleNames: t.roles.map((r) => roleNames.get(r.roleId) ?? r.roleId),
+      })),
+    };
+  }
+
+  /**
+   * Vista COMPLETA del flujo para el diagrama gráfico (reusa el `WorkflowDiagram` de
+   * Bitácoras): grafo (estados + transiciones, con nombres de rol resueltos) + recorrido
+   * REAL ejecutado (WorkOrderTransition → shape de `LogEntryTransitionDto`). La firma va
+   * null (deuda payloadHash compartida). Fiel al histórico: usa la versión CONGELADA.
+   */
+  private async buildWorkflowView(versionId: string, workOrderId: string): Promise<WorkOrderWorkflowView> {
+    const version = await this.prisma.workflowDefinitionVersion.findUnique({
+      where: { id: versionId },
+      include: {
+        states: true,
+        transitions: { include: { fromState: { select: { key: true } }, toState: { select: { key: true } }, roles: { select: { roleId: true } } } },
+      },
+    });
+    if (!version) return { states: [], transitions: [], executed: [] };
+    const roleIds = [...new Set(version.transitions.flatMap((t) => t.roles.map((r) => r.roleId)))];
+    const roleNames = roleIds.length
+      ? new Map((await this.prisma.role.findMany({ where: { id: { in: roleIds } }, select: { id: true, name: true } })).map((r) => [r.id, r.name]))
+      : new Map<string, string>();
+    const labelByKey = new Map(version.transitions.map((t) => [t.key, t.label]));
+
+    const executedRows = await this.prisma.workOrderTransition.findMany({ where: { workOrderId }, orderBy: { occurredAt: "asc" } });
+    const actorNames = await this.resolveUserNames(executedRows.map((e) => e.actorId));
+
+    return {
+      states: version.states
+        .sort((a, b) => a.order - b.order)
+        .map((s) => ({
+          id: s.id,
+          key: s.key,
+          name: s.name,
+          description: s.description,
+          order: s.order,
+          isInitial: s.isInitial,
+          isFinal: s.isFinal,
+          color: s.color,
+          maxStayMinutes: s.maxStayMinutes,
+        })),
+      transitions: version.transitions
+        .sort((a, b) => a.order - b.order)
+        .map((t) => ({
+          id: t.id,
+          key: t.key,
+          label: t.label,
+          fromStateKey: t.fromState.key,
+          toStateKey: t.toState.key,
+          order: t.order,
+          requireSignature: t.requireSignature,
+          signatureMeaning: t.signatureMeaning,
+          requireMfa: t.requireMfa,
+          notify: null,
+          roleIds: t.roles.map((r) => r.roleId),
+          roleNames: t.roles.map((r) => roleNames.get(r.roleId) ?? r.roleId),
+        })),
+      executed: executedRows.map((e) => ({
+        id: e.id,
+        transitionKey: e.transitionKey,
+        label: labelByKey.get(e.transitionKey) ?? null,
+        fromStateKey: e.fromStateKey,
+        toStateKey: e.toStateKey,
+        actorId: e.actorId,
+        actorName: e.actorId ? actorNames.get(e.actorId) ?? null : null,
+        reason: e.reason,
+        signature: null,
+        occurredAt: e.occurredAt.toISOString(),
       })),
     };
   }

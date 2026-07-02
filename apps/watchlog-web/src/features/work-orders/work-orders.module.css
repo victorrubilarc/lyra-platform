@@ -34,6 +34,10 @@
 .table td { padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--color-border-subtle); }
 .row { cursor: pointer; transition: var(--transition-fast); }
 .row:hover { background: var(--color-hover); }
+/* Fila que se estaba consultando: al volver del detalle se resalta completa (para
+   saber "dónde estabas"). Barra de acento a la izquierda + fondo tenue de marca. */
+.rowActive td { background: color-mix(in srgb, var(--color-accent-primary) 12%, transparent); }
+.rowActive td:first-child { box-shadow: inset 3px 0 0 var(--color-accent-primary); }
 .titleCell { max-width: 320px; }
 .mono { font-family: var(--font-mono); color: var(--color-accent-primary); font-size: 0.85em; }
 .muted { color: var(--color-text-muted); }
@@ -71,11 +75,30 @@
 .tabBadge { font-size: var(--text-caption-size); font-weight: 700; background: var(--color-bg-surface-2); border-radius: 999px; padding: 0 6px; min-width: 18px; text-align: center; }
 
 /* Stepper de estados del flujo congelado (S2, patrón Incidencias) */
-.stepper { display: flex; gap: var(--space-2); flex-wrap: wrap; padding: var(--space-3); background: var(--color-bg-surface-2); border-radius: var(--radius-md); }
-.step { display: flex; align-items: center; gap: 6px; }
-.stepDot { width: 12px; height: 12px; border-radius: var(--radius-full); border: 2px solid; flex: none; }
+.stepper { display: flex; align-items: center; gap: 0; flex-wrap: wrap; padding: var(--space-3) var(--space-4); background: var(--color-bg-surface-2); border-radius: var(--radius-md); overflow-x: auto; }
+/* Cada paso; el conector es un ::after que une con el siguiente (no tras el último). */
+.step { display: flex; align-items: center; gap: 8px; padding-right: 8px; position: relative; white-space: nowrap; }
+.step:not(:last-child)::after { content: ""; width: 20px; height: 2px; border-radius: 2px; background: var(--color-border-subtle); margin: 0 8px 0 0; }
+.stepDot { width: 12px; height: 12px; border-radius: var(--radius-full); border: 2px solid; flex: none; transition: var(--transition-fast); }
+/* Punto de la etapa ACTUAL: refulgente pero SOBRIO — glow suave + anillo tenue,
+   con una pulsación muy leve (respeta prefers-reduced-motion). */
+.stepDotCurrent { box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-accent-primary) 16%, transparent), 0 0 10px 1px color-mix(in srgb, var(--color-accent-primary) 55%, transparent); animation: stepGlow 2.4s ease-in-out infinite; }
+@keyframes stepGlow {
+  0%, 100% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-accent-primary) 14%, transparent), 0 0 8px 1px color-mix(in srgb, var(--color-accent-primary) 45%, transparent); }
+  50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--color-accent-primary) 20%, transparent), 0 0 13px 2px color-mix(in srgb, var(--color-accent-primary) 65%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) { .stepDotCurrent { animation: none; } }
 .stepLabel { font-size: var(--text-caption-size); color: var(--color-text-muted); }
-.stepLabelActive { font-size: var(--text-caption-size); color: var(--color-text-primary); font-weight: 700; }
+/* Paso ACTUAL: píldora de acento (destaca "dónde estás" con un toque premium). */
+.stepLabelActive { font-size: var(--text-caption-size); color: var(--color-accent-primary); font-weight: 700; padding: 2px 10px; border-radius: var(--radius-full); background: color-mix(in srgb, var(--color-accent-primary) 14%, transparent); }
+
+/* Resumen profesional: grupos con encabezado sobrio + rejilla clave/valor. */
+.summary { display: flex; flex-direction: column; gap: var(--space-4); }
+.summaryGroup { display: flex; flex-direction: column; gap: var(--space-2); }
+.summaryGroupTitle { font-size: var(--text-caption-size); font-weight: 700; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em; padding-bottom: 6px; border-bottom: 1px solid var(--color-border-subtle); }
+.summaryDesc { color: var(--color-text-primary); font-size: var(--text-body-size); line-height: 1.6; margin: 0; white-space: pre-wrap; }
+.summaryDescEmpty { color: var(--color-text-muted); font-style: italic; }
+.closureBox { display: flex; gap: 8px; align-items: flex-start; color: var(--color-text-secondary); font-size: var(--text-body-sm-size); background: color-mix(in srgb, var(--color-success) 8%, transparent); border-radius: var(--radius-md); padding: var(--space-3); margin: 0; }
 
 /* Rechazo (Puerta 1) + timeline + modal de transición/firma */
 .rejectBox { display: flex; align-items: center; gap: 6px; color: var(--color-error); font-size: var(--text-body-sm-size); margin: 0; }
@@ -188,8 +211,18 @@
 .wizardNav:has(> :only-child) { justify-content: flex-end; }
 
 /* === Object Page: detalle de OT a página completa (S4 UX) === */
-.detailPage { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4); max-width: 1400px; margin: 0 auto; width: 100%; }
+/* Ancho COMPLETO, alineado a la izquierda (sin centrar) — aprovecha toda la pantalla. */
+.detailPage { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4); width: 100%; }
 .detailTopbar { display: flex; align-items: center; }
+/* Botón "volver" visible (breadcrumb accionable), no un texto perdido. */
+.back {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-subtle); background: var(--color-bg-surface-1);
+  color: var(--color-text-secondary); font-size: var(--text-body-sm-size); font-weight: 600;
+  cursor: pointer; transition: var(--transition-fast); min-height: 36px;
+}
+.back:hover { background: var(--color-hover); color: var(--color-text-primary); border-color: var(--color-border-active); }
 .detailHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
 .detailHeaderMain { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .detailPageTitle { font-family: var(--font-display, inherit); font-size: var(--text-title-lg-size, 1.5rem); font-weight: 700; color: var(--color-text-primary); margin: 0; line-height: 1.2; }
