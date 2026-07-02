@@ -6,6 +6,7 @@ import { AuditService } from "../audit/audit.service";
 import { EmailConfigService } from "../email/email-config.service";
 import { SchedulesService } from "../schedules/schedules.service";
 import { IncidentSlaService } from "../incidents/incident-sla.service";
+import { WorkOrderSlaService } from "../work-orders/work-order-sla.service";
 import { NotificationEmitterService } from "./notification-emitter.service";
 import { NotificationResolverService } from "./notification-resolver.service";
 import { NotificationChannelRegistry } from "./notification-channel";
@@ -42,6 +43,7 @@ export class NotificationWorkerService {
     private readonly audit: AuditService,
     private readonly schedules: SchedulesService,
     private readonly incidentSla: IncidentSlaService,
+    private readonly workOrderSla: WorkOrderSlaService,
     private readonly emitter: NotificationEmitterService,
     private readonly resolver: NotificationResolverService,
     private readonly channels: NotificationChannelRegistry,
@@ -105,6 +107,15 @@ export class NotificationWorkerService {
       const incidentBreaches = await this.incidentSla.findBreaches(BATCH);
       for (const ib of incidentBreaches) {
         await this.emitter.emit(ib.eventKey, ib.payload, { dedupeKey: ib.dedupeKey });
+        emitted++;
+      }
+
+      // Órdenes de trabajo (OT S6): plazo de resolución vencido / permanencia de estado
+      // excedida / actividad del plan vencida. Misma mecánica: la DETECCIÓN vive en el
+      // dominio (WorkOrderSlaService); aquí sólo se encola cada orden por el Bloque N.
+      const workOrderBreaches = await this.workOrderSla.findBreaches(BATCH);
+      for (const wb of workOrderBreaches) {
+        await this.emitter.emit(wb.eventKey, wb.payload, { dedupeKey: wb.dedupeKey });
         emitted++;
       }
     } catch (err) {

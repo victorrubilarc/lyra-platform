@@ -245,6 +245,85 @@ export const NOTIFICATION_TEMPLATE_SEEDS: NotificationTemplateSeed[] = [
     ),
   },
   {
+    eventKey: "workorder.overdue",
+    locale: "es-CL",
+    channel: "EMAIL",
+    subject: "Plazo vencido: orden de trabajo {{workorder.folio}}",
+    bodyText:
+      "Hola {{recipient.name}}:\n\n" +
+      "El plazo de resolución de la orden de trabajo {{workorder.folio}} ({{workorder.title}}) venció " +
+      "el {{workorder.dueAt}} y sigue abierta (atraso de {{workorder.overdueBy}}).\n\n" +
+      "Tipo: {{workorder.type}}\nCriticidad: {{workorder.criticality}}\nNodo: {{workorder.node}}\n" +
+      "Estado: {{workorder.state}}\nResponsable: {{workorder.owner}}\n\n" +
+      "Resuélvala o reasígnela en {{workorder.url}}.\n\n— {{app.name}}",
+    bodyHtml: htmlShell(
+      "Plazo de resolución vencido",
+      "La orden de trabajo <strong>{{workorder.folio}}</strong> superó su plazo comprometido y sigue abierta.",
+      [
+        ["Orden de trabajo", "{{workorder.title}}"],
+        ["Tipo", "{{workorder.type}}"],
+        ["Criticidad", "{{workorder.criticality}}"],
+        ["Nodo", "{{workorder.node}}"],
+        ["Estado", "{{workorder.state}}"],
+        ["Responsable", "{{workorder.owner}}"],
+        ["Plazo", "{{workorder.dueAt}}"],
+        ["Atraso", "{{workorder.overdueBy}}"],
+      ],
+      { label: "Abrir orden de trabajo", url: "{{workorder.url}}" },
+    ),
+  },
+  {
+    eventKey: "workorder.stalled",
+    locale: "es-CL",
+    channel: "EMAIL",
+    subject: "Permanencia excedida: orden de trabajo {{workorder.folio}} en «{{workorder.state}}»",
+    bodyText:
+      "Hola {{recipient.name}}:\n\n" +
+      "La orden de trabajo {{workorder.folio}} ({{workorder.title}}) superó el tiempo máximo de permanencia " +
+      "en el estado «{{workorder.state}}» (SLA {{workorder.sla}}, atraso {{workorder.delayedBy}}).\n\n" +
+      "Tipo: {{workorder.type}}\nCriticidad: {{workorder.criticality}}\nNodo: {{workorder.node}}\n" +
+      "Responsable: {{workorder.owner}}\n\nRevísela en {{workorder.url}}.\n\n— {{app.name}}",
+    bodyHtml: htmlShell(
+      "Permanencia excedida",
+      "La orden de trabajo <strong>{{workorder.folio}}</strong> lleva demasiado tiempo en su estado actual.",
+      [
+        ["Orden de trabajo", "{{workorder.title}}"],
+        ["Tipo", "{{workorder.type}}"],
+        ["Criticidad", "{{workorder.criticality}}"],
+        ["Nodo", "{{workorder.node}}"],
+        ["Estado", "{{workorder.state}}"],
+        ["SLA", "{{workorder.sla}}"],
+        ["Atraso", "{{workorder.delayedBy}}"],
+      ],
+      { label: "Abrir orden de trabajo", url: "{{workorder.url}}" },
+    ),
+  },
+  {
+    eventKey: "workorder.activity.overdue",
+    locale: "es-CL",
+    channel: "EMAIL",
+    subject: "Actividad vencida: «{{activity.title}}» ({{workorder.folio}})",
+    bodyText:
+      "Hola {{recipient.name}}:\n\n" +
+      "La actividad «{{activity.title}}» del plan de la orden de trabajo {{workorder.folio}} " +
+      "({{workorder.title}}) venció su fecha de término el {{activity.dueAt}} (atraso de {{activity.overdueBy}}) " +
+      "y aún no se completa.\n\n" +
+      "Nodo: {{workorder.node}}\nResponsable de la OT: {{workorder.owner}}\n\n" +
+      "Regístrele avance o ciérrela en {{workorder.url}}.\n\n— {{app.name}}",
+    bodyHtml: htmlShell(
+      "Actividad del plan vencida",
+      "La actividad <strong>{{activity.title}}</strong> de la orden de trabajo {{workorder.folio}} superó su fecha de término.",
+      [
+        ["Actividad", "{{activity.title}}"],
+        ["Orden de trabajo", "{{workorder.title}}"],
+        ["Nodo", "{{workorder.node}}"],
+        ["Término planificado", "{{activity.dueAt}}"],
+        ["Atraso", "{{activity.overdueBy}}"],
+      ],
+      { label: "Abrir orden de trabajo", url: "{{workorder.url}}" },
+    ),
+  },
+  {
     eventKey: "handover.ready",
     locale: "es-CL",
     channel: "EMAIL",

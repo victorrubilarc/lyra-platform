@@ -147,6 +147,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 - ✅ **Verificaciones de EJECUCIÓN por actividad + confirmación del aprobador (Gobierno 2)** (controles de terreno —LOTO físico, energía cero, toma-5— que cuelgan de cada tarea del plan por especialidad; el aprobador **confirma el set** antes de autorizar el permiso; no se completa una tarea sin aprobar su verificación obligatoria) (§ Órdenes de trabajo ▸ Verificaciones de ejecución por actividad)
 - ✅ **Plan de actividades y autorización del plan — Puerta 3** (armar el plan con grilla o **asistente guiado**, congelar la línea base al autorizar, desviación plan-vs-real) (§ Órdenes de trabajo ▸ Plan de actividades)
 - ✅ **Seguimiento del avance y cierre — Puerta 4** (registrar el avance de cada actividad durante la ejecución, historial de avance; **verificación de cierre del permiso** que bloquea el cierre hasta aprobarla; cerrar la OT con firma cuando todo lo obligatorio está completo) (§ Órdenes de trabajo ▸ Seguimiento del avance y cierre · Verificación de cierre del permiso)
+- ✅ **Plazos, avisos de vencimiento y semáforos (SLA) — "vigía digital"** (plazo de resolución automático por tipo de OT, avisos por correo y campanita cuando algo vence o se estanca, escalamiento a un superior, semáforo verde/ámbar/rojo en la grilla y el detalle, indicadores "vencidas / por vencer / estancadas") (§ Órdenes de trabajo ▸ Plazos, avisos y semáforos (SLA))
 - ✅ **Administrar los catálogos** (tipos de OT, especialidades y **reglas de checklist con su momento**) (§ Órdenes de trabajo ▸ Catálogos) [solo administrador]
 
 ---
@@ -444,6 +445,49 @@ estructura organizacional — el nodo — igual que en los EAM líderes.)*
 **Importante.** No hay borrado físico: un tipo/especialidad se **desactiva**, no se elimina (preserva el historial de
 las OT que lo usaron). La **clave** es inmutable; elígela con cuidado. Crear con una clave ya existente se rechaza (evita
 duplicados silenciosos).
+
+---
+
+### Órdenes de trabajo ▸ Plazos, avisos y semáforos (SLA) — "vigía digital"  [todos los roles operativos]
+
+**Para qué sirve.** Que ninguna orden de trabajo se quede olvidada. El sistema vigila **tres cosas distintas** y avisa a
+tiempo (por correo y por la campanita), además de pintar un **semáforo** para que sepas de un vistazo qué está sano y qué
+no:
+- **Plazo de resolución vencido** (🔴): la OT tenía una fecha límite comprometida (`Fecha límite`) y ya pasó.
+- **Actividad del plan vencida** (🔴): una tarea del plan pasó su fecha de término y no está completada.
+- **OT estancada**: lleva demasiado tiempo detenida en el mismo estado del flujo (si ese estado tiene un tope de
+  permanencia configurado). Se muestra como una etiqueta **«Estancada»** aparte del semáforo de plazo.
+
+**Cómo se usa.**
+1. **Fijar el plazo automáticamente (recomendado).** En **Catálogos ▸ Tipos de OT**, al crear o editar un tipo, define un
+   **«Plazo de resolución (SLA)»** (por ejemplo, 24 horas). A partir de ahí, **cuando se apruebe** una OT de ese tipo, el
+   sistema le pone la **fecha límite** sola (momento de aprobación + ese tiempo). *(El plazo arranca al aprobar, no al crear
+   la solicitud: una solicitud en borrador todavía no es trabajo comprometido.)*
+2. **Ajustar el plazo a mano.** En el detalle de una OT (panel derecho, «Plazo de resolución»), cualquiera con permiso de
+   edición puede poner, cambiar o quitar la fecha límite. **Lo que pongas a mano manda**: si ya había un plazo, la aprobación
+   no lo pisa. Cada cambio queda en el **Historial**.
+3. **Leer el semáforo.** En la **grilla** de órdenes de trabajo hay una **columna de semáforo** (punto de color) y, en el
+   detalle, un **chip** junto al estado:
+   - 🟢 **En plazo** · 🟡 **Por vencer** (dentro de las próximas 48 h) · 🔴 **Vencida** (o con una actividad vencida) · ⚪ sin
+     plazo definido.
+4. **Ver "el tablero del vigía".** Arriba de la grilla, los indicadores **«Vencidas» / «Por vencer» / «Estancadas»** cuentan
+   cuántas OT hay en cada situación. **Haz clic** en cualquiera para filtrar la lista al instante (equivale al filtro
+   **«Plazo»** de la fila de filtros). Así el "panel de seguimiento" vive sobre la misma grilla, sin pantallas extra.
+5. **Recibir los avisos.** Cuando algo vence o se estanca, reciben el aviso el **responsable** de la OT y quienes tienen un
+   rol habilitado para actuar en el estado actual. El plazo y la actividad vencida se **recuerdan a diario** hasta que se
+   resuelven; el aviso de "estancada" se manda una vez por cada vez que entra a ese estado.
+6. **Escalamiento (opcional).** En el tipo de OT puedes definir **«Escalar tras el plazo»** (un tiempo extra) y un **«Rol de
+   escalamiento»**. Si la OT sigue vencida pasado ese tiempo, el aviso también llega a ese rol superior.
+
+**Quién puede.** Ver el semáforo/indicadores y recibir avisos: **cualquiera con acceso a la OT** (por nodo/estructura).
+Configurar el SLA y el escalamiento del **tipo**: **`workordercatalog:manage`** (administrador). Cambiar la fecha límite de
+una OT concreta: **`workorder:edit`**.
+
+**Importante.** El semáforo y los indicadores son **derivados en vivo** (no hay un "estado vencido" guardado): reflejan la
+realidad del momento, sin trabajos en segundo plano que haya que mantener. La OT sólo se vigila mientras está **abierta**
+(las cerradas o anuladas no generan avisos). "Estancada" (permanencia en un estado) es **distinto** de "Vencida" (plazo de
+resolución): son dos alertas independientes y sólo aparece «Estancada» si el flujo define un tope de permanencia para ese
+estado. Los correos salen sólo si el envío de correo está habilitado; la **campanita** funciona siempre.
 
 ---
 

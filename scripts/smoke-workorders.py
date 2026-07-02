@@ -71,6 +71,13 @@ CLOSURE_RULE_NAME = "Cierre smoke — retiro de bloqueos"
 # propia del smoke ACOTADA por especialidad (matchea SOLO las actividades de esa disciplina).
 EXEC_TEMPLATE = "Aplicación de controles en terreno — Bloqueo físico y toma-5 (LOTO)"
 EXEC_RULE_NAME = "Ejecución smoke — bloqueo físico por actividad"
+# SLA / vigía (S6): rol + usuario de ESCALAMIENTO exclusivos (no participan en ninguna
+# transición ⇒ si reciben el aviso, es por escalamiento). WO title propio del ciclo SLA.
+ESC_ROLE = "smoke-sla-esc-role"
+ESC_USER = "smoke-sla-esc-user"
+ESC_EMAIL = "smoke-sla-esc@watchlog.local"
+SLA_WO_TITLE = "OT Smoke SLA — vigía de plazos"
+SLA_ACT_ID = "smoke-sla-overdue-activity"
 
 
 def call(method, path, tok=None, body=None):
@@ -121,6 +128,14 @@ def cleanup():
         f"WHERE \"logEntryId\" IS NOT NULL AND \"workOrderId\" IN (SELECT id FROM \"WorkOrder\" WHERE title = '{WO_TITLE}'));"
     )
     sql(f"DELETE FROM \"WorkOrder\" WHERE title = '{WO_TITLE}';")
+    # Ciclo SLA (S6): OT del vigía + avisos derivados (huérfanos tras borrar la OT) + rol/usuario de escalamiento.
+    sql(f"DELETE FROM \"WorkActivity\" WHERE \"workOrderId\" IN (SELECT id FROM \"WorkOrder\" WHERE title = '{SLA_WO_TITLE}');")
+    sql(f"DELETE FROM \"WorkOrder\" WHERE title = '{SLA_WO_TITLE}';")
+    sql("DELETE FROM \"NotificationOutbox\" WHERE \"eventKey\" LIKE 'workorder.%' AND (\"relatedEntityId\" IS NULL OR \"relatedEntityId\" NOT IN (SELECT id FROM \"WorkOrder\"));")
+    sql("DELETE FROM \"NotificationEvent\" WHERE \"eventKey\" LIKE 'workorder.%' AND \"dedupeKey\" NOT IN (SELECT DISTINCT \"dedupeKey\" FROM \"NotificationOutbox\" WHERE \"dedupeKey\" IS NOT NULL);")
+    sql(f"DELETE FROM \"UserRole\" WHERE \"userId\" = '{ESC_USER}';")
+    sql(f"DELETE FROM \"User\" WHERE id = '{ESC_USER}';")
+    sql(f"DELETE FROM \"Role\" WHERE key = '{ESC_ROLE}';")
     # Reglas de checklist propias del smoke (CIERRE + EJECUCIÓN, S5b).
     sql(f"DELETE FROM \"WorkOrderChecklistRule\" WHERE name IN ('{CLOSURE_RULE_NAME}', '{EXEC_RULE_NAME}');")
     sql(f"DELETE FROM \"WorkOrderType\" WHERE key = '{TYPE_KEY}';")
@@ -144,6 +159,109 @@ def setup_reviewer():
         "INSERT INTO \"UserRole\" (\"userId\",\"roleId\",\"assignedAt\") "
         f"SELECT '{REV_USER}', r.id, now() FROM \"Role\" r WHERE r.key = 'admin';"
     )
+
+
+def setup_esc_role():
+    """Rol + usuario de ESCALAMIENTO exclusivos (S6). El rol NO participa en ninguna
+    transición del flujo ⇒ si su usuario recibe el aviso de plazo, es por escalamiento.
+    El usuario no tiene scope de nodo ⇒ ABAC = acceso total (canAccessNode true)."""
+    sql(f"DELETE FROM \"UserRole\" WHERE \"userId\" = '{ESC_USER}';")
+    sql(f"DELETE FROM \"User\" WHERE id = '{ESC_USER}';")
+    sql(f"DELETE FROM \"Role\" WHERE key = '{ESC_ROLE}';")
+    sql(f"INSERT INTO \"Role\" (id,key,name,\"updatedAt\") VALUES ('{ESC_ROLE}','{ESC_ROLE}','Smoke SLA Escalación',now());")
+    sql(
+        "INSERT INTO \"User\" (id,email,\"displayName\",\"passwordHash\",status,\"updatedAt\") "
+        f"SELECT '{ESC_USER}','{ESC_EMAIL}',u.\"displayName\",u.\"passwordHash\",'ACTIVE',now() "
+        f"FROM \"User\" u WHERE u.email = '{ADMIN}';"
+    )
+    sql(
+        "INSERT INTO \"UserRole\" (\"userId\",\"roleId\",\"assignedAt\") "
+        f"SELECT '{ESC_USER}', r.id, now() FROM \"Role\" r WHERE r.key = '{ESC_ROLE}';"
+    )
+    return sql(f"SELECT id FROM \"Role\" WHERE key = '{ESC_ROLE}';").strip()
+
+
+def test_sla(admin, me, node, spec_id):
+    """Ciclo del VIGÍA (S6): SLA del tipo → auto-dueAt al aprobar (override gana) →
+    semáforo/KPIs/filtro → worker detecta vencimiento/actividad vencida/escalamiento →
+    destinatarios + ABAC. Espejo de la Fase 4.4 de Incidencias."""
+    print("\n— SLA / semáforos / vigía digital (S6) —")
+    esc_role_id = setup_esc_role()
+
+    # (1) SLA en el TIPO: el upsert reemplaza todo el registro ⇒ re-enviar folioScheme.
+    s, r = call("POST", "/work-orders/types", admin, {
+        "key": TYPE_KEY, "name": "Tipo OT Smoke EDIT", "active": True, "criticalityDefault": 4,
+        "folioScheme": {"prefix": "OTSMK", "scope": "type"},
+        "resolutionDueMinutes": 120, "escalationAfterMinutes": 60, "escalationRoleId": esc_role_id,
+    })
+    check("tipo: persiste SLA (plazo 120 + escal. 60 + rol) → 2xx",
+          s in (200, 201) and isinstance(r, dict) and r.get("resolutionDueMinutes") == 120
+          and r.get("escalationAfterMinutes") == 60 and r.get("escalationRoleId") == esc_role_id
+          and bool(r.get("escalationRoleName")), str(s))
+    tid = r.get("id") if isinstance(r, dict) else None
+
+    # (2) auto-dueAt al APROBAR (ancla = aprobación): create sin dueAt → aprobar → dueAt = approvedAt + 120m.
+    s, wo = call("POST", "/work-orders", admin, {
+        "title": SLA_WO_TITLE, "typeId": tid, "criticality": 4, "orgNodeId": node,
+        "specialtyIds": [spec_id] if spec_id else [], "ownerId": me,
+    })
+    wid = wo.get("id") if isinstance(wo, dict) else None
+    check("SLA: crear OT (sin dueAt) → 2xx", s in (200, 201) and bool(wid), str(s))
+    call("POST", f"/work-orders/{wid}/transitions", admin, {"transitionKey": "enviar"})
+    s, r = call("POST", f"/work-orders/{wid}/transitions", admin, {"transitionKey": "aprobar", "password": PASS})
+    due = r.get("dueAt") if isinstance(r, dict) else None
+    appr = r.get("approvedAt") if isinstance(r, dict) else None
+    ok_due = False
+    if due and appr:
+        from datetime import datetime
+        d = datetime.fromisoformat(due.replace("Z", "+00:00")); a = datetime.fromisoformat(appr.replace("Z", "+00:00"))
+        ok_due = abs((d - a).total_seconds() - 120 * 60) < 90  # ~120 min desde la aprobación
+    check("SLA: al aprobar se AUTO-FIJA dueAt = aprobación + 120 min", ok_due, str(due))
+    check("SLA: timeline con evento DUE_CHANGED (auto)", isinstance(r, dict) and any(e.get("kind") == "DUE_CHANGED" for e in r.get("events", [])))
+
+    # (2b) override manual gana: otra OT con dueAt explícito → al aprobar NO se recalcula.
+    fixed = "2027-01-01T12:00:00.000Z"
+    s, wo2 = call("POST", "/work-orders", admin, {
+        "title": SLA_WO_TITLE, "typeId": tid, "criticality": 3, "orgNodeId": node, "ownerId": me, "dueAt": fixed,
+    })
+    wid2 = wo2.get("id") if isinstance(wo2, dict) else None
+    call("POST", f"/work-orders/{wid2}/transitions", admin, {"transitionKey": "enviar"})
+    s, r2 = call("POST", f"/work-orders/{wid2}/transitions", admin, {"transitionKey": "aprobar", "password": PASS})
+    check("SLA: override manual del plazo GANA (no se recalcula al aprobar)",
+          isinstance(r2, dict) and (r2.get("dueAt") or "").startswith("2027-01-01"), str(r2.get("dueAt") if isinstance(r2, dict) else None))
+
+    # (3) edición MANUAL del plazo → evento DUE_CHANGED (source manual).
+    s, r = call("PATCH", f"/work-orders/{wid2}", admin, {"dueAt": "2027-02-02T08:00:00.000Z"})
+    check("SLA: editar dueAt manual → 2xx + DUE_CHANGED en timeline",
+          s in (200, 201) and isinstance(r, dict) and any(e.get("kind") == "DUE_CHANGED" for e in r.get("events", [])), str(s))
+
+    # (4) fuerza el VENCIMIENTO: dueAt muy en el pasado (más allá del umbral de escalamiento)
+    # + inserta una ACTIVIDAD del plan vencida (baseline en el pasado).
+    sql(f"UPDATE \"WorkOrder\" SET \"dueAt\" = now() - interval '10 days' WHERE id = '{wid}';")
+    sql(
+        "INSERT INTO \"WorkActivity\" (id,\"workOrderId\",title,sequence,status,mandatory,\"baselineEnd\",\"createdAt\",\"updatedAt\") "
+        f"VALUES ('{SLA_ACT_ID}','{wid}','Actividad vencida smoke',0,'PENDING',true, now() - interval '2 days', now(), now());"
+    )
+
+    # (5) SEMÁFORO derivado + KPIs + filtro (sobre la grilla existente).
+    s, lst = call("GET", f"/work-orders?slaStatus=overdue&pageSize=200", admin)
+    row = next((i for i in (lst.get("items", []) if isinstance(lst, dict) else []) if i.get("id") == wid), None)
+    check("SLA: la OT vencida aparece con filtro slaStatus=overdue", row is not None)
+    check("SLA: semáforo derivado = 'red' (vencida/actividad vencida)", isinstance(row, dict) and row.get("slaStatus") == "red", str(row.get("slaStatus") if row else None))
+    s, stats = call("GET", "/work-orders/stats", admin)
+    check("SLA: KPI 'vencidas' ≥ 1", isinstance(stats, dict) and stats.get("overdue", 0) >= 1, str(stats.get("overdue") if isinstance(stats, dict) else None))
+
+    # (6) WORKER (Bloque N): barre → detecta → encola → despacha a la bandeja.
+    s, run = call("POST", "/notifications/run", admin)
+    check("worker /notifications/run → 200", s in (200, 201), str(s))
+    ov = sql(f"SELECT count(*) FROM \"NotificationOutbox\" WHERE \"eventKey\"='workorder.overdue' AND \"relatedEntityId\"='{wid}';").strip()
+    check("worker: aviso workorder.overdue encolado para la OT", ov.isdigit() and int(ov) >= 1, ov)
+    owner_ov = sql(f"SELECT count(*) FROM \"NotificationOutbox\" WHERE \"eventKey\"='workorder.overdue' AND \"relatedEntityId\"='{wid}' AND \"recipientUserId\"='{me}';").strip()
+    check("worker: el RESPONSABLE recibe el aviso de plazo (ABAC por nodo)", owner_ov.isdigit() and int(owner_ov) >= 1, owner_ov)
+    esc_ov = sql(f"SELECT count(*) FROM \"NotificationOutbox\" WHERE \"eventKey\"='workorder.overdue' AND \"relatedEntityId\"='{wid}' AND \"recipientUserId\"='{ESC_USER}';").strip()
+    check("worker: ESCALAMIENTO — el rol superior (exclusivo) recibe el aviso", esc_ov.isdigit() and int(esc_ov) >= 1, esc_ov)
+    act_ov = sql(f"SELECT count(*) FROM \"NotificationOutbox\" WHERE \"eventKey\"='workorder.activity.overdue' AND \"relatedEntityId\"='{wid}';").strip()
+    check("worker: aviso workorder.activity.overdue (actividad del plan vencida)", act_ov.isdigit() and int(act_ov) >= 1, act_ov)
 
 
 def create_request(admin, tid, node, spec_id):
@@ -621,6 +739,9 @@ def main():
     # OT cerrada ⇒ ya no se registra avance → 400
     s, _ = call("POST", f"/work-orders/{wid4}/activities/{aid1}/progress", admin, {"status": "IN_PROGRESS"})
     check("avance tras cerrar la OT → 400", s == 400, str(s))
+
+    # ---- SLA / semáforos / vigía digital (S6) ----
+    test_sla(admin, me, node, spec_id)
 
     cleanup()
     print(f"\n{len(OK)}/{len(OK)+len(FAIL)} OK" + ("" if not FAIL else f"   FALLARON: {FAIL}"))

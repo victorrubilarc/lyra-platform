@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { folioSchemeSchema } from "./folio.js";
+import { workOrderTrafficLightSchema } from "./sla.js";
 import { workflowStateSchema, workflowTransitionSchema } from "../workflows/workflows.js";
 import { logEntryTransitionSchema } from "../log-entries/log-entries.js";
 
@@ -80,6 +81,14 @@ export const workOrderTypeSchema = z.object({
   executeStateKey: z.string().nullable(),
   /** Estado al que, al ENTRAR, se SUGIEREN los checklists de CIERRE (null = "en_revision_cierre"). S5b. */
   closureChecklistSuggestStateKey: z.string().nullable(),
+  // --- SLA light (S6, espejo IncidentType) -----------------------------------
+  /** Minutos desde la APROBACIÓN para auto-fijar `WorkOrder.dueAt` (override manual gana). null = sin plazo automático. */
+  resolutionDueMinutes: z.number().int().nullable(),
+  /** Minutos tras `dueAt` a partir de los que el aviso de plazo ESCALA al rol superior. null = sin escalamiento. */
+  escalationAfterMinutes: z.number().int().nullable(),
+  /** Rol al que escala el aviso de plazo (null = sin escalamiento). */
+  escalationRoleId: z.string().nullable(),
+  escalationRoleName: z.string().nullable(),
   active: z.boolean(),
   sortOrder: z.number().int(),
 });
@@ -137,6 +146,11 @@ export const workOrderListItemSchema = z.object({
   requesterName: z.string().nullable(),
   specialties: z.array(workOrderTagRefSchema),
   dueAt: z.string().nullable(),
+  // --- SLA / semáforos (S6, DERIVADO en el server, sin cron) ------------------
+  /** Semáforo de PLAZO: 🔴 vencida/actividad vencida · 🟡 por vencer · 🟢 en plazo · ⚪ sin plazo. */
+  slaStatus: workOrderTrafficLightSchema,
+  /** PERMANENCIA de estado excedida (maxStayMinutes). Indicador SEPARADO del semáforo de plazo (§21). */
+  stalled: z.boolean(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -334,6 +348,13 @@ export const workOrderListQuerySchema = z.object({
   mine: z.coerce.boolean().optional(),
   /** Solo sin responsable. */
   unassignedOnly: z.coerce.boolean().optional(),
+  /**
+   * Faceta del "vigía" (S6): filtra por salud del plazo/permanencia (sobre OT ABIERTAS).
+   *  - `overdue`  → plazo vencido o actividad vencida (🔴).
+   *  - `atRisk`   → por vencer dentro de la ventana de riesgo (🟡).
+   *  - `stalled`  → permanencia de estado excedida (maxStayMinutes).
+   */
+  slaStatus: z.enum(["overdue", "atRisk", "stalled"]).optional(),
   createdFrom: z.coerce.date().optional(),
   createdTo: z.coerce.date().optional(),
   sort: z.enum(["recent", "criticality", "priority", "due"]).optional(),
@@ -361,6 +382,13 @@ export const workOrderStatsSchema = z.object({
   unassigned: z.number().int(),
   /** Que exigen permiso de trabajo (PTW), abiertas o en borrador. */
   ptw: z.number().int(),
+  // --- Vigía (S6): salud del plazo/permanencia (sobre OT ABIERTAS) ------------
+  /** Abiertas con plazo vencido o actividad del plan vencida (🔴). */
+  overdue: z.number().int(),
+  /** Abiertas por vencer dentro de la ventana de riesgo (🟡). */
+  atRisk: z.number().int(),
+  /** Abiertas con permanencia de estado excedida (estancadas). */
+  stalled: z.number().int(),
 });
 export type WorkOrderStats = z.infer<typeof workOrderStatsSchema>;
 
@@ -388,6 +416,13 @@ export const upsertWorkOrderTypeRequestSchema = z.object({
   executeStateKey: z.string().trim().min(1).max(64).nullable().optional(),
   /** Estado que dispara la sugerencia de checklists de CIERRE. null/omitido = "en_revision_cierre". S5b. */
   closureChecklistSuggestStateKey: z.string().trim().min(1).max(64).nullable().optional(),
+  // --- SLA light (S6, espejo IncidentType) -----------------------------------
+  /** Minutos desde la aprobación para auto-fijar el plazo (dueAt). null/omitido = sin plazo automático. */
+  resolutionDueMinutes: z.number().int().min(1).max(525600).nullable().optional(),
+  /** Minutos tras el plazo a partir de los que el aviso escala. null/omitido = sin escalamiento. */
+  escalationAfterMinutes: z.number().int().min(1).max(525600).nullable().optional(),
+  /** Rol al que escala el aviso de plazo. null/omitido = sin escalamiento. */
+  escalationRoleId: z.string().min(1).nullable().optional(),
   active: z.boolean().optional(),
   sortOrder: z.number().int().min(0).max(9999).optional(),
 });

@@ -6,7 +6,7 @@ import { Button, Card, EmptyState, GridPager, Input, Select, Spinner } from "@ly
 import { usePermissions } from "../../auth/use-permissions.js";
 import { useWorkOrderSpecialties, useWorkOrderStats, useWorkOrderTypes, useWorkOrders } from "./work-orders-queries.js";
 import { CreateWorkOrderModal } from "./CreateWorkOrderModal.js";
-import { LIFECYCLE_META, ORIGIN_META, PRIORITY_META, criticalityColor, criticalityLabel } from "./work-orders-presentation.js";
+import { LIFECYCLE_META, ORIGIN_META, PRIORITY_META, SLA_STATUS_META, criticalityColor, criticalityLabel } from "./work-orders-presentation.js";
 import styles from "./work-orders.module.css";
 
 type FlagKey = "" | "mine" | "unassignedOnly" | "requiresPtw";
@@ -34,6 +34,7 @@ export function WorkOrdersPage() {
   const [criticality, setCriticality] = useState("");
   const [priority, setPriority] = useState<WorkOrderListQuery["priority"] | "">("");
   const [specialtyId, setSpecialtyId] = useState("");
+  const [slaStatus, setSlaStatus] = useState<WorkOrderListQuery["slaStatus"] | "">("");
   const [flag, setFlag] = useState<FlagKey>("");
   const [sort, setSort] = useState<WorkOrderListQuery["sort"]>("recent");
 
@@ -45,13 +46,18 @@ export function WorkOrdersPage() {
       criticality: criticality ? Number(criticality) : undefined,
       priority: priority || undefined,
       specialtyId: specialtyId || undefined,
+      slaStatus: slaStatus || undefined,
       sort,
       ...(flag ? { [flag]: true } : {}),
       page,
       pageSize,
     }),
-    [search, lifecycle, typeId, criticality, priority, specialtyId, sort, flag, page, pageSize],
+    [search, lifecycle, typeId, criticality, priority, specialtyId, slaStatus, sort, flag, page, pageSize],
   );
+  /** Aplica una faceta del vigía: acota a ABIERTAS + el estado SLA, y ordena por plazo. */
+  const applySla = (s: NonNullable<WorkOrderListQuery["slaStatus"]>) => {
+    setLifecycle("OPEN"); setSlaStatus(s); setFlag(""); setCriticality(""); setSort(s === "stalled" ? "recent" : "due"); setPage(1);
+  };
 
   const { data, isLoading } = useWorkOrders(query);
   const { data: stats } = useWorkOrderStats();
@@ -88,6 +94,9 @@ export function WorkOrdersPage() {
           <Kpi label="Críticas" value={stats.critical} color="#EF4444" onClick={() => { setLifecycle("OPEN"); setCriticality("5"); setPage(1); }} />
           <Kpi label="Sin responsable" value={stats.unassigned} color="#EAB308" onClick={() => { setLifecycle("OPEN"); setFlag("unassignedOnly"); setPage(1); }} />
           <Kpi label="Con PTW" value={stats.ptw} color="#F97316" onClick={() => { setLifecycle(""); setFlag("requiresPtw"); setPage(1); }} />
+          <Kpi label="Vencidas" value={stats.overdue} color="var(--color-error)" onClick={() => applySla("overdue")} />
+          <Kpi label="Por vencer" value={stats.atRisk} color="var(--color-warning)" onClick={() => applySla("atRisk")} />
+          <Kpi label="Estancadas" value={stats.stalled} color="var(--color-text-secondary)" onClick={() => applySla("stalled")} />
         </div>
       )}
 
@@ -119,6 +128,12 @@ export function WorkOrdersPage() {
           <option value="">Todas las especialidades</option>
           {specialties.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
         </Select>
+        <Select value={slaStatus} onChange={(e) => { setSlaStatus(e.target.value as typeof slaStatus); setPage(1); }} className={styles.fixedSel}>
+          <option value="">Plazo (todos)</option>
+          <option value="overdue">Vencidas</option>
+          <option value="atRisk">Por vencer</option>
+          <option value="stalled">Estancadas</option>
+        </Select>
         <Select value={flag} onChange={(e) => { setFlag(e.target.value as FlagKey); setPage(1); }} className={styles.fixedSel}>
           <option value="">Todas</option>
           <option value="mine">Mías</option>
@@ -144,6 +159,7 @@ export function WorkOrdersPage() {
             <table className={styles.table}>
               <thead>
                 <tr>
+                  <th title="Semáforo de plazo"><span className={styles.srOnly}>SLA</span></th>
                   <th>Folio</th><th>Título</th><th>Tipo</th><th>Crit.</th><th>Prioridad</th><th>Estado</th><th>Nodo</th><th>Responsable</th><th>Especialidades</th>
                 </tr>
               </thead>
@@ -155,8 +171,19 @@ export function WorkOrdersPage() {
                     onClick={() => openDetail(w.id)}
                     ref={w.id === lastViewed ? (el) => el?.scrollIntoView({ block: "center" }) : undefined}
                   >
+                    <td>
+                      <span
+                        className={styles.slaDot}
+                        style={{ background: SLA_STATUS_META[w.slaStatus].color }}
+                        title={w.dueAt ? `${SLA_STATUS_META[w.slaStatus].label} · vence ${new Date(w.dueAt).toLocaleString()}` : SLA_STATUS_META[w.slaStatus].label}
+                      />
+                    </td>
                     <td className={styles.mono}>{w.code}</td>
-                    <td className={styles.titleCell}>{w.title}{w.requiresPtw && <span className={styles.ptwTag}>PTW</span>}</td>
+                    <td className={styles.titleCell}>
+                      {w.title}
+                      {w.requiresPtw && <span className={styles.ptwTag}>PTW</span>}
+                      {w.stalled && <span className={styles.stalledTag} title="Lleva demasiado tiempo en su estado actual">Estancada</span>}
+                    </td>
                     <td>{w.typeName ?? "—"}</td>
                     <td><span className={styles.sevDot} style={{ background: criticalityColor(w.criticality) }} title={`Criticidad ${w.criticality}`} /> {w.criticality}</td>
                     <td><span className={styles.priText} style={{ color: PRIORITY_META[w.priority].color }}>{PRIORITY_META[w.priority].label}</span></td>

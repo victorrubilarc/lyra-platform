@@ -6,18 +6,20 @@ import { WorkOrdersController } from "./work-orders.controller";
 import { WorkOrdersService } from "./work-orders.service";
 import { WorkOrderChecklistsService } from "./work-order-checklists.service";
 import { WorkActivitiesService } from "./work-activities.service";
+import { WorkOrderSlaService } from "./work-order-sla.service";
 
 /**
  * Órdenes de Trabajo / Work Orders (OT / PTW) — S1 cimientos + S2 Puerta 1 + S3
- * Puerta 2 (checklists/PTW). Espejo de Incidencias. Depende de AuthModule para
- * `ReauthService` (firma Part 11), FolioModule para el folio gapless y LogEntriesModule
- * para instanciar checklists como `LogEntry` vivos (fork W5). Prisma, Audit y
- * ScopeService llegan por módulos globales.
+ * Puerta 2 (checklists/PTW) + S6 SLA/semáforos. Espejo de Incidencias. Depende de
+ * AuthModule para `ReauthService` (firma Part 11), FolioModule para el folio gapless
+ * y LogEntriesModule para instanciar checklists como `LogEntry` vivos (fork W5).
+ * `WorkOrderSlaService` (S6) detecta vencimientos; lo consume el sweeper del Bloque N.
+ * Prisma, Audit y ScopeService llegan por módulos globales.
  */
 @Module({
   imports: [AuthModule, FolioModule, LogEntriesModule],
   controllers: [WorkOrdersController],
-  providers: [WorkOrdersService, WorkOrderChecklistsService, WorkActivitiesService],
-  exports: [WorkOrdersService, WorkOrderChecklistsService, WorkActivitiesService],
+  providers: [WorkOrdersService, WorkOrderChecklistsService, WorkActivitiesService, WorkOrderSlaService],
+  exports: [WorkOrdersService, WorkOrderChecklistsService, WorkActivitiesService, WorkOrderSlaService],
 })
 export class WorkOrdersModule {}

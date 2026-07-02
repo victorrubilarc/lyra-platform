@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import type { UpsertWorkOrderTypeRequest, WorkOrderTypeDto } from "@lyra/contracts";
 import { Button, Input, Modal, Select, Textarea, Toggle, useToast } from "@lyra/ui";
 import { useWorkflows } from "../workflows/workflows-queries.js";
+import { useRoles } from "../security/security-queries.js";
+import { SlaDurationField } from "../workflows/SlaDurationField.js";
 import { useUpsertWorkOrderType } from "./work-orders-queries.js";
 import { CATALOG_COLOR_SWATCHES, criticalityLabel } from "./work-orders-presentation.js";
 import styles from "./catalogs.module.css";
@@ -22,6 +24,7 @@ export function WorkOrderTypeModal({ open, onClose, type, existingKeys }: Props)
   const toast = useToast();
   const upsert = useUpsertWorkOrderType();
   const { data: workflows = [] } = useWorkflows({ status: "PUBLISHED" });
+  const { data: roles = [] } = useRoles();
   const isEdit = type !== null;
 
   const [name, setName] = useState("");
@@ -31,6 +34,9 @@ export function WorkOrderTypeModal({ open, onClose, type, existingKeys }: Props)
   const [defaultWorkflowId, setDefaultWorkflowId] = useState("");
   const [requiresPtwDefault, setRequiresPtwDefault] = useState(false);
   const [criticalityDefault, setCriticalityDefault] = useState<string>("");
+  const [resolutionDueMinutes, setResolutionDueMinutes] = useState<number | null>(null);
+  const [escalationAfterMinutes, setEscalationAfterMinutes] = useState<number | null>(null);
+  const [escalationRoleId, setEscalationRoleId] = useState("");
   const [sortOrder, setSortOrder] = useState(0);
 
   useEffect(() => {
@@ -39,9 +45,12 @@ export function WorkOrderTypeModal({ open, onClose, type, existingKeys }: Props)
       setName(type.name); setKey(type.key); setDescription(type.description ?? ""); setColor(type.color ?? "");
       setDefaultWorkflowId(type.defaultWorkflowId ?? ""); setRequiresPtwDefault(type.requiresPtwDefault);
       setCriticalityDefault(type.criticalityDefault != null ? String(type.criticalityDefault) : ""); setSortOrder(type.sortOrder);
+      setResolutionDueMinutes(type.resolutionDueMinutes); setEscalationAfterMinutes(type.escalationAfterMinutes);
+      setEscalationRoleId(type.escalationRoleId ?? "");
     } else {
       setName(""); setKey(""); setDescription(""); setColor(""); setDefaultWorkflowId("");
       setRequiresPtwDefault(false); setCriticalityDefault(""); setSortOrder(0);
+      setResolutionDueMinutes(null); setEscalationAfterMinutes(null); setEscalationRoleId("");
     }
   }, [open, type]);
 
@@ -62,6 +71,9 @@ export function WorkOrderTypeModal({ open, onClose, type, existingKeys }: Props)
       defaultWorkflowId: defaultWorkflowId || null,
       requiresPtwDefault,
       criticalityDefault: criticalityDefault ? Number(criticalityDefault) : null,
+      resolutionDueMinutes: resolutionDueMinutes ?? null,
+      escalationAfterMinutes: escalationAfterMinutes ?? null,
+      escalationRoleId: escalationRoleId || null,
       sortOrder,
     };
     upsert.mutate(
@@ -140,6 +152,26 @@ export function WorkOrderTypeModal({ open, onClose, type, existingKeys }: Props)
               <div className={styles.muted}>Las OT de este tipo prellenan "Requiere PTW" (trabajo de alto riesgo: LOTO, altura, espacio confinado…).</div>
             </div>
           </div>
+        </div>
+
+        {/* SLA de resolución + escalamiento (S6 — vigía digital) */}
+        <div className={styles.field}><span className={styles.fieldLabel}>Plazo de resolución (SLA)</span>
+          <SlaDurationField key={`res-${type?.id ?? "new"}`} minutes={resolutionDueMinutes} onChange={setResolutionDueMinutes} />
+          <span className={styles.muted}>Al APROBAR la OT se fija su plazo automáticamente (aprobación + este tiempo). El responsable puede sobrescribirlo. Vacío = sin plazo automático.</span>
+        </div>
+
+        <div className={styles.formRow}>
+          <label className={styles.field}><span className={styles.fieldLabel}>Escalar tras el plazo</span>
+            <SlaDurationField key={`esc-${type?.id ?? "new"}`} minutes={escalationAfterMinutes} onChange={setEscalationAfterMinutes} />
+            <span className={styles.muted}>Tiempo adicional, ya vencido el plazo, antes de avisar también al rol superior.</span>
+          </label>
+          <label className={styles.field}><span className={styles.fieldLabel}>Rol de escalamiento</span>
+            <Select value={escalationRoleId} onChange={(e) => setEscalationRoleId(e.target.value)}>
+              <option value="">(sin escalamiento)</option>
+              {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+            </Select>
+            <span className={styles.muted}>Recibe el aviso de plazo cuando se supera el tiempo de escalamiento.</span>
+          </label>
         </div>
       </div>
     </Modal>

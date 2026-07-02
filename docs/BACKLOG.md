@@ -5,7 +5,19 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-07-02** — **🔧 OT · Sesión 5b · Slice B · Checklists de EJECUCIÓN por actividad + Gobierno 2 ✅ → COMPLETA el §11**
+> actualización: **2026-07-02** — **🔧 OT · Sesión 6 · SLA, avisos de plazo, escalamiento y semáforos ("vigía digital") ✅**
+> (`feat/ot-sla-semaforos`): ESPEJO de la Fase 4.4 de Incidencias. **SIN migración** (columnas SLA del `WorkOrderType`,
+> `WorkOrder.dueAt`, `WorkActivity.baselineEnd/plannedEnd` YA latentes) y **SIN permiso nuevo** (avisos no gatean; SLA del tipo =
+> `workordercatalog:manage`, plazo = `workorder:edit`; 102 sin cambio, sin FLUSHALL). **3 eventos** `workorder.overdue` (plazo
+> `dueAt`, escala), `workorder.stalled` (permanencia `maxStayMinutes`), `workorder.activity.overdue` (fin baseline/planificado);
+> descarté `sla.breached` (redundante con overdue). **`dueAt` se ancla AL APROBAR** (override manual gana) + `DUE_CHANGED`.
+> Helpers puros `work-orders/sla.ts` (+ semáforo `workOrderTrafficLight`, ventana `AT_RISK_WINDOW_MINUTES`=48 h); `WorkOrderSlaService.findBreaches()`
+> barrido en `NotificationWorkerService.sweep()` + resolvers (owner + roles del estado + escalamiento, ABAC). Grilla: columna
+> semáforo + chip "Estancada" + KPIs Vencidas/Por vencer/Estancadas + filtro `slaStatus`; Object Page: chip + plazo editable;
+> `WorkOrderTypeModal` gana los campos SLA. Seed: 3 plantillas de notificación. verde + contracts **448** + `smoke-workorders.py`
+> **122/122** + regresión incidencias **32/32** + notif-inapp **18/18** + notif-avanzadas **22/22** (el base `smoke-notificaciones.py`
+> 13/18 = 5 fallos de correo/SMTP desactivado en dev, preexistentes/ajenos a S6). Pendiente: smoke VISUAL (dueño). **Siguiente =
+> OT S7 (Dashboard de OT + Incidencia→OT).** Antes: **🔧 OT · Sesión 5b · Slice B · Checklists de EJECUCIÓN por actividad + Gobierno 2 ✅ → COMPLETA el §11**
 > (`feat/ot-ejecucion-gobierno2`): `WorkOrderChecklist.workActivityId` (→ `WorkActivity` SetNull; unique
 > `(workOrderId, templateId, workActivityId)` — NULL distinto ⇒ anti-duplicado de nivel-OT por código) + `WorkOrder.executionSetConfirmedAt/ById`
 > (migr. aditiva `20260702220000`). El **set de EJECUCIÓN** se materializa por actividad al PREPARAR (una fila por actividad ×
@@ -821,9 +833,14 @@ nunca queda más de una sesión atrás.
         `20260702220000`. UI: «Verificaciones» grupo EJECUCIÓN sub-agrupado por actividad + banner/botón «Confirmar set de
         ejecución» + indicador en «Plan». Sin permiso nuevo. `smoke-workorders.py` **108/108** + incidencias 32/32. **Cierra §11.**
         DECISIONS 2026-07-02 (Slice B).
-- [ ] **Sesión 6 — Alertas, SLA y semáforos / "vigía digital" (~40 HH):** eventos `workorder.overdue`/`.activity.overdue`/
-      `.stalled`/`.sla.breached`; curva de alerta (esperado vs real / incoherencia); escalamiento democratizado; semáforos
-      + panel de seguimiento activo. Reusa Bloque N + `findBreaches`.
+- [x] **Sesión 6 — Alertas, SLA y semáforos / "vigía digital" ✅ (`feat/ot-sla-semaforos`, 2026-07-02):** 3 eventos
+      `workorder.overdue`/`.stalled`/`.activity.overdue` (se descartó `.sla.breached` por redundante con overdue: `resolutionDueMinutes`
+      CALCULA `dueAt`, no es un evento) + escalamiento OT-level (1 nivel, re-aviso diario) + semáforo `workOrderTrafficLight`
+      (columna+chip) + KPIs/filtro `slaStatus` sobre la grilla existente (el "panel de seguimiento" NO es vista nueva). `dueAt`
+      ancla AL APROBAR (override manual gana). ESPEJO Fase 4.4 (clon `IncidentSlaService`/resolvers/helpers). Reusa Bloque N +
+      `WorkOrderSlaService.findBreaches`. Sin migración/permiso nuevo. contracts 448 + smoke-workorders 122/122. **DEFERIDO a
+      futuro (no pedido):** curva de alerta esperado-vs-real / detección de incoherencia del avance; escalamiento multinivel (S8);
+      breach de permanencia (`stalled`) sólo se ve si el flujo configura `maxStayMinutes` por estado (hoy el seed no lo hace).
 - [ ] **Sesión 7 — Dashboard de OT + integración Incidencia→OT (~40 HH):** `WorkOrderDashboardService` (clon del de
       incidencias: KPIs, cuellos de botella, tendencia, drill-down, export CSV); botón "Generar OT" desde incidencia/
       excepción/bitácora con enlace bidireccional. **Fin del paquete comercial recomendado.**

@@ -226,7 +226,7 @@ function OutboxPanel() {
 type TplField = "subject" | "bodyText" | "bodyHtml";
 type TplDraft = { subject: string; bodyText: string; bodyHtml: string; active: boolean };
 
-const GROUP_LABEL: Record<string, string> = { schedules: "Rondas", logbook: "Bitácoras", incidents: "Incidencias" };
+const GROUP_LABEL: Record<string, string> = { schedules: "Rondas", logbook: "Bitácoras", incidents: "Incidencias", workorders: "Órdenes de trabajo", handover: "Cambio de turno" };
 
 function TemplatesPanel() {
   const { t } = useTranslation();
