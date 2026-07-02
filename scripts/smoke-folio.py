@@ -19,11 +19,20 @@ Requiere el dev arriba (API :3000). Crea y LIMPIA sus propios datos por id.
 Admin: demo@watchlog.local / Demo!Pass2026.
 """
 import json
+import re
 import subprocess
 import sys
+import unicodedata
 import urllib.error
 import urllib.request
 from datetime import datetime
+
+
+def norm_segment(raw: str) -> str:
+    """Réplica de normalizeFolioSegment: MAYÚSCULAS, sin tildes, sólo [A-Z0-9]."""
+    s = unicodedata.normalize("NFD", raw or "")
+    s = "".join(c for c in s if unicodedata.category(c) != "Mn")
+    return re.sub(r"[^A-Z0-9]", "", s.upper())
 
 BASE = "http://localhost:3000/api"
 ADMIN = "demo@watchlog.local"
@@ -212,6 +221,18 @@ def part_b(admin, node):
     items = lst.get("items", []) if isinstance(lst, dict) else []
     got = next((it.get("folio") for it in items if it.get("templateId") == tid1 and it.get("folio")), None)
     check("el LISTADO de bitácoras expone el folio propio de la plantilla", got is not None and got.startswith("RTSMK-"), str(got))
+
+    # (5) Ámbito POR NODO: el folio inyecta el CÓDIGO del nodo como segmento visible.
+    nodes = call("GET", "/structure/nodes", admin)[1]
+    node_obj = next((n for n in nodes if n["id"] == node), nodes[0])
+    raw = node_obj.get("code") or node_obj.get("externalCode") or node_obj.get("name") or ""
+    seg = norm_segment(raw)
+    tid3 = make_template(admin, node, "Folio Smoke por NODO", {"prefix": "RN", "scope": "node"})
+    seq_keys.append(f"logentry|node:{node}|{YEAR}")
+    s, sealed3 = seal_entry(admin, tid3, node)
+    folio3 = sealed3.get("folio") if isinstance(sealed3, dict) else None
+    check("ámbito por nodo: el folio incluye el CÓDIGO del nodo (RN-‹CODE›-AAAA-0001)",
+          folio3 == f"RN-{seg}-{YEAR}-0001" and bool(seg), f"{folio3} (seg={seg})")
 
 
 def main():

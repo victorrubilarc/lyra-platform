@@ -450,6 +450,10 @@
   ("BIT-######"). Default (cuando el esquema existe pero omite ejes) = `DEFAULT_LOG_ENTRY_FOLIO_SCHEME` (scope `type`=**por
   plantilla**, anual, prefijo "DOC"). Emitido al SELLAR (ver `LogEntry.folio`). NO es parte de la versión inmutable (SAP number
   range / NetSuite auto-numbering: la numeración por tipo de doc es config mutable, no de la definición). Auditado before/after.
+  **Ámbito completo (2026-07-02, `feat/folio-ambito-visible`):** con `scope` `node`/`structure` el folio inyecta el **código**
+  del nodo/estructura como segmento visible (`renderFolio(..., {scopeCode})` + `normalizeFolioSegment`; el backend resuelve
+  `orgNode.code ?? externalCode ?? name` / `structure.key ?? name`), p.ej. `RT-NORTE-2026-0001`; `type`/`global` no agregan
+  segmento (cero regresión). La unicidad la garantiza el contador por ID; el segmento es la etiqueta humana. Máscara: token `{SCOPE}`.
 - **`LogEntry.folio` / `LogEntry.folioSeqKey`** (`String?`, misma migración) — folio HUMANO de documento propio de la plantilla
   (`folio`) + clave de secuencia usada (`folioSeqKey`, auditoría del contador). Se emite **al SELLAR** (`submit()` sin flujo o
   1ª salida del estado inicial en `executeTransition()`), DENTRO de la tx (gapless: `FolioService.next(tx, seqKey)`), sólo si

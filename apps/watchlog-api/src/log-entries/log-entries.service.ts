@@ -54,6 +54,7 @@ import {
   isPresentationalType,
   isSectionEditableInState,
   maxAttachmentBytes,
+  normalizeFolioSegment,
   pruneEmptyTableRows,
   recomputeComputedValues,
   renderFolio,
@@ -1842,10 +1843,23 @@ export class LogEntriesService {
     const tmpl = await tx.template.findUnique({ where: { id: entry.templateId }, select: { folioScheme: true } });
     if (!tmpl?.folioScheme) return null; // plantilla sin esquema ⇒ correlativo global
     const scheme = resolveLogEntryFolioScheme(tmpl.folioScheme);
+    // El ámbito por nodo/estructura parte el contador Y aporta un SEGMENTO VISIBLE al
+    // folio (código del nodo/estructura) para distinguir series a simple vista.
     let structureId: string | null = null;
-    if (scheme.scope === "structure") {
-      const node = await tx.orgNode.findUnique({ where: { id: entry.orgNodeId }, select: { structureId: true } });
+    let scopeCode: string | null = null;
+    if (scheme.scope === "node") {
+      const node = await tx.orgNode.findUnique({
+        where: { id: entry.orgNodeId },
+        select: { code: true, externalCode: true, name: true },
+      });
+      scopeCode = normalizeFolioSegment(node?.code ?? node?.externalCode ?? node?.name ?? null);
+    } else if (scheme.scope === "structure") {
+      const node = await tx.orgNode.findUnique({
+        where: { id: entry.orgNodeId },
+        select: { structureId: true, structure: { select: { key: true, name: true } } },
+      });
       structureId = node?.structureId ?? null;
+      scopeCode = normalizeFolioSegment(node?.structure?.key ?? node?.structure?.name ?? null);
     }
     const year = this.folio.plantYear(now);
     const seqKey = buildFolioSeqKey(scheme, {
@@ -1856,7 +1870,7 @@ export class LogEntriesService {
       year,
     });
     const seq = await this.folio.next(tx, seqKey, scheme.start);
-    return { folio: renderFolio(scheme, seq, { year }), seqKey };
+    return { folio: renderFolio(scheme, seq, { year, scopeCode }), seqKey };
   }
 
   /** Interno: versión de plantilla congelada con su grafo completo. */

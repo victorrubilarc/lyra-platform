@@ -724,7 +724,10 @@ hoy el selector ofrece todas las plantillas publicadas. Ver DECISIONS 2026-07-02
   vez del correlativo general del sistema (`BIT-000123`). Se configura con el **mismo editor visual** que
   el folio de los **tipos de OT** (`FolioSchemeEditor`): prefijo · ámbito de la serie (por plantilla /
   nodo / estructura / global) · reinicio (nunca / anual) · relleno · número inicial · máscara opcional
-  con tokens `{PREFIX}`/`{YYYY}`/`{SEQ}` · **vista previa en vivo** + aviso de colisiones.
+  con tokens `{PREFIX}`/`{YYYY}`/`{SEQ}`/`{SCOPE}` · **vista previa en vivo** + aviso de colisiones.
+- **El ámbito es completo**: elegir *por nodo* o *por estructura* no sólo parte el contador, también
+  **inyecta el código** del nodo/estructura como segmento visible (`RT-NORTE-2026-0001`) para distinguir
+  las series a simple vista. *Por plantilla* / *global* no agregan segmento (el prefijo ya distingue).
 - **Vive en el contenedor MUTABLE** (`Template.folioScheme`), no en la versión inmutable: cambiar el
   prefijo NO obliga a republicar (patrón SAP *number range* / NetSuite *auto-numbering* por tipo de doc).
 - **Se emite al SELLAR** (no al abrir el borrador) ⇒ los borradores abandonados/anulados no gastan número

@@ -6,6 +6,7 @@ import {
   folioSchemeWarnings,
   renderFolio,
   resolveFolioSchemeWith,
+  scopeRendersSegment,
   type FolioReset,
   type FolioScheme,
   type FolioScope,
@@ -65,16 +66,21 @@ export function FolioSchemeEditor({
   const resolved = useMemo(() => resolveFolioSchemeWith(value ?? {}, defaultScheme), [value, defaultScheme]);
   const year = new Date().getFullYear();
 
+  // El ámbito por nodo/estructura inyecta un segmento visible (código del nodo/estructura).
+  // En la vista previa usamos un marcador ilustrativo del ámbito elegido.
+  const scopeSample = resolved.scope === "node" ? "NODO" : resolved.scope === "structure" ? "ESTRUCT" : null;
+  const showsSegment = scopeRendersSegment(resolved.scope);
+
   const preview = useMemo(() => {
     try {
       return [
-        renderFolio(resolved, resolved.start, { year }),
-        renderFolio(resolved, resolved.start + 1, { year }),
+        renderFolio(resolved, resolved.start, { year, scopeCode: scopeSample }),
+        renderFolio(resolved, resolved.start + 1, { year, scopeCode: scopeSample }),
       ];
     } catch {
       return null;
     }
-  }, [resolved, year]);
+  }, [resolved, year, scopeSample]);
 
   const seqKeyExample = useMemo(() => {
     try {
@@ -148,6 +154,12 @@ export function FolioSchemeEditor({
                 </option>
               ))}
             </Select>
+            {showsSegment && (
+              <span className={styles.muted}>
+                El folio incluirá el <strong>código</strong> del {resolved.scope === "node" ? "nodo" : "la estructura"} (o su clave
+                si no tiene código) para distinguir cada serie: <code>{scopeSample}</code>.
+              </span>
+            )}
           </label>
 
           <label className={styles.field}>
@@ -206,8 +218,9 @@ export function FolioSchemeEditor({
               onChange={(e) => update({ mask: e.target.value.trim() || undefined })}
             />
             <span className={styles.muted}>
-              Tokens disponibles: <code>{"{PREFIX}"}</code> <code>{"{YYYY}"}</code> <code>{"{SEQ}"}</code>. Vacío = formato
-              estándar (PREFIJO-AÑO-N.º).
+              Tokens: <code>{"{PREFIX}"}</code> <code>{"{YYYY}"}</code> <code>{"{SEQ}"}</code>
+              {showsSegment && <> <code>{"{SCOPE}"}</code> (código del ámbito)</>}. Vacío = formato estándar
+              (PREFIJO{showsSegment ? "-ÁMBITO" : ""}-AÑO-N.º).
             </span>
           </label>
         </div>
@@ -223,6 +236,12 @@ export function FolioSchemeEditor({
           </div>
         ) : (
           <div className={styles.muted}>{fallbackHint}</div>
+        )}
+        {enabled && showsSegment && (
+          <div className={styles.muted}>
+            <code>{scopeSample}</code> es un ejemplo: en cada registro se reemplaza por el código real del{" "}
+            {resolved.scope === "node" ? "nodo" : "la estructura"}.
+          </div>
         )}
         {enabled && <div className={styles.seqKey}>Clave de secuencia: <code>{seqKeyExample}</code></div>}
       </div>

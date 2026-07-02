@@ -1153,11 +1153,17 @@ activa **«Folio propio para esta plantilla»** y ajusta:
 - **Prefijo** — el texto inicial (ej. `RT`, `PT`, `RONDA`).
 - **Ámbito de la serie** — una serie **por plantilla** (lo habitual: cada plantilla numera aparte),
   o **por nodo** / **por estructura** (una serie distinta por planta/área) o una **serie única global**.
+  Cuando eliges **por nodo** o **por estructura**, el folio **incluye automáticamente el código** de ese
+  nodo/estructura, para que las series se distingan a simple vista: p. ej. `RT-NORTE-2026-0001` y
+  `RT-SUR-2026-0001` (cada planta lleva su propia cuenta *y se ve cuál es*). El código sale del **código**
+  del nodo (o su clave si no tiene). Con *serie única global* o *por plantilla* no se agrega ese segmento
+  (el prefijo ya distingue).
 - **Reinicio** — **anual** (el número vuelve a 1 cada año, ej. `RT-2026-0001`, `RT-2027-0001`) o **sin
   reinicio** (crece para siempre).
 - **Relleno** de ceros y **correlativo inicial** (empezar en 1, 500, 1000…).
 - **Máscara** (opcional) para un formato a medida con los tokens `{PREFIX}` `{YYYY}` `{SEQ}`
-  (ej. `{PREFIX}/{YYYY}/{SEQ}` → `RT/2026/0001`).
+  (y `{SCOPE}` = el código del nodo/estructura cuando el ámbito es por nodo/estructura), ej.
+  `{PREFIX}/{SCOPE}/{YYYY}/{SEQ}` → `RT/NORTE/2026/0001`.
 La **vista previa en vivo** muestra cómo quedarán los dos primeros folios mientras editas, y avisa si
 la combinación elegida podría **repetir** folios.
 

@@ -122,22 +122,60 @@ export function buildFolioSeqKey(scheme: ResolvedFolioScheme, ctx: FolioSeqKeyCo
 }
 
 /**
- * Renderiza el folio humano a partir del correlativo asignado. Con `mask` usa los
- * tokens `{PREFIX}`/`{YYYY}`/`{SEQ}`; sin máscara, el formato canónico
- * "PREFIX-YYYY-SEQ" (reset anual) o "PREFIX-SEQ" (sin reinicio). El padding nunca
- * trunca: un correlativo más largo que el ancho se imprime completo.
+ * Normaliza un código de ámbito (código de nodo/estructura) a un segmento seguro para
+ * el folio: MAYÚSCULAS y sólo `[A-Z0-9]` (quita espacios, guiones, barras, tildes…).
+ * Devuelve `null` si queda vacío. PURO. La UNICIDAD real la garantiza el contador por
+ * ID (`buildFolioSeqKey`); este segmento es la etiqueta HUMANA que distingue el ámbito.
  */
-export function renderFolio(scheme: ResolvedFolioScheme, seq: number, ctx: { year: number }): string {
+export function normalizeFolioSegment(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const seg = raw
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "") // quita diacríticos (Á→A)
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
+  return seg.length > 0 ? seg : null;
+}
+
+/**
+ * Renderiza el folio humano a partir del correlativo asignado.
+ *
+ * El **ámbito** por nodo/estructura no sólo parte el contador: también aporta un
+ * **segmento VISIBLE** al folio (`ctx.scopeCode`), para que dos series distintas se
+ * distingan a simple vista (`RT-NORTE-2026-0001` vs `RT-SUR-2026-0001`). El llamador
+ * (backend) resuelve el código del nodo/estructura y lo pasa ya normalizado; para
+ * `global`/`type` no se pasa código (el prefijo es el discriminador). *(Diseño 2026-07-02
+ * "el ámbito completo": elegir el ámbito define contador Y etiqueta.)*
+ *
+ * Con `mask` usa los tokens `{PREFIX}`/`{YYYY}`/`{SEQ}`/`{SCOPE}` (`{SCOPE}` = el código
+ * de ámbito, vacío si no aplica); sin máscara, el formato canónico
+ * "PREFIX[-SCOPE]-YYYY-SEQ" (reset anual) o "PREFIX[-SCOPE]-SEQ" (sin reinicio). El
+ * padding nunca trunca: un correlativo más largo que el ancho se imprime completo.
+ */
+export function renderFolio(
+  scheme: ResolvedFolioScheme,
+  seq: number,
+  ctx: { year: number; scopeCode?: string | null },
+): string {
   const seqText = String(seq).padStart(scheme.padding, "0");
+  const scopeCode = ctx.scopeCode || null;
   if (scheme.mask) {
     return scheme.mask
       .replaceAll("{PREFIX}", scheme.prefix)
       .replaceAll("{YYYY}", String(ctx.year))
-      .replaceAll("{SEQ}", seqText);
+      .replaceAll("{SEQ}", seqText)
+      .replaceAll("{SCOPE}", scopeCode ?? "");
   }
-  return scheme.reset === "annual"
-    ? `${scheme.prefix}-${ctx.year}-${seqText}`
-    : `${scheme.prefix}-${seqText}`;
+  const parts = [scheme.prefix];
+  if (scopeCode) parts.push(scopeCode);
+  if (scheme.reset === "annual") parts.push(String(ctx.year));
+  parts.push(seqText);
+  return parts.join("-");
+}
+
+/** ¿El ámbito aporta un segmento VISIBLE al folio? Sólo nodo/estructura (transversales). */
+export function scopeRendersSegment(scope: FolioScope): boolean {
+  return scope === "node" || scope === "structure";
 }
 
 /**
@@ -166,10 +204,21 @@ export function folioSchemeWarnings(
   if (scheme.mask && !maskHasSeq) {
     warnings.push("La máscara no incluye el token {SEQ}: sin el correlativo, todos los folios serían iguales.");
   }
-  if (domain === "global" && scheme.scope !== "global") {
+  // Ámbito por TIPO bajo unicidad global: el tipo NO se dibuja en el folio (a diferencia
+  // de nodo/estructura, que sí aportan su código), así que dos tipos colisionan salvo
+  // prefijo distinto. (Nodo/estructura ya no se avisan: el ámbito inyecta su segmento.)
+  if (domain === "global" && scheme.scope === "type") {
     warnings.push(
-      "Con ámbito por tipo/nodo/estructura y folio único global, dos series podrían generar el MISMO folio. " +
+      "Con ámbito por tipo y folio único global, dos tipos podrían generar el MISMO folio. " +
         "Asegúrate de que cada tipo use un prefijo distinto, o usa ámbito global.",
+    );
+  }
+  // Con máscara propia, el ámbito por nodo/estructura sólo aparece si el diseñador pone
+  // {SCOPE}; si falta, dos nodos/estructuras repetirían folio a la vista.
+  if (scheme.mask && scopeRendersSegment(scheme.scope) && !scheme.mask.includes("{SCOPE}")) {
+    warnings.push(
+      "El ámbito por nodo/estructura no aparece en la máscara: agrega el token {SCOPE} " +
+        "o dos nodos/estructuras podrían mostrar el mismo folio.",
     );
   }
   if (scheme.reset === "annual" && scheme.mask && !scheme.mask.includes("{YYYY}")) {

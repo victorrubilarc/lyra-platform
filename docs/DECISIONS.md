@@ -4,6 +4,20 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-02 · Folio — "el ámbito completo" (segmento visible por nodo/estructura)
+Corrección de diseño que planteó el dueño revisando el editor: dije que "faltaba un token `{NODE}` en la máscara"; él
+respondió, con razón, que **el problema es el ámbito, no la máscara**. Elegir "por nodo" partía el contador pero **no se
+reflejaba** en el folio (dos nodos → mismo `RT-2026-0001`), así que el ámbito estaba a medio construir. **Decisión: el ámbito
+es completo** — elegirlo define el contador *y* la etiqueta. Por nodo/estructura el folio **inyecta automáticamente** el
+código del nodo/estructura como segmento (`RT-NORTE-2026-0001`); por tipo/global no agrega segmento (el prefijo ya distingue,
+y así no se rompe el default OT `OT-2026-0001` ni el de bitácora `RT-2026-0001`). El código sale del `code`/`externalCode`/
+`name` del nodo (o `key`/`name` de la estructura), normalizado a `[A-Z0-9]`. La máscara mantiene un token `{SCOPE}` para
+ubicarlo manualmente; los avisos se recablearon (nodo/estructura ya no colisionan porque muestran su código). Es un cambio
+**aditivo/retrocompatible**: los folios ya emitidos son inmutables, y la unicidad real la sigue dando el contador por ID.
+Por qué así y no un `{NODE}` manual en la máscara: pedirle al usuario que "cablee" a mano lo que el ámbito ya sabe es tapar
+un hueco con la mano; que el ámbito rinda su propio discriminador es lo coherente (y como lo hace SAP con el centro/planta
+en el número de documento). *(Ver PROGRESS 2026-07-02 `feat/folio-ambito-visible`.)*
+
 ### 2026-07-02 · Editor visual de FOLIO configurable (reutilizable) + folio-por-plantilla de bitácora
 Cierra la deuda "editor UI de `folioScheme`" (OT, desde S2) y el requerimiento del dueño de "correlativo propio por
 plantilla" (BACKLOG 2026-06-30), con UN componente compartido y reusando el motor gapless de OT. El dueño aprobó las

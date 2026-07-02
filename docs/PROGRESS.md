@@ -1,5 +1,23 @@
 # Progreso — Lyra WatchLog
 
+**2026-07-02 — 🔢 Folio: "el ámbito completo" (segmento visible por nodo/estructura) ✅** (`feat/folio-ambito-visible`).
+Refinamiento pedido por el dueño tras revisar el editor: el **ámbito** (`por nodo`/`por estructura`) partía el contador
+pero **no se veía** en el folio ⇒ dos nodos generaban el mismo `RT-2026-0001`. Ahora el ámbito **inyecta automáticamente el
+código** del nodo/estructura como segmento visible → `RT-NORTE-2026-0001` vs `RT-SUR-2026-0001` (cada serie se distingue a
+simple vista y desaparece la colisión). `tipo`/`global` NO agregan segmento (el prefijo ya distingue ⇒ **cero regresión**,
+el default de bitácora `RT-2026-0001` y el folio de OT `OT-2026-0001` intactos). **Contracts:** `renderFolio(scheme, seq,
+{year, scopeCode?})` intercala el segmento (canónico `PREFIX-SCOPE-YYYY-SEQ`; máscara gana token **`{SCOPE}`**) +
+**`normalizeFolioSegment`** (MAYÚSCULAS, sin tildes, `[A-Z0-9]`) + `scopeRendersSegment` (solo node/structure); `folioSchemeWarnings`
+recableado (nodo/estructura ya NO avisan colisión —muestran su código—; el aviso queda para `scope=type` bajo unicidad global,
++ aviso si la máscara con ámbito no incluye `{SCOPE}`). **Backend:** `LogEntriesService.issueFolioWithinTx` y
+`WorkOrdersService.transition` resuelven el código (`orgNode.code ?? externalCode ?? name`; `structure.key ?? name`, normalizado)
+y lo pasan a `renderFolio`; `WorkOrderRow`/`listInclude` amplían el select del nodo. **Web:** el `FolioSchemeEditor` muestra el
+segmento en la **vista previa** (marcador `‹NODO›`/`‹ESTRUCT›`) + ayuda bajo el ámbito ("el folio incluirá el código del
+nodo…") + `{SCOPE}` en la ayuda de máscara. La UNICIDAD real la sigue garantizando el contador por ID; el segmento es la
+etiqueta humana. Verde: typecheck (7) · lint 0 err · build · **contracts 467** (+8) · API 252 · web 6 · **smoke-folio 15/15**
+(+2: OT/bitácora sin cambio + **por nodo** `RN-‹CODE›-AAAA-0001` con el código real del nodo) + regresión **smoke-workorders
+122/122** + **incidencias 32/32**. Ver DECISIONS 2026-07-02 ("el ámbito completo"). **Siguiente = OT S7 (Dashboard + Incidencia→OT).**
+
 **2026-07-02 — 🔢 Editor visual de FOLIO configurable (reutilizable) + folio-por-plantilla de bitácora ✅** (`feat/folio-editor-y-plantillas`).
 Cierra DOS deudas de una: (A) el **editor UI de `folioScheme`/`folioOnStateKey`** que faltaba en el mantenedor de tipos de OT
 (hoy era API-only, deuda desde S2) y (B) el requerimiento del dueño (BACKLOG 2026-06-30) de **correlativo/folio PROPIO por
