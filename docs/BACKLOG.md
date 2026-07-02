@@ -756,6 +756,10 @@ nunca queda más de una sesión atrás.
       (d) **visibilidad del aprobador (Gobierno 2)**: en la Puerta 2 el autorizador **ve y confirma (solo lectura, sin
       rellenar)** la LISTA de checklists de ejecución que se exigirán, y puede agregar/quitar/rechazar → valida la
       adecuación del set; trazabilidad aplicado=autorizado (§11.5).
+      (e) **UX (requisito del dueño):** módulo comprensible y fácil; la densidad se absorbe con UI intuitiva (próxima
+      acción clara por etapa, guards EXPLICADOS, progressive disclosure, responsive/terreno). Armar el plan con **grilla +
+      MODO GUIADO tipo asistente** (reusa `Stepper` de packages/ui: pasos "¿qué?/¿quién?/¿cuándo?/¿orden?/revisar") con
+      defaults inteligentes; proponer el enfoque de UX y esperar OK antes de construir.
       **Diferido a S5:** checklist de **CLOSURE** (retiro de controles/reenergización) — ver S5.
       **Diferido a backlog (solo con caso real, §11.7):** puntos de espera/testigo de calidad (guard por actividad);
       inspección independiente/doble firma (aviación RII); requisitos condicionales por reglas; y **gobernanza de aprobación
@@ -773,6 +777,13 @@ nunca queda más de una sesión atrás.
 - [ ] **Sesión 8 — Enterprise / opcional (~108 HH, Fase 3):** aprobadores dinámicos por reglas (área/criticidad/
       especialidad/monto/riesgo, reusa el motor de reglas); dependencias/ruta crítica; costos/HH + reportes/export;
       escalamiento multinivel. Puede subdividirse al llegar.
+- [ ] **SLICE FUTURO — Plantillas de plan / "job plans" (task lists) (~20–30 HH; posterior a S4):** biblioteca de
+      **planes de actividades predefinidos** por tipo de OT (equivalente a SAP PM *task list* / Maximo *job plan*): el
+      planificador **parte de una plantilla** (p. ej. "Cambio de rodamiento" → precarga N pasos estándar) y la ajusta, en
+      vez de armar el plan desde cero. Es el mayor salto de usabilidad **y** el estándar real de la industria. Merece su
+      propio slice (no meterlo en S4): definir el modelo (¿reusar `Template`/nuevo `WorkPlanTemplate`?), CRUD de la
+      biblioteca (gate catálogo), y "aplicar plantilla" en el asistente de plan de S4. Decisión del dueño 2026-07-02:
+      **registrado como slice siguiente al plan de actividades.**
 
 > **✅ BUG folio cross-tipo — CORREGIDO 2026-07-02 (`fix/ot-folio-global`).** *Síntoma:* aprobar una 2.ª OT (de otro
 > tipo) daba **Internal Error** (500 `Unique constraint failed: folio`). *Causa:* el default `folioScheme` era **scope
