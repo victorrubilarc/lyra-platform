@@ -4,7 +4,7 @@ import { ClipboardList, Plus, Search, Tags } from "lucide-react";
 import type { WorkOrderListQuery } from "@lyra/contracts";
 import { Button, Card, EmptyState, GridPager, Input, Select, Spinner } from "@lyra/ui";
 import { usePermissions } from "../../auth/use-permissions.js";
-import { useWorkOrderAreas, useWorkOrderSpecialties, useWorkOrderStats, useWorkOrderTypes, useWorkOrders } from "./work-orders-queries.js";
+import { useWorkOrderSpecialties, useWorkOrderStats, useWorkOrderTypes, useWorkOrders } from "./work-orders-queries.js";
 import { CreateWorkOrderModal } from "./CreateWorkOrderModal.js";
 import { WorkOrderDetailDrawer } from "./WorkOrderDetailDrawer.js";
 import { LIFECYCLE_META, ORIGIN_META, PRIORITY_META, criticalityColor, criticalityLabel } from "./work-orders-presentation.js";
@@ -24,7 +24,6 @@ export function WorkOrdersPage() {
   const [typeId, setTypeId] = useState("");
   const [criticality, setCriticality] = useState("");
   const [priority, setPriority] = useState<WorkOrderListQuery["priority"] | "">("");
-  const [areaId, setAreaId] = useState("");
   const [specialtyId, setSpecialtyId] = useState("");
   const [flag, setFlag] = useState<FlagKey>("");
   const [sort, setSort] = useState<WorkOrderListQuery["sort"]>("recent");
@@ -36,20 +35,18 @@ export function WorkOrdersPage() {
       typeId: typeId || undefined,
       criticality: criticality ? Number(criticality) : undefined,
       priority: priority || undefined,
-      areaId: areaId || undefined,
       specialtyId: specialtyId || undefined,
       sort,
       ...(flag ? { [flag]: true } : {}),
       page,
       pageSize,
     }),
-    [search, lifecycle, typeId, criticality, priority, areaId, specialtyId, sort, flag, page, pageSize],
+    [search, lifecycle, typeId, criticality, priority, specialtyId, sort, flag, page, pageSize],
   );
 
   const { data, isLoading } = useWorkOrders(query);
   const { data: stats } = useWorkOrderStats();
   const { data: types = [] } = useWorkOrderTypes();
-  const { data: areas = [] } = useWorkOrderAreas();
   const { data: specialties = [] } = useWorkOrderSpecialties();
 
   const items = data?.items ?? [];
@@ -109,10 +106,6 @@ export function WorkOrdersPage() {
           <option value="">Prioridad</option>
           {(Object.keys(PRIORITY_META) as Array<keyof typeof PRIORITY_META>).map((p) => <option key={p} value={p}>{PRIORITY_META[p].label}</option>)}
         </Select>
-        <Select value={areaId} onChange={(e) => { setAreaId(e.target.value); setPage(1); }} className={styles.fixedSel}>
-          <option value="">Todas las áreas</option>
-          {areas.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-        </Select>
         <Select value={specialtyId} onChange={(e) => { setSpecialtyId(e.target.value); setPage(1); }} className={styles.fixedSel}>
           <option value="">Todas las especialidades</option>
           {specialties.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -142,7 +135,7 @@ export function WorkOrdersPage() {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th>Folio</th><th>Título</th><th>Tipo</th><th>Crit.</th><th>Prioridad</th><th>Estado</th><th>Nodo</th><th>Responsable</th><th>Clasificación</th>
+                  <th>Folio</th><th>Título</th><th>Tipo</th><th>Crit.</th><th>Prioridad</th><th>Estado</th><th>Nodo</th><th>Responsable</th><th>Especialidades</th>
                 </tr>
               </thead>
               <tbody>
@@ -158,9 +151,8 @@ export function WorkOrdersPage() {
                     <td>{w.ownerName ?? <span className={styles.muted}>sin asignar</span>}</td>
                     <td>
                       <div className={styles.tags}>
-                        {w.areas.map((a) => <span key={`a-${a.id}`} className={styles.tagChip}>{a.name}</span>)}
                         {w.specialties.map((s) => <span key={`s-${s.id}`} className={styles.tagChip}>{s.name}</span>)}
-                        {w.areas.length === 0 && w.specialties.length === 0 && <span className={styles.muted}>{ORIGIN_META[w.originType].label}</span>}
+                        {w.specialties.length === 0 && <span className={styles.muted}>{ORIGIN_META[w.originType].label}</span>}
                       </div>
                     </td>
                   </tr>

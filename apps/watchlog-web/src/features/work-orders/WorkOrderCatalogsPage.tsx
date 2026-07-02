@@ -1,14 +1,12 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Lock, Pencil, Plus, Search, Tags } from "lucide-react";
-import type { AreaDto, SpecialtyDto, WorkOrderTypeDto } from "@lyra/contracts";
+import type { SpecialtyDto, WorkOrderTypeDto } from "@lyra/contracts";
 import { Button, Chip, EmptyState, GridPager, Input, Select, Spinner, Toggle, useToast } from "@lyra/ui";
 import { usePermissions } from "../../auth/use-permissions.js";
 import {
-  useUpsertWorkOrderArea,
   useUpsertWorkOrderSpecialty,
   useUpsertWorkOrderType,
-  useWorkOrderAreasAdmin,
   useWorkOrderSpecialtiesAdmin,
   useWorkOrderTypesAdmin,
 } from "./work-orders-queries.js";
@@ -27,7 +25,7 @@ type Row = { name: string; key: string; active: boolean; sortOrder: number };
  */
 export function WorkOrderCatalogsPage() {
   const { can } = usePermissions();
-  const [tab, setTab] = useState<"types" | "areas" | "specialties">("types");
+  const [tab, setTab] = useState<"types" | "specialties">("types");
 
   if (!can("workordercatalog:manage")) {
     return (
@@ -43,17 +41,16 @@ export function WorkOrderCatalogsPage() {
         <div>
           <Link to="/ordenes-trabajo" className={styles.back}><ArrowLeft size={14} /> Volver a órdenes de trabajo</Link>
           <h1 className={styles.h1}><Tags size={22} /> Catálogos de órdenes de trabajo</h1>
-          <p className={styles.sub}>Administra los tipos de OT, las áreas y las especialidades disponibles al crear una solicitud.</p>
+          <p className={styles.sub}>Administra los tipos de OT y las especialidades (disciplinas) disponibles al crear una solicitud. La ubicación la define la estructura organizacional (nodo).</p>
         </div>
       </header>
 
       <div className={styles.tabs} role="tablist">
         <button role="tab" aria-selected={tab === "types"} className={tab === "types" ? styles.tabActive : styles.tab} onClick={() => setTab("types")}>Tipos</button>
-        <button role="tab" aria-selected={tab === "areas"} className={tab === "areas" ? styles.tabActive : styles.tab} onClick={() => setTab("areas")}>Áreas</button>
         <button role="tab" aria-selected={tab === "specialties"} className={tab === "specialties" ? styles.tabActive : styles.tab} onClick={() => setTab("specialties")}>Especialidades</button>
       </div>
 
-      {tab === "types" ? <TypesTab /> : tab === "areas" ? <TagsTab kind="area" /> : <TagsTab kind="specialty" />}
+      {tab === "types" ? <TypesTab /> : <SpecialtiesTab />}
     </div>
   );
 }
@@ -183,24 +180,17 @@ function TypesTab() {
   );
 }
 
-function TagsTab({ kind }: { kind: "area" | "specialty" }) {
+function SpecialtiesTab() {
   const toast = useToast();
-  const areasQ = useWorkOrderAreasAdmin();
-  const specialtiesQ = useWorkOrderSpecialtiesAdmin();
-  const q = kind === "area" ? areasQ : specialtiesQ;
-  const rows = (q.data ?? []) as Array<AreaDto | SpecialtyDto>;
-  const upsertArea = useUpsertWorkOrderArea();
-  const upsertSpecialty = useUpsertWorkOrderSpecialty();
-  const upsert = kind === "area" ? upsertArea : upsertSpecialty;
-  const [editing, setEditing] = useState<AreaDto | SpecialtyDto | null>(null);
+  const { data: rows = [], isLoading } = useWorkOrderSpecialtiesAdmin();
+  const upsert = useUpsertWorkOrderSpecialty();
+  const [editing, setEditing] = useState<SpecialtyDto | null>(null);
   const [open, setOpen] = useState(false);
 
   const { pageRows, total, filterProps, pagerProps } = useCatalogFilter(rows);
   const existingKeys = useMemo(() => rows.map((r) => r.key.toLowerCase()), [rows]);
-  const nounSingular = kind === "area" ? "área" : "especialidad";
-  const newLabel = kind === "area" ? "Nueva área" : "Nueva especialidad";
 
-  function toggleActive(r: AreaDto | SpecialtyDto) {
+  function toggleActive(r: SpecialtyDto) {
     upsert.mutate(
       { dto: { key: r.key, name: r.name, description: r.description, color: r.color, sortOrder: r.sortOrder, active: !r.active } },
       { onSuccess: () => toast.success(r.active ? "Desactivada" : "Activada"), onError: (e) => toast.error((e as Error).message) },
@@ -213,18 +203,18 @@ function TagsTab({ kind }: { kind: "area" | "specialty" }) {
     <>
       <div className={styles.toolbar}>
         <Filters {...filterProps} />
-        <Button variant="primary" leftIcon={<Plus size={16} />} onClick={() => { setEditing(null); setOpen(true); }}>{newLabel}</Button>
+        <Button variant="primary" leftIcon={<Plus size={16} />} onClick={() => { setEditing(null); setOpen(true); }}>Nueva especialidad</Button>
       </div>
 
-      {q.isLoading ? <div className={styles.center}><Spinner /></div>
-        : total === 0 ? <EmptyState icon={<Tags size={32} />} title={`Sin ${kind === "area" ? "áreas" : "especialidades"}`} description="No hay elementos que coincidan con los filtros." />
+      {isLoading ? <div className={styles.center}><Spinner /></div>
+        : total === 0 ? <EmptyState icon={<Tags size={32} />} title="Sin especialidades" description="No hay elementos que coincidan con los filtros." />
         : (
           <>
             {pager}
             <div className={styles.tableCard}>
               <table className={styles.table}>
                 <thead><tr>
-                  <th>{kind === "area" ? "Área" : "Especialidad"}</th><th>Clave</th><th className={styles.num}>Orden</th><th>Estado</th><th></th>
+                  <th>Especialidad</th><th>Clave</th><th className={styles.num}>Orden</th><th>Estado</th><th></th>
                 </tr></thead>
                 <tbody>
                   {pageRows.map((r) => (
@@ -256,7 +246,7 @@ function TagsTab({ kind }: { kind: "area" | "specialty" }) {
           </>
         )}
 
-      <WorkOrderTagModal key={nounSingular} open={open} onClose={() => setOpen(false)} kind={kind} tag={editing} existingKeys={existingKeys} />
+      <WorkOrderTagModal open={open} onClose={() => setOpen(false)} specialty={editing} existingKeys={existingKeys} />
     </>
   );
 }

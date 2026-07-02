@@ -4,6 +4,22 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-01 · OT — Se ELIMINA el catálogo `Area` (alineación con EAM líderes)
+Tras revisar cómo lo modelan los grandes (SAP PM, IBM Maximo, Infor EAM), se **elimina** el catálogo plano `Area`
+(tabla + `WorkOrderArea` + relación + seed + UI + filtros + contrato), introducido horas antes en el anexo de S1.
+**Motivo:** en los EAM líderes **NO existe un catálogo "Área" separado**; la "área/zona" (Chancado, Molienda…) **ES la
+jerarquía de ubicación** (SAP *Functional Location* / Maximo *Location*), que en Lyra es el **`OrgNode`** (la estructura
+tiene un nivel que puede llamarse "Área"). Mi seed inicial sembró `Area` con zonas de planta → **duplicaba la jerarquía y
+confundía** (lo notó el dueño). El mapeo correcto y definitivo: **ubicación = `OrgNode` · disciplina/oficio = `Specialty`
+(= SAP *Work Center* / Maximo *Craft*) · tipo = `WorkOrderType` (= *Order/Work Type*)**. La agrupación transversal de
+responsabilidad que sí tienen los grandes (*Planner Group* / *Work Group*) **NO se llama "Área"** y **se DIFIERE a S6–S8**
+(cuando exista enrutamiento/aprobadores), y allí irá **fuera del formulario del solicitante** (la fija el planificador),
+para no complicar el registro en terreno. Migración `20260701190000_drop_work_order_area` (drop guardado; nada real la
+referenciaba). Verde + `smoke-workorders.py` 32/32. **Principio reforzado por el dueño: no construir cosas que luego haya
+que deshacer — decidir bien de una.**
+
+---
+
 ### 2026-07-01 · OT — Sesión 1 (Cimientos): decisiones de implementación
 Al construir el esqueleto de OT (`feat/ot-cimientos`, espejo de Incidencias) se tomaron 4 decisiones no explícitas en
 el diseño:

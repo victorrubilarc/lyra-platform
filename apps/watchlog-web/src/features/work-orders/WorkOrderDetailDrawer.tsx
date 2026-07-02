@@ -67,7 +67,6 @@ export function WorkOrderDetailDrawer({ workOrderId, onClose }: Props) {
             <dt>Nodo</dt><dd>{wo.orgNodeName ?? "—"}</dd>
             {wo.equipmentTag && (<><dt>Equipo</dt><dd>{wo.equipmentTag}</dd></>)}
             {wo.locationDetail && (<><dt>Ubicación</dt><dd>{wo.locationDetail}</dd></>)}
-            {wo.areas.length > 0 && (<><dt>Áreas</dt><dd>{wo.areas.map((a) => a.name).join(", ")}</dd></>)}
             {wo.specialties.length > 0 && (<><dt>Especialidades</dt><dd>{wo.specialties.map((s) => s.name).join(", ")}</dd></>)}
             <dt>Solicitante</dt><dd>{wo.requesterName ?? "—"}</dd>
             {wo.dueAt && (<><dt>Fecha límite</dt><dd>{formatDate(wo.dueAt)}</dd></>)}

@@ -7,10 +7,12 @@
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
 > actualización: **2026-07-01** — **🔧 OT · Sesión 1 · CIMIENTOS ✅** (`feat/ot-cimientos`): `WorkOrder`+`WorkOrderType`+
 > `Area`/`Specialty` (N:N), 8 permisos grupo `workorders`, backend CRUD+ABAC, web `/ordenes-trabajo` (grilla+wizard),
-> seed de arranque; folio/workflow INERTES (S2); verde + `smoke-workorders.py` **35/35**. **+ Anexo post-S1 ✅**
-> (`feat/ot-catalogos`): mantenedor de catálogos `/ordenes-trabajo/catalogos` (Tipos/Áreas/Especialidades) + seed realista
-> CMMS/EAM (10 tipos, 11 áreas de planta minera, 13 disciplinas). **DEUDA que queda:** SavedView de OT (+ Incidencias) =
-> slice transversal pendiente. **Siguiente: OT Sesión 2 (Puerta 1 + `FolioCounter`).** Antes (2026-07-01, SIN código): **📋 ROADMAP MÓDULO ÓRDENES DE TRABAJO
+> seed de arranque; folio/workflow INERTES (S2). **+ Anexo post-S1 ✅** (`feat/ot-catalogos`): mantenedor de catálogos
+> `/ordenes-trabajo/catalogos` + seed realista CMMS/EAM. **+ Ajuste ✅** (`feat/ot-quitar-area`): se **ELIMINÓ el catálogo
+> `Area`** (duplicaba la jerarquía de ubicación; los EAM líderes usan el `OrgNode`/Functional Location para eso). Modelo
+> final: **ubicación=nodo · disciplina=`Specialty` · tipo=`WorkOrderType`**. *Planner Group/Work Group* diferido a S6–S8.
+> **+ Responsive** grillas OT+Incidencias (tablet/móvil). verde + `smoke-workorders.py` **32/32**. **DEUDA que queda:**
+> SavedView de OT (+ Incidencias) = slice transversal pendiente. **Siguiente: OT Sesión 2 (Puerta 1 + `FolioCounter`).** Antes (2026-07-01, SIN código): **📋 ROADMAP MÓDULO ÓRDENES DE TRABAJO
 > (OT / PTW) registrado** en §2 (épico nuevo, 8 sesiones S0–S8, ~397 HH; oportunidad real de cliente minero;
 > **entitlements de módulo DIFERIDOS** al épico de licenciamiento §2(1)). Ver DECISIONS 2026-07-01 y memoria
 > `work-orders-module-plan`.
@@ -679,10 +681,19 @@ nunca queda más de una sesión atrás.
       para el estado `borrador` del flujo, S2). **DEUDA registrada:** SavedView de OT (y de Incidencias) = slice
       transversal pendiente — ver §3. **Siguiente = Sesión 2.**
       - [x] **Anexo (post-S1) — Mantenedor de catálogos de OT + seed de industria ✅ 2026-07-01** (`feat/ot-catalogos`):
-            pantalla `/ordenes-trabajo/catalogos` (3 sub-pestañas Tipos/Áreas/Especialidades, gate `workordercatalog:manage`,
-            botón en header, `inSidebar:false`) + seed realista CMMS/EAM (10 tipos, 11 áreas de planta, 13 especialidades;
-            retira mecánica/eléctrica como «áreas» → son disciplinas, guardado sin borrar en uso). smoke **35/35**. Sin
-            schema/permiso/contrato nuevos. **Cierra la deuda del mantenedor de catálogos de OT.**
+            pantalla `/ordenes-trabajo/catalogos` (gate `workordercatalog:manage`, botón en header, `inSidebar:false`) +
+            seed realista CMMS/EAM. **Cierra la deuda del mantenedor de catálogos de OT.**
+      - [x] **Ajuste (post-S1) — ELIMINADO el catálogo `Area` ✅ 2026-07-01** (`feat/ot-quitar-area`, migración
+            `20260701190000_drop_work_order_area`): duplicaba la jerarquía de ubicación (`OrgNode`, que tiene nivel "Área");
+            los EAM líderes (SAP PM Functional Location / Maximo Location) usan la ubicación para eso. Modelo final =
+            **ubicación=nodo · disciplina=`Specialty` (Work Center/Craft) · tipo=`WorkOrderType`**. El mantenedor queda con
+            **Tipos + Especialidades**. Ver DECISIONS 2026-07-01. smoke **32/32**.
+      - [ ] **(S6–S8) "Grupo responsable / de planificación" (Planner Group / Work Group)** — agrupación transversal de
+            responsabilidad que cruza nodos (SAP *Planner Group*, Maximo *Work Group*), para enrutamiento/backlog por grupo,
+            KPIs y **aprobadores automáticos**. NO se llama "Área" y va **fuera del formulario del solicitante** (lo fija el
+            planificador). Se evalúa cuando exista workflow/alertas/dashboard (S6–S8), solo si aporta.
+      - [x] **Responsive (post-S1) — grillas OT + Incidencias en tablet/móvil ✅ 2026-07-01** (`feat/ot-responsive`):
+            filtros que envuelven, selects full-width <900px, área táctil 44px; tabla con scroll horizontal. Solo CSS.
 - [ ] **Sesión 2 — Aprobación inicial + folio al aprobar / Puerta 1 (~35 HH):** workflow congelado, aprobar/rechazar
       (**motivo obligatorio**), `FolioCounter` gapless (emite folio **SOLO al aprobar**), firma Part 11 + timeline.
 - [ ] **Sesión 3 — Motor de checklists ligados / Puerta 2 (~45 HH):** tabla enlace `WorkOrderChecklist` + reglas de

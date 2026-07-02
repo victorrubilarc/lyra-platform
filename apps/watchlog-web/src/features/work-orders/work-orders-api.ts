@@ -4,13 +4,11 @@ import {
   workOrderStatsSchema,
   workOrderTypeSchema,
   workOrderTagSchema,
-  type AreaDto,
   type AssignWorkOrderRequest,
   type CancelWorkOrderRequest,
   type CreateWorkOrderRequest,
   type SpecialtyDto,
   type UpdateWorkOrderRequest,
-  type UpsertAreaRequest,
   type UpsertSpecialtyRequest,
   type UpsertWorkOrderTypeRequest,
   type WorkOrderDetail,
@@ -33,7 +31,6 @@ function queryString(q: WorkOrderListQuery): string {
   if (q.orgNodeIds && q.orgNodeIds.length) p.set("orgNodeIds", q.orgNodeIds.join(","));
   if (q.equipmentId) p.set("equipmentId", q.equipmentId);
   if (q.ownerId) p.set("ownerId", q.ownerId);
-  if (q.areaId) p.set("areaId", q.areaId);
   if (q.specialtyId) p.set("specialtyId", q.specialtyId);
   if (q.requiresPtw) p.set("requiresPtw", "true");
   if (q.mine) p.set("mine", "true");
@@ -67,20 +64,12 @@ export function fetchWorkOrderTypes(includeInactive = false): Promise<WorkOrderT
   return apiJson(`/work-orders/types${includeInactive ? "?includeInactive=true" : ""}`, z.array(workOrderTypeSchema));
 }
 
-export function fetchWorkOrderAreas(includeInactive = false): Promise<AreaDto[]> {
-  return apiJson(`/work-orders/areas${includeInactive ? "?includeInactive=true" : ""}`, z.array(workOrderTagSchema));
-}
-
 export function fetchWorkOrderSpecialties(includeInactive = false): Promise<SpecialtyDto[]> {
   return apiJson(`/work-orders/specialties${includeInactive ? "?includeInactive=true" : ""}`, z.array(workOrderTagSchema));
 }
 
 export function upsertWorkOrderType(dto: UpsertWorkOrderTypeRequest, create = false): Promise<WorkOrderTypeDto> {
   return apiJson(`/work-orders/types${create ? "?create=true" : ""}`, workOrderTypeSchema, { method: "POST", body: dto });
-}
-
-export function upsertWorkOrderArea(dto: UpsertAreaRequest, create = false): Promise<AreaDto> {
-  return apiJson(`/work-orders/areas${create ? "?create=true" : ""}`, workOrderTagSchema, { method: "POST", body: dto });
 }
 
 export function upsertWorkOrderSpecialty(dto: UpsertSpecialtyRequest, create = false): Promise<SpecialtyDto> {

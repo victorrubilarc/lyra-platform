@@ -16,7 +16,7 @@ import { REFERENCE_LISTS } from "./reference-data-seed.js";
 import { DEMO_CALENDAR, DEMO_FISCAL_CALENDAR } from "./operational-calendar-seed.js";
 import { NOTIFICATION_TEMPLATE_SEEDS } from "./notification-templates-seed.js";
 import { INCIDENT_WORKFLOW, INCIDENT_TYPES, INCIDENT_CATEGORIES, REPORTING_OBLIGATIONS } from "./incidents-seed-data.js";
-import { WORK_ORDER_TYPES, WORK_ORDER_AREAS, WORK_ORDER_SPECIALTIES, RETIRED_AREA_KEYS } from "./work-orders-seed-data.js";
+import { WORK_ORDER_TYPES, WORK_ORDER_SPECIALTIES } from "./work-orders-seed-data.js";
 
 const prisma = new PrismaClient();
 
@@ -567,13 +567,6 @@ async function seedWorkOrderCatalog(): Promise<void> {
       update: { name: t.name, description: t.description, color: t.color, requiresPtwDefault: t.requiresPtwDefault, criticalityDefault: t.criticalityDefault, sortOrder: t.sortOrder },
     });
   }
-  for (const a of WORK_ORDER_AREAS) {
-    await prisma.area.upsert({
-      where: { key: a.key },
-      create: { key: a.key, name: a.name, description: a.description, color: a.color, sortOrder: a.sortOrder },
-      update: { name: a.name, description: a.description, color: a.color, sortOrder: a.sortOrder },
-    });
-  }
   for (const s of WORK_ORDER_SPECIALTIES) {
     await prisma.specialty.upsert({
       where: { key: s.key },
@@ -581,12 +574,8 @@ async function seedWorkOrderCatalog(): Promise<void> {
       update: { name: s.name, description: s.description, color: s.color, sortOrder: s.sortOrder },
     });
   }
-  // Retira áreas del set inicial que ahora son DISCIPLINAS (mecánica/eléctrica),
-  // SOLO si ninguna OT las referencia (arranque/dev; nunca borra algo en uso).
-  const retired = await prisma.area.deleteMany({ where: { key: { in: RETIRED_AREA_KEYS }, workOrders: { none: {} } } });
   console.log(
-    `✔ Catálogo de OT sincronizado: ${WORK_ORDER_TYPES.length} tipos, ${WORK_ORDER_AREAS.length} áreas, ${WORK_ORDER_SPECIALTIES.length} especialidades` +
-      (retired.count ? ` (${retired.count} área(s) inicial(es) retirada(s))` : ""),
+    `✔ Catálogo de OT sincronizado: ${WORK_ORDER_TYPES.length} tipos, ${WORK_ORDER_SPECIALTIES.length} especialidades`,
   );
 }
 

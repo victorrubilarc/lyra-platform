@@ -723,10 +723,13 @@ lifecycle `CANCELED`).
   `defaultWorkflowId` (ref. blanda, S2), `requiresPtwDefault`, `criticalityDefault`, `folioScheme` (Json) + `folioOnStateKey`
   (inertes S1, para el folio configurable de S2), SLA light (`resolutionDueMinutes`/`escalationAfterMinutes`/
   `escalationRoleId` → **Role** SetNull, relación `WorkOrderTypeEscalationRole`), `active`/`sortOrder`.
-- **Area** / **Specialty** — catálogos ligeros independientes (mismo shape: `key` única, `name`/`description`/`color`,
-  `active`/`sortOrder`). Son ejes de CLASIFICACIÓN/enrutamiento, **NO** sustituyen a `orgNodeId` (fork W3).
-- **WorkOrderArea** / **WorkOrderSpecialty** — enlaces N:N (`@@id([workOrderId, <tag>Id])`); `onDelete: Cascade` desde
-  `WorkOrder`, `Restrict` desde el catálogo (no se borra un área en uso).
+- **Specialty** — catálogo de disciplina/oficio (`key` única, `name`/`description`/`color`, `active`/`sortOrder`).
+  Equivale al **Work Center (SAP PM) / Craft (Maximo)**. N:N con la OT. La **ubicación** la da `orgNodeId` (estructura,
+  que puede tener un nivel "Área"), **no** un catálogo aparte.
+- **WorkOrderSpecialty** — enlace N:N (`@@id([workOrderId, specialtyId])`); `onDelete: Cascade` desde `WorkOrder`,
+  `Restrict` desde el catálogo.
+- **`Area` / `WorkOrderArea` — ELIMINADOS (2026-07-01, migración `20260701190000_drop_work_order_area`).** Duplicaban la
+  jerarquía de ubicación (`OrgNode`); los EAM líderes usan la jerarquía de ubicación para la "área/zona". Ver DECISIONS.
 
 **Pendiente (S2–S5):** `FolioCounter` (folio gapless al aprobar), `WorkOrderTransition`/`WorkOrderEvent`/`WorkOrderComment`
 (satélites de workflow), `WorkOrderChecklistRule`/`WorkOrderChecklist` (checklists sobre Form Builder), `WorkActivity`/

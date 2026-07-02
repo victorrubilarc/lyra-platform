@@ -43,24 +43,6 @@ export const WORK_ORDER_TYPES: WorkOrderTypeSeed[] = [
 ];
 
 /**
- * ÁREAS funcionales / zonas de planta (minería-procesos). Es un eje de
- * CLASIFICACIÓN/enrutamiento, NO reemplaza al nodo de la estructura (ubicación+ABAC).
- */
-export const WORK_ORDER_AREAS: WorkOrderTagSeed[] = [
-  { key: "mina-rajo", name: "Mina / Rajo", description: "Operación mina: perforación, tronadura, carguío y transporte.", color: "#F97316", sortOrder: 10 },
-  { key: "chancado", name: "Chancado", description: "Chancado primario, secundario y terciario.", color: "#EAB308", sortOrder: 20 },
-  { key: "molienda", name: "Molienda", description: "Molinos SAG/bolas y clasificación.", color: "#06B6D4", sortOrder: 30 },
-  { key: "flotacion", name: "Flotación", description: "Celdas de flotación y reactivos.", color: "#06B6D4", sortOrder: 40 },
-  { key: "espesamiento", name: "Espesamiento y relaves", description: "Espesadores, manejo y disposición de relaves.", color: "#6B7280", sortOrder: 50 },
-  { key: "correas", name: "Correas transportadoras", description: "Sistema de correas y transferencias.", color: "#EAB308", sortOrder: 60 },
-  { key: "servicios", name: "Servicios / Utilidades", description: "Agua, aire comprimido, energía y combustibles.", color: "#22C55E", sortOrder: 70 },
-  { key: "puerto", name: "Puerto / Embarque", description: "Almacenamiento y embarque de producto.", color: "#06B6D4", sortOrder: 80 },
-  { key: "procesos", name: "Planta de procesos", description: "Áreas de proceso no clasificadas en otra zona.", color: "#6366F1", sortOrder: 90 },
-  { key: "taller", name: "Taller de mantención", description: "Talleres y maestranza.", color: "#6366F1", sortOrder: 100 },
-  { key: "civil", name: "Obras civiles", description: "Estructuras, caminos y obras civiles.", color: "#84CC16", sortOrder: 110 },
-];
-
-/**
  * ESPECIALIDADES / disciplinas — equivalentes a los "crafts" de Maximo y los
  * "work centers" de SAP PM (cuadrillas por oficio).
  */
@@ -79,10 +61,3 @@ export const WORK_ORDER_SPECIALTIES: WorkOrderTagSeed[] = [
   { key: "izaje", name: "Izaje y aparejo (rigging)", description: "Maniobras de izaje, grúas y aparejos.", color: "#F97316", sortOrder: 120 },
   { key: "pintura", name: "Pintura y anticorrosión", description: "Preparación de superficie, pintura y protección anticorrosiva.", color: "#EAB308", sortOrder: 130 },
 ];
-
-/**
- * Claves de ÁREAS del set inicial antiguo (S1) que ahora son DISCIPLINAS
- * (especialidades), no zonas de planta. Se retiran del catálogo de áreas en el
- * seed SOLO si ninguna OT las referencia (arranque/dev). Ver seed.ts.
- */
-export const RETIRED_AREA_KEYS = ["mecanica", "electrica"];

@@ -4,7 +4,6 @@ import type {
   CancelWorkOrderRequest,
   CreateWorkOrderRequest,
   UpdateWorkOrderRequest,
-  UpsertAreaRequest,
   UpsertSpecialtyRequest,
   UpsertWorkOrderTypeRequest,
   WorkOrderListQuery,
@@ -13,7 +12,6 @@ import {
   assignWorkOrder,
   cancelWorkOrder,
   createWorkOrder,
-  fetchWorkOrderAreas,
   fetchWorkOrderAssignableUsers,
   fetchWorkOrderDetail,
   fetchWorkOrderEquipmentOptions,
@@ -22,7 +20,6 @@ import {
   fetchWorkOrderTypes,
   fetchWorkOrders,
   updateWorkOrder,
-  upsertWorkOrderArea,
   upsertWorkOrderSpecialty,
   upsertWorkOrderType,
 } from "./work-orders-api.js";
@@ -34,7 +31,6 @@ export const WORK_ORDER_KEYS = {
   detail: (id: string) => ["work-orders", "detail", id] as const,
   stats: (structureId: string | null) => ["work-orders", "stats", structureId] as const,
   types: () => ["work-orders", "types"] as const,
-  areas: () => ["work-orders", "areas"] as const,
   specialties: () => ["work-orders", "specialties"] as const,
 };
 
@@ -56,10 +52,6 @@ export function useWorkOrderTypes() {
   return useQuery({ queryKey: WORK_ORDER_KEYS.types(), queryFn: () => fetchWorkOrderTypes() });
 }
 
-export function useWorkOrderAreas() {
-  return useQuery({ queryKey: WORK_ORDER_KEYS.areas(), queryFn: () => fetchWorkOrderAreas() });
-}
-
 export function useWorkOrderSpecialties() {
   return useQuery({ queryKey: WORK_ORDER_KEYS.specialties(), queryFn: () => fetchWorkOrderSpecialties() });
 }
@@ -67,10 +59,6 @@ export function useWorkOrderSpecialties() {
 /** Variantes para el MANTENEDOR: incluyen inactivos (key distinto, no contamina los desplegables del alta). */
 export function useWorkOrderTypesAdmin() {
   return useQuery({ queryKey: [...WORK_ORDER_KEYS.types(), "admin"], queryFn: () => fetchWorkOrderTypes(true) });
-}
-
-export function useWorkOrderAreasAdmin() {
-  return useQuery({ queryKey: [...WORK_ORDER_KEYS.areas(), "admin"], queryFn: () => fetchWorkOrderAreas(true) });
 }
 
 export function useWorkOrderSpecialtiesAdmin() {
@@ -82,14 +70,6 @@ export function useUpsertWorkOrderType() {
   return useMutation({
     mutationFn: ({ dto, create }: { dto: UpsertWorkOrderTypeRequest; create?: boolean }) => upsertWorkOrderType(dto, create),
     onSuccess: () => qc.invalidateQueries({ queryKey: WORK_ORDER_KEYS.types() }),
-  });
-}
-
-export function useUpsertWorkOrderArea() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ dto, create }: { dto: UpsertAreaRequest; create?: boolean }) => upsertWorkOrderArea(dto, create),
-    onSuccess: () => qc.invalidateQueries({ queryKey: WORK_ORDER_KEYS.areas() }),
   });
 }
 

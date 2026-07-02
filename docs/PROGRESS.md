@@ -1,5 +1,19 @@
 # Progreso — Lyra WatchLog
 
+**2026-07-01 — 🔧 OT · S1 · ajuste · ELIMINADO el catálogo `Area` (alineación con EAM líderes) ✅** (`feat/ot-quitar-area`).
+Tras revisar SAP PM / Maximo / Infor EAM: en los grandes **no hay un catálogo "Área" aparte** — la zona/área **es la
+jerarquía de ubicación** (Functional Location / Location), que en Lyra ya es el **`OrgNode`** (la estructura tiene un nivel
+que puede llamarse "Área"). Mi seed inicial sembró `Area` con zonas de planta (Chancado/Molienda…), **duplicando la
+jerarquía** y generando confusión (lo detectó el dueño). Se elimina `Area` en TODAS las capas: schema (`Area` +
+`WorkOrderArea` + relación `WorkOrder.areas`; migración `20260701190000_drop_work_order_area`, drop guardado, nada la
+referenciaba), contrato (`AreaDto`/`areaIds`/`areas`/`areaId` fuera), backend (endpoints `/areas`, validación, include,
+filtro), web (wizard, filtros, columna, detalle, pestaña del mantenedor → ahora **Tipos + Especialidades**), seed y smoke.
+**Modelo definitivo = idéntico a los EAM líderes: ubicación = `OrgNode` · disciplina = `Specialty` (Work Center/Craft) ·
+tipo = `WorkOrderType` (Order/Work Type)**. La agrupación transversal *Planner Group/Work Group* se DIFIERE a S6–S8 y NO
+se llamará "Área" ni irá en el formulario del solicitante. typecheck(0)/lint(0)/build/test(252) verdes; smoke **32/32**.
+Ver DECISIONS 2026-07-01. **También:** grillas de OT e Incidencias hechas responsivas (tablet/móvil: filtros que envuelven,
+selects full-width <900px, área táctil 44px; `feat/ot-responsive` en `main`).
+
 **2026-07-01 — 🔧 OT · S1 · anexo · Mantenedor de catálogos + seed de industria ✅** (`feat/ot-catalogos`). Cierra
 una deuda que quedó abierta en S1: los catálogos de OT (Tipos/Áreas/Especialidades) ya se administran **desde la app**,
 no solo por API/seed. **Web**: pantalla `/ordenes-trabajo/catalogos` (gate `workordercatalog:manage`, botón «Catálogos»
