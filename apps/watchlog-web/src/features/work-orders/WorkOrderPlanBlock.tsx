@@ -38,12 +38,12 @@ function toLocalInput(iso: string | null): string {
 }
 
 /**
- * Pestaña PLAN de una OT (Puerta 3, S4). Dos formas complementarias de armar el plan:
- * (a) grilla de actividades para el experto (agregar/editar/reordenar/eliminar, con la
- * desviación plan-vs-baseline visible); (b) asistente guiado (Stepper) que lleva paso a
- * paso con defaults inteligentes y genera las filas. Cuando la OT aún no tiene actividades
- * arranca el asistente; una vez autorizado el plan (baseline congelada) todo es de solo
- * lectura + seguimiento. El bloqueo de la Puerta 3 se EXPLICA (falta ≥1 actividad).
+ * Pestaña PLAN de una OT (Puerta 3, S4). La vista principal es SIEMPRE la GRILLA con
+ * todas las actividades configuradas y su información a la vista (estilo EAM: SAP PM /
+ * Maximo operations). Agregar/editar se hace en un MODAL: «Agregar actividad» (formulario)
+ * o «Asistente guiado» (Stepper que arma varias de una). Una vez autorizado el plan
+ * (baseline congelada) todo pasa a solo lectura + seguimiento de desviación. El bloqueo de
+ * la Puerta 3 se EXPLICA (falta ≥1 actividad).
  */
 export function WorkOrderPlanBlock({ wo, isLive }: { wo: WorkOrderDetail; isLive: boolean }) {
   const { can } = usePermissions();
@@ -53,10 +53,9 @@ export function WorkOrderPlanBlock({ wo, isLive }: { wo: WorkOrderDetail; isLive
   const summary = useMemo(() => summarizeActivities(activities), [activities]);
   const canEdit = isLive && manage && !frozen;
 
-  // Modo: si no hay actividades y se puede editar, arranca el asistente (decisión del dueño).
-  const [mode, setMode] = useState<"auto" | "grid" | "wizard">("auto");
-  const effectiveMode: "grid" | "wizard" =
-    mode === "auto" ? (canEdit && activities.length === 0 ? "wizard" : "grid") : mode;
+  // `null` = sin modal; "new" = agregar (formulario); una actividad = editar.
+  const [editing, setEditing] = useState<WorkActivityDto | "new" | null>(null);
+  const [wizardOpen, setWizardOpen] = useState(false);
 
   return (
     <>
@@ -75,23 +74,35 @@ export function WorkOrderPlanBlock({ wo, isLive }: { wo: WorkOrderDetail; isLive
         </div>
       )}
 
-      {canEdit && (
+      {/* Acciones: agregar (form) o asistente (guiado) — ambas en modal. */}
+      {canEdit && activities.length > 0 && (
         <div className={styles.actions}>
-          <Button variant={effectiveMode === "wizard" ? "primary" : "secondary"} leftIcon={<Wand2 size={15} />} onClick={() => setMode("wizard")}>
-            Asistente guiado
-          </Button>
-          <Button variant={effectiveMode === "grid" ? "primary" : "secondary"} leftIcon={<ListChecks size={15} />} onClick={() => setMode("grid")}>
-            Grilla {activities.length > 0 ? `(${activities.length})` : ""}
-          </Button>
+          <Button variant="primary" leftIcon={<Plus size={15} />} onClick={() => setEditing("new")}>Agregar actividad</Button>
+          <Button variant="secondary" leftIcon={<Wand2 size={15} />} onClick={() => setWizardOpen(true)}>Asistente guiado</Button>
         </div>
       )}
 
       {isLoading ? (
         <p className={styles.muted}>Cargando…</p>
-      ) : effectiveMode === "wizard" && canEdit ? (
-        <PlanWizard wo={wo} onDone={() => setMode("grid")} />
       ) : (
-        <ActivityGrid wo={wo} activities={activities} canEdit={canEdit} frozen={frozen} />
+        <ActivityGrid
+          wo={wo}
+          activities={activities}
+          canEdit={canEdit}
+          frozen={frozen}
+          onEdit={(a) => setEditing(a)}
+          onAdd={() => setEditing("new")}
+          onWizard={() => setWizardOpen(true)}
+        />
+      )}
+
+      {editing && (
+        <ActivityModal wo={wo} activity={editing === "new" ? undefined : editing} onClose={() => setEditing(null)} />
+      )}
+      {wizardOpen && (
+        <Modal open onClose={() => setWizardOpen(false)} size="xl" title="Asistente de plan de actividades">
+          <PlanWizard wo={wo} onDone={() => setWizardOpen(false)} />
+        </Modal>
       )}
     </>
   );
@@ -125,14 +136,28 @@ function PlanStageBanner({ wo, activities, frozen }: { wo: WorkOrderDetail; acti
   );
 }
 
-// === Grilla de actividades =====================================================
+// === Grilla de actividades (tabla enterprise) ==================================
 
-function ActivityGrid({ wo, activities, canEdit, frozen }: { wo: WorkOrderDetail; activities: WorkActivityDto[]; canEdit: boolean; frozen: boolean }) {
+function ActivityGrid({
+  wo,
+  activities,
+  canEdit,
+  frozen,
+  onEdit,
+  onAdd,
+  onWizard,
+}: {
+  wo: WorkOrderDetail;
+  activities: WorkActivityDto[];
+  canEdit: boolean;
+  frozen: boolean;
+  onEdit: (a: WorkActivityDto) => void;
+  onAdd: () => void;
+  onWizard: () => void;
+}) {
   const toast = useToast();
   const remove = useRemoveWorkOrderActivity(wo.id);
   const reorder = useReorderWorkOrderActivities(wo.id);
-  const [editing, setEditing] = useState<WorkActivityDto | null>(null);
-  const [adding, setAdding] = useState(false);
   const err = (e: unknown) => toast.error((e as Error).message);
 
   const move = (index: number, dir: -1 | 1) => {
@@ -145,60 +170,82 @@ function ActivityGrid({ wo, activities, canEdit, frozen }: { wo: WorkOrderDetail
     reorder.mutate({ orderedIds: ids }, { onError: err });
   };
 
+  // Estado vacío profesional (no volcar el asistente): explica y ofrece las 2 vías.
   if (activities.length === 0) {
     return (
-      <>
-        <p className={styles.muted}>Sin actividades en el plan.</p>
-        {canEdit && <Button variant="primary" leftIcon={<Plus size={15} />} onClick={() => setAdding(true)}>Agregar actividad</Button>}
-        {adding && <ActivityModal wo={wo} onClose={() => setAdding(false)} />}
-      </>
+      <div className={styles.planEmpty}>
+        <ListChecks size={26} />
+        <p className={styles.planEmptyTitle}>Aún no hay actividades en el plan</p>
+        <p className={styles.muted}>Define las tareas del trabajo: agrégalas una a una o usa el asistente guiado para armarlas de una vez.</p>
+        {canEdit && (
+          <div className={styles.actions}>
+            <Button variant="primary" leftIcon={<Plus size={15} />} onClick={onAdd}>Agregar actividad</Button>
+            <Button variant="secondary" leftIcon={<Wand2 size={15} />} onClick={onWizard}>Asistente guiado</Button>
+          </div>
+        )}
+      </div>
     );
   }
 
   return (
-    <>
-      {canEdit && (
-        <div className={styles.actions}>
-          <Button variant="secondary" leftIcon={<Plus size={15} />} onClick={() => setAdding(true)}>Agregar actividad</Button>
-        </div>
-      )}
-      <ul className={styles.planList}>
-        {activities.map((a, i) => {
-          const meta = ACTIVITY_STATUS_META[a.status];
-          const dev = activityEndDeviationDays(a);
-          return (
-            <li key={a.id} className={styles.planItem}>
-              <div className={styles.planItemHead}>
-                <span className={styles.planSeq}>{i + 1}</span>
-                <span className={styles.planName}>{a.title}</span>
-                {a.mandatory && <span className={styles.ptwTag}>Obligatoria</span>}
-                <span className={styles.lifeChip} style={{ color: meta.color, marginLeft: "auto" }}>{meta.label}</span>
-              </div>
-              <div className={styles.planItemMeta}>
-                {a.responsibleName && <span>👤 {a.responsibleName}</span>}
-                {a.specialtyName && <span>🔧 {a.specialtyName}</span>}
-                {a.priority && <span style={{ color: PRIORITY_META[a.priority].color }}>{PRIORITY_META[a.priority].label}</span>}
-                {a.plannedStart && <span>📅 {formatDate(a.plannedStart)}{a.plannedEnd ? ` → ${formatDate(a.plannedEnd)}` : ""}</span>}
-                {frozen && dev != null && dev !== 0 && (
-                  <span className={dev > 0 ? styles.devLate : styles.devEarly}>{dev > 0 ? `+${dev}d` : `${dev}d`} vs baseline</span>
+    <div className={styles.tableCard}>
+      <table className={styles.table}>
+        <thead>
+          <tr>
+            <th style={{ width: 36 }}>#</th>
+            <th>Actividad</th>
+            <th>Responsable</th>
+            <th>Especialidad</th>
+            <th>Prioridad</th>
+            <th>Plan</th>
+            <th>Estado</th>
+            {canEdit && <th style={{ width: 140, textAlign: "right" }}>Acciones</th>}
+          </tr>
+        </thead>
+        <tbody>
+          {activities.map((a, i) => {
+            const meta = ACTIVITY_STATUS_META[a.status];
+            const dev = activityEndDeviationDays(a);
+            return (
+              <tr key={a.id}>
+                <td className={styles.mono}>{i + 1}</td>
+                <td className={styles.titleCell}>
+                  <div className={styles.planCellTitle}>
+                    {a.title}
+                    {a.mandatory && <span className={styles.clMandatory}>Obligatoria</span>}
+                  </div>
+                  {a.description && <div className={styles.planCellSub}>{a.description}</div>}
+                </td>
+                <td>{a.responsibleName ?? <span className={styles.muted}>—</span>}</td>
+                <td>{a.specialtyName ?? <span className={styles.muted}>—</span>}</td>
+                <td>{a.priority ? <span style={{ color: PRIORITY_META[a.priority].color, fontWeight: 600 }}>{PRIORITY_META[a.priority].label}</span> : <span className={styles.muted}>—</span>}</td>
+                <td>
+                  {a.plannedStart ? (
+                    <>{formatDate(a.plannedStart)}{a.plannedEnd ? ` → ${formatDate(a.plannedEnd)}` : ""}</>
+                  ) : (
+                    <span className={styles.muted}>—</span>
+                  )}
+                  {frozen && dev != null && dev !== 0 && (
+                    <span className={dev > 0 ? styles.devLate : styles.devEarly}> · {dev > 0 ? `+${dev}d` : `${dev}d`}</span>
+                  )}
+                </td>
+                <td><span className={styles.lifeChip} style={{ color: meta.color }}>{meta.label}</span></td>
+                {canEdit && (
+                  <td>
+                    <div className={styles.rowActions}>
+                      <Button variant="icon" leftIcon={<ChevronUp size={14} />} disabled={i === 0} onClick={() => move(i, -1)} aria-label="Subir" title="Subir" />
+                      <Button variant="icon" leftIcon={<ChevronDown size={14} />} disabled={i === activities.length - 1} onClick={() => move(i, 1)} aria-label="Bajar" title="Bajar" />
+                      <Button variant="icon" leftIcon={<Pencil size={14} />} onClick={() => onEdit(a)} aria-label="Editar" title="Editar" />
+                      <Button variant="icon" leftIcon={<Trash2 size={14} />} onClick={() => remove.mutate(a.id, { onError: err })} aria-label="Eliminar" title="Eliminar" />
+                    </div>
+                  </td>
                 )}
-              </div>
-              {a.description && <p className={styles.planDesc}>{a.description}</p>}
-              {canEdit && (
-                <div className={styles.planItemActions}>
-                  <Button variant="icon" leftIcon={<ChevronUp size={14} />} disabled={i === 0} onClick={() => move(i, -1)} aria-label="Subir" />
-                  <Button variant="icon" leftIcon={<ChevronDown size={14} />} disabled={i === activities.length - 1} onClick={() => move(i, 1)} aria-label="Bajar" />
-                  <Button variant="secondary" leftIcon={<Pencil size={14} />} onClick={() => setEditing(a)}>Editar</Button>
-                  <Button variant="icon" leftIcon={<Trash2 size={14} />} onClick={() => remove.mutate(a.id, { onError: err })} aria-label="Eliminar" />
-                </div>
-              )}
-            </li>
-          );
-        })}
-      </ul>
-      {adding && <ActivityModal wo={wo} onClose={() => setAdding(false)} />}
-      {editing && <ActivityModal wo={wo} activity={editing} onClose={() => setEditing(null)} />}
-    </>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
