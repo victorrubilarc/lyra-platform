@@ -4,6 +4,16 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-02 · OT — UX: nombres de pestañas del detalle (coherencia con el modelo genérico)
+El dueño observó que **«Permiso»** alude solo a permisos de trabajo, pero el motor de checklists es **GENÉRICO**
+(OT_DESIGN §11.1: cubre PTW, JSA/ART, ITP de calidad, GMP, PSSR/readiness, SOP, inspección, cierre). *Decisiones de
+etiqueta (elegidas por el dueño):* **«Permiso» → «Verificaciones»** (título interno aclara "checklists / permisos de
+trabajo"); **«Plan» → «Plan de actividades»** (era muy escueto); y para no confundir con el plan, la pestaña del timeline
+**«Actividad» → «Historial»**. Set final de pestañas del detalle de OT: **Resumen · Plan de actividades · Verificaciones ·
+Flujo · Historial**. Solo etiquetas (cero cambios de lógica). typecheck/build verdes.
+
+---
+
 ### 2026-07-02 · OT — UX: llenar el checklist en un MODAL embebido (no salir de la OT)
 El dueño pidió que llenar un checklist **no lo saque** de la pantalla de la OT (hoy «Llenar» navegaba a
 `/nueva-entrada/:id`, otra pantalla). *Decisión:* **reutilizar `EntryFillPage` en MODO EMBEBIDO** con props OPCIONALES

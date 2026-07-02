@@ -241,7 +241,7 @@ lista de texto suelta. La OT **no puede pasar la Puerta 2** mientras quede un pe
 > registra **al EJECUTAR cada actividad** (checklists de ejecución ligados a la actividad), no aquí. Ese segundo momento
 > llega con la planificación/ejecución de actividades (Sesiones 4–5). *(Alineado al estándar PTW / ISO 45001 / LOTO.)*
 
-**Cómo se usa** (en el detalle de la OT, pestaña **«Checklists»**):
+**Cómo se usa** (en el detalle de la OT, pestaña **«Verificaciones»**):
 1. Al **iniciar la preparación** de la OT (transición «Iniciar preparación»), el sistema **sugiere automáticamente** los
    checklists cuyas **reglas** coinciden con la OT (por tipo, criticidad, especialidad o si exige PTW). Los **obligatorios**
    no se pueden quitar. También puedes **«Agregar»** manualmente otro checklist, o pulsar **«Sugerir aplicables»** para

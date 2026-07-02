@@ -131,16 +131,16 @@ export function WorkOrderDetailPage() {
               <Info size={14} /> Resumen
             </button>
             <button role="tab" aria-selected={tab === "plan"} className={tab === "plan" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setTab("plan")}>
-              <ListChecks size={14} /> Plan
+              <ListChecks size={14} /> Plan de actividades
             </button>
             <button role="tab" aria-selected={tab === "checklists"} className={tab === "checklists" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setTab("checklists")}>
-              <ClipboardCheck size={14} /> Permiso
+              <ClipboardCheck size={14} /> Verificaciones
             </button>
             <button role="tab" aria-selected={tab === "flujo"} className={tab === "flujo" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setTab("flujo")}>
               <Waypoints size={14} /> Flujo
             </button>
             <button role="tab" aria-selected={tab === "actividad"} className={tab === "actividad" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setTab("actividad")}>
-              <Activity size={14} /> Actividad
+              <Activity size={14} /> Historial
               {wo.events.length > 0 && <span className={styles.tabBadge}>{wo.events.length}</span>}
             </button>
           </div>
@@ -255,7 +255,7 @@ export function WorkOrderDetailPage() {
 
           {tab === "actividad" && (
             <>
-              <div className={styles.sectionTitle}>Actividad</div>
+              <div className={styles.sectionTitle}>Historial</div>
               <ul className={styles.timeline}>
                 {[...wo.events].reverse().map((e) => (
                   <li key={e.id}><span className={styles.muted}>{formatDateTime(e.occurredAt)}</span> — {e.summary}{e.actorName ? ` · ${e.actorName}` : ""}</li>
