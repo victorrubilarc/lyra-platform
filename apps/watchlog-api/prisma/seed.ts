@@ -22,6 +22,8 @@ import {
   WORK_ORDER_WORKFLOW,
   WORK_ORDER_CHECKLIST_TEMPLATES,
   WORK_ORDER_CHECKLIST_RULES,
+  LEGACY_CHECKLIST_TEMPLATE_NAME,
+  LEGACY_CHECKLIST_RULE_NAME,
 } from "./work-orders-seed-data.js";
 
 const prisma = new PrismaClient();
@@ -706,7 +708,12 @@ async function seedWorkOrderChecklists(): Promise<void> {
     if (exists) await prisma.workOrderChecklistRule.update({ where: { id: exists.id }, data });
     else await prisma.workOrderChecklistRule.create({ data });
   }
-  console.log(`✔ Checklists de OT sembrados: ${WORK_ORDER_CHECKLIST_TEMPLATES.length} plantilla(s) + ${WORK_ORDER_CHECKLIST_RULES.length} regla(s)`);
+  // Retira el demo LEGADO de S3 (redactado como "aplicación física", incorrecto para
+  // la Puerta 2 de AUTORIZACIÓN): desactiva su regla y archiva su plantilla para que no
+  // se sugiera ni se ofrezca. No se borra (una OT en curso puede referenciarla).
+  await prisma.workOrderChecklistRule.updateMany({ where: { name: LEGACY_CHECKLIST_RULE_NAME, deletedAt: null }, data: { active: false } });
+  await prisma.template.updateMany({ where: { name: LEGACY_CHECKLIST_TEMPLATE_NAME, deletedAt: null, status: "PUBLISHED" }, data: { status: "ARCHIVED" } });
+  console.log(`✔ Checklists de OT sembrados: ${WORK_ORDER_CHECKLIST_TEMPLATES.length} plantilla(s) + ${WORK_ORDER_CHECKLIST_RULES.length} regla(s) (demo legado retirado)`);
 }
 
 // Reconcilia el contador GLOBAL de folio de OT con los folios ya emitidos. Necesario
