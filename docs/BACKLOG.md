@@ -23,7 +23,7 @@
 > en el drawer + sub-tab "Reglas de checklist" en catálogos. verde + contracts **412** + `smoke-workorders.py` **65/65** +
 > regresión incidencias 32/32. **✅ FIX mismo día (`fix/ot-folio-global`): folio de OT = serie ÚNICA GLOBAL** (corrige la
 > colisión entre tipos que daba Internal Error al aprobar; default scope `type`→`global` + reconciliación de contador; ver
-> §2). **DEUDA:** `Template.purpose` (W5) diferido; editor UI de `folioScheme`/claves de estado. **Siguiente: OT Sesión 5
+> §2). **DEUDA:** editor UI de `folioScheme`/claves de estado. *(`Template.purpose` W5 = ✅ hecho 2026-07-02.)* **Siguiente: OT Sesión 5
 > (Puerta 4 — seguimiento vivo + cierre; incluye lo movido de S4: eje `momento`, checklists de EJECUCIÓN/CIERRE, Gobierno 2).**
 > Antes (2026-07-01): **🔧 OT · Sesión 2 · PUERTA 1 ✅** (`feat/ot-puerta1`): workflow CONGELADO al crear
 > (flujo sembrado **"OT — 4 puertas PTW"** como DATO; la solicitud nace `borrador`/DRAFT) + ejecutor de transiciones
@@ -784,6 +784,16 @@ nunca queda más de una sesión atrás.
 - [ ] **Sesión 8 — Enterprise / opcional (~108 HH, Fase 3):** aprobadores dinámicos por reglas (área/criticidad/
       especialidad/monto/riesgo, reusa el motor de reglas); dependencias/ruta crítica; costos/HH + reportes/export;
       escalamiento multinivel. Puede subdividirse al llegar.
+- [ ] **IDEA DEL DUEÑO (2026-07-02) — GANTT de actividades del plan (~15–25 HH):** en la pestaña «Plan de actividades»,
+      un **botón que levante un GANTT** (modal/pantalla) para ver el espectro completo del plan de forma profesional
+      (barras por actividad sobre una línea de tiempo, con **baseline vs plan vs real**, dependencias `dependsOnId` y, más
+      adelante, ruta crítica de S8). Encaja con S8 (dependencias/ruta crítica) o como slice de visualización propio.
+      Evaluar librería (p. ej. una de Gantt liviana o SVG propio, respetando tokens del DS y modo claro/oscuro).
+- [ ] **IDEA DEL DUEÑO (2026-07-02) — Grilla de OT ENRIQUECIDA (~10–18 HH):** en `/ordenes-trabajo`, mostrar por fila
+      **más información de un vistazo**: nº de **actividades** configuradas (y % avance), nº de **verificaciones**
+      (checklists) y su estado (p. ej. "2/3 aprobadas"), quizás SLA/desviación, y un **acceso directo** (ícono) para abrir
+      el **Gantt** del plan sin entrar al detalle. Requiere que el listado (`WorkOrderListItem`/`list()`) devuelva esos
+      conteos (agregados eficientes por OT). Alinéalo con el slice de columnas/`SavedView` (elegir qué columnas ver).
 - [ ] **SLICE FUTURO — Plantillas de plan / "job plans" (task lists) (~20–30 HH; posterior a S4):** biblioteca de
       **planes de actividades predefinidos** por tipo de OT (equivalente a SAP PM *task list* / Maximo *job plan*): el
       planificador **parte de una plantilla** (p. ej. "Cambio de rodamiento" → precarga N pasos estándar) y la ajusta, en
@@ -804,11 +814,13 @@ nunca queda más de una sesión atrás.
 > **Deuda relacionada (sigue abierta): editor UI de `folioScheme`/`folioOnStateKey`** en el mantenedor de tipos (hoy
 > API-only).
 
-> **DEUDA S3 (menor) — marcador `Template.purpose` (fork W5) DIFERIDO.** El diseño §2.4/W5 contemplaba una columna
-> **opcional** `Template.purpose` (null|CHECKLIST) SOLO como filtro UX del picker de plantillas de checklist. **Se difirió**
-> (aditivo pero inerte sin su propia UI en el Form Builder; "no construir lo que no se usa"). Hoy el picker de reglas ofrece
-> **todas las plantillas PUBLICADAS**. Si el catálogo de plantillas crece y el picker se vuelve ruidoso, agregar `purpose`
-> (columna nullable + selector en el builder + `?purpose=CHECKLIST` en `/templates`). Ver DECISIONS 2026-07-02.
+> ~~**DEUDA S3 (menor) — marcador `Template.purpose` (fork W5) DIFERIDO.**~~ **✅ HECHO 2026-07-02** (`feat/ot-template-purpose`,
+> a pedido del dueño): columna **`Template.purpose`** (enum `TemplatePurpose?`, hoy `CHECKLIST`; null = general; migr.
+> `20260702190000_add_template_purpose`) + `purpose` en contrato (templateSchema/create/update) y servicio + **selector
+> «Propósito de la plantilla» en el Form Builder** (General / Checklist, gobernanza viva vía `updateMeta`) + el **picker de
+> reglas de checklist filtra por defecto a `purpose=CHECKLIST`** (Combobox buscable) con toggle «ver todas» y fallback a
+> todas si aún no hay ninguna marcada; seed marca la plantilla LOTO. smoke-workorders 78/78. *(Filtrado en el CLIENTE por
+> ahora; si el catálogo crece mucho, agregar `?purpose=` a `/templates` — deuda menor.)*
 
 ### 🟡 DEUDA UX — Alinear el detalle de Incidencias al patrón Object Page (~6–10 HH)
 > **Decisión del dueño (2026-07-02):** OT migró su detalle de **drawer lateral → página dedicada** (Object Page, ruta

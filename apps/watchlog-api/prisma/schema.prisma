@@ -587,6 +587,12 @@ enum TemplateStatus {
   ARCHIVED
 }
 
+// Proposito/marcador de UX de una plantilla (fork W5). Hoy solo CHECKLIST (filtra el
+// picker de reglas de checklist de OT). null = general. Extensible a futuro.
+enum TemplatePurpose {
+  CHECKLIST
+}
+
 enum TemplateVersionStatus {
   DRAFT
   PUBLISHED
@@ -725,6 +731,10 @@ model Template {
   description       String?
   // Ancla en la estructura (null = global). La visibilidad se filtra por scope ABAC.
   orgNodeId         String?
+  // Proposito/marcador de UX (fork W5): CHECKLIST = pensada como checklist/permiso
+  // (filtra el picker de reglas de checklist de OT). null = general. No cambia la
+  // mecanica del formulario. Extensible a futuro.
+  purpose           TemplatePurpose?
   status            TemplateStatus    @default(DRAFT)
   // Versión publicada "viva". Null mientras solo exista borrador.
   currentVersionId  String?           @unique

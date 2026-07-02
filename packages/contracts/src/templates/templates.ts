@@ -190,11 +190,24 @@ export const templateVersionSchema = z.object({
 });
 export type TemplateVersionDto = z.infer<typeof templateVersionSchema>;
 
+/**
+ * PROPÓSITO de la plantilla (fork W5) — marcador OPCIONAL que sirve como FILTRO de UX:
+ * hoy solo `CHECKLIST` (para que el picker de reglas de checklist de OT ofrezca únicamente
+ * las plantillas pensadas como checklist/permiso/verificación y no toda la biblioteca).
+ * `null` = plantilla general (bitácora, ronda, etc.). Extensible a futuro. No cambia la
+ * mecánica del formulario: cualquier plantilla PUBLICADA sigue pudiendo usarse.
+ */
+export const TEMPLATE_PURPOSES = ["CHECKLIST"] as const;
+export const templatePurposeSchema = z.enum(TEMPLATE_PURPOSES);
+export type TemplatePurpose = (typeof TEMPLATE_PURPOSES)[number];
+
 export const templateSchema = z.object({
   id: z.string(),
   name: z.string(),
   description: z.string().nullable(),
   orgNodeId: z.string().nullable(),
+  /** Propósito/marcador de UX (fork W5). null = general; CHECKLIST = checklist/permiso. */
+  purpose: templatePurposeSchema.nullable(),
   status: templateStatusSchema,
   currentVersionId: z.string().nullable(),
   /**
@@ -261,6 +274,8 @@ export type TemplateDetail = z.infer<typeof templateDetailSchema>;
 export const createTemplateRequestSchema = z.object({
   name: z.string().trim().min(1).max(140),
   description: z.string().trim().max(1000).optional(),
+  /** Propósito (fork W5). null/omitido = general. */
+  purpose: templatePurposeSchema.nullable().optional(),
   /** @deprecated Nodo primario (derivado de `nodeAssignments`). Usar `nodeAssignments`. */
   orgNodeId: z.string().nullable().optional(),
   /** Alcance de estructura (2.8.0). Si se envía, REEMPLAZA el set. Vacío = GLOBAL. */
@@ -277,6 +292,8 @@ export type CreateTemplateRequest = z.infer<typeof createTemplateRequestSchema>;
 export const updateTemplateRequestSchema = z.object({
   name: z.string().trim().min(1).max(140).optional(),
   description: z.string().trim().max(1000).nullable().optional(),
+  /** Propósito (fork W5). Enviar null = volver a general; omitido = sin cambio. */
+  purpose: templatePurposeSchema.nullable().optional(),
   /** @deprecated Nodo primario (derivado de `nodeAssignments`). Usar `nodeAssignments`. */
   orgNodeId: z.string().nullable().optional(),
   /** Alcance de estructura (2.8.0). Si se envía, REEMPLAZA el set. Vacío = GLOBAL. */

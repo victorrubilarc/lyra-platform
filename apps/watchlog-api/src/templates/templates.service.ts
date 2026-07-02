@@ -194,6 +194,7 @@ export class TemplatesService {
         name: t.name,
         description: t.description,
         orgNodeId: t.orgNodeId,
+        purpose: t.purpose,
         status: t.status,
         currentVersionId: t.currentVersionId,
         editWindowAnchor: t.editWindowAnchor,
@@ -304,6 +305,7 @@ export class TemplatesService {
       name: template.name,
       description: template.description,
       orgNodeId: template.orgNodeId,
+      purpose: template.purpose,
       status: template.status,
       currentVersionId: template.currentVersionId,
       editWindowAnchor: template.editWindowAnchor,
@@ -331,6 +333,7 @@ export class TemplatesService {
         name: dto.name,
         description: dto.description ?? null,
         orgNodeId: change.orgNodeId,
+        purpose: dto.purpose ?? null,
         status: "DRAFT",
         editWindowAnchor: dto.editWindowAnchor ?? null,
         editWindowMinutes: dto.editWindowMinutes ?? null,
@@ -378,6 +381,8 @@ export class TemplatesService {
           name: dto.name ?? undefined,
           description: dto.description === undefined ? undefined : dto.description,
           orgNodeId: change ? change.orgNodeId : undefined,
+          // Propósito/marcador de UX (fork W5): editable en el contenedor mutable.
+          purpose: dto.purpose === undefined ? undefined : dto.purpose,
           // Ventana de edición (2.7.2): gobernanza viva, editable sin republicar.
           editWindowAnchor: dto.editWindowAnchor === undefined ? undefined : dto.editWindowAnchor,
           editWindowMinutes: dto.editWindowMinutes === undefined ? undefined : dto.editWindowMinutes,

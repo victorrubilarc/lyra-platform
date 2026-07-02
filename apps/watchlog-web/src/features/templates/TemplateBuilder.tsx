@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { Button, Card, Checkbox, Chip, Drawer, FormField, Input, Modal, Select, Textarea, useToast } from "@lyra/ui";
 import { GRID_FIELD_KEYS_MAX } from "@lyra/contracts";
-import type { EquipmentMode, FieldType, TemplateDetail } from "@lyra/contracts";
+import type { EquipmentMode, FieldType, TemplateDetail, TemplatePurpose } from "@lyra/contracts";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { EditWindowDurationField } from "../settings/EditWindowDurationField.js";
 import { fetchRoles } from "../security/security-api.js";
@@ -871,6 +871,23 @@ function ConfigView({
                   <option value="OPTIONAL">{t("templates.builder.equipmentModeOptional")}</option>
                   <option value="SUGGESTED">{t("templates.builder.equipmentModeSuggested")}</option>
                   <option value="REQUIRED">{t("templates.builder.equipmentModeRequired")}</option>
+                </Select>
+              )}
+            </FormField>
+            {/* Propósito (fork W5): marca la plantilla como checklist para el picker de reglas de OT. */}
+            <FormField
+              label="Propósito de la plantilla"
+              hint="Marca la plantilla como «checklist» para que el picker de reglas de checklist de OT la ofrezca. «General» = bitácora / ronda normal (no cambia cómo se llena)."
+            >
+              {({ id }) => (
+                <Select
+                  id={id}
+                  value={state.purpose ?? ""}
+                  disabled={!canEdit}
+                  onChange={(e) => patchConfig({ ...state, purpose: e.target.value ? (e.target.value as TemplatePurpose) : null })}
+                >
+                  <option value="">General</option>
+                  <option value="CHECKLIST">Checklist / permiso de trabajo</option>
                 </Select>
               )}
             </FormField>

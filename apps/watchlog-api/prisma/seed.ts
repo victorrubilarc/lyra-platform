@@ -718,6 +718,7 @@ async function seedWorkOrderChecklists(): Promise<void> {
           name: tpl.name,
           description: tpl.description,
           status: "PUBLISHED",
+          purpose: "CHECKLIST", // fork W5: la biblioteca de checklists queda marcada como tal
           equipmentMode: "NONE",
           versions: {
             create: {
@@ -744,6 +745,9 @@ async function seedWorkOrderChecklists(): Promise<void> {
       await prisma.template.update({ where: { id: created.id }, data: { currentVersionId: created.versions[0]!.id } });
       await prisma.templateNodeAssignment.create({ data: { templateId: created.id, orgNodeId: rootNode.id, includeDescendants: true } });
       template = { id: created.id };
+    } else {
+      // Ya existía (seed previo): asegura el marcador de propósito (fork W5), idempotente.
+      await prisma.template.update({ where: { id: template.id }, data: { purpose: "CHECKLIST" } });
     }
   }
   // Reglas de checklist (Capa A). Idempotente por NOMBRE.

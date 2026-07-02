@@ -4,6 +4,23 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-02 · OT/Form Builder — W5 `Template.purpose`: filtrar el picker a plantillas «checklist»
+Inquietud del dueño: la lista de plantillas del picker de reglas de checklist mezcla TODAS las publicadas (bitácoras,
+rondas, incidencias…) y con muchas se vuelve ruidosa. *Decisión (con su OK):* implementar el fork **W5** que estaba
+diferido — marcador **`Template.purpose`** (enum `TemplatePurpose?`, hoy solo `CHECKLIST`; null = general). **Alcance:**
+(1) schema + migración `20260702190000_add_template_purpose`; (2) contrato (`purpose` en templateSchema/create/update +
+`TEMPLATE_PURPOSES`); (3) servicio (persistir/exponer en list+detail+create+update); (4) **selector «Propósito de la
+plantilla» en el Form Builder** (General / Checklist) — gobernanza VIVA en el contenedor mutable vía `updateMeta` (era el
+blocker de S3: "inerte sin su propia UI"); (5) el **picker de reglas filtra por defecto a `purpose=CHECKLIST`** (Combobox
+buscable) con toggle «ver todas las plantillas» y **fallback a todas si aún no hay ninguna marcada** (nunca deja el picker
+vacío) + la plantilla ya seleccionada siempre visible; (6) seed marca la plantilla LOTO. **Filtrado en el CLIENTE** por
+ahora (si el catálogo de plantillas crece mucho, agregar `?purpose=` a `/templates` — deuda menor anotada). No cambia la
+mecánica del formulario: cualquier plantilla PUBLICADA sigue usable. Verde typecheck/lint/build + contracts 421 +
+smoke-workorders 78/78. *(Se anotaron además 2 ideas del dueño en BACKLOG: Gantt de actividades + grilla de OT enriquecida
+con conteos y acceso al Gantt.)*
+
+---
+
 ### 2026-07-02 · OT — UX: pickers buscables, quitar "Puerta N" de la UI, botón «volver» coherente
 Más pulido "pensando en quien tiene poco tiempo" (feedback del dueño):
 1. **Pickers buscables** en «Nueva regla de checklist»: el picker de **tipos de OT** pasa a `MultiSelect` (búsqueda +

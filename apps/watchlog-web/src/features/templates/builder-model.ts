@@ -51,6 +51,7 @@ import type {
   CrossRule,
   EditWindowAnchor,
   EquipmentMode,
+  TemplatePurpose,
   FieldSemanticRole,
   FieldType,
   OrgNodeTree,
@@ -424,6 +425,8 @@ export interface EditSection {
 export interface EditState {
   name: string;
   description: string;
+  /** Propósito/marcador de UX (fork W5). null = general; CHECKLIST = checklist/permiso. */
+  purpose: TemplatePurpose | null;
   /** Alcance de estructura (multi-nodo 2.8.0). Vacío = GLOBAL. Fuente de verdad. */
   nodeAssignments: TemplateNodeAssignmentInput[];
   requireSignature: boolean;
@@ -489,6 +492,7 @@ export function detailToEditState(detail: TemplateDetail): EditState {
   return {
     name: detail.name,
     description: detail.description ?? "",
+    purpose: detail.purpose,
     nodeAssignments: detail.nodeAssignments.map((a) => ({
       orgNodeId: a.orgNodeId,
       includeDescendants: a.includeDescendants,
@@ -621,6 +625,7 @@ export function editStateToConfigRequest(state: EditState): UpdateTemplateReques
   return {
     name: state.name.trim() || "Sin título",
     description: state.description.trim() || null,
+    purpose: state.purpose,
     nodeAssignments: state.nodeAssignments,
     editWindowAnchor: state.editWindowAnchor,
     editWindowMinutes: state.editWindowMinutes,
