@@ -8,6 +8,7 @@ import {
   planNotFrozen,
   buildFolioSeqKey,
   deriveWorkOrderLifecycle,
+  normalizeFolioSegment,
   renderFolio,
   resolveFolioScheme,
   workOrderCode,
@@ -407,6 +408,14 @@ export class WorkOrdersService {
       let folioFields: Prisma.WorkOrderUpdateInput = {};
       if (row.folio == null && toState.key === folioStateKey) {
         const scheme = resolveFolioScheme(type?.folioScheme ?? null);
+        // El ámbito por nodo/estructura aporta un SEGMENTO VISIBLE (código del nodo/
+        // estructura) además de partir el contador.
+        const scopeCode =
+          scheme.scope === "node"
+            ? normalizeFolioSegment(row.orgNode?.code ?? row.orgNode?.externalCode ?? row.orgNode?.name ?? null)
+            : scheme.scope === "structure"
+              ? normalizeFolioSegment(row.orgNode?.structure?.key ?? row.orgNode?.structure?.name ?? null)
+              : null;
         const seqKey = buildFolioSeqKey(scheme, {
           entity: "workorder",
           typeId: row.typeId,
@@ -415,7 +424,7 @@ export class WorkOrdersService {
           year: this.folio.plantYear(now),
         });
         const seq = await this.folio.next(tx, seqKey, scheme.start);
-        issuedFolio = renderFolio(scheme, seq, { year: this.folio.plantYear(now) });
+        issuedFolio = renderFolio(scheme, seq, { year: this.folio.plantYear(now), scopeCode });
         folioFields = { folio: issuedFolio, folioSeqKey: seqKey, folioIssuedAt: now };
       }
       await tx.workOrderTransition.create({
@@ -734,8 +743,11 @@ export class WorkOrdersService {
 
   private readonly listInclude = {
     type: { select: { name: true, color: true } },
-    // structureId: lo usa el scope "structure" del folio (buildFolioSeqKey).
-    orgNode: { select: { name: true, structureId: true } },
+    // structureId: lo usa el scope "structure" del folio (buildFolioSeqKey). code/externalCode
+    // + structure.key alimentan el SEGMENTO VISIBLE del folio por nodo/estructura.
+    orgNode: {
+      select: { name: true, structureId: true, code: true, externalCode: true, structure: { select: { key: true, name: true } } },
+    },
     equipment: { select: { tag: true } },
     specialties: { include: { specialty: { select: { id: true, name: true, color: true } } } },
   } satisfies Prisma.WorkOrderInclude;
@@ -1094,7 +1106,15 @@ export class WorkOrdersService {
 type WorkOrderRow = Prisma.WorkOrderGetPayload<{
   include: {
     type: { select: { name: true; color: true } };
-    orgNode: { select: { name: true; structureId: true } };
+    orgNode: {
+      select: {
+        name: true;
+        structureId: true;
+        code: true;
+        externalCode: true;
+        structure: { select: { key: true; name: true } };
+      };
+    };
     equipment: { select: { tag: true } };
     specialties: { include: { specialty: { select: { id: true; name: true; color: true } } } };
   };
