@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { WorkOrderChecklistRuleDto } from "@lyra/contracts";
-import { Button, Input, Modal, Select, Toggle, useToast } from "@lyra/ui";
+import { Button, Combobox, Input, Modal, MultiSelect, Select, Toggle, useToast } from "@lyra/ui";
 import {
   usePublishedTemplateOptions,
   useUpsertWorkOrderChecklistRule,
@@ -46,6 +46,17 @@ export function WorkOrderChecklistRuleModal({ open, onClose, rule }: { open: boo
 
   const canSave = name.trim().length > 0 && templateId.length > 0;
 
+  // Opciones ORDENADAS alfabéticamente para búsqueda rápida (Combobox/MultiSelect filtran
+  // al escribir ⇒ funciona igual con pocas o con muchas plantillas/tipos).
+  const templateOptions = useMemo(
+    () => [...templates].sort((a, b) => a.name.localeCompare(b.name)).map((t) => ({ value: t.id, label: t.name })),
+    [templates],
+  );
+  const typeOptions = useMemo(
+    () => [...types].sort((a, b) => a.name.localeCompare(b.name)).map((t) => ({ value: t.id, label: t.name })),
+    [types],
+  );
+
   function save() {
     upsert.mutate(
       {
@@ -77,46 +88,35 @@ export function WorkOrderChecklistRuleModal({ open, onClose, rule }: { open: boo
           <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej. PTW obligatorio — Bloqueo de energías (LOTO)" />
         </label>
 
-        <label className={styles.field}>
+        <div className={styles.field}>
           <span className={styles.fieldLabel}>Plantilla de checklist (publicada) *</span>
-          <Select value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
-            <option value="">Selecciona…</option>
-            {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </Select>
+          <Combobox
+            options={templateOptions}
+            value={templateId}
+            onChange={setTemplateId}
+            placeholder="Selecciona…"
+            searchPlaceholder="Buscar plantilla…"
+          />
           {templates.length === 0 && <span className={styles.hint}>No hay plantillas publicadas. Publica una plantilla en el Form Builder para usarla como checklist.</span>}
-        </label>
+        </div>
 
         <label className={styles.checkboxRow}>
           <Toggle checked={mandatory} onChange={(v) => setMandatory(v)} size="sm" />
-          <span>Obligatorio (bloquea la Puerta 2 hasta ser aprobado; no removible)</span>
+          <span>Obligatorio (impide avanzar hasta ser aprobado; no removible)</span>
         </label>
 
         <div className={styles.field}>
           <span className={styles.fieldLabel}>Aplica a tipos de OT (vacío = todos)</span>
-          {/* Lista de checkboxes: clic = alterna; nunca se pierde la selección (a diferencia
-              del multi-select nativo, donde un clic al vacío borraba todo). */}
-          <div className={styles.typePicker}>
-            {types.map((t) => {
-              const checked = appliesToTypeIds.includes(t.id);
-              return (
-                <label key={t.id} className={checked ? `${styles.typeOption} ${styles.typeOptionOn}` : styles.typeOption}>
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() =>
-                      setAppliesToTypeIds((prev) => (checked ? prev.filter((id) => id !== t.id) : [...prev, t.id]))
-                    }
-                  />
-                  <span>{t.name}</span>
-                </label>
-              );
-            })}
-          </div>
-          <span className={styles.hint}>
-            {appliesToTypeIds.length === 0
-              ? "Aplica a TODOS los tipos de OT."
-              : `${appliesToTypeIds.length} tipo(s) seleccionado(s).`}
-          </span>
+          {/* MultiSelect buscable + chips: encuentra rápido con muchos tipos y siempre
+              muestra lo elegido; un clic no borra la selección (a diferencia del nativo). */}
+          <MultiSelect
+            options={typeOptions}
+            value={appliesToTypeIds}
+            onChange={setAppliesToTypeIds}
+            placeholder="Todos los tipos"
+            searchPlaceholder="Buscar tipo de OT…"
+          />
+          {appliesToTypeIds.length === 0 && <span className={styles.hint}>Aplica a TODOS los tipos de OT.</span>}
         </div>
 
         <div className={styles.formRow}>

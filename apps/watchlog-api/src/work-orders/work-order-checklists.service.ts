@@ -244,7 +244,7 @@ export class WorkOrderChecklistsService {
     const checklists = await this.prisma.workOrderChecklist.findMany({ where: { workOrderId, mandatory: true }, select: { mandatory: true, status: true } });
     const blocking = blockingChecklistsForClose(checklists);
     if (blocking.length > 0) {
-      throw new BadRequestException(`No se puede avanzar la Puerta 2: ${blocking.length} checklist(s) obligatorio(s) sin aprobar.`);
+      throw new BadRequestException(`No se puede avanzar: ${blocking.length} verificación(es) obligatoria(s) sin aprobar.`);
     }
   }
 

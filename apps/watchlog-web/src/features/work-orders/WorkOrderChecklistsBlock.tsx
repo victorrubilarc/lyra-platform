@@ -63,7 +63,7 @@ export function WorkOrderChecklistsBlock({ workOrderId, isLive }: { workOrderId:
 
       {blocking.length > 0 && (
         <p className={styles.rejectBox}>
-          <ShieldAlert size={15} /> Puerta 2 bloqueada: {blocking.length} checklist(s) obligatorio(s) sin aprobar.
+          <ShieldAlert size={15} /> No se puede avanzar: {blocking.length} verificación(es) obligatoria(s) sin aprobar.
         </p>
       )}
 

@@ -125,7 +125,7 @@ function PlanStageBanner({ wo, activities, frozen }: { wo: WorkOrderDetail; acti
         {ready ? <Sparkles size={15} /> : <ShieldAlert size={15} />}
         {ready
           ? "Plan listo. Próxima acción: «Autorizar plan» (pestaña Resumen) para congelar la baseline."
-          : "Agrega al menos una actividad para poder autorizar el plan (Puerta 3)."}
+          : "Agrega al menos una actividad para poder autorizar el plan."}
       </p>
     );
   }
