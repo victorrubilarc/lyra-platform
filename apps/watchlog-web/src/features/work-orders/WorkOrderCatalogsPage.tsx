@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, BadgeCheck, ClipboardCheck, Lock, Pencil, Plus, Search, Tags, Trash2 } from "lucide-react";
-import { COMPETENCY_CATEGORY_META, DEFAULT_COMPETENCY_WARNING_LEAD_DAYS, WORK_ORDER_CHECKLIST_MOMENT_META, type CompetencyTypeDto, type SpecialtyDto, type WorkOrderChecklistRuleDto, type WorkOrderCompetencyRuleDto, type WorkOrderTypeDto } from "@lyra/contracts";
+import { ArrowLeft, BadgeCheck, ClipboardCheck, HardHat, Lock, Pencil, Plus, Search, Tags, Trash2 } from "lucide-react";
+import { COMPETENCY_CATEGORY_META, DEFAULT_COMPETENCY_WARNING_LEAD_DAYS, WORK_ORDER_CHECKLIST_MOMENT_META, type CompetencyTypeDto, type RosterRoleDto, type SpecialtyDto, type WorkOrderChecklistRuleDto, type WorkOrderCompetencyRuleDto, type WorkOrderTypeDto } from "@lyra/contracts";
 import { Button, Chip, EmptyState, GridPager, Input, Select, Spinner, Toggle, useToast } from "@lyra/ui";
 import { usePermissions } from "../../auth/use-permissions.js";
 import {
@@ -9,7 +9,9 @@ import {
   useCompetencyTypes,
   useDeleteCompetencyRule,
   useDeleteCompetencyType,
+  useDeleteRosterRole,
   useDeleteWorkOrderChecklistRule,
+  useRosterRoles,
   useUpsertWorkOrderSpecialty,
   useUpsertWorkOrderType,
   useWorkOrderChecklistRules,
@@ -21,6 +23,7 @@ import { WorkOrderTagModal } from "./WorkOrderTagModal.js";
 import { WorkOrderChecklistRuleModal } from "./WorkOrderChecklistRuleModal.js";
 import { CompetencyTypeModal } from "./CompetencyTypeModal.js";
 import { WorkOrderCompetencyRuleModal } from "./WorkOrderCompetencyRuleModal.js";
+import { RosterRoleModal } from "./RosterRoleModal.js";
 import { criticalityLabel } from "./work-orders-presentation.js";
 import styles from "./catalogs.module.css";
 
@@ -34,7 +37,7 @@ type Row = { name: string; key: string; active: boolean; sortOrder: number };
  */
 export function WorkOrderCatalogsPage() {
   const { can } = usePermissions();
-  const [tab, setTab] = useState<"types" | "specialties" | "checklists" | "competencyTypes" | "competencyRules">("types");
+  const [tab, setTab] = useState<"types" | "specialties" | "checklists" | "competencyTypes" | "competencyRules" | "rosterRoles">("types");
 
   if (!can("workordercatalog:manage")) {
     return (
@@ -60,9 +63,10 @@ export function WorkOrderCatalogsPage() {
         <button role="tab" aria-selected={tab === "checklists"} className={tab === "checklists" ? styles.tabActive : styles.tab} onClick={() => setTab("checklists")}>Reglas de checklist</button>
         <button role="tab" aria-selected={tab === "competencyTypes"} className={tab === "competencyTypes" ? styles.tabActive : styles.tab} onClick={() => setTab("competencyTypes")}>Competencias</button>
         <button role="tab" aria-selected={tab === "competencyRules"} className={tab === "competencyRules" ? styles.tabActive : styles.tab} onClick={() => setTab("competencyRules")}>Reglas de competencia</button>
+        <button role="tab" aria-selected={tab === "rosterRoles"} className={tab === "rosterRoles" ? styles.tabActive : styles.tab} onClick={() => setTab("rosterRoles")}>Roles de dotación</button>
       </div>
 
-      {tab === "types" ? <TypesTab /> : tab === "specialties" ? <SpecialtiesTab /> : tab === "checklists" ? <ChecklistRulesTab /> : tab === "competencyTypes" ? <CompetencyTypesTab /> : <CompetencyRulesTab />}
+      {tab === "types" ? <TypesTab /> : tab === "specialties" ? <SpecialtiesTab /> : tab === "checklists" ? <ChecklistRulesTab /> : tab === "competencyTypes" ? <CompetencyTypesTab /> : tab === "competencyRules" ? <CompetencyRulesTab /> : <RosterRolesTab />}
     </div>
   );
 }
@@ -259,6 +263,80 @@ function SpecialtiesTab() {
         )}
 
       <WorkOrderTagModal open={open} onClose={() => setOpen(false)} specialty={editing} existingKeys={existingKeys} />
+    </>
+  );
+}
+
+/**
+ * Roles de la DOTACIÓN (catálogo configurable). Los 3 estándar OSHA 1910.146 (ejecutante /
+ * vigía / supervisor de entrada) vienen sembrados y son editables; el cliente puede agregar
+ * los suyos. `isSupervisorRole` marca a quien autoriza/firma la entrada; `mustRemainOutside`
+ * la semántica de vigía. Grilla estándar (useCatalogFilter + GridPager).
+ */
+function RosterRolesTab() {
+  const toast = useToast();
+  const { data: rows = [], isLoading } = useRosterRoles(true);
+  const del = useDeleteRosterRole();
+  const [editing, setEditing] = useState<RosterRoleDto | null>(null);
+  const [open, setOpen] = useState(false);
+
+  const { pageRows, total, filterProps, pagerProps } = useCatalogFilter(rows);
+  const pager = <GridPager {...pagerProps} />;
+
+  function removeRole(r: RosterRoleDto) {
+    if (!window.confirm(`¿Eliminar el rol "${r.name}"? Las OT que ya lo usan conservan su dotación.`)) return;
+    del.mutate(r.id, { onSuccess: () => toast.success("Rol eliminado"), onError: (e) => toast.error((e as Error).message) });
+  }
+
+  return (
+    <>
+      <div className={styles.toolbar}>
+        <Filters {...filterProps} />
+        <Button variant="primary" leftIcon={<Plus size={16} />} onClick={() => { setEditing(null); setOpen(true); }}>Nuevo rol</Button>
+      </div>
+
+      {isLoading ? <div className={styles.center}><Spinner /></div>
+        : total === 0 ? <EmptyState icon={<HardHat size={32} />} title="Sin roles de dotación" description="Crea el primer rol (p. ej. Ejecutante, Vigía, Supervisor de entrada)." />
+        : (
+          <>
+            {pager}
+            <div className={styles.tableCard}>
+              <table className={styles.table}>
+                <thead><tr>
+                  <th>Rol</th><th>Clave</th><th>Marcadores</th><th className={styles.num}>Orden</th><th>Estado</th><th></th>
+                </tr></thead>
+                <tbody>
+                  {pageRows.map((r) => (
+                    <tr key={r.id} className={r.active ? undefined : styles.inactiveRow}>
+                      <td>
+                        <span className={styles.nameCell}>
+                          <span className={styles.dot} style={{ background: r.color ?? "var(--color-text-muted)" }} />
+                          {r.name}
+                        </span>
+                        {r.description && <div className={styles.cellDesc}>{r.description}</div>}
+                      </td>
+                      <td><span className={styles.mono}>{r.key}</span></td>
+                      <td>
+                        {r.isSupervisorRole && <Chip label="Autoriza/firma" variant="info" />}
+                        {r.mustRemainOutside && <Chip label="Permanece afuera (vigía)" variant="default" />}
+                        {!r.isSupervisorRole && !r.mustRemainOutside && <span className={styles.muted}>—</span>}
+                      </td>
+                      <td className={styles.num}>{r.sortOrder}</td>
+                      <td><span className={styles.muted}>{r.active ? "Activo" : "Inactivo"}</span></td>
+                      <td className={styles.actionsCell}>
+                        <Button variant="icon" aria-label="Editar" onClick={() => { setEditing(r); setOpen(true); }}><Pencil size={16} /></Button>
+                        <Button variant="icon" aria-label="Eliminar" onClick={() => removeRole(r)}><Trash2 size={16} /></Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {pager}
+          </>
+        )}
+
+      <RosterRoleModal open={open} onClose={() => setOpen(false)} role={editing} />
     </>
   );
 }

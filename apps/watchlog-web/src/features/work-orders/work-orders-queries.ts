@@ -5,6 +5,7 @@ import type {
   ConfirmRosterRequest,
   RemoveWorkOrderWorkerRequest,
   UpsertContractorCompanyRequest,
+  UpsertRosterRoleRequest,
   UpsertPersonRequest,
   AssignWorkOrderRequest,
   CancelWorkOrderRequest,
@@ -71,6 +72,8 @@ import {
   upsertContractorCompany,
   deleteContractorCompany,
   fetchRosterRoles,
+  upsertRosterRole,
+  deleteRosterRole,
   fetchCompetencyTypes,
   upsertCompetencyType,
   deleteCompetencyType,
@@ -397,8 +400,21 @@ export function useDeleteContractorCompany() {
   return useMutation({ mutationFn: (id: string) => deleteContractorCompany(id), onSuccess: () => qc.invalidateQueries({ queryKey: PERSON_KEYS.companies() }) });
 }
 
-export function useRosterRoles() {
-  return useQuery({ queryKey: PERSON_KEYS.rosterRoles(), queryFn: () => fetchRosterRoles() });
+export function useRosterRoles(includeInactive = false) {
+  return useQuery({ queryKey: [...PERSON_KEYS.rosterRoles(), includeInactive], queryFn: () => fetchRosterRoles(includeInactive) });
+}
+
+export function useUpsertRosterRole() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ dto, create }: { dto: UpsertRosterRoleRequest; create: boolean }) => upsertRosterRole(dto, create),
+    onSuccess: () => qc.invalidateQueries({ queryKey: PERSON_KEYS.rosterRoles() }),
+  });
+}
+
+export function useDeleteRosterRole() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (id: string) => deleteRosterRole(id), onSuccess: () => qc.invalidateQueries({ queryKey: PERSON_KEYS.rosterRoles() }) });
 }
 
 // === Competencias / restricciones / reglas (S2) ============================
@@ -438,8 +454,8 @@ export function useDeleteCompetencyRule() {
   return useMutation({ mutationFn: (ruleId: string) => deleteCompetencyRule(ruleId), onSuccess: () => qc.invalidateQueries({ queryKey: COMPETENCY_KEYS.rules() }) });
 }
 
-export function usePersonCompetencies(personId: string | null) {
-  return useQuery({ queryKey: COMPETENCY_KEYS.personCompetencies(personId ?? ""), queryFn: () => fetchPersonCompetencies(personId!), enabled: !!personId });
+export function usePersonCompetencies(personId: string | null, includeArchived = false) {
+  return useQuery({ queryKey: [...COMPETENCY_KEYS.personCompetencies(personId ?? ""), includeArchived], queryFn: () => fetchPersonCompetencies(personId!, includeArchived), enabled: !!personId });
 }
 
 export function useUpsertPersonCompetency(personId: string) {
@@ -452,8 +468,8 @@ export function useDeletePersonCompetency(personId: string) {
   return useMutation({ mutationFn: (id: string) => deletePersonCompetency(personId, id), onSuccess: () => qc.invalidateQueries({ queryKey: COMPETENCY_KEYS.personCompetencies(personId) }) });
 }
 
-export function usePersonRestrictions(personId: string | null) {
-  return useQuery({ queryKey: COMPETENCY_KEYS.personRestrictions(personId ?? ""), queryFn: () => fetchPersonRestrictions(personId!), enabled: !!personId });
+export function usePersonRestrictions(personId: string | null, includeArchived = false) {
+  return useQuery({ queryKey: [...COMPETENCY_KEYS.personRestrictions(personId ?? ""), includeArchived], queryFn: () => fetchPersonRestrictions(personId!, includeArchived), enabled: !!personId });
 }
 
 export function useUpsertPersonRestriction(personId: string) {

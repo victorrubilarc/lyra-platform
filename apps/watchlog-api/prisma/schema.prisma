@@ -3000,10 +3000,15 @@ model Person {
   firstName           String
   lastName            String
   fullName            String // denormalizado (busqueda / render rapido)
-  nationalId          String? // RUT/DNI (identificador de la persona real)
+  nationalIdType      String? // RUT|PASSPORT|DNI|OTHER (contempla extranjeros; RUT se valida/formatea)
+  nationalId          String? // numero de documento (RUT normalizado, o doc extranjero)
   personnelCode       String? // ficha/codigo interno o del contratista
   badgeId             String? // credencial fisica (gancho control de acceso S4)
   jobTitle            String? // cargo (texto libre en S1; Specialty formal si se pide)
+  // Datos personales opcionales (traza SAP HR IT0002 / Maximo Person)
+  birthDate           DateTime? // fecha de nacimiento (la edad se DERIVA)
+  gender              String? // MALE|FEMALE|OTHER|UNSPECIFIED
+  nationality         String? // nacionalidad (texto: "Chilena", "Peruana", ...)
   email               String?
   phone               String?
   contractorCompanyId String? // null = propio; set = trabajador de contratista

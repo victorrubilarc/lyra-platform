@@ -109,7 +109,7 @@ export function WorkOrderRosterBlock({ wo, isLive }: { wo: WorkOrderDetail; isLi
       {isLive && manage && <AddWorkerRow roster={roster} onAdd={(dto) => add.mutate(dto, { onSuccess: () => toast.success("Persona agregada a la dotación"), onError: err })} pending={add.isPending} />}
 
       {roster.workers.length === 0 ? (
-        <p className={styles.muted}>Sin personas en la dotación. Agrega a quienes ingresarán a ejecutar el permiso.</p>
+        <div className={styles.rosterEmpty}><Users size={16} /> Sin personas en la dotación. Agrega a quienes ingresarán a ejecutar el permiso.</div>
       ) : (
         <ul className={styles.rosterList}>
           {roster.workers.map((w) => (
@@ -179,15 +179,18 @@ function AddWorkerRow({ roster, onAdd, pending }: { roster: { workers: WorkOrder
   };
 
   return (
-    <div className={styles.rosterAddRow}>
-      <div className={styles.rosterAddPicker}>
-        <Combobox options={personOptions} value={personId} onChange={setPersonId} placeholder="Buscar persona…" searchPlaceholder="Buscar por nombre…" ariaLabel="Persona" clearable emptyText="No hay personas en el catálogo" />
+    <div className={styles.rosterAddCard}>
+      <span className={styles.rosterAddLabel}><Plus size={12} /> Agregar a la dotación</span>
+      <div className={styles.rosterAddRow}>
+        <div className={styles.rosterAddPicker}>
+          <Combobox options={personOptions} value={personId} onChange={setPersonId} placeholder="Buscar persona…" searchPlaceholder="Buscar por nombre…" ariaLabel="Persona" clearable emptyText="No hay personas en el catálogo" />
+        </div>
+        <Select value={roleId} onChange={(e) => setRoleId(e.target.value)} aria-label="Rol en la dotación" className={styles.rosterRoleSelect}>
+          <option value="">Rol en la dotación…</option>
+          {roster.roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+        </Select>
+        <Button variant="primary" leftIcon={<Plus size={15} />} loading={pending} disabled={!personId || !roleId} onClick={submit}>Agregar</Button>
       </div>
-      <Select value={roleId} onChange={(e) => setRoleId(e.target.value)} aria-label="Rol en la dotación">
-        <option value="">Rol…</option>
-        {roster.roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-      </Select>
-      <Button variant="secondary" leftIcon={<Plus size={15} />} loading={pending} disabled={!personId || !roleId} onClick={submit}>Agregar</Button>
     </div>
   );
 }
