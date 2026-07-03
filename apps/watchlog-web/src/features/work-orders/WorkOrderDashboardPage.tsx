@@ -102,6 +102,7 @@ export function WorkOrderDashboardPage() {
     if (specialtyId) p.set("specialtyId", specialtyId);
     if (origin) p.set("originType", origin);
     for (const [k, v] of Object.entries(extra)) p.set(k, v);
+    p.set("from", "dashboard"); // habilita el back-nav «← Volver al dashboard» en la lista
     navigate(`/ordenes-trabajo?${p.toString()}`);
   }
 

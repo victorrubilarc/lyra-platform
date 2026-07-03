@@ -1,15 +1,26 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { BarChart3, ClipboardList, Plus, Search, Tags, Users } from "lucide-react";
+import { ArrowLeft, BarChart3, ClipboardList, Plus, Search, Tags, Users } from "lucide-react";
 import type { WorkOrderListQuery } from "@lyra/contracts";
 import { Button, Card, EmptyState, GridPager, Input, Select, Spinner } from "@lyra/ui";
 import { usePermissions } from "../../auth/use-permissions.js";
-import { useWorkOrderSpecialties, useWorkOrderStats, useWorkOrderTypes, useWorkOrders } from "./work-orders-queries.js";
+import { formatDate } from "../../lib/format.js";
+import { DateRangePresets } from "../shared/DateRangePresets.js";
+import { FilterChips, type FilterChip } from "../shared/FilterChips.js";
+import { RefreshButton } from "../shared/RefreshButton.js";
+import { useWorkOrderSpecialties, useWorkOrderStats, useWorkOrderTypes, useWorkOrders, WORK_ORDER_KEYS } from "./work-orders-queries.js";
 import { CreateWorkOrderModal } from "./CreateWorkOrderModal.js";
 import { LIFECYCLE_META, ORIGIN_META, PRIORITY_META, SLA_STATUS_META, criticalityColor, criticalityLabel } from "./work-orders-presentation.js";
 import styles from "./work-orders.module.css";
 
 type FlagKey = "" | "mine" | "unassignedOnly" | "requiresPtw";
+
+/** Etiquetas del filtro de plazo (distinto del semáforo SLA_STATUS_META, que va por color). */
+const SLA_FILTER_LABELS: Record<NonNullable<WorkOrderListQuery["slaStatus"]>, string> = {
+  overdue: "Vencidas",
+  atRisk: "Por vencer",
+  stalled: "Estancadas",
+};
 
 export function WorkOrdersPage() {
   const { can } = usePermissions();
@@ -19,11 +30,8 @@ export function WorkOrdersPage() {
   const [params] = useSearchParams();
   const FLAG_KEYS = ["mine", "unassignedOnly", "requiresPtw"] as const;
   const initialFlag = (FLAG_KEYS.find((k) => params.get(k) === "true") ?? "") as FlagKey;
-  const passCreatedFrom = params.get("createdFrom") ?? undefined;
-  const passCreatedTo = params.get("createdTo") ?? undefined;
-  const passOrgNodeIds = params.get("orgNodeIds") ?? undefined;
-  const passOriginType = (params.get("originType") ?? undefined) as WorkOrderListQuery["originType"] | undefined;
-  const passEquipmentId = params.get("equipmentId") ?? undefined;
+  // Se llega desde el Dashboard de OT (?from=dashboard): mostramos un back-nav.
+  const fromDashboard = params.get("from") === "dashboard";
   // Recordar la ÚLTIMA OT consultada: al volver del detalle se resalta su fila y se
   // hace scroll a ella, para saber "dónde estabas" (sobrevive el desmontaje de la lista).
   const [lastViewed, setLastViewed] = useState<string | null>(() => sessionStorage.getItem("wo:lastViewed"));
@@ -54,6 +62,13 @@ export function WorkOrdersPage() {
   );
   const [flag, setFlag] = useState<FlagKey>(initialFlag);
   const [sort, setSort] = useState<WorkOrderListQuery["sort"]>("recent");
+  // Filtros del drill-down, ahora en ESTADO (para poder limpiarlos). Sin control propio
+  // en la barra: se muestran como chips removibles. El rango llega como ISO por URL.
+  const [orgNodeIds, setOrgNodeIds] = useState<string[]>(() => params.get("orgNodeIds")?.split(",").filter(Boolean) ?? []);
+  const [originType, setOriginType] = useState<WorkOrderListQuery["originType"] | "">((params.get("originType") as WorkOrderListQuery["originType"] | null) ?? "");
+  const [equipmentId, setEquipmentId] = useState(params.get("equipmentId") ?? "");
+  const [createdFrom, setCreatedFrom] = useState(params.get("createdFrom") ?? "");
+  const [createdTo, setCreatedTo] = useState(params.get("createdTo") ?? "");
 
   const query: WorkOrderListQuery = useMemo(
     () => ({
@@ -64,23 +79,27 @@ export function WorkOrdersPage() {
       priority: priority || undefined,
       specialtyId: specialtyId || undefined,
       slaStatus: slaStatus || undefined,
-      // Pass-through del drill-down (no tienen control propio en la barra): rango de
-      // creación, nodo, origen y equipo llegan por URL desde el Dashboard.
-      originType: passOriginType || undefined,
-      equipmentId: passEquipmentId || undefined,
-      orgNodeIds: passOrgNodeIds ? passOrgNodeIds.split(",").filter(Boolean) : undefined,
-      createdFrom: passCreatedFrom ? new Date(passCreatedFrom) : undefined,
-      createdTo: passCreatedTo ? new Date(passCreatedTo) : undefined,
+      // Filtros del drill-down (rango de creación, nodo, origen, equipo): en estado.
+      originType: originType || undefined,
+      equipmentId: equipmentId || undefined,
+      orgNodeIds: orgNodeIds.length ? orgNodeIds : undefined,
+      createdFrom: createdFrom ? new Date(createdFrom) : undefined,
+      createdTo: createdTo ? new Date(createdTo) : undefined,
       sort,
       ...(flag ? { [flag]: true } : {}),
       page,
       pageSize,
     }),
-    [search, lifecycle, typeId, criticality, priority, specialtyId, slaStatus, passOriginType, passEquipmentId, passOrgNodeIds, passCreatedFrom, passCreatedTo, sort, flag, page, pageSize],
+    [search, lifecycle, typeId, criticality, priority, specialtyId, slaStatus, originType, equipmentId, orgNodeIds, createdFrom, createdTo, sort, flag, page, pageSize],
   );
   /** Aplica una faceta del vigía: acota a ABIERTAS + el estado SLA, y ordena por plazo. */
   const applySla = (s: NonNullable<WorkOrderListQuery["slaStatus"]>) => {
     setLifecycle("OPEN"); setSlaStatus(s); setFlag(""); setCriticality(""); setSort(s === "stalled" ? "recent" : "due"); setPage(1);
+  };
+  /** Reset TOTAL de filtros (chips «Limpiar filtros»). */
+  const clearFilters = () => {
+    setSearch(""); setLifecycle(""); setTypeId(""); setCriticality(""); setPriority(""); setSpecialtyId("");
+    setSlaStatus(""); setFlag(""); setOrgNodeIds([]); setOriginType(""); setEquipmentId(""); setCreatedFrom(""); setCreatedTo(""); setPage(1);
   };
 
   const { data, isLoading } = useWorkOrders(query);
@@ -92,14 +111,35 @@ export function WorkOrdersPage() {
   const total = data?.total ?? 0;
   const pages = Math.max(1, Math.ceil(total / pageSize));
 
+  // Chips de filtros activos (deja claro QUÉ se está filtrando + quitar uno a uno).
+  const chips: FilterChip[] = [];
+  if (search.trim()) chips.push({ key: "search", label: `Buscar: ${search.trim()}`, onRemove: () => { setSearch(""); setPage(1); } });
+  if (lifecycle) chips.push({ key: "lifecycle", label: `Estado: ${LIFECYCLE_META[lifecycle].label}`, onRemove: () => { setLifecycle(""); setPage(1); } });
+  if (typeId) chips.push({ key: "type", label: `Tipo: ${types.find((t) => t.id === typeId)?.name ?? typeId}`, onRemove: () => { setTypeId(""); setPage(1); } });
+  if (criticality) chips.push({ key: "criticality", label: `Criticidad: ${criticality} · ${criticalityLabel(Number(criticality))}`, onRemove: () => { setCriticality(""); setPage(1); } });
+  if (priority) chips.push({ key: "priority", label: `Prioridad: ${PRIORITY_META[priority].label}`, onRemove: () => { setPriority(""); setPage(1); } });
+  if (specialtyId) chips.push({ key: "specialty", label: `Especialidad: ${specialties.find((s) => s.id === specialtyId)?.name ?? specialtyId}`, onRemove: () => { setSpecialtyId(""); setPage(1); } });
+  if (slaStatus) chips.push({ key: "sla", label: `Plazo: ${SLA_FILTER_LABELS[slaStatus]}`, onRemove: () => { setSlaStatus(""); setPage(1); } });
+  if (flag) chips.push({ key: "flag", label: { mine: "Mías", unassignedOnly: "Sin responsable", requiresPtw: "Requieren PTW" }[flag], onRemove: () => { setFlag(""); setPage(1); } });
+  if (orgNodeIds.length) chips.push({ key: "nodes", label: orgNodeIds.length === 1 ? "Nodo (drill-down)" : `Nodos: ${orgNodeIds.length}`, onRemove: () => { setOrgNodeIds([]); setPage(1); } });
+  if (originType) chips.push({ key: "origin", label: `Origen: ${ORIGIN_META[originType].label}`, onRemove: () => { setOriginType(""); setPage(1); } });
+  if (equipmentId) chips.push({ key: "equipment", label: "Equipo (filtrado)", onRemove: () => { setEquipmentId(""); setPage(1); } });
+  if (createdFrom || createdTo) chips.push({ key: "created", label: `Creación: ${createdFrom ? formatDate(createdFrom) : "…"} → ${createdTo ? formatDate(createdTo) : "…"}`, onRemove: () => { setCreatedFrom(""); setCreatedTo(""); setPage(1); } });
+
   return (
     <div className={styles.page}>
+      {fromDashboard && (
+        <Link to="/ordenes-trabajo/dashboard" className={styles.backLink}>
+          <ArrowLeft size={14} /> Volver al dashboard
+        </Link>
+      )}
       <header className={styles.header}>
         <div>
           <h1 className={styles.h1}>Órdenes de trabajo</h1>
           <p className={styles.sub}>Solicitudes de trabajo y permisos de trabajo (PTW).</p>
         </div>
         <div className={styles.headerActions}>
+          <RefreshButton queryKey={WORK_ORDER_KEYS.all} />
           <Link to="/ordenes-trabajo/dashboard">
             <Button variant="secondary" leftIcon={<BarChart3 size={16} />}>Dashboard</Button>
           </Link>
@@ -178,7 +218,10 @@ export function WorkOrdersPage() {
           <option value="priority">Prioridad</option>
           <option value="due">Fecha límite</option>
         </Select>
+        <DateRangePresets onApply={(from, to) => { setCreatedFrom(from); setCreatedTo(to); setPage(1); }} />
       </div>
+
+      <FilterChips chips={chips} onClear={clearFilters} />
 
       {isLoading ? (
         <div className={styles.center}><Spinner /></div>

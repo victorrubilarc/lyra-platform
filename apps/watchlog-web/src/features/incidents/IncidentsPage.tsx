@@ -1,11 +1,14 @@
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { AlertTriangle, BarChart3, LayoutGrid, List, Plus, Search, Tags } from "lucide-react";
+import { AlertTriangle, ArrowLeft, BarChart3, LayoutGrid, List, Plus, Search, Tags } from "lucide-react";
 import type { IncidentListItem, IncidentListQuery } from "@lyra/contracts";
 import { Button, Card, EmptyState, GridPager, Input, Select, Spinner } from "@lyra/ui";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { formatDate } from "../../lib/format.js";
-import { useIncidentStats, useIncidentTypes, useIncidents } from "./incidents-queries.js";
+import { DateRangePresets } from "../shared/DateRangePresets.js";
+import { FilterChips, type FilterChip } from "../shared/FilterChips.js";
+import { RefreshButton } from "../shared/RefreshButton.js";
+import { INCIDENT_KEYS, useIncidentStats, useIncidentTypes, useIncidents } from "./incidents-queries.js";
 import { CreateIncidentModal } from "./CreateIncidentModal.js";
 import { IncidentDetailDrawer } from "./IncidentDetailDrawer.js";
 import { LIFECYCLE_META, ORIGIN_META, PRIORITY_META, severityColor, severityLabel } from "./incidents-presentation.js";
@@ -41,12 +44,15 @@ export function IncidentsPage() {
   const [flag, setFlag] = useState<"" | "mine" | "unassignedOnly" | "overdueOnly" | "slaBreachedOnly" | "reportableOnly" | "reportOverdueOnly" | "fromLogbookOnly">(initialFlag);
   const [sort, setSort] = useState<IncidentListQuery["sort"]>("recent");
 
-  // Pase directo del drill-down (sin control visible): origen/equipo/nodo/rango.
-  const passOriginType = (params.get("originType") as IncidentListQuery["originType"] | null) ?? undefined;
-  const passEquipmentId = params.get("equipmentId") ?? undefined;
-  const passOrgNodeIds = params.get("orgNodeIds")?.split(",").filter(Boolean);
-  const passCreatedFrom = params.get("createdFrom") ?? undefined;
-  const passCreatedTo = params.get("createdTo") ?? undefined;
+  // Filtros del drill-down (sin control propio en la barra), ahora en ESTADO (para
+  // poder limpiarlos): origen/equipo/nodo/rango. El rango llega como ISO por URL.
+  const [originType, setOriginType] = useState<IncidentListQuery["originType"] | "">((params.get("originType") as IncidentListQuery["originType"] | null) ?? "");
+  const [equipmentId, setEquipmentId] = useState(params.get("equipmentId") ?? "");
+  const [orgNodeIds, setOrgNodeIds] = useState<string[]>(() => params.get("orgNodeIds")?.split(",").filter(Boolean) ?? []);
+  const [createdFrom, setCreatedFrom] = useState(params.get("createdFrom") ?? "");
+  const [createdTo, setCreatedTo] = useState(params.get("createdTo") ?? "");
+  // Se llega desde el Dashboard de Incidencias (?from=dashboard): back-nav sobre la lista.
+  const fromDashboard = params.get("from") === "dashboard";
 
   const query: IncidentListQuery = useMemo(() => ({
     search: search.trim() || undefined,
@@ -54,16 +60,22 @@ export function IncidentsPage() {
     typeId: typeId || undefined,
     severity: severity ? Number(severity) : undefined,
     priority: priority || undefined,
-    originType: passOriginType,
-    equipmentId: passEquipmentId,
-    orgNodeIds: passOrgNodeIds && passOrgNodeIds.length ? passOrgNodeIds : undefined,
-    createdFrom: passCreatedFrom ? new Date(passCreatedFrom) : undefined,
-    createdTo: passCreatedTo ? new Date(passCreatedTo) : undefined,
+    originType: originType || undefined,
+    equipmentId: equipmentId || undefined,
+    orgNodeIds: orgNodeIds.length ? orgNodeIds : undefined,
+    createdFrom: createdFrom ? new Date(createdFrom) : undefined,
+    createdTo: createdTo ? new Date(createdTo) : undefined,
     sort,
     ...(flag ? { [flag]: true } : {}),
     page: view === "list" ? page : 1,
     pageSize: view === "list" ? pageSize : 200,
-  }), [search, lifecycle, typeId, severity, priority, passOriginType, passEquipmentId, passOrgNodeIds, passCreatedFrom, passCreatedTo, sort, flag, page, pageSize, view]);
+  }), [search, lifecycle, typeId, severity, priority, originType, equipmentId, orgNodeIds, createdFrom, createdTo, sort, flag, page, pageSize, view]);
+
+  /** Reset TOTAL de filtros (chips «Limpiar filtros»). */
+  const clearFilters = () => {
+    setSearch(""); setLifecycle(""); setTypeId(""); setSeverity(""); setPriority(""); setFlag("");
+    setOriginType(""); setEquipmentId(""); setOrgNodeIds([]); setCreatedFrom(""); setCreatedTo(""); setPage(1);
+  };
 
   const { data, isLoading } = useIncidents(query);
   const { data: stats } = useIncidentStats();
@@ -76,14 +88,37 @@ export function IncidentsPage() {
     setSelId(id);
   }
 
+  const FLAG_LABELS: Record<Exclude<typeof flag, "">, string> = {
+    mine: "Mis incidencias", unassignedOnly: "Sin responsable", overdueOnly: "Plazo vencido",
+    slaBreachedOnly: "Permanencia excedida", reportableOnly: "Reportables", reportOverdueOnly: "Reporte vencido", fromLogbookOnly: "Desde bitácora",
+  };
+  // Chips de filtros activos (deja claro QUÉ se está filtrando + quitar uno a uno).
+  const chips: FilterChip[] = [];
+  if (search.trim()) chips.push({ key: "search", label: `Buscar: ${search.trim()}`, onRemove: () => { setSearch(""); setPage(1); } });
+  if (lifecycle) chips.push({ key: "lifecycle", label: `Estado: ${LIFECYCLE_META[lifecycle].label}`, onRemove: () => { setLifecycle(""); setPage(1); } });
+  if (typeId) chips.push({ key: "type", label: `Tipo: ${types.find((t) => t.id === typeId)?.name ?? typeId}`, onRemove: () => { setTypeId(""); setPage(1); } });
+  if (severity) chips.push({ key: "severity", label: `Severidad: ${severity} · ${severityLabel(Number(severity))}`, onRemove: () => { setSeverity(""); setPage(1); } });
+  if (priority) chips.push({ key: "priority", label: `Prioridad: ${PRIORITY_META[priority].label}`, onRemove: () => { setPriority(""); setPage(1); } });
+  if (flag) chips.push({ key: "flag", label: FLAG_LABELS[flag], onRemove: () => { setFlag(""); setPage(1); } });
+  if (orgNodeIds.length) chips.push({ key: "nodes", label: orgNodeIds.length === 1 ? "Nodo (drill-down)" : `Nodos: ${orgNodeIds.length}`, onRemove: () => { setOrgNodeIds([]); setPage(1); } });
+  if (originType) chips.push({ key: "origin", label: `Origen: ${ORIGIN_META[originType].label}`, onRemove: () => { setOriginType(""); setPage(1); } });
+  if (equipmentId) chips.push({ key: "equipment", label: "Equipo (filtrado)", onRemove: () => { setEquipmentId(""); setPage(1); } });
+  if (createdFrom || createdTo) chips.push({ key: "created", label: `Creación: ${createdFrom ? formatDate(createdFrom) : "…"} → ${createdTo ? formatDate(createdTo) : "…"}`, onRemove: () => { setCreatedFrom(""); setCreatedTo(""); setPage(1); } });
+
   return (
     <div className={styles.page}>
+      {fromDashboard && (
+        <Link to="/incidencias/dashboard" className={styles.backLink}>
+          <ArrowLeft size={14} /> Volver al dashboard
+        </Link>
+      )}
       <header className={styles.header}>
         <div>
           <h1 className={styles.h1}>Incidencias</h1>
           <p className={styles.sub}>Gestión de incidencias operacionales y HSE.</p>
         </div>
         <div className={styles.headerActions}>
+          <RefreshButton queryKey={INCIDENT_KEYS.all} />
           <Link to="/incidencias/dashboard">
             <Button variant="secondary" leftIcon={<BarChart3 size={16} />}>Dashboard</Button>
           </Link>
@@ -152,11 +187,14 @@ export function IncidentsPage() {
           <option value="priority">Prioridad</option>
           <option value="due">Vencimiento</option>
         </Select>
+        <DateRangePresets onApply={(from, to) => { setCreatedFrom(from); setCreatedTo(to); setPage(1); }} />
         <div className={styles.viewToggle}>
           <button className={view === "list" ? styles.vtActive : styles.vt} onClick={() => setView("list")} title="Lista"><List size={16} /></button>
           <button className={view === "board" ? styles.vtActive : styles.vt} onClick={() => setView("board")} title="Tablero"><LayoutGrid size={16} /></button>
         </div>
       </div>
+
+      <FilterChips chips={chips} onClear={clearFilters} />
 
       {isLoading ? (
         <div className={styles.center}><Spinner /></div>

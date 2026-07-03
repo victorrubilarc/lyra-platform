@@ -98,6 +98,7 @@ export function IncidentDashboardPage() {
     if (severity) p.set("severity", severity);
     if (origin) p.set("originType", origin);
     for (const [k, v] of Object.entries(extra)) p.set(k, v);
+    p.set("from", "dashboard"); // habilita el back-nav «← Volver al dashboard» en la lista
     navigate(`/incidencias?${p.toString()}`);
   }
 

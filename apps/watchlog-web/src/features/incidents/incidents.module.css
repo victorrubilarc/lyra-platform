@@ -2,6 +2,13 @@
 
 .header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
 .headerActions { display: flex; gap: var(--space-2); flex-shrink: 0; }
+/* Back-nav al dashboard (drill-down): enlace discreto sobre la lista. */
+.backLink {
+  display: inline-flex; align-items: center; gap: 6px; width: fit-content;
+  color: var(--color-text-secondary); font-size: var(--text-body-sm-size); font-weight: 600;
+  text-decoration: none; transition: var(--transition-fast);
+}
+.backLink:hover { color: var(--color-accent-primary); }
 .h1 { font-family: var(--font-brand); font-size: var(--text-h1-size); font-weight: 800; margin: 0; }
 .sub { color: var(--color-text-secondary); margin: var(--space-1) 0 0; font-size: var(--text-body-sm-size); }
 

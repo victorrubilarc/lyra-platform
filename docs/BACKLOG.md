@@ -5,7 +5,16 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-07-03** — **🔗 OT · Slice 7b · Enlace Incidencia↔OT bidireccional ✅** (`feat/ot-incidencia-enlace-s7b`):
+> actualización: **2026-07-03** — **🎛️ UX · Pulido transversal pre-Slice 8 ✅** (`feat/ux-pulido-pre-s8`):
+> 6 ítems de feedback + 2 hallazgos, TODO UI/consulta (SIN migración/permiso/FLUSHALL). (1) sin jerga «(Fase X)» en 6 hints;
+> (2) drawer incidencias 720→860; **(3) checklists de OT fuera de Bitácoras por el ENLACE** `{ workOrderChecklists: { none: {} } }`
+> en `buildWhere` (NO por `purpose`: una regla de checklist puede usar plantilla general y su instancia se colaba — fuga real
+> del dueño; **hallazgo: `{not:"CHECKLIST"}` NO es null-safe en Prisma**, habría ocultado todas las generales); (4)
+> `TemplatesService.list` gana `excludeChecklists` (null-safe) SOLO en pickers `/log-entries/templates`+`/filter-templates`
+> (catálogo admin intacto); (5) reutilizables `FilterChips`/`RefreshButton`/`DateRangePresets` en `features/shared/` aplicados a
+> WorkOrders+Incidents (drill-down de const→estado, removible) y refrescar+limpiar en Excepciones (Bitácoras ya los tenía);
+> (6) back-nav dashboard→lista (`?from=dashboard`). Verde web+api · **smoke-checklist-exclusion 12/12** (NUEVO) + regresión
+> rondas 21 · mis-rondas 18 · workorders 122 · incidencias 32 · ot-incidencia 17. Pendiente: **smoke VISUAL (dueño)**. — Antes: **🔗 OT · Slice 7b · Enlace Incidencia↔OT bidireccional ✅** (`feat/ot-incidencia-enlace-s7b`):
 > cierra el paquete de OT (SAP PM/Maximo ORIGINATOR↔FOLLOWUP). **Reusa `WorkOrder.originIncidentId`** ⇒ SIN migración/permiso/FLUSHALL.
 > (a) `GET /incidents/:id/work-orders` (gate `incident:view`+`workorder:view`; `WorkOrdersService.listForIncident` reusa ABAC+`toListItems`;
 > `IncidentsService.assertViewable`; `IncidentsModule`→`WorkOrdersModule` sin ciclo) + pestaña «Órdenes de trabajo» en el drawer
@@ -704,6 +713,23 @@ nunca queda más de una sesión atrás.
 ---
 
 ## 2. Pendiente por HACER (módulos / submódulos)
+
+### 🟧 Pantalla de INICIO · Rediseño a launchpad enterprise (feedback del dueño 2026-07-03)
+> **Origen:** el dueño observó que la pantalla de Inicio (`features/home/HomePage.tsx`) está **desactualizada**: los módulos
+> se pintan desde una **lista HARDCODEADA de 6 tarjetas** con estados fijos ⇒ (a) módulos ya LISTOS aparecen como «Pronto»
+> (Plantillas, Incidencias), (b) esas tarjetas **no navegan** ("no funcionan"), (c) **faltan** casi todos los módulos reales
+> (Bitácoras, Nueva entrada, Mis rondas, Órdenes de trabajo, Excepciones, Flujos, Datos de referencia, Programación de rondas,
+> Calendarios, Cambio de turno, Notificaciones, Configuración), (d) el copy «Los módulos se irán habilitando por fase» es de v1.
+> **Qué se quiere (enterprise, útil para el usuario conectado):**
+> - **Launchpad de módulos gateado por permiso**, alimentado por el **mismo registro de navegación** (no una lista aparte que
+>   se desincroniza) ⇒ el Inicio siempre refleja lo que el usuario realmente puede abrir.
+> - **Tiles ACCIONABLES / worklist personal** (patrón SAP Fiori launchpad): mis rondas vencidas (ya existe el widget), **mis
+>   incidencias abiertas/asignadas**, **mis OT asignadas / vencidas**, **excepciones pendientes de triage**, **notificaciones sin
+>   leer**, **firmas/reportes/plazos vencidos** — cada uno con conteo EN VIVO (reusando los `*Stats`/inbox ya existentes) y
+>   **deep-link** al listado ya filtrado (los drill-down + chips de esta sesión encajan aquí).
+> - Respetar ABAC ∩ estructura activa; sin hex (tokens del DS); responsivo/táctil.
+> **Alcance sugerido:** slice propio «Inicio enterprise» (no meter en un pulido). Estimado ~1 sesión. **SIN migración** (todo son
+> consultas ya existentes). Revisar `HomePage.tsx` (hoy `MODULES` hardcodeado + `STATUS_LABEL/CLASS`) y el registro de nav.
 
 ### 🟦 Dotación · Slice 4 — control de acceso / T&A tras interfaz abstracta (DIFERIDO por el dueño, 2026-07-03)
 > **Decisión del dueño (2026-07-03):** se DIFIERE; se prioriza el **Dashboard de OT (Slice 7)** primero. Registrado aquí para no perderlo.

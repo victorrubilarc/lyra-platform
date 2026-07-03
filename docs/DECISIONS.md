@@ -4,6 +4,31 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-03 · UX · Pulido transversal pre-Slice 8 (`feat/ux-pulido-pre-s8`)
+Ronda de feedback del dueño, TODO UI/consulta (sin migración/permiso/FLUSHALL).
+- **Checklists de OT fuera de Bitácoras: excluir por el ENLACE, no por el `purpose` de la plantilla.** El criterio "esto es un
+  checklist de OT y no una bitácora" es que el `LogEntry` sea el llenado vivo de una `WorkOrderChecklist` (Puerta 2). Filtrar por
+  `template.purpose = CHECKLIST` es una HEURÍSTICA que deja fugas: una regla de checklist puede apuntar a una plantilla GENERAL
+  (`purpose=null`) y su instancia se colaba en la grilla (fuga real: 1 registro en la BD del dueño). Solución en el ÚNICO punto que
+  alimenta list/stats/facets/export (`buildWhere`): `{ workOrderChecklists: { none: {} } }`. Semánticamente correcto y completo.
+- **Hallazgo Prisma: `{ purpose: { not: "CHECKLIST" } }` NO es null-safe** (deja fuera las filas `purpose=null`). El 1.er intento
+  con eso habría ocultado TODAS las bitácoras generales — lo cazó el smoke antes de publicar. Donde sí se filtra por purpose (los
+  PICKERS operacionales), se usa `{ OR: [{ purpose: null }, { purpose: { not: "CHECKLIST" } }] }`.
+- **Exclusión de checklists en los PICKERS = opción `excludeChecklists` de `TemplatesService.list`, pasada SOLO desde
+  `/log-entries/templates` y `/filter-templates`.** El catálogo admin `GET /templates` NO la pasa: ahí deben verse para
+  gestionarlas. Motivo: un checklist se instancia desde su OT en el momento del trabajo, no es una bitácora programable por
+  calendario.
+- **Controles de grilla como reutilizables en `features/shared/`** (`FilterChips`, `RefreshButton`, `DateRangePresets`), NO
+  copiados por página. Se REUSA el patrón que Bitácoras (`LogbookPage`) ya tenía en vez de reinventar; Bitácoras queda intacto.
+  `RefreshButton` invalida el prefijo de query-key del módulo (`*_KEYS.all`) ⇒ una sola llamada a `useIsFetching` (regla de hooks).
+- **Filtros del drill-down de const→ESTADO.** Antes createdFrom/To, orgNodeIds, originType, equipmentId llegaban por URL como
+  const sin control visible ⇒ "pegados". Ahora son estado ⇒ chips removibles + «Limpiar filtros». Back-nav dashboard→lista con
+  `?from=dashboard` (bandera efímera, no ensucia el estado de filtros).
+- **Pantalla de Inicio: NO se rediseñó en esta sesión.** El dueño reportó que está desactualizada (módulos hardcodeados con estado
+  «Pronto» ya listos, tarjetas que no navegan, faltan módulos). Se decidió registrarlo como **slice propio «Inicio enterprise»**
+  (launchpad gateado por permiso desde el registro de nav + tiles accionables del worklist personal) en BACKLOG §2, no meterlo en
+  un pulido. Sin migración (todo son consultas existentes).
+
 ### 2026-07-03 · OT · Slice 7b · Enlace Incidencia↔OT bidireccional (`feat/ot-incidencia-enlace-s7b`)
 Implementa lo trazado en S7a: conectar incidencias y OT en ambos sentidos al estándar SAP PM / IBM Maximo (ORIGINATOR↔FOLLOWUP).
 Decisiones (el dueño pidió "todo lo que sea mejor y más enterprise como los grandes"):

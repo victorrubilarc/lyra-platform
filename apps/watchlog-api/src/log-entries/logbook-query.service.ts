@@ -667,7 +667,16 @@ export class LogbookQueryService {
     query: LogEntryListQuery,
     opts?: { delayedIds?: string[]; structureId?: string },
   ): Promise<Prisma.LogEntryWhereInput> {
-    const and: Prisma.LogEntryWhereInput[] = [{ deletedAt: null }];
+    // Los checklists de OT se instancian desde su orden de trabajo (Puerta 2) como el
+    // "llenado vivo" de una WorkOrderChecklist; NO son bitácoras programables. Se
+    // excluyen del módulo Bitácoras (list/stats/facets/export). El criterio correcto es
+    // el ENLACE (`workOrderChecklists.none`), no el `purpose` de la plantilla: una regla
+    // de checklist puede apuntar a una plantilla GENERAL (purpose=null) y su instancia
+    // seguiría siendo un checklist de OT, no una bitácora.
+    const and: Prisma.LogEntryWhereInput[] = [
+      { deletedAt: null },
+      { workOrderChecklists: { none: {} } },
+    ];
 
     const accessible = await this.scope.getAccessibleNodeIds(userId);
     if (accessible !== null) and.push({ orgNodeId: { in: [...accessible] } });

@@ -98,7 +98,7 @@ export class TemplatesService {
   async list(
     userId: string,
     query: TemplateListQuery,
-    opts: { applyTemplateScope?: boolean; structureId?: string } = {},
+    opts: { applyTemplateScope?: boolean; structureId?: string; excludeChecklists?: boolean } = {},
   ): Promise<TemplateListItem[]> {
     const access = await this.scope.getAccessibleNodes(userId);
     const accessibleTemplates = opts.applyTemplateScope
@@ -107,6 +107,13 @@ export class TemplatesService {
 
     const where: Prisma.TemplateWhereInput = { deletedAt: null };
     if (query.status) where.status = query.status;
+    // Superficies OPERACIONALES (pickers de «Nueva entrada»/alta de rondas): un
+    // checklist se instancia desde su OT en el momento del trabajo, no es una
+    // bitácora programable por calendario ⇒ se ocultan. OJO: `{ not: "CHECKLIST" }` NO
+    // es null-safe en Prisma (deja fuera purpose=null) ⇒ OR con purpose=null para que
+    // las plantillas GENERALES SIGAN apareciendo. El catálogo admin de plantillas NO
+    // pasa esta opción (ahí deben verse para gestionarlas).
+    if (opts.excludeChecklists) where.AND = [{ OR: [{ purpose: null }, { purpose: { not: "CHECKLIST" } }] }];
     // Filtro explícito por nodo: la plantilla tiene una asignación a ese nodo.
     if (query.orgNodeId) where.nodeAssignments = { some: { orgNodeId: query.orgNodeId } };
     if (query.search) {

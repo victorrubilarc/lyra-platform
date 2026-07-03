@@ -1,5 +1,32 @@
 # Progreso — Lyra WatchLog
 
+**2026-07-03 — 🎛️ UX · Pulido transversal pre-Slice 8 ✅** (`feat/ux-pulido-pre-s8`).
+Ronda de 6 ítems de feedback del dueño + 2 hallazgos, TODO UI/consulta (SIN migración, SIN permisos, SIN FLUSHALL).
+**(1)** Se quitó la jerga «(Fase X)» de 6 hints VISIBLES en `es-CL.ts` (no se tocaron comentarios `// Fase`).
+**(2)** Ventana lateral de incidencias más ancha: `IncidentDetailDrawer` width 720→860.
+**(3+hallazgo A) Checklists de OT fuera de Bitácoras:** los checklists de OT son `LogEntry` que instancian una
+`WorkOrderChecklist` (Puerta 2). El 1.er intento filtró por `template.purpose=CHECKLIST` — **incompleto**: una regla de
+checklist puede apuntar a una plantilla GENERAL (`purpose=null`) y su instancia se colaba (fuga real: 1 registro en la
+BD del dueño). **Corregido de raíz por el ENLACE**, no por el purpose: `buildWhere` (único punto que alimenta
+list/stats/facets/export) excluye `{ workOrderChecklists: { none: {} } }`. **Hallazgo B:** `{ purpose: { not: "CHECKLIST" } }`
+NO es null-safe en Prisma (habría ocultado TODAS las bitácoras generales) — lo cazó el smoke antes de publicar.
+**(4) Pickers operacionales:** `TemplatesService.list` gana `opts.excludeChecklists` (null-safe con `OR purpose=null`),
+pasada SOLO desde `GET /log-entries/templates` y `/filter-templates` (Nueva entrada + filtro de grilla); el catálogo admin
+`GET /templates` NO la pasa (ahí deben verse para gestionarlas). **(5) Reutilizables en `features/shared/`:** `FilterChips`
+(chips de filtros activos removibles + «Limpiar filtros», espejo del patrón ya presente en Bitácoras), `RefreshButton`
+(invalida el prefijo del módulo vía `useIsFetching`+gira) y `DateRangePresets` (Hoy·24h·7d·30d por fecha de creación).
+Aplicados: chips+limpiar+refrescar+presets en `WorkOrdersPage` e `IncidentsPage` (los filtros del drill-down
+—createdFrom/To, orgNodeIds, originType, equipmentId— pasaron de const a ESTADO, ahora removibles); SOLO refrescar+limpiar en
+`ExceptionsPage`; Bitácoras (`LogbookPage`) YA los tenía ⇒ intacto. **(6) Back-nav dashboard→lista:** `drill()` de ambos
+dashboards (OT + Incidencias) añade `?from=dashboard` ⇒ la lista muestra «← Volver al dashboard». Tokens del DS (sin hex),
+ui-grid-conventions respetadas. Verde: web typecheck+lint+build · api typecheck+lint+**252** tests (logbook-query 21/21) ·
+**smoke-checklist-exclusion 12/12** (NUEVO: admin catálogo SÍ trae CHECKLIST; pickers y grilla NO; **fuga plantilla-general
+excluida**; null-safe generales visibles) + regresión **rondas 21/21 · mis-rondas 18/18 · workorders 122/122 · incidencias
+32/32 · ot-incidencia 17/17**. Pendiente: **smoke VISUAL (dueño)**. Decisiones en `DECISIONS.md` (2026-07-03, entrada UX pulido).
+**Feedback adicional del dueño (registrado en BACKLOG, próxima sesión):** pantalla de INICIO desactualizada (módulos con
+estado «Pronto» que ya están listos / tarjetas que no navegan / faltan módulos) ⇒ rediseño a **launchpad enterprise**
+(tiles accionables por permiso del usuario conectado). **Siguiente: a definir (Inicio enterprise u OT Slice 8).**
+
 **2026-07-03 — 🔗 OT · Slice 7b · Enlace Incidencia↔OT bidireccional ✅** (`feat/ot-incidencia-enlace-s7b`).
 Cierra el paquete comercial de OT conectando incidencias y órdenes de trabajo EN AMBOS SENTIDOS, al estándar de los grandes
 (SAP PM notification→order / IBM Maximo Related Records ORIGINATOR↔FOLLOWUP). **Reusa `WorkOrder.originIncidentId` (indexado) +
