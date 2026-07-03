@@ -24,13 +24,146 @@
   margin: 0;
 }
 
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+/* --- Secciones ------------------------------------------------------------ */
+.section {
+  display: flex;
+  flex-direction: column;
   gap: var(--space-4);
 }
 
-/* Enlace que envuelve la tarjeta navegable: ocupa toda la celda, sin subrayado. */
+.sectionTitle {
+  font-family: var(--font-brand);
+  font-weight: 700;
+  font-size: var(--text-h2-size);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+/* --- «Mi trabajo hoy»: tiles accionables (protagonistas) ------------------ */
+.tileGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(248px, 1fr));
+  gap: var(--space-4);
+}
+
+/* Enlace que envuelve el tile: ocupa toda la celda, sin subrayado. */
+.tileLink {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  border-radius: var(--radius-lg);
+  outline: none;
+}
+
+.tileLink:focus-visible {
+  box-shadow: 0 0 0 2px var(--color-accent-primary);
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  height: 100%;
+  min-height: 150px;
+  padding: var(--space-5);
+}
+
+/* Tile en 0 = buena noticia: se atenúa, no grita. */
+.tileCalm {
+  opacity: 0.66;
+}
+
+.tileHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tileIcon {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: var(--radius-md);
+  background: rgba(99, 102, 241, 0.14);
+  color: var(--color-accent-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tileLabel {
+  font-weight: 600;
+  font-size: var(--text-body-sm-size);
+  color: var(--color-text-secondary);
+  line-height: 1.25;
+}
+
+.tileCount {
+  font-family: var(--font-brand);
+  font-weight: 800;
+  font-size: 40px;
+  line-height: 1;
+  color: var(--color-text-primary);
+  margin-top: auto;
+}
+
+.tileStats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 22px;
+}
+
+.tileStat {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--text-caption-size);
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: var(--radius-full);
+}
+
+.tileEmpty {
+  font-size: var(--text-caption-size);
+  color: var(--color-text-muted);
+  align-self: center;
+}
+
+/* CTA sutil cuando el tile no tiene riesgos que mostrar (pero sí conteo). */
+.tileCta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-caption-size);
+  font-weight: 600;
+  color: var(--color-accent-primary);
+  opacity: 0.8;
+  transition: gap 0.15s ease, opacity 0.15s ease;
+}
+
+.tileLink:hover .tileCta {
+  opacity: 1;
+  gap: 8px;
+}
+
+/* Severidad SOLO por su semántica (vencidos/críticos = error, riesgo = warning). */
+.alert {
+  background: var(--color-error-bg);
+  color: var(--color-error);
+}
+
+.warn {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+/* --- «Operación»: accesos a los módulos del turno ------------------------- */
+.moduleGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: var(--space-4);
+}
+
 .moduleLink {
   display: block;
   text-decoration: none;
@@ -50,69 +183,6 @@
   height: 100%;
 }
 
-/* CTA "Abrir →" en tarjetas navegables; aparece/avanza al pasar el mouse. */
-.moduleCta {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-top: auto;
-  font-size: var(--text-caption-size);
-  font-weight: 600;
-  color: var(--color-accent-primary);
-  opacity: 0.85;
-  transition: gap 0.15s ease, opacity 0.15s ease;
-}
-
-.moduleLink:hover .moduleCta {
-  opacity: 1;
-  gap: 8px;
-}
-
-/* Widget "Mis rondas" (2.3.1): tile prominente del operador con glow de acento. */
-.roundsWidget {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  border: 1px solid var(--color-border-active);
-  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.12), 0 8px 24px -12px rgba(99, 102, 241, 0.5);
-}
-
-.roundsWidgetIcon {
-  width: 44px;
-  height: 44px;
-  flex-shrink: 0;
-  border-radius: var(--radius-md);
-  background: var(--gradient-brand);
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.roundsWidgetBody {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1;
-  min-width: 0;
-}
-
-.roundsWidgetTitle {
-  font-family: var(--font-brand);
-  font-weight: 700;
-  font-size: var(--text-h2-size);
-  color: var(--color-text-primary);
-}
-
-.roundsWidgetOverdue {
-  color: var(--color-error);
-}
-
-.roundsWidgetDesc {
-  font-size: var(--text-body-sm-size);
-  color: var(--color-text-muted);
-}
-
 .moduleHead {
   display: flex;
   align-items: center;
@@ -120,8 +190,8 @@
 }
 
 .moduleIcon {
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   border-radius: var(--radius-md);
   background: rgba(99, 102, 241, 0.14);
   color: var(--color-accent-primary);
@@ -140,26 +210,23 @@
 .moduleDesc {
   font-size: var(--text-body-sm-size);
   color: var(--color-text-muted);
+  line-height: 1.4;
 }
 
-.statusChip {
+/* CTA "Abrir →"; aparece/avanza al pasar el mouse. */
+.moduleCta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: auto;
   font-size: var(--text-caption-size);
   font-weight: 600;
-  padding: 4px 10px;
-  border-radius: var(--radius-full);
+  color: var(--color-accent-primary);
+  opacity: 0.85;
+  transition: gap 0.15s ease, opacity 0.15s ease;
 }
 
-.statusReady {
-  background: var(--color-success-bg);
-  color: var(--color-success);
-}
-
-.statusSoon {
-  background: rgba(6, 182, 212, 0.15);
-  color: var(--color-accent-secondary);
-}
-
-.statusBuilding {
-  background: var(--color-warning-bg);
-  color: var(--color-warning);
+.moduleLink:hover .moduleCta {
+  opacity: 1;
+  gap: 8px;
 }

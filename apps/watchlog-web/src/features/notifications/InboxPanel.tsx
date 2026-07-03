@@ -65,7 +65,7 @@ export function InboxPanel() {
         >
           <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("notifications.inbox.search")} rightSlot={<Search size={16} />} />
         </form>
-        <Select value={filter} onChange={(e) => { setFilter(e.target.value as Filter); setPage(0); }}>
+        <Select className={styles.filterSelect} value={filter} onChange={(e) => { setFilter(e.target.value as Filter); setPage(0); }}>
           <option value="all">{t("notifications.inbox.filterAll")}</option>
           <option value="unread">{t("notifications.inbox.filterUnread")}</option>
         </Select>

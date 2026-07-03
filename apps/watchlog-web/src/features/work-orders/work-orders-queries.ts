@@ -116,9 +116,9 @@ export function useWorkOrderDetail(id: string | null) {
   return useQuery({ queryKey: WORK_ORDER_KEYS.detail(id ?? ""), queryFn: () => fetchWorkOrderDetail(id!), enabled: !!id });
 }
 
-export function useWorkOrderStats() {
+export function useWorkOrderStats(enabled = true) {
   const structureId = useActiveStructureId();
-  return useQuery({ queryKey: WORK_ORDER_KEYS.stats(structureId), queryFn: () => fetchWorkOrderStats(structureId) });
+  return useQuery({ queryKey: WORK_ORDER_KEYS.stats(structureId), queryFn: () => fetchWorkOrderStats(structureId), enabled });
 }
 
 export function useWorkOrderTypes() {

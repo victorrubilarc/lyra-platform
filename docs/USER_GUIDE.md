@@ -37,6 +37,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 - ✍️ Mi seguridad (activar/regenerar/desactivar MFA)
 
 ### 2. El espacio de trabajo  [todos]
+- ✅ **Pantalla de Inicio (cockpit del turno)** — «Mi trabajo hoy» con conteos en vivo y accesos a los módulos operativos (§ El espacio de trabajo ▸ Pantalla de Inicio)
 - ✅ **Menú lateral por grupos** (Operación · Diseño y datos · Administración) + **Favoritos en el topbar** (§ El espacio de trabajo ▸ Menú lateral)
 - ✅ **Filtros de las grillas** (chips de filtros activos removibles, «Limpiar filtros», «Refrescar», «← Volver al dashboard», atajos de fecha) — comunes a Órdenes de trabajo, Incidencias, Excepciones y Bitácoras (§ El espacio de trabajo ▸ Filtros de las grillas)
 - ✍️ Pestañas, búsqueda ⌘K, idioma, densidad, tema claro/oscuro
@@ -971,6 +972,42 @@ error o a propósito, siempre queda al menos una cuenta capaz de administrarlo t
   invisible para él).
 - El backend es la fuente de verdad: aunque la interfaz oculte o deshabilite un botón, cualquier intento de
   administrar una estructura no delegada se rechaza en el servidor.
+
+---
+
+## El espacio de trabajo ▸ Pantalla de Inicio  [todos]
+
+**Para qué sirve.** El Inicio es tu **cockpit del turno**: lo primero que ves al entrar. En vez de un
+listado de módulos, te muestra **lo pendiente primero** (qué tienes que atender hoy) y te deja a un clic de
+la acción. No es el directorio completo de la app (eso vive en el menú lateral): el Inicio se enfoca en la
+operación del día para no sobrecargar.
+
+**Cómo se usa.**
+1. **Saludo.** Arriba, tu nombre y una línea de contexto del turno.
+2. **«Mi trabajo hoy» (tarjetas con números en vivo).** Una fila de tarjetas, cada una con un **conteo real**
+   y un **detalle de riesgo** debajo (en rojo lo vencido/crítico, en ámbar lo que está por vencer o sin
+   responsable). Al hacer **clic** te lleva al listado **ya filtrado** correspondiente:
+   - **Mis rondas** → tus rondas pendientes (y cuántas vencidas) → abre *Mis rondas*.
+   - **Incidencias abiertas** → abiertas, con cuántas críticas / con plazo vencido / sin responsable → abre *Incidencias*.
+   - **Órdenes abiertas** → OT abiertas, con vencidas / por vencer / sin responsable → abre *Órdenes de trabajo*.
+   - **Excepciones por triar** → desviaciones de bitácora sin resolver (críticas / advertencias) → abre *Excepciones*.
+   - **Notificaciones sin leer** → tu bandeja → abre *Mis notificaciones*.
+   Cuando una tarjeta está en **0**, se muestra **atenuada** y con un mensaje tranquilo (p. ej. «Sin rondas
+   pendientes»): es una buena noticia, no una alarma.
+3. **«Operación» (accesos).** Debajo, tarjetas para entrar a los módulos operativos del día que no son ya una
+   tarjeta de conteo (Panorama, Nueva entrada, Bitácoras, Cambio de turno), cada una con una breve descripción.
+
+**Quién puede.** Todos. **Cada quien ve solo lo suyo:** una tarjeta de conteo aparece únicamente si tienes el
+permiso de ese módulo (quien no tiene Órdenes de trabajo no ve su tarjeta), y los accesos de «Operación» siguen
+la misma regla que el menú lateral. Los conteos respetan tu **estructura activa** y tu **alcance de datos** (solo
+cuentan lo que puedes ver).
+
+**Importante.**
+- Los números son **en vivo**: reflejan el estado actual del sistema para tu alcance, no una foto antigua.
+- Si una tarjeta muestra todo como vencido, revisa que las fechas de tus datos sean recientes: las tarjetas no
+  inventan urgencia, la reflejan.
+- El Inicio no reemplaza al menú lateral: los módulos de Diseño y Administración se abren desde el menú o con la
+  búsqueda **⌘K / Ctrl+K**.
 
 ---
 

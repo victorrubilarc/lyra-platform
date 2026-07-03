@@ -1,5 +1,26 @@
 # Progreso — Lyra WatchLog
 
+**2026-07-03 — 🏠 Inicio enterprise · cockpit del turno ✅** (`feat/inicio-enterprise`).
+Rediseño de la pantalla de Inicio (`features/home/HomePage.tsx`), que pintaba **6 tarjetas HARDCODEADAS** (`MODULES` +
+`STATUS_LABEL/CLASS`) con estados fijos: módulos ya listos (Plantillas/Incidencias) salían como «Pronto» y NO navegaban,
+faltaban casi todos los módulos reales, y el copy era de v1. TODO consulta ya existente ⇒ **SIN migración, SIN permisos, SIN
+FLUSHALL**. **(1) Accesos derivados del REGISTRO** (`SIDEBAR_ROUTES`, fuente única de verdad; se agregó `descKey?` opcional
+i18n a `NavRoute` + descripciones `nav.desc.*` para los 18 módulos). **(2) «Mi trabajo hoy» = 5 tiles accionables** con conteo
+EN VIVO + desglose de riesgo (crítico/vencido/sin responsable/advertencia) + deep-link al listado filtrado: Mis rondas
+(`useMyRoundsStats`), Incidencias (`useIncidentStats`), Órdenes de trabajo (`useWorkOrderStats`, `?lifecycle=OPEN`), Excepciones
+por triar (`useExceptions().summary`), Notificaciones (`useInboxUnreadCount`). Cada hook **gateado por su permiso**
+(`enabled: can(...)`) ⇒ sin 403 al operador sin módulo; se aditó `enabled?` a `useIncidentStats`/`useWorkOrderStats`. Tile en 0 =
+calmo (severidad solo semántica, no grita). **(3) «Operación»** = accesos del grupo `operation` del registro que no son ya un tile
+(Panorama, Nueva entrada, Bitácoras, Cambio de turno). **Tras feedback del dueño** («sobrecargado, poco premium») se DESCARTÓ el
+muro de los 3 grupos (18 tarjetas): el Inicio es un **cockpit**, no el directorio (Diseño/Admin quedan en el sidebar). Tokens del
+DS (sin hex), Lucide 16–24px, glass, 44px táctil, responsivo, claro+oscuro, conteos con `lib/format`. **Fixes de UX en vivo:**
+`/mis-notificaciones` usa ahora todo el ancho (se quitó `max-width:1180px` centrado) + el `Select` «Todas» de la bandeja dejó de
+estirarse (clase `.filterSelect` de ancho fijo; el `Select` de `@lyra/ui` trae `width:100%`). **Mis rondas «no filtra» = NO bug:**
+verificado por API (289 rondas 100% vencidas, 17 días de antigüedad); el horizonte acota solo lo que VIENE y las vencidas siempre
+se muestran (estándar de worklists) ⇒ deuda de DATA (reseed), no de código. Verde: web typecheck + lint (0 errores) + build +
+**test 8/8** (`navigation.spec` extendido: descKey en todo módulo + grupo operativo). Pendiente: **smoke VISUAL (dueño)**.
+Decisiones en `DECISIONS.md` (2026-07-03, entrada Inicio). USER_GUIDE §Inicio redactada.
+
 **2026-07-03 — 🎛️ UX · Pulido transversal pre-Slice 8 ✅** (`feat/ux-pulido-pre-s8`).
 Ronda de 6 ítems de feedback del dueño + 2 hallazgos, TODO UI/consulta (SIN migración, SIN permisos, SIN FLUSHALL).
 **(1)** Se quitó la jerga «(Fase X)» de 6 hints VISIBLES en `es-CL.ts` (no se tocaron comentarios `// Fase`).
