@@ -11,6 +11,7 @@ import {
   type ConfirmRosterRequest,
   type RemoveWorkOrderWorkerRequest,
   type RosterRoleDto,
+  type WorkerCompanyAccreditationInput,
   type WorkerCompetencyRuleInput,
   type WorkerStatusDetail,
   type WorkOrderRosterDto,
@@ -160,6 +161,11 @@ export class WorkOrderRosterService {
         if (d.reason === "COMPETENCY_MISSING") return `falta «${d.competencyTypeName ?? "competencia requerida"}»`;
         if (d.reason === "COMPETENCY_EXPIRED") return `«${d.competencyTypeName ?? "competencia"}» vencida`;
         if (d.reason === "RESTRICTION_ACTIVE") return `restricción activa (${d.restrictionReason ?? d.restrictionType ?? "veto"})`;
+        if (d.reason === "COMPANY_NOT_ACCREDITED") {
+          const co = d.companyName ? `empresa «${d.companyName}»` : "empresa contratista";
+          // Si venció (había fecha), lo decimos; si no, es no acreditada/suspendida.
+          return d.accreditedUntil ? `${co}: acreditación vencida` : `${co} no acreditada`;
+        }
         return WORKER_BLOCK_REASON_META[d.reason].label.toLowerCase();
       });
     return parts.length ? parts.join(", ") : "impedimento";
@@ -267,7 +273,10 @@ export class WorkOrderRosterService {
    */
   private async deriveReasonsByPerson(wo: RosterWorkOrder, personIds: string[], rolesByPerson: Map<string, string[]>): Promise<Map<string, WorkerStatusDetail[]>> {
     const nowMs = Date.now();
-    const [ruleRows, competencyRows, restrictionRows] = await Promise.all([
+    // El gate de EMPRESA (S3) sólo se evalúa si el tipo de la OT lo exige; si no, ni siquiera
+    // se leen las empresas (cero costo / cero riesgo de falso-bloqueo). Traza toggle por tipo.
+    const requireAccreditation = wo.type.requireCompanyAccreditation;
+    const [ruleRows, competencyRows, restrictionRows, personRows] = await Promise.all([
       this.prisma.workOrderCompetencyRule.findMany({
         where: { deletedAt: null, active: true },
         include: { competencyType: { select: { name: true, warningLeadDays: true } } },
@@ -280,6 +289,13 @@ export class WorkOrderRosterService {
         where: { personId: { in: personIds }, deletedAt: null, active: true },
         select: { personId: true, type: true, reason: true, startsAt: true, endsAt: true },
       }),
+      // Empresa contratista de cada persona (sólo si el tipo exige acreditación).
+      requireAccreditation
+        ? this.prisma.person.findMany({
+            where: { id: { in: personIds } },
+            select: { id: true, kind: true, contractorCompany: { select: { name: true, accreditationStatus: true, accreditedUntil: true } } },
+          })
+        : Promise.resolve([] as { id: string; kind: string; contractorCompany: { name: string; accreditationStatus: string; accreditedUntil: Date | null } | null }[]),
     ]);
     // Reglas aplicables a ESTA OT (función pura, espejo de checklists); el filtro por rol
     // se aplica por persona dentro de `deriveWorkerReasons`.
@@ -309,6 +325,19 @@ export class WorkOrderRosterService {
       arr.push({ type: r.type, reason: r.reason });
       restrByPerson.set(r.personId, arr);
     }
+    // Eje EMPRESA (S3): acreditación de la empresa contratista, por persona. Sólo se arma si
+    // el tipo lo exige y la persona es CONTRATISTA con empresa (`deriveWorkerReasons` sólo
+    // emite causas cuando `company.required`); internos ⇒ null.
+    const companyByPerson = new Map<string, WorkerCompanyAccreditationInput>();
+    for (const p of personRows) {
+      if (p.kind !== "CONTRACTOR" || !p.contractorCompany) continue;
+      companyByPerson.set(p.id, {
+        required: true,
+        companyName: p.contractorCompany.name,
+        status: p.contractorCompany.accreditationStatus as WorkerCompanyAccreditationInput["status"],
+        accreditedUntilMs: p.contractorCompany.accreditedUntil ? p.contractorCompany.accreditedUntil.getTime() : null,
+      });
+    }
     const out = new Map<string, WorkerStatusDetail[]>();
     for (const personId of personIds) {
       out.set(
@@ -318,6 +347,7 @@ export class WorkOrderRosterService {
           personRosterRoleIds: rolesByPerson.get(personId) ?? [],
           competencies: compByPerson.get(personId) ?? [],
           restrictions: restrByPerson.get(personId) ?? [],
+          company: companyByPerson.get(personId) ?? null,
           nowMs,
         }),
       );
@@ -337,7 +367,7 @@ export class WorkOrderRosterService {
         requiresPtw: true,
         rosterConfirmedAt: true,
         rosterConfirmedById: true,
-        type: { select: { rosterEnabled: true } },
+        type: { select: { rosterEnabled: true, requireCompanyAccreditation: true } },
         specialties: { select: { specialtyId: true } },
       },
     });
@@ -382,6 +412,6 @@ type RosterWorkOrder = {
   requiresPtw: boolean;
   rosterConfirmedAt: Date | null;
   rosterConfirmedById: string | null;
-  type: { rosterEnabled: boolean };
+  type: { rosterEnabled: boolean; requireCompanyAccreditation: boolean };
   specialties: { specialtyId: string }[];
 };

@@ -317,6 +317,38 @@ export const NOTIFICATION_EVENTS = [
       { name: "worker.expiresIn", description: "Tiempo transcurrido desde el vencimiento.", sample: "2 d" },
     ],
   },
+  {
+    key: "contractor.accreditation.expiring",
+    group: "workorders",
+    labelKey: "notifications.events.contractorAccreditationExpiring",
+    description:
+      "La ACREDITACIÓN de una empresa contratista está por vencer (dentro de la ventana de aviso) y tiene personal en la dotación de una OT abierta cuyo tipo exige acreditación. Avisa al responsable de la OT y a los roles del estado actual.",
+    origin: "derived",
+    variables: [
+      ...COMMON_VARIABLES,
+      ...WORKORDER_VARIABLES,
+      { name: "company.name", description: "Nombre de la empresa contratista.", sample: "Montajes ACME Ltda." },
+      { name: "company.grade", description: "Grado/score de acreditación (si existe).", sample: "A" },
+      { name: "company.accreditedUntil", description: "Fecha de vencimiento de la acreditación.", sample: "1 oct 2026, 00:00" },
+      { name: "company.expiresIn", description: "Tiempo restante hasta el vencimiento.", sample: "89 d" },
+    ],
+  },
+  {
+    key: "contractor.accreditation.expired",
+    group: "workorders",
+    labelKey: "notifications.events.contractorAccreditationExpired",
+    description:
+      "La ACREDITACIÓN de una empresa contratista ya venció y la empresa sigue con personal en la dotación de una OT abierta cuyo tipo exige acreditación. Avisa al responsable de la OT y a los roles del estado actual.",
+    origin: "derived",
+    variables: [
+      ...COMMON_VARIABLES,
+      ...WORKORDER_VARIABLES,
+      { name: "company.name", description: "Nombre de la empresa contratista.", sample: "Montajes ACME Ltda." },
+      { name: "company.grade", description: "Grado/score de acreditación (si existe).", sample: "A" },
+      { name: "company.accreditedUntil", description: "Fecha en que venció la acreditación.", sample: "1 jul 2026, 00:00" },
+      { name: "company.expiresIn", description: "Tiempo transcurrido desde el vencimiento.", sample: "2 d" },
+    ],
+  },
 ] as const satisfies readonly NotificationEventDef[];
 
 /** Unión literal de todas las claves de evento conocidas. */

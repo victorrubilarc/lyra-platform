@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
-import { DEFAULT_COMPETENCY_WARNING_LEAD_DAYS } from "@lyra/contracts";
+import { DEFAULT_ACCREDITATION_WARNING_LEAD_DAYS, DEFAULT_COMPETENCY_WARNING_LEAD_DAYS } from "@lyra/contracts";
 import { PrismaService } from "../prisma/prisma.service";
 
 /** Una orden de aviso a encolar (evento + payload mínimo + clave de dedupe). */
@@ -21,7 +21,10 @@ export interface WorkerBreachEmit {
  * expirations and sends notifications to renew". Acreditación de EMPRESA → S3.
  *  - `worker.competency.expiring` → vence dentro de la ventana del tipo (warningLeadDays).
  *  - `worker.competency.expired`  → ya venció y sigue en un roster activo.
- * Ambos se RE-AVISAN a diario (clave con el día) — recordatorio recurrente.
+ *  - `contractor.accreditation.expiring` → la ACREDITACIÓN de una empresa contratista con
+ *    personal en una OT abierta (cuyo tipo la EXIGE) vence dentro de la ventana (90 d, ISN).
+ *  - `contractor.accreditation.expired`  → esa acreditación ya venció y sigue con personal.
+ * Todos se RE-AVISAN a diario (clave con el día) — recordatorio recurrente.
  */
 @Injectable()
 export class WorkerComplianceService {
@@ -78,6 +81,55 @@ export class WorkerComplianceService {
         eventKey: "worker.competency.expired",
         payload: { workOrderId: r.workOrderId, competencyId: r.competencyId, personId: r.personId, personName: r.personName, competencyName: r.competencyName, expiresAt: r.expiresAt.toISOString() },
         dedupeKey: `worker.competency.expired|${r.workOrderId}|${r.competencyId}|${day}`,
+      });
+    }
+
+    // === Acreditación de EMPRESA contratista (Dotación S3) ====================
+    // Sólo empresas con personal en un roster de OT ABIERTA cuyo TIPO exige acreditación
+    // (`requireCompanyAccreditation`). Sólo estados ACCREDITED/CONDITIONAL con `accreditedUntil`
+    // fechado tienen sentido "por vencer/vencida" (SUSPENDED/EXPIRED/NONE ya bloquean en el gate).
+    type CoRow = { workOrderId: string; companyId: string; companyName: string; grade: string | null; accreditedUntil: Date };
+
+    const accExpiring = await this.prisma.$queryRaw<CoRow[]>`
+      SELECT DISTINCT wo."id" AS "workOrderId", cc."id" AS "companyId", cc."name" AS "companyName",
+             cc."accreditationGrade" AS "grade", cc."accreditedUntil"
+      FROM "ContractorCompany" cc
+      JOIN "Person" p ON p."contractorCompanyId" = cc."id" AND p."deletedAt" IS NULL AND p."kind" = 'CONTRACTOR'
+      JOIN "WorkOrderWorker" ww ON ww."personId" = p."id" AND ww."removedAt" IS NULL
+      JOIN "WorkOrder" wo ON wo."id" = ww."workOrderId" AND wo."lifecycle" = 'OPEN' AND wo."deletedAt" IS NULL
+      JOIN "WorkOrderType" wt ON wt."id" = wo."typeId" AND wt."requireCompanyAccreditation" = true
+      WHERE cc."deletedAt" IS NULL
+        AND cc."accreditationStatus" IN ('ACCREDITED', 'CONDITIONAL')
+        AND cc."accreditedUntil" IS NOT NULL
+        AND cc."accreditedUntil" > now()
+        AND cc."accreditedUntil" <= now() + (${DEFAULT_ACCREDITATION_WARNING_LEAD_DAYS} * interval '1 day')
+      LIMIT ${limit}`;
+    for (const r of accExpiring) {
+      out.push({
+        eventKey: "contractor.accreditation.expiring",
+        payload: { workOrderId: r.workOrderId, companyId: r.companyId, companyName: r.companyName, grade: r.grade, accreditedUntil: r.accreditedUntil.toISOString() },
+        dedupeKey: `contractor.accreditation.expiring|${r.workOrderId}|${r.companyId}|${day}`,
+      });
+    }
+
+    const accExpired = await this.prisma.$queryRaw<CoRow[]>`
+      SELECT DISTINCT wo."id" AS "workOrderId", cc."id" AS "companyId", cc."name" AS "companyName",
+             cc."accreditationGrade" AS "grade", cc."accreditedUntil"
+      FROM "ContractorCompany" cc
+      JOIN "Person" p ON p."contractorCompanyId" = cc."id" AND p."deletedAt" IS NULL AND p."kind" = 'CONTRACTOR'
+      JOIN "WorkOrderWorker" ww ON ww."personId" = p."id" AND ww."removedAt" IS NULL
+      JOIN "WorkOrder" wo ON wo."id" = ww."workOrderId" AND wo."lifecycle" = 'OPEN' AND wo."deletedAt" IS NULL
+      JOIN "WorkOrderType" wt ON wt."id" = wo."typeId" AND wt."requireCompanyAccreditation" = true
+      WHERE cc."deletedAt" IS NULL
+        AND cc."accreditationStatus" IN ('ACCREDITED', 'CONDITIONAL')
+        AND cc."accreditedUntil" IS NOT NULL
+        AND cc."accreditedUntil" <= now()
+      LIMIT ${limit}`;
+    for (const r of accExpired) {
+      out.push({
+        eventKey: "contractor.accreditation.expired",
+        payload: { workOrderId: r.workOrderId, companyId: r.companyId, companyName: r.companyName, grade: r.grade, accreditedUntil: r.accreditedUntil.toISOString() },
+        dedupeKey: `contractor.accreditation.expired|${r.workOrderId}|${r.companyId}|${day}`,
       });
     }
 

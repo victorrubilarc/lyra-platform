@@ -43,6 +43,7 @@ export function WorkOrderTypeModal({ open, onClose, type, existingKeys }: Props)
   const [defaultWorkflowId, setDefaultWorkflowId] = useState("");
   const [requiresPtwDefault, setRequiresPtwDefault] = useState(false);
   const [rosterEnabled, setRosterEnabled] = useState(false);
+  const [requireCompanyAccreditation, setRequireCompanyAccreditation] = useState(false);
   const [criticalityDefault, setCriticalityDefault] = useState<string>("");
   const [resolutionDueMinutes, setResolutionDueMinutes] = useState<number | null>(null);
   const [escalationAfterMinutes, setEscalationAfterMinutes] = useState<number | null>(null);
@@ -56,13 +57,14 @@ export function WorkOrderTypeModal({ open, onClose, type, existingKeys }: Props)
     if (type) {
       setName(type.name); setKey(type.key); setDescription(type.description ?? ""); setColor(type.color ?? "");
       setDefaultWorkflowId(type.defaultWorkflowId ?? ""); setRequiresPtwDefault(type.requiresPtwDefault); setRosterEnabled(type.rosterEnabled);
+      setRequireCompanyAccreditation(type.requireCompanyAccreditation);
       setCriticalityDefault(type.criticalityDefault != null ? String(type.criticalityDefault) : ""); setSortOrder(type.sortOrder);
       setResolutionDueMinutes(type.resolutionDueMinutes); setEscalationAfterMinutes(type.escalationAfterMinutes);
       setEscalationRoleId(type.escalationRoleId ?? "");
       setFolioScheme(type.folioScheme ?? null); setFolioOnStateKey(type.folioOnStateKey ?? "");
     } else {
       setName(""); setKey(""); setDescription(""); setColor(""); setDefaultWorkflowId("");
-      setRequiresPtwDefault(false); setRosterEnabled(false); setCriticalityDefault(""); setSortOrder(0);
+      setRequiresPtwDefault(false); setRosterEnabled(false); setRequireCompanyAccreditation(false); setCriticalityDefault(""); setSortOrder(0);
       setResolutionDueMinutes(null); setEscalationAfterMinutes(null); setEscalationRoleId("");
       setFolioScheme(null); setFolioOnStateKey("");
     }
@@ -91,6 +93,8 @@ export function WorkOrderTypeModal({ open, onClose, type, existingKeys }: Props)
       defaultWorkflowId: defaultWorkflowId || null,
       requiresPtwDefault,
       rosterEnabled,
+      // El gate de acreditación sólo tiene sentido si el tipo gestiona dotación.
+      requireCompanyAccreditation: rosterEnabled && requireCompanyAccreditation,
       criticalityDefault: criticalityDefault ? Number(criticalityDefault) : null,
       resolutionDueMinutes: resolutionDueMinutes ?? null,
       escalationAfterMinutes: escalationAfterMinutes ?? null,
@@ -182,6 +186,15 @@ export function WorkOrderTypeModal({ open, onClose, type, existingKeys }: Props)
               <div className={styles.muted}>Las OT de este tipo listan las personas (propias y contratistas) que ingresan a ejecutar; el aprobador confirma y firma la dotación antes de autorizar el permiso.</div>
             </div>
           </div>
+          {rosterEnabled && (
+            <div className={styles.flagRow} style={{ paddingLeft: "var(--space-6)" }}>
+              <Toggle checked={requireCompanyAccreditation} onChange={setRequireCompanyAccreditation} aria-label="Exige acreditación de la empresa contratista" />
+              <div>
+                <div className={styles.flagLabel}>Exige acreditación de la empresa contratista</div>
+                <div className={styles.muted}>Una persona contratista cuya empresa no está acreditada (o su acreditación venció/está suspendida) se marca en ROJO en el semáforo y bloquea confirmar sin excepción firmada. Traza Ley 16.744 art. 66 bis. Sin esto, la acreditación es solo informativa.</div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* SLA de resolución + escalamiento (S6 — vigía digital) */}

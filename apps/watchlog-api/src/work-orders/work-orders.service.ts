@@ -650,6 +650,7 @@ export class WorkOrdersService {
       defaultWorkflowName: r.defaultWorkflowId ? wfNames.get(r.defaultWorkflowId) ?? null : null,
       requiresPtwDefault: r.requiresPtwDefault,
       rosterEnabled: r.rosterEnabled,
+      requireCompanyAccreditation: r.requireCompanyAccreditation,
       criticalityDefault: r.criticalityDefault,
       folioScheme: (r.folioScheme as FolioScheme | null) ?? null,
       folioOnStateKey: r.folioOnStateKey,
@@ -688,6 +689,7 @@ export class WorkOrdersService {
       defaultWorkflowId: dto.defaultWorkflowId ?? null,
       requiresPtwDefault: dto.requiresPtwDefault ?? false,
       rosterEnabled: dto.rosterEnabled ?? false,
+      requireCompanyAccreditation: dto.requireCompanyAccreditation ?? false,
       criticalityDefault: dto.criticalityDefault ?? null,
       // Folio configurable (fork W4): el Zod del pipe ya validó el esquema.
       folioScheme: (dto.folioScheme ?? null) as Prisma.InputJsonValue,

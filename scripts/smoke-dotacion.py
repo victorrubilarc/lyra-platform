@@ -20,9 +20,16 @@ Verifica el ciclo completo de la dotación vía API (server-authoritative):
         revisar_checklists → 400 de nuevo → re-confirmar → revisar_checklists → checklists_ok.
  D) Retrocompatibilidad: OT de un tipo SIN dotación → GET /roster enabled false; POST
     /roster → 400 ("no gestiona dotación").
+ E) S2: competencias con vigencia (verde/ámbar/rojo), restricción (Eje B), override firmado
+    por persona, avisos worker.competency.expiring/.expired (Bloque N).
+ F) S3: GATE de acreditación de EMPRESA. Tipo con requireCompanyAccreditation ⇒ empresa NONE
+    → contratista ROJO (COMPANY_NOT_ACCREDITED) + gate bloquea; acreditar con vigencia → verde;
+    condicional/por-vencer → ámbar; vencida → rojo; override firmado por persona desbloquea;
+    avisos contractor.accreditation.expired/.expiring (Bloque N).
 
 Crea y LIMPIA por marcadores (psql). API :3000. Clave demo Demo!Pass2026.
-Requiere `pnpm db:seed` + Redis FLUSHALL previos (permisos nuevos worker:manage / workorder:roster:manage)."""
+S3 NO agrega permisos (worker:manage gobierna empresas; workordercatalog:manage la config): sin
+FLUSHALL. Requiere `pnpm db:seed` para las plantillas de correo nuevas (contractor.accreditation.*)."""
 import json
 import os
 import subprocess
@@ -44,10 +51,13 @@ OK, FAIL = [], []
 TYPE_KEY = "smoke-dot-tipo"
 NOROSTER_TYPE_KEY = "smoke-dot-noroster"
 S2_TYPE_KEY = "smoke-dot-s2"  # tipo NO-PTW, aislado de las reglas sembradas
+S3_TYPE_KEY = "smoke-dot-s3"  # tipo NO-PTW con requireCompanyAccreditation (gate de empresa)
 WO_TITLE = "OT Smoke Dotación — permiso de prueba"
 WO2_TITLE = "OT Smoke Dotación — sin dotación"
 WO3_TITLE = "OT Smoke Dotación — competencias S2"
+WO4_TITLE = "OT Smoke Dotación — acreditación S3"
 COMPANY_KEY = "smoke-dot-empresa"
+COMPANY2_KEY = "smoke-dot-empresa2"  # empresa del gate de acreditación (S3)
 COMP_KEY = "smoke-dot-comp"  # tipo de competencia S2
 RULE_NAME = "Regla Smoke Competencia S2"
 PERSON_LAST = "SmokeDotApellido"  # marcador para limpieza
@@ -92,7 +102,7 @@ def check(name, cond, detail=""):
 
 
 def cleanup():
-    titles = (WO_TITLE, WO2_TITLE, WO3_TITLE)
+    titles = (WO_TITLE, WO2_TITLE, WO3_TITLE, WO4_TITLE)
     intitles = ", ".join(f"'{t}'" for t in titles)
     # Avisos del Bloque N emitidos para las OT del smoke (por payload workOrderId).
     sql(f"DELETE FROM \"NotificationOutbox\" o USING \"NotificationEvent\" e WHERE o.\"eventId\"=e.id AND e.payload->>'workOrderId' IN (SELECT id FROM \"WorkOrder\" WHERE title IN ({intitles}));")
@@ -104,9 +114,9 @@ def cleanup():
     sql(f"DELETE FROM \"WorkOrderCompetencyRule\" WHERE name = '{RULE_NAME}';")
     sql(f"DELETE FROM \"Person\" WHERE \"lastName\" = '{PERSON_LAST}';")  # cascada PersonCompetency/Restriction
     sql(f"DELETE FROM \"CompetencyType\" WHERE key = '{COMP_KEY}';")
-    sql(f"DELETE FROM \"ContractorCompany\" WHERE key = '{COMPANY_KEY}';")
+    sql(f"DELETE FROM \"ContractorCompany\" WHERE key IN ('{COMPANY_KEY}', '{COMPANY2_KEY}');")
     sql("DELETE FROM \"FolioCounter\" WHERE \"sequenceKey\" LIKE 'workorder|type:' || (SELECT id FROM \"WorkOrderType\" WHERE key = '" + TYPE_KEY + "') || '%';")
-    sql(f"DELETE FROM \"WorkOrderType\" WHERE key IN ('{TYPE_KEY}', '{NOROSTER_TYPE_KEY}', '{S2_TYPE_KEY}');")
+    sql(f"DELETE FROM \"WorkOrderType\" WHERE key IN ('{TYPE_KEY}', '{NOROSTER_TYPE_KEY}', '{S2_TYPE_KEY}', '{S3_TYPE_KEY}');")
 
 
 def main():
@@ -331,8 +341,93 @@ def main():
     n_soon = sql(f"SELECT count(*) FROM \"NotificationEvent\" WHERE \"eventKey\"='worker.competency.expiring' AND payload->>'workOrderId'='{wid3}';")
     check("aviso worker.competency.expiring encolado tras /notifications/run", n_soon.isdigit() and int(n_soon) >= 1, n_soon)
 
+    # === F) S3: acreditación de EMPRESA contratista como GATE =================
+    # Tipo NO-PTW con requireCompanyAccreditation ⇒ el ÚNICO origen de rojo es la empresa
+    # (sin reglas de competencia para este tipo). Traza Ley 16.744 art.66 bis + ISN/Avetta.
+    s, ty3 = call("POST", "/work-orders/types?create=true", admin,
+                  {"key": S3_TYPE_KEY, "name": "Tipo Acreditación S3 Smoke", "requiresPtwDefault": False, "rosterEnabled": True, "requireCompanyAccreditation": True, "criticalityDefault": 2, "sortOrder": 96})
+    tid_s3 = ty3.get("id") if isinstance(ty3, dict) else None
+    check("crear tipo con requireCompanyAccreditation → 2xx + flag true", s in (200, 201) and isinstance(ty3, dict) and ty3.get("requireCompanyAccreditation") is True, str(s))
+
+    # Empresa SIN acreditar (NONE) + persona contratista suya.
+    s, co2 = call("POST", "/contractor-companies?create=true", admin, {"key": COMPANY2_KEY, "name": "Contratista NoAcreditada SpA", "accreditationStatus": "NONE"})
+    co2_id = co2.get("id") if isinstance(co2, dict) else None
+    s, pco = call("POST", "/persons", admin, {"kind": "CONTRACTOR", "firstName": "Rodrigo", "lastName": PERSON_LAST, "contractorCompanyId": co2_id})
+    pco_id = pco.get("id") if isinstance(pco, dict) else None
+    check("empresa NONE + persona contratista creadas", co2_id and pco_id, str(s))
+
+    def upd_company(**over):
+        # El name es obligatorio en el DTO de upsert; se reenvía en cada actualización.
+        call("POST", "/contractor-companies", admin, {"id": co2_id, "name": "Contratista NoAcreditada SpA", **over})
+
+    # OT del tipo S3 → en_preparacion.
+    s, wo4 = call("POST", "/work-orders", admin, {"title": WO4_TITLE, "typeId": tid_s3, "criticality": 2, "requiresPtw": False, "orgNodeId": node})
+    wid4 = wo4.get("id") if isinstance(wo4, dict) else None
+    call("POST", f"/work-orders/{wid4}/transitions", admin, {"transitionKey": "enviar"})
+    call("POST", f"/work-orders/{wid4}/transitions", admin, {"transitionKey": "aprobar", "password": PASS})
+    call("POST", f"/work-orders/{wid4}/transitions", admin, {"transitionKey": "planificar"})
+    call("POST", f"/work-orders/{wid4}/activities", admin, {"title": "Tarea S3", "mandatory": True})
+    call("POST", f"/work-orders/{wid4}/transitions", admin, {"transitionKey": "autorizar_plan"})
+    call("POST", f"/work-orders/{wid4}/transitions", admin, {"transitionKey": "preparar"})
+
+    # F2. empresa NO acreditada ⇒ persona contratista ROJO (COMPANY_NOT_ACCREDITED).
+    s, r = call("POST", f"/work-orders/{wid4}/roster", admin, {"personId": pco_id, "rosterRoleId": ent_id})
+    w = worker_of(r, pco_id)
+    check("empresa no acreditada (NONE) → contratista ROJO (COMPANY_NOT_ACCREDITED)",
+          w is not None and w["status"]["level"] == "blocked" and "COMPANY_NOT_ACCREDITED" in w["status"]["reasons"], str(w and w["status"]))
+
+    # F3. GATE: confirmar con la persona en rojo SIN override → 400.
+    s, e = call("POST", f"/work-orders/{wid4}/roster/confirm", admin, {"password": PASS})
+    msg = (e or {}).get("message", "") if isinstance(e, dict) else ""
+    check("gate empresa: confirmar con empresa no acreditada sin override → 400", s == 400 and "impediment" in msg.lower(), f"{s} {msg[:50]}")
+
+    # F4. acreditar la empresa con vigencia futura → VERDE.
+    upd_company(accreditationStatus="ACCREDITED", accreditationGrade="A", accreditedUntil=iso(180))
+    s, r = call("GET", f"/work-orders/{wid4}/roster", admin)
+    w = worker_of(r, pco_id)
+    check("acreditar empresa (vigente) → VERDE (ok)", w is not None and w["status"]["level"] == "ok", str(w and w["status"]))
+
+    # F5. acreditación CONDICIONAL → ÁMBAR (pasa marcada, no bloquea).
+    upd_company(accreditationStatus="CONDITIONAL", accreditedUntil=iso(200))
+    s, r = call("GET", f"/work-orders/{wid4}/roster", admin)
+    w = worker_of(r, pco_id)
+    check("acreditación CONDICIONAL → ÁMBAR (COMPANY_ACCREDITATION_CONDITIONAL)",
+          w is not None and w["status"]["level"] == "warning" and "COMPANY_ACCREDITATION_CONDITIONAL" in w["status"]["reasons"], str(w and w["status"]))
+
+    # F6. acreditación por vencer (dentro de 90 d) → ÁMBAR.
+    upd_company(accreditationStatus="ACCREDITED", accreditedUntil=iso(30))
+    s, r = call("GET", f"/work-orders/{wid4}/roster", admin)
+    w = worker_of(r, pco_id)
+    check("acreditación por vencer (≤90 d) → ÁMBAR (COMPANY_ACCREDITATION_EXPIRING)",
+          w is not None and w["status"]["level"] == "warning" and "COMPANY_ACCREDITATION_EXPIRING" in w["status"]["reasons"], str(w and w["status"]))
+
+    # F7. acreditación VENCIDA → ROJO.
+    upd_company(accreditationStatus="ACCREDITED", accreditedUntil=iso(-5))
+    s, r = call("GET", f"/work-orders/{wid4}/roster", admin)
+    w = worker_of(r, pco_id)
+    check("acreditación VENCIDA → ROJO (COMPANY_NOT_ACCREDITED)",
+          w is not None and w["status"]["level"] == "blocked" and "COMPANY_NOT_ACCREDITED" in w["status"]["reasons"], str(w and w["status"]))
+
+    # F8. override firmado POR PERSONA desbloquea (reusa el flujo de S2).
+    s, _ = call("POST", f"/work-orders/{wid4}/roster/confirm", admin, {"password": PASS})
+    check("gate empresa: confirmar sin override (vencida) → 400", s == 400, str(s))
+    s, r = call("POST", f"/work-orders/{wid4}/roster/confirm", admin, {"password": PASS, "overrides": [{"workerId": w["id"], "reason": "Acreditación en trámite; riesgo aceptado (smoke)"}]})
+    wov = worker_of(r, pco_id)
+    check("override firmado por persona (empresa no acreditada) → confirmar 2xx + override registrado",
+          s == 200 and isinstance(r, dict) and r.get("confirmedAt") and wov and wov.get("override") and (wov["override"] or {}).get("reason"), str(s))
+
+    # F9. avisos de acreditación (Bloque N): empresa vencida (iso -5) con personal en OT abierta
+    # cuyo tipo la exige ⇒ contractor.accreditation.expired; por vencer (iso 30) ⇒ .expiring.
+    call("POST", "/notifications/run", admin)
+    n_accexp = sql(f"SELECT count(*) FROM \"NotificationEvent\" WHERE \"eventKey\"='contractor.accreditation.expired' AND payload->>'workOrderId'='{wid4}';")
+    check("aviso contractor.accreditation.expired encolado tras /notifications/run", n_accexp.isdigit() and int(n_accexp) >= 1, n_accexp)
+    upd_company(accreditationStatus="ACCREDITED", accreditedUntil=iso(30))
+    call("POST", "/notifications/run", admin)
+    n_accsoon = sql(f"SELECT count(*) FROM \"NotificationEvent\" WHERE \"eventKey\"='contractor.accreditation.expiring' AND payload->>'workOrderId'='{wid4}';")
+    check("aviso contractor.accreditation.expiring encolado tras /notifications/run", n_accsoon.isdigit() and int(n_accsoon) >= 1, n_accsoon)
+
     cleanup()
-    print(f"\n== Dotación S1+S2: {len(OK)} ok, {len(FAIL)} fail ==")
+    print(f"\n== Dotación S1+S2+S3: {len(OK)} ok, {len(FAIL)} fail ==")
     if FAIL:
         for f in FAIL:
             print("  FAIL " + f)

@@ -8,6 +8,7 @@ import {
   upsertPersonRequestSchema,
   workerStatusFromDetails,
   type WorkerBlockReason,
+  type WorkerCompanyAccreditationInput,
   type WorkerCompetencyRuleInput,
 } from "./roster.js";
 
@@ -130,6 +131,81 @@ describe("deriveWorkerReasons — causas rojas por persona (Ejes A/B)", () => {
   it("competencia no-mandatoria ausente NO bloquea", () => {
     const d = deriveWorkerReasons({ rules: [rule({ mandatory: false })], personRosterRoleIds: [], competencies: [], restrictions: [], nowMs: now });
     expect(d).toHaveLength(0);
+  });
+});
+
+describe("deriveWorkerReasons — eje EMPRESA (acreditación de contratista, S3)", () => {
+  const now = Date.parse("2026-07-03T00:00:00.000Z");
+  const day = 24 * 60 * 60 * 1000;
+  const withCo = (co: Partial<WorkerCompanyAccreditationInput>) =>
+    deriveWorkerReasons({
+      rules: [],
+      personRosterRoleIds: [],
+      competencies: [],
+      restrictions: [],
+      nowMs: now,
+      company: { required: true, companyName: "ACME", status: "ACCREDITED", accreditedUntilMs: null, ...co },
+    });
+
+  it("el eje empresa NO se evalúa si el tipo no lo exige (required=false) ⇒ verde", () => {
+    expect(withCo({ required: false, status: "NONE" })).toHaveLength(0);
+  });
+
+  it("sin bloque `company` ⇒ verde (persona propia / tipo sin gate) — retrocompatible", () => {
+    expect(deriveWorkerReasons({ rules: [], personRosterRoleIds: [], competencies: [], restrictions: [], nowMs: now })).toHaveLength(0);
+  });
+
+  it("NONE / SUSPENDED / EXPIRED ⇒ COMPANY_NOT_ACCREDITED (rojo)", () => {
+    for (const status of ["NONE", "SUSPENDED", "EXPIRED"] as const) {
+      const d = withCo({ status });
+      expect(d[0]!.reason).toBe("COMPANY_NOT_ACCREDITED");
+      expect(d[0]!.companyName).toBe("ACME");
+      expect(workerStatusFromDetails(d).level).toBe("blocked");
+    }
+  });
+
+  it("ACCREDITED vigente (sin vencimiento o lejano) ⇒ verde", () => {
+    expect(withCo({ status: "ACCREDITED", accreditedUntilMs: null })).toHaveLength(0);
+    expect(withCo({ status: "ACCREDITED", accreditedUntilMs: now + 200 * day })).toHaveLength(0);
+  });
+
+  it("ACCREDITED con vencimiento pasado ⇒ COMPANY_NOT_ACCREDITED (rojo) con fecha", () => {
+    const d = withCo({ status: "ACCREDITED", accreditedUntilMs: now - day });
+    expect(d[0]!.reason).toBe("COMPANY_NOT_ACCREDITED");
+    expect(d[0]!.accreditedUntil).toBe(new Date(now - day).toISOString());
+    expect(workerStatusFromDetails(d).level).toBe("blocked");
+  });
+
+  it("ACCREDITED dentro de la ventana de 90 días ⇒ COMPANY_ACCREDITATION_EXPIRING (ámbar)", () => {
+    const d = withCo({ status: "ACCREDITED", accreditedUntilMs: now + 30 * day });
+    expect(d[0]!.reason).toBe("COMPANY_ACCREDITATION_EXPIRING");
+    expect(workerStatusFromDetails(d).level).toBe("warning");
+    // Justo fuera de la ventana (100 días) ⇒ verde.
+    expect(withCo({ status: "ACCREDITED", accreditedUntilMs: now + 100 * day })).toHaveLength(0);
+  });
+
+  it("CONDITIONAL vigente ⇒ COMPANY_ACCREDITATION_CONDITIONAL (ámbar, pasa marcada)", () => {
+    const d = withCo({ status: "CONDITIONAL", accreditedUntilMs: now + 200 * day });
+    expect(d[0]!.reason).toBe("COMPANY_ACCREDITATION_CONDITIONAL");
+    expect(workerStatusFromDetails(d).level).toBe("warning");
+  });
+
+  it("CONDITIONAL con vencimiento pasado ⇒ COMPANY_NOT_ACCREDITED (rojo manda sobre condicional)", () => {
+    const d = withCo({ status: "CONDITIONAL", accreditedUntilMs: now - day });
+    expect(d[0]!.reason).toBe("COMPANY_NOT_ACCREDITED");
+  });
+
+  it("el eje empresa es ORTOGONAL a competencia/veto (coexisten)", () => {
+    const d = deriveWorkerReasons({
+      rules: [{ competencyTypeId: "alt", competencyTypeName: "Altura", mandatory: true, appliesToRosterRoleId: null, warningLeadDays: null }],
+      personRosterRoleIds: [],
+      competencies: [],
+      restrictions: [{ type: "MEDICAL", reason: "No apto" }],
+      nowMs: now,
+      company: { required: true, companyName: "ACME", status: "SUSPENDED", accreditedUntilMs: null },
+    });
+    expect(d.map((x) => x.reason).sort()).toEqual(["COMPANY_NOT_ACCREDITED", "COMPETENCY_MISSING", "RESTRICTION_ACTIVE"]);
+    expect(workerStatusFromDetails(d).level).toBe("blocked");
   });
 });
 

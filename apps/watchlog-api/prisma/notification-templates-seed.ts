@@ -375,6 +375,57 @@ export const NOTIFICATION_TEMPLATE_SEEDS: NotificationTemplateSeed[] = [
     ),
   },
   {
+    eventKey: "contractor.accreditation.expiring",
+    locale: "es-CL",
+    channel: "EMAIL",
+    subject: "Acreditación por vencer: {{company.name}} ({{workorder.folio}})",
+    bodyText:
+      "Hola {{recipient.name}}:\n\n" +
+      "La acreditación de la empresa contratista «{{company.name}}», con personal en la dotación de la orden " +
+      "de trabajo {{workorder.folio}} ({{workorder.title}}), vence el {{company.accreditedUntil}} (en {{company.expiresIn}}).\n\n" +
+      "Nodo: {{workorder.node}}\nResponsable de la OT: {{workorder.owner}}\n\n" +
+      "Verifique la re-acreditación de la empresa antes del vencimiento en {{workorder.url}}.\n\n— {{app.name}}",
+    bodyHtml: htmlShell(
+      "Acreditación de empresa por vencer",
+      "La acreditación de <strong>{{company.name}}</strong> está por vencer y tiene personal en la dotación.",
+      [
+        ["Empresa contratista", "{{company.name}}"],
+        ["Grado / score", "{{company.grade}}"],
+        ["Orden de trabajo", "{{workorder.folio}} — {{workorder.title}}"],
+        ["Nodo", "{{workorder.node}}"],
+        ["Vence", "{{company.accreditedUntil}}"],
+        ["Tiempo restante", "{{company.expiresIn}}"],
+      ],
+      { label: "Abrir orden de trabajo", url: "{{workorder.url}}" },
+    ),
+  },
+  {
+    eventKey: "contractor.accreditation.expired",
+    locale: "es-CL",
+    channel: "EMAIL",
+    subject: "Acreditación VENCIDA: {{company.name}} ({{workorder.folio}})",
+    bodyText:
+      "Hola {{recipient.name}}:\n\n" +
+      "La acreditación de la empresa contratista «{{company.name}}», con personal en la dotación de la orden " +
+      "de trabajo {{workorder.folio}} ({{workorder.title}}), venció el {{company.accreditedUntil}} (hace {{company.expiresIn}}) " +
+      "y la empresa sigue con personal en la dotación.\n\n" +
+      "Nodo: {{workorder.node}}\nResponsable de la OT: {{workorder.owner}}\n\n" +
+      "Re-acredite la empresa o retire a su personal de la dotación en {{workorder.url}}.\n\n— {{app.name}}",
+    bodyHtml: htmlShell(
+      "Acreditación de empresa vencida",
+      "La acreditación de <strong>{{company.name}}</strong> está vencida y sigue con personal en la dotación.",
+      [
+        ["Empresa contratista", "{{company.name}}"],
+        ["Grado / score", "{{company.grade}}"],
+        ["Orden de trabajo", "{{workorder.folio}} — {{workorder.title}}"],
+        ["Nodo", "{{workorder.node}}"],
+        ["Venció", "{{company.accreditedUntil}}"],
+        ["Hace", "{{company.expiresIn}}"],
+      ],
+      { label: "Abrir orden de trabajo", url: "{{workorder.url}}" },
+    ),
+  },
+  {
     eventKey: "handover.ready",
     locale: "es-CL",
     channel: "EMAIL",

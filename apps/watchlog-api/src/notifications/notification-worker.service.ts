@@ -121,8 +121,9 @@ export class NotificationWorkerService {
         emitted++;
       }
 
-      // Dotación (S2): competencias/certificaciones por vencer o vencidas de personas en
-      // un roster de OT abierta. Detección en el dominio (WorkerComplianceService).
+      // Dotación (S2/S3): competencias por vencer/vencidas de personas + acreditación de
+      // EMPRESA contratista por vencer/vencida (tipos que la exigen), con personal en un
+      // roster de OT abierta. Detección en el dominio (WorkerComplianceService).
       const workerBreaches = await this.workerCompliance.findBreaches(BATCH);
       for (const cb of workerBreaches) {
         await this.emitter.emit(cb.eventKey, cb.payload, { dedupeKey: cb.dedupeKey });

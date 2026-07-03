@@ -10,7 +10,7 @@
 > funcionalidades existentes** aunque su detalle aún esté por redactar (✍️): así nada se
 > olvida; el backfill de lo ya construido se llena de a poco (incremental).
 >
-> Última actualización: **2026-07-03** (Dotación del permiso · Slice 2 — competencias y certificaciones con vigencia por persona: catálogo de competencias + reglas de requisito, carga de certificaciones con vencimiento e historial, semáforo REAL por persona con motivo legible, excepción firmada para autorizar impedimentos, y avisos de vencimiento).
+> Última actualización: **2026-07-03** (Dotación del permiso · Slice 3 — acreditación de EMPRESAS contratistas como GATE: registro de acreditación con grado/vigencia/plataforma, exigencia por tipo de OT que bloquea a contratistas de empresas no acreditadas/vencidas/suspendidas [condicional y por-vencer en ámbar], excepción firmada por persona, y avisos de vencimiento de acreditación).
 
 ## Convención de cada sección
 Cada funcionalidad se documenta con estas cuatro partes fijas:
@@ -152,6 +152,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 - ✅ **Plazos, avisos de vencimiento y semáforos (SLA) — "vigía digital"** (plazo de resolución automático por tipo de OT, avisos por correo y campanita cuando algo vence o se estanca, escalamiento a un superior, semáforo verde/ámbar/rojo en la grilla y el detalle, indicadores "vencidas / por vencer / estancadas") (§ Órdenes de trabajo ▸ Plazos, avisos y semáforos (SLA))
 - ✅ **Dotación del permiso: quiénes ingresan y validación del aprobador** (listar las personas —propias y contratistas— que entran a ejecutar, con su rol; el aprobador revisa la dotación y la **confirma firmando** antes de autorizar el permiso; catálogo de personas y empresas contratistas) (§ Órdenes de trabajo ▸ Dotación del permiso)
 - ✅ **Competencias y certificaciones de la dotación** (catálogo de competencias + reglas de requisito; carga de certificaciones con vencimiento e historial de renovaciones; semáforo REAL por persona con motivo legible; excepción firmada para autorizar impedimentos; avisos de vencimiento) (§ Órdenes de trabajo ▸ Competencias y certificaciones de la dotación)
+- ✅ **Acreditación de empresas contratistas** (registro de acreditación de la empresa con grado/vigencia/plataforma; gate por tipo de OT que bloquea a contratistas de empresas no acreditadas/vencidas/suspendidas; condicional y por-vencer en ámbar; excepción firmada; avisos de vencimiento de acreditación) (§ Órdenes de trabajo ▸ Acreditación de empresas contratistas)
 - ✅ **Administrar los catálogos** (tipos de OT, especialidades y **reglas de checklist con su momento**) (§ Órdenes de trabajo ▸ Catálogos) [solo administrador]
 
 ---
@@ -466,7 +467,9 @@ y se activa por tipo de OT**: si el tipo no la gestiona, la OT no muestra ningun
    - **Personas:** «Nueva persona» → elige si es **Propia** o **Contratista** (si es contratista, elige su **empresa**),
      nombre y apellido, y opcionalmente RUT/DNI, ficha, cargo, teléfono y correo. *(Una persona **no** es un usuario del
      sistema: los contratistas no necesitan cuenta ni acceso.)* Buscador por nombre/RUT/ficha y filtro Propios/Contratistas.
-   - **Empresas contratistas:** «Nueva empresa» → nombre, RUT y —opcional— su estado de acreditación (informativo por ahora).
+   - **Empresas contratistas:** «Nueva empresa» → nombre, RUT y su **acreditación** (estado, grado/score, **vigencia**,
+     plataforma de origen y nota). La acreditación puede ser **solo informativa** o funcionar como **gate** que bloquea a los
+     contratistas de una empresa no acreditada (ver «Acreditación de empresas contratistas» más abajo).
 2. **Activar la dotación en el tipo de OT (administrador).** En **Catálogos → Tipos**, edita el tipo y activa **«Gestiona
    dotación»**. Desde ahí, las OT de ese tipo mostrarán la pestaña **«Dotación»**. *(Los tipos «Permiso de Alto Riesgo (PTW)»
    y «Mantención mayor / Overhaul» vienen con la dotación activada de fábrica.)*
@@ -535,8 +538,48 @@ excepciones: *«Gestionar la dotación»* (`workorder:roster:manage`).
   previo** por tipo para que el sistema avise con tiempo.
 - **Avisos automáticos:** cuando una competencia de alguien que está en la dotación de una OT abierta está **por vencer** o
   **vencida**, el sistema avisa al responsable de la OT (por correo y campanita). Así nadie descubre el vencimiento tarde.
-- **Acreditación de la empresa contratista:** hoy es informativa; el **bloqueo** por empresa no acreditada llega en una etapa
-  posterior (Slice 3). El semáforo actual valida competencias y restricciones **de la persona**.
+- **Acreditación de la empresa contratista:** además de las competencias **de la persona**, el semáforo puede validar la
+  **acreditación de su empresa** (nivel empresa). Ver la sección siguiente.
+
+### Órdenes de trabajo ▸ Acreditación de empresas contratistas  [aprobador / preparador · catálogo: administrador]
+
+**Para qué sirve.** En Chile, el **mandante** debe **verificar el cumplimiento** de sus empresas contratistas y mantener un
+**registro actualizado** de ellas (Ley 16.744 art. 66 bis; Código del Trabajo art. 183-C). En la industria global esto se
+gestiona con plataformas de **prequalification** (ISNetworld, Avetta, Veriforce) que le dan a cada empresa un **grado/estado
+de acreditación con vigencia**. Esta función lleva ese control al permiso: cuando el tipo de OT lo exige, una persona
+**contratista** cuya **empresa no está acreditada** (o su acreditación **venció** o está **suspendida**) se marca en **rojo** y
+**bloquea** confirmar la dotación sin una excepción firmada.
+
+**Cómo se usa.**
+1. **Registrar la acreditación de la empresa (administrador).** En **«Personas» → pestaña «Empresas contratistas»**, edita la
+   empresa y completa su **acreditación**: **estado** (Acreditada / Condicional / Suspendida / Vencida / Sin acreditación),
+   **grado o score** (p. ej. «A» de ISNetworld), **vigente hasta** (fecha), **fuente/plataforma** (ISNetworld, Avetta…) y una
+   **nota**. La grilla muestra un **badge de color** con el estado y la vigencia (verde = vigente, ámbar = condicional o por
+   vencer, rojo = no acreditada/vencida). Puedes filtrar por acreditación y la lista pagina.
+2. **Exigir la acreditación en el tipo de OT (administrador).** En **Catálogos → Tipos**, en un tipo que **gestiona dotación**,
+   activa además **«Exige acreditación de la empresa contratista»**. *(Sin activarlo, la acreditación es solo informativa: no
+   bloquea nada — cero regresión.)*
+3. **Ver el semáforo (en la OT).** En la pestaña «Dotación», cada persona contratista refleja la acreditación de su empresa:
+   **verde** si está acreditada y vigente; **ámbar** si es **condicional** o está **por vencer** (dentro de 90 días); **rojo**
+   si la empresa **no está acreditada**, está **suspendida** o su acreditación **venció** (con el motivo legible, p. ej.
+   «Empresa «ACME»: acreditación vencida el 28-06-2026»).
+4. **Autorizar pese a una empresa no acreditada (excepción firmada).** Igual que con las competencias: al **«Confirmar
+   dotación»**, cada persona en rojo exige un **motivo** y **una firma** (riesgo aceptado / medida compensatoria). Queda
+   registrada la excepción.
+
+**Quién puede.** Registrar la acreditación de una empresa: *«Administrar personas»* (`worker:manage`). Activar la exigencia en
+el tipo: *«Administrar catálogos de OT»* (`workordercatalog:manage`). Confirmar y registrar excepciones: *«Gestionar la
+dotación»* (`workorder:roster:manage`).
+
+**Importante.**
+- **Es opcional y por tipo.** El bloqueo solo aplica a los tipos de OT que activaron «Exige acreditación de la empresa». En el
+  resto, la acreditación se ve pero no bloquea.
+- **La condicional pasa marcada.** Una acreditación **Condicional** no bloquea (queda en ámbar): refleja el estándar (ISN grado
+  B / Avetta *conditional* = aceptable pero observada), pero deja la traza visible.
+- **Avisos automáticos:** cuando la acreditación de una empresa con personal en una OT abierta (de un tipo que la exige) está
+  **por vencer** (dentro de 90 días) o **vencida**, el sistema avisa al responsable de la OT (correo y campanita).
+- **Solo el nivel EMPRESA.** La acreditación **del trabajador** (sus certificaciones) se gestiona con las competencias de la
+  sección anterior. Son ejes distintos y se validan por separado.
 
 ### Órdenes de trabajo ▸ Plazos, avisos y semáforos (SLA) — "vigía digital"  [todos los roles operativos]
 

@@ -4,6 +4,39 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-03 · Dotación · Slice 3 — acreditación de EMPRESA contratista como GATE
+Hace REAL el tercer origen de rojo (nivel EMPRESA) que S2-A dejó explícitamente diferido. **Investigación citada**
+(fuente primaria): **ISNetworld RAVS** grados A (todos los elementos) / B (aceptable, faltan componentes) / F (descalifica);
+A y B pasan, cada cliente fija su umbral, y se marca con un "**90-day flag**" antes de vencer. **Avetta**: estados
+*Compliant / Conditional / Non-Compliant*; *Non-Compliant* **impide** trabajar, *Conditional* "**retrasa**" pero no impide.
+⇒ Semántica del semáforo de empresa (persona CONTRATISTA, sólo si el tipo lo exige): `ACCREDITED` vigente = verde ·
+por vencer (≤ ventana) = ámbar `COMPANY_ACCREDITATION_EXPIRING` · `CONDITIONAL` = ámbar `COMPANY_ACCREDITATION_CONDITIONAL`
+(pasa marcada) · `SUSPENDED`/`EXPIRED`/`NONE`/vencida = rojo `COMPANY_NOT_ACCREDITED`.
+- **S3-A · Activación por TOGGLE POR TIPO** `WorkOrderType.requireCompanyAccreditation` (default `false`, espejo de
+  `rosterEnabled`; migración aditiva `20260703140000`). OFF ⇒ la acreditación es **solo informativa** (cero regresión: sin
+  esto, al mergear, TODO contratista en `NONE` se pondría rojo de golpe). ON ⇒ gate vivo. *Motivo:* separa "gestiono quién
+  entra" (S1) de "exijo prequalification del contratista" (Ley 16.744 art.66 bis); coincide con el estándar "cada cliente fija
+  su umbral". Descartadas: (b) auto-por-dato sin migración —deja `NONE`="sin acreditación" pasando en silencio, débil frente
+  al 66 bis; (c) acoplar a `rosterEnabled` —fuerza el gate a todos los que ya usan dotación. *(Recomendación del agente, aprobada por el dueño.)*
+- **S3-B · `NONE` bajo el gate = ROJO**: si el tipo EXIGE acreditación y no hay ninguna, el mandante no verificó el
+  cumplimiento (Ley 16.744 art.66 bis) ⇒ bloquea. Fuera del gate, `NONE` es neutro (informativo).
+- **S3-C · `CONDITIONAL` = ÁMBAR, no rojo** (reason nuevo `COMPANY_ACCREDITATION_CONDITIONAL`): Avetta conditional / ISN B
+  = "pasa marcada, retrasa pero no impide". No bloquea confirmar; sí avisa. Se agregó el reason propio (aditivo) para no
+  mentir en el mensaje (reusar "por vencer" sería incorrecto).
+- **S3-D · Ventana ámbar de acreditación = 90 días** (const `DEFAULT_ACCREDITATION_WARNING_LEAD_DAYS`, fija): traza directa
+  al "90-day flag" de ISN; re-acreditar una empresa (re-revisión de prequalification) toma semanas, mayor que la de una
+  competencia individual (30 d). Config por empresa DESCARTADA (over-parametrización sin caso real).
+- **S3-E · Override firmado POR PERSONA se REUSA tal cual** de S2: `COMPANY_NOT_ACCREDITED` es nivel `blocked` ⇒ entra sin
+  cambios en el flujo de `confirmRoster` (motivo por persona + firma Part 11). **CERO cambio** al gate/override. Sólo se
+  enriqueció el mensaje ("Empresa «ACME»: acreditación vencida el …").
+- **S3-F · Avisos Bloque N** `contractor.accreditation.expiring`/`.expired` (clon del patrón de competencias): sólo empresas
+  con personal en un roster de OT ABIERTA cuyo tipo EXIGE acreditación; sólo `ACCREDITED`/`CONDITIONAL` con `accreditedUntil`
+  fechado (los otros estados ya bloquean en el gate). Destinatario: responsable de la OT + roles del estado (ABAC por nodo).
+  Traza ISN "tracks all accreditation expirations and sends notifications".
+- **CERO permiso nuevo / CERO FLUSHALL** (`worker:manage` gobierna empresas, `workordercatalog:manage` la config del tipo).
+  `db:seed` sí, por las plantillas de correo nuevas. Verde: contracts **497** (roster.spec **30**) + **smoke-dotacion 51/51**
+  + regresión workorders **122/122** e incidencias **32/32**.
+
 ### 2026-07-03 · Dotación · Slice 2 — competencias/certificaciones con vigencia + causas rojas
 Hace REAL la validación que S1 dejó inerte (semáforo siempre verde). Entidades nuevas `CompetencyType` (catálogo:
 qué certificación/formación existe; `category CERTIFICATION|TRAINING|MEDICAL_EXAM|INDUCTION|LICENSE`, `defaultValidityDays`,

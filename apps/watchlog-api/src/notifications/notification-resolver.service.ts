@@ -130,6 +130,12 @@ export class NotificationResolverService {
       case "worker.competency.expired":
         resolution = await this.resolveWorkerCompetency(payload, "expired");
         break;
+      case "contractor.accreditation.expiring":
+        resolution = await this.resolveContractorAccreditation(payload, "expiring");
+        break;
+      case "contractor.accreditation.expired":
+        resolution = await this.resolveContractorAccreditation(payload, "expired");
+        break;
       case "handover.ready":
         resolution = await this.resolveHandoverReady(payload);
         break;
@@ -852,6 +858,48 @@ export class NotificationResolverService {
         "worker.competency": comp.competencyType.name,
         "worker.expiresAt": this.formatDateTime(comp.expiresAt),
         "worker.expiresIn": mode === "expiring" ? this.formatDuration(Math.max(0, minutesTo)) : this.formatDuration(Math.max(0, -minutesTo)),
+      },
+    };
+  }
+
+  /**
+   * Acreditación de EMPRESA contratista por vencer/vencida con personal en el roster de una OT
+   * abierta cuyo tipo la exige (Dotación S3). Destinatarios = responsable de la OT + roles del
+   * estado actual (ABAC por nodo). Re-verifica en vivo el estado de la empresa y que siga con
+   * personal en el roster (evita avisar tras re-acreditar/quitar entre el barrido y el envío).
+   */
+  private async resolveContractorAccreditation(payload: Record<string, unknown>, mode: "expiring" | "expired"): Promise<EventResolution | null> {
+    const workOrderId = String(payload.workOrderId ?? "");
+    const companyId = String(payload.companyId ?? "");
+    if (!workOrderId || !companyId) return null;
+    const wo = await this.loadWorkOrderForNotification(workOrderId);
+    if (!wo || wo.lifecycle !== "OPEN") return null;
+    const company = await this.prisma.contractorCompany.findFirst({
+      where: { id: companyId, deletedAt: null },
+      select: { name: true, accreditationGrade: true, accreditationStatus: true, accreditedUntil: true },
+    });
+    if (!company || !company.accreditedUntil) return null;
+    // Re-verificar contra el estado ACTUAL: sólo ACCREDITED/CONDITIONAL siguen siendo "por
+    // vencer/vencida" (otros estados ya son un rojo distinto); y el vencimiento debe calzar.
+    if (company.accreditationStatus !== "ACCREDITED" && company.accreditationStatus !== "CONDITIONAL") return null;
+    const expired = company.accreditedUntil.getTime() <= Date.now();
+    if (mode === "expired" && !expired) return null;
+    if (mode === "expiring" && expired) return null;
+    // Sigue con personal contratista de esa empresa en el roster de esta OT.
+    const stillStaffed = await this.prisma.workOrderWorker.count({
+      where: { workOrderId, removedAt: null, person: { contractorCompanyId: companyId, kind: "CONTRACTOR" } },
+    });
+    if (stillStaffed === 0) return null;
+    const userIds = await this.workOrderRecipients(wo, { includeStateRoles: true });
+    const minutesTo = Math.round((company.accreditedUntil.getTime() - Date.now()) / 60000);
+    return {
+      ...this.baseWorkOrderResolution(wo, workOrderId, userIds),
+      context: {
+        ...this.workOrderContext(wo),
+        "company.name": company.name,
+        "company.grade": company.accreditationGrade ?? "—",
+        "company.accreditedUntil": this.formatDateTime(company.accreditedUntil),
+        "company.expiresIn": mode === "expiring" ? this.formatDuration(Math.max(0, minutesTo)) : this.formatDuration(Math.max(0, -minutesTo)),
       },
     };
   }

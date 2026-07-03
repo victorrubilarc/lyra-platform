@@ -778,7 +778,7 @@ anulación lifecycle `CANCELED`).
   - **ContractorCompany** — empresa contratista (nivel EMPRESA; traza ISN/Avetta/Veriforce + Ley 16.744 art.66bis/183-C).
     `key` única, `name`/`taxId`, **acreditación** `accreditationStatus` (enum `AccreditationStatus` ACCREDITED|CONDITIONAL|
     SUSPENDED|EXPIRED|NONE)/`accreditationGrade`/`accreditedUntil`/`externalProvider` (gancho ISN/Avetta/Veriforce S4)/
-    `accreditationNote` — **inertes en S1** (el gate se activa en S3). Soft-delete.
+    `accreditationNote` — presentes desde S1; **el GATE se activa en S3** (ver abajo). Soft-delete.
   - **RosterRole** — rol de la persona en la dotación, **CONFIGURABLE** (seed = 3 estándar OSHA 1910.146: entry supervisor /
     attendant-vigía / authorized entrant). `key` única, `name`/`description`, `isSupervisorRole` (quien autoriza/firma la
     entrada, traza (f)(6)/(e)(2)), `mustRemainOutside` (semántica de vigía, traza (i)(4)), `color`/`sortOrder`. Soft-delete.
@@ -817,6 +817,23 @@ anulación lifecycle `CANCELED`).
     exige motivo por persona + UNA firma Part 11 → `overrideReason`/`overrideById`/`overrideAt` (evento `WORKER_OVERRIDE`).
   - **Avisos (Bloque N)**: `WorkerComplianceService.findBreaches()` (dominio) → `worker.competency.expiring`/`.expired`
     (personas en roster de OT abierta; dedupe por OT+competencia+día).
+- **Dotación · Slice 3 — acreditación de EMPRESA como GATE** *(S3 — `feat/dotacion-acreditacion-s3`; migr.
+  `20260703140000_add_dotacion_acreditacion`, aditiva; traza ISN RAVS A/B/F + Avetta compliant/conditional/non-compliant +
+  Ley 16.744 art.66bis / Cód. Trabajo art.183-C)*:
+  - En **WorkOrderType**: **`requireCompanyAccreditation`** (bool, default false) — **toggle por tipo**, espejo de
+    `rosterEnabled`. OFF ⇒ la acreditación de empresa es SOLO informativa (cero regresión). ON ⇒ el semáforo evalúa el nivel
+    EMPRESA de las personas CONTRATISTAS.
+  - **Semáforo de empresa** = tercer bloque `company` (opcional) de `deriveWorkerReasons` (PURA; NO reescrita, ortogonal a los
+    Ejes A/B): sólo si `required && persona contratista con empresa`. `ACCREDITED` vigente = ok · por vencer (≤ `DEFAULT_ACCREDITATION_WARNING_LEAD_DAYS`=90 d,
+    ISN 90-day flag) = `COMPANY_ACCREDITATION_EXPIRING` (ámbar) · `CONDITIONAL` = `COMPANY_ACCREDITATION_CONDITIONAL` (ámbar
+    NUEVO; pasa marcada) · `SUSPENDED`/`EXPIRED`/`NONE`/vencida = `COMPANY_NOT_ACCREDITED` (rojo). Derivado EN VIVO en
+    `WorkOrderRosterService` cruzando `Person.contractorCompanyId → ContractorCompany.accreditationStatus/accreditedUntil`
+    (nunca almacenado). **Override firmado POR PERSONA REUSADO** (`COMPANY_NOT_ACCREDITED` es `blocked` ⇒ entra sin cambio en
+    `confirmRoster`).
+  - **Avisos (Bloque N)**: `WorkerComplianceService.findBreaches()` += `contractor.accreditation.expiring`/`.expired` (sólo
+    empresas con personal en OT abierta cuyo tipo EXIGE acreditación; sólo ACCREDITED/CONDITIONAL con `accreditedUntil`
+    fechado; dedupe por OT+empresa+día) + resolver `resolveContractorAccreditation` + 2 plantillas de correo. **CERO permiso
+    nuevo** (`worker:manage`/`workordercatalog:manage`).
 - **FolioCounter** *(S2, fork W4)* — motor de folio gapless configurable, REUTILIZABLE (sirve al folio-por-plantilla,
   BACKLOG 2026-06-30). Una fila por secuencia: `sequenceKey` **PK** (codifica entidad+scope+período, ej.
   `workorder|type:<id>|2026`) + `lastValue`. Asignación ATÓMICA `INSERT … ON CONFLICT … DO UPDATE … RETURNING`

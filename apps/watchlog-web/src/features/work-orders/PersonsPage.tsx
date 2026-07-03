@@ -1,16 +1,19 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, BadgeCheck, Building2, Pencil, Plus, Trash2, UserPlus, Users } from "lucide-react";
 import {
   ACCREDITATION_STATUS_META,
+  DEFAULT_ACCREDITATION_WARNING_LEAD_DAYS,
   PERSON_KIND_META,
   personKindSchema,
+  type AccreditationStatus,
   type ContractorCompanyDto,
   type PersonDto,
   type PersonKind,
 } from "@lyra/contracts";
 import { Button, Input, Modal, Select, useToast } from "@lyra/ui";
 import { usePermissions } from "../../auth/use-permissions.js";
+import { formatDate } from "../../lib/format.js";
 import {
   useContractorCompanies,
   useDeleteContractorCompany,
@@ -199,18 +202,83 @@ function PersonModal({ person, onClose }: { person: PersonDto | null; onClose: (
   );
 }
 
+/**
+ * Vista derivada de la acreditación de una empresa para el badge (nivel semántico) y la
+ * vigencia legible. Espeja la lógica del gate del backend (`deriveWorkerReasons`, eje empresa):
+ * NONE/SUSPENDED/EXPIRED o vencida ⇒ rojo; CONDITIONAL o por vencer (≤90d) ⇒ ámbar; si no ⇒ verde.
+ */
+function accreditationView(c: ContractorCompanyDto): { cls: string; label: string; expiry: { text: string; cls: string } | null } {
+  const statusLabel = ACCREDITATION_STATUS_META[c.accreditationStatus].label + (c.accreditationGrade ? ` · ${c.accreditationGrade}` : "");
+  const untilMs = c.accreditedUntil ? new Date(c.accreditedUntil).getTime() : null;
+  const now = Date.now();
+  const expired = untilMs != null && untilMs <= now;
+  const expiringSoon = untilMs != null && !expired && untilMs - now <= DEFAULT_ACCREDITATION_WARNING_LEAD_DAYS * 24 * 60 * 60 * 1000;
+  let cls = styles.badgeNeutral;
+  if (c.accreditationStatus === "ACCREDITED" || c.accreditationStatus === "CONDITIONAL") {
+    if (expired) cls = styles.badgeBad;
+    else if (c.accreditationStatus === "CONDITIONAL" || expiringSoon) cls = styles.badgeWarn;
+    else cls = styles.badgeOk;
+  } else {
+    cls = styles.badgeBad; // NONE / SUSPENDED / EXPIRED
+  }
+  const expiry = c.accreditedUntil
+    ? { text: `${expired ? "Venció" : "Vence"} ${formatDate(c.accreditedUntil)}`, cls: (expired ? styles.subBad : expiringSoon ? styles.subWarn : "") ?? "" }
+    : null;
+  return { cls: `${styles.badge} ${cls}`, label: statusLabel, expiry };
+}
+
+const COMPANY_PAGE_SIZE = 10;
+
 function CompaniesSection({ canManage }: { canManage: boolean }) {
   const toast = useToast();
   const { data: companies = [], isLoading } = useContractorCompanies(true);
   const del = useDeleteContractorCompany();
   const [editing, setEditing] = useState<ContractorCompanyDto | null | "new">(null);
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("");
+  const [page, setPage] = useState(0);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return companies.filter((c) => {
+      if (status && c.accreditationStatus !== status) return false;
+      if (!q) return true;
+      return c.name.toLowerCase().includes(q) || (c.taxId ?? "").toLowerCase().includes(q);
+    });
+  }, [companies, search, status]);
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / COMPANY_PAGE_SIZE));
+  const current = Math.min(page, pageCount - 1);
+  const shown = filtered.slice(current * COMPANY_PAGE_SIZE, current * COMPANY_PAGE_SIZE + COMPANY_PAGE_SIZE);
+
+  const pager = (
+    <div className={styles.pageBar}>
+      <span>{filtered.length} empresa(s){filtered.length !== companies.length ? ` · ${companies.length} en total` : ""}</span>
+      {pageCount > 1 && (
+        <span className={styles.pageBtns}>
+          <Button variant="secondary" disabled={current === 0} onClick={() => setPage(current - 1)}>Anterior</Button>
+          <span>Página {current + 1} de {pageCount}</span>
+          <Button variant="secondary" disabled={current >= pageCount - 1} onClick={() => setPage(current + 1)}>Siguiente</Button>
+        </span>
+      )}
+    </div>
+  );
 
   return (
     <>
       <div className={styles.toolbar}>
-        <span className={styles.muted} style={{ flex: 1 }}>La acreditación (grado/vigencia) se controla como gate en una etapa posterior; hoy es informativa.</span>
+        <div className={styles.grow}>
+          <Input placeholder="Buscar por empresa o RUT…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(0); }} />
+        </div>
+        <Select value={status} onChange={(e) => { setStatus(e.target.value); setPage(0); }} aria-label="Acreditación">
+          <option value="">Toda acreditación</option>
+          {Object.entries(ACCREDITATION_STATUS_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+        </Select>
         {canManage && <Button variant="primary" leftIcon={<Plus size={15} />} onClick={() => setEditing("new")}>Nueva empresa</Button>}
       </div>
+
+      {pager}
+
       <div className={styles.tableWrap}>
         <table className={styles.table}>
           <thead>
@@ -219,31 +287,51 @@ function CompaniesSection({ canManage }: { canManage: boolean }) {
           <tbody>
             {isLoading ? (
               <tr><td colSpan={6} className={styles.empty}>Cargando…</td></tr>
-            ) : companies.length === 0 ? (
-              <tr><td colSpan={6} className={styles.empty}>Sin empresas contratistas. Crea la primera con «Nueva empresa».</td></tr>
-            ) : companies.map((c) => (
-              <tr key={c.id}>
-                <td>{c.name}</td>
-                <td>{c.taxId ?? <span className={styles.muted}>—</span>}</td>
-                <td><span className={styles.chip}>{ACCREDITATION_STATUS_META[c.accreditationStatus].label}{c.accreditationGrade ? ` · ${c.accreditationGrade}` : ""}</span></td>
-                <td>{c.personCount}</td>
-                <td>{c.active ? "Activa" : <span className={styles.muted}>Inactiva</span>}</td>
-                {canManage && (
+            ) : filtered.length === 0 ? (
+              <tr><td colSpan={6} className={styles.empty}>{companies.length === 0 ? "Sin empresas contratistas. Crea la primera con «Nueva empresa»." : "Sin empresas que coincidan con el filtro."}</td></tr>
+            ) : shown.map((c) => {
+              const acc = accreditationView(c);
+              return (
+                <tr key={c.id}>
+                  <td>{c.name}</td>
+                  <td>{c.taxId ?? <span className={styles.muted}>—</span>}</td>
                   <td>
-                    <div className={styles.rowActions}>
-                      <Button variant="secondary" leftIcon={<Pencil size={13} />} onClick={() => setEditing(c)}>Editar</Button>
-                      <Button variant="secondary" leftIcon={<Trash2 size={13} />} onClick={() => del.mutate(c.id, { onSuccess: () => toast.success("Empresa eliminada"), onError: (e) => toast.error((e as Error).message) })}>Eliminar</Button>
-                    </div>
+                    <span className={acc.cls}>{acc.label}</span>
+                    {acc.expiry && <span className={`${styles.subline} ${acc.expiry.cls}`}>{acc.expiry.text}</span>}
+                    {c.externalProvider && <span className={styles.subline}>vía {c.externalProvider}</span>}
                   </td>
-                )}
-              </tr>
-            ))}
+                  <td>{c.personCount}</td>
+                  <td>{c.active ? "Activa" : <span className={styles.muted}>Inactiva</span>}</td>
+                  {canManage && (
+                    <td>
+                      <div className={styles.rowActions}>
+                        <Button variant="secondary" leftIcon={<Pencil size={13} />} onClick={() => setEditing(c)}>Editar</Button>
+                        <Button variant="secondary" leftIcon={<Trash2 size={13} />} onClick={() => del.mutate(c.id, { onSuccess: () => toast.success("Empresa eliminada"), onError: (e) => toast.error((e as Error).message) })}>Eliminar</Button>
+                      </div>
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
+
+      {pager}
+
       {editing && <CompanyModal company={editing === "new" ? null : editing} onClose={() => setEditing(null)} />}
     </>
   );
+}
+
+/** "YYYY-MM-DD" (input date) ⇒ ISO UTC con sufijo Z (lo exige el DTO `z.string().datetime()`). */
+function dateInputToIso(v: string): string | null {
+  if (!v) return null;
+  return new Date(`${v}T00:00:00.000Z`).toISOString();
+}
+/** ISO ⇒ "YYYY-MM-DD" para prellenar el input date. */
+function isoToDateInput(v: string | null): string {
+  return v ? v.slice(0, 10) : "";
 }
 
 function CompanyModal({ company, onClose }: { company: ContractorCompanyDto | null; onClose: () => void }) {
@@ -251,9 +339,15 @@ function CompanyModal({ company, onClose }: { company: ContractorCompanyDto | nu
   const upsert = useUpsertContractorCompany();
   const [name, setName] = useState(company?.name ?? "");
   const [taxId, setTaxId] = useState(company?.taxId ?? "");
-  const [status, setStatus] = useState(company?.accreditationStatus ?? "NONE");
+  const [status, setStatus] = useState<AccreditationStatus>(company?.accreditationStatus ?? "NONE");
   const [grade, setGrade] = useState(company?.accreditationGrade ?? "");
+  const [accreditedUntil, setAccreditedUntil] = useState(isoToDateInput(company?.accreditedUntil ?? null));
+  const [externalProvider, setExternalProvider] = useState(company?.externalProvider ?? "");
+  const [note, setNote] = useState(company?.accreditationNote ?? "");
   const [active, setActive] = useState(company?.active ?? true);
+
+  // El vencimiento sólo aplica a empresas ACREDITADAS/CONDICIONALES.
+  const showUntil = status === "ACCREDITED" || status === "CONDITIONAL";
 
   const submit = () =>
     upsert.mutate(
@@ -264,6 +358,9 @@ function CompanyModal({ company, onClose }: { company: ContractorCompanyDto | nu
           taxId: taxId.trim() || null,
           accreditationStatus: status,
           accreditationGrade: grade.trim() || null,
+          accreditedUntil: showUntil ? dateInputToIso(accreditedUntil) : null,
+          externalProvider: externalProvider.trim() || null,
+          accreditationNote: note.trim() || null,
           active,
         },
         create: !company,
@@ -280,15 +377,28 @@ function CompanyModal({ company, onClose }: { company: ContractorCompanyDto | nu
     }>
       <div className={styles.modalBody}>
         <label className={styles.field}><span className={styles.fieldLabel}>Nombre</span><Input value={name} onChange={(e) => setName(e.target.value)} /></label>
-        <label className={styles.field}><span className={styles.fieldLabel}>RUT de la empresa</span><Input value={taxId} onChange={(e) => setTaxId(e.target.value)} /></label>
+        <label className={styles.field}><span className={styles.fieldLabel}>RUT de la empresa</span><Input value={taxId} onChange={(e) => setTaxId(e.target.value)} placeholder="Registro art. 183-C" /></label>
         <div className={styles.grid2}>
           <label className={styles.field}><span className={styles.fieldLabel}>Acreditación</span>
-            <Select value={status} onChange={(e) => setStatus(e.target.value as ContractorCompanyDto["accreditationStatus"])}>
+            <Select value={status} onChange={(e) => setStatus(e.target.value as AccreditationStatus)}>
               {Object.entries(ACCREDITATION_STATUS_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
             </Select>
           </label>
-          <label className={styles.field}><span className={styles.fieldLabel}>Grado / score</span><Input value={grade} onChange={(e) => setGrade(e.target.value)} placeholder="Ej. A" /></label>
+          <label className={styles.field}><span className={styles.fieldLabel}>Grado / score</span><Input value={grade} onChange={(e) => setGrade(e.target.value)} placeholder="Ej. A (ISN RAVS)" /></label>
         </div>
+        {showUntil && (
+          <div className={styles.grid2}>
+            <label className={styles.field}><span className={styles.fieldLabel}>Vigente hasta</span>
+              <Input type="date" value={accreditedUntil} onChange={(e) => setAccreditedUntil(e.target.value)} />
+            </label>
+            <label className={styles.field}><span className={styles.fieldLabel}>Fuente / plataforma</span>
+              <Input value={externalProvider} onChange={(e) => setExternalProvider(e.target.value)} placeholder="ISNetworld, Avetta…" />
+            </label>
+          </div>
+        )}
+        <label className={styles.field}><span className={styles.fieldLabel}>Nota de acreditación</span>
+          <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Observación (opcional)" />
+        </label>
         <label className={styles.field}><span className={styles.fieldLabel}>Estado</span>
           <Select value={active ? "1" : "0"} onChange={(e) => setActive(e.target.value === "1")}><option value="1">Activa</option><option value="0">Inactiva</option></Select>
         </label>

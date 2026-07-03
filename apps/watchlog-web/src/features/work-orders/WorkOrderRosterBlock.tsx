@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { HardHat, Lock, Plus, ShieldAlert, ShieldCheck, Trash2, UserCheck, Users } from "lucide-react";
 import {
   PERSON_KIND_META,
+  WORKER_BLOCK_REASON_META,
   type WorkerStatusDetail,
   type WorkerStatusLevel,
   type WorkOrderDetail,
@@ -34,8 +35,16 @@ function describeDetail(d: WorkerStatusDetail): string {
       return `Restricción activa${d.restrictionReason ? `: ${d.restrictionReason}` : ""}`;
     case "NOT_AUTHORIZED":
       return "Persona no autorizada/designada";
-    case "COMPANY_NOT_ACCREDITED":
-      return "Empresa contratista no acreditada";
+    case "COMPANY_NOT_ACCREDITED": {
+      const co = d.companyName ? `Empresa «${d.companyName}»` : "Empresa contratista";
+      return d.accreditedUntil ? `${co}: acreditación vencida el ${formatDate(d.accreditedUntil)}` : `${co} no acreditada`;
+    }
+    case "COMPANY_ACCREDITATION_CONDITIONAL":
+      return d.companyName ? `Empresa «${d.companyName}»: acreditación condicional` : "Acreditación de la empresa condicional";
+    case "COMPANY_ACCREDITATION_EXPIRING": {
+      const co = d.companyName ? `Empresa «${d.companyName}»` : "Empresa contratista";
+      return `${co}: acreditación por vencer${d.accreditedUntil ? ` el ${formatDate(d.accreditedUntil)}` : ""}`;
+    }
     case "ROLE_MISSING":
       return "Falta un rol requerido en la dotación";
     default:
@@ -133,7 +142,7 @@ function RosterItem({ worker, canManage, onRemove }: { worker: WorkOrderWorkerDt
         {worker.status.details.length > 0 && (
           <ul className={styles.rosterReasons}>
             {worker.status.details.map((d, i) => (
-              <li key={i} style={{ color: d.reason === "COMPETENCY_EXPIRING" ? "var(--color-warning)" : undefined }}>{describeDetail(d)}</li>
+              <li key={i} style={{ color: WORKER_BLOCK_REASON_META[d.reason].level === "warning" ? "var(--color-warning)" : undefined }}>{describeDetail(d)}</li>
             ))}
           </ul>
         )}
@@ -228,7 +237,7 @@ function ConfirmRosterModal({ workOrderId, roster, onClose }: { workOrderId: str
             {blocked.map((w) => (
               <label key={w.id} className={styles.field}>
                 <span className={styles.fieldLabel}>
-                  {w.personName} — {w.status.details.filter((d) => d.reason !== "COMPETENCY_EXPIRING").map(describeDetail).join(", ")}
+                  {w.personName} — {w.status.details.filter((d) => WORKER_BLOCK_REASON_META[d.reason].level === "blocked").map(describeDetail).join(", ")}
                 </span>
                 <Input value={reasons[w.id] ?? ""} onChange={(e) => setReasons((r) => ({ ...r, [w.id]: e.target.value }))} placeholder="Motivo del riesgo aceptado / medida compensatoria…" />
               </label>
