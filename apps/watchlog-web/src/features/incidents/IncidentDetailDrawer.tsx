@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Activity, AlertTriangle, ArrowRight, Ban, ClipboardList, FileCheck2, GitBranch, Info, MessageSquare, Send, ShieldCheck } from "lucide-react";
+import { Activity, AlertTriangle, ArrowRight, Ban, ClipboardList, FileCheck2, GitBranch, Info, MessageSquare, Send, ShieldCheck, Wrench } from "lucide-react";
 import type { IncidentAvailableTransition } from "@lyra/contracts";
 import { isInvestigationComplete } from "@lyra/contracts";
 import { Button, Drawer, Input, Modal, Select, Spinner, Textarea, useToast } from "@lyra/ui";
@@ -15,12 +15,14 @@ import {
   useIncidentDetail,
   useIncidentInvestigation,
   useIncidentReports,
+  useIncidentWorkOrders,
   useTransitionIncident,
   useUpdateIncident,
 } from "./incidents-queries.js";
 import { IncidentActionsBlock } from "./IncidentActionsBlock.js";
 import { IncidentInvestigationBlock } from "./IncidentInvestigationBlock.js";
 import { IncidentReportsBlock } from "./IncidentReportsBlock.js";
+import { IncidentWorkOrdersBlock } from "./IncidentWorkOrdersBlock.js";
 import { LIFECYCLE_META, ORIGIN_META, PRIORITY_META, severityColor, severityLabel } from "./incidents-presentation.js";
 import { useExceptions } from "../exceptions/exceptions-queries.js";
 import { THRESHOLD_META, formatExceptionValue } from "../exceptions/exceptions-presentation.js";
@@ -55,12 +57,15 @@ export function IncidentDetailDrawer({ incidentId, onClose }: Props) {
   const [commentText, setCommentText] = useState("");
   const [pending, setPending] = useState<IncidentAvailableTransition | null>(null);
   const [cancelOpen, setCancelOpen] = useState(false);
-  const [tab, setTab] = useState<"resumen" | "acciones" | "investigacion" | "reportes" | "actividad">("resumen");
+  const [tab, setTab] = useState<"resumen" | "acciones" | "investigacion" | "reportes" | "ot" | "actividad">("resumen");
 
   // Conteos/avisos para los chips de pestaña (cacheados; las dedupea React Query).
   const { data: actionsForTab = [] } = useIncidentActions(incidentId);
   const { data: investigationForTab } = useIncidentInvestigation(incidentId);
   const { data: reportsForTab = [] } = useIncidentReports(incidentId);
+  // OT relacionadas (S7b): solo si el usuario puede ver OT (el endpoint exige workorder:view).
+  const canViewWorkOrders = can("workorder:view");
+  const { data: workOrdersForTab = [] } = useIncidentWorkOrders(canViewWorkOrders ? incidentId : null);
   const pendingMandatory = actionsForTab.filter((a) => a.mandatory && a.status !== "VERIFIED" && a.status !== "CANCELED").length;
   const investigationBlocks = !!inc?.typeRequiresInvestigation && !isInvestigationComplete(investigationForTab);
   const reportsBlock = reportsForTab.filter((r) => r.mandatory && r.status === "PENDING").length;
@@ -120,6 +125,12 @@ export function IncidentDetailDrawer({ incidentId, onClose }: Props) {
               {reportsForTab.length > 0 && <span className={styles.tabBadge}>{reportsForTab.length}</span>}
               {(reportsBlock > 0 || reportsOverdue) && <span className={styles.tabDot} title={reportsBlock > 0 ? "Reporte obligatorio pendiente (bloquea el cierre)" : "Reporte vencido"} />}
             </button>
+            {canViewWorkOrders && (
+              <button role="tab" aria-selected={tab === "ot"} className={tab === "ot" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setTab("ot")}>
+                <Wrench size={14} /> Órdenes de trabajo
+                {workOrdersForTab.length > 0 && <span className={styles.tabBadge}>{workOrdersForTab.length}</span>}
+              </button>
+            )}
             <button role="tab" aria-selected={tab === "actividad"} className={tab === "actividad" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setTab("actividad")}>
               <Activity size={14} /> Actividad
             </button>
@@ -254,6 +265,22 @@ export function IncidentDetailDrawer({ incidentId, onClose }: Props) {
           {/* Pestaña Reportabilidad (Fase 4.3) */}
           {tab === "reportes" && can("module:incidents:view") && (
             <IncidentReportsBlock incidentId={inc.id} incidentOpen={inc.lifecycle === "OPEN"} />
+          )}
+
+          {/* Pestaña Órdenes de trabajo relacionadas (S7b) */}
+          {tab === "ot" && canViewWorkOrders && (
+            <IncidentWorkOrdersBlock
+              incidentId={inc.id}
+              incidentOpen={inc.lifecycle === "OPEN"}
+              seed={{
+                originIncidentId: inc.id,
+                originIncidentCode: inc.code,
+                title: inc.title,
+                description: inc.description ?? undefined,
+                orgNodeId: inc.orgNodeId,
+                criticality: inc.severity,
+              }}
+            />
           )}
 
           {tab === "actividad" && (<>

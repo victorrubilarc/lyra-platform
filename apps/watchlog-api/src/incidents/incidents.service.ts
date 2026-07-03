@@ -210,6 +210,16 @@ export class IncidentsService {
     };
   }
 
+  /**
+   * Verifica que el usuario puede VER la incidencia (existe + su nodo está dentro del
+   * alcance ABAC). Lo usa el endpoint de OT relacionadas (S7b) antes de delegar en el
+   * módulo de OT, para no filtrar la existencia de una incidencia fuera de alcance.
+   */
+  async assertViewable(userId: string, id: string): Promise<void> {
+    const row = await this.loadIncident(id);
+    await this.assertNodeAccess(userId, row.orgNodeId);
+  }
+
   // === Creación ===============================================================
 
   async create(userId: string, dto: CreateIncidentRequest, ctx: AuditContext): Promise<IncidentDetail> {

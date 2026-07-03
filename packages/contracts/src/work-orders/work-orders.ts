@@ -228,6 +228,9 @@ export const workOrderDetailSchema = workOrderListItemSchema.extend({
   plannedEnd: z.string().nullable(),
   /** Origen ligado (refs blandas). */
   originIncidentId: z.string().nullable(),
+  /** Código + título de la incidencia de origen, resueltos para la navegación de vuelta (S7b). null si no aplica o sin acceso. */
+  originIncidentCode: z.string().nullable(),
+  originIncidentTitle: z.string().nullable(),
   originLogEntryId: z.string().nullable(),
   originExceptionId: z.string().nullable(),
   /** Flujo congelado (S2): grafo para el stepper + transiciones ejecutables. */

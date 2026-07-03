@@ -1,5 +1,32 @@
 # Progreso — Lyra WatchLog
 
+**2026-07-03 — 🔗 OT · Slice 7b · Enlace Incidencia↔OT bidireccional ✅** (`feat/ot-incidencia-enlace-s7b`).
+Cierra el paquete comercial de OT conectando incidencias y órdenes de trabajo EN AMBOS SENTIDOS, al estándar de los grandes
+(SAP PM notification→order / IBM Maximo Related Records ORIGINATOR↔FOLLOWUP). **Reusa `WorkOrder.originIncidentId` (indexado) +
+`originType=INCIDENT`, ya cableados en `create()` desde S7a** ⇒ **SIN migración, SIN permiso nuevo, SIN FLUSHALL**. Decidido:
+enlace SOLO a nivel incidencia (NO `IncidentAction.workOrderId` — excede el estándar ticket→followup). **(a) Vista inversa:**
+`WorkOrdersService.listForIncident(userId, incidentId)` (nuevo) reusa `buildWhere`-style ABAC por nodo + `listInclude` +
+`toListItems` (semáforo/estado/criticidad ya resueltos; NO por estructura activa: la incidencia define el contexto,
+cross-structure-safe) → endpoint `GET /incidents/:id/work-orders` en `IncidentsController` (gate **`incident:view` + `workorder:view`**,
+defensa en profundidad: es un join cross-módulo; `IncidentsService.assertViewable` valida existencia + ABAC de la incidencia ANTES
+de delegar). `IncidentsModule` importa `WorkOrdersModule` (una dirección, sin ciclo). **(b) Crear OT desde la incidencia:**
+`CreateWorkOrderModal` gana prop `seed` (`WorkOrderSeed`: originIncidentId/code/title/description/orgNodeId/criticality) que
+pre-siembra el asistente (título/descr. copiados, nodo de la incidencia, criticidad ← severidad 1..5 escala común; **tipo NO
+sembrado** — no hay mapeo incidencia→tipo, lo elige el usuario, como SAP PM); montaje CONDICIONAL en la pestaña ⇒ el seed se
+aplica al abrir sin efectos. **(c) Vuelta:** `getDetail` de OT resuelve `originIncidentCode`+`originIncidentTitle` (helper de
+contrato NUEVO `incidentCode` reutilizado; espejo de `originLogEntryNumber` de incidencias) → `WorkOrderDetailPage` muestra
+«Originada por incidencia **INC-#### — «título»**» con link. **Web:** 6.ª pestaña «Órdenes de trabajo» (ícono `Wrench`, badge de
+conteo, gate `workorder:view`) en `IncidentDetailDrawer` = `IncidentWorkOrdersBlock` (lista con folio/estado/criticidad/semáforo
+de plazo, tokens del DS; botón «Crear OT» gate `workorder:create`; invalida la query al crear) + FIX del deep-link roto
+`/incidencias/:id` (no existía la ruta): IncidentsPage ahora auto-abre el drawer con `?open=<id>` y el link de vuelta apunta ahí.
+Contrato `work-orders/work-orders.ts` (+2 campos en `workOrderDetailSchema`) + `incidents/incidents.ts` (helper `incidentCode` +
+spec `incidents.spec.ts`). Verde: contracts **507** (incidents.spec +2) · api typecheck+lint+**252** tests · web typecheck+lint+build+**6** ·
+**smoke-ot-incidencia 17/17** (ida: originType INCIDENT; inversa: aparece/DIRECT no aparece/incidencia sin OT = []; vuelta:
+code+title resueltos; **gate operador 403**; **ABAC scoped: ve OT nodo A, NO ve OT nodo B ligada a A [filtro de nodo de OT],
+403 en incidencia de nodo fuera de alcance**) + regresión OT **122/122** · incidencias **32/32** · incid-dashboard **24/24** ·
+OT-dashboard **30/30** · dotación **65/65** (flaky de notif re-corrido). Pendiente: **smoke VISUAL (dueño)**. Decisiones en
+`DECISIONS.md` (2026-07-03, entrada S7b). **FASE OT (S1–S7b) COMPLETA. Siguiente: a definir con el dueño.**
+
 **2026-07-03 — 🔧 OT · Slice 7a · Dashboard analítico de Órdenes de Trabajo (read-only) ✅** (`feat/ot-dashboard-s7a`).
 ESPEJO del dashboard de Incidencias (Fase 4.5). Analítica agregada **siempre en el backend** (GROUP BY / `$queryRaw` acotado;
 nunca filas crudas al cliente) con el **MISMO ABAC por nodo ∩ estructura activa** que la lista de OT (replica el `buildWhere`:

@@ -8,6 +8,7 @@ import {
   planNotFrozen,
   buildFolioSeqKey,
   deriveWorkOrderLifecycle,
+  incidentCode,
   normalizeFolioSegment,
   renderFolio,
   resolveFolioScheme,
@@ -139,6 +140,44 @@ export class WorkOrdersService {
     return { draft, open, critical, unassigned, ptw, overdue, atRisk, stalled };
   }
 
+  /**
+   * OT ligadas a una incidencia (vista inversa del enlace Incidencia↔OT, S7b). Reusa
+   * `toListItems` (semáforo + estado del flujo ya resueltos) y aplica ABAC por nodo del
+   * usuario sobre CADA OT (no por estructura activa: la incidencia define el contexto,
+   * cross-structure-safe). Sin borrado físico (`deletedAt: null`). El acceso a la
+   * incidencia lo verifica el controlador ANTES (assertViewable).
+   */
+  async listForIncident(userId: string, incidentId: string): Promise<WorkOrderListItem[]> {
+    const nodeIds = await this.scope.getAccessibleNodeIds(userId);
+    if (nodeIds && nodeIds.size === 0) return [];
+    const rows = await this.prisma.workOrder.findMany({
+      where: {
+        originIncidentId: incidentId,
+        deletedAt: null,
+        ...(nodeIds ? { orgNodeId: { in: [...nodeIds] } } : {}),
+      },
+      include: this.listInclude,
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    });
+    return this.toListItems(rows);
+  }
+
+  /**
+   * Resuelve código + título de la incidencia de origen para la navegación de vuelta
+   * (S7b). Devuelve nulls si no hay origen o la incidencia no existe (ref. blanda).
+   */
+  private async resolveOriginIncident(
+    originIncidentId: string | null,
+  ): Promise<{ originIncidentCode: string | null; originIncidentTitle: string | null }> {
+    if (!originIncidentId) return { originIncidentCode: null, originIncidentTitle: null };
+    const inc = await this.prisma.incident.findUnique({
+      where: { id: originIncidentId },
+      select: { number: true, title: true },
+    });
+    if (!inc) return { originIncidentCode: null, originIncidentTitle: null };
+    return { originIncidentCode: incidentCode(inc.number), originIncidentTitle: inc.title };
+  }
+
   // === Detalle ================================================================
 
   async getDetail(userId: string, id: string): Promise<WorkOrderDetail> {
@@ -187,6 +226,7 @@ export class WorkOrdersService {
       plannedStart: row.plannedStart?.toISOString() ?? null,
       plannedEnd: row.plannedEnd?.toISOString() ?? null,
       originIncidentId: row.originIncidentId,
+      ...(await this.resolveOriginIncident(row.originIncidentId)),
       originLogEntryId: row.originLogEntryId,
       originExceptionId: row.originExceptionId,
       workflowDefinitionId: row.workflowDefinitionId,

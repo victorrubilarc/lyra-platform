@@ -5,7 +5,14 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-07-03** — **🔧 OT · Slice 7a · Dashboard analítico de OT (read-only) ✅** (`feat/ot-dashboard-s7a`):
+> actualización: **2026-07-03** — **🔗 OT · Slice 7b · Enlace Incidencia↔OT bidireccional ✅** (`feat/ot-incidencia-enlace-s7b`):
+> cierra el paquete de OT (SAP PM/Maximo ORIGINATOR↔FOLLOWUP). **Reusa `WorkOrder.originIncidentId`** ⇒ SIN migración/permiso/FLUSHALL.
+> (a) `GET /incidents/:id/work-orders` (gate `incident:view`+`workorder:view`; `WorkOrdersService.listForIncident` reusa ABAC+`toListItems`;
+> `IncidentsService.assertViewable`; `IncidentsModule`→`WorkOrdersModule` sin ciclo) + pestaña «Órdenes de trabajo» en el drawer
+> (`IncidentWorkOrdersBlock`). (b) «Crear OT» = `CreateWorkOrderModal` con prop `seed` (título/descr./nodo/criticidad←severidad; tipo NO
+> sembrado). (c) `getDetail` OT resuelve `originIncidentCode`+`Title` (helper contrato `incidentCode`) → back-nav «Originada por INC-####».
+> FIX deep-link roto: `?open=<id>` auto-abre el drawer. contracts **507** + **smoke-ot-incidencia 17/17** (ida/inversa/vuelta/gate 403/ABAC scoped) +
+> regresión OT 122 · incid 32 · incid-dash 24 · OT-dash 30 · dotación 65. Pendiente: **smoke VISUAL (dueño)**. **FASE OT (S1–S7b) COMPLETA.** — Antes: **🔧 OT · Slice 7a · Dashboard analítico de OT (read-only) ✅** (`feat/ot-dashboard-s7a`):
 > clon del dashboard de Incidencias (4.5). `WorkOrderDashboardService` (ABAC por nodo ∩ estructura replicando `buildWhere`;
 > KPIs vivos + periodo, MTTR, cumplimiento SLA, tendencia, distribuciones/Pareto por tipo/criticidad/nodo/especialidad/estado/
 > prioridad/origen) + `GET /work-orders/dashboard` (gate `workorder:view`, **sin permiso/migración/FLUSHALL**) + web

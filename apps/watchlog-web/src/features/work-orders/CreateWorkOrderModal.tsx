@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link2 as LinkIcon } from "lucide-react";
 import type { CreateWorkOrderRequest, OrgNodeTree, WorkOrderPriority } from "@lyra/contracts";
 import { Button, Combobox, Input, Modal, Select, Stepper, Textarea, useToast } from "@lyra/ui";
 import { useAccessibleOrgTree } from "../structure/structure-queries.js";
@@ -11,11 +12,28 @@ import {
 import { PRIORITY_META, criticalityLabel } from "./work-orders-presentation.js";
 import styles from "./work-orders.module.css";
 
+/**
+ * Valores pre-sembrados al abrir el asistente desde otro contexto (S7b: «Crear OT
+ * desde incidencia»). El backend sigue validando todo; esto sólo rellena el formulario
+ * (como SAP PM copia el short/long text de la notificación a la orden). El tipo NO se
+ * siembra (no hay mapeo incidencia→tipo de OT; lo elige el usuario).
+ */
+export interface WorkOrderSeed {
+  originIncidentId?: string;
+  originIncidentCode?: string;
+  title?: string;
+  description?: string;
+  orgNodeId?: string;
+  criticality?: number;
+}
+
 interface Props {
   open: boolean;
   onClose: () => void;
   onCreated: (id: string) => void;
   presetNodeId?: string;
+  /** Contexto de origen para pre-sembrar el formulario (S7b). Móntalo condicionalmente para que el seed se aplique al abrir. */
+  seed?: WorkOrderSeed;
 }
 
 /** Aplana el árbol de nodos: label = nombre; hint = ruta de ancestros. */
@@ -40,7 +58,7 @@ const STEPS = [
  * (nodo/equipo, áreas, especialidades, responsable). El backend valida todo (nodo
  * ABAC, tipo activo, equipo del nodo, catálogos activos).
  */
-export function CreateWorkOrderModal({ open, onClose, onCreated, presetNodeId }: Props) {
+export function CreateWorkOrderModal({ open, onClose, onCreated, presetNodeId, seed }: Props) {
   const toast = useToast();
   const { data: types = [] } = useWorkOrderTypes();
   const { data: specialties = [] } = useWorkOrderSpecialties();
@@ -48,13 +66,13 @@ export function CreateWorkOrderModal({ open, onClose, onCreated, presetNodeId }:
   const create = useCreateWorkOrder();
 
   const [step, setStep] = useState(0);
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
+  const [title, setTitle] = useState(seed?.title ?? "");
+  const [description, setDescription] = useState(seed?.description ?? "");
   const [typeId, setTypeId] = useState("");
-  const [criticality, setCriticality] = useState(3);
+  const [criticality, setCriticality] = useState(seed?.criticality ?? 3);
   const [priority, setPriority] = useState<WorkOrderPriority>("MEDIUM");
   const [requiresPtw, setRequiresPtw] = useState(false);
-  const [orgNodeId, setOrgNodeId] = useState(presetNodeId ?? "");
+  const [orgNodeId, setOrgNodeId] = useState(seed?.orgNodeId ?? presetNodeId ?? "");
   const [equipmentId, setEquipmentId] = useState("");
   const [locationDetail, setLocationDetail] = useState("");
   const [specialtyIds, setSpecialtyIds] = useState<string[]>([]);
@@ -92,8 +110,9 @@ export function CreateWorkOrderModal({ open, onClose, onCreated, presetNodeId }:
   }
 
   function reset() {
-    setStep(0); setTitle(""); setDescription(""); setTypeId(""); setCriticality(3); setPriority("MEDIUM");
-    setRequiresPtw(false); setOrgNodeId(presetNodeId ?? ""); setEquipmentId(""); setLocationDetail("");
+    setStep(0); setTitle(seed?.title ?? ""); setDescription(seed?.description ?? ""); setTypeId("");
+    setCriticality(seed?.criticality ?? 3); setPriority("MEDIUM");
+    setRequiresPtw(false); setOrgNodeId(seed?.orgNodeId ?? presetNodeId ?? ""); setEquipmentId(""); setLocationDetail("");
     setSpecialtyIds([]); setDueAt("");
   }
 
@@ -111,6 +130,7 @@ export function CreateWorkOrderModal({ open, onClose, onCreated, presetNodeId }:
       locationDetail: locationDetail.trim() || undefined,
       specialtyIds: specialtyIds.length ? specialtyIds : undefined,
       dueAt: dueAt ? new Date(dueAt).toISOString() : undefined,
+      originIncidentId: seed?.originIncidentId,
     };
     create.mutate(dto, {
       onSuccess: (wo) => { toast.success(`Solicitud ${wo.code} creada`); reset(); onCreated(wo.id); },
@@ -138,6 +158,15 @@ export function CreateWorkOrderModal({ open, onClose, onCreated, presetNodeId }:
     >
       <div className={styles.form}>
         <Stepper steps={STEPS} current={step} onStepClick={(i) => i < step && setStep(i)} />
+
+        {seed?.originIncidentId && (
+          <div className={styles.originNote}>
+            <LinkIcon size={14} />
+            <span>
+              Se creará ligada a la incidencia{seed.originIncidentCode ? ` ${seed.originIncidentCode}` : ""}. Puedes ajustar título, tipo y datos antes de crearla.
+            </span>
+          </div>
+        )}
 
         {step === 0 ? (
           <>

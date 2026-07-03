@@ -14,6 +14,8 @@ import {
   incidentInvestigationSchema,
   incidentReportSchema,
   reportingObligationSchema,
+  workOrderListItemSchema,
+  type WorkOrderListItem,
   type CancelIncidentReportRequest,
   type CreateIncidentReportRequest,
   type IncidentReportDto,
@@ -120,6 +122,11 @@ export function fetchCrossDashboard(): Promise<CrossDashboard> {
 
 export function fetchIncidentDetail(id: string): Promise<IncidentDetail> {
   return apiJson(`/incidents/${id}`, incidentDetailSchema);
+}
+
+/** OT relacionadas (vista inversa del enlace Incidencia↔OT, S7b). */
+export function fetchIncidentWorkOrders(id: string): Promise<WorkOrderListItem[]> {
+  return apiJson(`/incidents/${id}/work-orders`, z.array(workOrderListItemSchema));
 }
 
 export function fetchIncidentStats(structureId?: string | null): Promise<IncidentStats> {
