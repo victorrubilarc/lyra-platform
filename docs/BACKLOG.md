@@ -690,6 +690,18 @@ nunca queda más de una sesión atrás.
 
 ## 2. Pendiente por HACER (módulos / submódulos)
 
+### 🟦 Dotación · Slice 4 — control de acceso / T&A tras interfaz abstracta (DIFERIDO por el dueño, 2026-07-03)
+> **Decisión del dueño (2026-07-03):** se DIFIERE; se prioriza el **Dashboard de OT (Slice 7)** primero. Registrado aquí para no perderlo.
+- **Qué es:** conectar la **dotación autorizada en el sistema** con la **puerta física** de la faena (torniquete/molinete/lector de
+  credencial) y con la **asistencia (T&A = Time & Attendance)** = presencia real (quién entró/salió y cuándo). El campo
+  `Person.badgeId` ya está preparado como gancho (S1). Casos que habilita a futuro: al firmar la dotación, "avisar" al torniquete
+  qué credenciales pueden pasar; bloquear a quien no está en la dotación o tiene competencia vencida; ver presencia en vivo
+  ("4 de 5 autorizados están adentro").
+- **Alcance acordado:** **SOLO esbozar la interfaz abstracta** (puerto/adaptador, patrón de la interfaz de IA) — definir el
+  contrato ("cualquier sistema de acceso recibe 'esta dotación puede entrar' y envía 'esta persona entró/salió'") + quizás un
+  **adaptador falso (mock)** para demostrar el flujo end-to-end. **NO** integrar hardware/proveedor real (eso llega cuando haya un
+  cliente con torniquetes concretos). On-premise. Slice chico y de bajo riesgo; deja la dotación "conceptualmente completa".
+
 ### 🟣 ÉPICO — PREPARACIÓN PARA DISTRIBUCIÓN / CANAL (modelo mayorista marca blanca) 🔒
 > **Registrado 2026-07-01.** Contexto de negocio: se vende vía un **socio de canal** (mayorista) que revende a
 > los clientes finales (minería/industria) con **marca blanca**; ITESICWS **no** llega al cliente final. Modelo:
