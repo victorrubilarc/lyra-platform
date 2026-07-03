@@ -58,7 +58,7 @@ export class LogEntriesController {
   availableTemplates(@CurrentUser() user: RequestUser, @Query("structureId") structureId?: string) {
     // Picker operacional: aplica el 2.º eje ABAC (alcance por plantilla) + la
     // coherencia con la estructura activa del workspace (L1c, aditivo al ABAC).
-    return this.templates.list(user.id, { status: "PUBLISHED" }, { applyTemplateScope: true, structureId });
+    return this.templates.list(user.id, { status: "PUBLISHED" }, { applyTemplateScope: true, structureId, excludeChecklists: true });
   }
 
   /**
@@ -70,7 +70,7 @@ export class LogEntriesController {
   @Get("filter-templates")
   @RequirePermission("logentry:view")
   filterTemplates(@CurrentUser() user: RequestUser) {
-    return this.templates.list(user.id, { status: "PUBLISHED" }, { applyTemplateScope: true });
+    return this.templates.list(user.id, { status: "PUBLISHED" }, { applyTemplateScope: true, excludeChecklists: true });
   }
 
   /**

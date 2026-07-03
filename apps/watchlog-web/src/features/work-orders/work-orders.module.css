@@ -230,6 +230,13 @@
   cursor: pointer; transition: var(--transition-fast); min-height: 36px;
 }
 .back:hover { background: var(--color-hover); color: var(--color-text-primary); border-color: var(--color-border-active); }
+/* Back-nav al dashboard (drill-down): enlace discreto sobre la lista. */
+.backLink {
+  display: inline-flex; align-items: center; gap: 6px; width: fit-content;
+  color: var(--color-text-secondary); font-size: var(--text-body-sm-size); font-weight: 600;
+  text-decoration: none; transition: var(--transition-fast);
+}
+.backLink:hover { color: var(--color-accent-primary); }
 .detailHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
 .detailHeaderMain { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .detailPageTitle { font-family: var(--font-display, inherit); font-size: var(--text-title-lg-size, 1.5rem); font-weight: 700; color: var(--color-text-primary); margin: 0; line-height: 1.2; }

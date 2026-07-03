@@ -38,6 +38,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 
 ### 2. El espacio de trabajo  [todos]
 - ✅ **Menú lateral por grupos** (Operación · Diseño y datos · Administración) + **Favoritos en el topbar** (§ El espacio de trabajo ▸ Menú lateral)
+- ✅ **Filtros de las grillas** (chips de filtros activos removibles, «Limpiar filtros», «Refrescar», «← Volver al dashboard», atajos de fecha) — comunes a Órdenes de trabajo, Incidencias, Excepciones y Bitácoras (§ El espacio de trabajo ▸ Filtros de las grillas)
 - ✍️ Pestañas, búsqueda ⌘K, idioma, densidad, tema claro/oscuro
 
 ### 3. Estructura organizacional  [Configurador/Admin]
@@ -1007,6 +1008,39 @@ grupos, el plegado y el modo riel son **preferencias personales** de tu navegado
   búsqueda **⌘K / Ctrl+K** y desde Favoritos.
 - Tus favoritos y el estado de los grupos viven en este equipo/navegador; en otro equipo parten del
   estado por defecto (todos los grupos desplegados).
+
+---
+
+## El espacio de trabajo ▸ Filtros de las grillas  [todos]
+
+**Para qué sirve.** Todas las grillas grandes (Órdenes de trabajo, Incidencias, Excepciones, Bitácoras)
+comparten los mismos controles para que nunca te "pierdas" en un listado filtrado: saber **qué** está
+filtrando, **quitar** un filtro sin borrar los demás, **volver** a los datos frescos y **regresar** al
+dashboard desde el que llegaste.
+
+**Cómo se usa.**
+1. **Chips de filtros activos.** Debajo de la barra de filtros aparece una fila de **etiquetas** (chips),
+   una por cada filtro puesto (p. ej. «Tipo: Correctiva», «Criticidad: 5 · Crítica», «Creación: 01-07-2026 → 03-07-2026»).
+   Cada chip tiene una **«×»** para quitar **solo ese** filtro. Es especialmente útil cuando llegas desde un
+   **dashboard** (drill-down): los chips te dicen exactamente qué segmento pinchaste.
+2. **«Limpiar filtros».** Al final de la fila de chips (o de la barra de filtros, en Excepciones) hay un
+   botón que **borra todos** los filtros de una vez y te devuelve la vista completa.
+3. **«Refrescar».** En la cabecera de cada listado, vuelve a **consultar los datos al servidor** (por si algo
+   cambió mientras mirabas); el ícono **gira** mientras carga. No cambia tus filtros, solo re-lee.
+4. **«← Volver al dashboard».** Si llegaste a la lista haciendo clic en un gráfico del **dashboard**, arriba
+   del listado aparece este enlace para regresar al dashboard con un clic.
+5. **Atajos de fecha (Hoy · 24h · 7d · 30d).** En Órdenes de trabajo e Incidencias, al final de la barra de
+   filtros, acotan el listado a lo **creado** en ese rango con un clic (aparece como chip «Creación: … → …»,
+   removible). Es el mismo patrón de los presets de Bitácoras.
+
+**Quién puede.** Todos los que ven cada listado. Son ayudas de navegación; **no cambian permisos ni datos**,
+solo cómo consultas lo que ya puedes ver.
+
+**Importante.**
+- Limpiar o quitar un filtro **no borra nada**: solo cambia lo que se muestra.
+- Los filtros que llegan desde un dashboard (rango de fechas, nodo, origen, equipo) ahora se pueden **quitar**
+  igual que cualquier otro (antes quedaban "pegados" sin control visible).
+- **Bitácoras** ya tenía estos controles; ahora Órdenes de trabajo, Incidencias y Excepciones los comparten.
 
 ---
 

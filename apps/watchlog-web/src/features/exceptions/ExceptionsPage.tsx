@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { AlertTriangle, Layers, Search } from "lucide-react";
+import { AlertTriangle, FilterX, Layers, Search } from "lucide-react";
 import type { ExceptionListQuery, ExceptionStatus, ExceptionThresholdType, ExceptionTrigger } from "@lyra/contracts";
 import { Button, EmptyState, GridPager, Input, Select, Spinner } from "@lyra/ui";
 import { usePermissions } from "../../auth/use-permissions.js";
-import { useExceptions } from "./exceptions-queries.js";
+import { RefreshButton } from "../shared/RefreshButton.js";
+import { EXCEPTION_KEYS, useExceptions } from "./exceptions-queries.js";
 import { ExceptionCard } from "./ExceptionCard.js";
 import { ExceptionDetailDrawer } from "./ExceptionDetailDrawer.js";
 import { ConvertExceptionModal } from "./ConvertExceptionModal.js";
@@ -50,6 +51,11 @@ export function ExceptionsPage() {
   const canConvert = can("exception:triage") && can("incident:create");
 
   function resetPage() { setPage(1); }
+  // Filtros de estado fáciles de resetear (sin drill-down por URL): un botón «Limpiar»
+  // basta (no hace falta la fila de chips de OT/Incidencias). `status="open"` y
+  // `sort="severity"` son la vista por defecto de la bandeja.
+  const hasFilters = Boolean(search.trim() || thresholdType || triggerKind || scope || status !== "open");
+  const clearFilters = () => { setSearch(""); setThresholdType(""); setTriggerKind(""); setScope(""); setStatus("open"); resetPage(); };
   function toggle(id: string) {
     setSelected((prev) => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
   }
@@ -72,6 +78,9 @@ export function ExceptionsPage() {
         <div>
           <h1 className={styles.h1}>Excepciones operacionales</h1>
           <p className={styles.sub}>Desviaciones detectadas en las bitácoras (umbrales, reglas y registros manuales) pendientes de triage.</p>
+        </div>
+        <div className={styles.headerActions}>
+          <RefreshButton queryKey={EXCEPTION_KEYS.all} />
         </div>
       </header>
 
@@ -121,6 +130,9 @@ export function ExceptionsPage() {
           <option value="severity">Severidad</option>
           <option value="recent">Recientes</option>
         </Select>
+        {hasFilters && (
+          <Button variant="secondary" leftIcon={<FilterX size={14} />} onClick={clearFilters}>Limpiar filtros</Button>
+        )}
       </div>
 
       {canConvert && selectedIds.length > 1 && (
