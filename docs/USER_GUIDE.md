@@ -10,7 +10,7 @@
 > funcionalidades existentes** aunque su detalle aún esté por redactar (✍️): así nada se
 > olvida; el backfill de lo ya construido se llena de a poco (incremental).
 >
-> Última actualización: **2026-07-03** (Dotación del permiso · Slice 3 — acreditación de EMPRESAS contratistas como GATE: registro de acreditación con grado/vigencia/plataforma, exigencia por tipo de OT que bloquea a contratistas de empresas no acreditadas/vencidas/suspendidas [condicional y por-vencer en ámbar], excepción firmada por persona, y avisos de vencimiento de acreditación).
+> Última actualización: **2026-07-03** (OT · Slice 7b — enlace Incidencia↔OT bidireccional: crear una OT desde una incidencia con datos pre-rellenados, ver las OT relacionadas en la ficha de la incidencia, y volver desde la OT a su incidencia de origen).
 
 ## Convención de cada sección
 Cada funcionalidad se documenta con estas cuatro partes fijas:
@@ -155,6 +155,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 - ✅ **Acreditación de empresas contratistas** (registro de acreditación de la empresa con grado/vigencia/plataforma; gate por tipo de OT que bloquea a contratistas de empresas no acreditadas/vencidas/suspendidas; condicional y por-vencer en ámbar; excepción firmada; avisos de vencimiento de acreditación) (§ Órdenes de trabajo ▸ Acreditación de empresas contratistas)
 - ✅ **Administrar los catálogos** (tipos de OT, especialidades y **reglas de checklist con su momento**) (§ Órdenes de trabajo ▸ Catálogos) [solo administrador]
 - ✅ **Dashboard de órdenes de trabajo** (tendencias e indicadores: abiertas/vencidas/estancadas, MTTR, cumplimiento de SLA, Pareto por tipo, distribución por criticidad/nodo/especialidad/estado/prioridad/origen; con rango de fechas, export CSV y clic-para-filtrar) (§ Órdenes de trabajo ▸ Dashboard)
+- ✅ **Enlace con incidencias** (crear una OT desde una incidencia con los datos pre-rellenados; ver las OT relacionadas —folio, estado, criticidad, semáforo— en la ficha de la incidencia; volver desde la OT a la incidencia de origen) (§ Órdenes de trabajo ▸ Enlace con incidencias)
 
 ---
 
@@ -669,6 +670,40 @@ activa (un supervisor de un área no ve los números de otra).
 actividad del plan): son dos alertas independientes, igual que en el "vigía" (SLA). La distribución **por estado** usa los estados
 reales del flujo configurado (no hay estados fijos escritos a mano), por eso refleja tu configuración de workflow. Las fechas y
 números se muestran en tu **formato regional** y la agrupación temporal usa la **zona horaria de la planta**.
+
+---
+
+### Órdenes de trabajo ▸ Enlace con incidencias (crear OT desde una incidencia y ver las OT relacionadas)  [gestor de incidencias + solicitante de OT]
+
+**Para qué sirve.** Conecta el **qué pasó** (una incidencia) con el **qué se hizo para arreglarlo** (una o varias órdenes de
+trabajo), en **ambos sentidos** y con trazabilidad completa —el mismo patrón de los sistemas grandes (SAP PM «notification →
+order», IBM Maximo «Related Records»): la incidencia es el **origen**, la OT es el **trabajo derivado**. Así, desde una incidencia
+puedes lanzar la reparación/mantención sin retipear datos, y desde la OT siempre sabes qué incidencia la motivó. Evita el "copiar
+a mano" y deja la historia auditable de punta a punta.
+
+**Cómo se usa.**
+1. **Ver las OT de una incidencia.** Abre una incidencia (pestaña **«Órdenes de trabajo»** en su ficha; muestra un contador). Ahí
+   aparecen todas las OT ligadas a esa incidencia, cada una con su **folio**, **estado** del flujo, **criticidad** y **semáforo de
+   plazo**. Haz clic en cualquiera para ir a su detalle.
+2. **Crear una OT desde la incidencia.** En esa misma pestaña pulsa **«Crear OT»**. Se abre el asistente de OT **ya rellenado** con
+   los datos de la incidencia: **título** y **descripción** copiados, el **nodo/ubicación** de la incidencia y la **criticidad**
+   equivalente a su severidad. Un aviso te recuerda que quedará ligada a la incidencia (verás su folio INC-####).
+3. **Elige el tipo de OT y ajusta lo que necesites.** El **tipo** no se rellena solo (no hay una equivalencia automática
+   incidencia→tipo de OT): selecciónalo tú, igual que ajustas prioridad, equipo, especialidades o fecha límite. Pulsa **«Crear
+   solicitud»**: la OT nace ligada a la incidencia y aparece al instante en la pestaña.
+4. **Volver a la incidencia desde la OT.** En el detalle de la orden de trabajo, el bloque **«Origen ligado»** muestra
+   **«Originada por incidencia INC-#### — «título»»** como enlace: un clic te devuelve a la incidencia de origen.
+
+**Quién puede.** Para **ver** la pestaña de OT relacionadas necesitas permiso de **ver incidencias** *y* de **ver órdenes de
+trabajo** (`incident:view` + `workorder:view`). Para el botón **«Crear OT»** necesitas además **crear órdenes de trabajo**
+(`workorder:create`); si no lo tienes, la pestaña sigue visible pero sin ese botón. Todo respeta tu **alcance por nodo**: solo ves
+las OT de nodos a los que tienes acceso.
+
+**Importante.** El enlace se guarda a **nivel de la incidencia** (no de cada acción correctiva): una incidencia puede tener varias
+OT. La lista de OT relacionadas **no** depende de la estructura activa —se muestra en el contexto de la incidencia—, pero **sí**
+filtra por tu alcance por nodo (podrías no ver una OT que esté en un nodo fuera de tu alcance, aunque cuelgue de esa incidencia).
+Crear la OT desde aquí es idéntico a crearla desde el módulo de OT (el sistema valida todo en el servidor); lo único que cambia es
+que llega **pre-rellenada** y **ya ligada**.
 
 ---
 

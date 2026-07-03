@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { AuthModule } from "../auth/auth.module";
+import { WorkOrdersModule } from "../work-orders/work-orders.module";
 import { IncidentActionsService } from "./incident-actions.service";
 import { IncidentDashboardService } from "./incident-dashboard.service";
 import { IncidentInvestigationService } from "./incident-investigation.service";
@@ -15,7 +16,7 @@ import { IncidentsService } from "./incidents.service";
  * Audit y ScopeService llegan por módulos globales.
  */
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, WorkOrdersModule],
   controllers: [IncidentsController],
   providers: [IncidentsService, IncidentActionsService, IncidentInvestigationService, IncidentReportsService, IncidentSlaService, IncidentDashboardService],
   exports: [IncidentsService, IncidentActionsService, IncidentInvestigationService, IncidentReportsService, IncidentSlaService],

@@ -113,6 +113,8 @@
 .signTitle { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: var(--text-body-sm-size); color: var(--color-accent-secondary); }
 
 /* Formulario de creación / modales */
+.originNote { display: flex; align-items: center; gap: 8px; font-size: var(--text-body-sm-size); color: var(--color-accent-secondary); background: color-mix(in srgb, var(--color-accent-secondary) 9%, transparent); border: 1px solid color-mix(in srgb, var(--color-accent-secondary) 28%, transparent); border-radius: var(--radius-md); padding: var(--space-2) var(--space-3); }
+.originNote svg { flex: none; }
 .form { display: flex; flex-direction: column; gap: var(--space-3); }
 .formRow { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--space-3); }
 .checkRow { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-body-sm-size); color: var(--color-text-secondary); cursor: pointer; }

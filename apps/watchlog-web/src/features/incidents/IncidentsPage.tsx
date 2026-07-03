@@ -20,7 +20,8 @@ export function IncidentsPage() {
   const [view, setView] = useState<"list" | "board">("list");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
-  const [selId, setSelId] = useState<string | null>(null);
+  // `?open=<id>` auto-abre el drawer de una incidencia (deep-link desde una OT, S7b).
+  const [selId, setSelId] = useState<string | null>(params.get("open"));
   const initialOrigin = params.get("fromEntry");
   const initialNode = params.get("fromNode");
   const [createOpen, setCreateOpen] = useState(!!initialOrigin);
@@ -194,7 +195,13 @@ export function IncidentsPage() {
         <Board items={items} onOpen={openDetail} />
       )}
 
-      <IncidentDetailDrawer incidentId={selId} onClose={() => setSelId(null)} />
+      <IncidentDetailDrawer
+        incidentId={selId}
+        onClose={() => {
+          setSelId(null);
+          if (params.has("open")) { params.delete("open"); setParams(params, { replace: true }); }
+        }}
+      />
       <CreateIncidentModal
         open={createOpen}
         onClose={() => {

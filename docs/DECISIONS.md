@@ -4,6 +4,36 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-03 · OT · Slice 7b · Enlace Incidencia↔OT bidireccional (`feat/ot-incidencia-enlace-s7b`)
+Implementa lo trazado en S7a: conectar incidencias y OT en ambos sentidos al estándar SAP PM / IBM Maximo (ORIGINATOR↔FOLLOWUP).
+Decisiones (el dueño pidió "todo lo que sea mejor y más enterprise como los grandes"):
+- **Reusar `WorkOrder.originIncidentId` (indexado) — SIN migración/permiso/FLUSHALL.** El lado OT (ORIGINATOR) ya existía y
+  `create()` ya setea `originType=INCIDENT` + persiste + audita. Solo faltaban la vista inversa y el flujo de creación. Confirmado
+  en schema/código antes de tocar nada (regla "cero invento").
+- **NO se agrega `IncidentAction.workOrderId`.** El enlace queda a NIVEL INCIDENCIA. Maximo/SAP PM modelan el followup a nivel del
+  ticket (incident→work order), no de cada acción CAPA. Un enlace por acción excedería el estándar y añadiría migración sin
+  beneficio claro. Se mantiene la decisión de S7a.
+- **Vista inversa = `GET /incidents/:id/work-orders`, NO un filtro más de la lista de OT.** Es un sub-recurso RESTful de la
+  incidencia (consistente con `/incidents/:id/actions|reports`, que ya viven así). Delega en `WorkOrdersService.listForIncident`
+  para **reusar** `toListItems` (semáforo/estado/criticidad) — no se duplica el cálculo del semáforo. `IncidentsModule` importa
+  `WorkOrdersModule` (una sola dirección; OT no importa incidencias ⇒ sin ciclo).
+- **Gate de la vista inversa = `incident:view` + `workorder:view` (AMBOS, modo "all").** Es un join cross-módulo: ver el vínculo
+  exige ver ambas caras (defensa en profundidad / separación de módulos, como Maximo exige acceso a la app Work Order para ver
+  Related Records de tipo OT). Además `assertViewable` valida existencia + ABAC de la incidencia ANTES de listar (no se filtra la
+  existencia de una incidencia fuera de alcance), y cada OT se filtra por el alcance de nodo del usuario (`getAccessibleNodeIds`).
+  **NO** se acota por estructura activa: la incidencia define el contexto (cross-structure-safe).
+- **Al crear OT desde la incidencia NO se pre-siembra el TIPO.** Se copian título/descripción (SAP PM copia short/long text),
+  el nodo de la incidencia y la criticidad ← severidad (escala común 1..5). El TIPO de OT no tiene mapeo desde la incidencia;
+  inventar uno sería arbitrario ⇒ lo elige el usuario (igual que SAP PM/Maximo piden el order type al crear el followup). El
+  `CreateWorkOrderModal` se generaliza con una prop `seed` y se monta CONDICIONALmente en la pestaña para que el seed aplique al
+  abrir (sin efectos ni clobbering del formulario de "Nueva OT" de la grilla, que sigue sin seed).
+- **Back-nav en el detalle de OT resuelto en el backend.** `getDetail` de OT agrega `originIncidentCode`+`originIncidentTitle`
+  (helper de contrato NUEVO `incidentCode`, reutilizado por ambos módulos; espejo de `originLogEntryNumber` de incidencias) en
+  vez de que el front haga una segunda llamada. Campos nullable en `WorkOrderDetail` (aditivo, retrocompatible).
+- **Fix de paso: deep-link `/incidencias/:id` estaba roto** (no existe esa ruta; el detalle es un drawer con estado interno).
+  IncidentsPage ahora auto-abre el drawer leyendo `?open=<id>` (patrón querystring del propio módulo) y el link de vuelta de la OT
+  apunta a `/incidencias?open=<id>`. Sin nueva ruta, coherente con el drill-down existente.
+
 ### 2026-07-03 · OT · Slice 7a · Dashboard analítico de Órdenes de Trabajo (`feat/ot-dashboard-s7a`)
 Se decidió PARTIR el S7 en **S7a (Dashboard, esta sesión)** y **S7b (enlace Incidencia↔OT, siguiente sesión)** porque el
 dashboard es cerrable por sí solo y reduce el riesgo de contexto. Decisiones:

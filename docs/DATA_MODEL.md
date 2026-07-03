@@ -726,6 +726,14 @@ Incident(resuelta) ──> KnowledgeArticle
 
 ### Órdenes de Trabajo / Work Orders (OT / PTW) — S1 Cimientos + S2 Puerta 1 + S3 Puerta 2 + S4 Puerta 3 + S5 Puerta 4 + S6 SLA/semáforos + S7a Dashboard *(implementado)*
 
+> **S7b (Enlace Incidencia↔OT, `feat/ot-incidencia-enlace-s7b`, 2026-07-03) — SIN migración.** Se materializó lo anticipado por
+> S7a **reusando `WorkOrder.originIncidentId`** (no se tocó el esquema). Vista inversa `GET /incidents/:id/work-orders` (gate
+> `incident:view`+`workorder:view`) resuelta por `WorkOrdersService.listForIncident` (ABAC por nodo del usuario ∩ `originIncidentId`,
+> `deletedAt: null`; **NO** por estructura activa — la incidencia define el contexto). Navegación de vuelta: `WorkOrderDetail`
+> gana dos campos **DERIVADOS en `getDetail`** (no columnas): `originIncidentCode` + `originIncidentTitle` (helper de contrato
+> `incidentCode(number)="INC-####"`), espejo del `originLogEntryNumber` de incidencias. `IncidentAction.workOrderId` **NO** existe
+> (decisión 2026-07-03). Cross-módulo: `IncidentsModule` → `WorkOrdersModule` (una dirección, sin ciclo).
+
 > **S7a (Dashboard analítico, `feat/ot-dashboard-s7a`, 2026-07-03) — SIN migración (read-only).** `WorkOrderDashboardService`
 > agrega en el backend (GROUP BY / `$queryRaw`) con el MISMO ABAC por nodo ∩ estructura de la lista; no toca el esquema. Nota
 > para **S7b (enlace Incidencia↔OT)**: el lado OT del enlace YA existe en el modelo — `WorkOrder.originIncidentId` (ref. blanda

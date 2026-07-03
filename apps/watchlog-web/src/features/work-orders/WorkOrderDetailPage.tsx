@@ -251,7 +251,18 @@ export function WorkOrderDetailPage() {
                 <section className={styles.summaryGroup}>
                   <div className={styles.summaryGroupTitle}>Origen ligado</div>
                   <dl className={styles.kv}>
-                    {wo.originIncidentId && (<><dt>Incidencia</dt><dd><Link to={`/incidencias/${wo.originIncidentId}`}>Ver incidencia de origen</Link></dd></>)}
+                    {wo.originIncidentId && (
+                      <>
+                        <dt>Incidencia</dt>
+                        <dd>
+                          <Link to={`/incidencias?open=${wo.originIncidentId}`}>
+                            {wo.originIncidentCode
+                              ? `${wo.originIncidentCode}${wo.originIncidentTitle ? ` — ${wo.originIncidentTitle}` : ""}`
+                              : "Ver incidencia de origen"}
+                          </Link>
+                        </dd>
+                      </>
+                    )}
                     {wo.originLogEntryId && (<><dt>Bitácora</dt><dd><Link to={`/bitacoras/${wo.originLogEntryId}`}>Ver entrada de origen</Link></dd></>)}
                     {wo.originExceptionId && (<><dt>Excepción</dt><dd className={styles.mono}>{wo.originExceptionId}</dd></>)}
                   </dl>

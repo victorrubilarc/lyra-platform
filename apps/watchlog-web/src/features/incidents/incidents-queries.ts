@@ -39,6 +39,7 @@ import {
   fetchCrossDashboard,
   fetchIncidentDashboard,
   fetchIncidentDetail,
+  fetchIncidentWorkOrders,
   fetchIncidentStats,
   fetchIncidentTypes,
   fetchIncidents,
@@ -75,6 +76,7 @@ export const INCIDENT_KEYS = {
   investigation: (incidentId: string) => ["incidents", "investigation", incidentId] as const,
   obligations: () => ["incidents", "obligations"] as const,
   reports: (incidentId: string) => ["incidents", "reports", incidentId] as const,
+  workOrders: (incidentId: string) => ["incidents", "work-orders", incidentId] as const,
   dashboard: (q: IncidentDashboardQuery, structureId: string | null) => ["incidents", "dashboard", q, structureId] as const,
   crossDashboard: () => ["incidents", "dashboard", "cross"] as const,
 };
@@ -99,6 +101,11 @@ export function useIncidents(q: IncidentListQuery) {
 
 export function useIncidentDetail(id: string | null) {
   return useQuery({ queryKey: INCIDENT_KEYS.detail(id ?? ""), queryFn: () => fetchIncidentDetail(id!), enabled: !!id });
+}
+
+/** OT relacionadas (vista inversa del enlace Incidencia↔OT, S7b). */
+export function useIncidentWorkOrders(id: string | null) {
+  return useQuery({ queryKey: INCIDENT_KEYS.workOrders(id ?? ""), queryFn: () => fetchIncidentWorkOrders(id!), enabled: !!id });
 }
 
 export function useIncidentStats() {

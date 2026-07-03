@@ -57,6 +57,7 @@ import { IncidentDashboardService } from "./incident-dashboard.service";
 import { IncidentInvestigationService } from "./incident-investigation.service";
 import { IncidentReportsService } from "./incident-reports.service";
 import { IncidentsService } from "./incidents.service";
+import { WorkOrdersService } from "../work-orders/work-orders.service";
 
 @Controller("incidents")
 export class IncidentsController {
@@ -66,6 +67,7 @@ export class IncidentsController {
     private readonly investigation: IncidentInvestigationService,
     private readonly reports: IncidentReportsService,
     private readonly dashboard: IncidentDashboardService,
+    private readonly workOrders: WorkOrdersService,
   ) {}
 
   // --- Catálogos (antes de :id para no chocar) -------------------------------
@@ -189,6 +191,19 @@ export class IncidentsController {
   @RequirePermission("incident:view")
   getDetail(@Param("id") id: string, @CurrentUser() user: RequestUser) {
     return this.incidents.getDetail(user.id, id);
+  }
+
+  /**
+   * OT relacionadas (vista inversa del enlace Incidencia↔OT, S7b). La incidencia es el
+   * ORIGINATOR; devuelve sus OT FOLLOWUP. Exige VER incidencias Y OT (defensa en
+   * profundidad: es un join cross-módulo) + acceso ABAC a la incidencia; cada OT se
+   * filtra además por el alcance de nodo del usuario en el módulo de OT.
+   */
+  @Get(":id/work-orders")
+  @RequirePermission("incident:view", "workorder:view")
+  async relatedWorkOrders(@Param("id") id: string, @CurrentUser() user: RequestUser) {
+    await this.incidents.assertViewable(user.id, id);
+    return this.workOrders.listForIncident(user.id, id);
   }
 
   // --- Mutaciones ------------------------------------------------------------

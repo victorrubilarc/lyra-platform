@@ -92,6 +92,11 @@ export type IncidentCategoryDto = z.infer<typeof incidentCategorySchema>;
 
 // === Incidencia (listado + detalle) ==========================================
 
+/** Código humano visible de la incidencia a partir del correlativo ("INC-####"). */
+export function incidentCode(number: number): string {
+  return `INC-${String(number).padStart(4, "0")}`;
+}
+
 /** Fila de listado/kanban (liviana, con nombres ya resueltos para mostrar). */
 export const incidentListItemSchema = z.object({
   id: z.string(),
