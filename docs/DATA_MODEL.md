@@ -766,7 +766,32 @@ anulación lifecycle `CANCELED`).
 - **WorkOrderEvent** *(S2)* — timeline APPEND-ONLY (espejo de `IncidentActivity`; se llama "Event" para no chocar con
   `WorkActivity` de S4). `kind` clasifica: CREATED|SENT|APPROVED|REJECTED|FOLIO_ISSUED|TRANSITION|ASSIGNED|CLOSED|CANCELED
   |PLAN_FROZEN|CHECKLIST_ADDED|ACTIVITY_ADDED|ACTIVITY_REMOVED|**ACTIVITY_PROGRESS|ACTIVITY_DONE|ACTIVITY_BLOCKED** (S5).
-  `summary`, actor, `metadata` Json, `occurredAt`. Cascade; índice `(workOrderId, occurredAt)`.
+  `summary`, actor, `metadata` Json, `occurredAt`. Cascade; índice `(workOrderId, occurredAt)`. Dotación (S1) agrega los
+  `kind`: WORKER_ADDED|WORKER_REMOVED|ROSTER_CONFIRMED|ROSTER_CHANGED.
+- **Dotación del permiso** *(S1 — `feat/dotacion-permiso-s1`; traza OSHA 1910.146 / Maximo Person≠User; diseño citado en
+  `docs/design/DOTACION_DESIGN_ARCHITECTURE.md`)*:
+  - **Person** — persona real que ingresa a ejecutar, **SEPARADA de `User`** (Maximo Person≠User; los contratistas NO tienen
+    login). `kind` (enum `PersonKind` INTERNAL|CONTRACTOR), `firstName`/`lastName`/`fullName` (denormalizado "Apellido, Nombre"),
+    `nationalId`/`personnelCode`/`badgeId`/`jobTitle`/`email`/`phone`, `contractorCompanyId?` (→ ContractorCompany SetNull;
+    obligatorio si CONTRACTOR), `userId?` (enlace **blando** opcional si además tiene login). Catálogo **compartido** (sin ABAC
+    por estructura; el ABAC vive en el roster vía `WorkOrder.orgNodeId`). Soft-delete. Gate `worker:manage`.
+  - **ContractorCompany** — empresa contratista (nivel EMPRESA; traza ISN/Avetta/Veriforce + Ley 16.744 art.66bis/183-C).
+    `key` única, `name`/`taxId`, **acreditación** `accreditationStatus` (enum `AccreditationStatus` ACCREDITED|CONDITIONAL|
+    SUSPENDED|EXPIRED|NONE)/`accreditationGrade`/`accreditedUntil`/`externalProvider` (gancho ISN/Avetta/Veriforce S4)/
+    `accreditationNote` — **inertes en S1** (el gate se activa en S3). Soft-delete.
+  - **RosterRole** — rol de la persona en la dotación, **CONFIGURABLE** (seed = 3 estándar OSHA 1910.146: entry supervisor /
+    attendant-vigía / authorized entrant). `key` única, `name`/`description`, `isSupervisorRole` (quien autoriza/firma la
+    entrada, traza (f)(6)/(e)(2)), `mustRemainOutside` (semántica de vigía, traza (i)(4)), `color`/`sortOrder`. Soft-delete.
+  - **WorkOrderWorker** — el ROSTER de ESTA OT: persona + rol (traza OSHA (f)(4)-(6): el permiso lista personas por rol).
+    `workOrderId`(Cascade)/`personId`(Restrict)/`rosterRoleId`(Restrict), `note`, soft-remove (`removedAt`/`removedById`/
+    `removeReason`; **re-agregar REVIVE** la fila), columnas de override reservadas (S2: `overrideReason`/`overrideById`/
+    `overrideAt`/`overrideSignatureId`). **`@@unique([workOrderId, personId, rosterRoleId])`** (multi-rol: el supervisor puede
+    ser además vigía/entrant). Gate `workorder:roster:manage`.
+  - En **WorkOrder**: `rosterConfirmedAt?`/`rosterConfirmedById?` (**Gobierno 2** espejo EXACTO de `executionSetConfirmedAt/ById`:
+    `confirmRoster` FIRMADO Part 11 / auto-limpieza al curar / `assertRosterConfirmed` gate en la autorización del permiso).
+  - En **WorkOrderType**: `rosterEnabled` (bool, default false) — activación OPTATIVA por tipo (sin esto la OT no muestra
+    dotación; cero fricción/regresión).
+  - Semáforo por persona = función PURA `evaluateWorkerStatus` (contracts; forma final desde S1, causas rojas de S2/S3).
 - **FolioCounter** *(S2, fork W4)* — motor de folio gapless configurable, REUTILIZABLE (sirve al folio-por-plantilla,
   BACKLOG 2026-06-30). Una fila por secuencia: `sequenceKey` **PK** (codifica entidad+scope+período, ej.
   `workorder|type:<id>|2026`) + `lastValue`. Asignación ATÓMICA `INSERT … ON CONFLICT … DO UPDATE … RETURNING`

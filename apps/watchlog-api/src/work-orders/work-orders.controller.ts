@@ -2,8 +2,11 @@ import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query, Req
 import type { FastifyRequest } from "fastify";
 import {
   addWorkOrderChecklistRequestSchema,
+  addWorkOrderWorkerRequestSchema,
   assignWorkOrderRequestSchema,
   cancelWorkOrderRequestSchema,
+  confirmRosterRequestSchema,
+  removeWorkOrderWorkerRequestSchema,
   createWorkActivitiesBatchRequestSchema,
   createWorkActivityRequestSchema,
   createWorkOrderRequestSchema,
@@ -18,8 +21,11 @@ import {
   upsertWorkOrderTypeRequestSchema,
   workOrderListQuerySchema,
   type AddWorkOrderChecklistRequest,
+  type AddWorkOrderWorkerRequest,
   type AssignWorkOrderRequest,
   type CancelWorkOrderRequest,
+  type ConfirmRosterRequest,
+  type RemoveWorkOrderWorkerRequest,
   type CreateWorkActivitiesBatchRequest,
   type CreateWorkActivityRequest,
   type CreateWorkOrderRequest,
@@ -41,6 +47,7 @@ import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { WorkOrdersService } from "./work-orders.service";
 import { WorkOrderChecklistsService } from "./work-order-checklists.service";
 import { WorkActivitiesService } from "./work-activities.service";
+import { WorkOrderRosterService } from "./work-order-roster.service";
 
 @Controller("work-orders")
 export class WorkOrdersController {
@@ -48,6 +55,7 @@ export class WorkOrdersController {
     private readonly workOrders: WorkOrdersService,
     private readonly checklists: WorkOrderChecklistsService,
     private readonly activities: WorkActivitiesService,
+    private readonly roster: WorkOrderRosterService,
   ) {}
 
   // --- Catálogos (antes de :id para no chocar) -------------------------------
@@ -363,6 +371,57 @@ export class WorkOrdersController {
     @Req() req: FastifyRequest,
   ) {
     return this.activities.recordProgress(user.id, id, aid, dto, this.ctx(user, req));
+  }
+
+  // --- Dotación del permiso (S1) ---------------------------------------------
+
+  /** Estado de la dotación de la OT (roster + roles + confirmación + semáforo). */
+  @Get(":id/roster")
+  @RequirePermission("workorder:view")
+  getRoster(@Param("id") id: string, @CurrentUser() user: RequestUser) {
+    return this.roster.getRoster(user.id, id);
+  }
+
+  /** Agrega una persona a la dotación con su rol (invalida una confirmación previa). */
+  @Post(":id/roster")
+  @RequirePermission("workorder:roster:manage")
+  addWorker(
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(addWorkOrderWorkerRequestSchema)) dto: AddWorkOrderWorkerRequest,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.roster.addWorker(user.id, id, dto, this.ctx(user, req));
+  }
+
+  /**
+   * Confirma (sella) la dotación con FIRMA Part 11 = gate para autorizar el permiso.
+   * Ruta literal ANTES de `:workerId` para no colisionar con el param.
+   */
+  @Post(":id/roster/confirm")
+  @HttpCode(200)
+  @RequirePermission("workorder:roster:manage")
+  confirmRoster(
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(confirmRosterRequestSchema)) dto: ConfirmRosterRequest,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.roster.confirmRoster(user.id, id, dto, this.ctx(user, req));
+  }
+
+  /** Quita (soft) una persona de la dotación con motivo opcional. */
+  @Post(":id/roster/:workerId/remove")
+  @HttpCode(200)
+  @RequirePermission("workorder:roster:manage")
+  removeWorker(
+    @Param("id") id: string,
+    @Param("workerId") workerId: string,
+    @Body(new ZodValidationPipe(removeWorkOrderWorkerRequestSchema)) dto: RemoveWorkOrderWorkerRequest,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+  ) {
+    return this.roster.removeWorker(user.id, id, workerId, dto, this.ctx(user, req));
   }
 
   private ctx(user: RequestUser, req: FastifyRequest): AuditContext {

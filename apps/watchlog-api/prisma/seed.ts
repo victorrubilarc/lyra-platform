@@ -19,6 +19,7 @@ import { INCIDENT_WORKFLOW, INCIDENT_TYPES, INCIDENT_CATEGORIES, REPORTING_OBLIG
 import {
   WORK_ORDER_TYPES,
   WORK_ORDER_SPECIALTIES,
+  ROSTER_ROLES,
   WORK_ORDER_WORKFLOW,
   WORK_ORDER_CHECKLIST_TEMPLATES,
   WORK_ORDER_CHECKLIST_RULES,
@@ -684,8 +685,9 @@ async function seedWorkOrderCatalog(): Promise<void> {
         requiresPtwDefault: t.requiresPtwDefault,
         criticalityDefault: t.criticalityDefault,
         sortOrder: t.sortOrder,
+        rosterEnabled: t.rosterEnabled ?? false,
       },
-      update: { name: t.name, description: t.description, color: t.color, requiresPtwDefault: t.requiresPtwDefault, criticalityDefault: t.criticalityDefault, sortOrder: t.sortOrder },
+      update: { name: t.name, description: t.description, color: t.color, requiresPtwDefault: t.requiresPtwDefault, criticalityDefault: t.criticalityDefault, sortOrder: t.sortOrder, rosterEnabled: t.rosterEnabled ?? false },
     });
   }
   for (const s of WORK_ORDER_SPECIALTIES) {
@@ -695,8 +697,16 @@ async function seedWorkOrderCatalog(): Promise<void> {
       update: { name: s.name, description: s.description, color: s.color, sortOrder: s.sortOrder },
     });
   }
+  // Roles de DOTACIÓN (S1): los 3 estándar OSHA 1910.146, configurables.
+  for (const r of ROSTER_ROLES) {
+    await prisma.rosterRole.upsert({
+      where: { key: r.key },
+      create: { key: r.key, name: r.name, description: r.description, isSupervisorRole: r.isSupervisorRole, mustRemainOutside: r.mustRemainOutside, color: r.color, sortOrder: r.sortOrder },
+      update: { name: r.name, description: r.description, isSupervisorRole: r.isSupervisorRole, mustRemainOutside: r.mustRemainOutside, color: r.color, sortOrder: r.sortOrder },
+    });
+  }
   console.log(
-    `✔ Catálogo de OT sincronizado: ${WORK_ORDER_TYPES.length} tipos, ${WORK_ORDER_SPECIALTIES.length} especialidades`,
+    `✔ Catálogo de OT sincronizado: ${WORK_ORDER_TYPES.length} tipos, ${WORK_ORDER_SPECIALTIES.length} especialidades, ${ROSTER_ROLES.length} roles de dotación`,
   );
 }
 

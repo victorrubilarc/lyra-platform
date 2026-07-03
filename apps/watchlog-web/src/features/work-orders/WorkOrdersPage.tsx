@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ClipboardList, Plus, Search, Tags } from "lucide-react";
+import { ClipboardList, Plus, Search, Tags, Users } from "lucide-react";
 import type { WorkOrderListQuery } from "@lyra/contracts";
 import { Button, Card, EmptyState, GridPager, Input, Select, Spinner } from "@lyra/ui";
 import { usePermissions } from "../../auth/use-permissions.js";
@@ -76,6 +76,11 @@ export function WorkOrdersPage() {
           <p className={styles.sub}>Solicitudes de trabajo y permisos de trabajo (PTW).</p>
         </div>
         <div className={styles.headerActions}>
+          {can("worker:manage") && (
+            <Link to="/ordenes-trabajo/personas">
+              <Button variant="secondary" leftIcon={<Users size={16} />}>Personas</Button>
+            </Link>
+          )}
           {can("workordercatalog:manage") && (
             <Link to="/ordenes-trabajo/catalogos">
               <Button variant="secondary" leftIcon={<Tags size={16} />}>Catálogos</Button>

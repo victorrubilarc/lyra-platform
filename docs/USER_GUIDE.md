@@ -10,7 +10,7 @@
 > funcionalidades existentes** aunque su detalle aún esté por redactar (✍️): así nada se
 > olvida; el backfill de lo ya construido se llena de a poco (incremental).
 >
-> Última actualización: **2026-07-02** (Folio del documento configurable por plantilla de bitácora y por tipo de OT — editor visual con vista previa en vivo, opcional con fallback al correlativo global).
+> Última actualización: **2026-07-03** (Dotación del permiso — listar las personas propias y contratistas que ingresan a ejecutar una OT, con su rol, y confirmación firmada por el aprobador antes de autorizar; catálogo de personas y empresas contratistas).
 
 ## Convención de cada sección
 Cada funcionalidad se documenta con estas cuatro partes fijas:
@@ -150,6 +150,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 - ✅ **Plan de actividades y autorización del plan — Puerta 3** (armar el plan con grilla o **asistente guiado**, congelar la línea base al autorizar, desviación plan-vs-real) (§ Órdenes de trabajo ▸ Plan de actividades)
 - ✅ **Seguimiento del avance y cierre — Puerta 4** (registrar el avance de cada actividad durante la ejecución, historial de avance; **verificación de cierre del permiso** que bloquea el cierre hasta aprobarla; cerrar la OT con firma cuando todo lo obligatorio está completo) (§ Órdenes de trabajo ▸ Seguimiento del avance y cierre · Verificación de cierre del permiso)
 - ✅ **Plazos, avisos de vencimiento y semáforos (SLA) — "vigía digital"** (plazo de resolución automático por tipo de OT, avisos por correo y campanita cuando algo vence o se estanca, escalamiento a un superior, semáforo verde/ámbar/rojo en la grilla y el detalle, indicadores "vencidas / por vencer / estancadas") (§ Órdenes de trabajo ▸ Plazos, avisos y semáforos (SLA))
+- ✅ **Dotación del permiso: quiénes ingresan y validación del aprobador** (listar las personas —propias y contratistas— que entran a ejecutar, con su rol; el aprobador revisa la dotación y la **confirma firmando** antes de autorizar el permiso; catálogo de personas y empresas contratistas) (§ Órdenes de trabajo ▸ Dotación del permiso)
 - ✅ **Administrar los catálogos** (tipos de OT, especialidades y **reglas de checklist con su momento**) (§ Órdenes de trabajo ▸ Catálogos) [solo administrador]
 
 ---
@@ -449,6 +450,47 @@ las OT que lo usaron). La **clave** es inmutable; elígela con cuidado. Crear co
 duplicados silenciosos).
 
 ---
+
+### Órdenes de trabajo ▸ Dotación del permiso  [aprobador / preparador · catálogo: administrador]
+
+**Para qué sirve.** En muchos trabajos —sobre todo los de alto riesgo— importa **quiénes** entran a ejecutarlos: personas
+propias y de empresas contratistas. Quien **autoriza el permiso** debe conocer y validar esa **dotación** (quiénes ingresan y
+con qué rol) antes de dar la autorización. Es el estándar de la industria: un permiso de trabajo lista por nombre a los que
+ingresan, al vigía y al supervisor de entrada, y este último **firma** para autorizar la entrada. Esta función es **opcional
+y se activa por tipo de OT**: si el tipo no la gestiona, la OT no muestra ninguna sección de dotación (cero fricción).
+
+**Cómo se usa.**
+1. **Preparar el catálogo (una vez, administrador).** Menú de Órdenes de trabajo → botón **«Personas»** (`/ordenes-trabajo/
+   personas`). Tiene dos pestañas:
+   - **Personas:** «Nueva persona» → elige si es **Propia** o **Contratista** (si es contratista, elige su **empresa**),
+     nombre y apellido, y opcionalmente RUT/DNI, ficha, cargo, teléfono y correo. *(Una persona **no** es un usuario del
+     sistema: los contratistas no necesitan cuenta ni acceso.)* Buscador por nombre/RUT/ficha y filtro Propios/Contratistas.
+   - **Empresas contratistas:** «Nueva empresa» → nombre, RUT y —opcional— su estado de acreditación (informativo por ahora).
+2. **Activar la dotación en el tipo de OT (administrador).** En **Catálogos → Tipos**, edita el tipo y activa **«Gestiona
+   dotación»**. Desde ahí, las OT de ese tipo mostrarán la pestaña **«Dotación»**. *(Los tipos «Permiso de Alto Riesgo (PTW)»
+   y «Mantención mayor / Overhaul» vienen con la dotación activada de fábrica.)*
+3. **Armar la dotación (en la OT, durante la preparación).** Abre la OT → pestaña **«Dotación»**. Busca a cada persona en el
+   selector (es buscable), elige su **rol** —Ejecutante, Vigía o Supervisor de entrada— y pulsa **«Agregar»**. Cada persona
+   muestra un **semáforo** (verde = habilitada) y su empresa. Puedes **quitar** a quien no corresponda.
+4. **Confirmar y firmar (el aprobador).** Cuando la dotación esté completa, pulsa **«Confirmar dotación»**: el sistema pide tu
+   **firma electrónica** (tu contraseña, y el código MFA si lo tienes). Al firmar, queda registrado quién confirmó y cuándo.
+5. **Autorizar el permiso.** El sistema **no deja autorizar el permiso** si la dotación no está confirmada: si lo intentas,
+   avisa que primero confirmes la dotación. Una vez confirmada, la autorización procede (junto con las verificaciones).
+
+**Quién puede.** Ver la dotación: quien puede ver la OT. Agregar/quitar personas y confirmar la dotación: el permiso
+*«Gestionar la dotación»* (`workorder:roster:manage`). Administrar el catálogo de personas y empresas: *«Administrar
+personas»* (`worker:manage`). Quién puede **autorizar** el permiso lo decide el flujo, como siempre.
+
+**Importante.**
+- **Quien entra = quien fue autorizado.** Si después de confirmar cambias la dotación (agregas o quitas a alguien), la
+  confirmación **se anula automáticamente** y hay que **volver a confirmarla y firmarla**. Así nunca ingresa alguien que el
+  aprobador no validó.
+- Los **roles** (Ejecutante / Vigía / Supervisor de entrada) son **configurables**: el administrador puede renombrarlos o
+  agregar otros. Una misma persona puede tener **más de un rol** en la misma OT.
+- Quitar a una persona no la borra: queda el registro de que estuvo y de que se la quitó (con su motivo).
+- **Próximamente:** validación automática de **competencias y certificaciones vigentes** por persona (semáforo en rojo si
+  falta o venció una certificación, si la persona tiene una restricción, o si su empresa no está acreditada) y **avisos de
+  vencimiento**. En esta versión el semáforo confirma la presencia y el rol; las validaciones de competencia llegan después.
 
 ### Órdenes de trabajo ▸ Plazos, avisos y semáforos (SLA) — "vigía digital"  [todos los roles operativos]
 

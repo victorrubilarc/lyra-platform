@@ -4,6 +4,33 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-03 · Dotación del permiso (personas/contratistas/roles) — diseño + Slice 1
+Necesidad del dueño: en muchas OT (no todas) hay que gestionar el LISTADO DE PERSONAS que ingresan a ejecutar, y quien
+APRUEBA debe validar esa dotación (quién entra, autorizado, competencias vigentes, sin veto, empresa acreditada). **Diseño
+completo, investigado y CITADO** en `docs/design/DOTACION_DESIGN_ARCHITECTURE.md` (trazabilidad a OSHA 1910.146/1910.147,
+HSG250, ISO 45001 §7.2, IBM Maximo Person/Qualifications, SAP WCM/Qualifications, ISN/Avetta/Veriforce, marco chileno
+Ley 16.744/DS 44/DS 132). Decisiones aprobadas por el dueño:
+- **D1 · `Person` catálogo global compartido** (no ABAC por estructura): Maximo Person es global; contratistas cruzan
+  estructuras; el ABAC se aplica en el ROSTER vía `WorkOrder.orgNodeId`. `Person` **separada** de `User` (contratistas sin login).
+- **D2 · Activación optativa por tipo** (`WorkOrderType.rosterEnabled`): sin esto la OT no muestra dotación (cero fricción/
+  regresión). Las exigencias concretas (qué competencia, a quién) = reglas data-driven en S2.
+- **D3 · Confirmación FIRMADA (Part 11)** en S1: traza dura OSHA 1910.146(e)(2) — la autorización de entrada del supervisor
+  ES una firma; HSG250 exige e-firma segura. Reusa `ReauthService`.
+- **D4 · Unique `(OT, persona, rol)`** (multi-rol): OSHA permite que el supervisor de entrada sea además vigía/ejecutante.
+  Re-agregar a una persona previamente quitada REVIVE su fila (el índice único abarca las soft-removed).
+- **D5 · Solo firma de confirmación en S1** (override por persona en S2): en S1 no hay causas rojas (sin competencias/veto),
+  así que no se construye gobierno de override sin sujeto.
+- **D6 · Vocabulario estándar**: catálogo «Personas», sección «Dotación»; roles Ejecutante (authorized entrant) / Vigía
+  (attendant) / Supervisor de entrada (entry supervisor) — sembrados y CONFIGURABLES.
+- **D7 · `jobTitle` libre** en S1 (no ligar `Specialty` a la persona hasta un caso real).
+- **Gobierno 2 espejo EXACTO**: `confirmRoster`/`clearRosterConfirmation`(auto-limpieza al curar)/`assertRosterConfirmed`
+  (gate) = calco de `executionSet*`; campos `WorkOrder.rosterConfirmedAt/ById`.
+- **Orden de gates en la autorización**: la dotación se valida ANTES que los checklists/set de ejecución (quién ingresa antes
+  que la documentación del permiso). Cambio de orden menor que mejora el mensaje que ve el aprobador. Permisos NUEVOS:
+  `worker:manage` (catálogo Personas/Contratistas) + `workorder:roster:manage` (roster); **sin** permisos de "gate" fijos
+  (misma objeción W2: la autorización por transición ya es dato). Roadmap: S2 competencias/vigencias/semáforo/gate por
+  persona · S3 acreditación de contratistas · S4 control de acceso (interfaz abstracta).
+
 ### 2026-07-02 · Folio — "el ámbito completo" (segmento visible por nodo/estructura)
 Corrección de diseño que planteó el dueño revisando el editor: dije que "faltaba un token `{NODE}` en la máscara"; él
 respondió, con razón, que **el problema es el ámbito, no la máscara**. Elegir "por nodo" partía el contador pero **no se

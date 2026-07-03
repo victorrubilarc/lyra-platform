@@ -5,7 +5,18 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-07-02** — **🔧 OT · Sesión 6 · SLA, avisos de plazo, escalamiento y semáforos ("vigía digital") ✅**
+> actualización: **2026-07-03** — **👷 Dotación del permiso · DISEÑO + Slice 1 (MVP) ✅** (`feat/dotacion-permiso-s1`):
+> personas propias/contratistas que ingresan a ejecutar + confirmación FIRMADA (Gobierno 2) por el aprobador. Diseño citado en
+> `docs/design/DOTACION_DESIGN_ARCHITECTURE.md`. Entidades `Person`(≠User)/`ContractorCompany`/`RosterRole`(3 OSHA)/`WorkOrderWorker`
+> + `WorkOrder.rosterConfirmedAt/ById` + `WorkOrderType.rosterEnabled` (migr. `20260703000000`). `confirmRoster`(firma Part 11)/
+> `clearRosterConfirmation`(auto-limpieza)/`assertRosterConfirmed`(gate ANTES de checklists). Permisos `worker:manage` +
+> `workorder:roster:manage` (104). Web: catálogo `/ordenes-trabajo/personas` + pestaña «Dotación» + toggle en el tipo. verde +
+> roster.spec 8/8 + **smoke-dotacion 26/26** + regresión workorders 122/122 + incidencias 32/32. **ROADMAP dotación (abierto):**
+> **S2** = competencias/certificaciones con vigencia + `WorkOrderCompetencyRule` (data-driven) + `PersonRestriction` (veto) +
+> semáforo con causas ROJAS (ejes competencia/autorización) + gate/override firmado POR PERSONA + avisos de vencimiento (Bloque N,
+> traza ISN 90 días). **S3** = acreditación de contratistas (gate por `accreditationStatus`/`accreditedUntil`). **S4** = integración
+> control de acceso/T&A tras interfaz abstracta (on-prem). Pendiente: **smoke VISUAL (dueño)**. Antes:
+> **🔧 OT · Sesión 6 · SLA, avisos de plazo, escalamiento y semáforos ("vigía digital") ✅**
 > (`feat/ot-sla-semaforos`): ESPEJO de la Fase 4.4 de Incidencias. **SIN migración** (columnas SLA del `WorkOrderType`,
 > `WorkOrder.dueAt`, `WorkActivity.baselineEnd/plannedEnd` YA latentes) y **SIN permiso nuevo** (avisos no gatean; SLA del tipo =
 > `workordercatalog:manage`, plazo = `workorder:edit`; 102 sin cambio, sin FLUSHALL). **3 eventos** `workorder.overdue` (plazo

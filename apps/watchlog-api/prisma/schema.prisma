@@ -2769,6 +2769,11 @@ model WorkOrderType {
   resolutionDueMinutes   Int?
   escalationAfterMinutes Int?
   escalationRoleId       String?
+  // --- Dotacion del permiso (S1): activacion OPTATIVA por tipo --------------------
+  // Sin esto la OT NO muestra dotacion (cero friccion/regresion). El dueño: "no aplica
+  // siempre ni a todas las OT". Las EXIGENCIAS concretas (que competencia, a quien) se
+  // derivan de reglas data-driven en S2 (WorkOrderCompetencyRule).
+  rosterEnabled      Boolean  @default(false)
   active             Boolean  @default(true)
   sortOrder          Int      @default(0)
   createdAt          DateTime @default(now())
@@ -2854,6 +2859,13 @@ model WorkOrder {
   // Se limpia si el set cambia despues (agregar/quitar). Gate en la autorizacion del permiso.
   executionSetConfirmedAt   DateTime?
   executionSetConfirmedById String?
+  // --- Dotacion del permiso (S1): confirmacion FIRMADA del roster por el aprobador ----
+  // Espejo EXACTO de executionSetConfirmedAt/ById (Gobierno 2). El aprobador ve la
+  // dotacion con semaforo por persona, la cura y CONFIRMA (firma Part 11) => gate a
+  // autorizar el permiso. Se limpia si el roster cambia despues (auto-limpieza al curar).
+  // Traza: OSHA 1910.146(e)(2) el supervisor de entrada FIRMA para autorizar la entrada.
+  rosterConfirmedAt   DateTime?
+  rosterConfirmedById String?
   // --- Puerta 1 (aprobacion de la solicitud) - INERTE en S1 ------------------------
   approvedAt   DateTime?
   approvedById String?
@@ -2885,6 +2897,7 @@ model WorkOrder {
   activities  WorkActivity[]
   transitions WorkOrderTransition[]
   events      WorkOrderEvent[]
+  workers     WorkOrderWorker[]
 
   @@index([typeId])
   @@index([orgNodeId])
@@ -2961,6 +2974,146 @@ model WorkOrderSpecialty {
 
   @@id([workOrderId, specialtyId])
   @@index([specialtyId])
+}
+
+// === DOTACION del permiso (S1) ===============================================
+// La persona que ingresa a ejecutar labores. SEPARADA de User (traza IBM Maximo:
+// Person != User; los contratistas NO tienen login). Catalogo COMPARTIDO (como
+// Especialidades/Tipos): el ABAC se aplica en el ROSTER via WorkOrder.orgNodeId, no
+// en el catalogo. `userId` = enlace BLANDO opcional (un propio puede ademas ser User).
+// Competencias/restricciones (con vigencia) llegan en S2.
+enum PersonKind {
+  INTERNAL // propio (empleado de la organizacion)
+  CONTRACTOR // trabajador de una empresa contratista
+}
+
+model Person {
+  id                  String     @id @default(cuid())
+  kind                PersonKind @default(INTERNAL)
+  firstName           String
+  lastName            String
+  fullName            String // denormalizado (busqueda / render rapido)
+  nationalId          String? // RUT/DNI (identificador de la persona real)
+  personnelCode       String? // ficha/codigo interno o del contratista
+  badgeId             String? // credencial fisica (gancho control de acceso S4)
+  jobTitle            String? // cargo (texto libre en S1; Specialty formal si se pide)
+  email               String?
+  phone               String?
+  contractorCompanyId String? // null = propio; set = trabajador de contratista
+  userId              String? // enlace BLANDO si ademas tiene login (propios); null = sin login
+  active              Boolean    @default(true)
+  createdById         String?
+  updatedById         String?
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+  deletedAt           DateTime?
+
+  contractorCompany ContractorCompany? @relation(fields: [contractorCompanyId], references: [id], onDelete: SetNull)
+  rosterEntries     WorkOrderWorker[]
+
+  @@index([kind])
+  @@index([contractorCompanyId])
+  @@index([active])
+  @@index([deletedAt])
+  @@index([nationalId])
+  @@index([fullName])
+}
+
+// Empresa contratista con acreditacion (nivel EMPRESA). Traza: ISN (grado RAVS) /
+// Avetta (score) / Veriforce; marco chileno Ley 16.744 art.66 bis + Cod. Trabajo
+// art.183-C (registro de contratistas). Campos de acreditacion PRESENTES en S1
+// (inertes, como folioScheme lo fue en S1 de OT); el GATE por acreditacion se activa
+// en S3. `externalProvider` = gancho de integracion (ISN/Avetta/Veriforce, S4).
+enum AccreditationStatus {
+  ACCREDITED
+  CONDITIONAL
+  SUSPENDED
+  EXPIRED
+  NONE
+}
+
+model ContractorCompany {
+  id                  String              @id @default(cuid())
+  key                 String              @unique
+  name                String
+  taxId               String? // RUT de la empresa
+  accreditationStatus AccreditationStatus @default(NONE)
+  accreditationGrade  String? // "A" (ISN RAVS) / score (Avetta/Veriforce)
+  accreditedUntil     DateTime? // vencimiento de la acreditacion
+  externalProvider    String? // "ISNetworld"|"Avetta"|"Veriforce"|null
+  accreditationNote   String?
+  active              Boolean             @default(true)
+  createdById         String?
+  updatedById         String?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  deletedAt           DateTime?
+
+  persons Person[]
+
+  @@index([active])
+  @@index([accreditationStatus])
+  @@index([deletedAt])
+}
+
+// Rol de una persona en la dotacion del permiso. CONFIGURABLE (catalogo, no
+// hardcodeado). Seed = los 3 roles estandar OSHA 1910.146: authorized entrant
+// (ejecutante), attendant (vigia), entry supervisor (supervisor de entrada).
+// `isSupervisorRole` = el que autoriza/firma la entrada (traza OSHA (f)(6)/(e)(2));
+// `mustRemainOutside` = semantica de vigia (traza OSHA (i)(4)).
+model RosterRole {
+  id                String    @id @default(cuid())
+  key               String    @unique
+  name              String
+  description       String?
+  isSupervisorRole  Boolean   @default(false)
+  mustRemainOutside Boolean   @default(false)
+  color             String?
+  active            Boolean   @default(true)
+  sortOrder         Int       @default(0)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+
+  rosterEntries WorkOrderWorker[]
+
+  @@index([active])
+  @@index([deletedAt])
+}
+
+// El ROSTER de ESTA OT: persona + su rol. Traza: OSHA 1910.146(f)(4)-(6) el permiso
+// lista a las personas por nombre y rol. Sin borrado fisico (removedAt). El override
+// gobernado (motivo + firma Part 11) por persona en ROJO se materializa en S2 (aqui
+// las columnas quedan reservadas). Unique por (OT, persona, rol): una persona puede
+// tener >1 rol (OSHA: el supervisor de entrada puede ademas ser vigia/entrant si esta
+// capacitado).
+model WorkOrderWorker {
+  id           String @id @default(cuid())
+  workOrderId  String
+  personId     String
+  rosterRoleId String
+  note         String?
+  addedById    String?
+  addedAt      DateTime  @default(now())
+  removedAt    DateTime?
+  removedById  String?
+  removeReason String?
+  // Override gobernado (S2, reservado): confirmar con la persona en ROJO exige motivo + firma.
+  overrideReason      String?
+  overrideById        String?
+  overrideAt          DateTime?
+  overrideSignatureId String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  workOrder  WorkOrder  @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  person     Person     @relation(fields: [personId], references: [id], onDelete: Restrict)
+  rosterRole RosterRole @relation(fields: [rosterRoleId], references: [id], onDelete: Restrict)
+
+  @@unique([workOrderId, personId, rosterRoleId])
+  @@index([workOrderId])
+  @@index([personId])
+  @@index([removedAt])
 }
 
 // Estado de un checklist operativo (Capa B, Puerta 2 - S3). IN_PROGRESS = LogEntry
