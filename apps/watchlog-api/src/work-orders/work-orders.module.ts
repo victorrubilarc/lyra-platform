@@ -10,6 +10,7 @@ import { WorkOrderChecklistsService } from "./work-order-checklists.service";
 import { WorkActivitiesService } from "./work-activities.service";
 import { WorkOrderSlaService } from "./work-order-sla.service";
 import { WorkOrderRosterService } from "./work-order-roster.service";
+import { WorkOrderDashboardService } from "./work-order-dashboard.service";
 import { PersonsService } from "./persons.service";
 import { CompetenciesService } from "./competencies.service";
 import { WorkerComplianceService } from "./worker-compliance.service";
@@ -25,7 +26,7 @@ import { WorkerComplianceService } from "./worker-compliance.service";
 @Module({
   imports: [AuthModule, FolioModule, LogEntriesModule],
   controllers: [WorkOrdersController, PersonsController, CompetenciesController],
-  providers: [WorkOrdersService, WorkOrderChecklistsService, WorkActivitiesService, WorkOrderSlaService, WorkOrderRosterService, PersonsService, CompetenciesService, WorkerComplianceService],
+  providers: [WorkOrdersService, WorkOrderChecklistsService, WorkActivitiesService, WorkOrderSlaService, WorkOrderRosterService, WorkOrderDashboardService, PersonsService, CompetenciesService, WorkerComplianceService],
   exports: [WorkOrdersService, WorkOrderChecklistsService, WorkActivitiesService, WorkOrderSlaService, WorkOrderRosterService, PersonsService, CompetenciesService, WorkerComplianceService],
 })
 export class WorkOrdersModule {}

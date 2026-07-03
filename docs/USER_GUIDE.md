@@ -154,6 +154,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 - ✅ **Competencias y certificaciones de la dotación** (catálogo de competencias + reglas de requisito; carga de certificaciones con vencimiento e historial de renovaciones; semáforo REAL por persona con motivo legible; excepción firmada para autorizar impedimentos; avisos de vencimiento) (§ Órdenes de trabajo ▸ Competencias y certificaciones de la dotación)
 - ✅ **Acreditación de empresas contratistas** (registro de acreditación de la empresa con grado/vigencia/plataforma; gate por tipo de OT que bloquea a contratistas de empresas no acreditadas/vencidas/suspendidas; condicional y por-vencer en ámbar; excepción firmada; avisos de vencimiento de acreditación) (§ Órdenes de trabajo ▸ Acreditación de empresas contratistas)
 - ✅ **Administrar los catálogos** (tipos de OT, especialidades y **reglas de checklist con su momento**) (§ Órdenes de trabajo ▸ Catálogos) [solo administrador]
+- ✅ **Dashboard de órdenes de trabajo** (tendencias e indicadores: abiertas/vencidas/estancadas, MTTR, cumplimiento de SLA, Pareto por tipo, distribución por criticidad/nodo/especialidad/estado/prioridad/origen; con rango de fechas, export CSV y clic-para-filtrar) (§ Órdenes de trabajo ▸ Dashboard)
 
 ---
 
@@ -632,6 +633,42 @@ realidad del momento, sin trabajos en segundo plano que haya que mantener. La OT
 (las cerradas o anuladas no generan avisos). "Estancada" (permanencia en un estado) es **distinto** de "Vencida" (plazo de
 resolución): son dos alertas independientes y sólo aparece «Estancada» si el flujo define un tope de permanencia para ese
 estado. Los correos salen sólo si el envío de correo está habilitado; la **campanita** funciona siempre.
+
+---
+
+### Órdenes de trabajo ▸ Dashboard  [todos los roles operativos]
+
+**Para qué sirve.** Es el tablero analítico de las órdenes de trabajo: de un vistazo muestra cuántas hay abiertas, cuántas
+tienen el plazo vencido o están por vencer, cuántas llevan demasiado tiempo estancadas en un estado, cuánto se demora en promedio
+cerrar una OT (MTTR) y qué porcentaje se cerró dentro de plazo (cumplimiento de SLA). Además grafica la tendencia (cuántas se
+crean vs. cuántas se cierran en el tiempo) y las distribuciones por tipo, criticidad, nodo, especialidad, estado del flujo,
+prioridad y origen. Sirve para la gestión y la mejora: dónde se acumula el trabajo, qué tipo concentra el 80 % (Pareto), qué
+disciplina está sobrecargada. Es **solo lectura** y **respeta tu alcance**: solo agrega las OT que ya podrías ver (por nodo y por
+la estructura activa) — nunca revela datos de nodos a los que no tienes acceso.
+
+**Cómo se usa.**
+1. En **Órdenes de trabajo**, pulsa el botón **«Dashboard»** de la cabecera.
+2. Arriba, elige el **rango de fechas**: botones rápidos (30 días · 90 días · 12 meses) o las fechas «Desde/Hasta». Puedes acotar
+   además por **tipo, criticidad, especialidad y origen** con los selectores de la misma línea.
+3. Lee los **indicadores**: la fila «Estado actual (en vivo)» refleja el momento presente (no depende del rango); la fila «En el
+   periodo» (creadas, cerradas, MTTR, cumplimiento SLA) sí corresponde al rango elegido.
+4. Explora los **gráficos**: tendencia creación/cierre, Pareto por tipo, dona por criticidad y barras por nodo / especialidad /
+   estado / prioridad / origen.
+5. **Clic para filtrar (drill-down):** al pulsar un indicador o una barra/segmento, saltas a la **lista de OT** ya filtrada por
+   esa dimensión y el rango activo (por ejemplo, clic en «Plazo vencido» abre la lista de las vencidas; clic en una barra de un
+   tipo, la lista de ese tipo). Desde ahí abres cada OT.
+6. **Exportar CSV:** el botón «Exportar CSV» descarga todos los indicadores y tablas del periodo para abrirlos en una planilla
+   (Excel/Sheets), con los acentos y separadores correctos.
+
+**Quién puede.** Cualquier usuario con permiso de **ver órdenes de trabajo** (`workorder:view`) — el mismo que ya usa para la
+lista. No hace falta ningún permiso adicional. Lo que cada quien ve está acotado por su alcance por nodo y por la estructura
+activa (un supervisor de un área no ve los números de otra).
+
+**Importante.** Todos los números son **derivados en vivo** al momento de consultar (no hay tareas en segundo plano ni cifras
+"congeladas"). «Estancadas» (permanencia excedida en un estado) es **distinto** de «Plazo vencido» (venció el `dueAt` o una
+actividad del plan): son dos alertas independientes, igual que en el "vigía" (SLA). La distribución **por estado** usa los estados
+reales del flujo configurado (no hay estados fijos escritos a mano), por eso refleja tu configuración de workflow. Las fechas y
+números se muestran en tu **formato regional** y la agrupación temporal usa la **zona horaria de la planta**.
 
 ---
 

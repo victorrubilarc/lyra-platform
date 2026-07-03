@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { ClipboardList, Plus, Search, Tags, Users } from "lucide-react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { BarChart3, ClipboardList, Plus, Search, Tags, Users } from "lucide-react";
 import type { WorkOrderListQuery } from "@lyra/contracts";
 import { Button, Card, EmptyState, GridPager, Input, Select, Spinner } from "@lyra/ui";
 import { usePermissions } from "../../auth/use-permissions.js";
@@ -14,6 +14,16 @@ type FlagKey = "" | "mine" | "unassignedOnly" | "requiresPtw";
 export function WorkOrdersPage() {
   const { can } = usePermissions();
   const navigate = useNavigate();
+  // Siembra de filtros desde la URL (drill-down desde el Dashboard de OT): el rango y la
+  // dimensión clicada llegan por querystring y quedan reflejados en la barra de filtros.
+  const [params] = useSearchParams();
+  const FLAG_KEYS = ["mine", "unassignedOnly", "requiresPtw"] as const;
+  const initialFlag = (FLAG_KEYS.find((k) => params.get(k) === "true") ?? "") as FlagKey;
+  const passCreatedFrom = params.get("createdFrom") ?? undefined;
+  const passCreatedTo = params.get("createdTo") ?? undefined;
+  const passOrgNodeIds = params.get("orgNodeIds") ?? undefined;
+  const passOriginType = (params.get("originType") ?? undefined) as WorkOrderListQuery["originType"] | undefined;
+  const passEquipmentId = params.get("equipmentId") ?? undefined;
   // Recordar la ÚLTIMA OT consultada: al volver del detalle se resalta su fila y se
   // hace scroll a ella, para saber "dónde estabas" (sobrevive el desmontaje de la lista).
   const [lastViewed, setLastViewed] = useState<string | null>(() => sessionStorage.getItem("wo:lastViewed"));
@@ -28,14 +38,21 @@ export function WorkOrdersPage() {
 
   const [search, setSearch] = useState("");
   // Sin filtro por defecto: desde S2 la solicitud NACE en borrador (DRAFT) y debe
-  // verse recién creada; "OPEN" como default la ocultaría.
-  const [lifecycle, setLifecycle] = useState<WorkOrderListQuery["lifecycle"] | "">("");
-  const [typeId, setTypeId] = useState("");
-  const [criticality, setCriticality] = useState("");
-  const [priority, setPriority] = useState<WorkOrderListQuery["priority"] | "">("");
-  const [specialtyId, setSpecialtyId] = useState("");
-  const [slaStatus, setSlaStatus] = useState<WorkOrderListQuery["slaStatus"] | "">("");
-  const [flag, setFlag] = useState<FlagKey>("");
+  // verse recién creada; "OPEN" como default la ocultaría. Si llega un rango del
+  // drill-down (createdFrom), no se fuerza lifecycle (se muestran todas).
+  const [lifecycle, setLifecycle] = useState<WorkOrderListQuery["lifecycle"] | "">(
+    (params.get("lifecycle") as WorkOrderListQuery["lifecycle"] | null) ?? "",
+  );
+  const [typeId, setTypeId] = useState(params.get("typeId") ?? "");
+  const [criticality, setCriticality] = useState(params.get("criticality") ?? "");
+  const [priority, setPriority] = useState<WorkOrderListQuery["priority"] | "">(
+    (params.get("priority") as WorkOrderListQuery["priority"] | null) ?? "",
+  );
+  const [specialtyId, setSpecialtyId] = useState(params.get("specialtyId") ?? "");
+  const [slaStatus, setSlaStatus] = useState<WorkOrderListQuery["slaStatus"] | "">(
+    (params.get("slaStatus") as WorkOrderListQuery["slaStatus"] | null) ?? "",
+  );
+  const [flag, setFlag] = useState<FlagKey>(initialFlag);
   const [sort, setSort] = useState<WorkOrderListQuery["sort"]>("recent");
 
   const query: WorkOrderListQuery = useMemo(
@@ -47,12 +64,19 @@ export function WorkOrdersPage() {
       priority: priority || undefined,
       specialtyId: specialtyId || undefined,
       slaStatus: slaStatus || undefined,
+      // Pass-through del drill-down (no tienen control propio en la barra): rango de
+      // creación, nodo, origen y equipo llegan por URL desde el Dashboard.
+      originType: passOriginType || undefined,
+      equipmentId: passEquipmentId || undefined,
+      orgNodeIds: passOrgNodeIds ? passOrgNodeIds.split(",").filter(Boolean) : undefined,
+      createdFrom: passCreatedFrom ? new Date(passCreatedFrom) : undefined,
+      createdTo: passCreatedTo ? new Date(passCreatedTo) : undefined,
       sort,
       ...(flag ? { [flag]: true } : {}),
       page,
       pageSize,
     }),
-    [search, lifecycle, typeId, criticality, priority, specialtyId, slaStatus, sort, flag, page, pageSize],
+    [search, lifecycle, typeId, criticality, priority, specialtyId, slaStatus, passOriginType, passEquipmentId, passOrgNodeIds, passCreatedFrom, passCreatedTo, sort, flag, page, pageSize],
   );
   /** Aplica una faceta del vigía: acota a ABIERTAS + el estado SLA, y ordena por plazo. */
   const applySla = (s: NonNullable<WorkOrderListQuery["slaStatus"]>) => {
@@ -76,6 +100,9 @@ export function WorkOrdersPage() {
           <p className={styles.sub}>Solicitudes de trabajo y permisos de trabajo (PTW).</p>
         </div>
         <div className={styles.headerActions}>
+          <Link to="/ordenes-trabajo/dashboard">
+            <Button variant="secondary" leftIcon={<BarChart3 size={16} />}>Dashboard</Button>
+          </Link>
           {can("worker:manage") && (
             <Link to="/ordenes-trabajo/personas">
               <Button variant="secondary" leftIcon={<Users size={16} />}>Personas</Button>

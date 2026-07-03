@@ -25,6 +25,7 @@ import type {
   UpsertPersonCompetencyRequest,
   UpsertPersonRestrictionRequest,
   UpsertWorkOrderCompetencyRuleRequest,
+  WorkOrderDashboardQuery,
   WorkOrderListQuery,
 } from "@lyra/contracts";
 import {
@@ -45,6 +46,7 @@ import {
   fetchWorkOrderEquipmentOptions,
   fetchWorkOrderSpecialties,
   fetchWorkOrderStats,
+  fetchWorkOrderDashboard,
   fetchWorkOrderTypes,
   fetchWorkOrders,
   instantiateWorkOrderChecklist,
@@ -95,9 +97,15 @@ export const WORK_ORDER_KEYS = {
   list: (q: WorkOrderListQuery, structureId: string | null) => ["work-orders", "list", q, structureId] as const,
   detail: (id: string) => ["work-orders", "detail", id] as const,
   stats: (structureId: string | null) => ["work-orders", "stats", structureId] as const,
+  dashboard: (q: WorkOrderDashboardQuery, structureId: string | null) => ["work-orders", "dashboard", q, structureId] as const,
   types: () => ["work-orders", "types"] as const,
   specialties: () => ["work-orders", "specialties"] as const,
 };
+
+export function useWorkOrderDashboard(q: WorkOrderDashboardQuery) {
+  const structureId = useActiveStructureId();
+  return useQuery({ queryKey: WORK_ORDER_KEYS.dashboard(q, structureId), queryFn: () => fetchWorkOrderDashboard(q, structureId) });
+}
 
 export function useWorkOrders(q: WorkOrderListQuery) {
   const structureId = useActiveStructureId();
