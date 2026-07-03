@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Building2, Pencil, Plus, Trash2, UserPlus, Users } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Building2, Pencil, Plus, Trash2, UserPlus, Users } from "lucide-react";
 import {
   ACCREDITATION_STATUS_META,
   PERSON_KIND_META,
@@ -19,6 +19,7 @@ import {
   useUpsertContractorCompany,
   useUpsertPerson,
 } from "./work-orders-queries.js";
+import { PersonCompetenciesModal } from "./PersonCompetenciesModal.js";
 import styles from "./persons.module.css";
 
 /**
@@ -64,6 +65,7 @@ function PersonsSection({ canManage }: { canManage: boolean }) {
   const { data: persons = [], isLoading } = usePersons({ search: search.trim() || undefined, kind: kind || undefined, includeInactive: true });
   const del = useDeletePerson();
   const [editing, setEditing] = useState<PersonDto | null | "new">(null);
+  const [competencyOf, setCompetencyOf] = useState<PersonDto | null>(null);
 
   return (
     <>
@@ -100,6 +102,7 @@ function PersonsSection({ canManage }: { canManage: boolean }) {
                 {canManage && (
                   <td>
                     <div className={styles.rowActions}>
+                      <Button variant="secondary" leftIcon={<BadgeCheck size={13} />} onClick={() => setCompetencyOf(p)}>Competencias</Button>
                       <Button variant="secondary" leftIcon={<Pencil size={13} />} onClick={() => setEditing(p)}>Editar</Button>
                       <Button variant="secondary" leftIcon={<Trash2 size={13} />} onClick={() => del.mutate(p.id, { onSuccess: () => toast.success("Persona eliminada"), onError: (e) => toast.error((e as Error).message) })}>Eliminar</Button>
                     </div>
@@ -112,6 +115,7 @@ function PersonsSection({ canManage }: { canManage: boolean }) {
       </div>
 
       {editing && <PersonModal person={editing === "new" ? null : editing} onClose={() => setEditing(null)} />}
+      {competencyOf && <PersonCompetenciesModal person={competencyOf} onClose={() => setCompetencyOf(null)} />}
     </>
   );
 }

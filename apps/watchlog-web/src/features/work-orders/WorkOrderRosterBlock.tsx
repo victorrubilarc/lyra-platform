@@ -2,14 +2,15 @@ import { useMemo, useState } from "react";
 import { HardHat, Lock, Plus, ShieldAlert, ShieldCheck, Trash2, UserCheck, Users } from "lucide-react";
 import {
   PERSON_KIND_META,
-  WORKER_BLOCK_REASON_META,
+  type WorkerStatusDetail,
   type WorkerStatusLevel,
   type WorkOrderDetail,
+  type WorkOrderRosterDto,
   type WorkOrderWorkerDto,
 } from "@lyra/contracts";
 import { Button, Combobox, Input, Modal, Select, useToast } from "@lyra/ui";
 import { usePermissions } from "../../auth/use-permissions.js";
-import { formatDateTime } from "../../lib/format.js";
+import { formatDate, formatDateTime } from "../../lib/format.js";
 import { usePersons, useWorkOrderRoster, useAddWorkOrderWorker, useConfirmWorkOrderRoster, useRemoveWorkOrderWorker } from "./work-orders-queries.js";
 import styles from "./work-orders.module.css";
 
@@ -19,13 +20,36 @@ const STATUS_META: Record<WorkerStatusLevel, { color: string; label: string }> =
   blocked: { color: "var(--color-error)", label: "Con impedimentos" },
 };
 
+/** Redacta en español un detalle del semáforo (§6.2: qué le falta a quién). */
+function describeDetail(d: WorkerStatusDetail): string {
+  const name = d.competencyTypeName ?? "competencia requerida";
+  switch (d.reason) {
+    case "COMPETENCY_MISSING":
+      return `Falta «${name}»`;
+    case "COMPETENCY_EXPIRED":
+      return `«${name}» vencida${d.expiresAt ? ` el ${formatDate(d.expiresAt)}` : ""}`;
+    case "COMPETENCY_EXPIRING":
+      return `«${name}» por vencer${d.expiresAt ? ` el ${formatDate(d.expiresAt)}` : ""}`;
+    case "RESTRICTION_ACTIVE":
+      return `Restricción activa${d.restrictionReason ? `: ${d.restrictionReason}` : ""}`;
+    case "NOT_AUTHORIZED":
+      return "Persona no autorizada/designada";
+    case "COMPANY_NOT_ACCREDITED":
+      return "Empresa contratista no acreditada";
+    case "ROLE_MISSING":
+      return "Falta un rol requerido en la dotación";
+    default:
+      return "Impedimento";
+  }
+}
+
 /**
- * Pestaña DOTACIÓN de una OT (S1). Muestra el ROSTER de personas que ingresarán a
- * ejecutar el permiso, con su ROL y su SEMÁFORO por persona; permite curar (agregar/
- * quitar) y CONFIRMAR (firmar) la dotación = gate para autorizar el permiso (Gobierno 2).
- * Solo se muestra si el tipo de la OT gestiona dotación (`roster.enabled`). Traza OSHA
- * 1910.146(f)(4)-(6) + (e)(2). En S1 el semáforo siempre es "Habilitada" (competencias/
- * veto/acreditación = S2/S3).
+ * Pestaña DOTACIÓN de una OT. Muestra el ROSTER de personas que ingresarán a ejecutar el
+ * permiso, con su ROL y su SEMÁFORO por persona (S2: causas rojas de competencia/veto
+ * derivadas en vivo); permite curar (agregar/quitar) y CONFIRMAR (firmar) la dotación =
+ * gate para autorizar el permiso (Gobierno 2). Si hay personas en ROJO, la confirmación
+ * exige un override firmado POR PERSONA (§6.3). Solo se muestra si el tipo gestiona
+ * dotación. Traza OSHA 1910.146(f)(4)-(6) + (e)(2); ISO 45001 §7.2.
  */
 export function WorkOrderRosterBlock({ wo, isLive }: { wo: WorkOrderDetail; isLive: boolean }) {
   const workOrderId = wo.id;
@@ -59,7 +83,11 @@ export function WorkOrderRosterBlock({ wo, isLive }: { wo: WorkOrderDetail; isLi
         ) : (
           <div className={styles.planBannerWarn}>
             <ShieldAlert size={15} />
-            <span style={{ flex: 1 }}>Revisa y confirma la dotación que ingresará antes de autorizar el permiso.</span>
+            <span style={{ flex: 1 }}>
+              {roster.hasBlocked
+                ? "Hay personas con impedimentos. Resuélvelos o registra una justificación firmada por persona antes de autorizar el permiso."
+                : "Revisa y confirma la dotación que ingresará antes de autorizar el permiso."}
+            </span>
             <Button variant="primary" leftIcon={<Lock size={14} />} disabled={roster.workers.length === 0}
               title={roster.workers.length === 0 ? "Agrega al menos una persona" : undefined}
               onClick={() => setConfirmOpen(true)}>
@@ -82,7 +110,7 @@ export function WorkOrderRosterBlock({ wo, isLive }: { wo: WorkOrderDetail; isLi
       )}
 
       {confirmOpen && (
-        <ConfirmRosterModal workOrderId={workOrderId} count={roster.workers.length} onClose={() => setConfirmOpen(false)} />
+        <ConfirmRosterModal workOrderId={workOrderId} roster={roster} onClose={() => setConfirmOpen(false)} />
       )}
     </>
   );
@@ -102,10 +130,17 @@ function RosterItem({ worker, canManage, onRemove }: { worker: WorkOrderWorkerDt
           <span className={styles.rosterKind}>{PERSON_KIND_META[worker.personKind].label}{worker.contractorCompanyName ? ` · ${worker.contractorCompanyName}` : ""}</span>
           <span className={styles.rosterStatus} style={{ color: status.color, marginLeft: "auto" }}>{status.label}</span>
         </div>
-        {worker.status.reasons.length > 0 && (
+        {worker.status.details.length > 0 && (
           <ul className={styles.rosterReasons}>
-            {worker.status.reasons.map((r) => <li key={r}>{WORKER_BLOCK_REASON_META[r].label}</li>)}
+            {worker.status.details.map((d, i) => (
+              <li key={i} style={{ color: d.reason === "COMPETENCY_EXPIRING" ? "var(--color-warning)" : undefined }}>{describeDetail(d)}</li>
+            ))}
           </ul>
+        )}
+        {worker.override && (
+          <p className={styles.rosterOverride}>
+            <ShieldAlert size={12} /> Autorizada con excepción firmada{worker.override.byName ? ` por ${worker.override.byName}` : ""}: {worker.override.reason}
+          </p>
         )}
         {worker.note && <p className={styles.rosterNote}>{worker.note}</p>}
       </div>
@@ -148,26 +183,59 @@ function AddWorkerRow({ roster, onAdd, pending }: { roster: { workers: WorkOrder
   );
 }
 
-/** Modal de CONFIRMACIÓN con FIRMA Part 11 (re-autenticación del aprobador). */
-function ConfirmRosterModal({ workOrderId, count, onClose }: { workOrderId: string; count: number; onClose: () => void }) {
+/**
+ * Modal de CONFIRMACIÓN con FIRMA Part 11. Si hay personas en ROJO exige un motivo
+ * (override) POR PERSONA — una sola firma cubre todo el acto (§6.3, decisión S2-B).
+ */
+function ConfirmRosterModal({ workOrderId, roster, onClose }: { workOrderId: string; roster: WorkOrderRosterDto; onClose: () => void }) {
   const toast = useToast();
   const confirm = useConfirmWorkOrderRoster(workOrderId);
   const [password, setPassword] = useState("");
   const [mfaCode, setMfaCode] = useState("");
+  const [reasons, setReasons] = useState<Record<string, string>>({});
+
+  const blocked = roster.workers.filter((w) => w.status.level === "blocked");
+  const allReasonsFilled = blocked.every((w) => (reasons[w.id] ?? "").trim().length > 0);
+  const canSubmit = password.length > 0 && allReasonsFilled;
+
   const submit = () =>
     confirm.mutate(
-      { password, mfaCode: mfaCode.trim() || undefined },
-      { onSuccess: () => { toast.success("Dotación confirmada y firmada"); onClose(); }, onError: (e) => toast.error((e as Error).message) },
+      {
+        password,
+        mfaCode: mfaCode.trim() || undefined,
+        overrides: blocked.length > 0 ? blocked.map((w) => ({ workerId: w.id, reason: (reasons[w.id] ?? "").trim() })) : undefined,
+      },
+      { onSuccess: () => { toast.success(blocked.length > 0 ? "Dotación confirmada con excepción(es) firmada(s)" : "Dotación confirmada y firmada"); onClose(); }, onError: (e) => toast.error((e as Error).message) },
     );
+
   return (
-    <Modal open onClose={onClose} title="Confirmar y firmar la dotación" size="sm" footer={
+    <Modal open onClose={onClose} title="Confirmar y firmar la dotación" size={blocked.length > 0 ? "md" : "sm"} footer={
       <>
         <Button variant="secondary" onClick={onClose}>Cancelar</Button>
-        <Button variant="primary" leftIcon={<ShieldCheck size={15} />} loading={confirm.isPending} disabled={password.length === 0} onClick={submit}>Confirmar y firmar</Button>
+        <Button variant="primary" leftIcon={<ShieldCheck size={15} />} loading={confirm.isPending} disabled={!canSubmit} onClick={submit}>
+          {blocked.length > 0 ? "Autorizar con excepción y firmar" : "Confirmar y firmar"}
+        </Button>
       </>
     }>
       <div className={styles.modalBody}>
-        <p className={styles.muted}>Confirmas que las {count} persona(s) listadas están autorizadas a ingresar a ejecutar este permiso. Quien ingresa = quien fue autorizado.</p>
+        <p className={styles.muted}>
+          Confirmas que las {roster.workers.length} persona(s) listadas están autorizadas a ingresar a ejecutar este permiso. Quien ingresa = quien fue autorizado.
+        </p>
+
+        {blocked.length > 0 && (
+          <div className={styles.overrideBox}>
+            <div className={styles.signTitle}><ShieldAlert size={14} /> {blocked.length} persona(s) con impedimentos: justifica cada excepción</div>
+            {blocked.map((w) => (
+              <label key={w.id} className={styles.field}>
+                <span className={styles.fieldLabel}>
+                  {w.personName} — {w.status.details.filter((d) => d.reason !== "COMPETENCY_EXPIRING").map(describeDetail).join(", ")}
+                </span>
+                <Input value={reasons[w.id] ?? ""} onChange={(e) => setReasons((r) => ({ ...r, [w.id]: e.target.value }))} placeholder="Motivo del riesgo aceptado / medida compensatoria…" />
+              </label>
+            ))}
+          </div>
+        )}
+
         <div className={styles.signBox}>
           <div className={styles.signTitle}><ShieldCheck size={14} /> Firma electrónica requerida: autorización de la dotación</div>
           <label className={styles.field}>

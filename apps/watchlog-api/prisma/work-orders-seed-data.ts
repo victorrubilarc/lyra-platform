@@ -290,3 +290,44 @@ export const ROSTER_ROLES: RosterRoleSeed[] = [
     sortOrder: 30,
   },
 ];
+
+// === DOTACIÓN S2: catálogo de competencias + reglas de requisito ==============
+
+export interface CompetencyTypeSeed {
+  key: string;
+  name: string;
+  description: string;
+  category: "CERTIFICATION" | "TRAINING" | "MEDICAL_EXAM" | "INDUCTION" | "LICENSE";
+  defaultValidityDays: number | null;
+  requiresExpiry: boolean;
+  warningLeadDays: number | null;
+  sortOrder: number;
+}
+
+/** Competencias estándar de arranque (configurables). Traza: ISO 45001 §7.2 + Chile. */
+export const COMPETENCY_TYPES: CompetencyTypeSeed[] = [
+  { key: "trabajo_altura", name: "Trabajo en altura", description: "Certificación para trabajos sobre 1,8 m con riesgo de caída.", category: "CERTIFICATION", defaultValidityDays: 365, requiresExpiry: true, warningLeadDays: 30, sortOrder: 10 },
+  { key: "espacio_confinado", name: "Espacio confinado — entrante", description: "Habilitación para ingreso a espacios confinados (OSHA 1910.146).", category: "CERTIFICATION", defaultValidityDays: 365, requiresExpiry: true, warningLeadDays: 30, sortOrder: 20 },
+  { key: "loto", name: "Bloqueo y etiquetado (LOTO)", description: "Formación en aislación de energías peligrosas (OSHA 1910.147).", category: "TRAINING", defaultValidityDays: 730, requiresExpiry: true, warningLeadDays: 45, sortOrder: 30 },
+  { key: "examen_preocupacional", name: "Examen preocupacional vigente", description: "Vigilancia de salud ocupacional (Ley 16.744 art.71).", category: "MEDICAL_EXAM", defaultValidityDays: 365, requiresExpiry: true, warningLeadDays: 30, sortOrder: 40 },
+  { key: "induccion_faena", name: "Inducción de faena (ODI)", description: "Curso básico de inducción / derecho a saber (DS 44 art.15; DS 132).", category: "INDUCTION", defaultValidityDays: 365, requiresExpiry: true, warningLeadDays: 30, sortOrder: 50 },
+];
+
+export interface CompetencyRuleSeed {
+  name: string;
+  competencyTypeKey: string;
+  mandatory: boolean;
+  appliesToTypeKeys: string[]; // vacío = todos los tipos
+  minCriticality: number | null;
+  requiresPtw: boolean | null;
+  appliesToRosterRoleKey: string | null; // null = a toda la dotación
+  sortOrder: number;
+}
+
+/** Reglas de requisito de arranque (data-driven; espejo de las reglas de checklist). */
+export const COMPETENCY_RULES: CompetencyRuleSeed[] = [
+  // Toda persona que ingresa bajo un permiso PTW debe tener inducción de faena vigente.
+  { name: "Inducción de faena vigente (PTW)", competencyTypeKey: "induccion_faena", mandatory: true, appliesToTypeKeys: [], minCriticality: null, requiresPtw: true, appliesToRosterRoleKey: null, sortOrder: 10 },
+  // El ejecutante autorizado de un permiso de alto riesgo requiere examen preocupacional vigente.
+  { name: "Examen preocupacional del ejecutante (alto riesgo)", competencyTypeKey: "examen_preocupacional", mandatory: true, appliesToTypeKeys: [], minCriticality: 4, requiresPtw: true, appliesToRosterRoleKey: "authorized_entrant", sortOrder: 20 },
+];

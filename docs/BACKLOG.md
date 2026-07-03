@@ -5,16 +5,22 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-07-03** — **👷 Dotación del permiso · DISEÑO + Slice 1 (MVP) ✅** (`feat/dotacion-permiso-s1`):
+> actualización: **2026-07-03** — **👷 Dotación del permiso · Slice 2 (competencias con vigencia) ✅** (`feat/dotacion-competencias-s2`):
+> hace REAL el semáforo (S1 era siempre verde). Entidades `CompetencyType`/`PersonCompetency`(renovar=registro nuevo)/`PersonRestriction`(veto)/
+> `WorkOrderCompetencyRule`(espejo de checklist + `appliesToRosterRoleId`) (migr. `20260703120000`). Funciones puras `applicableCompetencyRules`+
+> `deriveWorkerReasons` (Ejes A/B separados); semáforo derivado EN VIVO; gate/**override firmado POR PERSONA** en `confirmRoster`; avisos
+> `worker.competency.expiring`/`.expired` (Bloque N, clon `WorkerComplianceService`). **CERO permiso nuevo/FLUSHALL**. Web: panel competencias/
+> restricciones por persona + catálogos CompetencyType/reglas + semáforo real + modal override. contracts **488** (roster.spec 21) + **smoke-dotacion
+> 39/39** + regresión workorders 122/122 + incidencias 32/32. **COMPANY_NOT_ACCREDITED diferida a S3** (S2-A); completitud de roles diferida (S2-D).
+> **ROADMAP dotación (abierto): S3** = acreditación de contratistas (gate por `accreditationStatus`/`accreditedUntil`). **S4** = control de acceso/T&A.
+> Pendiente: **smoke VISUAL (dueño)**. — Sesión previa: **👷 Dotación del permiso · DISEÑO + Slice 1 (MVP) ✅** (`feat/dotacion-permiso-s1`):
 > personas propias/contratistas que ingresan a ejecutar + confirmación FIRMADA (Gobierno 2) por el aprobador. Diseño citado en
 > `docs/design/DOTACION_DESIGN_ARCHITECTURE.md`. Entidades `Person`(≠User)/`ContractorCompany`/`RosterRole`(3 OSHA)/`WorkOrderWorker`
 > + `WorkOrder.rosterConfirmedAt/ById` + `WorkOrderType.rosterEnabled` (migr. `20260703000000`). `confirmRoster`(firma Part 11)/
 > `clearRosterConfirmation`(auto-limpieza)/`assertRosterConfirmed`(gate ANTES de checklists). Permisos `worker:manage` +
 > `workorder:roster:manage` (104). Web: catálogo `/ordenes-trabajo/personas` + pestaña «Dotación» + toggle en el tipo. verde +
-> roster.spec 8/8 + **smoke-dotacion 26/26** + regresión workorders 122/122 + incidencias 32/32. **ROADMAP dotación (abierto):**
-> **S2** = competencias/certificaciones con vigencia + `WorkOrderCompetencyRule` (data-driven) + `PersonRestriction` (veto) +
-> semáforo con causas ROJAS (ejes competencia/autorización) + gate/override firmado POR PERSONA + avisos de vencimiento (Bloque N,
-> traza ISN 90 días). **S3** = acreditación de contratistas (gate por `accreditationStatus`/`accreditedUntil`). **S4** = integración
+> roster.spec 8/8 + **smoke-dotacion 26/26** + regresión workorders 122/122 + incidencias 32/32. **ROADMAP dotación:**
+> **S2 ✅ HECHO** (`feat/dotacion-competencias-s2`, ver arriba). **S3** = acreditación de contratistas (gate por `accreditationStatus`/`accreditedUntil`). **S4** = integración
 > control de acceso/T&A tras interfaz abstracta (on-prem). Pendiente: **smoke VISUAL (dueño)**. Antes:
 > **🔧 OT · Sesión 6 · SLA, avisos de plazo, escalamiento y semáforos ("vigía digital") ✅**
 > (`feat/ot-sla-semaforos`): ESPEJO de la Fase 4.4 de Incidencias. **SIN migración** (columnas SLA del `WorkOrderType`,

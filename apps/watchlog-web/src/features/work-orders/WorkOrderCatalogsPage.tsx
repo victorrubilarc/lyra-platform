@@ -1,10 +1,14 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, ClipboardCheck, Lock, Pencil, Plus, Search, Tags, Trash2 } from "lucide-react";
-import { WORK_ORDER_CHECKLIST_MOMENT_META, type SpecialtyDto, type WorkOrderChecklistRuleDto, type WorkOrderTypeDto } from "@lyra/contracts";
+import { ArrowLeft, BadgeCheck, ClipboardCheck, Lock, Pencil, Plus, Search, Tags, Trash2 } from "lucide-react";
+import { COMPETENCY_CATEGORY_META, DEFAULT_COMPETENCY_WARNING_LEAD_DAYS, WORK_ORDER_CHECKLIST_MOMENT_META, type CompetencyTypeDto, type SpecialtyDto, type WorkOrderChecklistRuleDto, type WorkOrderCompetencyRuleDto, type WorkOrderTypeDto } from "@lyra/contracts";
 import { Button, Chip, EmptyState, GridPager, Input, Select, Spinner, Toggle, useToast } from "@lyra/ui";
 import { usePermissions } from "../../auth/use-permissions.js";
 import {
+  useCompetencyRules,
+  useCompetencyTypes,
+  useDeleteCompetencyRule,
+  useDeleteCompetencyType,
   useDeleteWorkOrderChecklistRule,
   useUpsertWorkOrderSpecialty,
   useUpsertWorkOrderType,
@@ -15,6 +19,8 @@ import {
 import { WorkOrderTypeModal } from "./WorkOrderTypeModal.js";
 import { WorkOrderTagModal } from "./WorkOrderTagModal.js";
 import { WorkOrderChecklistRuleModal } from "./WorkOrderChecklistRuleModal.js";
+import { CompetencyTypeModal } from "./CompetencyTypeModal.js";
+import { WorkOrderCompetencyRuleModal } from "./WorkOrderCompetencyRuleModal.js";
 import { criticalityLabel } from "./work-orders-presentation.js";
 import styles from "./catalogs.module.css";
 
@@ -28,7 +34,7 @@ type Row = { name: string; key: string; active: boolean; sortOrder: number };
  */
 export function WorkOrderCatalogsPage() {
   const { can } = usePermissions();
-  const [tab, setTab] = useState<"types" | "specialties" | "checklists">("types");
+  const [tab, setTab] = useState<"types" | "specialties" | "checklists" | "competencyTypes" | "competencyRules">("types");
 
   if (!can("workordercatalog:manage")) {
     return (
@@ -52,9 +58,11 @@ export function WorkOrderCatalogsPage() {
         <button role="tab" aria-selected={tab === "types"} className={tab === "types" ? styles.tabActive : styles.tab} onClick={() => setTab("types")}>Tipos</button>
         <button role="tab" aria-selected={tab === "specialties"} className={tab === "specialties" ? styles.tabActive : styles.tab} onClick={() => setTab("specialties")}>Especialidades</button>
         <button role="tab" aria-selected={tab === "checklists"} className={tab === "checklists" ? styles.tabActive : styles.tab} onClick={() => setTab("checklists")}>Reglas de checklist</button>
+        <button role="tab" aria-selected={tab === "competencyTypes"} className={tab === "competencyTypes" ? styles.tabActive : styles.tab} onClick={() => setTab("competencyTypes")}>Competencias</button>
+        <button role="tab" aria-selected={tab === "competencyRules"} className={tab === "competencyRules" ? styles.tabActive : styles.tab} onClick={() => setTab("competencyRules")}>Reglas de competencia</button>
       </div>
 
-      {tab === "types" ? <TypesTab /> : tab === "specialties" ? <SpecialtiesTab /> : <ChecklistRulesTab />}
+      {tab === "types" ? <TypesTab /> : tab === "specialties" ? <SpecialtiesTab /> : tab === "checklists" ? <ChecklistRulesTab /> : tab === "competencyTypes" ? <CompetencyTypesTab /> : <CompetencyRulesTab />}
     </div>
   );
 }
@@ -330,6 +338,149 @@ function ChecklistRulesTab() {
         )}
 
       <WorkOrderChecklistRuleModal open={open} onClose={() => setOpen(false)} rule={editing} />
+    </>
+  );
+}
+
+/** Catálogo de tipos de COMPETENCIA (S2): qué certificación/formación existe. */
+function CompetencyTypesTab() {
+  const toast = useToast();
+  const { data: rows = [], isLoading } = useCompetencyTypes(true);
+  const del = useDeleteCompetencyType();
+  const [editing, setEditing] = useState<CompetencyTypeDto | null>(null);
+  const [open, setOpen] = useState(false);
+
+  const { pageRows, total, filterProps, pagerProps } = useCatalogFilter(rows);
+  const pager = <GridPager {...pagerProps} />;
+
+  function removeType(t: CompetencyTypeDto) {
+    if (!window.confirm(`¿Eliminar el tipo de competencia "${t.name}"? Las competencias ya registradas y las reglas que lo usan se conservan.`)) return;
+    del.mutate(t.id, { onSuccess: () => toast.success("Tipo de competencia eliminado"), onError: (e) => toast.error((e as Error).message) });
+  }
+
+  return (
+    <>
+      <div className={styles.toolbar}>
+        <Filters {...filterProps} />
+        <Button variant="primary" leftIcon={<Plus size={16} />} onClick={() => { setEditing(null); setOpen(true); }}>Nueva competencia</Button>
+      </div>
+
+      {isLoading ? <div className={styles.center}><Spinner /></div>
+        : total === 0 ? <EmptyState icon={<BadgeCheck size={32} />} title="Sin tipos de competencia" description="Crea las certificaciones/formaciones que exiges a la dotación (trabajo en altura, LOTO, inducción…)." />
+        : (
+          <>
+            {pager}
+            <div className={styles.tableCard}>
+              <table className={styles.table}>
+                <thead><tr>
+                  <th>Competencia</th><th>Clave</th><th>Categoría</th><th>Vigencia típica</th><th>Aviso previo</th><th className={styles.num}>Orden</th><th>Estado</th><th></th>
+                </tr></thead>
+                <tbody>
+                  {pageRows.map((t) => (
+                    <tr key={t.id} className={t.active ? undefined : styles.inactiveRow}>
+                      <td>
+                        <span className={styles.nameCell}>{t.name}</span>
+                        {t.description && <div className={styles.cellDesc}>{t.description}</div>}
+                      </td>
+                      <td><span className={styles.mono}>{t.key}</span></td>
+                      <td><Chip label={COMPETENCY_CATEGORY_META[t.category].label} /></td>
+                      <td>{t.requiresExpiry ? (t.defaultValidityDays != null ? `${t.defaultValidityDays} días` : <span className={styles.muted}>—</span>) : <span className={styles.muted}>Sin vencimiento</span>}</td>
+                      <td>{t.requiresExpiry ? `${t.warningLeadDays ?? DEFAULT_COMPETENCY_WARNING_LEAD_DAYS} días` : <span className={styles.muted}>—</span>}</td>
+                      <td className={styles.num}>{t.sortOrder}</td>
+                      <td><span className={styles.muted}>{t.active ? "Activa" : "Inactiva"}</span></td>
+                      <td className={styles.actionsCell}>
+                        <Button variant="icon" aria-label="Editar" onClick={() => { setEditing(t); setOpen(true); }}><Pencil size={16} /></Button>
+                        <Button variant="icon" aria-label="Eliminar" onClick={() => removeType(t)}><Trash2 size={16} /></Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {pager}
+          </>
+        )}
+
+      <CompetencyTypeModal open={open} onClose={() => setOpen(false)} type={editing} />
+    </>
+  );
+}
+
+/** Reglas de REQUISITO de competencia (S2): qué competencia se exige, a quién, cuándo. */
+function CompetencyRulesTab() {
+  const toast = useToast();
+  const { data: rules = [], isLoading } = useCompetencyRules();
+  const del = useDeleteCompetencyRule();
+  const [editing, setEditing] = useState<WorkOrderCompetencyRuleDto | null>(null);
+  const [open, setOpen] = useState(false);
+
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(25);
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return rules.filter((r) => !q || r.name.toLowerCase().includes(q) || (r.competencyTypeName ?? "").toLowerCase().includes(q));
+  }, [rules, search]);
+  const total = filtered.length;
+  const pageRows = filtered.slice(page * pageSize, page * pageSize + pageSize);
+  const pager = <GridPager page={page} pages={Math.max(1, Math.ceil(total / pageSize))} total={total} pageSize={pageSize} onPage={setPage} onPageSize={(n) => { setPageSize(n); setPage(0); }} />;
+
+  function removeRule(r: WorkOrderCompetencyRuleDto) {
+    if (!window.confirm(`¿Eliminar la regla "${r.name}"?`)) return;
+    del.mutate(r.id, { onSuccess: () => toast.success("Regla eliminada"), onError: (e) => toast.error((e as Error).message) });
+  }
+
+  return (
+    <>
+      <div className={styles.toolbar}>
+        <div className={styles.filters}>
+          <div className={styles.searchBox}>
+            <Search size={15} className={styles.searchIcon} />
+            <Input value={search} onChange={(e) => { setSearch(e.target.value); setPage(0); }} placeholder="Buscar por nombre o competencia…" />
+          </div>
+        </div>
+        <Button variant="primary" leftIcon={<Plus size={16} />} onClick={() => { setEditing(null); setOpen(true); }}>Nueva regla</Button>
+      </div>
+
+      {isLoading ? <div className={styles.center}><Spinner /></div>
+        : total === 0 ? <EmptyState icon={<ClipboardCheck size={32} />} title="Sin reglas de competencia" description="Crea una regla para exigir una competencia vigente a la dotación (a un tipo de OT, criticidad o rol)." />
+        : (
+          <>
+            {pager}
+            <div className={styles.tableCard}>
+              <table className={styles.table}>
+                <thead><tr>
+                  <th>Regla</th><th>Competencia</th><th>Aplica a</th><th>Rol</th><th>Obligatorio</th><th className={styles.num}>Orden</th><th>Estado</th><th></th>
+                </tr></thead>
+                <tbody>
+                  {pageRows.map((r) => (
+                    <tr key={r.id} className={r.active ? undefined : styles.inactiveRow}>
+                      <td><span className={styles.nameCell}>{r.name}</span></td>
+                      <td>{r.competencyTypeName ?? <span className={styles.muted}>—</span>}</td>
+                      <td>
+                        {r.appliesToTypeNames.length > 0 ? r.appliesToTypeNames.join(", ") : <span className={styles.muted}>Todos los tipos</span>}
+                        {r.minCriticality != null && <div className={styles.cellDesc}>Criticidad ≥ {r.minCriticality}</div>}
+                        {r.specialtyName && <div className={styles.cellDesc}>Especialidad: {r.specialtyName}</div>}
+                        {r.requiresPtw != null && <div className={styles.cellDesc}>{r.requiresPtw ? "Solo PTW" : "Solo sin PTW"}</div>}
+                      </td>
+                      <td>{r.appliesToRosterRoleName ?? <span className={styles.muted}>Toda la dotación</span>}</td>
+                      <td>{r.mandatory ? <Chip label="Obligatorio" variant="warning" /> : <span className={styles.muted}>Opcional</span>}</td>
+                      <td className={styles.num}>{r.sortOrder}</td>
+                      <td><span className={styles.muted}>{r.active ? "Activa" : "Inactiva"}</span></td>
+                      <td className={styles.actionsCell}>
+                        <Button variant="icon" aria-label="Editar" onClick={() => { setEditing(r); setOpen(true); }}><Pencil size={16} /></Button>
+                        <Button variant="icon" aria-label="Eliminar" onClick={() => removeRule(r)}><Trash2 size={16} /></Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {pager}
+          </>
+        )}
+
+      <WorkOrderCompetencyRuleModal open={open} onClose={() => setOpen(false)} rule={editing} />
     </>
   );
 }

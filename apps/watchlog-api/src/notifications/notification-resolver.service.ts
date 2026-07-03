@@ -124,6 +124,12 @@ export class NotificationResolverService {
       case "workorder.activity.overdue":
         resolution = await this.resolveWorkOrderActivityOverdue(payload);
         break;
+      case "worker.competency.expiring":
+        resolution = await this.resolveWorkerCompetency(payload, "expiring");
+        break;
+      case "worker.competency.expired":
+        resolution = await this.resolveWorkerCompetency(payload, "expired");
+        break;
       case "handover.ready":
         resolution = await this.resolveHandoverReady(payload);
         break;
@@ -808,6 +814,44 @@ export class NotificationResolverService {
         "activity.title": activity.title,
         "activity.dueAt": this.formatDateTime(end),
         "activity.overdueBy": this.formatDuration(overdueBy),
+      },
+    };
+  }
+
+  /**
+   * Competencia por vencer/vencida de una persona en el roster de una OT abierta (Dotación
+   * S2). Destinatarios = responsable de la OT + roles del estado actual (ABAC por nodo).
+   * El destinatario "la persona" queda para el futuro (traza ISN). Re-verifica en vivo.
+   */
+  private async resolveWorkerCompetency(payload: Record<string, unknown>, mode: "expiring" | "expired"): Promise<EventResolution | null> {
+    const workOrderId = String(payload.workOrderId ?? "");
+    const competencyId = String(payload.competencyId ?? "");
+    if (!workOrderId || !competencyId) return null;
+    const wo = await this.loadWorkOrderForNotification(workOrderId);
+    if (!wo || wo.lifecycle !== "OPEN") return null;
+    // Re-verificar contra el estado ACTUAL: la competencia sigue existiendo y la persona
+    // sigue en el roster (evita avisar tras renovar/quitar entre el barrido y el envío).
+    const comp = await this.prisma.personCompetency.findFirst({
+      where: { id: competencyId, deletedAt: null },
+      select: { id: true, personId: true, expiresAt: true, competencyType: { select: { name: true } } },
+    });
+    if (!comp || !comp.expiresAt) return null;
+    const expired = comp.expiresAt.getTime() <= Date.now();
+    if (mode === "expired" && !expired) return null;
+    if (mode === "expiring" && expired) return null;
+    const stillOnRoster = await this.prisma.workOrderWorker.count({ where: { workOrderId, personId: comp.personId, removedAt: null } });
+    if (stillOnRoster === 0) return null;
+    const personName = String(payload.personName ?? "");
+    const userIds = await this.workOrderRecipients(wo, { includeStateRoles: true });
+    const minutesTo = Math.round((comp.expiresAt.getTime() - Date.now()) / 60000);
+    return {
+      ...this.baseWorkOrderResolution(wo, workOrderId, userIds),
+      context: {
+        ...this.workOrderContext(wo),
+        "worker.name": personName,
+        "worker.competency": comp.competencyType.name,
+        "worker.expiresAt": this.formatDateTime(comp.expiresAt),
+        "worker.expiresIn": mode === "expiring" ? this.formatDuration(Math.max(0, minutesTo)) : this.formatDuration(Math.max(0, -minutesTo)),
       },
     };
   }

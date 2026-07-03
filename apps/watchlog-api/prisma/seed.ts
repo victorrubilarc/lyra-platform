@@ -23,6 +23,8 @@ import {
   WORK_ORDER_WORKFLOW,
   WORK_ORDER_CHECKLIST_TEMPLATES,
   WORK_ORDER_CHECKLIST_RULES,
+  COMPETENCY_TYPES,
+  COMPETENCY_RULES,
   LEGACY_CHECKLIST_TEMPLATE_NAME,
   LEGACY_CHECKLIST_RULE_NAME,
 } from "./work-orders-seed-data.js";
@@ -705,8 +707,36 @@ async function seedWorkOrderCatalog(): Promise<void> {
       update: { name: r.name, description: r.description, isSupervisorRole: r.isSupervisorRole, mustRemainOutside: r.mustRemainOutside, color: r.color, sortOrder: r.sortOrder },
     });
   }
+  // Catálogo de COMPETENCIAS (S2): tipos + reglas de requisito data-driven. Idempotente.
+  for (const c of COMPETENCY_TYPES) {
+    await prisma.competencyType.upsert({
+      where: { key: c.key },
+      create: { key: c.key, name: c.name, description: c.description, category: c.category, defaultValidityDays: c.defaultValidityDays, requiresExpiry: c.requiresExpiry, warningLeadDays: c.warningLeadDays, sortOrder: c.sortOrder },
+      update: { name: c.name, description: c.description, category: c.category, defaultValidityDays: c.defaultValidityDays, requiresExpiry: c.requiresExpiry, warningLeadDays: c.warningLeadDays, sortOrder: c.sortOrder },
+    });
+  }
+  const compTypeByKey = new Map((await prisma.competencyType.findMany({ select: { id: true, key: true } })).map((t) => [t.key, t.id]));
+  const woTypeByKey = new Map((await prisma.workOrderType.findMany({ select: { id: true, key: true } })).map((t) => [t.key, t.id]));
+  const rosterRoleByKey = new Map((await prisma.rosterRole.findMany({ select: { id: true, key: true } })).map((r) => [r.key, r.id]));
+  for (const rule of COMPETENCY_RULES) {
+    const competencyTypeId = compTypeByKey.get(rule.competencyTypeKey);
+    if (!competencyTypeId) continue;
+    const data = {
+      name: rule.name,
+      competencyTypeId,
+      mandatory: rule.mandatory,
+      appliesToTypeIds: rule.appliesToTypeKeys.map((k) => woTypeByKey.get(k)).filter((x): x is string => !!x),
+      minCriticality: rule.minCriticality,
+      requiresPtw: rule.requiresPtw,
+      appliesToRosterRoleId: rule.appliesToRosterRoleKey ? rosterRoleByKey.get(rule.appliesToRosterRoleKey) ?? null : null,
+      sortOrder: rule.sortOrder,
+    };
+    const exists = await prisma.workOrderCompetencyRule.findFirst({ where: { name: rule.name, deletedAt: null }, select: { id: true } });
+    if (exists) await prisma.workOrderCompetencyRule.update({ where: { id: exists.id }, data });
+    else await prisma.workOrderCompetencyRule.create({ data });
+  }
   console.log(
-    `✔ Catálogo de OT sincronizado: ${WORK_ORDER_TYPES.length} tipos, ${WORK_ORDER_SPECIALTIES.length} especialidades, ${ROSTER_ROLES.length} roles de dotación`,
+    `✔ Catálogo de OT sincronizado: ${WORK_ORDER_TYPES.length} tipos, ${WORK_ORDER_SPECIALTIES.length} especialidades, ${ROSTER_ROLES.length} roles de dotación, ${COMPETENCY_TYPES.length} competencias, ${COMPETENCY_RULES.length} regla(s) de competencia`,
   );
 }
 

@@ -791,7 +791,32 @@ anulación lifecycle `CANCELED`).
     `confirmRoster` FIRMADO Part 11 / auto-limpieza al curar / `assertRosterConfirmed` gate en la autorización del permiso).
   - En **WorkOrderType**: `rosterEnabled` (bool, default false) — activación OPTATIVA por tipo (sin esto la OT no muestra
     dotación; cero fricción/regresión).
-  - Semáforo por persona = función PURA `evaluateWorkerStatus` (contracts; forma final desde S1, causas rojas de S2/S3).
+  - Semáforo por persona = función PURA `evaluateWorkerStatus` (contracts; colapsa causas a nivel ok/warning/blocked).
+- **Dotación · Slice 2 — competencias con vigencia** *(S2 — `feat/dotacion-competencias-s2`; migr. `20260703120000_add_dotacion_competencias`;
+  traza ISO 45001 §7.2 / Maximo Qualifications LABORCERTHIST / SAP validity)*:
+  - **CompetencyType** — catálogo: QUÉ certificación/formación existe. `key` única, `name`/`description`, `category` enum
+    `CERTIFICATION|TRAINING|MEDICAL_EXAM|INDUCTION|LICENSE`, `defaultValidityDays?`, `requiresExpiry` (default true),
+    `warningLeadDays?` (ventana ámbar «por vencer» por tipo; fallback const `DEFAULT_COMPETENCY_WARNING_LEAD_DAYS`=30, traza
+    ISN 90d / práctica 30-14-7), `active`/`sortOrder`, soft-delete. Gate `workordercatalog:manage`.
+  - **PersonCompetency** — la persona POSEE una competencia. `personId`(Cascade)/`competencyTypeId`(Restrict), `issuedAt`
+    (Effective Date), `expiresAt?` (null = sin vencimiento), `certificateNumber?`/`issuedBy?`, `evidence` Json (reservado Ola 3),
+    `verifiedById?`/`verifiedAt?` (evidencia documentada ISO 45001), `note?`. **Renovar = registro NUEVO** (soft-delete el viejo,
+    historial estilo LABORCERTHIST; la fecha de vencimiento es inmutable una vez emitida). Estado VALID/EXPIRING/EXPIRED
+    **DERIVADO** (`competencyValidityState`), nunca almacenado. Gate `worker:manage`.
+  - **PersonRestriction** — veto/restricción (Eje B, autorización). `personId`(Cascade), `type` enum
+    `MEDICAL|DISCIPLINARY|SITE_BAN|OTHER`, `reason`, `startsAt`/`endsAt?` (null = indefinida), `active`, soft-delete. Vigente
+    ⇒ `RESTRICTION_ACTIVE` (rojo). Traza OSHA «authorized by the employer». Gate `worker:manage`.
+  - **WorkOrderCompetencyRule** — regla de REQUISITO data-driven, **ESPEJO EXACTO** de `WorkOrderChecklistRule`:
+    `competencyTypeId`(Restrict), `mandatory`, `appliesToTypeIds[]`/`minCriticality?`/`specialtyId?`(SetNull)/`requiresPtw?` +
+    **`appliesToRosterRoleId?`**(SetNull; exigir sólo a cierto rol, ej. sólo al entrant), `active`/`sortOrder`, soft-delete.
+    Función pura `applicableCompetencyRules(ctx, rules)` (clon de `applicableChecklistRules`). Gate `workordercatalog:manage`.
+  - **Semáforo REAL** = `deriveWorkerReasons(ctx, now)` (PURA): cruza reglas aplicables × competencias vigentes × restricciones
+    activas → `WorkerBlockReason[]` con detalle legible; Ejes A (competencia) y B (autorización) **separados**. Derivado EN VIVO
+    en `WorkOrderRosterService` (nunca almacenado). `COMPANY_NOT_ACCREDITED` (empresa) diferida a S3.
+  - **Override gobernado** (columnas ya reservadas en `WorkOrderWorker`): al confirmar con personas en ROJO, `confirmRoster`
+    exige motivo por persona + UNA firma Part 11 → `overrideReason`/`overrideById`/`overrideAt` (evento `WORKER_OVERRIDE`).
+  - **Avisos (Bloque N)**: `WorkerComplianceService.findBreaches()` (dominio) → `worker.competency.expiring`/`.expired`
+    (personas en roster de OT abierta; dedupe por OT+competencia+día).
 - **FolioCounter** *(S2, fork W4)* — motor de folio gapless configurable, REUTILIZABLE (sirve al folio-por-plantilla,
   BACKLOG 2026-06-30). Una fila por secuencia: `sequenceKey` **PK** (codifica entidad+scope+período, ej.
   `workorder|type:<id>|2026`) + `lastValue`. Asignación ATÓMICA `INSERT … ON CONFLICT … DO UPDATE … RETURNING`

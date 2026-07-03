@@ -1,5 +1,35 @@
 # Progreso — Lyra WatchLog
 
+**2026-07-03 — 👷 Dotación del permiso · Slice 2 (competencias/certificaciones con vigencia) ✅** (`feat/dotacion-competencias-s2`).
+Hace REAL la validación que S1 dejó inerte (el semáforo era siempre verde). **Investigación citada** (piezas nuevas,
+fuente primaria): ISN «flag 90 días» + práctica 30/14/7 ⇒ ventana de aviso configurable por tipo; Maximo *Expiration Date*
+inmutable + Extend/Renew crea registro nuevo en `LABORCERTHIST` + SAP elimina al vencer ⇒ **renovar = fila nueva, expiración
+DURA sin gracia**; Maximo no auto-verifica al renovar ⇒ `verifiedById/verifiedAt` (ISO 45001 §7.2 evidencia documentada).
+**Entidades nuevas** (migración `20260703120000_add_dotacion_competencias`, aditiva; drift ajeno descartado a mano):
+`CompetencyType` (catálogo: `category CERTIFICATION|TRAINING|MEDICAL_EXAM|INDUCTION|LICENSE`, `defaultValidityDays`,
+`requiresExpiry`, `warningLeadDays` = ventana ámbar por tipo, fallback const 30), `PersonCompetency` (posee la competencia
+con `issuedAt/expiresAt/certificateNumber/issuedBy/verified*`; renovar = registro nuevo, historial; estado VALID/EXPIRING/
+EXPIRED **derivado**), `PersonRestriction` (veto Eje B: `MEDICAL|DISCIPLINARY|SITE_BAN|OTHER` con vigencia),
+`WorkOrderCompetencyRule` (**espejo EXACTO** de `WorkOrderChecklistRule` + `appliesToRosterRoleId`). **Funciones PURAS** en
+`contracts/work-orders/roster.ts`: `applicableCompetencyRules` (clon de `applicableChecklistRules`) + `deriveWorkerReasons`
+(cruza reglas aplicables × competencias vigentes × restricciones activas → `WorkerBlockReason[]`, Ejes A/B **separados**) +
+`competencyValidityState` + `workerStatusFromDetails`; `evaluateWorkerStatus` queda de colapsador (specs `roster.spec` 21).
+**Semáforo REAL**: `WorkOrderRosterService.buildRosterDto` deriva las causas EN VIVO por persona (nunca almacena;
+COMPANY_NOT_ACCREDITED **diferida a S3**). **Gate/override firmado POR PERSONA** (§6.3): si al confirmar hay personas en
+ROJO, `confirmRoster` exige `overrides:[{workerId,reason}]` por cada una + UNA firma Part 11 (columnas reservadas
+`overrideReason/ById/At`; `overrideSignatureId` null = deuda compartida) → evento `WORKER_OVERRIDE` + `AuditLog`; bloqueos
+**explicados en español** (`explainBlock`). **Avisos de vencimiento (Bloque N)**: `WorkerComplianceService.findBreaches()`
+(clon de `WorkOrderSlaService`, `$queryRaw` join roster de OT abierta) barrido por `sweep()` + casos
+`worker.competency.expiring`/`.expired` en `NotificationResolverService` + eventos en `events.ts` + plantillas de correo;
+dedupe por OT+competencia+día. **CERO permiso nuevo** (`worker:manage` competencias/restricciones, `workordercatalog:manage`
+tipos/reglas, `workorder:roster:manage` confirmar/override ⇒ sin FLUSHALL). **Web:** panel «Competencias»/«Restricciones»
+por persona en el catálogo Personas (`PersonCompetenciesModal`, renovar = nuevo registro, badge de vigencia); pestañas
+«Competencias» + «Reglas de competencia» en el catálogo de OT (`CompetencyTypeModal`, `WorkOrderCompetencyRuleModal` con
+`MultiSelect`/`Combobox`); semáforo REAL en la pestaña «Dotación» con motivos legibles + modal de override firmado por
+persona. Seed demo: 5 competencias + 2 reglas (inducción PTW / examen preocupacional del ejecutante alto riesgo). Verde:
+typecheck 7 · lint 0 err · build · contracts **488** (roster.spec 21) · **smoke-dotacion 39/39** + regresión **workorders
+122/122** + **incidencias 32/32**. **Pendiente:** smoke VISUAL del dueño. **Siguiente = S3 (acreditación de contratistas como gate).**
+
 **2026-07-03 — 👷 Dotación del permiso · DISEÑO + Slice 1 (MVP) ✅** (`feat/dotacion-permiso-s1`). Necesidad real del dueño:
 gestionar el LISTADO DE PERSONAS (propias y contratistas) que ingresan a ejecutar una OT, y que quien APRUEBA valide esa
 dotación. **DISEÑO** completo, investigado y **citado** (`docs/design/DOTACION_DESIGN_ARCHITECTURE.md`): traza a OSHA

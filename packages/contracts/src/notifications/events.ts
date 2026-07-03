@@ -285,6 +285,38 @@ export const NOTIFICATION_EVENTS = [
       { name: "activity.overdueBy", description: "Tiempo transcurrido desde el término planificado.", sample: "6 h" },
     ],
   },
+  {
+    key: "worker.competency.expiring",
+    group: "workorders",
+    labelKey: "notifications.events.workerCompetencyExpiring",
+    description:
+      "La certificación/competencia de una persona de la dotación está por vencer (dentro de la ventana de aviso del tipo). Avisa al responsable de la OT y a los roles del estado actual.",
+    origin: "derived",
+    variables: [
+      ...COMMON_VARIABLES,
+      ...WORKORDER_VARIABLES,
+      { name: "worker.name", description: "Nombre de la persona.", sample: "Juan Pérez" },
+      { name: "worker.competency", description: "Competencia/certificación afectada.", sample: "Trabajo en altura" },
+      { name: "worker.expiresAt", description: "Fecha de vencimiento de la competencia.", sample: "1 ago 2026, 00:00" },
+      { name: "worker.expiresIn", description: "Tiempo restante hasta el vencimiento.", sample: "29 d" },
+    ],
+  },
+  {
+    key: "worker.competency.expired",
+    group: "workorders",
+    labelKey: "notifications.events.workerCompetencyExpired",
+    description:
+      "La certificación/competencia de una persona de la dotación ya venció y la persona sigue en un roster de OT abierta. Avisa al responsable de la OT y a los roles del estado actual.",
+    origin: "derived",
+    variables: [
+      ...COMMON_VARIABLES,
+      ...WORKORDER_VARIABLES,
+      { name: "worker.name", description: "Nombre de la persona.", sample: "Juan Pérez" },
+      { name: "worker.competency", description: "Competencia/certificación afectada.", sample: "Trabajo en altura" },
+      { name: "worker.expiresAt", description: "Fecha en que venció la competencia.", sample: "1 jul 2026, 00:00" },
+      { name: "worker.expiresIn", description: "Tiempo transcurrido desde el vencimiento.", sample: "2 d" },
+    ],
+  },
 ] as const satisfies readonly NotificationEventDef[];
 
 /** Unión literal de todas las claves de evento conocidas. */

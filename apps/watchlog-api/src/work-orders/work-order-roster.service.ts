@@ -1,12 +1,18 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
 import {
-  evaluateWorkerStatus,
+  applicableCompetencyRules,
+  deriveWorkerReasons,
   ROSTER_CONFIRM_SIGNATURE_MEANING,
+  ROSTER_OVERRIDE_SIGNATURE_MEANING,
+  workerStatusFromDetails,
+  WORKER_BLOCK_REASON_META,
   type AddWorkOrderWorkerRequest,
   type ConfirmRosterRequest,
   type RemoveWorkOrderWorkerRequest,
   type RosterRoleDto,
+  type WorkerCompetencyRuleInput,
+  type WorkerStatusDetail,
   type WorkOrderRosterDto,
   type WorkOrderWorkerDto,
 } from "@lyra/contracts";
@@ -100,14 +106,63 @@ export class WorkOrderRosterService {
     this.assertRosterEnabled(wo);
     const roster = await this.buildRosterDto(wo);
     if (roster.workers.length === 0) throw new BadRequestException("No hay personas en la dotación para confirmar");
-    if (roster.hasBlocked) throw new BadRequestException("Hay personas con impedimentos: resuélvalos o registre un override firmado antes de confirmar");
-    // Firma Part 11: re-autenticación del aprobador ANTES de sellar (§11.200).
+
+    // Gate/override POR PERSONA (S2-B): si hay personas en ROJO, cada una exige un motivo
+    // (override) para poder autorizar pese al impedimento. Los rojos SIN motivo se explican.
+    const blocked = roster.workers.filter((w) => w.status.level === "blocked");
+    const overrideMap = new Map((dto.overrides ?? []).map((o) => [o.workerId, o.reason.trim()]));
+    if (blocked.length > 0) {
+      const missing = blocked.filter((w) => !overrideMap.get(w.id));
+      if (missing.length > 0) {
+        const detail = missing.map((w) => `${w.personName} (${this.explainBlock(w.status.details)})`).join("; ");
+        throw new BadRequestException(
+          `No se puede confirmar la dotación: hay personas con impedimentos. Resuélvalos o registre una justificación firmada (override) por cada una. Pendientes: ${detail}.`,
+        );
+      }
+    }
+
+    // Firma Part 11: re-autenticación del aprobador ANTES de sellar (§11.200). El significado
+    // de la firma cambia si la confirmación incluye excepciones (una firma cubre todo el acto).
+    const meaning = blocked.length > 0 ? ROSTER_OVERRIDE_SIGNATURE_MEANING : ROSTER_CONFIRM_SIGNATURE_MEANING;
     const reauth = await this.reauth.verifyForSignature(userId, { password: dto.password, mfaCode: dto.mfaCode }, { requireMfa: false });
     const now = new Date();
+
+    // Persistir el override firmado por cada persona en rojo (motivo + firma; §6.3).
+    for (const w of blocked) {
+      const reason = overrideMap.get(w.id)!;
+      await this.prisma.workOrderWorker.update({
+        where: { id: w.id },
+        // overrideSignatureId queda null (LogEntrySignature es deuda COMPARTIDA con las
+        // transiciones); la re-autenticación anterior es el control efectivo.
+        data: { overrideReason: reason, overrideById: userId, overrideAt: now, overrideSignatureId: null },
+      });
+      await this.addEvent(workOrderId, "WORKER_OVERRIDE", `Excepción firmada para ${w.personName} (${this.explainBlock(w.status.details)}): ${reason}`, userId, {
+        workerId: w.id,
+        personId: w.personId,
+        reasons: w.status.reasons,
+        reason,
+      });
+      await this.audit.record({ ...ctx, action: "workorder.roster.override", entityType: "WorkOrderWorker", entityId: w.id, after: { personId: w.personId, reasons: w.status.reasons, reason } });
+    }
+
     await this.prisma.workOrder.update({ where: { id: workOrderId }, data: { rosterConfirmedAt: now, rosterConfirmedById: userId } });
-    await this.addEvent(workOrderId, "ROSTER_CONFIRMED", `Dotación confirmada y firmada por ${reauth.signerName} (${roster.workers.length} persona(s))`, userId, { count: roster.workers.length, meaning: ROSTER_CONFIRM_SIGNATURE_MEANING });
-    await this.audit.record({ ...ctx, action: "workorder.roster.confirmed", entityType: "WorkOrder", entityId: workOrderId, after: { count: roster.workers.length, signerName: reauth.signerName } });
+    const overrideNote = blocked.length > 0 ? ` con ${blocked.length} excepción(es) documentada(s)` : "";
+    await this.addEvent(workOrderId, "ROSTER_CONFIRMED", `Dotación confirmada y firmada por ${reauth.signerName} (${roster.workers.length} persona(s)${overrideNote})`, userId, { count: roster.workers.length, overrides: blocked.length, meaning });
+    await this.audit.record({ ...ctx, action: "workorder.roster.confirmed", entityType: "WorkOrder", entityId: workOrderId, after: { count: roster.workers.length, overrides: blocked.length, signerName: reauth.signerName } });
     return this.buildRosterDto(await this.loadWorkOrder(workOrderId));
+  }
+
+  /** Redacta en español el impedimento de una persona a partir de sus detalles (§6.2). */
+  private explainBlock(details: WorkerStatusDetail[]): string {
+    const parts = details
+      .filter((d) => WORKER_BLOCK_REASON_META[d.reason].level === "blocked")
+      .map((d) => {
+        if (d.reason === "COMPETENCY_MISSING") return `falta «${d.competencyTypeName ?? "competencia requerida"}»`;
+        if (d.reason === "COMPETENCY_EXPIRED") return `«${d.competencyTypeName ?? "competencia"}» vencida`;
+        if (d.reason === "RESTRICTION_ACTIVE") return `restricción activa (${d.restrictionReason ?? d.restrictionType ?? "veto"})`;
+        return WORKER_BLOCK_REASON_META[d.reason].label.toLowerCase();
+      });
+    return parts.length ? parts.join(", ") : "impedimento";
   }
 
   /** Invalida una confirmación previa cuando la dotación cambia (auto-limpieza al curar). */
@@ -150,10 +205,26 @@ export class WorkOrderRosterService {
       }),
       this.persons.listRosterRoles(false),
     ]);
+
+    // === S2: derivar las causas del semáforo POR PERSONA (Ejes A/B), en vivo ===
+    const personIds = [...new Set(workerRows.map((r) => r.personId))];
+    const rolesByPerson = new Map<string, string[]>();
+    for (const r of workerRows) {
+      const arr = rolesByPerson.get(r.personId) ?? [];
+      arr.push(r.rosterRoleId);
+      rolesByPerson.set(r.personId, arr);
+    }
+    const detailsByPerson = personIds.length ? await this.deriveReasonsByPerson(wo, personIds, rolesByPerson) : new Map<string, WorkerStatusDetail[]>();
+
+    const overrideUserIds = [...new Set(workerRows.map((r) => r.overrideById).filter((x): x is string => !!x))];
+    const overrideNames = overrideUserIds.length
+      ? new Map((await this.prisma.user.findMany({ where: { id: { in: overrideUserIds } }, select: { id: true, displayName: true, email: true } })).map((u) => [u.id, u.displayName ?? u.email]))
+      : new Map<string, string>();
+
     const workers: WorkOrderWorkerDto[] = workerRows
       .map((r) => {
-        // S1: sin causas rojas (competencias/veto/acreditación = S2/S3). Forma estable.
-        const status = evaluateWorkerStatus({ reasons: [] });
+        const details = detailsByPerson.get(r.personId) ?? [];
+        const status = workerStatusFromDetails(details);
         return {
           id: r.id,
           workOrderId: wo.id,
@@ -166,7 +237,10 @@ export class WorkOrderRosterService {
           isSupervisorRole: r.rosterRole.isSupervisorRole,
           note: r.note,
           addedAt: r.addedAt.toISOString(),
-          status: { level: status.level, reasons: status.reasons },
+          status: { level: status.level, reasons: status.reasons, details },
+          override: r.overrideReason && r.overrideAt
+            ? { reason: r.overrideReason, byName: r.overrideById ? overrideNames.get(r.overrideById) ?? null : null, at: r.overrideAt.toISOString() }
+            : null,
           _sort: r.rosterRole.sortOrder,
         };
       })
@@ -185,10 +259,87 @@ export class WorkOrderRosterService {
     };
   }
 
+  /**
+   * Deriva las causas rojas/ámbar de cada persona de la dotación (S2). Cruza EN VIVO las
+   * reglas de competencia aplicables a la OT × las competencias vigentes de la persona ×
+   * sus restricciones activas. NO almacena nada (evita staleness). COMPANY_NOT_ACCREDITED
+   * (empresa) se DIFIERE a S3 (S2-A). Devuelve el detalle legible por persona.
+   */
+  private async deriveReasonsByPerson(wo: RosterWorkOrder, personIds: string[], rolesByPerson: Map<string, string[]>): Promise<Map<string, WorkerStatusDetail[]>> {
+    const nowMs = Date.now();
+    const [ruleRows, competencyRows, restrictionRows] = await Promise.all([
+      this.prisma.workOrderCompetencyRule.findMany({
+        where: { deletedAt: null, active: true },
+        include: { competencyType: { select: { name: true, warningLeadDays: true } } },
+      }),
+      this.prisma.personCompetency.findMany({
+        where: { personId: { in: personIds }, deletedAt: null },
+        select: { personId: true, competencyTypeId: true, expiresAt: true },
+      }),
+      this.prisma.personRestriction.findMany({
+        where: { personId: { in: personIds }, deletedAt: null, active: true },
+        select: { personId: true, type: true, reason: true, startsAt: true, endsAt: true },
+      }),
+    ]);
+    // Reglas aplicables a ESTA OT (función pura, espejo de checklists); el filtro por rol
+    // se aplica por persona dentro de `deriveWorkerReasons`.
+    const applicable = applicableCompetencyRules(
+      { typeId: wo.typeId, criticality: wo.criticality, requiresPtw: wo.requiresPtw, specialtyIds: wo.specialties.map((s) => s.specialtyId) },
+      ruleRows,
+    );
+    const rules: WorkerCompetencyRuleInput[] = applicable.map((r) => ({
+      competencyTypeId: r.competencyTypeId,
+      competencyTypeName: r.competencyType.name,
+      mandatory: r.mandatory,
+      appliesToRosterRoleId: r.appliesToRosterRoleId,
+      warningLeadDays: r.competencyType.warningLeadDays,
+    }));
+    const compByPerson = new Map<string, { competencyTypeId: string; expiresAtMs: number | null }[]>();
+    for (const c of competencyRows) {
+      const arr = compByPerson.get(c.personId) ?? [];
+      arr.push({ competencyTypeId: c.competencyTypeId, expiresAtMs: c.expiresAt ? c.expiresAt.getTime() : null });
+      compByPerson.set(c.personId, arr);
+    }
+    const restrByPerson = new Map<string, { type: string; reason: string }[]>();
+    for (const r of restrictionRows) {
+      const started = r.startsAt.getTime() <= nowMs;
+      const notEnded = !r.endsAt || r.endsAt.getTime() > nowMs;
+      if (!started || !notEnded) continue; // sólo activas Y vigentes
+      const arr = restrByPerson.get(r.personId) ?? [];
+      arr.push({ type: r.type, reason: r.reason });
+      restrByPerson.set(r.personId, arr);
+    }
+    const out = new Map<string, WorkerStatusDetail[]>();
+    for (const personId of personIds) {
+      out.set(
+        personId,
+        deriveWorkerReasons({
+          rules,
+          personRosterRoleIds: rolesByPerson.get(personId) ?? [],
+          competencies: compByPerson.get(personId) ?? [],
+          restrictions: restrByPerson.get(personId) ?? [],
+          nowMs,
+        }),
+      );
+    }
+    return out;
+  }
+
   private async loadWorkOrder(id: string): Promise<RosterWorkOrder> {
     const row = await this.prisma.workOrder.findFirst({
       where: { id, deletedAt: null },
-      select: { id: true, orgNodeId: true, lifecycle: true, rosterConfirmedAt: true, rosterConfirmedById: true, type: { select: { rosterEnabled: true } } },
+      select: {
+        id: true,
+        orgNodeId: true,
+        lifecycle: true,
+        typeId: true,
+        criticality: true,
+        requiresPtw: true,
+        rosterConfirmedAt: true,
+        rosterConfirmedById: true,
+        type: { select: { rosterEnabled: true } },
+        specialties: { select: { specialtyId: true } },
+      },
     });
     if (!row) throw new NotFoundException("Orden de trabajo no encontrada");
     return row;
@@ -226,7 +377,11 @@ type RosterWorkOrder = {
   id: string;
   orgNodeId: string;
   lifecycle: string;
+  typeId: string;
+  criticality: number;
+  requiresPtw: boolean;
   rosterConfirmedAt: Date | null;
   rosterConfirmedById: string | null;
   type: { rosterEnabled: boolean };
+  specialties: { specialtyId: string }[];
 };

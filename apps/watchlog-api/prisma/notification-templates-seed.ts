@@ -324,6 +324,57 @@ export const NOTIFICATION_TEMPLATE_SEEDS: NotificationTemplateSeed[] = [
     ),
   },
   {
+    eventKey: "worker.competency.expiring",
+    locale: "es-CL",
+    channel: "EMAIL",
+    subject: "Competencia por vencer: {{worker.name}} — {{worker.competency}} ({{workorder.folio}})",
+    bodyText:
+      "Hola {{recipient.name}}:\n\n" +
+      "La competencia «{{worker.competency}}» de {{worker.name}}, en la dotación de la orden de trabajo " +
+      "{{workorder.folio}} ({{workorder.title}}), vence el {{worker.expiresAt}} (en {{worker.expiresIn}}).\n\n" +
+      "Nodo: {{workorder.node}}\nResponsable de la OT: {{workorder.owner}}\n\n" +
+      "Gestione su renovación antes del vencimiento en {{workorder.url}}.\n\n— {{app.name}}",
+    bodyHtml: htmlShell(
+      "Competencia por vencer",
+      "La competencia <strong>{{worker.competency}}</strong> de {{worker.name}} está por vencer.",
+      [
+        ["Persona", "{{worker.name}}"],
+        ["Competencia", "{{worker.competency}}"],
+        ["Orden de trabajo", "{{workorder.folio}} — {{workorder.title}}"],
+        ["Nodo", "{{workorder.node}}"],
+        ["Vence", "{{worker.expiresAt}}"],
+        ["Tiempo restante", "{{worker.expiresIn}}"],
+      ],
+      { label: "Abrir orden de trabajo", url: "{{workorder.url}}" },
+    ),
+  },
+  {
+    eventKey: "worker.competency.expired",
+    locale: "es-CL",
+    channel: "EMAIL",
+    subject: "Competencia VENCIDA: {{worker.name}} — {{worker.competency}} ({{workorder.folio}})",
+    bodyText:
+      "Hola {{recipient.name}}:\n\n" +
+      "La competencia «{{worker.competency}}» de {{worker.name}}, en la dotación de la orden de trabajo " +
+      "{{workorder.folio}} ({{workorder.title}}), venció el {{worker.expiresAt}} (hace {{worker.expiresIn}}) " +
+      "y la persona sigue en la dotación.\n\n" +
+      "Nodo: {{workorder.node}}\nResponsable de la OT: {{workorder.owner}}\n\n" +
+      "Renuévela o retire a la persona de la dotación en {{workorder.url}}.\n\n— {{app.name}}",
+    bodyHtml: htmlShell(
+      "Competencia vencida",
+      "La competencia <strong>{{worker.competency}}</strong> de {{worker.name}} está vencida y sigue en la dotación.",
+      [
+        ["Persona", "{{worker.name}}"],
+        ["Competencia", "{{worker.competency}}"],
+        ["Orden de trabajo", "{{workorder.folio}} — {{workorder.title}}"],
+        ["Nodo", "{{workorder.node}}"],
+        ["Venció", "{{worker.expiresAt}}"],
+        ["Hace", "{{worker.expiresIn}}"],
+      ],
+      { label: "Abrir orden de trabajo", url: "{{workorder.url}}" },
+    ),
+  },
+  {
     eventKey: "handover.ready",
     locale: "es-CL",
     channel: "EMAIL",
