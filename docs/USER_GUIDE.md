@@ -10,7 +10,7 @@
 > funcionalidades existentes** aunque su detalle aún esté por redactar (✍️): así nada se
 > olvida; el backfill de lo ya construido se llena de a poco (incremental).
 >
-> Última actualización: **2026-07-03** (Dotación del permiso — listar las personas propias y contratistas que ingresan a ejecutar una OT, con su rol, y confirmación firmada por el aprobador antes de autorizar; catálogo de personas y empresas contratistas).
+> Última actualización: **2026-07-03** (Dotación del permiso · Slice 2 — competencias y certificaciones con vigencia por persona: catálogo de competencias + reglas de requisito, carga de certificaciones con vencimiento e historial, semáforo REAL por persona con motivo legible, excepción firmada para autorizar impedimentos, y avisos de vencimiento).
 
 ## Convención de cada sección
 Cada funcionalidad se documenta con estas cuatro partes fijas:
@@ -151,6 +151,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 - ✅ **Seguimiento del avance y cierre — Puerta 4** (registrar el avance de cada actividad durante la ejecución, historial de avance; **verificación de cierre del permiso** que bloquea el cierre hasta aprobarla; cerrar la OT con firma cuando todo lo obligatorio está completo) (§ Órdenes de trabajo ▸ Seguimiento del avance y cierre · Verificación de cierre del permiso)
 - ✅ **Plazos, avisos de vencimiento y semáforos (SLA) — "vigía digital"** (plazo de resolución automático por tipo de OT, avisos por correo y campanita cuando algo vence o se estanca, escalamiento a un superior, semáforo verde/ámbar/rojo en la grilla y el detalle, indicadores "vencidas / por vencer / estancadas") (§ Órdenes de trabajo ▸ Plazos, avisos y semáforos (SLA))
 - ✅ **Dotación del permiso: quiénes ingresan y validación del aprobador** (listar las personas —propias y contratistas— que entran a ejecutar, con su rol; el aprobador revisa la dotación y la **confirma firmando** antes de autorizar el permiso; catálogo de personas y empresas contratistas) (§ Órdenes de trabajo ▸ Dotación del permiso)
+- ✅ **Competencias y certificaciones de la dotación** (catálogo de competencias + reglas de requisito; carga de certificaciones con vencimiento e historial de renovaciones; semáforo REAL por persona con motivo legible; excepción firmada para autorizar impedimentos; avisos de vencimiento) (§ Órdenes de trabajo ▸ Competencias y certificaciones de la dotación)
 - ✅ **Administrar los catálogos** (tipos de OT, especialidades y **reglas de checklist con su momento**) (§ Órdenes de trabajo ▸ Catálogos) [solo administrador]
 
 ---
@@ -488,9 +489,54 @@ personas»* (`worker:manage`). Quién puede **autorizar** el permiso lo decide e
 - Los **roles** (Ejecutante / Vigía / Supervisor de entrada) son **configurables**: el administrador puede renombrarlos o
   agregar otros. Una misma persona puede tener **más de un rol** en la misma OT.
 - Quitar a una persona no la borra: queda el registro de que estuvo y de que se la quitó (con su motivo).
-- **Próximamente:** validación automática de **competencias y certificaciones vigentes** por persona (semáforo en rojo si
-  falta o venció una certificación, si la persona tiene una restricción, o si su empresa no está acreditada) y **avisos de
-  vencimiento**. En esta versión el semáforo confirma la presencia y el rol; las validaciones de competencia llegan después.
+- El **semáforo** por persona ahora valida de verdad las **competencias vigentes** y las **restricciones** (ver la sección
+  siguiente): puede aparecer en **rojo** con el motivo explicado (p. ej. «"Trabajo en altura" vencida el 12-05-2026»).
+
+### Órdenes de trabajo ▸ Competencias y certificaciones de la dotación  [aprobador / preparador · catálogo: administrador]
+
+**Para qué sirve.** Asegurar que quien entra a ejecutar **tiene las certificaciones y formaciones vigentes** que el trabajo
+exige (trabajo en altura, espacio confinado, LOTO, examen preocupacional, inducción de faena…) y que **no tiene un veto**
+activo. Es el corazón de la validación de competencia en la aprobación: el semáforo de cada persona se pone **rojo** si le
+falta una competencia obligatoria, si se le venció, o si tiene una restricción activa; **ámbar** si algo está por vencer.
+Es el estándar de la industria (ISO 45001 §7.2: competencia con evidencia documentada; Maximo/SAP: certificaciones con
+vigencia que expiran solas).
+
+**Cómo se usa.**
+1. **Definir qué competencias existen (administrador).** En **Órdenes de trabajo → Catálogos → pestaña «Competencias»**,
+   crea cada certificación/formación: nombre, **categoría** (certificación, formación, examen médico, inducción o licencia),
+   si **tiene vencimiento**, su **vigencia típica** (días) y la **ventana de aviso previo** (a cuántos días antes avisar que
+   está por vencer; por defecto 30). Vienen 5 de fábrica (trabajo en altura, espacio confinado, LOTO, examen preocupacional,
+   inducción de faena).
+2. **Definir qué se exige, a quién y cuándo (administrador).** En la pestaña **«Reglas de competencia»**, crea una regla:
+   elige la **competencia exigida**, si es **obligatoria**, y su **aplicabilidad** (a qué tipos de OT, criticidad mínima,
+   especialidad, si es PTW) y —opcional— **sólo a un rol** de la dotación (p. ej. exigir el examen preocupacional sólo al
+   Ejecutante). Funciona igual que las reglas de checklist.
+3. **Cargar las competencias de cada persona (administrador).** En **«Personas»**, en la fila de una persona, pulsa
+   **«Competencias»**. Ahí registras cada certificación con su **fecha de emisión** y **vencimiento**, número de certificado,
+   emisor, y marcas si **verificas la evidencia**. **Renovar = agregar un registro nuevo** (el anterior queda de historial,
+   nunca se sobrescribe). Un badge muestra el estado: **Vigente / Por vencer / Vencida**. En la pestaña **«Restricciones»**
+   registras vetos (médico, disciplinario, prohibición de faena…) con su vigencia.
+4. **Ver el semáforo real (en la OT).** En la pestaña «Dotación», cada persona muestra su semáforo con el **motivo legible**
+   del bloqueo. Verde = habilitada; ámbar = tiene algo por vencer; rojo = le falta/venció una competencia obligatoria o
+   tiene una restricción activa.
+5. **Autorizar pese a un impedimento (excepción firmada).** Si el aprobador decide autorizar a alguien en rojo (riesgo
+   aceptado, medida compensatoria), al **«Confirmar dotación»** el sistema exige un **motivo por cada persona en rojo** y
+   **una firma**. Queda registrada la excepción (quién, por qué, cuándo) y visible en la lista. Sin ese motivo+firma, no se
+   puede confirmar.
+
+**Quién puede.** Cargar competencias y restricciones de una persona: *«Administrar personas»* (`worker:manage`). Crear tipos
+de competencia y reglas: *«Administrar catálogos de OT»* (`workordercatalog:manage`). Confirmar la dotación y registrar
+excepciones: *«Gestionar la dotación»* (`workorder:roster:manage`).
+
+**Importante.**
+- **Renovar no borra el historial:** cada renovación es un registro nuevo; queda la traza de todas las certificaciones
+  emitidas (como exige la auditoría de un sistema Part 11 / GxP).
+- **La expiración es dura:** una certificación vencida es vencida (no hay período de gracia). Configura la **ventana de aviso
+  previo** por tipo para que el sistema avise con tiempo.
+- **Avisos automáticos:** cuando una competencia de alguien que está en la dotación de una OT abierta está **por vencer** o
+  **vencida**, el sistema avisa al responsable de la OT (por correo y campanita). Así nadie descubre el vencimiento tarde.
+- **Acreditación de la empresa contratista:** hoy es informativa; el **bloqueo** por empresa no acreditada llega en una etapa
+  posterior (Slice 3). El semáforo actual valida competencias y restricciones **de la persona**.
 
 ### Órdenes de trabajo ▸ Plazos, avisos y semáforos (SLA) — "vigía digital"  [todos los roles operativos]
 

@@ -7,6 +7,7 @@ import { EmailConfigService } from "../email/email-config.service";
 import { SchedulesService } from "../schedules/schedules.service";
 import { IncidentSlaService } from "../incidents/incident-sla.service";
 import { WorkOrderSlaService } from "../work-orders/work-order-sla.service";
+import { WorkerComplianceService } from "../work-orders/worker-compliance.service";
 import { NotificationEmitterService } from "./notification-emitter.service";
 import { NotificationResolverService } from "./notification-resolver.service";
 import { NotificationChannelRegistry } from "./notification-channel";
@@ -44,6 +45,7 @@ export class NotificationWorkerService {
     private readonly schedules: SchedulesService,
     private readonly incidentSla: IncidentSlaService,
     private readonly workOrderSla: WorkOrderSlaService,
+    private readonly workerCompliance: WorkerComplianceService,
     private readonly emitter: NotificationEmitterService,
     private readonly resolver: NotificationResolverService,
     private readonly channels: NotificationChannelRegistry,
@@ -116,6 +118,14 @@ export class NotificationWorkerService {
       const workOrderBreaches = await this.workOrderSla.findBreaches(BATCH);
       for (const wb of workOrderBreaches) {
         await this.emitter.emit(wb.eventKey, wb.payload, { dedupeKey: wb.dedupeKey });
+        emitted++;
+      }
+
+      // Dotación (S2): competencias/certificaciones por vencer o vencidas de personas en
+      // un roster de OT abierta. Detección en el dominio (WorkerComplianceService).
+      const workerBreaches = await this.workerCompliance.findBreaches(BATCH);
+      for (const cb of workerBreaches) {
+        await this.emitter.emit(cb.eventKey, cb.payload, { dedupeKey: cb.dedupeKey });
         emitted++;
       }
     } catch (err) {

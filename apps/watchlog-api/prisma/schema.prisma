@@ -110,18 +110,18 @@ model Role {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  users                   UserRole[]
-  permissions             RolePermission[]
-  scopes                  Scope[]
-  templateScopes          TemplateScope[]
-  structureAdmins         StructureAdmin[]
-  templateSectionRoles    TemplateSectionRole[]
-  templateFieldRoles      TemplateFieldRole[]
-  workflowTransitionRoles WorkflowTransitionRole[]
-  responsibleSchedules    LogSchedule[]
-  incidentActions         IncidentAction[]
-  incidentTypeEscalations IncidentType[]           @relation("IncidentTypeEscalationRole")
-  workOrderTypeEscalations WorkOrderType[]         @relation("WorkOrderTypeEscalationRole")
+  users                    UserRole[]
+  permissions              RolePermission[]
+  scopes                   Scope[]
+  templateScopes           TemplateScope[]
+  structureAdmins          StructureAdmin[]
+  templateSectionRoles     TemplateSectionRole[]
+  templateFieldRoles       TemplateFieldRole[]
+  workflowTransitionRoles  WorkflowTransitionRole[]
+  responsibleSchedules     LogSchedule[]
+  incidentActions          IncidentAction[]
+  incidentTypeEscalations  IncidentType[]           @relation("IncidentTypeEscalationRole")
+  workOrderTypeEscalations WorkOrderType[]          @relation("WorkOrderTypeEscalationRole")
 }
 
 model Permission {
@@ -391,8 +391,8 @@ model OrgStructure {
   updatedAt   DateTime  @updatedAt
   deletedAt   DateTime? // borrado lógico
 
-  levels    OrgLevel[]
-  nodes     OrgNode[]
+  levels          OrgLevel[]
+  nodes           OrgNode[]
   opCalendars     OperationalCalendar[]
   fiscalCalendars FiscalCalendar[]
   admins          StructureAdmin[]
@@ -768,14 +768,14 @@ model Template {
   updatedAt         DateTime          @updatedAt
   deletedAt         DateTime? // borrado lógico
 
-  orgNode         OrgNode?                 @relation(fields: [orgNodeId], references: [id], onDelete: SetNull)
-  versions        TemplateVersion[]        @relation("TemplateVersions")
-  currentVersion  TemplateVersion?         @relation("TemplateCurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
-  logEntries      LogEntry[]
-  templateScopes  TemplateScope[]
-  nodeAssignments TemplateNodeAssignment[]
-  schedules       LogSchedule[]
-  checklistRules     WorkOrderChecklistRule[]
+  orgNode             OrgNode?                 @relation(fields: [orgNodeId], references: [id], onDelete: SetNull)
+  versions            TemplateVersion[]        @relation("TemplateVersions")
+  currentVersion      TemplateVersion?         @relation("TemplateCurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  logEntries          LogEntry[]
+  templateScopes      TemplateScope[]
+  nodeAssignments     TemplateNodeAssignment[]
+  schedules           LogSchedule[]
+  checklistRules      WorkOrderChecklistRule[]
   workOrderChecklists WorkOrderChecklist[]
 
   @@index([orgNodeId])
@@ -1243,47 +1243,47 @@ model OperationalPeriod {
 // Configuración del sistema (Fase 2.7.1.1 UX). Fila SINGLETON (id fijo "system").
 // Ajustes operativos globales del single-tenant; hoy: exigir MFA para gobernar períodos.
 model SystemSettings {
-  id                           String           @id @default("system")
+  id                                      String           @id @default("system")
   // Re-autenticación MFA exigida POR ACCIÓN de gobernanza de período (configurable).
-  requireMfaPeriodClose        Boolean          @default(false)
-  requireMfaPeriodReopen       Boolean          @default(false)
-  requireMfaPeriodLock         Boolean          @default(false)
-  requireMfaPeriodUnlock       Boolean          @default(false)
+  requireMfaPeriodClose                   Boolean          @default(false)
+  requireMfaPeriodReopen                  Boolean          @default(false)
+  requireMfaPeriodLock                    Boolean          @default(false)
+  requireMfaPeriodUnlock                  Boolean          @default(false)
   // --- Ventana de edición GLOBAL (Fase 2.7.2) --------------------------------
   // Fallback para plantillas sin config propia. hours null = sin ventana
   // (comportamiento pre-2.7.2). El ancla siempre tiene valor (fin de la cadena).
-  editWindowAnchor             EditWindowAnchor @default(RECORDED)
-  editWindowMinutes            Int?
+  editWindowAnchor                        EditWindowAnchor @default(RECORDED)
+  editWindowMinutes                       Int?
   // Exigir re-auth con MFA al editar FUERA de ventana (override privilegiado).
-  requireMfaEditWindowOverride Boolean          @default(false)
+  requireMfaEditWindowOverride            Boolean          @default(false)
   // --- Correo saliente / SMTP (Bloque N hardening) ---------------------------
   // Config del transporte persistida en BD (editable sin reiniciar). El `.env`
   // (SMTP_*) queda como FALLBACK por campo. La contraseña va CIFRADA en reposo
   // (emailPasswordEnc) y es write-only (nunca vuelve a la UI). `emailConfiguredAt`
   // null = nunca guardada en BD ⇒ la config vigente proviene del entorno (source=env).
-  emailEnabled                 Boolean          @default(false)
-  emailService                 String?
-  emailHost                    String?
-  emailPort                    Int?
-  emailSecure                  Boolean          @default(false)
-  emailUser                    String?
-  emailPasswordEnc             String?
-  emailFromName                String?
-  emailFromEmail               String?
-  emailConfiguredAt            DateTime?
-  emailConfiguredById          String?
+  emailEnabled                            Boolean          @default(false)
+  emailService                            String?
+  emailHost                               String?
+  emailPort                               Int?
+  emailSecure                             Boolean          @default(false)
+  emailUser                               String?
+  emailPasswordEnc                        String?
+  emailFromName                           String?
+  emailFromEmail                          String?
+  emailConfiguredAt                       DateTime?
+  emailConfiguredById                     String?
   // --- Notificaciones avanzadas — defaults de sistema (Fase A) ---------------
   // Conducta de las transiciones SIN config de aviso explícita. true (default) =
   // reproduce la conducta clásica de `entry.transition` (avisar a los roles del estado
   // destino); false = no se notifica si la transición no lo configura. No rompe nada.
-  notifyTransitionDefaultDestinationRoles Boolean @default(true)
+  notifyTransitionDefaultDestinationRoles Boolean          @default(true)
   // --- Apariencia / Temas (EST-TEMAS) ----------------------------------------
   // Paleta por defecto de la INSTALACIÓN: la que reciben los usuarios que no eligieron
   // una. Ref BLANDA (sin FK, como emailConfiguredById): el servicio tolera un id colgante
   // (paleta borrada ⇒ se trata como "sin default" ⇒ marca base). null = marca Lyra base.
-  defaultPaletteId             String?
-  updatedById                  String?
-  updatedAt                    DateTime         @updatedAt
+  defaultPaletteId                        String?
+  updatedById                             String?
+  updatedAt                               DateTime         @updatedAt
 }
 
 // ===========================================================================
@@ -1615,19 +1615,19 @@ model LogEntry {
   updatedAt                   DateTime       @updatedAt
   deletedAt                   DateTime? // borrado lógico / anulación
 
-  template        Template              @relation(fields: [templateId], references: [id], onDelete: Restrict)
-  templateVersion TemplateVersion       @relation(fields: [templateVersionId], references: [id], onDelete: Restrict)
-  orgNode         OrgNode               @relation(fields: [orgNodeId], references: [id], onDelete: Restrict)
-  equipment       Equipment?            @relation(fields: [equipmentId], references: [id], onDelete: SetNull)
-  sections        LogEntrySection[]
-  values          LogEntryValue[]
-  changes         LogEntryFieldChange[]
-  transitions     LogEntryTransition[]
-  signatures      LogEntrySignature[]
+  template            Template              @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  templateVersion     TemplateVersion       @relation(fields: [templateVersionId], references: [id], onDelete: Restrict)
+  orgNode             OrgNode               @relation(fields: [orgNodeId], references: [id], onDelete: Restrict)
+  equipment           Equipment?            @relation(fields: [equipmentId], references: [id], onDelete: SetNull)
+  sections            LogEntrySection[]
+  values              LogEntryValue[]
+  changes             LogEntryFieldChange[]
+  transitions         LogEntryTransition[]
+  signatures          LogEntrySignature[]
   // Ronda programada que originó esta entrada (Fase 2.3). null = entrada manual.
   // El enlace lo posee la ocurrencia (RoundOccurrence.logEntryId @unique); aquí solo
   // la relación inversa, sin columna duplicada.
-  roundOccurrence RoundOccurrence?
+  roundOccurrence     RoundOccurrence?
   // Checklists de OT que instanciaron esta entrada como su llenado vivo (S3, Puerta 2).
   workOrderChecklists WorkOrderChecklist[]
 
@@ -2016,32 +2016,32 @@ enum IncidentLifecycle {
 // Catálogo configurable de TIPOS (con flags de comportamiento). El flujo por
 // defecto que se congela al crear es referencia BLANDA al WorkflowDefinition.
 model IncidentType {
-  id                    String   @id @default(cuid())
-  key                   String   @unique // estable, ej. "falla-equipo"
-  name                  String
-  description           String?
-  color                 String? // token del DS para el chip
-  defaultWorkflowId     String? // WorkflowDefinition que se congela al crear (ref. blanda)
-  requiresInvestigation Boolean  @default(false)
-  requiresCapa          Boolean  @default(false)
-  reportableDefault     Boolean  @default(false)
+  id                     String    @id @default(cuid())
+  key                    String    @unique // estable, ej. "falla-equipo"
+  name                   String
+  description            String?
+  color                  String? // token del DS para el chip
+  defaultWorkflowId      String? // WorkflowDefinition que se congela al crear (ref. blanda)
+  requiresInvestigation  Boolean   @default(false)
+  requiresCapa           Boolean   @default(false)
+  reportableDefault      Boolean   @default(false)
   // --- SLA light (4.4): plazo de resolución + escalamiento ----------------------
   // Minutos desde la creación para auto-fijar Incident.dueAt (override explícito gana).
   // null = sin plazo automático.
-  resolutionDueMinutes  Int?
+  resolutionDueMinutes   Int?
   // Tras `dueAt + escalationAfterMinutes` aún vencida ⇒ el aviso de plazo escala al
   // rol de escalamiento (nivel 1). null en cualquiera de los dos = sin escalamiento.
   escalationAfterMinutes Int?
-  escalationRoleId      String?
-  active                Boolean  @default(true)
-  sortOrder             Int      @default(0)
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  deletedAt             DateTime?
+  escalationRoleId       String?
+  active                 Boolean   @default(true)
+  sortOrder              Int       @default(0)
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+  deletedAt              DateTime?
 
-  escalationRole Role? @relation("IncidentTypeEscalationRole", fields: [escalationRoleId], references: [id], onDelete: SetNull)
-  categories IncidentCategory[]
-  incidents  Incident[]
+  escalationRole Role?              @relation("IncidentTypeEscalationRole", fields: [escalationRoleId], references: [id], onDelete: SetNull)
+  categories     IncidentCategory[]
+  incidents      Incident[]
 
   @@index([active])
   @@index([deletedAt])
@@ -2050,15 +2050,15 @@ model IncidentType {
 
 // Catálogo configurable de CATEGORÍAS (subtipos), opcionalmente colgadas de un tipo.
 model IncidentCategory {
-  id          String   @id @default(cuid())
-  key         String   @unique
+  id          String    @id @default(cuid())
+  key         String    @unique
   name        String
   description String?
   typeId      String? // null = categoría transversal
-  active      Boolean  @default(true)
-  sortOrder   Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  active      Boolean   @default(true)
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
 
   type      IncidentType? @relation(fields: [typeId], references: [id], onDelete: SetNull)
@@ -2070,67 +2070,67 @@ model IncidentCategory {
 }
 
 model Incident {
-  id          String           @id @default(cuid())
+  id                          String            @id @default(cuid())
   // Folio humano correlativo (patrón entryNumber/WO number). El código "INC-####"
   // se DERIVA en el backend a partir de este número.
-  number      Int              @unique @default(autoincrement())
-  title       String
-  description String?
-  typeId      String
-  categoryId  String?
+  number                      Int               @unique @default(autoincrement())
+  title                       String
+  description                 String?
+  typeId                      String
+  categoryId                  String?
   // Escala 1..5 (tokens severidad). potentialSeverity = potencial de gravedad (MPL).
-  severity         Int
-  potentialSeverity Int?
-  priority         IncidentPriority  @default(MEDIUM)
+  severity                    Int
+  potentialSeverity           Int?
+  priority                    IncidentPriority  @default(MEDIUM)
   // Riesgo ISO 31000 (ejes de la matriz RISK_MATRIX; nivel se deriva con riskLevelFor).
-  riskProbability  Int?
-  riskConsequence  Int?
-  originType       IncidentOrigin    @default(MANUAL)
-  lifecycle        IncidentLifecycle @default(OPEN)
+  riskProbability             Int?
+  riskConsequence             Int?
+  originType                  IncidentOrigin    @default(MANUAL)
+  lifecycle                   IncidentLifecycle @default(OPEN)
   // --- Ciclo de vida por flujo (reusa WorkflowDefinition; ref. denormalizada) ---
   workflowDefinitionId        String?
   workflowDefinitionVersionId String?
   currentStateKey             String? // clave del estado actual dentro de la versión congelada
   // Momento de entrada al estado actual (base del cómputo de SLA de permanencia).
-  currentStateSince           DateTime @default(now())
+  currentStateSince           DateTime          @default(now())
   // --- Alcance / ligazón (referencias blandas salvo nodo/equipo/catálogo) -------
-  orgNodeId       String
-  equipmentId     String?
-  shiftCode       String?
+  orgNodeId                   String
+  equipmentId                 String?
+  shiftCode                   String?
   // Origen desde una entrada de bitácora (ref. blanda; 4.1 agrega excepciones).
-  originLogEntryId String?
+  originLogEntryId            String?
   // Fecha/hora en que OCURRIÓ el evento (ISO 14224 / HSE), distinta de `createdAt`
   // (cuándo se REPORTÓ): en terreno se reporta tarde. Null = no declarada (cae a createdAt).
-  occurredAt      DateTime?
+  occurredAt                  DateTime?
   // --- Personas (ref. blanda + snapshot de nombre en el timeline) ---------------
-  reporterId  String?
-  ownerId     String?
+  reporterId                  String?
+  ownerId                     String?
   // --- SLA / cierre -------------------------------------------------------------
-  dueAt          DateTime?
-  reportable     Boolean   @default(false)
-  closedAt       DateTime?
-  closedById     String?
-  closureSummary String?
+  dueAt                       DateTime?
+  reportable                  Boolean           @default(false)
+  closedAt                    DateTime?
+  closedById                  String?
+  closureSummary              String?
   // --- Anulación (sin borrado físico) -------------------------------------------
-  canceledAt   DateTime?
-  cancelReason String?
-  canceledById String?
-  createdById  String?
-  updatedById  String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  canceledAt                  DateTime?
+  cancelReason                String?
+  canceledById                String?
+  createdById                 String?
+  updatedById                 String?
+  createdAt                   DateTime          @default(now())
+  updatedAt                   DateTime          @updatedAt
 
-  type       IncidentType         @relation(fields: [typeId], references: [id], onDelete: Restrict)
-  category   IncidentCategory?    @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  orgNode    OrgNode              @relation(fields: [orgNodeId], references: [id], onDelete: Restrict)
-  equipment  Equipment?           @relation(fields: [equipmentId], references: [id], onDelete: SetNull)
-  comments   IncidentComment[]
-  activities IncidentActivity[]
-  transitions IncidentTransition[]
+  type           IncidentType            @relation(fields: [typeId], references: [id], onDelete: Restrict)
+  category       IncidentCategory?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  orgNode        OrgNode                 @relation(fields: [orgNodeId], references: [id], onDelete: Restrict)
+  equipment      Equipment?              @relation(fields: [equipmentId], references: [id], onDelete: SetNull)
+  comments       IncidentComment[]
+  activities     IncidentActivity[]
+  transitions    IncidentTransition[]
   exceptionLinks IncidentExceptionLink[]
-  actions    IncidentAction[]
-  investigation IncidentInvestigation?
-  reports    IncidentReport[]
+  actions        IncidentAction[]
+  investigation  IncidentInvestigation?
+  reports        IncidentReport[]
 
   @@index([typeId])
   @@index([categoryId])
@@ -2206,9 +2206,9 @@ enum ExceptionStatus {
 // (patrón AuditLog/Incident), sin FK que ate la entrada. El valor ORIGINAL nunca
 // se pierde; una corrección lo preserva (GxP). Una incidencia agrupa N excepciones.
 model LogEntryException {
-  id     String @id @default(cuid())
+  id                String                 @id @default(cuid())
   // Folio humano correlativo. El código "EXC-####" se DERIVA en el backend.
-  number Int    @unique @default(autoincrement())
+  number            Int                    @unique @default(autoincrement())
   // --- Origen del dato (contexto congelado; refs blandas) -----------------------
   logEntryId        String
   templateId        String?
@@ -2223,40 +2223,40 @@ model LogEntryException {
   // Referencia a la celda de una TABLE/MATRIX (MVP: nivel de campo, suele null).
   occurrenceRef     String?
   // --- Valor (jsonb; el original es INMUTABLE) ----------------------------------
-  originalValue Json?
-  bandsSnapshot Json? // {warnLow,warnHigh,critLow,critHigh} efectivas en la detección
+  originalValue     Json?
+  bandsSnapshot     Json? // {warnLow,warnHigh,critLow,critHigh} efectivas en la detección
   // --- Disparador ---------------------------------------------------------------
-  triggerKind   ExceptionTrigger
-  thresholdType ExceptionThresholdType
-  ruleKey       String?
-  ruleVersionId String?
-  ruleSeverity  String?
-  detail        String? // descripción legible (regla/manual)
+  triggerKind       ExceptionTrigger
+  thresholdType     ExceptionThresholdType
+  ruleKey           String?
+  ruleVersionId     String?
+  ruleSeverity      String?
+  detail            String? // descripción legible (regla/manual)
   // --- Operacional (denormalizado; refs blandas) --------------------------------
-  orgNodeId     String
-  equipmentId   String?
-  shiftCode     String?
-  operatorId    String?
-  detectedAt    DateTime  @default(now())
-  entrySealedAt DateTime?
+  orgNodeId         String
+  equipmentId       String?
+  shiftCode         String?
+  operatorId        String?
+  detectedAt        DateTime               @default(now())
+  entrySealedAt     DateTime?
   // --- Triage -------------------------------------------------------------------
-  status        ExceptionStatus @default(OPEN)
-  triagedById   String?
-  triagedAt     DateTime?
-  dismissReason String?
+  status            ExceptionStatus        @default(OPEN)
+  triagedById       String?
+  triagedAt         DateTime?
+  dismissReason     String?
   // --- Corrección (GxP: el original arriba NUNCA se pierde) ----------------------
-  correctedValue  Json?
-  correctionReason String?
-  correctedById   String?
-  correctedAt     DateTime?
+  correctedValue    Json?
+  correctionReason  String?
+  correctedById     String?
+  correctedAt       DateTime?
   // --- Ligazón (N:1 denormalizado para filtros rápidos; el link table es la fuente) -
-  incidentId String?
+  incidentId        String?
   // Idempotencia: una sola excepción viva por (entrada, campo, ocurrencia, disparador).
-  dedupeKey  String? @unique
-  createdById String?
-  updatedById String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  dedupeKey         String?                @unique
+  createdById       String?
+  updatedById       String?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
 
   links IncidentExceptionLink[]
 
@@ -2344,45 +2344,45 @@ enum IncidentActionOutcome {
 // motivo). Refs BLANDAS a usuario/rol (patrón Incident). La evidencia (archivos) se
 // reserva (`evidence` jsonb, descriptores Ola 3) y la subida se difiere a follow-up.
 model IncidentAction {
-  id          String   @id @default(cuid())
+  id                   String                 @id @default(cuid())
   // Folio humano correlativo; el código "ACT-####" se DERIVA en el backend.
-  number      Int      @unique @default(autoincrement())
-  incidentId  String
-  kind        IncidentActionKind
-  title       String
-  description String?
+  number               Int                    @unique @default(autoincrement())
+  incidentId           String
+  kind                 IncidentActionKind
+  title                String
+  description          String?
   // Si está abierta, bloquea el cierre de la incidencia.
-  mandatory   Boolean  @default(false)
+  mandatory            Boolean                @default(false)
   // Responsable: persona y/o grupo (rol). Refs blandas.
-  responsibleId     String?
-  responsibleRoleId String?
-  dueAt             DateTime?
-  status            IncidentActionStatus @default(OPEN)
+  responsibleId        String?
+  responsibleRoleId    String?
+  dueAt                DateTime?
+  status               IncidentActionStatus   @default(OPEN)
   // --- Realización --------------------------------------------------------------
-  completedAt    DateTime?
-  completedById  String?
-  completionNote String?
+  completedAt          DateTime?
+  completedById        String?
+  completionNote       String?
   // --- Verificación de eficacia (DONE → VERIFIED; permiso separado) -------------
   verifiedAt           DateTime?
   verifiedById         String?
   effectivenessOutcome IncidentActionOutcome?
   verificationNote     String?
   // --- Anulación (sin borrado físico) -------------------------------------------
-  canceledAt   DateTime?
-  cancelReason String?
-  canceledById String?
+  canceledAt           DateTime?
+  cancelReason         String?
+  canceledById         String?
   // --- Evidencia (reservado; descriptores Ola 3 — subida diferida) --------------
-  evidence    Json?
+  evidence             Json?
   // Causa raíz que esta acción ATIENDE (Fase 4.2b; ref. blanda, SetNull). Opcional:
   // las acciones de contención inmediata no nacen de la investigación de causa raíz.
-  investigationStepId String?
-  createdById String?
-  updatedById String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  investigationStepId  String?
+  createdById          String?
+  updatedById          String?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
 
-  incident Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
-  role     Role?    @relation(fields: [responsibleRoleId], references: [id], onDelete: SetNull)
+  incident          Incident                   @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  role              Role?                      @relation(fields: [responsibleRoleId], references: [id], onDelete: SetNull)
   investigationStep IncidentInvestigationStep? @relation(fields: [investigationStepId], references: [id], onDelete: SetNull)
 
   @@index([incidentId, createdAt])
@@ -2412,24 +2412,24 @@ enum IncidentInvestigationStatus {
 // debe estar COMPLETED (con ≥1 causa raíz) para cerrar la incidencia. Sin borrado
 // físico (la incidencia no se borra; la investigación vive con ella).
 model IncidentInvestigation {
-  id         String   @id @default(cuid())
-  incidentId String   @unique
-  method     IncidentInvestigationMethod @default(FIVE_WHYS)
-  status     IncidentInvestigationStatus @default(DRAFT)
+  id               String                      @id @default(cuid())
+  incidentId       String                      @unique
+  method           IncidentInvestigationMethod @default(FIVE_WHYS)
+  status           IncidentInvestigationStatus @default(DRAFT)
   // Enunciado del problema a investigar (el "porqué 0" / problem statement).
   problemStatement String
   // Síntesis de la(s) causa(s) raíz (texto narrativo; las causas formales son los
   // pasos marcados `isRootCause`).
   rootCauseSummary String?
-  conductedById String? // quién condujo la investigación (ref. blanda)
-  completedAt   DateTime?
-  completedById String?
-  createdById   String?
-  updatedById   String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  conductedById    String? // quién condujo la investigación (ref. blanda)
+  completedAt      DateTime?
+  completedById    String?
+  createdById      String?
+  updatedById      String?
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
 
-  incident Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  incident Incident                    @relation(fields: [incidentId], references: [id], onDelete: Cascade)
   steps    IncidentInvestigationStep[]
 
   @@index([status])
@@ -2442,13 +2442,13 @@ model IncidentInvestigationStep {
   investigationId String
   order           Int
   // La pregunta "¿por qué?" (enunciado) y su respuesta.
-  statement String
-  answer    String?
+  statement       String
+  answer          String?
   // ¿Este paso es una causa raíz? (terminal de una rama). Las acciones CAPA pueden
   // ligarse a una causa raíz.
-  isRootCause Boolean @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isRootCause     Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   investigation IncidentInvestigation @relation(fields: [investigationId], references: [id], onDelete: Cascade)
   actions       IncidentAction[]
@@ -2495,23 +2495,23 @@ enum IncidentReportStatus {
 // vertical — JAMÁS hardcodeados en la lógica. La aplicabilidad (a qué tipos y desde
 // qué severidad) y la obligatoriedad (mandatory = bloquea el cierre) son DATO.
 model ReportingObligation {
-  id                String   @id @default(cuid())
-  key               String   @unique // estable, ej. "reporte-autoridad-ambiental"
+  id                String    @id @default(cuid())
+  key               String    @unique // estable, ej. "reporte-autoridad-ambiental"
   name              String
   description       String?
   authorityName     String? // a quién se reporta (informativo)
   // Plazo por defecto en minutos desde la materialización (null = sin plazo).
   defaultDueMinutes Int?
   // Tipos de incidencia a los que aplica. Vacío = TODOS los tipos (transversal).
-  appliesToTypeIds  String[] @default([])
+  appliesToTypeIds  String[]  @default([])
   // Severidad mínima a la que aplica (null = cualquiera).
   minSeverity       Int?
   // ¿Legalmente vinculante? Si sí, su reporte PENDIENTE bloquea el cierre.
-  mandatory         Boolean  @default(false)
-  active            Boolean  @default(true)
-  sortOrder         Int      @default(0)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  mandatory         Boolean   @default(false)
+  active            Boolean   @default(true)
+  sortOrder         Int       @default(0)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
   deletedAt         DateTime?
 
   reports IncidentReport[]
@@ -2525,33 +2525,33 @@ model ReportingObligation {
 // para integridad histórica: cambiar el catálogo después NO altera lo ya
 // materializado (GxP). Sin borrado físico (anulación = CANCELED con motivo).
 model IncidentReport {
-  id            String @id @default(cuid())
+  id             String               @id @default(cuid())
   // Folio humano correlativo; el código "REP-####" se DERIVA en el backend.
-  number        Int    @unique @default(autoincrement())
-  incidentId    String
-  obligationId  String
+  number         Int                  @unique @default(autoincrement())
+  incidentId     String
+  obligationId   String
   // --- Snapshot de la obligación en la materialización -------------------------
   obligationName String
   authorityName  String?
-  mandatory      Boolean @default(false)
+  mandatory      Boolean              @default(false)
   // --- Estado / plazo (vencido se deriva) --------------------------------------
-  status        IncidentReportStatus @default(PENDING)
-  dueAt         DateTime?
+  status         IncidentReportStatus @default(PENDING)
+  dueAt          DateTime?
   // --- Envío (evidencia de cumplimiento) ---------------------------------------
-  submittedAt   DateTime?
-  submittedById String?
-  externalFolio String? // folio/número que entrega la autoridad
-  notes         String?
+  submittedAt    DateTime?
+  submittedById  String?
+  externalFolio  String? // folio/número que entrega la autoridad
+  notes          String?
   // --- Anulación (sin borrado físico) ------------------------------------------
-  canceledAt    DateTime?
-  cancelReason  String?
-  canceledById  String?
+  canceledAt     DateTime?
+  cancelReason   String?
+  canceledById   String?
   // --- Evidencia (reservado; descriptores Ola 3 — subida diferida) -------------
-  evidence      Json?
-  createdById   String?
-  updatedById   String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  evidence       Json?
+  createdById    String?
+  updatedById    String?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
 
   incident   Incident            @relation(fields: [incidentId], references: [id], onDelete: Cascade)
   obligation ReportingObligation @relation(fields: [obligationId], references: [id], onDelete: Restrict)
@@ -2745,42 +2745,42 @@ enum WorkOrderLifecycle {
 // Catalogo configurable de TIPOS de OT (espejo de IncidentType). El flujo por
 // defecto y el esquema de folio se congelan/leen al operar; ref. blandas.
 model WorkOrderType {
-  id                 String  @id @default(cuid())
-  key                String  @unique
-  name               String
-  description        String?
-  color              String? // token del DS para el chip
+  id                              String    @id @default(cuid())
+  key                             String    @unique
+  name                            String
+  description                     String?
+  color                           String? // token del DS para el chip
   // --- Workflow (S2): flujo por defecto que se congela al crear (ref. blanda) -----
-  defaultWorkflowId  String?
-  requiresPtwDefault Boolean @default(false)
-  criticalityDefault Int? // 1..5 sugerida al crear
+  defaultWorkflowId               String?
+  requiresPtwDefault              Boolean   @default(false)
+  criticalityDefault              Int? // 1..5 sugerida al crear
   // --- Folio (S2: FolioCounter) - esquema configurable, INERTE en S1 --------------
-  folioScheme        Json? // {prefix, mask, padding, start, scope, reset}
-  folioOnStateKey    String? // estado al que, al ENTRAR, se emite el folio (default "aprobada")
+  folioScheme                     Json? // {prefix, mask, padding, start, scope, reset}
+  folioOnStateKey                 String? // estado al que, al ENTRAR, se emite el folio (default "aprobada")
   // --- Checklists / Puerta 2 (S3): claves de estado data-driven (default por constante) ---
-  checklistSuggestStateKey String? // estado que dispara la sugerencia de checklists (default "en_preparacion")
-  checklistGateStateKey    String? // estado-puerta: sólo se ENTRA con checklists obligatorios APROBADOS (default "checklists_ok")
+  checklistSuggestStateKey        String? // estado que dispara la sugerencia de checklists (default "en_preparacion")
+  checklistGateStateKey           String? // estado-puerta: sólo se ENTRA con checklists obligatorios APROBADOS (default "checklists_ok")
   // --- Plan / Puerta 3 (S4): claves de estado data-driven (default por constante) --------
-  planFreezeStateKey String? // estado al que, al ENTRAR, se CONGELA la baseline del plan (default "plan_aprobado")
-  executeStateKey    String? // estado de ejecución: sólo se ENTRA con la baseline del plan congelada (default "en_ejecucion")
+  planFreezeStateKey              String? // estado al que, al ENTRAR, se CONGELA la baseline del plan (default "plan_aprobado")
+  executeStateKey                 String? // estado de ejecución: sólo se ENTRA con la baseline del plan congelada (default "en_ejecucion")
   // --- Checklists de CIERRE / Puerta 4 (S5b): momento CLOSURE data-driven (default constante) --
   closureChecklistSuggestStateKey String? // estado que dispara la sugerencia de checklists de CIERRE (default "en_revision_cierre")
   // --- SLA light (S6, espejo IncidentType) ----------------------------------------
-  resolutionDueMinutes   Int?
-  escalationAfterMinutes Int?
-  escalationRoleId       String?
+  resolutionDueMinutes            Int?
+  escalationAfterMinutes          Int?
+  escalationRoleId                String?
   // --- Dotacion del permiso (S1): activacion OPTATIVA por tipo --------------------
   // Sin esto la OT NO muestra dotacion (cero friccion/regresion). El dueño: "no aplica
   // siempre ni a todas las OT". Las EXIGENCIAS concretas (que competencia, a quien) se
   // derivan de reglas data-driven en S2 (WorkOrderCompetencyRule).
-  rosterEnabled      Boolean  @default(false)
-  active             Boolean  @default(true)
-  sortOrder          Int      @default(0)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-  deletedAt          DateTime?
+  rosterEnabled                   Boolean   @default(false)
+  active                          Boolean   @default(true)
+  sortOrder                       Int       @default(0)
+  createdAt                       DateTime  @default(now())
+  updatedAt                       DateTime  @updatedAt
+  deletedAt                       DateTime?
 
-  escalationRole Role?                     @relation("WorkOrderTypeEscalationRole", fields: [escalationRoleId], references: [id], onDelete: SetNull)
+  escalationRole Role?       @relation("WorkOrderTypeEscalationRole", fields: [escalationRoleId], references: [id], onDelete: SetNull)
   workOrders     WorkOrder[]
 
   @@index([active])
@@ -2793,101 +2793,102 @@ model WorkOrderType {
 // N:N con la OT. La UBICACION la da orgNodeId (estructura, incluye nivel "Area"), NO
 // un catalogo aparte (como en los EAM lideres). Ver DECISIONS 2026-07-01.
 model Specialty {
-  id          String   @id @default(cuid())
-  key         String   @unique
+  id          String    @id @default(cuid())
+  key         String    @unique
   name        String
   description String?
   color       String?
-  active      Boolean  @default(true)
-  sortOrder   Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  active      Boolean   @default(true)
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
 
-  workOrders     WorkOrderSpecialty[]
-  checklistRules WorkOrderChecklistRule[]
-  activities     WorkActivity[]          @relation("WorkActivitySpecialty")
+  workOrders      WorkOrderSpecialty[]
+  checklistRules  WorkOrderChecklistRule[]
+  competencyRules WorkOrderCompetencyRule[]
+  activities      WorkActivity[]            @relation("WorkActivitySpecialty")
 
   @@index([active])
   @@index([deletedAt])
 }
 
 model WorkOrder {
-  id          String  @id @default(cuid())
+  id                          String             @id @default(cuid())
   // Correlativo interno provisional (patron Incident.number): da a la SOLICITUD un
   // handle humano estable "SOL-######" ANTES de tener folio oficial. El FOLIO oficial
   // gapless (OT-2026-0001) se emite SOLO al aprobar (S2, FolioCounter) -> folio inerte aqui.
-  number      Int     @unique @default(autoincrement())
-  folio       String? @unique // "OT-2026-0001" (humano, inmutable; null hasta aprobacion - S2)
-  folioSeqKey String? // clave de secuencia usada (auditoria del contador - S2)
-  folioIssuedAt DateTime?
-  title       String
-  description String?
-  typeId      String
-  originType  WorkOrderOrigin   @default(DIRECT)
-  criticality Int // 1..5 (tokens severidad; significado operacional)
-  priority    WorkOrderPriority @default(MEDIUM)
+  number                      Int                @unique @default(autoincrement())
+  folio                       String?            @unique // "OT-2026-0001" (humano, inmutable; null hasta aprobacion - S2)
+  folioSeqKey                 String? // clave de secuencia usada (auditoria del contador - S2)
+  folioIssuedAt               DateTime?
+  title                       String
+  description                 String?
+  typeId                      String
+  originType                  WorkOrderOrigin    @default(DIRECT)
+  criticality                 Int // 1..5 (tokens severidad; significado operacional)
+  priority                    WorkOrderPriority  @default(MEDIUM)
   // Riesgo ISO 31000 (ejes de la matriz; nivel se deriva con riskLevelFor).
-  riskProbability Int?
-  riskConsequence Int?
-  requiresPtw     Boolean @default(false) // exige permiso de trabajo? (default del tipo, override)
+  riskProbability             Int?
+  riskConsequence             Int?
+  requiresPtw                 Boolean            @default(false) // exige permiso de trabajo? (default del tipo, override)
   // --- Ubicacion / alcance (orgNode = ancla ABAC; location = detalle libre) --------
-  orgNodeId      String
-  equipmentId    String?
-  locationDetail String?
-  shiftCode      String?
+  orgNodeId                   String
+  equipmentId                 String?
+  locationDetail              String?
+  shiftCode                   String?
   // --- Workflow congelado (denormalizado, patron Incident) - INERTE en S1 ----------
   workflowDefinitionId        String?
   workflowDefinitionVersionId String?
   currentStateKey             String?
-  currentStateSince           DateTime @default(now())
+  currentStateSince           DateTime           @default(now())
   lifecycle                   WorkOrderLifecycle @default(DRAFT)
   // --- Personas / fechas -----------------------------------------------------------
-  requesterId String? // solicitante (ref. blanda)
-  ownerId     String? // responsable de la OT
-  requestedAt DateTime  @default(now())
-  detectedAt  DateTime?
-  plannedStart DateTime? // tentativa (baseline se congela en Puerta 3 - S4)
-  plannedEnd   DateTime?
-  dueAt        DateTime? // SLA de resolucion (S6)
+  requesterId                 String? // solicitante (ref. blanda)
+  ownerId                     String? // responsable de la OT
+  requestedAt                 DateTime           @default(now())
+  detectedAt                  DateTime?
+  plannedStart                DateTime? // tentativa (baseline se congela en Puerta 3 - S4)
+  plannedEnd                  DateTime?
+  dueAt                       DateTime? // SLA de resolucion (S6)
   // --- Puerta 3 (S4): baseline del plan congelada -----------------------------------
-  planFrozenAt   DateTime? // cuando se autorizo/congelo el plan (Puerta 3)
-  planFrozenById String?
+  planFrozenAt                DateTime? // cuando se autorizo/congelo el plan (Puerta 3)
+  planFrozenById              String?
   // --- Gobierno 2 (S5b Slice B): confirmacion del SET de verificaciones de EJECUCION ----
   // El aprobador cura y CONFIRMA (solo lectura) el set de checklists de ejecucion por
   // actividad ANTES de autorizar el permiso => trazabilidad "lo aplicado = lo autorizado".
   // Se limpia si el set cambia despues (agregar/quitar). Gate en la autorizacion del permiso.
-  executionSetConfirmedAt   DateTime?
-  executionSetConfirmedById String?
+  executionSetConfirmedAt     DateTime?
+  executionSetConfirmedById   String?
   // --- Dotacion del permiso (S1): confirmacion FIRMADA del roster por el aprobador ----
   // Espejo EXACTO de executionSetConfirmedAt/ById (Gobierno 2). El aprobador ve la
   // dotacion con semaforo por persona, la cura y CONFIRMA (firma Part 11) => gate a
   // autorizar el permiso. Se limpia si el roster cambia despues (auto-limpieza al curar).
   // Traza: OSHA 1910.146(e)(2) el supervisor de entrada FIRMA para autorizar la entrada.
-  rosterConfirmedAt   DateTime?
-  rosterConfirmedById String?
+  rosterConfirmedAt           DateTime?
+  rosterConfirmedById         String?
   // --- Puerta 1 (aprobacion de la solicitud) - INERTE en S1 ------------------------
-  approvedAt   DateTime?
-  approvedById String?
-  rejectedAt   DateTime?
-  rejectReason String?
-  rejectedById String?
+  approvedAt                  DateTime?
+  approvedById                String?
+  rejectedAt                  DateTime?
+  rejectReason                String?
+  rejectedById                String?
   // --- Cierre / anulacion (sin borrado fisico) -------------------------------------
-  closedAt      DateTime?
-  closedById    String?
-  closureSummary String?
-  canceledAt    DateTime?
-  cancelReason  String?
-  canceledById  String?
+  closedAt                    DateTime?
+  closedById                  String?
+  closureSummary              String?
+  canceledAt                  DateTime?
+  cancelReason                String?
+  canceledById                String?
   // --- Origen / ligazon bidireccional (refs blandas) -------------------------------
-  originIncidentId  String?
-  originLogEntryId  String?
-  originExceptionId String?
-  createdById  String?
-  updatedById  String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  deletedAt    DateTime?
+  originIncidentId            String?
+  originLogEntryId            String?
+  originExceptionId           String?
+  createdById                 String?
+  updatedById                 String?
+  createdAt                   DateTime           @default(now())
+  updatedAt                   DateTime           @updatedAt
+  deletedAt                   DateTime?
 
   type        WorkOrderType         @relation(fields: [typeId], references: [id], onDelete: Restrict)
   orgNode     OrgNode               @relation(fields: [orgNodeId], references: [id], onDelete: Restrict)
@@ -3008,8 +3009,10 @@ model Person {
   updatedAt           DateTime   @updatedAt
   deletedAt           DateTime?
 
-  contractorCompany ContractorCompany? @relation(fields: [contractorCompanyId], references: [id], onDelete: SetNull)
+  contractorCompany ContractorCompany?  @relation(fields: [contractorCompanyId], references: [id], onDelete: SetNull)
   rosterEntries     WorkOrderWorker[]
+  competencies      PersonCompetency[]
+  restrictions      PersonRestriction[]
 
   @@index([kind])
   @@index([contractorCompanyId])
@@ -3075,7 +3078,8 @@ model RosterRole {
   updatedAt         DateTime  @updatedAt
   deletedAt         DateTime?
 
-  rosterEntries WorkOrderWorker[]
+  rosterEntries   WorkOrderWorker[]
+  competencyRules WorkOrderCompetencyRule[]
 
   @@index([active])
   @@index([deletedAt])
@@ -3088,23 +3092,23 @@ model RosterRole {
 // tener >1 rol (OSHA: el supervisor de entrada puede ademas ser vigia/entrant si esta
 // capacitado).
 model WorkOrderWorker {
-  id           String @id @default(cuid())
-  workOrderId  String
-  personId     String
-  rosterRoleId String
-  note         String?
-  addedById    String?
-  addedAt      DateTime  @default(now())
-  removedAt    DateTime?
-  removedById  String?
-  removeReason String?
+  id                  String    @id @default(cuid())
+  workOrderId         String
+  personId            String
+  rosterRoleId        String
+  note                String?
+  addedById           String?
+  addedAt             DateTime  @default(now())
+  removedAt           DateTime?
+  removedById         String?
+  removeReason        String?
   // Override gobernado (S2, reservado): confirmar con la persona en ROJO exige motivo + firma.
   overrideReason      String?
   overrideById        String?
   overrideAt          DateTime?
   overrideSignatureId String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   workOrder  WorkOrder  @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
   person     Person     @relation(fields: [personId], references: [id], onDelete: Restrict)
@@ -3114,6 +3118,153 @@ model WorkOrderWorker {
   @@index([workOrderId])
   @@index([personId])
   @@index([removedAt])
+}
+
+// ==========================================================================
+// DOTACION - Slice 2: competencias/certificaciones con vigencia + reglas + veto
+// ==========================================================================
+
+// Categoria de una competencia (traza estandar): certificacion, formacion, examen
+// medico (Chile Ley 16.744 art.71 preocupacional), induccion (Chile DS 44 ODI /
+// DS 132 SERNAGEOMIN), o licencia (conduccion/operacion de equipo).
+enum CompetencyCategory {
+  CERTIFICATION
+  TRAINING
+  MEDICAL_EXAM
+  INDUCTION
+  LICENSE
+}
+
+// Catalogo: QUE certificacion/formacion existe (no quien la posee). Traza:
+// ISO 45001 §7.2 (competencia necesaria) + IBM Maximo Qualifications (Craft/Qual con
+// Effective+Duration) + SAP HR Qualifications Catalog (validity). `defaultValidityDays`
+// = duracion tipica al emitir; `requiresExpiry` = false para competencias sin vencimiento
+// (p.ej. un titulo). `warningLeadDays` = ventana AMBAR "por vencer" por tipo (S2-C;
+// fallback constante 30 d si null) — traza ISN flag-90d / practica 30-14-7.
+model CompetencyType {
+  id                  String             @id @default(cuid())
+  key                 String             @unique
+  name                String
+  description         String?
+  category            CompetencyCategory
+  defaultValidityDays Int?
+  requiresExpiry      Boolean            @default(true)
+  warningLeadDays     Int?
+  active              Boolean            @default(true)
+  sortOrder           Int                @default(0)
+  createdById         String?
+  updatedById         String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  deletedAt           DateTime?
+
+  personCompetencies PersonCompetency[]
+  requirementRules   WorkOrderCompetencyRule[]
+
+  @@index([category])
+  @@index([active])
+  @@index([deletedAt])
+}
+
+// La persona POSEE una competencia (con vigencia + evidencia + verificacion). Traza:
+// ISO 45001 §7.2 (conservar informacion documentada como EVIDENCIA de competencia) +
+// Maximo Qualification (Effective/Expiration Date) + SAP validity. RENOVAR = registro
+// NUEVO (soft-delete el viejo, no se sobreescribe): historial estilo Maximo LABORCERTHIST
+// (la Expiration Date es inmutable una vez guardada; extend/renew crea otra fila).
+// El estado VALID/EXPIRING/EXPIRED es DERIVADO de expiresAt vs ahora (no se almacena).
+model PersonCompetency {
+  id                String    @id @default(cuid())
+  personId          String
+  competencyTypeId  String
+  issuedAt          DateTime // "Effective Date"
+  expiresAt         DateTime? // null = sin vencimiento (requiresExpiry=false)
+  certificateNumber String?
+  issuedBy          String? // organismo/instructor emisor
+  evidence          Json? // descriptores de adjunto (Ola 3), reservado
+  verifiedById      String? // quien valido la evidencia (ISO 45001 evidencia documentada)
+  verifiedAt        DateTime?
+  note              String?
+  createdById       String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime? // renovar = nuevo registro; el anterior queda soft (historial)
+
+  person         Person         @relation(fields: [personId], references: [id], onDelete: Cascade)
+  competencyType CompetencyType @relation(fields: [competencyTypeId], references: [id], onDelete: Restrict)
+
+  @@index([personId])
+  @@index([competencyTypeId])
+  @@index([expiresAt])
+  @@index([deletedAt])
+}
+
+// Tipo de veto/restriccion sobre una persona (Eje B - autorizacion/designacion).
+enum RestrictionType {
+  MEDICAL // no apto por vigilancia de salud
+  DISCIPLINARY // sancion interna
+  SITE_BAN // prohibicion de acceso a faena
+  OTHER
+}
+
+// Veto/restriccion de una persona (Eje B). Traza: OSHA "authorized by the employer" —
+// una persona con restriccion activa NO esta autorizada a ingresar, aunque tenga las
+// competencias vigentes (los ejes son ORTOGONALES). Vigencia opcional (endsAt null =
+// indefinida). El semaforo se pone ROJO (RESTRICTION_ACTIVE) mientras este activa y vigente.
+model PersonRestriction {
+  id          String          @id @default(cuid())
+  personId    String
+  type        RestrictionType
+  reason      String
+  startsAt    DateTime        @default(now())
+  endsAt      DateTime? // null = indefinida
+  active      Boolean         @default(true)
+  createdById String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  deletedAt   DateTime?
+
+  person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@index([personId])
+  @@index([active])
+  @@index([endsAt])
+  @@index([deletedAt])
+}
+
+// Regla de REQUISITO de competencia (catalogo, data-driven). ESPEJO EXACTO de
+// WorkOrderChecklistRule/applicableChecklistRules: mismo shape de aplicabilidad
+// (appliesToTypeIds/minCriticality/specialtyId/requiresPtw) + `appliesToRosterRoleId`
+// para exigir la competencia SOLO a cierto rol (p.ej. solo al ejecutante/entrant, traza
+// OSHA). `mandatory` => su ausencia/vencimiento pone ROJO y bloquea confirmar la dotacion.
+// Gate del catalogo: reusa `workordercatalog:manage` (es otro catalogo, como Tipos).
+model WorkOrderCompetencyRule {
+  id                    String    @id @default(cuid())
+  name                  String
+  competencyTypeId      String
+  mandatory             Boolean   @default(true)
+  // Aplicabilidad (todo vacio/null = aplica a todas las OT / todos los roles):
+  appliesToTypeIds      String[]  @default([]) // WorkOrderType.id (vacio = todos)
+  minCriticality        Int? // criticidad minima (null = cualquiera)
+  specialtyId           String? // disciplina (null = cualquiera)
+  requiresPtw           Boolean? // solo si el flag PTW de la OT coincide (null = no discrimina)
+  appliesToRosterRoleId String? // exigir solo a cierto rol (null = a toda la dotacion)
+  active                Boolean   @default(true)
+  sortOrder             Int       @default(0)
+  createdById           String?
+  updatedById           String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  deletedAt             DateTime?
+
+  competencyType CompetencyType @relation(fields: [competencyTypeId], references: [id], onDelete: Restrict)
+  specialty      Specialty?     @relation(fields: [specialtyId], references: [id], onDelete: SetNull)
+  rosterRole     RosterRole?    @relation(fields: [appliesToRosterRoleId], references: [id], onDelete: SetNull)
+
+  @@index([competencyTypeId])
+  @@index([specialtyId])
+  @@index([appliesToRosterRoleId])
+  @@index([active])
+  @@index([deletedAt])
 }
 
 // Estado de un checklist operativo (Capa B, Puerta 2 - S3). IN_PROGRESS = LogEntry
@@ -3145,26 +3296,26 @@ enum WorkOrderChecklistMoment {
 // OT se sugiere (patron appliesToTypeIds/minSeverity de ReportingObligation). NO
 // hay catalogo "Area" (la ubicacion = OrgNode); el eje de disciplina = Specialty.
 model WorkOrderChecklistRule {
-  id               String   @id @default(cuid())
+  id               String                   @id @default(cuid())
   name             String
   templateId       String // -> Template (checklist a instanciar; Restrict)
   // MOMENTO del ciclo en que se exige (S5b). Default AUTHORIZATION = comportamiento S3
   // (retrocompatible: las reglas existentes se leen como de autorizacion).
   moment           WorkOrderChecklistMoment @default(AUTHORIZATION)
-  mandatory        Boolean  @default(false) // obligatorio => no removible, bloquea la puerta de su momento
+  mandatory        Boolean                  @default(false) // obligatorio => no removible, bloquea la puerta de su momento
   // Aplicabilidad (todo vacio/null = aplica a todas las OT):
-  appliesToTypeIds String[] @default([]) // WorkOrderType.id (vacio = todos los tipos)
+  appliesToTypeIds String[]                 @default([]) // WorkOrderType.id (vacio = todos los tipos)
   minCriticality   Int? // criticidad minima (null = cualquiera)
   specialtyId      String? // disciplina (null = cualquiera)
   requiresPtw      Boolean? // solo si el flag PTW de la OT coincide (null = no discrimina)
-  active           Boolean  @default(true)
-  sortOrder        Int      @default(0)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  active           Boolean                  @default(true)
+  sortOrder        Int                      @default(0)
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
   deletedAt        DateTime?
 
-  template  Template   @relation(fields: [templateId], references: [id], onDelete: Restrict)
-  specialty Specialty? @relation(fields: [specialtyId], references: [id], onDelete: SetNull)
+  template   Template             @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  specialty  Specialty?           @relation(fields: [specialtyId], references: [id], onDelete: SetNull)
   checklists WorkOrderChecklist[]
 
   @@index([templateId])
@@ -3235,46 +3386,46 @@ enum WorkActivityStatus {
 // blockingActivitiesForClose). `dependsOnId` = predecesora (ruta critica = S8, hoy
 // solo la columna). ABAC heredado de la OT (por nodo). Sin borrado fisico (CANCELED).
 model WorkActivity {
-  id                String  @id @default(cuid())
+  id                String             @id @default(cuid())
   workOrderId       String
   title             String
   description       String?
-  sequence          Int     @default(0) // orden en el plan
+  sequence          Int                @default(0) // orden en el plan
   responsibleId     String? // ref. blanda
   responsibleRoleId String?
   specialtyId       String? // disciplina (SetNull)
   // --- Planificacion (baseline congelada en Puerta 3) -----------------------------
-  plannedStart  DateTime? // plan VIVO (editable hasta congelar)
-  plannedEnd    DateTime?
-  baselineStart DateTime? // congelado al autorizar el plan => mide desviacion
-  baselineEnd   DateTime?
-  actualStart   DateTime? // avance real (S5)
-  actualEnd     DateTime?
-  estimatedHours Decimal? @db.Decimal(10, 2) // reservado (S8)
-  actualHours    Decimal? @db.Decimal(10, 2) // reservado (S8)
-  progressPct   Int                @default(0) // 0..100
-  status        WorkActivityStatus @default(PENDING)
-  mandatory     Boolean            @default(true) // abierta => bloquea cierre (Puerta 4)
-  dependsOnId   String? // predecesora (self, SetNull) - ruta critica (S8)
-  priority      WorkOrderPriority?
-  delayReason   String?
-  completedAt    DateTime?
-  completedById  String?
-  completionNote String?
-  canceledAt   DateTime?
-  cancelReason String?
-  canceledById String?
-  evidence     Json? // reservado (descriptores Ola 3)
-  createdById String?
-  updatedById String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  plannedStart      DateTime? // plan VIVO (editable hasta congelar)
+  plannedEnd        DateTime?
+  baselineStart     DateTime? // congelado al autorizar el plan => mide desviacion
+  baselineEnd       DateTime?
+  actualStart       DateTime? // avance real (S5)
+  actualEnd         DateTime?
+  estimatedHours    Decimal?           @db.Decimal(10, 2) // reservado (S8)
+  actualHours       Decimal?           @db.Decimal(10, 2) // reservado (S8)
+  progressPct       Int                @default(0) // 0..100
+  status            WorkActivityStatus @default(PENDING)
+  mandatory         Boolean            @default(true) // abierta => bloquea cierre (Puerta 4)
+  dependsOnId       String? // predecesora (self, SetNull) - ruta critica (S8)
+  priority          WorkOrderPriority?
+  delayReason       String?
+  completedAt       DateTime?
+  completedById     String?
+  completionNote    String?
+  canceledAt        DateTime?
+  cancelReason      String?
+  canceledById      String?
+  evidence          Json? // reservado (descriptores Ola 3)
+  createdById       String?
+  updatedById       String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 
-  workOrder  WorkOrder      @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
-  specialty  Specialty?     @relation("WorkActivitySpecialty", fields: [specialtyId], references: [id], onDelete: SetNull)
-  dependsOn  WorkActivity?  @relation("WorkActivityDeps", fields: [dependsOnId], references: [id], onDelete: SetNull)
-  dependents WorkActivity[] @relation("WorkActivityDeps")
-  updates    WorkActivityUpdate[]
+  workOrder           WorkOrder            @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  specialty           Specialty?           @relation("WorkActivitySpecialty", fields: [specialtyId], references: [id], onDelete: SetNull)
+  dependsOn           WorkActivity?        @relation("WorkActivityDeps", fields: [dependsOnId], references: [id], onDelete: SetNull)
+  dependents          WorkActivity[]       @relation("WorkActivityDeps")
+  updates             WorkActivityUpdate[]
   executionChecklists WorkOrderChecklist[] // checklists de EJECUCION ligados a esta actividad (Slice B)
 
   @@index([workOrderId, sequence])
@@ -3291,7 +3442,7 @@ model WorkActivity {
 // terreno. La foto vigente (status/progressPct/actual*) vive DENORMALIZADA en
 // `WorkActivity`; este historial explica como llego ahi. hoursSpent/cost = S8.
 model WorkActivityUpdate {
-  id             String   @id @default(cuid())
+  id             String              @id @default(cuid())
   workActivityId String
   status         WorkActivityStatus? // estado declarado en este avance (null = sin cambio)
   progressPct    Int? // 0..100 declarado (null = sin cambio)
@@ -3300,12 +3451,12 @@ model WorkActivityUpdate {
   note           String? // nota de avance
   deviation      String? // desviacion respecto al baseline (texto libre)
   delayReason    String? // motivo de atraso / bloqueo
-  hoursSpent     Decimal? @db.Decimal(10, 2) // reservado (S8)
-  cost           Decimal? @db.Decimal(14, 2) // reservado (S8)
+  hoursSpent     Decimal?            @db.Decimal(10, 2) // reservado (S8)
+  cost           Decimal?            @db.Decimal(14, 2) // reservado (S8)
   evidence       Json? // reservado (descriptores Ola 3)
   authorId       String? // ref. blanda
   authorName     String?
-  createdAt      DateTime @default(now())
+  createdAt      DateTime            @default(now())
 
   workActivity WorkActivity @relation(fields: [workActivityId], references: [id], onDelete: Cascade)
 

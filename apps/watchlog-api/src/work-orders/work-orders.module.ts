@@ -4,12 +4,15 @@ import { FolioModule } from "../folio/folio.module";
 import { LogEntriesModule } from "../log-entries/log-entries.module";
 import { WorkOrdersController } from "./work-orders.controller";
 import { PersonsController } from "./persons.controller";
+import { CompetenciesController } from "./competencies.controller";
 import { WorkOrdersService } from "./work-orders.service";
 import { WorkOrderChecklistsService } from "./work-order-checklists.service";
 import { WorkActivitiesService } from "./work-activities.service";
 import { WorkOrderSlaService } from "./work-order-sla.service";
 import { WorkOrderRosterService } from "./work-order-roster.service";
 import { PersonsService } from "./persons.service";
+import { CompetenciesService } from "./competencies.service";
+import { WorkerComplianceService } from "./worker-compliance.service";
 
 /**
  * Órdenes de Trabajo / Work Orders (OT / PTW) — S1 cimientos + S2 Puerta 1 + S3
@@ -21,8 +24,8 @@ import { PersonsService } from "./persons.service";
  */
 @Module({
   imports: [AuthModule, FolioModule, LogEntriesModule],
-  controllers: [WorkOrdersController, PersonsController],
-  providers: [WorkOrdersService, WorkOrderChecklistsService, WorkActivitiesService, WorkOrderSlaService, WorkOrderRosterService, PersonsService],
-  exports: [WorkOrdersService, WorkOrderChecklistsService, WorkActivitiesService, WorkOrderSlaService, WorkOrderRosterService, PersonsService],
+  controllers: [WorkOrdersController, PersonsController, CompetenciesController],
+  providers: [WorkOrdersService, WorkOrderChecklistsService, WorkActivitiesService, WorkOrderSlaService, WorkOrderRosterService, PersonsService, CompetenciesService, WorkerComplianceService],
+  exports: [WorkOrdersService, WorkOrderChecklistsService, WorkActivitiesService, WorkOrderSlaService, WorkOrderRosterService, PersonsService, CompetenciesService, WorkerComplianceService],
 })
 export class WorkOrdersModule {}

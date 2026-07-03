@@ -4,6 +4,35 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-03 · Dotación · Slice 2 — competencias/certificaciones con vigencia + causas rojas
+Hace REAL la validación que S1 dejó inerte (semáforo siempre verde). Entidades nuevas `CompetencyType` (catálogo:
+qué certificación/formación existe; `category CERTIFICATION|TRAINING|MEDICAL_EXAM|INDUCTION|LICENSE`, `defaultValidityDays`,
+`requiresExpiry`) + `PersonCompetency` (la persona POSEE una competencia con `issuedAt/expiresAt/certificateNumber/
+issuedBy/evidence/verificación`; **renovar = registro NUEVO**, historial estilo Maximo `LABORCERTHIST`) + `PersonRestriction`
+(veto Eje B: `MEDICAL|DISCIPLINARY|SITE_BAN|OTHER` con vigencia) + `WorkOrderCompetencyRule` (espejo EXACTO de
+`WorkOrderChecklistRule` + `appliesToRosterRoleId`). Migración aditiva; **sin permiso nuevo** (`worker:manage` cubre
+competencias/restricciones, `workordercatalog:manage` cubre tipos/reglas, `workorder:roster:manage` cubre confirmar/override).
+**Investigación citada** (piezas nuevas, verificadas en fuente primaria, no de memoria): ISN «flag a 90 días» + práctica
+30/14/7 d ⇒ ventana de aviso configurable; Maximo *Expiration Date* inmutable + Extend/Renew crea registro nuevo en
+`LABORCERTHIST` + SAP elimina al vencer ⇒ **renovar = fila nueva, expiración DURA sin gracia**; Maximo no auto-verifica al
+renovar ⇒ `verifiedById/verifiedAt` (ISO 45001 §7.2 evidencia documentada). Forks decididos por el dueño (2026-07-03):
+- **S2-A · `COMPANY_NOT_ACCREDITED` se DIFIERE 100% a S3**: S2 se enfoca en los DOS ejes de la PERSONA (competencia +
+  restricción). La causa de empresa queda reservada/inerte hasta S3 (su casa: el gate por acreditación). Evita falso-bloquear
+  contratistas sin datos de acreditación cargados. *(Recomendación del agente, aprobada.)*
+- **S2-B · Override = UNA firma + motivo por persona**: si al confirmar hay personas en rojo, el aprobador registra un motivo
+  por cada una y firma UNA vez toda la confirmación-con-excepciones (un acto de autorización = una firma; OSHA (e)(2)/Part 11).
+  Motivo por persona en `WorkOrderWorker.overrideReason/ById/At/SignatureId`; evento `WORKER_OVERRIDE` + `AuditLog`.
+- **S2-C · Ventana ámbar por tipo de competencia** (`CompetencyType.warningLeadDays`, fallback const 30 d): data-driven —
+  un examen médico puede avisar a 30 d y una licencia a 90. Alineado a ISN 90d / práctica 30-14-7.
+- **S2-D · Completitud de roles (§6.2, causa `ROLE_MISSING`) DIFERIDA**: S2 se centra en competencia+restricción (el corazón).
+  El enum ya tiene `ROLE_MISSING`; su regla de configuración queda para un slice chico posterior.
+- **Ejes ORTOGONALES no colapsados**: función pura `deriveWorkerReasons(ctx, now)` cruza reglas aplicables × competencias
+  vigentes × restricciones activas → `WorkerBlockReason[]` (Eje A competencia / Eje B autorización, por separado);
+  `evaluateWorkerStatus(reasons)` queda como colapsador de nivel. `applicableCompetencyRules` = clon de `applicableChecklistRules`.
+- **Avisos de vencimiento (Bloque N)**: `WorkerComplianceService.findBreaches()` (clon de `WorkOrderSlaService`) barrido por
+  `sweep()`; eventos `worker.competency.expiring` (a `warningLeadDays`) / `worker.competency.expired`. Traza ISN «tracks all
+  training expirations». Acreditación de empresa → S3.
+
 ### 2026-07-03 · Dotación del permiso (personas/contratistas/roles) — diseño + Slice 1
 Necesidad del dueño: en muchas OT (no todas) hay que gestionar el LISTADO DE PERSONAS que ingresan a ejecutar, y quien
 APRUEBA debe validar esa dotación (quién entra, autorizado, competencias vigentes, sin veto, empresa acreditada). **Diseño

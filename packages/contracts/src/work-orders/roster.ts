@@ -201,6 +201,26 @@ export function evaluateWorkerStatus(ctx: WorkerEvaluationContext): WorkerStatus
   return { level, reasons };
 }
 
+// === Detalle legible de una causa del semáforo (para EXPLICAR el bloqueo) ======
+
+/**
+ * Una causa concreta del semáforo con contexto para redactar el mensaje que ve el
+ * aprobador (§6.2: "qué le falta a quién"). Ej.: COMPETENCY_EXPIRED + "Trabajo en altura"
+ * + expiresAt ⇒ "certificación 'Trabajo en altura' vencida el 12-05-2026". La fecha viaja
+ * como ISO; la UI la formatea por locale (lib/format.ts).
+ */
+export const workerStatusDetailSchema = z.object({
+  reason: z.enum(WORKER_BLOCK_REASONS),
+  competencyTypeId: z.string().nullable().optional(),
+  competencyTypeName: z.string().nullable().optional(),
+  /** Vencimiento relevante (ISO) para COMPETENCY_EXPIRED/EXPIRING (null si no aplica). */
+  expiresAt: z.string().nullable().optional(),
+  /** Contexto de la restricción (RESTRICTION_ACTIVE). */
+  restrictionType: z.string().nullable().optional(),
+  restrictionReason: z.string().nullable().optional(),
+});
+export type WorkerStatusDetail = z.infer<typeof workerStatusDetailSchema>;
+
 // === DTO: persona en el roster de una OT ======================================
 
 export const workOrderWorkerSchema = z.object({
@@ -215,11 +235,21 @@ export const workOrderWorkerSchema = z.object({
   isSupervisorRole: z.boolean(),
   note: z.string().nullable(),
   addedAt: z.string(),
-  /** Semáforo derivado en vivo (S1: siempre "ok"; causas rojas en S2/S3). */
+  /** Semáforo derivado en vivo (S2: causas rojas de competencia/restricción por persona). */
   status: z.object({
     level: z.enum(WORKER_STATUS_LEVELS),
     reasons: z.array(z.enum(WORKER_BLOCK_REASONS)),
+    /** Detalle legible por causa (para explicar el bloqueo en español). */
+    details: z.array(workerStatusDetailSchema),
   }),
+  /** Override gobernado (si se confirmó con la persona en ROJO — §6.3); null si no hubo. */
+  override: z
+    .object({
+      reason: z.string(),
+      byName: z.string().nullable(),
+      at: z.string(),
+    })
+    .nullable(),
 });
 export type WorkOrderWorkerDto = z.infer<typeof workOrderWorkerSchema>;
 
@@ -252,14 +282,359 @@ export const removeWorkOrderWorkerRequestSchema = z.object({
 export type RemoveWorkOrderWorkerRequest = z.infer<typeof removeWorkOrderWorkerRequestSchema>;
 
 /**
+ * Excepción por persona: motivo de autorizar a alguien en ROJO (S2-B). El aprobador
+ * registra un motivo por CADA persona en rojo; la confirmación entera se sella con UNA
+ * firma (un acto de autorización = una firma; OSHA (e)(2)/Part 11).
+ */
+export const rosterOverrideRequestSchema = z.object({
+  workerId: z.string().min(1),
+  reason: z.string().trim().min(1).max(500),
+});
+export type RosterOverrideRequest = z.infer<typeof rosterOverrideRequestSchema>;
+
+/**
  * Confirmar (sellar) la dotación. FIRMADA (Part 11): re-autenticación del aprobador.
  * Traza OSHA 1910.146(e)(2) — la autorización de entrada del supervisor ES una firma.
+ * Si hay personas en ROJO, `overrides` debe traer un motivo por CADA una (S2-B); sin
+ * rojos, se ignora.
  */
 export const confirmRosterRequestSchema = z.object({
   password: z.string().min(1),
   mfaCode: z.string().trim().optional(),
+  overrides: z.array(rosterOverrideRequestSchema).max(200).optional(),
 });
 export type ConfirmRosterRequest = z.infer<typeof confirmRosterRequestSchema>;
 
 /** Significado de la firma de confirmación de dotación (Part 11). */
 export const ROSTER_CONFIRM_SIGNATURE_MEANING = "Autorización de la dotación que ingresa a ejecutar el permiso";
+
+/** Significado de la firma cuando la confirmación incluye override(s) de personas en rojo. */
+export const ROSTER_OVERRIDE_SIGNATURE_MEANING =
+  "Autorización de la dotación con excepción(es) documentada(s) para personas con impedimentos";
+
+// ============================================================================
+// DOTACIÓN · Slice 2 — competencias con vigencia, restricciones y reglas
+// ============================================================================
+
+/**
+ * Ventana AMBAR por defecto ("por vencer"), en días, si el tipo de competencia no fija
+ * su propia `warningLeadDays`. Traza: ISN recomienda flag a 90 días; las prácticas de
+ * compliance avisan a 30/14/7 — 30 es un punto medio sensato y configurable por tipo.
+ */
+export const DEFAULT_COMPETENCY_WARNING_LEAD_DAYS = 30;
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+// === Vocabulario: categoría de competencia ====================================
+
+export const COMPETENCY_CATEGORIES = ["CERTIFICATION", "TRAINING", "MEDICAL_EXAM", "INDUCTION", "LICENSE"] as const;
+export const competencyCategorySchema = z.enum(COMPETENCY_CATEGORIES);
+export type CompetencyCategory = (typeof COMPETENCY_CATEGORIES)[number];
+
+export const COMPETENCY_CATEGORY_META: Record<CompetencyCategory, { label: string; hint: string }> = {
+  CERTIFICATION: { label: "Certificación", hint: "Certificado de competencia (p. ej. trabajo en altura, espacio confinado)" },
+  TRAINING: { label: "Formación", hint: "Curso o capacitación (p. ej. LOTO, primeros auxilios)" },
+  MEDICAL_EXAM: { label: "Examen médico", hint: "Vigilancia de salud (preocupacional/ocupacional, Ley 16.744 art.71)" },
+  INDUCTION: { label: "Inducción", hint: "ODI / inducción de faena (DS 44 art.15; DS 132 SERNAGEOMIN)" },
+  LICENSE: { label: "Licencia", hint: "Licencia habilitante (conducción, operación de equipo)" },
+};
+
+// === Vocabulario: tipo de restricción =========================================
+
+export const RESTRICTION_TYPES = ["MEDICAL", "DISCIPLINARY", "SITE_BAN", "OTHER"] as const;
+export const restrictionTypeSchema = z.enum(RESTRICTION_TYPES);
+export type RestrictionType = (typeof RESTRICTION_TYPES)[number];
+
+export const RESTRICTION_TYPE_META: Record<RestrictionType, { label: string }> = {
+  MEDICAL: { label: "Médica (no apto)" },
+  DISCIPLINARY: { label: "Disciplinaria" },
+  SITE_BAN: { label: "Prohibición de acceso a faena" },
+  OTHER: { label: "Otra" },
+};
+
+// === DTO: CompetencyType (catálogo) ===========================================
+
+export const competencyTypeSchema = z.object({
+  id: z.string(),
+  key: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+  category: competencyCategorySchema,
+  defaultValidityDays: z.number().int().nullable(),
+  requiresExpiry: z.boolean(),
+  warningLeadDays: z.number().int().nullable(),
+  active: z.boolean(),
+  sortOrder: z.number().int(),
+});
+export type CompetencyTypeDto = z.infer<typeof competencyTypeSchema>;
+
+export const upsertCompetencyTypeRequestSchema = z.object({
+  id: z.string().min(1).optional(),
+  key: z.string().trim().min(1).max(60).optional(), // se deriva del nombre al crear si falta
+  name: z.string().trim().min(1).max(160),
+  description: z.string().trim().max(500).nullable().optional(),
+  category: competencyCategorySchema,
+  defaultValidityDays: z.number().int().min(1).max(36500).nullable().optional(),
+  requiresExpiry: z.boolean().optional(),
+  warningLeadDays: z.number().int().min(1).max(3650).nullable().optional(),
+  active: z.boolean().optional(),
+  sortOrder: z.number().int().min(0).max(9999).optional(),
+});
+export type UpsertCompetencyTypeRequest = z.infer<typeof upsertCompetencyTypeRequestSchema>;
+
+// === DTO: PersonCompetency (la persona posee la competencia) ==================
+
+/** Estado de vigencia DERIVADO de una competencia (nunca almacenado). */
+export const COMPETENCY_VALIDITY_STATES = ["valid", "expiring", "expired", "no_expiry"] as const;
+export type CompetencyValidityState = (typeof COMPETENCY_VALIDITY_STATES)[number];
+
+export const COMPETENCY_VALIDITY_META: Record<CompetencyValidityState, { label: string; level: WorkerStatusLevel }> = {
+  valid: { label: "Vigente", level: "ok" },
+  expiring: { label: "Por vencer", level: "warning" },
+  expired: { label: "Vencida", level: "blocked" },
+  no_expiry: { label: "Sin vencimiento", level: "ok" },
+};
+
+export const personCompetencySchema = z.object({
+  id: z.string(),
+  personId: z.string(),
+  competencyTypeId: z.string(),
+  competencyTypeName: z.string(),
+  category: competencyCategorySchema,
+  issuedAt: z.string(),
+  expiresAt: z.string().nullable(),
+  certificateNumber: z.string().nullable(),
+  issuedBy: z.string().nullable(),
+  verifiedById: z.string().nullable(),
+  verifiedByName: z.string().nullable(),
+  verifiedAt: z.string().nullable(),
+  note: z.string().nullable(),
+  /** Estado de vigencia derivado en vivo (para el badge de la fila). */
+  validity: z.enum(COMPETENCY_VALIDITY_STATES),
+});
+export type PersonCompetencyDto = z.infer<typeof personCompetencySchema>;
+
+export const upsertPersonCompetencyRequestSchema = z
+  .object({
+    id: z.string().min(1).optional(), // presente = editar; ausente = crear (renovar = crear otra)
+    competencyTypeId: z.string().min(1),
+    issuedAt: z.string().datetime(),
+    expiresAt: z.string().datetime().nullable().optional(),
+    certificateNumber: z.string().trim().max(80).nullable().optional(),
+    issuedBy: z.string().trim().max(160).nullable().optional(),
+    note: z.string().trim().max(500).nullable().optional(),
+    /** Marca la evidencia como verificada por el actor (ISO 45001 evidencia documentada). */
+    markVerified: z.boolean().optional(),
+  })
+  .refine((d) => !d.expiresAt || d.expiresAt >= d.issuedAt, {
+    message: "La fecha de vencimiento no puede ser anterior a la de emisión",
+    path: ["expiresAt"],
+  });
+export type UpsertPersonCompetencyRequest = z.infer<typeof upsertPersonCompetencyRequestSchema>;
+
+// === DTO: PersonRestriction (veto — Eje B) ====================================
+
+export const personRestrictionSchema = z.object({
+  id: z.string(),
+  personId: z.string(),
+  type: restrictionTypeSchema,
+  reason: z.string(),
+  startsAt: z.string(),
+  endsAt: z.string().nullable(),
+  active: z.boolean(),
+  /** ¿Está vigente ahora? (active && dentro de ventana). Derivado. */
+  effective: z.boolean(),
+});
+export type PersonRestrictionDto = z.infer<typeof personRestrictionSchema>;
+
+export const upsertPersonRestrictionRequestSchema = z
+  .object({
+    id: z.string().min(1).optional(),
+    type: restrictionTypeSchema,
+    reason: z.string().trim().min(1).max(500),
+    startsAt: z.string().datetime().optional(),
+    endsAt: z.string().datetime().nullable().optional(),
+    active: z.boolean().optional(),
+  })
+  .refine((d) => !d.endsAt || !d.startsAt || d.endsAt >= d.startsAt, {
+    message: "El fin de la restricción no puede ser anterior a su inicio",
+    path: ["endsAt"],
+  });
+export type UpsertPersonRestrictionRequest = z.infer<typeof upsertPersonRestrictionRequestSchema>;
+
+// === DTO: WorkOrderCompetencyRule (regla de requisito · catálogo) =============
+
+export const workOrderCompetencyRuleSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  competencyTypeId: z.string(),
+  competencyTypeName: z.string().nullable(),
+  mandatory: z.boolean(),
+  appliesToTypeIds: z.array(z.string()),
+  appliesToTypeNames: z.array(z.string()),
+  minCriticality: z.number().int().nullable(),
+  specialtyId: z.string().nullable(),
+  specialtyName: z.string().nullable(),
+  requiresPtw: z.boolean().nullable(),
+  /** Exigir sólo a cierto rol de la dotación (null = a toda la dotación). */
+  appliesToRosterRoleId: z.string().nullable(),
+  appliesToRosterRoleName: z.string().nullable(),
+  active: z.boolean(),
+  sortOrder: z.number().int(),
+});
+export type WorkOrderCompetencyRuleDto = z.infer<typeof workOrderCompetencyRuleSchema>;
+
+export const upsertWorkOrderCompetencyRuleRequestSchema = z.object({
+  id: z.string().min(1).optional(),
+  name: z.string().trim().min(1).max(120),
+  competencyTypeId: z.string().min(1),
+  mandatory: z.boolean().optional(),
+  appliesToTypeIds: z.array(z.string().min(1)).max(100).optional(),
+  minCriticality: z.number().int().min(1).max(5).nullable().optional(),
+  specialtyId: z.string().min(1).nullable().optional(),
+  requiresPtw: z.boolean().nullable().optional(),
+  appliesToRosterRoleId: z.string().min(1).nullable().optional(),
+  active: z.boolean().optional(),
+  sortOrder: z.number().int().min(0).max(9999).optional(),
+});
+export type UpsertWorkOrderCompetencyRuleRequest = z.infer<typeof upsertWorkOrderCompetencyRuleRequestSchema>;
+
+// === Funciones PURAS (con specs) ==============================================
+
+/**
+ * Filtra las reglas de competencia aplicables a una OT por su contexto. ESPEJO EXACTO
+ * de `applicableChecklistRules` (mismo shape de aplicabilidad). NO discrimina por rol:
+ * el filtro por `appliesToRosterRoleId` es POR PERSONA y lo aplica `deriveWorkerReasons`.
+ */
+export function applicableCompetencyRules<
+  T extends {
+    appliesToTypeIds: ReadonlyArray<string>;
+    minCriticality: number | null;
+    specialtyId: string | null;
+    requiresPtw: boolean | null;
+    active: boolean;
+  },
+>(
+  ctx: { typeId: string; criticality: number; requiresPtw: boolean; specialtyIds: ReadonlyArray<string> },
+  rules: ReadonlyArray<T>,
+): T[] {
+  return rules.filter((r) => {
+    if (!r.active) return false;
+    if (r.appliesToTypeIds.length > 0 && !r.appliesToTypeIds.includes(ctx.typeId)) return false;
+    if (r.minCriticality != null && ctx.criticality < r.minCriticality) return false;
+    if (r.requiresPtw != null && r.requiresPtw !== ctx.requiresPtw) return false;
+    if (r.specialtyId != null && !ctx.specialtyIds.includes(r.specialtyId)) return false;
+    return true;
+  });
+}
+
+/** Estado de vigencia derivado de una competencia (epoch ms). PURA. */
+export function competencyValidityState(
+  expiresAtMs: number | null,
+  nowMs: number,
+  warningLeadDays: number,
+): CompetencyValidityState {
+  if (expiresAtMs == null) return "no_expiry";
+  if (expiresAtMs <= nowMs) return "expired";
+  if (expiresAtMs - nowMs <= warningLeadDays * MS_PER_DAY) return "expiring";
+  return "valid";
+}
+
+/** Regla de competencia (subset) que consume la derivación por persona. */
+export interface WorkerCompetencyRuleInput {
+  competencyTypeId: string;
+  competencyTypeName: string;
+  mandatory: boolean;
+  /** null = aplica a toda la dotación; si trae rol, sólo a quien tenga ese rol. */
+  appliesToRosterRoleId: string | null;
+  /** Ventana ámbar del tipo (null ⇒ usa el default). */
+  warningLeadDays: number | null;
+}
+
+/** Competencia vigente-o-no que posee la persona (subset). */
+export interface WorkerCompetencyInput {
+  competencyTypeId: string;
+  /** Vencimiento en epoch ms; null = sin vencimiento. */
+  expiresAtMs: number | null;
+}
+
+/** Restricción activa+vigente de la persona (subset). */
+export interface WorkerRestrictionInput {
+  type: string;
+  reason: string;
+}
+
+/** Contexto de derivación de causas para UNA persona de la dotación. */
+export interface DeriveWorkerReasonsContext {
+  /** Reglas aplicables a la OT (ya filtradas por `applicableCompetencyRules`). */
+  rules: ReadonlyArray<WorkerCompetencyRuleInput>;
+  /** Roles de la persona en esta dotación (para el filtro `appliesToRosterRoleId`). */
+  personRosterRoleIds: ReadonlyArray<string>;
+  /** Competencias (no borradas) que posee la persona. */
+  competencies: ReadonlyArray<WorkerCompetencyInput>;
+  /** Restricciones activas y vigentes de la persona. */
+  restrictions: ReadonlyArray<WorkerRestrictionInput>;
+  nowMs: number;
+  defaultWarningLeadDays?: number;
+}
+
+/**
+ * Deriva las causas del semáforo de UNA persona (Ejes A y B, ORTOGONALES). PURA.
+ *  - Eje A · Competencia: por cada regla aplicable a la persona, exige una competencia del
+ *    tipo VIGENTE. Falta ⇒ COMPETENCY_MISSING; todas vencidas ⇒ COMPETENCY_EXPIRED (ambas
+ *    sólo si la regla es `mandatory` ⇒ bloquean). Vigente pero dentro de la ventana ⇒
+ *    COMPETENCY_EXPIRING (ámbar, informativo, aunque la regla no sea obligatoria).
+ *  - Eje B · Autorización: cualquier restricción activa+vigente ⇒ RESTRICTION_ACTIVE (rojo).
+ * NO deriva COMPANY_NOT_ACCREDITED (empresa) — eso llega en S3 (S2-A).
+ */
+export function deriveWorkerReasons(ctx: DeriveWorkerReasonsContext): WorkerStatusDetail[] {
+  const details: WorkerStatusDetail[] = [];
+  const roleSet = new Set(ctx.personRosterRoleIds);
+  const defWarn = ctx.defaultWarningLeadDays ?? DEFAULT_COMPETENCY_WARNING_LEAD_DAYS;
+  for (const rule of ctx.rules) {
+    // ¿La regla aplica a esta persona por su rol?
+    if (rule.appliesToRosterRoleId != null && !roleSet.has(rule.appliesToRosterRoleId)) continue;
+    const held = ctx.competencies.filter((c) => c.competencyTypeId === rule.competencyTypeId);
+    const warn = rule.warningLeadDays ?? defWarn;
+    // La "mejor" competencia = la de mayor vencimiento (null=sin vencimiento gana).
+    const best = held.reduce<WorkerCompetencyInput | null>((acc, c) => {
+      if (!acc) return c;
+      if (c.expiresAtMs == null) return c;
+      if (acc.expiresAtMs == null) return acc;
+      return c.expiresAtMs > acc.expiresAtMs ? c : acc;
+    }, null);
+    if (!best) {
+      if (rule.mandatory) {
+        details.push({ reason: "COMPETENCY_MISSING", competencyTypeId: rule.competencyTypeId, competencyTypeName: rule.competencyTypeName });
+      }
+      continue;
+    }
+    const state = competencyValidityState(best.expiresAtMs, ctx.nowMs, warn);
+    if (state === "expired") {
+      if (rule.mandatory) {
+        details.push({
+          reason: "COMPETENCY_EXPIRED",
+          competencyTypeId: rule.competencyTypeId,
+          competencyTypeName: rule.competencyTypeName,
+          expiresAt: best.expiresAtMs != null ? new Date(best.expiresAtMs).toISOString() : null,
+        });
+      }
+    } else if (state === "expiring") {
+      details.push({
+        reason: "COMPETENCY_EXPIRING",
+        competencyTypeId: rule.competencyTypeId,
+        competencyTypeName: rule.competencyTypeName,
+        expiresAt: best.expiresAtMs != null ? new Date(best.expiresAtMs).toISOString() : null,
+      });
+    }
+  }
+  for (const r of ctx.restrictions) {
+    details.push({ reason: "RESTRICTION_ACTIVE", restrictionType: r.type, restrictionReason: r.reason });
+  }
+  return details;
+}
+
+/** Colapsa un conjunto de detalles al nivel del semáforo (blocked > warning > ok). PURA. */
+export function workerStatusFromDetails(details: ReadonlyArray<WorkerStatusDetail>): WorkerStatus {
+  return evaluateWorkerStatus({ reasons: details.map((d) => d.reason) });
+}

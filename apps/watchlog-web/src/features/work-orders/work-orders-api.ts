@@ -12,6 +12,18 @@ import {
   personSchema,
   contractorCompanySchema,
   rosterRoleSchema,
+  competencyTypeSchema,
+  personCompetencySchema,
+  personRestrictionSchema,
+  workOrderCompetencyRuleSchema,
+  type CompetencyTypeDto,
+  type PersonCompetencyDto,
+  type PersonRestrictionDto,
+  type UpsertCompetencyTypeRequest,
+  type UpsertPersonCompetencyRequest,
+  type UpsertPersonRestrictionRequest,
+  type UpsertWorkOrderCompetencyRuleRequest,
+  type WorkOrderCompetencyRuleDto,
   type AddWorkOrderChecklistRequest,
   type AddWorkOrderWorkerRequest,
   type ConfirmRosterRequest,
@@ -281,4 +293,54 @@ export function deleteContractorCompany(id: string): Promise<void> {
 
 export function fetchRosterRoles(): Promise<RosterRoleDto[]> {
   return apiJson(`/roster-roles`, z.array(rosterRoleSchema));
+}
+
+// --- Competencias / restricciones / reglas (S2) ----------------------------
+
+export function fetchCompetencyTypes(includeInactive = false): Promise<CompetencyTypeDto[]> {
+  return apiJson(`/competency-types${includeInactive ? "?includeInactive=true" : ""}`, z.array(competencyTypeSchema));
+}
+
+export function upsertCompetencyType(dto: UpsertCompetencyTypeRequest): Promise<CompetencyTypeDto> {
+  return apiJson("/competency-types", competencyTypeSchema, { method: "POST", body: dto });
+}
+
+export function deleteCompetencyType(id: string): Promise<void> {
+  return apiJson(`/competency-types/${id}`, z.unknown(), { method: "DELETE" }).then(() => undefined);
+}
+
+export function fetchCompetencyRules(includeInactive = false): Promise<WorkOrderCompetencyRuleDto[]> {
+  return apiJson(`/work-order-competency-rules${includeInactive ? "?includeInactive=true" : ""}`, z.array(workOrderCompetencyRuleSchema));
+}
+
+export function upsertCompetencyRule(dto: UpsertWorkOrderCompetencyRuleRequest): Promise<WorkOrderCompetencyRuleDto> {
+  return apiJson("/work-order-competency-rules", workOrderCompetencyRuleSchema, { method: "POST", body: dto });
+}
+
+export function deleteCompetencyRule(ruleId: string): Promise<void> {
+  return apiJson(`/work-order-competency-rules/${ruleId}`, z.unknown(), { method: "DELETE" }).then(() => undefined);
+}
+
+export function fetchPersonCompetencies(personId: string): Promise<PersonCompetencyDto[]> {
+  return apiJson(`/persons/${personId}/competencies`, z.array(personCompetencySchema));
+}
+
+export function upsertPersonCompetency(personId: string, dto: UpsertPersonCompetencyRequest): Promise<PersonCompetencyDto[]> {
+  return apiJson(`/persons/${personId}/competencies`, z.array(personCompetencySchema), { method: "POST", body: dto });
+}
+
+export function deletePersonCompetency(personId: string, id: string): Promise<PersonCompetencyDto[]> {
+  return apiJson(`/persons/${personId}/competencies/${id}`, z.array(personCompetencySchema), { method: "DELETE" });
+}
+
+export function fetchPersonRestrictions(personId: string): Promise<PersonRestrictionDto[]> {
+  return apiJson(`/persons/${personId}/restrictions`, z.array(personRestrictionSchema));
+}
+
+export function upsertPersonRestriction(personId: string, dto: UpsertPersonRestrictionRequest): Promise<PersonRestrictionDto[]> {
+  return apiJson(`/persons/${personId}/restrictions`, z.array(personRestrictionSchema), { method: "POST", body: dto });
+}
+
+export function deletePersonRestriction(personId: string, id: string): Promise<PersonRestrictionDto[]> {
+  return apiJson(`/persons/${personId}/restrictions/${id}`, z.array(personRestrictionSchema), { method: "DELETE" });
 }

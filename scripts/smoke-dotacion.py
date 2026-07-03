@@ -29,6 +29,7 @@ import subprocess
 import sys
 import urllib.error
 import urllib.request
+from datetime import datetime, timedelta, timezone
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
@@ -42,10 +43,19 @@ OK, FAIL = [], []
 
 TYPE_KEY = "smoke-dot-tipo"
 NOROSTER_TYPE_KEY = "smoke-dot-noroster"
+S2_TYPE_KEY = "smoke-dot-s2"  # tipo NO-PTW, aislado de las reglas sembradas
 WO_TITLE = "OT Smoke Dotación — permiso de prueba"
 WO2_TITLE = "OT Smoke Dotación — sin dotación"
+WO3_TITLE = "OT Smoke Dotación — competencias S2"
 COMPANY_KEY = "smoke-dot-empresa"
+COMP_KEY = "smoke-dot-comp"  # tipo de competencia S2
+RULE_NAME = "Regla Smoke Competencia S2"
 PERSON_LAST = "SmokeDotApellido"  # marcador para limpieza
+
+
+def iso(days):
+    # Formato UTC con sufijo Z (z.string().datetime() rechaza el offset +00:00).
+    return (datetime.now(timezone.utc) + timedelta(days=days)).replace(tzinfo=None).isoformat(timespec="milliseconds") + "Z"
 
 
 def call(method, path, tok=None, body=None):
@@ -82,13 +92,21 @@ def check(name, cond, detail=""):
 
 
 def cleanup():
-    for t in (WO_TITLE, WO2_TITLE):
+    titles = (WO_TITLE, WO2_TITLE, WO3_TITLE)
+    intitles = ", ".join(f"'{t}'" for t in titles)
+    # Avisos del Bloque N emitidos para las OT del smoke (por payload workOrderId).
+    sql(f"DELETE FROM \"NotificationOutbox\" o USING \"NotificationEvent\" e WHERE o.\"eventId\"=e.id AND e.payload->>'workOrderId' IN (SELECT id FROM \"WorkOrder\" WHERE title IN ({intitles}));")
+    sql(f"DELETE FROM \"NotificationEvent\" WHERE payload->>'workOrderId' IN (SELECT id FROM \"WorkOrder\" WHERE title IN ({intitles}));")
+    for t in titles:
         sql(f"DELETE FROM \"WorkActivity\" WHERE \"workOrderId\" IN (SELECT id FROM \"WorkOrder\" WHERE title = '{t}');")
         sql(f"DELETE FROM \"WorkOrder\" WHERE title = '{t}';")  # cascada WorkOrderWorker
-    sql(f"DELETE FROM \"Person\" WHERE \"lastName\" = '{PERSON_LAST}';")
+    # Regla de competencia (referencia el tipo con Restrict) ANTES que el tipo de competencia.
+    sql(f"DELETE FROM \"WorkOrderCompetencyRule\" WHERE name = '{RULE_NAME}';")
+    sql(f"DELETE FROM \"Person\" WHERE \"lastName\" = '{PERSON_LAST}';")  # cascada PersonCompetency/Restriction
+    sql(f"DELETE FROM \"CompetencyType\" WHERE key = '{COMP_KEY}';")
     sql(f"DELETE FROM \"ContractorCompany\" WHERE key = '{COMPANY_KEY}';")
     sql("DELETE FROM \"FolioCounter\" WHERE \"sequenceKey\" LIKE 'workorder|type:' || (SELECT id FROM \"WorkOrderType\" WHERE key = '" + TYPE_KEY + "') || '%';")
-    sql(f"DELETE FROM \"WorkOrderType\" WHERE key IN ('{TYPE_KEY}', '{NOROSTER_TYPE_KEY}');")
+    sql(f"DELETE FROM \"WorkOrderType\" WHERE key IN ('{TYPE_KEY}', '{NOROSTER_TYPE_KEY}', '{S2_TYPE_KEY}');")
 
 
 def main():
@@ -131,6 +149,20 @@ def main():
         s, _ = call("GET", "/persons", operador)
         check("operador GET /persons → 403 (worker:manage)", s == 403, str(s))
 
+    # Otorgar las competencias que las reglas SEMBRADAS exigen (inducción a todo PTW;
+    # examen preocupacional al ejecutante de alto riesgo) para que el semáforo quede VERDE
+    # en la sección C. Prueba de paso: competencia vigente = verde. (S2)
+    s, ctypes = call("GET", "/competency-types", admin)
+    ind = next((c for c in ctypes if c.get("key") == "induccion_faena"), None) if isinstance(ctypes, list) else None
+    exa = next((c for c in ctypes if c.get("key") == "examen_preocupacional"), None) if isinstance(ctypes, list) else None
+    check("GET /competency-types → catálogo sembrado (inducción + examen)", s == 200 and ind is not None and exa is not None, str(s))
+    if ind and exa and p1_id and p2_id:
+        for pid, cid in ((p1_id, ind["id"]), (p2_id, ind["id"]), (p2_id, exa["id"])):
+            call("POST", f"/persons/{pid}/competencies", admin, {"competencyTypeId": cid, "issuedAt": iso(-10), "expiresAt": iso(180), "markVerified": True})
+        s, comps = call("GET", f"/persons/{p1_id}/competencies", admin)
+        check("POST /persons/:id/competencies → competencia registrada y vigente",
+              s == 200 and isinstance(comps, list) and len(comps) == 1 and comps[0].get("validity") == "valid", str(s))
+
     # === B) Tipo con dotación + OT ==========================================
     s, ty = call("POST", "/work-orders/types?create=true", admin,
                  {"key": TYPE_KEY, "name": "Tipo Dotación Smoke", "requiresPtwDefault": True, "rosterEnabled": True, "criticalityDefault": 4, "sortOrder": 99})
@@ -167,8 +199,9 @@ def main():
     s, r = call("POST", f"/work-orders/{wid}/roster", admin, {"personId": p2_id, "rosterRoleId": ent_id})
     worker_ent = next((w for w in r.get("workers", []) if w.get("personId") == p2_id), None) if isinstance(r, dict) else None
     check("agregar ejecutante (contratista) → 2xx (len 2)", s in (200, 201) and isinstance(r, dict) and len(r.get("workers", [])) == 2, str(s))
-    # semáforo S1: todos 'ok'
-    check("semáforo por persona = 'ok' en S1 (sin causas rojas)", worker_ent is not None and worker_ent.get("status", {}).get("level") == "ok")
+    # semáforo S2: 'ok' porque el ejecutante tiene inducción + examen vigentes.
+    check("semáforo por persona = 'ok' (competencias requeridas vigentes)", worker_ent is not None and worker_ent.get("status", {}).get("level") == "ok",
+          str(worker_ent.get("status") if worker_ent else None))
 
     s, r = call("POST", f"/work-orders/{wid}/roster/{worker_ent['id']}/remove", admin, {"reason": "prueba"})
     check("quitar ejecutante (soft) → 2xx (len 1)", s == 200 and isinstance(r, dict) and len(r.get("workers", [])) == 1, str(s))
@@ -215,8 +248,91 @@ def main():
     s, _ = call("POST", f"/work-orders/{wid2}/roster", admin, {"personId": p1_id, "rosterRoleId": sup_id})
     check("POST /roster en tipo sin dotación → 400 (no gestiona dotación)", s == 400, str(s))
 
+    # === E) S2: competencias con vigencia, causas rojas, override, avisos ====
+    # Tipo de competencia + regla (endpoints S2). Regla acotada a un tipo NO-PTW criticidad
+    # baja ⇒ AISLADA de las reglas sembradas (solo esta regla aplica a las OT de ese tipo).
+    s, sct = call("POST", "/competency-types", admin, {"key": COMP_KEY, "name": "Competencia Smoke S2", "category": "CERTIFICATION", "defaultValidityDays": 365, "warningLeadDays": 30})
+    comp_id = sct.get("id") if isinstance(sct, dict) else None
+    check("POST /competency-types → crear tipo de competencia (2xx)", s in (200, 201) and comp_id, str(s))
+    call("POST", "/work-orders/types?create=true", admin, {"key": S2_TYPE_KEY, "name": "Tipo Dotación S2 Smoke", "requiresPtwDefault": False, "rosterEnabled": True, "criticalityDefault": 2, "sortOrder": 97})
+    s, tylist = call("GET", "/work-orders/types", admin)
+    tid_s2 = next((t.get("id") for t in tylist if t.get("key") == S2_TYPE_KEY), None) if isinstance(tylist, list) else None
+    s, srule = call("POST", "/work-order-competency-rules", admin, {"name": RULE_NAME, "competencyTypeId": comp_id, "mandatory": True, "appliesToTypeIds": [tid_s2]})
+    check("POST /work-order-competency-rules → crear regla mandatoria (2xx)", s in (200, 201) and isinstance(srule, dict) and srule.get("id"), str(s))
+
+    # OT del tipo S2 → en_preparacion.
+    s, wo3 = call("POST", "/work-orders", admin, {"title": WO3_TITLE, "typeId": tid_s2, "criticality": 2, "requiresPtw": False, "orgNodeId": node})
+    wid3 = wo3.get("id") if isinstance(wo3, dict) else None
+    call("POST", f"/work-orders/{wid3}/transitions", admin, {"transitionKey": "enviar"})
+    call("POST", f"/work-orders/{wid3}/transitions", admin, {"transitionKey": "aprobar", "password": PASS})
+    call("POST", f"/work-orders/{wid3}/transitions", admin, {"transitionKey": "planificar"})
+    call("POST", f"/work-orders/{wid3}/activities", admin, {"title": "Tarea S2", "mandatory": True})
+    call("POST", f"/work-orders/{wid3}/transitions", admin, {"transitionKey": "autorizar_plan"})
+    call("POST", f"/work-orders/{wid3}/transitions", admin, {"transitionKey": "preparar"})
+
+    s, p3 = call("POST", "/persons", admin, {"kind": "INTERNAL", "firstName": "Nadia", "lastName": PERSON_LAST})
+    p3_id = p3.get("id") if isinstance(p3, dict) else None
+
+    def worker_of(rost_dto, pid):
+        return next((w for w in rost_dto.get("workers", []) if w.get("personId") == pid), None) if isinstance(rost_dto, dict) else None
+
+    # E2. p1 SIN la competencia smoke → ROJO (COMPETENCY_MISSING).
+    s, r = call("POST", f"/work-orders/{wid3}/roster", admin, {"personId": p1_id, "rosterRoleId": ent_id})
+    w = worker_of(r, p1_id)
+    check("persona sin competencia requerida → ROJO (COMPETENCY_MISSING)",
+          w is not None and w["status"]["level"] == "blocked" and "COMPETENCY_MISSING" in w["status"]["reasons"], str(w and w["status"]))
+
+    # E3. confirmar con persona en ROJO SIN override → 400 (impedimentos).
+    s, e = call("POST", f"/work-orders/{wid3}/roster/confirm", admin, {"password": PASS})
+    msg = (e or {}).get("message", "") if isinstance(e, dict) else ""
+    check("confirmar con persona en ROJO sin override → 400", s == 400 and "impediment" in msg.lower(), f"{s} {msg[:50]}")
+
+    # E4. otorgar competencia VIGENTE → VERDE.
+    call("POST", f"/persons/{p1_id}/competencies", admin, {"competencyTypeId": comp_id, "issuedAt": iso(-10), "expiresAt": iso(180), "markVerified": True})
+    s, r = call("GET", f"/work-orders/{wid3}/roster", admin)
+    w = worker_of(r, p1_id)
+    check("otorgar competencia vigente → VERDE (ok)", w is not None and w["status"]["level"] == "ok", str(w and w["status"]))
+
+    # E5. p3 con competencia VENCIDA → ROJO (COMPETENCY_EXPIRED).
+    call("POST", f"/persons/{p3_id}/competencies", admin, {"competencyTypeId": comp_id, "issuedAt": iso(-400), "expiresAt": iso(-5)})
+    s, r = call("POST", f"/work-orders/{wid3}/roster", admin, {"personId": p3_id, "rosterRoleId": ent_id})
+    w = worker_of(r, p3_id)
+    check("competencia VENCIDA → ROJO (COMPETENCY_EXPIRED)",
+          w is not None and w["status"]["level"] == "blocked" and "COMPETENCY_EXPIRED" in w["status"]["reasons"], str(w and w["status"]))
+
+    # E6. restricción activa sobre p1 (que estaba verde) → ROJO (RESTRICTION_ACTIVE, Eje B).
+    call("POST", f"/persons/{p1_id}/restrictions", admin, {"type": "MEDICAL", "reason": "No apto (smoke)"})
+    s, r = call("GET", f"/work-orders/{wid3}/roster", admin)
+    w = worker_of(r, p1_id)
+    check("restricción activa → ROJO (RESTRICTION_ACTIVE, Eje B ortogonal)",
+          w is not None and w["status"]["level"] == "blocked" and "RESTRICTION_ACTIVE" in w["status"]["reasons"], str(w and w["status"]))
+    # Quitar la restricción de p1 ⇒ vuelve a verde (solo p3 queda rojo, para override selectivo).
+    s, rl = call("GET", f"/persons/{p1_id}/restrictions", admin)
+    rid = rl[0]["id"] if isinstance(rl, list) and rl else None
+    if rid:
+        call("DELETE", f"/persons/{p1_id}/restrictions/{rid}", admin)
+
+    # E7. override firmado POR PERSONA (p3 sigue rojo por vencida): sin override → 400; con → 2xx.
+    s, r = call("GET", f"/work-orders/{wid3}/roster", admin)
+    w3 = worker_of(r, p3_id)
+    s, _ = call("POST", f"/work-orders/{wid3}/roster/confirm", admin, {"password": PASS})
+    check("confirmar con override faltante para la persona en rojo → 400", s == 400, str(s))
+    s, r = call("POST", f"/work-orders/{wid3}/roster/confirm", admin, {"password": PASS, "overrides": [{"workerId": w3["id"], "reason": "Riesgo aceptado con medida compensatoria (smoke)"}]})
+    w3 = worker_of(r, p3_id)
+    check("override firmado por persona → confirmar 2xx + override registrado",
+          s == 200 and isinstance(r, dict) and r.get("confirmedAt") and w3 and w3.get("override") and (w3["override"] or {}).get("reason"), str(s))
+
+    # E8. avisos de vencimiento (Bloque N): p3 vencida + p1 por vencer, ambas en roster de OT
+    # abierta ⇒ POST /notifications/run encola worker.competency.expired / .expiring.
+    call("POST", f"/persons/{p1_id}/competencies", admin, {"competencyTypeId": comp_id, "issuedAt": iso(-10), "expiresAt": iso(10)})
+    call("POST", "/notifications/run", admin)
+    n_exp = sql(f"SELECT count(*) FROM \"NotificationEvent\" WHERE \"eventKey\"='worker.competency.expired' AND payload->>'workOrderId'='{wid3}';")
+    check("aviso worker.competency.expired encolado tras /notifications/run", n_exp.isdigit() and int(n_exp) >= 1, n_exp)
+    n_soon = sql(f"SELECT count(*) FROM \"NotificationEvent\" WHERE \"eventKey\"='worker.competency.expiring' AND payload->>'workOrderId'='{wid3}';")
+    check("aviso worker.competency.expiring encolado tras /notifications/run", n_soon.isdigit() and int(n_soon) >= 1, n_soon)
+
     cleanup()
-    print(f"\n== Dotación S1: {len(OK)} ok, {len(FAIL)} fail ==")
+    print(f"\n== Dotación S1+S2: {len(OK)} ok, {len(FAIL)} fail ==")
     if FAIL:
         for f in FAIL:
             print("  FAIL " + f)

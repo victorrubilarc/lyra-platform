@@ -20,6 +20,10 @@ import type {
   UpsertSpecialtyRequest,
   UpsertWorkOrderChecklistRuleRequest,
   UpsertWorkOrderTypeRequest,
+  UpsertCompetencyTypeRequest,
+  UpsertPersonCompetencyRequest,
+  UpsertPersonRestrictionRequest,
+  UpsertWorkOrderCompetencyRuleRequest,
   WorkOrderListQuery,
 } from "@lyra/contracts";
 import {
@@ -67,6 +71,18 @@ import {
   upsertContractorCompany,
   deleteContractorCompany,
   fetchRosterRoles,
+  fetchCompetencyTypes,
+  upsertCompetencyType,
+  deleteCompetencyType,
+  fetchCompetencyRules,
+  upsertCompetencyRule,
+  deleteCompetencyRule,
+  fetchPersonCompetencies,
+  upsertPersonCompetency,
+  deletePersonCompetency,
+  fetchPersonRestrictions,
+  upsertPersonRestriction,
+  deletePersonRestriction,
 } from "./work-orders-api.js";
 import { fetchTemplates } from "../templates/templates-api.js";
 import { useActiveStructureId } from "../structure/structure-queries.js";
@@ -383,4 +399,69 @@ export function useDeleteContractorCompany() {
 
 export function useRosterRoles() {
   return useQuery({ queryKey: PERSON_KEYS.rosterRoles(), queryFn: () => fetchRosterRoles() });
+}
+
+// === Competencias / restricciones / reglas (S2) ============================
+
+export const COMPETENCY_KEYS = {
+  types: () => ["competency-types"] as const,
+  rules: () => ["work-order-competency-rules"] as const,
+  personCompetencies: (personId: string) => ["persons", personId, "competencies"] as const,
+  personRestrictions: (personId: string) => ["persons", personId, "restrictions"] as const,
+};
+
+export function useCompetencyTypes(includeInactive = false) {
+  return useQuery({ queryKey: [...COMPETENCY_KEYS.types(), includeInactive], queryFn: () => fetchCompetencyTypes(includeInactive) });
+}
+
+export function useUpsertCompetencyType() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (dto: UpsertCompetencyTypeRequest) => upsertCompetencyType(dto), onSuccess: () => qc.invalidateQueries({ queryKey: COMPETENCY_KEYS.types() }) });
+}
+
+export function useDeleteCompetencyType() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (id: string) => deleteCompetencyType(id), onSuccess: () => qc.invalidateQueries({ queryKey: COMPETENCY_KEYS.types() }) });
+}
+
+export function useCompetencyRules() {
+  return useQuery({ queryKey: COMPETENCY_KEYS.rules(), queryFn: () => fetchCompetencyRules(true) });
+}
+
+export function useUpsertCompetencyRule() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (dto: UpsertWorkOrderCompetencyRuleRequest) => upsertCompetencyRule(dto), onSuccess: () => qc.invalidateQueries({ queryKey: COMPETENCY_KEYS.rules() }) });
+}
+
+export function useDeleteCompetencyRule() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (ruleId: string) => deleteCompetencyRule(ruleId), onSuccess: () => qc.invalidateQueries({ queryKey: COMPETENCY_KEYS.rules() }) });
+}
+
+export function usePersonCompetencies(personId: string | null) {
+  return useQuery({ queryKey: COMPETENCY_KEYS.personCompetencies(personId ?? ""), queryFn: () => fetchPersonCompetencies(personId!), enabled: !!personId });
+}
+
+export function useUpsertPersonCompetency(personId: string) {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (dto: UpsertPersonCompetencyRequest) => upsertPersonCompetency(personId, dto), onSuccess: () => qc.invalidateQueries({ queryKey: COMPETENCY_KEYS.personCompetencies(personId) }) });
+}
+
+export function useDeletePersonCompetency(personId: string) {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (id: string) => deletePersonCompetency(personId, id), onSuccess: () => qc.invalidateQueries({ queryKey: COMPETENCY_KEYS.personCompetencies(personId) }) });
+}
+
+export function usePersonRestrictions(personId: string | null) {
+  return useQuery({ queryKey: COMPETENCY_KEYS.personRestrictions(personId ?? ""), queryFn: () => fetchPersonRestrictions(personId!), enabled: !!personId });
+}
+
+export function useUpsertPersonRestriction(personId: string) {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (dto: UpsertPersonRestrictionRequest) => upsertPersonRestriction(personId, dto), onSuccess: () => qc.invalidateQueries({ queryKey: COMPETENCY_KEYS.personRestrictions(personId) }) });
+}
+
+export function useDeletePersonRestriction(personId: string) {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (id: string) => deletePersonRestriction(personId, id), onSuccess: () => qc.invalidateQueries({ queryKey: COMPETENCY_KEYS.personRestrictions(personId) }) });
 }
