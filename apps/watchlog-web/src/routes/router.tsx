@@ -40,6 +40,7 @@ import { ShiftHandoverPage } from "../features/shift-handover/ShiftHandoverPage.
 import { WorkOrdersPage } from "../features/work-orders/WorkOrdersPage.js";
 import { WorkOrderDetailPage } from "../features/work-orders/WorkOrderDetailPage.js";
 import { WorkOrderCatalogsPage } from "../features/work-orders/WorkOrderCatalogsPage.js";
+import { PersonsPage } from "../features/work-orders/PersonsPage.js";
 
 /**
  * Mapa de rutas. `/login` es pública; todo lo demás cuelga de `ProtectedRoute`
@@ -79,6 +80,7 @@ export const router = createBrowserRouter([
           { path: "/cambio-turno", element: <ShiftHandoverPage /> },
           { path: "/ordenes-trabajo", element: <WorkOrdersPage /> },
           { path: "/ordenes-trabajo/catalogos", element: <WorkOrderCatalogsPage /> },
+          { path: "/ordenes-trabajo/personas", element: <PersonsPage /> },
           { path: "/ordenes-trabajo/:id", element: <WorkOrderDetailPage /> },
           { path: "/notificaciones", element: <NotificationsPage /> },
           { path: "/mis-notificaciones", element: <MyNotificationsPage /> },

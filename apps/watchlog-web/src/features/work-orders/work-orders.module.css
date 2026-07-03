@@ -273,3 +273,18 @@
 .statusOptionActive { border-color: var(--color-accent-primary); background: color-mix(in srgb, var(--color-accent-primary) 12%, transparent); color: var(--color-text-primary); }
 .rangeRow { display: flex; align-items: center; gap: var(--space-3); }
 .rangeRow input[type="range"] { flex: 1; accent-color: var(--color-accent-primary); }
+
+/* --- Dotación del permiso (S1) --- */
+.rosterAddRow { display: flex; align-items: center; gap: var(--space-2); margin: var(--space-3) 0; flex-wrap: wrap; }
+.rosterAddPicker { flex: 1; min-width: 220px; }
+.rosterList { list-style: none; margin: var(--space-2) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.rosterItem { display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-3); border: 1px solid var(--color-border-subtle); border-radius: var(--radius-md); background: var(--color-bg-surface-1); }
+.rosterDot { width: 10px; height: 10px; border-radius: 999px; margin-top: 6px; flex: 0 0 auto; box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 0%, transparent); }
+.rosterBody { flex: 1; min-width: 0; }
+.rosterHead { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.rosterName { font-weight: 600; color: var(--color-text-primary); }
+.rosterRoleChip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: var(--radius-sm); border: 1px solid var(--color-border-subtle); background: var(--color-bg-surface-2); color: var(--color-text-secondary); font-size: var(--text-body-sm-size); font-weight: 600; }
+.rosterKind { color: var(--color-text-muted); font-size: var(--text-body-sm-size); }
+.rosterStatus { font-size: var(--text-body-sm-size); font-weight: 600; }
+.rosterReasons { list-style: disc; margin: var(--space-1) 0 0; padding-left: var(--space-4); color: var(--color-error); font-size: var(--text-body-sm-size); }
+.rosterNote { margin: var(--space-1) 0 0; color: var(--color-text-secondary); font-size: var(--text-body-sm-size); }

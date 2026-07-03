@@ -41,6 +41,7 @@ import { ReauthService } from "../auth/reauth.service";
 import { FolioService } from "../folio/folio.service";
 import { WorkOrderChecklistsService } from "./work-order-checklists.service";
 import { WorkActivitiesService } from "./work-activities.service";
+import { WorkOrderRosterService } from "./work-order-roster.service";
 
 /** Clave del flujo global por defecto de OT (seed fork W6; el tipo puede declarar otro). */
 const WORK_ORDER_WORKFLOW_KEY = "ot-4-puertas";
@@ -83,6 +84,7 @@ export class WorkOrdersService {
     private readonly folio: FolioService,
     private readonly checklists: WorkOrderChecklistsService,
     private readonly activities: WorkActivitiesService,
+    private readonly roster: WorkOrderRosterService,
   ) {}
 
   // === Listado / KPIs ========================================================
@@ -358,6 +360,11 @@ export class WorkOrdersService {
     // + Gobierno 2: el aprobador debe haber CONFIRMADO el set de verificaciones de EJECUCIÓN
     // (§11.5) — así "lo aplicado en terreno = lo autorizado".
     if (toState.key === checklistGateStateKey) {
+      // Gobierno 2 · dotación (S1): si el tipo gestiona dotación y hay personas, el
+      // aprobador debe haberla CONFIRMADO (firmada) ANTES de autorizar el permiso —
+      // "quien entra = quien fue autorizado". Se valida primero (quién ingresa) y luego
+      // la documentación del permiso (checklists / set de ejecución).
+      await this.roster.assertRosterConfirmed(id);
       await this.checklists.assertChecklistsCompleteForMoment(id, "AUTHORIZATION");
       await this.checklists.assertExecutionSetConfirmed(id);
     }
@@ -642,6 +649,7 @@ export class WorkOrdersService {
       defaultWorkflowId: r.defaultWorkflowId,
       defaultWorkflowName: r.defaultWorkflowId ? wfNames.get(r.defaultWorkflowId) ?? null : null,
       requiresPtwDefault: r.requiresPtwDefault,
+      rosterEnabled: r.rosterEnabled,
       criticalityDefault: r.criticalityDefault,
       folioScheme: (r.folioScheme as FolioScheme | null) ?? null,
       folioOnStateKey: r.folioOnStateKey,
@@ -679,6 +687,7 @@ export class WorkOrdersService {
       color: dto.color ?? null,
       defaultWorkflowId: dto.defaultWorkflowId ?? null,
       requiresPtwDefault: dto.requiresPtwDefault ?? false,
+      rosterEnabled: dto.rosterEnabled ?? false,
       criticalityDefault: dto.criticalityDefault ?? null,
       // Folio configurable (fork W4): el Zod del pipe ya validó el esquema.
       folioScheme: (dto.folioScheme ?? null) as Prisma.InputJsonValue,

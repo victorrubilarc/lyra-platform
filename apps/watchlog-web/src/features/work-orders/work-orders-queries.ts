@@ -1,6 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   AddWorkOrderChecklistRequest,
+  AddWorkOrderWorkerRequest,
+  ConfirmRosterRequest,
+  RemoveWorkOrderWorkerRequest,
+  UpsertContractorCompanyRequest,
+  UpsertPersonRequest,
   AssignWorkOrderRequest,
   CancelWorkOrderRequest,
   CreateWorkActivitiesBatchRequest,
@@ -51,6 +56,17 @@ import {
   upsertWorkOrderChecklistRule,
   upsertWorkOrderSpecialty,
   upsertWorkOrderType,
+  fetchWorkOrderRoster,
+  addWorkOrderWorker,
+  removeWorkOrderWorker,
+  confirmWorkOrderRoster,
+  fetchPersons,
+  upsertPerson,
+  deletePerson,
+  fetchContractorCompanies,
+  upsertContractorCompany,
+  deleteContractorCompany,
+  fetchRosterRoles,
 } from "./work-orders-api.js";
 import { fetchTemplates } from "../templates/templates-api.js";
 import { useActiveStructureId } from "../structure/structure-queries.js";
@@ -297,4 +313,74 @@ export function useRecordWorkOrderActivityProgress(id: string) {
       qc.invalidateQueries({ queryKey: ["work-orders", "activity-updates", id, aid] });
     },
   });
+}
+
+// === Dotación del permiso (S1) =============================================
+
+export const WORK_ORDER_ROSTER_KEYS = {
+  forWorkOrder: (id: string) => ["work-orders", "roster", id] as const,
+};
+
+export function useWorkOrderRoster(id: string | null) {
+  return useQuery({ queryKey: WORK_ORDER_ROSTER_KEYS.forWorkOrder(id ?? ""), queryFn: () => fetchWorkOrderRoster(id!), enabled: !!id });
+}
+
+function invalidateRoster(qc: ReturnType<typeof useQueryClient>, id: string): void {
+  qc.invalidateQueries({ queryKey: WORK_ORDER_ROSTER_KEYS.forWorkOrder(id) });
+  qc.invalidateQueries({ queryKey: WORK_ORDER_KEYS.detail(id) });
+}
+
+export function useAddWorkOrderWorker(id: string) {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (dto: AddWorkOrderWorkerRequest) => addWorkOrderWorker(id, dto), onSuccess: () => invalidateRoster(qc, id) });
+}
+
+export function useRemoveWorkOrderWorker(id: string) {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: ({ workerId, dto }: { workerId: string; dto: RemoveWorkOrderWorkerRequest }) => removeWorkOrderWorker(id, workerId, dto), onSuccess: () => invalidateRoster(qc, id) });
+}
+
+export function useConfirmWorkOrderRoster(id: string) {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (dto: ConfirmRosterRequest) => confirmWorkOrderRoster(id, dto), onSuccess: () => invalidateRoster(qc, id) });
+}
+
+// === Catálogo de Personas / Empresas contratistas / Roles (S1) =============
+
+export const PERSON_KEYS = {
+  persons: (search?: string, kind?: string, includeInactive?: boolean) => ["persons", { search: search ?? "", kind: kind ?? "", includeInactive: !!includeInactive }] as const,
+  companies: () => ["contractor-companies"] as const,
+  rosterRoles: () => ["roster-roles"] as const,
+};
+
+export function usePersons(opts: { search?: string; kind?: string; includeInactive?: boolean } = {}) {
+  return useQuery({ queryKey: PERSON_KEYS.persons(opts.search, opts.kind, opts.includeInactive), queryFn: () => fetchPersons(opts) });
+}
+
+export function useUpsertPerson() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (dto: UpsertPersonRequest) => upsertPerson(dto), onSuccess: () => qc.invalidateQueries({ queryKey: ["persons"] }) });
+}
+
+export function useDeletePerson() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (id: string) => deletePerson(id), onSuccess: () => qc.invalidateQueries({ queryKey: ["persons"] }) });
+}
+
+export function useContractorCompanies(includeInactive = false) {
+  return useQuery({ queryKey: [...PERSON_KEYS.companies(), includeInactive], queryFn: () => fetchContractorCompanies(includeInactive) });
+}
+
+export function useUpsertContractorCompany() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: ({ dto, create }: { dto: UpsertContractorCompanyRequest; create: boolean }) => upsertContractorCompany(dto, create), onSuccess: () => qc.invalidateQueries({ queryKey: PERSON_KEYS.companies() }) });
+}
+
+export function useDeleteContractorCompany() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (id: string) => deleteContractorCompany(id), onSuccess: () => qc.invalidateQueries({ queryKey: PERSON_KEYS.companies() }) });
+}
+
+export function useRosterRoles() {
+  return useQuery({ queryKey: PERSON_KEYS.rosterRoles(), queryFn: () => fetchRosterRoles() });
 }

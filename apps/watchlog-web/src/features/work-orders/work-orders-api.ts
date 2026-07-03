@@ -8,7 +8,20 @@ import {
   workOrderStatsSchema,
   workOrderTypeSchema,
   workOrderTagSchema,
+  workOrderRosterSchema,
+  personSchema,
+  contractorCompanySchema,
+  rosterRoleSchema,
   type AddWorkOrderChecklistRequest,
+  type AddWorkOrderWorkerRequest,
+  type ConfirmRosterRequest,
+  type ContractorCompanyDto,
+  type PersonDto,
+  type RemoveWorkOrderWorkerRequest,
+  type RosterRoleDto,
+  type UpsertContractorCompanyRequest,
+  type UpsertPersonRequest,
+  type WorkOrderRosterDto,
   type AssignWorkOrderRequest,
   type CancelWorkOrderRequest,
   type CreateWorkActivitiesBatchRequest,
@@ -214,4 +227,58 @@ export function recordWorkOrderActivityProgress(id: string, aid: string, dto: Re
 /** Historial (append-only) de avance de una actividad. */
 export function fetchWorkOrderActivityUpdates(id: string, aid: string): Promise<WorkActivityUpdateDto[]> {
   return apiJson(`/work-orders/${id}/activities/${aid}/updates`, z.array(workActivityUpdateSchema));
+}
+
+// --- Dotación del permiso (S1) ---------------------------------------------
+
+export function fetchWorkOrderRoster(id: string): Promise<WorkOrderRosterDto> {
+  return apiJson(`/work-orders/${id}/roster`, workOrderRosterSchema);
+}
+
+export function addWorkOrderWorker(id: string, dto: AddWorkOrderWorkerRequest): Promise<WorkOrderRosterDto> {
+  return apiJson(`/work-orders/${id}/roster`, workOrderRosterSchema, { method: "POST", body: dto });
+}
+
+export function removeWorkOrderWorker(id: string, workerId: string, dto: RemoveWorkOrderWorkerRequest): Promise<WorkOrderRosterDto> {
+  return apiJson(`/work-orders/${id}/roster/${workerId}/remove`, workOrderRosterSchema, { method: "POST", body: dto });
+}
+
+/** Confirma (sella) la dotación con firma Part 11 = gate para autorizar el permiso. */
+export function confirmWorkOrderRoster(id: string, dto: ConfirmRosterRequest): Promise<WorkOrderRosterDto> {
+  return apiJson(`/work-orders/${id}/roster/confirm`, workOrderRosterSchema, { method: "POST", body: dto });
+}
+
+// --- Catálogo de Personas / Empresas contratistas / Roles (S1) -------------
+
+export function fetchPersons(params: { search?: string; kind?: string; includeInactive?: boolean } = {}): Promise<PersonDto[]> {
+  const p = new URLSearchParams();
+  if (params.search) p.set("search", params.search);
+  if (params.kind) p.set("kind", params.kind);
+  if (params.includeInactive) p.set("includeInactive", "true");
+  const qs = p.toString();
+  return apiJson(`/persons${qs ? `?${qs}` : ""}`, z.array(personSchema));
+}
+
+export function upsertPerson(dto: UpsertPersonRequest): Promise<PersonDto> {
+  return apiJson("/persons", personSchema, { method: "POST", body: dto });
+}
+
+export function deletePerson(id: string): Promise<void> {
+  return apiJson(`/persons/${id}`, z.unknown(), { method: "DELETE" }).then(() => undefined);
+}
+
+export function fetchContractorCompanies(includeInactive = false): Promise<ContractorCompanyDto[]> {
+  return apiJson(`/contractor-companies${includeInactive ? "?includeInactive=true" : ""}`, z.array(contractorCompanySchema));
+}
+
+export function upsertContractorCompany(dto: UpsertContractorCompanyRequest, create = false): Promise<ContractorCompanyDto> {
+  return apiJson(`/contractor-companies${create ? "?create=true" : ""}`, contractorCompanySchema, { method: "POST", body: dto });
+}
+
+export function deleteContractorCompany(id: string): Promise<void> {
+  return apiJson(`/contractor-companies/${id}`, z.unknown(), { method: "DELETE" }).then(() => undefined);
+}
+
+export function fetchRosterRoles(): Promise<RosterRoleDto[]> {
+  return apiJson(`/roster-roles`, z.array(rosterRoleSchema));
 }

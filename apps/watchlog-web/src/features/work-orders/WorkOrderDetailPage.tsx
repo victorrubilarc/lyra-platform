@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Activity, ArrowLeft, ArrowRight, ClipboardCheck, Info, ListChecks, ShieldCheck, Waypoints, XCircle } from "lucide-react";
+import { Activity, ArrowLeft, ArrowRight, ClipboardCheck, Info, ListChecks, ShieldCheck, Users, Waypoints, XCircle } from "lucide-react";
 import type { WorkOrderAvailableTransition, WorkOrderPriority } from "@lyra/contracts";
 import { Button, Input, Modal, Select, Spinner, Textarea, useToast } from "@lyra/ui";
 import { usePermissions } from "../../auth/use-permissions.js";
@@ -12,9 +12,11 @@ import {
   useUpdateWorkOrder,
   useWorkOrderAssignableUsers,
   useWorkOrderDetail,
+  useWorkOrderRoster,
 } from "./work-orders-queries.js";
 import { LIFECYCLE_META, ORIGIN_META, PRIORITY_META, SLA_STATUS_META, criticalityColor, criticalityLabel } from "./work-orders-presentation.js";
 import { WorkOrderChecklistsBlock } from "./WorkOrderChecklistsBlock.js";
+import { WorkOrderRosterBlock } from "./WorkOrderRosterBlock.js";
 import { WorkOrderPlanBlock } from "./WorkOrderPlanBlock.js";
 import { WorkflowDiagram } from "../logbook/WorkflowDiagram.js";
 import styles from "./work-orders.module.css";
@@ -42,6 +44,7 @@ export function WorkOrderDetailPage() {
   const { can } = usePermissions();
   const toast = useToast();
   const { data: wo, isLoading } = useWorkOrderDetail(id);
+  const { data: roster } = useWorkOrderRoster(id);
   const { data: users = [] } = useWorkOrderAssignableUsers();
   const assign = useAssignWorkOrder();
   const update = useUpdateWorkOrder();
@@ -51,7 +54,8 @@ export function WorkOrderDetailPage() {
   const [cancelReason, setCancelReason] = useState("");
   const [showCancel, setShowCancel] = useState(false);
   const [pending, setPending] = useState<WorkOrderAvailableTransition | null>(null);
-  const [tab, setTab] = useState<"resumen" | "plan" | "checklists" | "flujo" | "actividad">("resumen");
+  const [tab, setTab] = useState<"resumen" | "plan" | "checklists" | "dotacion" | "flujo" | "actividad">("resumen");
+  const rosterEnabled = !!roster?.enabled;
 
   const back = () => navigate("/ordenes-trabajo");
 
@@ -154,6 +158,12 @@ export function WorkOrderDetailPage() {
             <button role="tab" aria-selected={tab === "checklists"} className={tab === "checklists" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setTab("checklists")}>
               <ClipboardCheck size={14} /> Verificaciones
             </button>
+            {rosterEnabled && (
+              <button role="tab" aria-selected={tab === "dotacion"} className={tab === "dotacion" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setTab("dotacion")}>
+                <Users size={14} /> Dotación
+                {roster && roster.workers.length > 0 && <span className={styles.tabBadge}>{roster.workers.length}</span>}
+              </button>
+            )}
             <button role="tab" aria-selected={tab === "flujo"} className={tab === "flujo" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setTab("flujo")}>
               <Waypoints size={14} /> Flujo
             </button>
@@ -252,6 +262,7 @@ export function WorkOrderDetailPage() {
 
           {tab === "plan" && <WorkOrderPlanBlock wo={wo} isLive={isLive} />}
           {tab === "checklists" && <WorkOrderChecklistsBlock wo={wo} isLive={isLive} />}
+          {tab === "dotacion" && <WorkOrderRosterBlock wo={wo} isLive={isLive} />}
 
           {tab === "flujo" && (
             wo.workflow && wo.workflow.states.length > 0 ? (

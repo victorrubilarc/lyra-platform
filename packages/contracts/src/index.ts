@@ -102,3 +102,4 @@ export * from "./work-orders/work-orders.js";
 export * from "./work-orders/checklists.js";
 export * from "./work-orders/activities.js";
 export * from "./work-orders/sla.js";
+export * from "./work-orders/roster.js";

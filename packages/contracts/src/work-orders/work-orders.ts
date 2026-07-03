@@ -65,6 +65,8 @@ export const workOrderTypeSchema = z.object({
   defaultWorkflowName: z.string().nullable(),
   /** ¿Exige permiso de trabajo (PTW) por defecto? */
   requiresPtwDefault: z.boolean(),
+  /** ¿El tipo gestiona DOTACIÓN? (S1). Sin esto, la OT no muestra dotación (cero fricción). */
+  rosterEnabled: z.boolean(),
   /** Criticidad 1..5 sugerida al crear (null = sin sugerencia). */
   criticalityDefault: z.number().int().nullable(),
   /** Esquema de folio configurable (fork W4; null = default OT por-tipo + anual). */
@@ -401,6 +403,7 @@ export const upsertWorkOrderTypeRequestSchema = z.object({
   color: z.string().trim().max(32).nullable().optional(),
   defaultWorkflowId: z.string().min(1).nullable().optional(),
   requiresPtwDefault: z.boolean().optional(),
+  rosterEnabled: z.boolean().optional(),
   criticalityDefault: z.number().int().min(1).max(5).nullable().optional(),
   /** Esquema de folio (fork W4). null/omitido = default OT (por tipo + anual). */
   folioScheme: folioSchemeSchema.nullable().optional(),

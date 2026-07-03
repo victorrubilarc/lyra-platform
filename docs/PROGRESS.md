@@ -1,5 +1,28 @@
 # Progreso — Lyra WatchLog
 
+**2026-07-03 — 👷 Dotación del permiso · DISEÑO + Slice 1 (MVP) ✅** (`feat/dotacion-permiso-s1`). Necesidad real del dueño:
+gestionar el LISTADO DE PERSONAS (propias y contratistas) que ingresan a ejecutar una OT, y que quien APRUEBA valide esa
+dotación. **DISEÑO** completo, investigado y **citado** (`docs/design/DOTACION_DESIGN_ARCHITECTURE.md`): traza a OSHA
+1910.146 (authorized entrant / attendant-vigía / entry supervisor; el permiso lista personas y el supervisor **firma** para
+autorizar) + 1910.147 (authorized/affected), HSG250 (e-firma segura), ISO 45001 §7.2 (competencia + evidencia), IBM Maximo
+(**Person ≠ User**; Qualifications con vigencia), SAP WCM/Qualifications (validity auto-expira), ISN/Avetta/Veriforce
+(acreditación empresa+trabajador), Chile (DS 44 ODI, Ley 16.744 art.66bis/183-C, DS 132 SERNAGEOMIN). **Tres sentidos de
+autorización separados** + **dos ejes ortogonales** (competencia vs autorización/designación) sin colapsar en un flag.
+**Slice 1 construido:** entidades `Person` (≠User, `kind` INTERNAL/CONTRACTOR, catálogo compartido), `ContractorCompany`
+(acreditación inerte, gate en S3), `RosterRole` (seed 3 roles OSHA, configurable), `WorkOrderWorker` (roster con rol, soft-
+remove, columnas de override reservadas); `WorkOrder.rosterConfirmedAt/ById` + `WorkOrderType.rosterEnabled` (migración
+`20260703000000_add_dotacion_roster`). **Gobierno 2 espejo EXACTO** (`confirmRoster` FIRMADO Part 11 vía `ReauthService` /
+`clearRosterConfirmation` auto-limpieza al curar / `assertRosterConfirmed` gate en la autorización, ANTES del gate de
+checklists). Semáforo por persona = función pura `evaluateWorkerStatus` (forma final desde S1; en S1 siempre verde, causas
+rojas en S2/S3). Permisos NUEVOS `worker:manage` + `workorder:roster:manage` (104 total). Contratos `work-orders/roster.ts`
+(+ `rosterEnabled` en el tipo). **Web:** catálogo «Personas y contratistas» (`/ordenes-trabajo/personas`, tabs Personas/
+Empresas), pestaña «Dotación» en la Object Page (visible solo si el tipo la gestiona; `Combobox` buscable + semáforo +
+confirmar con modal de firma), toggle «Gestiona dotación» en el editor de tipos. Verde: typecheck (7) · lint 0 err · build ·
+**contracts (roster.spec 8/8)** · API 252 · web 6 · **smoke-dotacion 26/26** (catálogo + gate + firma + auto-limpieza +
+retrocompat tipo sin dotación) + regresión **smoke-workorders 122/122** + **smoke-incidencias 32/32**. **Diferido:** S2
+competencias/vigencias + semáforo con causas rojas + gate/override por persona + avisos de vencimiento (Bloque N); S3
+acreditación de contratistas; S4 control de acceso (interfaz abstracta).
+
 **2026-07-02 — 🔢 Folio: "el ámbito completo" (segmento visible por nodo/estructura) ✅** (`feat/folio-ambito-visible`).
 Refinamiento pedido por el dueño tras revisar el editor: el **ámbito** (`por nodo`/`por estructura`) partía el contador
 pero **no se veía** en el folio ⇒ dos nodos generaban el mismo `RT-2026-0001`. Ahora el ámbito **inyecta automáticamente el

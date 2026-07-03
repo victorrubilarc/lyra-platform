@@ -776,6 +776,20 @@ export const PERMISSION_CATALOG = [
     group: "workorders",
     description: "Administrar el catálogo de tipos de OT, especialidades y reglas de checklist.",
   },
+  {
+    key: "worker:manage",
+    dimension: "ACTION",
+    group: "workorders",
+    description:
+      "Administrar el catálogo de Personas (propias y de contratistas) y de Empresas contratistas. Una persona es distinta de un usuario del sistema: los contratistas no tienen acceso.",
+  },
+  {
+    key: "workorder:roster:manage",
+    dimension: "ACTION",
+    group: "workorders",
+    description:
+      "Gestionar la dotación de una OT: agregar/quitar personas con su rol y confirmar (firmar) la dotación antes de autorizar el permiso.",
+  },
 ] as const satisfies readonly PermissionDef[];
 
 /** Unión literal de todas las claves de permiso conocidas. */

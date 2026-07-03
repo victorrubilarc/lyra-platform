@@ -72,6 +72,8 @@ export interface WorkOrderTypeSeed {
   requiresPtwDefault: boolean;
   criticalityDefault: number | null;
   sortOrder: number;
+  /** ¿El tipo gestiona DOTACIÓN? (S1). Solo los trabajos de alto riesgo por defecto. */
+  rosterEnabled?: boolean;
 }
 
 export interface WorkOrderTagSeed {
@@ -95,9 +97,9 @@ export const WORK_ORDER_TYPES: WorkOrderTypeSeed[] = [
   { key: "inspeccion", name: "Inspección", description: "Inspección o monitoreo de condición sin intervención mayor (rutas, checklists).", color: "#06B6D4", requiresPtwDefault: false, criticalityDefault: 2, sortOrder: 50 },
   { key: "lubricacion", name: "Lubricación", description: "Rutas de lubricación y engrase programado.", color: "#84CC16", requiresPtwDefault: false, criticalityDefault: 1, sortOrder: 60 },
   { key: "calibracion", name: "Calibración", description: "Calibración y verificación de instrumentos y lazos de control (Maximo CAL).", color: "#06B6D4", requiresPtwDefault: false, criticalityDefault: 2, sortOrder: 70 },
-  { key: "overhaul", name: "Mantención mayor / Overhaul", description: "Detención mayor programada: reacondicionamiento o reemplazo de componentes (SAP refurbishment).", color: "#6366F1", requiresPtwDefault: true, criticalityDefault: 3, sortOrder: 80 },
+  { key: "overhaul", name: "Mantención mayor / Overhaul", description: "Detención mayor programada: reacondicionamiento o reemplazo de componentes (SAP refurbishment).", color: "#6366F1", requiresPtwDefault: true, criticalityDefault: 3, sortOrder: 80, rosterEnabled: true },
   { key: "mejora", name: "Mejora / Proyecto", description: "Modificación o mejora de un activo o instalación (gestión del cambio / MOC).", color: "#6366F1", requiresPtwDefault: false, criticalityDefault: 2, sortOrder: 90 },
-  { key: "ptw-alto-riesgo", name: "Permiso de Alto Riesgo (PTW)", description: "Trabajo con permiso: bloqueo de energías (LOTO), altura, espacio confinado, trabajo en caliente.", color: "#EF4444", requiresPtwDefault: true, criticalityDefault: 4, sortOrder: 100 },
+  { key: "ptw-alto-riesgo", name: "Permiso de Alto Riesgo (PTW)", description: "Trabajo con permiso: bloqueo de energías (LOTO), altura, espacio confinado, trabajo en caliente.", color: "#EF4444", requiresPtwDefault: true, criticalityDefault: 4, sortOrder: 100, rosterEnabled: true },
 ];
 
 /**
@@ -242,3 +244,49 @@ export const WORK_ORDER_CHECKLIST_RULES: ChecklistRuleSeed[] = [
  */
 export const LEGACY_CHECKLIST_TEMPLATE_NAME = "Checklist PTW — Bloqueo de energías (LOTO)";
 export const LEGACY_CHECKLIST_RULE_NAME = "PTW obligatorio — Bloqueo de energías (LOTO)";
+
+/**
+ * Catálogo de arranque de ROLES DE DOTACIÓN (S1). Configurable desde la UI; los 3
+ * roles estándar de OSHA 29 CFR 1910.146 para trabajo con permiso. NO hardcodeados:
+ * el cliente los renombra/agrega. `isSupervisorRole` = quien autoriza/firma la entrada
+ * (traza OSHA (f)(6)/(e)(2)); `mustRemainOutside` = semántica de vigía (traza OSHA (i)(4)).
+ */
+export interface RosterRoleSeed {
+  key: string;
+  name: string;
+  description: string;
+  isSupervisorRole: boolean;
+  mustRemainOutside: boolean;
+  color: string;
+  sortOrder: number;
+}
+
+export const ROSTER_ROLES: RosterRoleSeed[] = [
+  {
+    key: "entry_supervisor",
+    name: "Supervisor de entrada",
+    description: "Autoriza el ingreso, verifica condiciones aceptables y que el rescate esté disponible; firma para autorizar la entrada (OSHA entry supervisor).",
+    isSupervisorRole: true,
+    mustRemainOutside: false,
+    color: "#6366F1",
+    sortOrder: 10,
+  },
+  {
+    key: "attendant",
+    name: "Vigía",
+    description: "Permanece fuera del área monitoreando a quienes ingresan; ordena la evacuación y solicita rescate si es necesario (OSHA attendant).",
+    isSupervisorRole: false,
+    mustRemainOutside: true,
+    color: "#06B6D4",
+    sortOrder: 20,
+  },
+  {
+    key: "authorized_entrant",
+    name: "Ejecutante autorizado",
+    description: "Persona autorizada a ingresar a ejecutar la labor; conoce los peligros y usa el equipo requerido (OSHA authorized entrant).",
+    isSupervisorRole: false,
+    mustRemainOutside: false,
+    color: "#84CC16",
+    sortOrder: 30,
+  },
+];

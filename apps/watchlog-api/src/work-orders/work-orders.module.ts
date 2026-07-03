@@ -3,10 +3,13 @@ import { AuthModule } from "../auth/auth.module";
 import { FolioModule } from "../folio/folio.module";
 import { LogEntriesModule } from "../log-entries/log-entries.module";
 import { WorkOrdersController } from "./work-orders.controller";
+import { PersonsController } from "./persons.controller";
 import { WorkOrdersService } from "./work-orders.service";
 import { WorkOrderChecklistsService } from "./work-order-checklists.service";
 import { WorkActivitiesService } from "./work-activities.service";
 import { WorkOrderSlaService } from "./work-order-sla.service";
+import { WorkOrderRosterService } from "./work-order-roster.service";
+import { PersonsService } from "./persons.service";
 
 /**
  * Órdenes de Trabajo / Work Orders (OT / PTW) — S1 cimientos + S2 Puerta 1 + S3
@@ -18,8 +21,8 @@ import { WorkOrderSlaService } from "./work-order-sla.service";
  */
 @Module({
   imports: [AuthModule, FolioModule, LogEntriesModule],
-  controllers: [WorkOrdersController],
-  providers: [WorkOrdersService, WorkOrderChecklistsService, WorkActivitiesService, WorkOrderSlaService],
-  exports: [WorkOrdersService, WorkOrderChecklistsService, WorkActivitiesService, WorkOrderSlaService],
+  controllers: [WorkOrdersController, PersonsController],
+  providers: [WorkOrdersService, WorkOrderChecklistsService, WorkActivitiesService, WorkOrderSlaService, WorkOrderRosterService, PersonsService],
+  exports: [WorkOrdersService, WorkOrderChecklistsService, WorkActivitiesService, WorkOrderSlaService, WorkOrderRosterService, PersonsService],
 })
 export class WorkOrdersModule {}

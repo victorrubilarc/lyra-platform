@@ -42,6 +42,7 @@ export function WorkOrderTypeModal({ open, onClose, type, existingKeys }: Props)
   const [color, setColor] = useState<string>("");
   const [defaultWorkflowId, setDefaultWorkflowId] = useState("");
   const [requiresPtwDefault, setRequiresPtwDefault] = useState(false);
+  const [rosterEnabled, setRosterEnabled] = useState(false);
   const [criticalityDefault, setCriticalityDefault] = useState<string>("");
   const [resolutionDueMinutes, setResolutionDueMinutes] = useState<number | null>(null);
   const [escalationAfterMinutes, setEscalationAfterMinutes] = useState<number | null>(null);
@@ -54,14 +55,14 @@ export function WorkOrderTypeModal({ open, onClose, type, existingKeys }: Props)
     if (!open) return;
     if (type) {
       setName(type.name); setKey(type.key); setDescription(type.description ?? ""); setColor(type.color ?? "");
-      setDefaultWorkflowId(type.defaultWorkflowId ?? ""); setRequiresPtwDefault(type.requiresPtwDefault);
+      setDefaultWorkflowId(type.defaultWorkflowId ?? ""); setRequiresPtwDefault(type.requiresPtwDefault); setRosterEnabled(type.rosterEnabled);
       setCriticalityDefault(type.criticalityDefault != null ? String(type.criticalityDefault) : ""); setSortOrder(type.sortOrder);
       setResolutionDueMinutes(type.resolutionDueMinutes); setEscalationAfterMinutes(type.escalationAfterMinutes);
       setEscalationRoleId(type.escalationRoleId ?? "");
       setFolioScheme(type.folioScheme ?? null); setFolioOnStateKey(type.folioOnStateKey ?? "");
     } else {
       setName(""); setKey(""); setDescription(""); setColor(""); setDefaultWorkflowId("");
-      setRequiresPtwDefault(false); setCriticalityDefault(""); setSortOrder(0);
+      setRequiresPtwDefault(false); setRosterEnabled(false); setCriticalityDefault(""); setSortOrder(0);
       setResolutionDueMinutes(null); setEscalationAfterMinutes(null); setEscalationRoleId("");
       setFolioScheme(null); setFolioOnStateKey("");
     }
@@ -89,6 +90,7 @@ export function WorkOrderTypeModal({ open, onClose, type, existingKeys }: Props)
       color: color || null,
       defaultWorkflowId: defaultWorkflowId || null,
       requiresPtwDefault,
+      rosterEnabled,
       criticalityDefault: criticalityDefault ? Number(criticalityDefault) : null,
       resolutionDueMinutes: resolutionDueMinutes ?? null,
       escalationAfterMinutes: escalationAfterMinutes ?? null,
@@ -171,6 +173,13 @@ export function WorkOrderTypeModal({ open, onClose, type, existingKeys }: Props)
             <div>
               <div className={styles.flagLabel}>Requiere permiso de trabajo (PTW) por defecto</div>
               <div className={styles.muted}>Las OT de este tipo prellenan "Requiere PTW" (trabajo de alto riesgo: LOTO, altura, espacio confinado…).</div>
+            </div>
+          </div>
+          <div className={styles.flagRow}>
+            <Toggle checked={rosterEnabled} onChange={setRosterEnabled} aria-label="Gestiona dotación" />
+            <div>
+              <div className={styles.flagLabel}>Gestiona dotación</div>
+              <div className={styles.muted}>Las OT de este tipo listan las personas (propias y contratistas) que ingresan a ejecutar; el aprobador confirma y firma la dotación antes de autorizar el permiso.</div>
             </div>
           </div>
         </div>
