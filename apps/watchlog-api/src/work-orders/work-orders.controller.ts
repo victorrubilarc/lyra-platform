@@ -19,6 +19,7 @@ import {
   upsertWorkOrderChecklistRuleRequestSchema,
   upsertWorkOrderTagRequestSchema,
   upsertWorkOrderTypeRequestSchema,
+  workOrderDashboardQuerySchema,
   workOrderListQuerySchema,
   type AddWorkOrderChecklistRequest,
   type AddWorkOrderWorkerRequest,
@@ -38,6 +39,7 @@ import {
   type UpsertSpecialtyRequest,
   type UpsertWorkOrderChecklistRuleRequest,
   type UpsertWorkOrderTypeRequest,
+  type WorkOrderDashboardQuery,
   type WorkOrderListQuery,
 } from "@lyra/contracts";
 import type { AuditContext } from "../audit/audit.service";
@@ -48,6 +50,7 @@ import { WorkOrdersService } from "./work-orders.service";
 import { WorkOrderChecklistsService } from "./work-order-checklists.service";
 import { WorkActivitiesService } from "./work-activities.service";
 import { WorkOrderRosterService } from "./work-order-roster.service";
+import { WorkOrderDashboardService } from "./work-order-dashboard.service";
 
 @Controller("work-orders")
 export class WorkOrdersController {
@@ -56,6 +59,7 @@ export class WorkOrdersController {
     private readonly checklists: WorkOrderChecklistsService,
     private readonly activities: WorkActivitiesService,
     private readonly roster: WorkOrderRosterService,
+    private readonly dashboard: WorkOrderDashboardService,
   ) {}
 
   // --- Catálogos (antes de :id para no chocar) -------------------------------
@@ -125,6 +129,22 @@ export class WorkOrdersController {
   @RequirePermission("workorder:view")
   stats(@CurrentUser() user: RequestUser, @Query("structureId") structureId?: string) {
     return this.workOrders.stats(user.id, structureId);
+  }
+
+  /**
+   * Dashboard analítico de OT (S7a). Read-only, agregado en el backend con el MISMO ABAC
+   * por nodo ∩ estructura activa que la lista: no expone nada que el usuario no vea, solo
+   * lo agrega. Gate REUSANDO `workorder:view` (sin permiso nuevo, como incidencias reusó
+   * `incident:view`). Ruta ESTÁTICA antes de `:id`.
+   */
+  @Get("dashboard")
+  @RequirePermission("workorder:view")
+  dashboardData(
+    @Query(new ZodValidationPipe(workOrderDashboardQuerySchema)) q: WorkOrderDashboardQuery,
+    @CurrentUser() user: RequestUser,
+    @Query("structureId") structureId?: string,
+  ) {
+    return this.dashboard.build(user.id, q, structureId);
   }
 
   @Get("users")

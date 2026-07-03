@@ -6,6 +6,7 @@ import {
   workOrderDetailSchema,
   workOrderListResponseSchema,
   workOrderStatsSchema,
+  workOrderDashboardSchema,
   workOrderTypeSchema,
   workOrderTagSchema,
   workOrderRosterSchema,
@@ -55,6 +56,8 @@ import {
   type WorkOrderChecklistDto,
   type WorkOrderChecklistRuleDto,
   type WorkOrderDetail,
+  type WorkOrderDashboard,
+  type WorkOrderDashboardQuery,
   type WorkOrderListQuery,
   type WorkOrderListResponse,
   type WorkOrderStats,
@@ -78,6 +81,9 @@ function queryString(q: WorkOrderListQuery): string {
   if (q.requiresPtw) p.set("requiresPtw", "true");
   if (q.mine) p.set("mine", "true");
   if (q.unassignedOnly) p.set("unassignedOnly", "true");
+  if (q.slaStatus) p.set("slaStatus", q.slaStatus);
+  if (q.createdFrom) p.set("createdFrom", new Date(q.createdFrom).toISOString());
+  if (q.createdTo) p.set("createdTo", new Date(q.createdTo).toISOString());
   if (q.sort) p.set("sort", q.sort);
   if (q.page) p.set("page", String(q.page));
   if (q.pageSize) p.set("pageSize", String(q.pageSize));
@@ -101,6 +107,28 @@ export function fetchWorkOrderDetail(id: string): Promise<WorkOrderDetail> {
 
 export function fetchWorkOrderStats(structureId?: string | null): Promise<WorkOrderStats> {
   return apiJson(`/work-orders/stats${withStructure("", structureId)}`, workOrderStatsSchema);
+}
+
+/** Querystring del dashboard de OT (subconjunto de filtros + rango + granularidad). */
+function dashboardQueryString(q: WorkOrderDashboardQuery): string {
+  const p = new URLSearchParams();
+  if (q.lifecycle) p.set("lifecycle", q.lifecycle);
+  if (q.typeId) p.set("typeId", q.typeId);
+  if (q.criticality) p.set("criticality", String(q.criticality));
+  if (q.priority) p.set("priority", q.priority);
+  if (q.originType) p.set("originType", q.originType);
+  if (q.specialtyId) p.set("specialtyId", q.specialtyId);
+  if (q.orgNodeIds && q.orgNodeIds.length) p.set("orgNodeIds", q.orgNodeIds.join(","));
+  if (q.equipmentId) p.set("equipmentId", q.equipmentId);
+  if (q.createdFrom) p.set("createdFrom", new Date(q.createdFrom).toISOString());
+  if (q.createdTo) p.set("createdTo", new Date(q.createdTo).toISOString());
+  if (q.bucket) p.set("bucket", q.bucket);
+  const s = p.toString();
+  return s ? `?${s}` : "";
+}
+
+export function fetchWorkOrderDashboard(q: WorkOrderDashboardQuery, structureId?: string | null): Promise<WorkOrderDashboard> {
+  return apiJson(`/work-orders/dashboard${withStructure(dashboardQueryString(q), structureId)}`, workOrderDashboardSchema);
 }
 
 export function fetchWorkOrderTypes(includeInactive = false): Promise<WorkOrderTypeDto[]> {

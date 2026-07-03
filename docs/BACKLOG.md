@@ -5,7 +5,15 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-07-03** — **👷 Dotación · Pulido UX enterprise + datos personales + auditoría ✅** (`feat/dotacion-ux-enterprise`):
+> actualización: **2026-07-03** — **🔧 OT · Slice 7a · Dashboard analítico de OT (read-only) ✅** (`feat/ot-dashboard-s7a`):
+> clon del dashboard de Incidencias (4.5). `WorkOrderDashboardService` (ABAC por nodo ∩ estructura replicando `buildWhere`;
+> KPIs vivos + periodo, MTTR, cumplimiento SLA, tendencia, distribuciones/Pareto por tipo/criticidad/nodo/especialidad/estado/
+> prioridad/origen) + `GET /work-orders/dashboard` (gate `workorder:view`, **sin permiso/migración/FLUSHALL**) + web
+> `WorkOrderDashboardPage` (Recharts con tokens, export CSV, drill-down por querystring que siembra la lista) + contract
+> `work-orders/dashboard.ts` (reusa helpers puros de incidencias) + spec 8. Fix latente: `slaStatus`/`createdFrom`/`createdTo`
+> no se serializaban en la lista de OT. contracts **505** + **smoke-workorders-dashboard 30/30** + regresión OT 122 · incid 32 ·
+> dotación 65. **Hallazgo:** el enlace Incidencia↔OT ya está medio hecho (`WorkOrder.originIncidentId`); **S7b** = siguiente
+> sesión (solo nivel incidencia, sin migración). Pendiente: **smoke VISUAL (dueño)**. — Antes: **👷 Dotación · Pulido UX enterprise + datos personales + auditoría ✅** (`feat/dotacion-ux-enterprise`):
 > feedback del dueño sobre la UX de Personas/Dotación. **Grillas al ESTÁNDAR** (`GridPager`+`.tableCard` de catalogs, se descartó la tabla a mano de S3);
 > íconos en línea en cabeceras/pestañas; **datos personales** en `Person` (nacimiento/edad, **género**, nacionalidad, **tipo de documento** con extranjeros;
 > migr. aditiva `20260703160000`); **RUT formateado/validado mód-11/normalizado** reutilizando helpers (persona+empresa); **roles de dotación configurables
@@ -888,9 +896,19 @@ nunca queda más de una sesión atrás.
       `WorkOrderSlaService.findBreaches`. Sin migración/permiso nuevo. contracts 448 + smoke-workorders 122/122. **DEFERIDO a
       futuro (no pedido):** curva de alerta esperado-vs-real / detección de incoherencia del avance; escalamiento multinivel (S8);
       breach de permanencia (`stalled`) sólo se ve si el flujo configura `maxStayMinutes` por estado (hoy el seed no lo hace).
-- [ ] **Sesión 7 — Dashboard de OT + integración Incidencia→OT (~40 HH):** `WorkOrderDashboardService` (clon del de
-      incidencias: KPIs, cuellos de botella, tendencia, drill-down, export CSV); botón "Generar OT" desde incidencia/
-      excepción/bitácora con enlace bidireccional. **Fin del paquete comercial recomendado.**
+- [x] **Sesión 7a — Dashboard de OT ✅ (2026-07-03, `feat/ot-dashboard-s7a`):** `WorkOrderDashboardService` (clon del de
+      incidencias 4.5: KPIs vivos + periodo, tendencia, MTTR, cumplimiento SLA, distribuciones/Pareto por tipo/criticidad/
+      nodo/especialidad/estado/prioridad/origen), ABAC por nodo ∩ estructura replicando `buildWhere`; `GET /work-orders/dashboard`
+      (gate `workorder:view`, sin permiso/migración); web `WorkOrderDashboardPage` (Recharts con tokens, export CSV, drill-down);
+      contract `work-orders/dashboard.ts` (reusa helpers puros de incidencias) + spec 8. contracts 505 + smoke-workorders-dashboard
+      30/30 + regresión OT 122 · incid 32 · dotación 65. Fix latente de paso: `slaStatus`/`createdFrom`/`createdTo` no se
+      serializaban en el `queryString` de la lista de OT (el filtro `slaStatus` no llegaba al backend). Pendiente: smoke VISUAL.
+- [ ] **Sesión 7b — Enlace Incidencia↔OT bidireccional (~15 HH):** **el schema YA modela el lado OT** (`WorkOrder.originIncidentId`
+      indexado + `originType=INCIDENT`, cableado en `create()`). Falta: vista inversa en la incidencia ("OT relacionadas" vía
+      `GET /incidents/:id/work-orders`) + botón **"Crear OT desde incidencia"** (pre-siembra `originIncidentId`/tipo/criticidad/
+      nodo, copia título/descripción como SAP PM) + mostrar "Originada por INC-####" en el detalle de OT. **Decidido (dueño,
+      2026-07-03):** SOLO nivel incidencia (reusar `originIncidentId`, **sin migración**); **NO** `IncidentAction.workOrderId`
+      (excede el estándar ticket→followup de SAP/Maximo). **Fin del paquete comercial recomendado.**
 - [ ] **Sesión 8 — Enterprise / opcional (~108 HH, Fase 3):** aprobadores dinámicos por reglas (área/criticidad/
       especialidad/monto/riesgo, reusa el motor de reglas); dependencias/ruta crítica; costos/HH + reportes/export;
       escalamiento multinivel. Puede subdividirse al llegar.

@@ -1,5 +1,29 @@
 # Progreso — Lyra WatchLog
 
+**2026-07-03 — 🔧 OT · Slice 7a · Dashboard analítico de Órdenes de Trabajo (read-only) ✅** (`feat/ot-dashboard-s7a`).
+ESPEJO del dashboard de Incidencias (Fase 4.5). Analítica agregada **siempre en el backend** (GROUP BY / `$queryRaw` acotado;
+nunca filas crudas al cliente) con el **MISMO ABAC por nodo ∩ estructura activa** que la lista de OT (replica el `buildWhere`:
+`getAccessibleNodeIds` ∩ `orgNode.structureId` ∩ filtros). **Sin permiso nuevo** (gate `workorder:view`, como incidencias reusó
+`incident:view`) → **sin migración, sin FLUSHALL**. **Servicio** `WorkOrderDashboardService`: KPIs vivos (borradores, abiertas,
+críticas, sin responsable, con PTW, **plazo vencido / por vencer / estancadas** reusando el "vigía" S6 y `workOrderTrafficLight`)
++ del periodo (creadas, cerradas, **MTTR** creación→cierre `AVG`, **cumplimiento SLA** `FILTER` cerró ≤ `dueAt`) + tendencia
+creación/cierre (`date_trunc AT TIME ZONE`, `PLANT_TIME_ZONE`) + distribuciones/Pareto por **tipo, criticidad, nodo,
+especialidad, prioridad, origen y ESTADO del workflow** (esta última DERIVADA del flujo configurable congelado —no hay estado
+hardcodeado— resolviendo nombre/color desde `WorkflowState` y fusionando por nombre). **Endpoint** `GET /work-orders/dashboard`
+(ruta estática **antes de `:id`**). **Contrato** `work-orders/dashboard.ts` que REUSA los helpers puros genéricos de
+`incidents/dashboard.ts` (`paretoOrder`/`defaultBucketForRange`/`defaultDashboardRange`, DRY) + aporta `criticalityDimensionLabel`;
+spec 8 casos. **Web** `WorkOrderDashboardPage` + `dashboard.module.css` (Recharts con **tokens del DS, nunca hex**; Area tendencia
++ Pareto por tipo + dona por criticidad + barras nodo/especialidad/estado/prioridad/origen) + **export CSV** (BOM+CRLF) +
+**drill-down por querystring** que siembra los filtros de `WorkOrdersPage` (ruta `inSidebar:false` + botón "Dashboard" en el
+header de OT). **De paso** se cableó en el `queryString` de la lista de OT el envío de `slaStatus`/`createdFrom`/`createdTo` que
+faltaban (el filtro `slaStatus` de la grilla no llegaba al backend —bug latente— y el drill-down los necesita). Verde: contracts
+**505** (dashboard.spec 8) · api typecheck · web typecheck+build · **smoke-workorders-dashboard 30/30** (KPIs, agregación, MTTR/SLA,
+**ABAC con usuario scoped**, rango/contrato, gate 403, **drill-down parity con la lista**) + regresión OT **122/122** ·
+incidencias **32/32** · dotación **65/65**. **Hallazgo clave**: el enlace Incidencia↔OT **ya está medio hecho** en el schema
+(`WorkOrder.originIncidentId` indexado + `originType=INCIDENT`, cableado en `create()`); **S7b** (vista inversa en la incidencia +
+"Crear OT desde incidencia") = **siguiente sesión** (decidido: solo nivel incidencia, sin `IncidentAction.workOrderId`). Pendiente:
+**smoke VISUAL (dueño)**. Decisiones en `DECISIONS.md` (2026-07-03, entrada OT S7a). **Siguiente = OT S7b (enlace Incidencia↔OT).**
+
 **2026-07-03 — 👷 Dotación · Pulido UX enterprise + datos personales + auditoría ✅** (`feat/dotacion-ux-enterprise`).
 Ronda de feedback del dueño sobre la UX del catálogo de Personas/Dotación, resuelta de raíz. **Grillas al ESTÁNDAR**:
 Personas y Empresas ahora usan `GridPager` + `.tableCard`/`.table` de `catalogs.module.css` (importado como `grid`) — se

@@ -4,6 +4,31 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-03 · OT · Slice 7a · Dashboard analítico de Órdenes de Trabajo (`feat/ot-dashboard-s7a`)
+Se decidió PARTIR el S7 en **S7a (Dashboard, esta sesión)** y **S7b (enlace Incidencia↔OT, siguiente sesión)** porque el
+dashboard es cerrable por sí solo y reduce el riesgo de contexto. Decisiones:
+- **Clonar, NO reinventar el dashboard de Incidencias (4.5).** `WorkOrderDashboardService` replica la estructura de
+  `IncidentDashboardService` (ABAC replicando `buildWhere`, `$queryRaw` acotado con `date_trunc AT TIME ZONE`, MTTR `AVG`,
+  cumplimiento SLA `FILTER`). El contrato `work-orders/dashboard.ts` **reusa** los helpers puros GENÉRICOS de
+  `incidents/dashboard.ts` (`paretoOrder`/`defaultBucketForRange`/`defaultDashboardRange`, `DashboardDimensionSlice`/
+  `DashboardTrendPoint`/`DashboardBucket`) en vez de duplicarlos (DRY, regla "no copiar/pegar").
+- **Sin permiso nuevo: gate `workorder:view`.** Igual que el dashboard de incidencias reusó `incident:view`: el dashboard NO
+  expone nada que el usuario no vea ya (mismo ABAC), solo lo agrega ⇒ el permiso de LECTURA basta. Sin migración/FLUSHALL.
+- **Los "estados operacionales" (por autorizar / en ejecución / …) NO son KPIs hardcodeados.** Salen de la distribución
+  `byState`, derivada del **workflow CONFIGURABLE congelado** en cada OT: se agrupa por (versión, clave de estado) y se resuelve
+  nombre/color desde `WorkflowState`, fusionando por NOMBRE. Coherente con "permisos/flujo = dato, nada en duro".
+- **§21 respetado (heredado de Incidencias 4.4):** "vencida por PLAZO" (`dueAt`/actividad vencida → `overdue`) y "PERMANENCIA de
+  estado excedida" (`maxStayMinutes` → `stalled`) son KPIs SEPARADOS; no se mezclan (reusan el "vigía" S6 y `workOrderTrafficLight`).
+- **Enlace Incidencia↔OT (contraste con el estándar antes de S7b).** Se investigó SAP PM (notification→order con vínculo
+  bidireccional para trazabilidad; desde la orden se vuelve a la notification) e IBM Maximo (acción "Create Work Order" desde un
+  incident ⇒ **FOLLOWUP** work order visible en "Related Records"; tipos ORIGINATOR/FOLLOWUP/RELATED). **Hallazgo:** el schema YA
+  modela el lado OT (`WorkOrder.originIncidentId` indexado + `originType=INCIDENT`, cableado en `create()`) = exactamente el
+  ORIGINATOR estándar. Por eso S7b será **solo nivel incidencia** (reusar `originIncidentId`, **sin migración**; vista inversa
+  "OT relacionadas" + "Crear OT desde incidencia") y **NO** se agregará `IncidentAction.workOrderId` (excede el estándar
+  ticket→followup y añadiría migración). Decisión del dueño (AskUserQuestion 2026-07-03).
+- **Fix latente de paso:** el `queryString` de la lista de OT no serializaba `slaStatus`/`createdFrom`/`createdTo`; el filtro
+  `slaStatus` de la grilla nunca llegaba al backend. Se agregaron (el drill-down del dashboard los necesita).
+
 ### 2026-07-03 · Dotación · Pulido UX enterprise + datos personales + auditoría (`feat/dotacion-ux-enterprise`)
 Ronda de feedback del dueño sobre la UX del catálogo de Personas/Dotación. Decisiones:
 - **Grillas AL ESTÁNDAR (no divergir).** Personas y Empresas ahora usan el MISMO patrón que el mantenedor de catálogos de OT:

@@ -38,6 +38,7 @@ import { CatalogsPage } from "../features/incidents/CatalogsPage.js";
 import { ExceptionsPage } from "../features/exceptions/ExceptionsPage.js";
 import { ShiftHandoverPage } from "../features/shift-handover/ShiftHandoverPage.js";
 import { WorkOrdersPage } from "../features/work-orders/WorkOrdersPage.js";
+import { WorkOrderDashboardPage } from "../features/work-orders/WorkOrderDashboardPage.js";
 import { WorkOrderDetailPage } from "../features/work-orders/WorkOrderDetailPage.js";
 import { WorkOrderCatalogsPage } from "../features/work-orders/WorkOrderCatalogsPage.js";
 import { PersonsPage } from "../features/work-orders/PersonsPage.js";
@@ -79,6 +80,7 @@ export const router = createBrowserRouter([
           { path: "/excepciones", element: <ExceptionsPage /> },
           { path: "/cambio-turno", element: <ShiftHandoverPage /> },
           { path: "/ordenes-trabajo", element: <WorkOrdersPage /> },
+          { path: "/ordenes-trabajo/dashboard", element: <WorkOrderDashboardPage /> },
           { path: "/ordenes-trabajo/catalogos", element: <WorkOrderCatalogsPage /> },
           { path: "/ordenes-trabajo/personas", element: <PersonsPage /> },
           { path: "/ordenes-trabajo/:id", element: <WorkOrderDetailPage /> },

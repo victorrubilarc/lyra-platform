@@ -724,7 +724,15 @@ Incident(resuelta) ──> KnowledgeArticle
 - Índices previstos: FKs, `OrgNode.parentId`, `Entry(templateId, createdAt)`, `Incident(status, severity)`, GIN en `tsvector` de KB y en `JSONB` consultable.
 - El esquema vive en `apps/watchlog-api/prisma/schema.prisma`; migraciones versionadas con `prisma migrate`.
 
-### Órdenes de Trabajo / Work Orders (OT / PTW) — S1 Cimientos + S2 Puerta 1 + S3 Puerta 2 + S4 Puerta 3 + S5 Puerta 4 + S6 SLA/semáforos *(implementado)*
+### Órdenes de Trabajo / Work Orders (OT / PTW) — S1 Cimientos + S2 Puerta 1 + S3 Puerta 2 + S4 Puerta 3 + S5 Puerta 4 + S6 SLA/semáforos + S7a Dashboard *(implementado)*
+
+> **S7a (Dashboard analítico, `feat/ot-dashboard-s7a`, 2026-07-03) — SIN migración (read-only).** `WorkOrderDashboardService`
+> agrega en el backend (GROUP BY / `$queryRaw`) con el MISMO ABAC por nodo ∩ estructura de la lista; no toca el esquema. Nota
+> para **S7b (enlace Incidencia↔OT)**: el lado OT del enlace YA existe en el modelo — `WorkOrder.originIncidentId` (ref. blanda
+> indexada `@@index([originIncidentId])`) + `originType=INCIDENT` (enum `WorkOrderOrigin`), y `create()` ya lo persiste. S7b
+> reusará esa columna (sin migración) para la vista inversa "OT relacionadas" en la incidencia y el botón "Crear OT desde
+> incidencia" (traza SAP PM notification→order / Maximo FOLLOWUP). **No** se agregará `IncidentAction.workOrderId` (decisión
+> 2026-07-03).
 
 > **S6 (SLA / vigía, `feat/ot-sla-semaforos`, 2026-07-02) — SIN migración** (columnas ya latentes desde el diseño):
 > `WorkOrderType.resolutionDueMinutes?`/`escalationAfterMinutes?`/`escalationRoleId?` (FK Role SetNull) = SLA light espejo de
