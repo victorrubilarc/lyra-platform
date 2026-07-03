@@ -58,6 +58,7 @@ WO3_TITLE = "OT Smoke Dotación — competencias S2"
 WO4_TITLE = "OT Smoke Dotación — acreditación S3"
 COMPANY_KEY = "smoke-dot-empresa"
 COMPANY2_KEY = "smoke-dot-empresa2"  # empresa del gate de acreditación (S3)
+ROLE_KEY = "smoke-dot-rol"  # rol de dotación creado por CRUD (UX enterprise)
 COMP_KEY = "smoke-dot-comp"  # tipo de competencia S2
 RULE_NAME = "Regla Smoke Competencia S2"
 PERSON_LAST = "SmokeDotApellido"  # marcador para limpieza
@@ -115,6 +116,7 @@ def cleanup():
     sql(f"DELETE FROM \"Person\" WHERE \"lastName\" = '{PERSON_LAST}';")  # cascada PersonCompetency/Restriction
     sql(f"DELETE FROM \"CompetencyType\" WHERE key = '{COMP_KEY}';")
     sql(f"DELETE FROM \"ContractorCompany\" WHERE key IN ('{COMPANY_KEY}', '{COMPANY2_KEY}');")
+    sql(f"DELETE FROM \"RosterRole\" WHERE key = '{ROLE_KEY}';")
     sql("DELETE FROM \"FolioCounter\" WHERE \"sequenceKey\" LIKE 'workorder|type:' || (SELECT id FROM \"WorkOrderType\" WHERE key = '" + TYPE_KEY + "') || '%';")
     sql(f"DELETE FROM \"WorkOrderType\" WHERE key IN ('{TYPE_KEY}', '{NOROSTER_TYPE_KEY}', '{S2_TYPE_KEY}', '{S3_TYPE_KEY}');")
 
@@ -135,7 +137,7 @@ def main():
           s == 200 and isinstance(roles, list) and len(roles) >= 3 and sup is not None and ent is not None, str(s))
 
     s, comp = call("POST", "/contractor-companies?create=true", admin,
-                   {"key": COMPANY_KEY, "name": "Contratista Smoke SpA", "taxId": "76.111.222-3", "accreditationStatus": "ACCREDITED", "accreditationGrade": "A"})
+                   {"key": COMPANY_KEY, "name": "Contratista Smoke SpA", "taxId": "76.111.222-8", "accreditationStatus": "ACCREDITED", "accreditationGrade": "A"})
     company_id = comp.get("id") if isinstance(comp, dict) else None
     check("crear empresa contratista → 2xx", s in (200, 201) and company_id, str(s))
 
@@ -426,8 +428,63 @@ def main():
     n_accsoon = sql(f"SELECT count(*) FROM \"NotificationEvent\" WHERE \"eventKey\"='contractor.accreditation.expiring' AND payload->>'workOrderId'='{wid4}';")
     check("aviso contractor.accreditation.expiring encolado tras /notifications/run", n_accsoon.isdigit() and int(n_accsoon) >= 1, n_accsoon)
 
+    # === G) UX enterprise: validación de RUT + datos personales + CRUD de roles =====
+    # G1. persona con RUT INVÁLIDO → 400; con RUT VÁLIDO → 2xx y guardado NORMALIZADO
+    # (sin puntos ni guion en BD; la UI lo formatea). Contempla documento extranjero.
+    s, _ = call("POST", "/persons", admin, {"kind": "INTERNAL", "firstName": "Rut", "lastName": PERSON_LAST, "nationalIdType": "RUT", "nationalId": "12.345.678-9"})
+    check("persona con RUT inválido (DV) → 400", s == 400, str(s))
+    s, prut = call("POST", "/persons", admin, {"kind": "INTERNAL", "firstName": "Rut", "lastName": PERSON_LAST, "nationalIdType": "RUT", "nationalId": "11.111.111-1",
+                                               "birthDate": iso(-9000), "gender": "MALE", "nationality": "Chilena"})
+    prut_id = prut.get("id") if isinstance(prut, dict) else None
+    nat = sql(f"SELECT \"nationalId\" FROM \"Person\" WHERE id = '{prut_id}';") if prut_id else ""
+    check("persona con RUT válido → 2xx + datos personales (género/nacionalidad/nacimiento)",
+          s in (200, 201) and isinstance(prut, dict) and prut.get("gender") == "MALE" and prut.get("nationality") == "Chilena" and prut.get("birthDate"), str(s))
+    check("RUT guardado NORMALIZADO (sin puntos/guion en BD)", nat == "11111111-1", nat)
+    s, pext = call("POST", "/persons", admin, {"kind": "INTERNAL", "firstName": "Ext", "lastName": PERSON_LAST, "nationalIdType": "PASSPORT", "nationalId": "AB-EXTRANJERO-123"})
+    check("persona EXTRANJERA (pasaporte, sin validación RUT) → 2xx", s in (200, 201), str(s))
+
+    # G2. empresa con RUT inválido → 400.
+    s, _ = call("POST", "/contractor-companies?create=true", admin, {"key": COMPANY_KEY + "-bad", "name": "RUT malo SpA", "taxId": "76.111.222-3"})
+    check("empresa con RUT inválido → 400", s == 400, str(s))
+
+    # G3. CRUD de roles de dotación (gate workordercatalog:manage; el operador no puede).
+    if operador:
+        s, _ = call("POST", "/roster-roles?create=true", operador, {"key": ROLE_KEY, "name": "Rol Smoke"})
+        check("operador crear rol de dotación → 403 (workordercatalog:manage)", s == 403, str(s))
+    s, role = call("POST", "/roster-roles?create=true", admin, {"key": ROLE_KEY, "name": "Rol Smoke", "isSupervisorRole": True})
+    role_id = role.get("id") if isinstance(role, dict) else None
+    check("crear rol de dotación → 2xx + isSupervisorRole", s in (200, 201) and isinstance(role, dict) and role.get("isSupervisorRole") is True, str(s))
+    s, roles2 = call("GET", "/roster-roles", admin)
+    check("el rol nuevo aparece en el catálogo", isinstance(roles2, list) and any(r.get("key") == ROLE_KEY for r in roles2), str(s))
+    s, _ = call("POST", "/roster-roles", admin, {"id": role_id, "name": "Rol Smoke (editado)"})
+    check("editar rol de dotación → 2xx", s in (200, 201), str(s))
+    s, _ = call("DELETE", f"/roster-roles/{role_id}", admin)
+    check("eliminar rol de dotación (sin uso) → 2xx", s in (200, 204), str(s))
+
+    # G4. AUDITORÍA e HISTORIAL: quitar una competencia = soft-delete (queda archivada y
+    # visible con ?includeArchived) + AuditLog con el ANTES (qué se quitó). Traza CLAUDE.md.
+    if ind and prut_id:
+        s, comps = call("POST", f"/persons/{prut_id}/competencies", admin, {"competencyTypeId": ind["id"], "issuedAt": iso(-10), "expiresAt": iso(180)})
+        comp_del_id = comps[0]["id"] if isinstance(comps, list) and comps else None
+        call("DELETE", f"/persons/{prut_id}/competencies/{comp_del_id}", admin)
+        s, live = call("GET", f"/persons/{prut_id}/competencies", admin)
+        s2, arch = call("GET", f"/persons/{prut_id}/competencies?includeArchived=true", admin)
+        arch_row = next((c for c in arch if c.get("id") == comp_del_id), None) if isinstance(arch, list) else None
+        check("competencia quitada NO aparece en el listado vivo", isinstance(live, list) and all(c.get("id") != comp_del_id for c in live), str(len(live) if isinstance(live, list) else live))
+        check("con ?includeArchived la competencia archivada SÍ aparece con archivedAt", arch_row is not None and arch_row.get("archivedAt"), str(arch_row and arch_row.get("archivedAt")))
+        bef = sql(f"SELECT (before IS NOT NULL)::text FROM \"AuditLog\" WHERE action='personcompetency.deleted' AND \"entityId\"='{comp_del_id}' LIMIT 1;")
+        check("AuditLog del borrado guarda el ANTES (snapshot de lo quitado)", bef == "true", bef)
+
+    # G5. levantar un veto queda auditado con el ANTES (no apto → apto con traza).
+    if prut_id:
+        s, rl = call("POST", f"/persons/{prut_id}/restrictions", admin, {"type": "MEDICAL", "reason": "No apto smoke audit ascii"})
+        rid = rl[0]["id"] if isinstance(rl, list) and rl else None
+        call("DELETE", f"/persons/{prut_id}/restrictions/{rid}", admin)
+        befr = sql(f"SELECT (before->>'reason') FROM \"AuditLog\" WHERE action='personrestriction.deleted' AND \"entityId\"='{rid}' LIMIT 1;")
+        check("levantar veto → AuditLog guarda el motivo que tenía (antes)", befr == "No apto smoke audit ascii", befr)
+
     cleanup()
-    print(f"\n== Dotación S1+S2+S3: {len(OK)} ok, {len(FAIL)} fail ==")
+    print(f"\n== Dotación S1+S2+S3 + UX: {len(OK)} ok, {len(FAIL)} fail ==")
     if FAIL:
         for f in FAIL:
             print("  FAIL " + f)

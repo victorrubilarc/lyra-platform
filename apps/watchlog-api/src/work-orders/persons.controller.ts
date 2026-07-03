@@ -3,8 +3,10 @@ import type { FastifyRequest } from "fastify";
 import {
   upsertContractorCompanyRequestSchema,
   upsertPersonRequestSchema,
+  upsertRosterRoleRequestSchema,
   type UpsertContractorCompanyRequest,
   type UpsertPersonRequest,
+  type UpsertRosterRoleRequest,
 } from "@lyra/contracts";
 import type { AuditContext } from "../audit/audit.service";
 import type { RequestUser } from "../authz/auth-user";
@@ -76,6 +78,25 @@ export class PersonsController {
   @RequirePermission("workorder:view")
   listRosterRoles(@Query("includeInactive") includeInactive?: string) {
     return this.persons.listRosterRoles(includeInactive === "true");
+  }
+
+  // Administración de roles (catálogo configurable) — gate `workordercatalog:manage`
+  // (como Tipos/Especialidades/Competencias). Traza OSHA: los 3 roles son editables.
+  @Post("roster-roles")
+  @RequirePermission("workordercatalog:manage")
+  upsertRosterRole(
+    @Body(new ZodValidationPipe(upsertRosterRoleRequestSchema)) dto: UpsertRosterRoleRequest,
+    @CurrentUser() user: RequestUser,
+    @Req() req: FastifyRequest,
+    @Query("create") create?: string,
+  ) {
+    return this.persons.upsertRosterRole(dto, this.ctx(user, req), user.id, create === "true");
+  }
+
+  @Delete("roster-roles/:id")
+  @RequirePermission("workordercatalog:manage")
+  deleteRosterRole(@Param("id") id: string, @CurrentUser() user: RequestUser, @Req() req: FastifyRequest) {
+    return this.persons.deleteRosterRole(id, this.ctx(user, req));
   }
 
   private ctx(user: RequestUser, req: FastifyRequest): AuditContext {

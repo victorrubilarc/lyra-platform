@@ -76,12 +76,12 @@ export class CompetenciesService {
 
   // === PersonCompetency (la persona posee la competencia) ====================
 
-  async listPersonCompetencies(personId: string): Promise<PersonCompetencyDto[]> {
+  async listPersonCompetencies(personId: string, includeArchived = false): Promise<PersonCompetencyDto[]> {
     await this.assertPerson(personId);
     const rows = await this.prisma.personCompetency.findMany({
-      where: { personId, deletedAt: null },
+      where: { personId, ...(includeArchived ? {} : { deletedAt: null }) },
       include: { competencyType: { select: { name: true, category: true, warningLeadDays: true } } },
-      orderBy: [{ issuedAt: "desc" }],
+      orderBy: [{ deletedAt: "asc" }, { issuedAt: "desc" }],
     });
     const verifierIds = [...new Set(rows.map((r) => r.verifiedById).filter((x): x is string => !!x))];
     const verifiers = verifierIds.length
@@ -108,6 +108,7 @@ export class CompetenciesService {
         verifiedAt: r.verifiedAt?.toISOString() ?? null,
         note: r.note,
         validity,
+        archivedAt: r.deletedAt?.toISOString() ?? null,
       };
     });
   }
@@ -129,31 +130,51 @@ export class CompetenciesService {
       ...verified,
     };
     let row;
+    let before: Prisma.InputJsonValue | null = null;
     if (dto.id) {
-      const existing = await this.prisma.personCompetency.findFirst({ where: { id: dto.id, personId, deletedAt: null }, select: { id: true } });
+      const existing = await this.prisma.personCompetency.findFirst({ where: { id: dto.id, personId, deletedAt: null }, include: { competencyType: { select: { name: true } } } });
       if (!existing) throw new NotFoundException("Competencia no encontrada");
+      before = this.snapshotCompetency(existing);
       row = await this.prisma.personCompetency.update({ where: { id: dto.id }, data });
     } else {
       // Renovar = registro NUEVO (historial LABORCERTHIST); no se sobreescribe el anterior.
       row = await this.prisma.personCompetency.create({ data: { ...data, personId, createdById: actorId } });
     }
-    await this.audit.record({ ...ctx, action: dto.id ? "personcompetency.updated" : "personcompetency.added", entityType: "PersonCompetency", entityId: row.id, after: { personId, competencyTypeId: row.competencyTypeId, expiresAt: row.expiresAt } });
+    const rowFull = await this.prisma.personCompetency.findUnique({ where: { id: row.id }, include: { competencyType: { select: { name: true } } } });
+    await this.audit.record({ ...ctx, action: dto.id ? "personcompetency.updated" : "personcompetency.added", entityType: "PersonCompetency", entityId: row.id, before, after: this.snapshotCompetency(rowFull!) });
     return this.listPersonCompetencies(personId);
   }
 
   async deletePersonCompetency(personId: string, id: string, ctx: AuditContext): Promise<PersonCompetencyDto[]> {
-    const row = await this.prisma.personCompetency.findFirst({ where: { id, personId, deletedAt: null }, select: { id: true } });
+    const row = await this.prisma.personCompetency.findFirst({ where: { id, personId, deletedAt: null }, include: { competencyType: { select: { name: true } } } });
     if (!row) throw new NotFoundException("Competencia no encontrada");
     await this.prisma.personCompetency.update({ where: { id }, data: { deletedAt: new Date() } });
-    await this.audit.record({ ...ctx, action: "personcompetency.deleted", entityType: "PersonCompetency", entityId: id, after: { personId } });
+    // Auditoría inmutable con el ANTES (qué se archivó): el auditor ve exactamente qué se quitó.
+    await this.audit.record({ ...ctx, action: "personcompetency.deleted", entityType: "PersonCompetency", entityId: id, before: this.snapshotCompetency(row), after: null });
     return this.listPersonCompetencies(personId);
+  }
+
+  /** Foto de una competencia para la auditoría (antes/después) — legible por el auditor. */
+  private snapshotCompetency(r: { personId: string; competencyTypeId: string; competencyType: { name: string }; issuedAt: Date; expiresAt: Date | null; certificateNumber: string | null; issuedBy: string | null; verifiedById: string | null; verifiedAt: Date | null; note: string | null }): Prisma.InputJsonValue {
+    return {
+      personId: r.personId,
+      competencyType: r.competencyType.name,
+      competencyTypeId: r.competencyTypeId,
+      issuedAt: r.issuedAt.toISOString(),
+      expiresAt: r.expiresAt?.toISOString() ?? null,
+      certificateNumber: r.certificateNumber,
+      issuedBy: r.issuedBy,
+      verifiedById: r.verifiedById,
+      verifiedAt: r.verifiedAt?.toISOString() ?? null,
+      note: r.note,
+    };
   }
 
   // === PersonRestriction (veto — Eje B) ======================================
 
-  async listPersonRestrictions(personId: string): Promise<PersonRestrictionDto[]> {
+  async listPersonRestrictions(personId: string, includeArchived = false): Promise<PersonRestrictionDto[]> {
     await this.assertPerson(personId);
-    const rows = await this.prisma.personRestriction.findMany({ where: { personId, deletedAt: null }, orderBy: [{ startsAt: "desc" }] });
+    const rows = await this.prisma.personRestriction.findMany({ where: { personId, ...(includeArchived ? {} : { deletedAt: null }) }, orderBy: [{ deletedAt: "asc" }, { startsAt: "desc" }] });
     const now = Date.now();
     return rows.map((r) => this.toRestrictionDto(r, now));
   }
@@ -168,23 +189,39 @@ export class CompetenciesService {
       active: dto.active ?? true,
     };
     let row;
+    let before: Prisma.InputJsonValue | null = null;
     if (dto.id) {
-      const existing = await this.prisma.personRestriction.findFirst({ where: { id: dto.id, personId, deletedAt: null }, select: { id: true } });
+      const existing = await this.prisma.personRestriction.findFirst({ where: { id: dto.id, personId, deletedAt: null } });
       if (!existing) throw new NotFoundException("Restricción no encontrada");
+      before = this.snapshotRestriction(existing);
       row = await this.prisma.personRestriction.update({ where: { id: dto.id }, data });
     } else {
       row = await this.prisma.personRestriction.create({ data: { ...data, personId, createdById: actorId } });
     }
-    await this.audit.record({ ...ctx, action: dto.id ? "personrestriction.updated" : "personrestriction.added", entityType: "PersonRestriction", entityId: row.id, after: { personId, type: row.type, active: row.active } });
+    await this.audit.record({ ...ctx, action: dto.id ? "personrestriction.updated" : "personrestriction.added", entityType: "PersonRestriction", entityId: row.id, before, after: this.snapshotRestriction(row) });
     return this.listPersonRestrictions(personId);
   }
 
   async deletePersonRestriction(personId: string, id: string, ctx: AuditContext): Promise<PersonRestrictionDto[]> {
-    const row = await this.prisma.personRestriction.findFirst({ where: { id, personId, deletedAt: null }, select: { id: true } });
+    const row = await this.prisma.personRestriction.findFirst({ where: { id, personId, deletedAt: null } });
     if (!row) throw new NotFoundException("Restricción no encontrada");
     await this.prisma.personRestriction.update({ where: { id }, data: { deletedAt: new Date(), active: false } });
-    await this.audit.record({ ...ctx, action: "personrestriction.deleted", entityType: "PersonRestriction", entityId: id, after: { personId } });
+    // Auditoría inmutable con el ANTES: levantar un veto (no apto → apto) queda trazado con
+    // el motivo y la vigencia que tenía la restricción. Traza CLAUDE.md (antes/después).
+    await this.audit.record({ ...ctx, action: "personrestriction.deleted", entityType: "PersonRestriction", entityId: id, before: this.snapshotRestriction(row), after: null });
     return this.listPersonRestrictions(personId);
+  }
+
+  /** Foto de una restricción para la auditoría (antes/después). */
+  private snapshotRestriction(r: { personId: string; type: string; reason: string; startsAt: Date; endsAt: Date | null; active: boolean }): Prisma.InputJsonValue {
+    return {
+      personId: r.personId,
+      type: r.type,
+      reason: r.reason,
+      startsAt: r.startsAt.toISOString(),
+      endsAt: r.endsAt?.toISOString() ?? null,
+      active: r.active,
+    };
   }
 
   // === WorkOrderCompetencyRule (regla de requisito · catálogo) ===============
@@ -258,9 +295,10 @@ export class CompetenciesService {
     };
   }
 
-  private toRestrictionDto(r: { id: string; personId: string; type: string; reason: string; startsAt: Date; endsAt: Date | null; active: boolean }, nowMs: number): PersonRestrictionDto {
+  private toRestrictionDto(r: { id: string; personId: string; type: string; reason: string; startsAt: Date; endsAt: Date | null; active: boolean; deletedAt?: Date | null }, nowMs: number): PersonRestrictionDto {
     const started = r.startsAt.getTime() <= nowMs;
     const notEnded = !r.endsAt || r.endsAt.getTime() > nowMs;
+    const archived = r.deletedAt != null;
     return {
       id: r.id,
       personId: r.personId,
@@ -269,7 +307,8 @@ export class CompetenciesService {
       startsAt: r.startsAt.toISOString(),
       endsAt: r.endsAt?.toISOString() ?? null,
       active: r.active,
-      effective: r.active && started && notEnded,
+      effective: !archived && r.active && started && notEnded,
+      archivedAt: r.deletedAt?.toISOString() ?? null,
     };
   }
 

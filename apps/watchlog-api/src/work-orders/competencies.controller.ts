@@ -70,8 +70,8 @@ export class CompetenciesController {
 
   @Get("persons/:personId/competencies")
   @RequirePermission("worker:manage")
-  listPersonCompetencies(@Param("personId") personId: string) {
-    return this.competencies.listPersonCompetencies(personId);
+  listPersonCompetencies(@Param("personId") personId: string, @Query("includeArchived") includeArchived?: string) {
+    return this.competencies.listPersonCompetencies(personId, includeArchived === "true");
   }
 
   @Post("persons/:personId/competencies")
@@ -90,8 +90,8 @@ export class CompetenciesController {
 
   @Get("persons/:personId/restrictions")
   @RequirePermission("worker:manage")
-  listPersonRestrictions(@Param("personId") personId: string) {
-    return this.competencies.listPersonRestrictions(personId);
+  listPersonRestrictions(@Param("personId") personId: string, @Query("includeArchived") includeArchived?: string) {
+    return this.competencies.listPersonRestrictions(personId, includeArchived === "true");
   }
 
   @Post("persons/:personId/restrictions")

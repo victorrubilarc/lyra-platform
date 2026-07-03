@@ -5,7 +5,14 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-07-03** — **👷 Dotación del permiso · Slice 3 (acreditación de contratistas como GATE) ✅** (`feat/dotacion-acreditacion-s3`):
+> actualización: **2026-07-03** — **👷 Dotación · Pulido UX enterprise + datos personales + auditoría ✅** (`feat/dotacion-ux-enterprise`):
+> feedback del dueño sobre la UX de Personas/Dotación. **Grillas al ESTÁNDAR** (`GridPager`+`.tableCard` de catalogs, se descartó la tabla a mano de S3);
+> íconos en línea en cabeceras/pestañas; **datos personales** en `Person` (nacimiento/edad, **género**, nacionalidad, **tipo de documento** con extranjeros;
+> migr. aditiva `20260703160000`); **RUT formateado/validado mód-11/normalizado** reutilizando helpers (persona+empresa); **roles de dotación configurables
+> por UI** (CRUD bajo `workordercatalog:manage`, cierra deuda S1 solo-seed); grillas revelan **impedimentos** (vencidas/restricciones); **AUDITORÍA completa**
+> (AuditLog captura el **antes** al quitar/editar competencia/restricción + `?includeArchived`/`archivedAt` + toggle "Mostrar archivadas"). Modales enterprise
+> (competencias xl, Person/Company lg por secciones). **Sin permisos nuevos/FLUSHALL.** contracts 497 + **smoke-dotacion 65/65** + OT 122/122 + incidencias 32/32.
+> Pendiente: **smoke VISUAL (dueño)**. — Antes: **👷 Dotación · Slice 3 (acreditación de contratistas como GATE) ✅** (`feat/dotacion-acreditacion-s3`):
 > hace REAL el 3.er origen de rojo (nivel EMPRESA) diferido en S2-A. **Toggle por tipo** `WorkOrderType.requireCompanyAccreditation` (default false,
 > espejo de `rosterEnabled`; migr. aditiva `20260703140000`): OFF ⇒ informativa (cero regresión); ON ⇒ gate vivo. Semáforo de empresa derivado EN VIVO
 > (persona CONTRATISTA, sólo si el tipo lo exige): ACCREDITED vigente=verde · por vencer ≤90 d=ámbar `COMPANY_ACCREDITATION_EXPIRING` · CONDITIONAL=ámbar

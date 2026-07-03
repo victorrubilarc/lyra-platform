@@ -31,6 +31,7 @@ import {
   type PersonDto,
   type RemoveWorkOrderWorkerRequest,
   type RosterRoleDto,
+  type UpsertRosterRoleRequest,
   type UpsertContractorCompanyRequest,
   type UpsertPersonRequest,
   type WorkOrderRosterDto,
@@ -291,8 +292,16 @@ export function deleteContractorCompany(id: string): Promise<void> {
   return apiJson(`/contractor-companies/${id}`, z.unknown(), { method: "DELETE" }).then(() => undefined);
 }
 
-export function fetchRosterRoles(): Promise<RosterRoleDto[]> {
-  return apiJson(`/roster-roles`, z.array(rosterRoleSchema));
+export function fetchRosterRoles(includeInactive = false): Promise<RosterRoleDto[]> {
+  return apiJson(`/roster-roles${includeInactive ? "?includeInactive=true" : ""}`, z.array(rosterRoleSchema));
+}
+
+export function upsertRosterRole(dto: UpsertRosterRoleRequest, create = false): Promise<RosterRoleDto> {
+  return apiJson(`/roster-roles${create ? "?create=true" : ""}`, rosterRoleSchema, { method: "POST", body: dto });
+}
+
+export function deleteRosterRole(id: string): Promise<void> {
+  return apiJson(`/roster-roles/${id}`, z.unknown(), { method: "DELETE" }).then(() => undefined);
 }
 
 // --- Competencias / restricciones / reglas (S2) ----------------------------
@@ -321,8 +330,8 @@ export function deleteCompetencyRule(ruleId: string): Promise<void> {
   return apiJson(`/work-order-competency-rules/${ruleId}`, z.unknown(), { method: "DELETE" }).then(() => undefined);
 }
 
-export function fetchPersonCompetencies(personId: string): Promise<PersonCompetencyDto[]> {
-  return apiJson(`/persons/${personId}/competencies`, z.array(personCompetencySchema));
+export function fetchPersonCompetencies(personId: string, includeArchived = false): Promise<PersonCompetencyDto[]> {
+  return apiJson(`/persons/${personId}/competencies${includeArchived ? "?includeArchived=true" : ""}`, z.array(personCompetencySchema));
 }
 
 export function upsertPersonCompetency(personId: string, dto: UpsertPersonCompetencyRequest): Promise<PersonCompetencyDto[]> {
@@ -333,8 +342,8 @@ export function deletePersonCompetency(personId: string, id: string): Promise<Pe
   return apiJson(`/persons/${personId}/competencies/${id}`, z.array(personCompetencySchema), { method: "DELETE" });
 }
 
-export function fetchPersonRestrictions(personId: string): Promise<PersonRestrictionDto[]> {
-  return apiJson(`/persons/${personId}/restrictions`, z.array(personRestrictionSchema));
+export function fetchPersonRestrictions(personId: string, includeArchived = false): Promise<PersonRestrictionDto[]> {
+  return apiJson(`/persons/${personId}/restrictions${includeArchived ? "?includeArchived=true" : ""}`, z.array(personRestrictionSchema));
 }
 
 export function upsertPersonRestriction(personId: string, dto: UpsertPersonRestrictionRequest): Promise<PersonRestrictionDto[]> {

@@ -817,6 +817,17 @@ anulación lifecycle `CANCELED`).
     exige motivo por persona + UNA firma Part 11 → `overrideReason`/`overrideById`/`overrideAt` (evento `WORKER_OVERRIDE`).
   - **Avisos (Bloque N)**: `WorkerComplianceService.findBreaches()` (dominio) → `worker.competency.expiring`/`.expired`
     (personas en roster de OT abierta; dedupe por OT+competencia+día).
+- **Dotación · Pulido UX enterprise + datos personales + auditoría** *(`feat/dotacion-ux-enterprise`, 2026-07-03; migr. aditiva
+  `20260703160000_add_person_personal_data`)*:
+  - En **Person**: `birthDate?` (edad DERIVADA, nunca almacenada), `gender?` (MALE|FEMALE|OTHER|UNSPECIFIED), `nationality?`,
+    `nationalIdType?` (RUT|PASSPORT|DNI|OTHER — contempla EXTRANJEROS). El **RUT se guarda NORMALIZADO** (cuerpo-DV vía
+    `normalizeRut`) y se valida mód-11 (`isValidRut`) en el Zod de persona **y** empresa (`taxId`); la UI formatea al mostrar
+    (`formatRut`). `PersonDto += activeRestrictions/expiredCompetencies` (impedimentos derivados en vivo para la grilla).
+  - **RosterRole CRUD** expuesto (`POST/DELETE /roster-roles`, gate `workordercatalog:manage`; soft-delete, bloqueado si en
+    uso en roster activo) — cierra la deuda S1 (eran solo-seed).
+  - **Auditoría antes/después**: `deletePersonCompetency`/`deletePersonRestriction` y sus updates ahora graban el **`before`**
+    (snapshot legible) en `AuditLog` además del `after` (regla CLAUDE.md). Listados `listPersonCompetencies/Restrictions`
+    aceptan `includeArchived` + `PersonCompetencyDto/PersonRestrictionDto += archivedAt` (soft-delete visible como historial).
 - **Dotación · Slice 3 — acreditación de EMPRESA como GATE** *(S3 — `feat/dotacion-acreditacion-s3`; migr.
   `20260703140000_add_dotacion_acreditacion`, aditiva; traza ISN RAVS A/B/F + Avetta compliant/conditional/non-compliant +
   Ley 16.744 art.66bis / Cód. Trabajo art.183-C)*:

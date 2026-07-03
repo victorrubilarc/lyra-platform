@@ -38,7 +38,7 @@ const VALIDITY_COLOR: Record<CompetencyValidityState, string> = {
 export function PersonCompetenciesModal({ person, onClose }: { person: PersonDto; onClose: () => void }) {
   const [tab, setTab] = useState<"competencias" | "restricciones">("competencias");
   return (
-    <Modal open onClose={onClose} title={`Competencias y restricciones — ${person.fullName}`} size="lg" footer={<Button variant="secondary" onClick={onClose}>Cerrar</Button>}>
+    <Modal open onClose={onClose} title={`Competencias y restricciones — ${person.fullName}`} size="xl" footer={<Button variant="secondary" onClick={onClose}>Cerrar</Button>}>
       <div className={styles.tabs} role="tablist" style={{ marginTop: 0 }}>
         <button role="tab" aria-selected={tab === "competencias"} className={tab === "competencias" ? `${styles.tab} ${styles.tabActive}` : styles.tab} onClick={() => setTab("competencias")}>
           <BadgeCheck size={14} /> Competencias
@@ -54,7 +54,8 @@ export function PersonCompetenciesModal({ person, onClose }: { person: PersonDto
 
 function CompetenciesSection({ personId }: { personId: string }) {
   const toast = useToast();
-  const { data: rows = [], isLoading } = usePersonCompetencies(personId);
+  const [showArchived, setShowArchived] = useState(false);
+  const { data: rows = [], isLoading } = usePersonCompetencies(personId, showArchived);
   const { data: types = [] } = useCompetencyTypes(false);
   const upsert = useUpsertPersonCompetency(personId);
   const del = useDeletePersonCompetency(personId);
@@ -100,15 +101,24 @@ function CompetenciesSection({ personId }: { personId: string }) {
             <span className={styles.fieldLabel}>Vence{selectedType && !selectedType.requiresExpiry ? " (opcional)" : ""}</span>
             <Input type="date" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} />
           </label>
-          <label className={styles.field}><span className={styles.fieldLabel}>N.º de certificado</span><Input value={certificateNumber} onChange={(e) => setCert(e.target.value)} /></label>
-          <label className={styles.field}><span className={styles.fieldLabel}>Emisor</span><Input value={issuedBy} onChange={(e) => setIssuedBy(e.target.value)} placeholder="Organismo/instructor" /></label>
-          <label className={styles.checkField}>
+          <label className={styles.field}><span className={styles.fieldLabel}>N.º de certificado</span><Input value={certificateNumber} onChange={(e) => setCert(e.target.value)} placeholder="Folio del certificado" /></label>
+          <label className={styles.field} style={{ gridColumn: "span 2" }}><span className={styles.fieldLabel}>Emisor</span><Input value={issuedBy} onChange={(e) => setIssuedBy(e.target.value)} placeholder="Organismo certificador o instructor (p. ej. ACHS, Mutual, OTEC…)" /></label>
+          <label className={styles.checkField} style={{ gridColumn: "span 1", alignSelf: "center", paddingBottom: 0 }}>
             <input type="checkbox" checked={markVerified} onChange={(e) => setMarkVerified(e.target.checked)} />
-            <span>Verifico la evidencia</span>
+            <span>Verifiqué la evidencia</span>
           </label>
         </div>
+        <p className={styles.addHint}>
+          <strong>Verifiqué la evidencia:</strong> marca esto si revisaste el certificado o constancia original. Queda registrado
+          quién validó y cuándo (evidencia documentada de competencia — ISO 45001 §7.2).
+        </p>
         <Button variant="primary" leftIcon={<Plus size={15} />} loading={upsert.isPending} disabled={!valid} onClick={submit}>Agregar / renovar</Button>
       </div>
+
+      <label className={styles.archiveToggle}>
+        <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
+        <span>Mostrar archivadas (historial / auditoría)</span>
+      </label>
 
       <div className={styles.tableWrap}>
         <table className={styles.table}>
@@ -119,14 +129,14 @@ function CompetenciesSection({ personId }: { personId: string }) {
             ) : rows.length === 0 ? (
               <tr><td colSpan={7} className={styles.empty}>Sin competencias registradas.</td></tr>
             ) : rows.map((c) => (
-              <tr key={c.id}>
-                <td>{c.competencyTypeName}</td>
+              <tr key={c.id} className={c.archivedAt ? styles.archivedRow : undefined}>
+                <td>{c.competencyTypeName}{c.archivedAt && <span className={styles.archivedTag}>Archivada {formatDate(c.archivedAt)}</span>}</td>
                 <td><span className={styles.chip}>{COMPETENCY_CATEGORY_META[c.category].label}</span></td>
                 <td>{formatDate(c.issuedAt)}</td>
                 <td>{c.expiresAt ? formatDate(c.expiresAt) : <span className={styles.muted}>—</span>}</td>
-                <td><span style={{ color: VALIDITY_COLOR[c.validity], fontWeight: 600 }}>{COMPETENCY_VALIDITY_META[c.validity].label}</span></td>
+                <td>{c.archivedAt ? <span className={styles.muted}>Archivada</span> : <span style={{ color: VALIDITY_COLOR[c.validity], fontWeight: 600 }}>{COMPETENCY_VALIDITY_META[c.validity].label}</span>}</td>
                 <td>{c.verifiedByName ? <span className={styles.chip}><BadgeCheck size={12} /> {c.verifiedByName}</span> : <span className={styles.muted}>Sin verificar</span>}</td>
-                <td><Button variant="secondary" leftIcon={<Trash2 size={13} />} onClick={() => del.mutate(c.id, { onSuccess: () => toast.success("Competencia eliminada"), onError: (e) => toast.error((e as Error).message) })}>Quitar</Button></td>
+                <td>{c.archivedAt ? <span className={styles.muted}>—</span> : <Button variant="secondary" leftIcon={<Trash2 size={13} />} onClick={() => { if (!window.confirm(`¿Quitar la competencia «${c.competencyTypeName}»?\n\nNo se borra: queda archivada (soft-delete) y la acción se registra en la auditoría (quién y cuándo). El historial de certificaciones se conserva.`)) return; del.mutate(c.id, { onSuccess: () => toast.success("Competencia archivada (queda en auditoría)"), onError: (e) => toast.error((e as Error).message) }); }}>Quitar</Button>}</td>
               </tr>
             ))}
           </tbody>
@@ -138,7 +148,8 @@ function CompetenciesSection({ personId }: { personId: string }) {
 
 function RestrictionsSection({ personId }: { personId: string }) {
   const toast = useToast();
-  const { data: rows = [], isLoading } = usePersonRestrictions(personId);
+  const [showArchived, setShowArchived] = useState(false);
+  const { data: rows = [], isLoading } = usePersonRestrictions(personId, showArchived);
   const upsert = useUpsertPersonRestriction(personId);
   const del = useDeletePersonRestriction(personId);
 
@@ -173,6 +184,11 @@ function RestrictionsSection({ personId }: { personId: string }) {
         <Button variant="primary" leftIcon={<Plus size={15} />} loading={upsert.isPending} disabled={!reason.trim()} onClick={submit}>Agregar restricción</Button>
       </div>
 
+      <label className={styles.archiveToggle}>
+        <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
+        <span>Mostrar archivadas (historial / auditoría)</span>
+      </label>
+
       <div className={styles.tableWrap}>
         <table className={styles.table}>
           <thead><tr><th>Tipo</th><th>Motivo</th><th>Desde</th><th>Hasta</th><th>Estado</th><th /></tr></thead>
@@ -182,13 +198,13 @@ function RestrictionsSection({ personId }: { personId: string }) {
             ) : rows.length === 0 ? (
               <tr><td colSpan={6} className={styles.empty}>Sin restricciones.</td></tr>
             ) : rows.map((r) => (
-              <tr key={r.id}>
+              <tr key={r.id} className={r.archivedAt ? styles.archivedRow : undefined}>
                 <td><span className={styles.chip}>{RESTRICTION_TYPE_META[r.type].label}</span></td>
-                <td>{r.reason}</td>
+                <td>{r.reason}{r.archivedAt && <span className={styles.archivedTag}>Archivada {formatDate(r.archivedAt)}</span>}</td>
                 <td>{formatDate(r.startsAt)}</td>
                 <td>{r.endsAt ? formatDate(r.endsAt) : <span className={styles.muted}>Indefinida</span>}</td>
-                <td>{r.effective ? <span style={{ color: "var(--color-error)", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4 }}><CalendarClock size={12} /> Vigente</span> : <span className={styles.muted}>Inactiva</span>}</td>
-                <td><Button variant="secondary" leftIcon={<Trash2 size={13} />} onClick={() => del.mutate(r.id, { onSuccess: () => toast.success("Restricción eliminada"), onError: (e) => toast.error((e as Error).message) })}>Quitar</Button></td>
+                <td>{r.archivedAt ? <span className={styles.muted}>Archivada</span> : r.effective ? <span style={{ color: "var(--color-error)", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4 }}><CalendarClock size={12} /> Vigente</span> : <span className={styles.muted}>Inactiva</span>}</td>
+                <td>{r.archivedAt ? <span className={styles.muted}>—</span> : <Button variant="secondary" leftIcon={<Trash2 size={13} />} onClick={() => { if (!window.confirm(`¿Levantar/quitar esta restricción?\n\nNo se borra: queda archivada (soft-delete) y la acción se registra en la auditoría (quién y cuándo).`)) return; del.mutate(r.id, { onSuccess: () => toast.success("Restricción archivada (queda en auditoría)"), onError: (e) => toast.error((e as Error).message) }); }}>Quitar</Button>}</td>
               </tr>
             ))}
           </tbody>

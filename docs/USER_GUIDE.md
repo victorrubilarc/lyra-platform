@@ -464,9 +464,16 @@ y se activa por tipo de OT**: si el tipo no la gestiona, la OT no muestra ningun
 **Cómo se usa.**
 1. **Preparar el catálogo (una vez, administrador).** Menú de Órdenes de trabajo → botón **«Personas»** (`/ordenes-trabajo/
    personas`). Tiene dos pestañas:
-   - **Personas:** «Nueva persona» → elige si es **Propia** o **Contratista** (si es contratista, elige su **empresa**),
-     nombre y apellido, y opcionalmente RUT/DNI, ficha, cargo, teléfono y correo. *(Una persona **no** es un usuario del
-     sistema: los contratistas no necesitan cuenta ni acceso.)* Buscador por nombre/RUT/ficha y filtro Propios/Contratistas.
+   - **Personas:** «Nueva persona» → formulario por secciones (Vínculo · Identidad · Datos personales · Contacto y cargo):
+     tipo Propia/Contratista (si es contratista, elige su **empresa** en un selector buscable), nombre y apellido, **tipo de
+     documento** (RUT chileno —se formatea y valida el dígito verificador— o **Pasaporte/DNI para extranjeros**), nacionalidad,
+     y opcionalmente **fecha de nacimiento** (muestra la **edad**), **género**, ficha, cargo, teléfono y correo. *(Una persona
+     **no** es un usuario del sistema: los contratistas no necesitan cuenta.)* La grilla (con paginación) tiene una columna
+     **Impedimentos** que avisa en rojo si la persona tiene competencias vencidas o restricciones activas. Buscador por
+     nombre/RUT/ficha + filtros por tipo y por **empresa**.
+   - **Roles de dotación (administrador):** los roles (Ejecutante, Vigía, Supervisor de entrada…) se administran en **Órdenes
+     de trabajo → Catálogos → pestaña «Roles de dotación»**: puedes renombrarlos, agregar los tuyos, marcar cuál «autoriza y
+     firma la entrada» y cuál «permanece afuera (vigía)». Vienen 3 de fábrica (estándar OSHA), editables.
    - **Empresas contratistas:** «Nueva empresa» → nombre, RUT y su **acreditación** (estado, grado/score, **vigencia**,
      plataforma de origen y nota). La acreditación puede ser **solo informativa** o funcionar como **gate** que bloquea a los
      contratistas de una empresa no acreditada (ver «Acreditación de empresas contratistas» más abajo).
@@ -534,6 +541,10 @@ excepciones: *«Gestionar la dotación»* (`workorder:roster:manage`).
 **Importante.**
 - **Renovar no borra el historial:** cada renovación es un registro nuevo; queda la traza de todas las certificaciones
   emitidas (como exige la auditoría de un sistema Part 11 / GxP).
+- **Quitar = archivar, con auditoría.** Al «Quitar» una competencia o levantar una restricción no se borra físicamente: queda
+  **archivada** (soft-delete) y la acción se registra en la **auditoría** con quién, cuándo y **el antes** (p. ej. al levantar
+  un veto queda guardado el motivo que tenía). En el modal, el toggle **«Mostrar archivadas (historial/auditoría)»** lista las
+  filas archivadas en gris con su fecha; un auditor también las ve en **Seguridad → Auditoría** (antes/después).
 - **La expiración es dura:** una certificación vencida es vencida (no hay período de gracia). Configura la **ventana de aviso
   previo** por tipo para que el sistema avise con tiempo.
 - **Avisos automáticos:** cuando una competencia de alguien que está en la dotación de una OT abierta está **por vencer** o

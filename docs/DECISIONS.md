@@ -4,6 +4,35 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-03 · Dotación · Pulido UX enterprise + datos personales + auditoría (`feat/dotacion-ux-enterprise`)
+Ronda de feedback del dueño sobre la UX del catálogo de Personas/Dotación. Decisiones:
+- **Grillas AL ESTÁNDAR (no divergir).** Personas y Empresas ahora usan el MISMO patrón que el mantenedor de catálogos de OT:
+  `GridPager` + `.tableCard`/`.table` de `catalogs.module.css` (importado como `grid`, una sola fuente de verdad) + acciones
+  con `Button variant="icon"` + `Chip`. Se descartó la tabla/paginador a mano que se había hecho en S3. *(El dueño: "por qué
+  te sales del estándar".)*
+- **Íconos en cabeceras/pestañas en LÍNEA.** `.sectionTitle`/`.tab`/`.h1` pasan a `display:flex` (el DS renderiza `<svg>` en
+  bloque ⇒ el ícono quedaba arriba del texto). Regla general: todo contenedor ícono+texto es flex.
+- **Datos personales opcionales en `Person`** (traza SAP HR IT0002 / Maximo Person; migr. aditiva `20260703160000`):
+  `birthDate` (edad DERIVADA, `personAge` pura), `gender` (MALE/FEMALE/OTHER/UNSPECIFIED, etiqueta **"Género"**),
+  `nationality` (texto), `nationalIdType` (RUT/PASSPORT/DNI/OTHER — contempla EXTRANJEROS).
+- **RUT: formateado + validado + normalizado.** Se REUSAN los helpers existentes (`normalizeRut`/`isValidRut` de contracts,
+  `formatRut`/`formatRutLive` de web; NO se reinventan). El RUT se **guarda normalizado** (cuerpo-DV, sin puntos) y la UI lo
+  formatea; validación mód-11 en el schema Zod (persona y empresa). Documentos extranjeros = texto libre sin validar.
+- **Roles de dotación CONFIGURABLES por UI** (cierra deuda S1: eran solo-seed). CRUD `POST/DELETE /roster-roles` bajo
+  **`workordercatalog:manage`** (es otro catálogo, como Tipos/Especialidades/Competencias; NO permiso nuevo) + tab "Roles de
+  dotación" en el mantenedor. Borrado = soft-delete (bloqueado si en uso en roster activo).
+- **Grillas revelan IMPEDIMENTOS** (info antes oculta): `PersonDto += activeRestrictions/expiredCompetencies` (derivados en
+  vivo) ⇒ chip rojo "N vencida(s) · N restricción(es)" en la grilla de Personas.
+- **AUDITORÍA COMPLETA (antes/después) + historial visible.** Objeción del dueño: "se pueden quitar sin más, ¿no queda
+  historial?". Ya era soft-delete, pero: (1) el `AuditLog` de borrar/editar competencia/restricción ahora captura el
+  **`before`** (snapshot de lo quitado/cambiado — ej. levantar un veto guarda el motivo) además del `after` (regla CLAUDE.md
+  "antes/después"); (2) los listados aceptan `?includeArchived=true` + `archivedAt` en el DTO ⇒ toggle **"Mostrar archivadas
+  (historial/auditoría)"** en el modal, filas archivadas en gris con su fecha; el auditor también las ve en `/seguridad/auditoria`.
+- **Modales enterprise:** competencias `xl`; PersonModal/CompanyModal `lg` con secciones agrupadas (`.formSection`); "Emisor"
+  ensanchado; aclarado "Verifiqué la evidencia" (ISO 45001) con hint; confirmación antes de archivar (aclara que queda auditado).
+- Verde: contracts **497** · api **252** · web **6** · **smoke-dotacion 65/65** (RUT/extranjeros/roles CRUD/auditoría before-after/
+  archivadas) + regresión OT 122/122 e incidencias 32/32. Sin permisos nuevos / sin FLUSHALL.
+
 ### 2026-07-03 · Dotación · Slice 3 — acreditación de EMPRESA contratista como GATE
 Hace REAL el tercer origen de rojo (nivel EMPRESA) que S2-A dejó explícitamente diferido. **Investigación citada**
 (fuente primaria): **ISNetworld RAVS** grados A (todos los elementos) / B (aceptable, faltan componentes) / F (descalifica);

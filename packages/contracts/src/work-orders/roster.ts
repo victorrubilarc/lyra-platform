@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isValidRut } from "../templates/field-types.js";
 
 /**
  * DOTACIÓN del permiso de trabajo (S1) — contratos compartidos back↔front.
@@ -31,6 +32,45 @@ export const PERSON_KIND_META: Record<PersonKind, { label: string }> = {
   CONTRACTOR: { label: "Contratista" },
 };
 
+/**
+ * Tipo de documento de identidad. Contempla personas EXTRANJERAS (no sólo RUT chileno):
+ * el RUT se valida (módulo 11) y se formatea; los demás son texto libre.
+ */
+export const ID_DOCUMENT_TYPES = ["RUT", "PASSPORT", "DNI", "OTHER"] as const;
+export const idDocumentTypeSchema = z.enum(ID_DOCUMENT_TYPES);
+export type IdDocumentType = (typeof ID_DOCUMENT_TYPES)[number];
+
+export const ID_DOCUMENT_TYPE_META: Record<IdDocumentType, { label: string }> = {
+  RUT: { label: "RUT (Chile)" },
+  PASSPORT: { label: "Pasaporte" },
+  DNI: { label: "DNI / Cédula" },
+  OTHER: { label: "Otro documento" },
+};
+
+/** Sexo/género de la persona (dato personal opcional — traza SAP HR IT0002 / Maximo Person). */
+export const PERSON_GENDERS = ["MALE", "FEMALE", "OTHER", "UNSPECIFIED"] as const;
+export const personGenderSchema = z.enum(PERSON_GENDERS);
+export type PersonGender = (typeof PERSON_GENDERS)[number];
+
+export const PERSON_GENDER_META: Record<PersonGender, { label: string }> = {
+  MALE: { label: "Masculino" },
+  FEMALE: { label: "Femenino" },
+  OTHER: { label: "Otro" },
+  UNSPECIFIED: { label: "Prefiere no indicar" },
+};
+
+/** Edad en años a partir de la fecha de nacimiento (ISO). Pura; null si no hay fecha. */
+export function personAge(birthDateIso: string | null | undefined, nowMs: number): number | null {
+  if (!birthDateIso) return null;
+  const b = new Date(birthDateIso);
+  if (Number.isNaN(b.getTime())) return null;
+  const now = new Date(nowMs);
+  let age = now.getUTCFullYear() - b.getUTCFullYear();
+  const m = now.getUTCMonth() - b.getUTCMonth();
+  if (m < 0 || (m === 0 && now.getUTCDate() < b.getUTCDate())) age--;
+  return age >= 0 && age < 150 ? age : null;
+}
+
 /** Estado de acreditación de una empresa contratista (nivel EMPRESA; gate en S3). */
 export const ACCREDITATION_STATUSES = ["ACCREDITED", "CONDITIONAL", "SUSPENDED", "EXPIRED", "NONE"] as const;
 export const accreditationStatusSchema = z.enum(ACCREDITATION_STATUSES);
@@ -52,16 +92,25 @@ export const personSchema = z.object({
   firstName: z.string(),
   lastName: z.string(),
   fullName: z.string(),
+  nationalIdType: idDocumentTypeSchema.nullable(),
   nationalId: z.string().nullable(),
   personnelCode: z.string().nullable(),
   badgeId: z.string().nullable(),
   jobTitle: z.string().nullable(),
   email: z.string().nullable(),
   phone: z.string().nullable(),
+  // Datos personales opcionales (traza SAP HR IT0002 / Maximo Person).
+  birthDate: z.string().nullable(),
+  gender: personGenderSchema.nullable(),
+  nationality: z.string().nullable(),
   contractorCompanyId: z.string().nullable(),
   contractorCompanyName: z.string().nullable(),
   userId: z.string().nullable(),
   active: z.boolean(),
+  /** Restricciones/vetos activos y vigentes (Eje B). >0 = impedimento (rojo en la grilla). */
+  activeRestrictions: z.number().int(),
+  /** Competencias/certificaciones de la persona ya VENCIDAS. >0 = impedimento (rojo). */
+  expiredCompetencies: z.number().int(),
 });
 export type PersonDto = z.infer<typeof personSchema>;
 
@@ -71,18 +120,26 @@ export const upsertPersonRequestSchema = z
     kind: personKindSchema,
     firstName: z.string().trim().min(1).max(120),
     lastName: z.string().trim().min(1).max(120),
+    nationalIdType: idDocumentTypeSchema.nullable().optional(),
     nationalId: z.string().trim().max(40).nullable().optional(),
     personnelCode: z.string().trim().max(60).nullable().optional(),
     badgeId: z.string().trim().max(60).nullable().optional(),
     jobTitle: z.string().trim().max(120).nullable().optional(),
     email: z.string().trim().email().max(160).nullable().optional().or(z.literal("")),
     phone: z.string().trim().max(40).nullable().optional(),
+    birthDate: z.string().datetime().nullable().optional(),
+    gender: personGenderSchema.nullable().optional(),
+    nationality: z.string().trim().max(80).nullable().optional(),
     contractorCompanyId: z.string().min(1).nullable().optional(),
     active: z.boolean().optional(),
   })
   .refine((d) => d.kind !== "CONTRACTOR" || !!d.contractorCompanyId, {
     message: "Una persona contratista debe pertenecer a una empresa contratista",
     path: ["contractorCompanyId"],
+  })
+  .refine((d) => d.nationalIdType !== "RUT" || !d.nationalId?.trim() || isValidRut(d.nationalId), {
+    message: "El RUT no es válido (dígito verificador incorrecto)",
+    path: ["nationalId"],
   });
 export type UpsertPersonRequest = z.infer<typeof upsertPersonRequestSchema>;
 
@@ -120,6 +177,9 @@ export const upsertContractorCompanyRequestSchema = z.object({
   externalProvider: z.string().trim().max(40).nullable().optional(),
   accreditationNote: z.string().trim().max(500).nullable().optional(),
   active: z.boolean().optional(),
+}).refine((d) => !d.taxId?.trim() || isValidRut(d.taxId), {
+  message: "El RUT de la empresa no es válido (dígito verificador incorrecto)",
+  path: ["taxId"],
 });
 export type UpsertContractorCompanyRequest = z.infer<typeof upsertContractorCompanyRequestSchema>;
 
@@ -137,6 +197,25 @@ export const rosterRoleSchema = z.object({
   sortOrder: z.number().int(),
 });
 export type RosterRoleDto = z.infer<typeof rosterRoleSchema>;
+
+/**
+ * Alta/edición de un ROL de dotación (catálogo CONFIGURABLE — traza OSHA 1910.146: el
+ * cliente puede renombrar los 3 estándar [entry supervisor/attendant-vigía/authorized
+ * entrant] o agregar los suyos). `isSupervisorRole` marca a quien autoriza/firma la
+ * entrada [(f)(6)/(e)(2)]; `mustRemainOutside` la semántica de vigía [(i)(4)].
+ */
+export const upsertRosterRoleRequestSchema = z.object({
+  id: z.string().min(1).optional(), // presente = editar; ausente = crear
+  key: z.string().trim().min(1).max(60).optional(), // se deriva del nombre al crear si falta
+  name: z.string().trim().min(1).max(120),
+  description: z.string().trim().max(500).nullable().optional(),
+  isSupervisorRole: z.boolean().optional(),
+  mustRemainOutside: z.boolean().optional(),
+  color: z.string().trim().max(32).nullable().optional(),
+  active: z.boolean().optional(),
+  sortOrder: z.number().int().min(0).max(9999).optional(),
+});
+export type UpsertRosterRoleRequest = z.infer<typeof upsertRosterRoleRequestSchema>;
 
 // === Semáforo por persona (derivado en vivo; forma final desde S1) ============
 
@@ -429,6 +508,8 @@ export const personCompetencySchema = z.object({
   note: z.string().nullable(),
   /** Estado de vigencia derivado en vivo (para el badge de la fila). */
   validity: z.enum(COMPETENCY_VALIDITY_STATES),
+  /** Fecha de ARCHIVADO (soft-delete) si fue quitada; null = vigente en el registro. */
+  archivedAt: z.string().nullable(),
 });
 export type PersonCompetencyDto = z.infer<typeof personCompetencySchema>;
 
@@ -462,6 +543,8 @@ export const personRestrictionSchema = z.object({
   active: z.boolean(),
   /** ¿Está vigente ahora? (active && dentro de ventana). Derivado. */
   effective: z.boolean(),
+  /** Fecha de ARCHIVADO (soft-delete) si fue levantada/quitada; null = vigente en el registro. */
+  archivedAt: z.string().nullable(),
 });
 export type PersonRestrictionDto = z.infer<typeof personRestrictionSchema>;
 

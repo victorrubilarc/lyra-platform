@@ -1,5 +1,21 @@
 # Progreso — Lyra WatchLog
 
+**2026-07-03 — 👷 Dotación · Pulido UX enterprise + datos personales + auditoría ✅** (`feat/dotacion-ux-enterprise`).
+Ronda de feedback del dueño sobre la UX del catálogo de Personas/Dotación, resuelta de raíz. **Grillas al ESTÁNDAR**:
+Personas y Empresas ahora usan `GridPager` + `.tableCard`/`.table` de `catalogs.module.css` (importado como `grid`) — se
+descartó la tabla/paginador a mano de S3 (regla "no salirse del estándar de grillas"). **Íconos en línea** en cabeceras y
+pestañas (`.sectionTitle`/`.tab`/`.h1` a flex; el DS renderiza `<svg>` en bloque). **Datos personales opcionales** en `Person`
+(migr. aditiva `20260703160000`): fecha de nacimiento (edad derivada), **género**, nacionalidad y **tipo de documento**
+(RUT/Pasaporte/DNI/Otro — contempla extranjeros). **RUT formateado + validado (mód-11) + normalizado** reutilizando helpers
+existentes (`normalizeRut`/`isValidRut`/`formatRut`/`formatRutLive`), en persona y empresa. **Roles de dotación configurables
+por UI** (cierra deuda S1: eran solo-seed) — CRUD bajo `workordercatalog:manage` + tab "Roles de dotación". **Grillas revelan
+impedimentos** (chip rojo con competencias vencidas/restricciones activas por persona). **AUDITORÍA COMPLETA**: el `AuditLog`
+de quitar/editar competencia o restricción ahora captura el **antes** (snapshot — ej. levantar un veto guarda el motivo) +
+listados con `?includeArchived` + toggle "Mostrar archivadas (historial/auditoría)" que muestra las filas archivadas en gris.
+**Modales enterprise** (competencias `xl`, Person/Company `lg` por secciones; "Verifiqué la evidencia" aclarado; confirmación
+al archivar). **Sin permisos nuevos / sin FLUSHALL.** Verde: contracts **497** · api **252** · web **6** · **smoke-dotacion
+65/65** + regresión OT **122/122** e incidencias **32/32**. Decisiones en `DECISIONS.md` (2026-07-03, entrada UX enterprise).
+
 **2026-07-03 — 👷 Dotación del permiso · Slice 3 (acreditación de contratistas como GATE) ✅** (`feat/dotacion-acreditacion-s3`).
 Hace REAL el tercer origen de rojo (nivel EMPRESA) que S2-A dejó diferido. **Investigación citada** (fuente primaria):
 ISNetworld RAVS A/B pasan, F descalifica + "90-day flag"; Avetta Compliant/Conditional/Non-Compliant (*conditional* retrasa
