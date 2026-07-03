@@ -714,22 +714,22 @@ nunca queda más de una sesión atrás.
 
 ## 2. Pendiente por HACER (módulos / submódulos)
 
-### 🟧 Pantalla de INICIO · Rediseño a launchpad enterprise (feedback del dueño 2026-07-03)
-> **Origen:** el dueño observó que la pantalla de Inicio (`features/home/HomePage.tsx`) está **desactualizada**: los módulos
-> se pintan desde una **lista HARDCODEADA de 6 tarjetas** con estados fijos ⇒ (a) módulos ya LISTOS aparecen como «Pronto»
-> (Plantillas, Incidencias), (b) esas tarjetas **no navegan** ("no funcionan"), (c) **faltan** casi todos los módulos reales
-> (Bitácoras, Nueva entrada, Mis rondas, Órdenes de trabajo, Excepciones, Flujos, Datos de referencia, Programación de rondas,
-> Calendarios, Cambio de turno, Notificaciones, Configuración), (d) el copy «Los módulos se irán habilitando por fase» es de v1.
-> **Qué se quiere (enterprise, útil para el usuario conectado):**
-> - **Launchpad de módulos gateado por permiso**, alimentado por el **mismo registro de navegación** (no una lista aparte que
->   se desincroniza) ⇒ el Inicio siempre refleja lo que el usuario realmente puede abrir.
-> - **Tiles ACCIONABLES / worklist personal** (patrón SAP Fiori launchpad): mis rondas vencidas (ya existe el widget), **mis
->   incidencias abiertas/asignadas**, **mis OT asignadas / vencidas**, **excepciones pendientes de triage**, **notificaciones sin
->   leer**, **firmas/reportes/plazos vencidos** — cada uno con conteo EN VIVO (reusando los `*Stats`/inbox ya existentes) y
->   **deep-link** al listado ya filtrado (los drill-down + chips de esta sesión encajan aquí).
-> - Respetar ABAC ∩ estructura activa; sin hex (tokens del DS); responsivo/táctil.
-> **Alcance sugerido:** slice propio «Inicio enterprise» (no meter en un pulido). Estimado ~1 sesión. **SIN migración** (todo son
-> consultas ya existentes). Revisar `HomePage.tsx` (hoy `MODULES` hardcodeado + `STATUS_LABEL/CLASS`) y el registro de nav.
+### ✅ Pantalla de INICIO · Rediseño a cockpit enterprise — CERRADO 2026-07-03 (`feat/inicio-enterprise`)
+> **Hecho.** Se eliminó la lista HARDCODEADA (`MODULES`/`STATUS_LABEL`/`STATUS_CLASS`). El Inicio es ahora un **cockpit del turno**
+> (patrón SAP Fiori "My Home"), NO el directorio completo (eso vive en el sidebar):
+> - **«Mi trabajo hoy»**: 5 tiles accionables con conteo EN VIVO + desglose de riesgo (crítico/vencido/sin responsable/advertencia)
+>   + deep-link al listado filtrado — Mis rondas (`useMyRoundsStats`), Incidencias (`useIncidentStats`), Órdenes de trabajo
+>   (`useWorkOrderStats`, `?lifecycle=OPEN`), Excepciones por triar (`useExceptions().summary`), Notificaciones (`useInboxUnreadCount`).
+>   Cada hook gateado por su permiso (`enabled: can(...)`) ⇒ sin 403 al operador sin módulo; en 0 el tile queda calmo (no grita).
+> - **«Operación»**: accesos a los módulos del **grupo `operation` del registro** que NO son ya un tile (Panorama, Nueva entrada,
+>   Bitácoras, Cambio de turno) — derivados de `SIDEBAR_ROUTES` (fuente única de verdad; nunca se desincroniza), con `descKey` nuevo.
+> - Anclado a ABAC ∩ estructura activa (los `*Stats` reusan `buildWhere`); tokens del DS (sin hex); responsivo/táctil; claro+oscuro.
+> **Ajuste de alcance vs. propuesta inicial:** tras feedback del dueño (Inicio "sobrecargado, poco premium") se DESCARTÓ el muro de
+> los 3 grupos (18 tarjetas) — el Inicio muestra solo lo operativo relevante + tiles ricos. Diseño y Administración quedan solo en
+> el sidebar. Ver `DECISIONS.md` (2026-07-03).
+> **Bonus de la sesión (fixes de UX pedidos en vivo):** `/mis-notificaciones` ya usa todo el ancho (se quitó el `max-width:1180px`
+> centrado, alineado a las grillas) + el `Select` «Todas» de la bandeja dejó de estirarse (clase `.filterSelect` con ancho fijo).
+> **Verde:** typecheck + lint (0 errores) + build + test 8/8 (navigation.spec extendido). Smoke visual = del dueño.
 
 ### 🟦 Dotación · Slice 4 — control de acceso / T&A tras interfaz abstracta (DIFERIDO por el dueño, 2026-07-03)
 > **Decisión del dueño (2026-07-03):** se DIFIERE; se prioriza el **Dashboard de OT (Slice 7)** primero. Registrado aquí para no perderlo.
@@ -2096,6 +2096,14 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
 ## 3. Deuda técnica / seguridad REGISTRADA (no perder)
 
 > Items con fundamento ya discutidos; aquí para que no se diluyan en `DECISIONS.md`.
+
+### DATA demo · Rondas del seed 100% vencidas (2026-07-03)
+> Detectado al revisar «Mis rondas no filtra» (`feat/inicio-enterprise`): el demo tiene **289 rondas todas vencidas** (programadas
+> el 16-jun; a 3-jul = 17 días atrás). NO es bug de la pantalla: el horizonte acota solo lo que VIENE y las vencidas siempre se
+> muestran (bucket fijo, estándar de worklists). El efecto secundario es que el **horizonte parece no filtrar** y los KPIs/tiles del
+> Inicio muestran todo como vencido. **Acción sugerida:** reseed con ventana realista (rondas de hoy/próximas) para que el demo luzca
+> operativo y el horizonte se aprecie funcionando — p. ej. regenerar ocurrencias desde `scripts/seed-demo-*.py` o `generateSchedules`
+> con fechas relativas a hoy. Solo DATA, sin código.
 
 ### OT · S2 — Editor UI del esquema de folio (`folioScheme` / `folioOnStateKey`) — ✅ HECHO 2026-07-02
 - [x] **✅ HECHO 2026-07-02** (`feat/folio-editor-y-plantillas`). El `WorkOrderTypeModal` gana la sección "Folio de la

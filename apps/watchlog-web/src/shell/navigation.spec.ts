@@ -26,3 +26,24 @@ describe("navegación del sidebar — integridad de grupos", () => {
     expect(flujos?.group).toBe("design");
   });
 });
+
+/**
+ * Inicio enterprise (feat/inicio-enterprise): la sección «Operación» y sus
+ * descripciones derivan del MISMO registro que el sidebar, así el Inicio nunca se
+ * desincroniza de los módulos reales.
+ */
+describe("Inicio — accesos derivados del registro", () => {
+  it("toda ruta de módulo del sidebar (salvo la Home) tiene descripción (descKey)", () => {
+    // El Inicio muestra la descripción de cada acceso; sin descKey la tarjeta
+    // quedaría muda. Este test vuelve ruidoso el olvido al añadir un módulo.
+    const conModulo = SIDEBAR_ROUTES.filter((r) => r.path !== "/");
+    const sinDesc = conModulo.filter((r) => !r.descKey);
+    expect(sinDesc.map((r) => r.path)).toEqual([]);
+  });
+
+  it("el grupo operativo del registro define los accesos del Inicio (existe y no incluye la Home)", () => {
+    const operativos = SIDEBAR_ROUTES.filter((r) => r.group === "operation" && r.path !== "/");
+    expect(operativos.length).toBeGreaterThan(0);
+    expect(operativos.some((r) => r.path === "/")).toBe(false);
+  });
+});

@@ -30,6 +30,12 @@ export interface NavRoute {
   path: string;
   /** Clave i18n del nombre legible. */
   labelKey: string;
+  /**
+   * Clave i18n de la descripción corta (una línea). La consume el launchpad del
+   * Inicio para dar contexto de cada módulo; el sidebar la ignora. Opcional y
+   * aditiva: una ruta sin `descKey` simplemente no muestra descripción.
+   */
+  descKey?: string;
   icon: LucideIcon;
   /** Permiso de módulo que habilita la sección (la UI solo oculta). */
   permission?: Permission;
@@ -48,6 +54,7 @@ export const ROUTES: readonly NavRoute[] = [
   {
     path: "/panorama",
     labelKey: "nav.panorama",
+    descKey: "nav.desc.panorama",
     icon: Gauge,
     permission: "module:dashboard:cross-view",
     inSidebar: true,
@@ -56,6 +63,7 @@ export const ROUTES: readonly NavRoute[] = [
   {
     path: "/estructura",
     labelKey: "nav.structure",
+    descKey: "nav.desc.structure",
     icon: Network,
     permission: "module:structure:view",
     inSidebar: true,
@@ -64,6 +72,7 @@ export const ROUTES: readonly NavRoute[] = [
   {
     path: "/plantillas",
     labelKey: "nav.templates",
+    descKey: "nav.desc.templates",
     icon: Layers,
     permission: "module:templates:view",
     inSidebar: true,
@@ -72,6 +81,7 @@ export const ROUTES: readonly NavRoute[] = [
   {
     path: "/nueva-entrada",
     labelKey: "nav.newEntry",
+    descKey: "nav.desc.newEntry",
     icon: FilePlus2,
     // Crear entradas requiere `logentry:create`; quien solo llena/revisa (sin crear)
     // no ve este ítem y llega a las entradas por Bitácoras → Editar.
@@ -82,6 +92,7 @@ export const ROUTES: readonly NavRoute[] = [
   {
     path: "/bitacoras",
     labelKey: "nav.logbook",
+    descKey: "nav.desc.logbook",
     icon: BookOpenCheck,
     permission: "module:logbook:view",
     inSidebar: true,
@@ -92,6 +103,7 @@ export const ROUTES: readonly NavRoute[] = [
   {
     path: "/mis-rondas",
     labelKey: "nav.myRounds",
+    descKey: "nav.desc.myRounds",
     icon: ListTodo,
     permission: "round:execute",
     inSidebar: true,
@@ -101,6 +113,7 @@ export const ROUTES: readonly NavRoute[] = [
   {
     path: "/rondas",
     labelKey: "nav.rounds",
+    descKey: "nav.desc.rounds",
     icon: Route,
     permission: "schedule:view",
     inSidebar: true,
@@ -110,6 +123,7 @@ export const ROUTES: readonly NavRoute[] = [
   {
     path: "/incidencias",
     labelKey: "nav.incidents",
+    descKey: "nav.desc.incidents",
     icon: AlertTriangle,
     permission: "module:incidents:view",
     inSidebar: true,
@@ -120,6 +134,7 @@ export const ROUTES: readonly NavRoute[] = [
   {
     path: "/excepciones",
     labelKey: "nav.exceptions",
+    descKey: "nav.desc.exceptions",
     icon: AlertOctagon,
     permission: "module:incidents:view",
     inSidebar: true,
@@ -130,6 +145,7 @@ export const ROUTES: readonly NavRoute[] = [
   {
     path: "/cambio-turno",
     labelKey: "nav.shiftHandover",
+    descKey: "nav.desc.shiftHandover",
     icon: ArrowLeftRight,
     permission: "module:handover:view",
     inSidebar: true,
@@ -139,6 +155,7 @@ export const ROUTES: readonly NavRoute[] = [
   {
     path: "/ordenes-trabajo",
     labelKey: "nav.workOrders",
+    descKey: "nav.desc.workOrders",
     icon: ClipboardList,
     permission: "module:workorders:view",
     inSidebar: true,
@@ -178,6 +195,7 @@ export const ROUTES: readonly NavRoute[] = [
   {
     path: "/flujos",
     labelKey: "nav.workflows",
+    descKey: "nav.desc.workflows",
     icon: GitBranch,
     permission: "module:workflows:view",
     inSidebar: true,
@@ -186,6 +204,7 @@ export const ROUTES: readonly NavRoute[] = [
   {
     path: "/datos-referencia",
     labelKey: "nav.referenceData",
+    descKey: "nav.desc.referenceData",
     icon: ListChecks,
     permission: "module:referencedata:view",
     inSidebar: true,
@@ -194,6 +213,7 @@ export const ROUTES: readonly NavRoute[] = [
   {
     path: "/calendario-operacional",
     labelKey: "nav.opsCalendar",
+    descKey: "nav.desc.opsCalendar",
     icon: CalendarClock,
     permission: "module:opscalendar:view",
     inSidebar: true,
@@ -202,6 +222,7 @@ export const ROUTES: readonly NavRoute[] = [
   {
     path: "/calendario-fiscal",
     labelKey: "nav.fiscalCalendar",
+    descKey: "nav.desc.fiscalCalendar",
     icon: CalendarRange,
     permission: "module:opscalendar:view",
     inSidebar: true,
@@ -210,6 +231,7 @@ export const ROUTES: readonly NavRoute[] = [
   {
     path: "/seguridad",
     labelKey: "nav.security",
+    descKey: "nav.desc.security",
     icon: ShieldCheck,
     permission: "module:security:view",
     inSidebar: true,
@@ -219,6 +241,7 @@ export const ROUTES: readonly NavRoute[] = [
   {
     path: "/notificaciones",
     labelKey: "nav.notifications",
+    descKey: "nav.desc.notifications",
     icon: Bell,
     permission: "module:notifications:view",
     inSidebar: true,
@@ -227,6 +250,7 @@ export const ROUTES: readonly NavRoute[] = [
   {
     path: "/configuracion",
     labelKey: "nav.settings",
+    descKey: "nav.desc.settings",
     icon: Settings,
     permission: "module:settings:view",
     inSidebar: true,

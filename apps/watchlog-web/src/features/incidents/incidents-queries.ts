@@ -108,9 +108,9 @@ export function useIncidentWorkOrders(id: string | null) {
   return useQuery({ queryKey: INCIDENT_KEYS.workOrders(id ?? ""), queryFn: () => fetchIncidentWorkOrders(id!), enabled: !!id });
 }
 
-export function useIncidentStats() {
+export function useIncidentStats(enabled = true) {
   const structureId = useActiveStructureId();
-  return useQuery({ queryKey: INCIDENT_KEYS.stats(structureId), queryFn: () => fetchIncidentStats(structureId) });
+  return useQuery({ queryKey: INCIDENT_KEYS.stats(structureId), queryFn: () => fetchIncidentStats(structureId), enabled });
 }
 
 export function useIncidentTypes() {

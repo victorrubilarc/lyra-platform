@@ -3,8 +3,6 @@
   flex-direction: column;
   gap: var(--space-5);
   padding: var(--space-5);
-  max-width: 1180px;
-  margin: 0 auto;
   width: 100%;
 }
 
@@ -78,6 +76,13 @@
 .filters > form {
   flex: 1;
   min-width: 0;
+}
+/* El Select de @lyra/ui trae width:100%; sin acotarlo estira su flex-basis y
+   aplasta el buscador. Ancho fijo + sin crecer = filtro compacto a la izquierda. */
+.filterSelect {
+  flex: 0 0 auto;
+  width: 220px;
+  max-width: 40%;
 }
 .spacer {
   flex: 1;

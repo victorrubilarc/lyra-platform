@@ -4,6 +4,30 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-03 · UX · Pantalla de Inicio = cockpit del turno, NO directorio de módulos (`feat/inicio-enterprise`)
+Se rediseñó el Inicio (`features/home/HomePage.tsx`), que pintaba 6 tarjetas HARDCODEADAS con estados fijos ("Pronto") que no
+navegaban y desincronizadas de los módulos reales.
+- **Los accesos derivan del REGISTRO de navegación (`SIDEBAR_ROUTES`), no de una lista aparte.** Fuente única de verdad: lo que se
+  muestra es exactamente lo que el usuario puede abrir (gateado por permiso, igual que el sidebar). Añadir un módulo al registro lo
+  hace aparecer en el Inicio sin tocar `HomePage`. Se agregó `descKey?` (opcional, i18n) a `NavRoute` para las descripciones.
+- **Tiles accionables del worklist personal (patrón SAP Fiori "My Home").** «Mi trabajo hoy» = 5 tiles con conteo EN VIVO + desglose
+  de riesgo + deep-link al listado filtrado: Mis rondas, Incidencias, Órdenes de trabajo, Excepciones por triar, Notificaciones.
+  Reusan los `*Stats`/`useExceptions().summary`/`useInboxUnreadCount` YA existentes (respetan estructura activa ∩ ABAC vía
+  `buildWhere`). Cada hook se gatea por su permiso (`enabled: can(...)`) ⇒ sin 403 a quien no tiene el módulo. En 0 el tile queda
+  calmo (severidad SOLO por su semántica, no grita) — buena noticia no debe alarmar.
+- **El Inicio NO es el directorio completo (decisión tras feedback del dueño: "sobrecargado, poco premium").** Se DESCARTÓ el muro de
+  los 3 grupos (18 tarjetas). El Inicio muestra solo lo operativo del día: tiles ricos + accesos del grupo `operation` del registro
+  que no son ya un tile (Panorama, Nueva entrada, Bitácoras, Cambio de turno). Diseño y Administración viven en el sidebar. Menos es
+  más premium; el Inicio es un cockpit, no un launchpad exhaustivo.
+- **Se aditó `enabled?` a `useIncidentStats`/`useWorkOrderStats`** (el resto de hooks ya lo tenía) para poder gatear sin refetch a 403.
+- **Fixes de UX en vivo (misma sesión):** `/mis-notificaciones` quitó el `max-width:1180px` centrado (usaba media pantalla) y se
+  alineó a las grillas (ancho completo); el `Select` «Todas» de la bandeja dejó de estirarse (el `Select` de `@lyra/ui` trae
+  `width:100%` y su flex-basis dominaba) con una clase de ancho fijo.
+- **Mis rondas «no filtra» = NO es bug.** Diagnóstico con evidencia: las 289 rondas del demo están 100% vencidas (17 días de
+  antigüedad). El horizonte acota SOLO lo que viene; las **vencidas siempre se muestran** (bucket fijo, estándar de worklists
+  SAP/Maximo: nunca ocultar trabajo atrasado). Con data toda vencida el horizonte no tiene futuro que recortar. Se mantiene el
+  comportamiento; queda como deuda de DATA (reseed con ventana realista) en `BACKLOG.md`, no de código.
+
 ### 2026-07-03 · UX · Pulido transversal pre-Slice 8 (`feat/ux-pulido-pre-s8`)
 Ronda de feedback del dueño, TODO UI/consulta (sin migración/permiso/FLUSHALL).
 - **Checklists de OT fuera de Bitácoras: excluir por el ENLACE, no por el `purpose` de la plantilla.** El criterio "esto es un
