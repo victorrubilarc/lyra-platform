@@ -159,6 +159,7 @@ export const WORKER_BLOCK_REASONS = [
   "NOT_AUTHORIZED",
   "RESTRICTION_ACTIVE",
   "COMPANY_NOT_ACCREDITED",
+  "COMPANY_ACCREDITATION_CONDITIONAL",
   "COMPANY_ACCREDITATION_EXPIRING",
 ] as const;
 export type WorkerBlockReason = (typeof WORKER_BLOCK_REASONS)[number];
@@ -170,7 +171,11 @@ export const WORKER_BLOCK_REASON_META: Record<WorkerBlockReason, { level: Worker
   COMPETENCY_EXPIRING: { level: "warning", label: "Certificación por vencer" },
   NOT_AUTHORIZED: { level: "blocked", label: "Persona no autorizada/designada" },
   RESTRICTION_ACTIVE: { level: "blocked", label: "Restricción/veto activo" },
+  // Nivel EMPRESA (S3): no acreditada / suspendida / vencida = ROJO (Avetta non-compliant
+  // impide trabajar). CONDITIONAL = ÁMBAR (Avetta conditional / ISN grado B: pasa marcado,
+  // "retrasa" pero no impide). Por vencer = ÁMBAR (ISN 90-day flag).
   COMPANY_NOT_ACCREDITED: { level: "blocked", label: "Empresa contratista no acreditada" },
+  COMPANY_ACCREDITATION_CONDITIONAL: { level: "warning", label: "Acreditación de la empresa condicional" },
   COMPANY_ACCREDITATION_EXPIRING: { level: "warning", label: "Acreditación de la empresa por vencer" },
 };
 
@@ -218,6 +223,11 @@ export const workerStatusDetailSchema = z.object({
   /** Contexto de la restricción (RESTRICTION_ACTIVE). */
   restrictionType: z.string().nullable().optional(),
   restrictionReason: z.string().nullable().optional(),
+  /** Contexto de la EMPRESA (COMPANY_NOT_ACCREDITED/CONDITIONAL/EXPIRING) — nivel empresa, S3. */
+  companyName: z.string().nullable().optional(),
+  accreditationStatus: accreditationStatusSchema.nullable().optional(),
+  /** Vencimiento de la acreditación de la empresa (ISO) para EXPIRED/EXPIRING (null si no aplica). */
+  accreditedUntil: z.string().nullable().optional(),
 });
 export type WorkerStatusDetail = z.infer<typeof workerStatusDetailSchema>;
 
@@ -322,6 +332,14 @@ export const ROSTER_OVERRIDE_SIGNATURE_MEANING =
  * compliance avisan a 30/14/7 — 30 es un punto medio sensato y configurable por tipo.
  */
 export const DEFAULT_COMPETENCY_WARNING_LEAD_DAYS = 30;
+
+/**
+ * Ventana ÁMBAR por defecto para la ACREDITACIÓN DE EMPRESA ("por vencer"), en días.
+ * Traza: ISNetworld marca la acreditación con un "90-day flag" antes de vencer; re-acreditar
+ * una empresa (re-revisión de prequalification) toma semanas, por lo que el margen es mayor
+ * que el de una competencia individual (30 d). Fijo en S3 (config por empresa = over-eng).
+ */
+export const DEFAULT_ACCREDITATION_WARNING_LEAD_DAYS = 90;
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -564,6 +582,22 @@ export interface WorkerRestrictionInput {
   reason: string;
 }
 
+/**
+ * Acreditación de la EMPRESA contratista de la persona (nivel empresa — S3). Sólo se evalúa
+ * si `required` (el tipo de OT exige acreditación, `WorkOrderType.requireCompanyAccreditation`)
+ * y la persona es CONTRATISTA con empresa. Traza Ley 16.744 art.66 bis + ISN/Avetta/Veriforce.
+ */
+export interface WorkerCompanyAccreditationInput {
+  /** El tipo de la OT exige acreditación de empresa (toggle por tipo). */
+  required: boolean;
+  companyName: string | null;
+  status: AccreditationStatus;
+  /** Vencimiento de la acreditación en epoch ms; null = sin vencimiento declarado. */
+  accreditedUntilMs: number | null;
+  /** Ventana ámbar (null ⇒ usa `DEFAULT_ACCREDITATION_WARNING_LEAD_DAYS`). */
+  warningLeadDays?: number | null;
+}
+
 /** Contexto de derivación de causas para UNA persona de la dotación. */
 export interface DeriveWorkerReasonsContext {
   /** Reglas aplicables a la OT (ya filtradas por `applicableCompetencyRules`). */
@@ -574,6 +608,8 @@ export interface DeriveWorkerReasonsContext {
   competencies: ReadonlyArray<WorkerCompetencyInput>;
   /** Restricciones activas y vigentes de la persona. */
   restrictions: ReadonlyArray<WorkerRestrictionInput>;
+  /** Acreditación de la empresa contratista (nivel empresa — S3); null = no aplica. */
+  company?: WorkerCompanyAccreditationInput | null;
   nowMs: number;
   defaultWarningLeadDays?: number;
 }
@@ -585,7 +621,10 @@ export interface DeriveWorkerReasonsContext {
  *    sólo si la regla es `mandatory` ⇒ bloquean). Vigente pero dentro de la ventana ⇒
  *    COMPETENCY_EXPIRING (ámbar, informativo, aunque la regla no sea obligatoria).
  *  - Eje B · Autorización: cualquier restricción activa+vigente ⇒ RESTRICTION_ACTIVE (rojo).
- * NO deriva COMPANY_NOT_ACCREDITED (empresa) — eso llega en S3 (S2-A).
+ *  - Nivel EMPRESA (S3): si el tipo de OT exige acreditación y la persona es contratista, la
+ *    acreditación de su empresa se cruza EN VIVO ⇒ COMPANY_NOT_ACCREDITED (rojo: no acreditada/
+ *    suspendida/vencida) · COMPANY_ACCREDITATION_CONDITIONAL (ámbar: condicional) ·
+ *    COMPANY_ACCREDITATION_EXPIRING (ámbar: por vencer). Los tres ejes son ORTOGONALES.
  */
 export function deriveWorkerReasons(ctx: DeriveWorkerReasonsContext): WorkerStatusDetail[] {
   const details: WorkerStatusDetail[] = [];
@@ -630,6 +669,28 @@ export function deriveWorkerReasons(ctx: DeriveWorkerReasonsContext): WorkerStat
   }
   for (const r of ctx.restrictions) {
     details.push({ reason: "RESTRICTION_ACTIVE", restrictionType: r.type, restrictionReason: r.reason });
+  }
+  // Eje EMPRESA (S3): sólo si el tipo exige acreditación y la persona trae empresa contratista.
+  const co = ctx.company;
+  if (co && co.required) {
+    const warn = co.warningLeadDays ?? DEFAULT_ACCREDITATION_WARNING_LEAD_DAYS;
+    const untilIso = co.accreditedUntilMs != null ? new Date(co.accreditedUntilMs).toISOString() : null;
+    const base = { companyName: co.companyName, accreditationStatus: co.status, accreditedUntil: untilIso };
+    if (co.status === "ACCREDITED" || co.status === "CONDITIONAL") {
+      // Acreditada/condicional: el vencimiento manda. Vencida ⇒ rojo; por vencer ⇒ ámbar; si
+      // no, una acreditación CONDICIONAL sigue siendo ámbar (pasa marcada, ISN B/Avetta conditional).
+      if (co.accreditedUntilMs != null && co.accreditedUntilMs <= ctx.nowMs) {
+        details.push({ reason: "COMPANY_NOT_ACCREDITED", ...base });
+      } else if (co.accreditedUntilMs != null && co.accreditedUntilMs - ctx.nowMs <= warn * MS_PER_DAY) {
+        details.push({ reason: "COMPANY_ACCREDITATION_EXPIRING", ...base });
+      } else if (co.status === "CONDITIONAL") {
+        details.push({ reason: "COMPANY_ACCREDITATION_CONDITIONAL", ...base });
+      }
+    } else {
+      // SUSPENDED / EXPIRED / NONE ⇒ no acreditada (rojo). NONE = "sin acreditación": bajo un
+      // tipo que la exige, el mandante no verificó el cumplimiento (Ley 16.744 art.66 bis).
+      details.push({ reason: "COMPANY_NOT_ACCREDITED", ...base });
+    }
   }
   return details;
 }

@@ -5,7 +5,18 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-07-03** — **👷 Dotación del permiso · Slice 2 (competencias con vigencia) ✅** (`feat/dotacion-competencias-s2`):
+> actualización: **2026-07-03** — **👷 Dotación del permiso · Slice 3 (acreditación de contratistas como GATE) ✅** (`feat/dotacion-acreditacion-s3`):
+> hace REAL el 3.er origen de rojo (nivel EMPRESA) diferido en S2-A. **Toggle por tipo** `WorkOrderType.requireCompanyAccreditation` (default false,
+> espejo de `rosterEnabled`; migr. aditiva `20260703140000`): OFF ⇒ informativa (cero regresión); ON ⇒ gate vivo. Semáforo de empresa derivado EN VIVO
+> (persona CONTRATISTA, sólo si el tipo lo exige): ACCREDITED vigente=verde · por vencer ≤90 d=ámbar `COMPANY_ACCREDITATION_EXPIRING` · CONDITIONAL=ámbar
+> `COMPANY_ACCREDITATION_CONDITIONAL` (reason NUEVO, pasa marcada) · SUSPENDED/EXPIRED/NONE/vencida=rojo `COMPANY_NOT_ACCREDITED`. **`deriveWorkerReasons`
+> NO reescrita** (3.er bloque `company` opcional, ortogonal a Ejes A/B). **Override firmado POR PERSONA REUSADO tal cual** (`blocked` ⇒ sin cambio en
+> `confirmRoster`). Avisos Bloque N `contractor.accreditation.expiring`/`.expired` (clon del patrón de competencias; sólo OT abierta de tipo que lo exige).
+> Web: `CompanyModal` completo (vigencia con fecha/proveedor/nota) + badge por nivel + grilla empresas filtros-1-línea+paginación; toggle en el tipo;
+> `describeDetail` de las 3 causas de empresa; se quitó la nota "informativa por ahora". Ventana 90 d = ISN "90-day flag" (const fija). **Traza:** ISN RAVS
+> A/B/F, Avetta compliant/conditional/non-compliant, Ley 16.744 art.66 bis + Cód. Trabajo art.183-C. **CERO permiso nuevo/FLUSHALL** (`db:seed` por plantillas).
+> contracts **497** (roster.spec **30**) + **smoke-dotacion 51/51** + regresión workorders 122/122 + incidencias 32/32. **ROADMAP dotación (abierto): S4** =
+> control de acceso/T&A tras interfaz abstracta (solo esbozo). Pendiente: **smoke VISUAL (dueño)**. — Sesión previa: **👷 Dotación · Slice 2 (competencias con vigencia) ✅** (`feat/dotacion-competencias-s2`):
 > hace REAL el semáforo (S1 era siempre verde). Entidades `CompetencyType`/`PersonCompetency`(renovar=registro nuevo)/`PersonRestriction`(veto)/
 > `WorkOrderCompetencyRule`(espejo de checklist + `appliesToRosterRoleId`) (migr. `20260703120000`). Funciones puras `applicableCompetencyRules`+
 > `deriveWorkerReasons` (Ejes A/B separados); semáforo derivado EN VIVO; gate/**override firmado POR PERSONA** en `confirmRoster`; avisos

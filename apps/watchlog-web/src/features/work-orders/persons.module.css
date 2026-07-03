@@ -16,6 +16,21 @@
 .rowActions { display: flex; gap: var(--space-1); justify-content: flex-end; }
 .chip { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: var(--radius-sm); border: 1px solid var(--color-border-subtle); background: var(--color-bg-surface-1); color: var(--color-text-secondary); font-weight: 600; }
 .muted { color: var(--color-text-muted); }
+
+/* Badge de acreditación por nivel semántico (dot + etiqueta), tokens del DS. */
+.badge { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: var(--radius-sm); border: 1px solid var(--color-border-subtle); font-weight: 600; font-size: var(--text-body-sm-size); }
+.badge::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex: none; }
+.badgeOk { color: var(--color-success); }
+.badgeWarn { color: var(--color-warning); }
+.badgeBad { color: var(--color-danger); }
+.badgeNeutral { color: var(--color-text-muted); }
+.subline { display: block; font-size: var(--text-caption-size); color: var(--color-text-muted); margin-top: 2px; }
+.subWarn { color: var(--color-warning); }
+.subBad { color: var(--color-danger); }
+
+/* Barra de paginación (arriba/abajo) — convención de grillas. */
+.pageBar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: var(--space-2) 0; color: var(--color-text-secondary); font-size: var(--text-body-sm-size); }
+.pageBtns { display: flex; align-items: center; gap: var(--space-2); }
 .empty { padding: var(--space-6); text-align: center; color: var(--color-text-muted); }
 .modalBody { display: flex; flex-direction: column; gap: var(--space-3); }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }

@@ -2774,6 +2774,12 @@ model WorkOrderType {
   // siempre ni a todas las OT". Las EXIGENCIAS concretas (que competencia, a quien) se
   // derivan de reglas data-driven en S2 (WorkOrderCompetencyRule).
   rosterEnabled                   Boolean   @default(false)
+  // --- Dotacion S3: exigir ACREDITACION de la empresa contratista (GATE por empresa) ---
+  // Espejo de rosterEnabled: sin esto la acreditacion es SOLO informativa (cero regresion).
+  // ON => una persona CONTRATISTA cuya empresa no esta acreditada/vencida/suspendida va a
+  // ROJO en el semaforo. Traza: Ley 16.744 art.66 bis (el mandante VERIFICA cumplimiento del
+  // contratista) + prequalification ISN/Avetta/Veriforce (cada cliente fija su umbral).
+  requireCompanyAccreditation     Boolean   @default(false)
   active                          Boolean   @default(true)
   sortOrder                       Int       @default(0)
   createdAt                       DateTime  @default(now())

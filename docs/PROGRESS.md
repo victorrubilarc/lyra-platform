@@ -1,5 +1,28 @@
 # Progreso — Lyra WatchLog
 
+**2026-07-03 — 👷 Dotación del permiso · Slice 3 (acreditación de contratistas como GATE) ✅** (`feat/dotacion-acreditacion-s3`).
+Hace REAL el tercer origen de rojo (nivel EMPRESA) que S2-A dejó diferido. **Investigación citada** (fuente primaria):
+ISNetworld RAVS A/B pasan, F descalifica + "90-day flag"; Avetta Compliant/Conditional/Non-Compliant (*conditional* retrasa
+pero no impide; *non-compliant* impide); Ley 16.744 art.66 bis (el mandante VERIFICA el cumplimiento del contratista) +
+Cód. Trabajo art.183-C. **Toggle por tipo** `WorkOrderType.requireCompanyAccreditation` (default false, espejo de
+`rosterEnabled`; migración aditiva `20260703140000`, drift ajeno descartado a mano): OFF ⇒ acreditación **informativa** (cero
+regresión); ON ⇒ gate vivo. **Semáforo de empresa** (persona CONTRATISTA, sólo si el tipo lo exige, derivado EN VIVO al leer
+el roster — nunca almacenado): `ACCREDITED` vigente = verde · por vencer (≤90 d) = ámbar `COMPANY_ACCREDITATION_EXPIRING` ·
+`CONDITIONAL` = ámbar `COMPANY_ACCREDITATION_CONDITIONAL` (reason NUEVO; pasa marcada) · `SUSPENDED`/`EXPIRED`/`NONE`/vencida
+= rojo `COMPANY_NOT_ACCREDITED`. **`deriveWorkerReasons` NO se reescribió** — se le agregó un tercer bloque `company`
+(opcional) tras los Ejes A/B; ortogonal. **Override firmado POR PERSONA REUSADO tal cual** (`COMPANY_NOT_ACCREDITED` es
+`blocked` ⇒ entra sin cambios en `confirmRoster`; sólo se enriqueció el mensaje). **Avisos Bloque N**
+`contractor.accreditation.expiring`/`.expired` (clon del patrón de competencias en `WorkerComplianceService.findBreaches` +
+resolver `resolveContractorAccreditation` + `events.ts` + 2 plantillas de correo); sólo empresas con personal en OT abierta
+cuyo tipo exige acreditación. **Web:** `CompanyModal` completo (estado, grado, **vigencia con fecha por locale**, proveedor
+externo, nota) + badge de estado/vigencia por nivel + grilla de empresas con **filtros en una línea + paginación arriba/abajo**
+(convención); toggle "Exige acreditación" anidado bajo Dotación en `WorkOrderTypeModal`; `describeDetail` del semáforo redacta
+las 3 causas de empresa en español ("Empresa «ACME»: acreditación vencida el …"); se quitó la nota "la acreditación es
+informativa por ahora". **CERO permiso nuevo / CERO FLUSHALL** (`worker:manage`/`workordercatalog:manage`); `db:seed` por las
+plantillas nuevas. **Verde:** contracts **497** (roster.spec **30**) + **smoke-dotacion 51/51** + regresión workorders
+**122/122** e incidencias **32/32**. **Pendiente: smoke VISUAL del dueño.** **ROADMAP dotación: S4** = control de acceso/T&A
+tras interfaz abstracta (solo esbozo). Decisiones S3-A…S3-F en `DECISIONS.md`; USER_GUIDE actualizado.
+
 **2026-07-03 — 👷 Dotación del permiso · Slice 2 (competencias/certificaciones con vigencia) ✅** (`feat/dotacion-competencias-s2`).
 Hace REAL la validación que S1 dejó inerte (el semáforo era siempre verde). **Investigación citada** (piezas nuevas,
 fuente primaria): ISN «flag 90 días» + práctica 30/14/7 ⇒ ventana de aviso configurable por tipo; Maximo *Expiration Date*
