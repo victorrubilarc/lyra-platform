@@ -1,5 +1,26 @@
 # Progreso — Lyra WatchLog
 
+**2026-07-04 — 🔐 Licenciamiento L0 · núcleo `@lyra/licensing` ✅** (`feat/licenciamiento-l0`).
+Primera sesión del plan L0–L6 del módulo de licenciamiento (BACKLOG §2(1), estrategia **Opción C** decidida el
+2026-07-04). Se creó **`packages/licensing`** como librería **PURA** (sin NestJS/Prisma/infra/I-O; **cero dependencias**,
+solo `node:crypto`; llaves, señales y `now` SIEMPRE por parámetro) = el PoC `docs/poc/licencia-poc.mjs` (9/9) endurecido,
+tipado y testeado. **API pública** (aprobada por el dueño antes de codificar): `signLicense`/`verifyLicense` (JWS compacto
+EdDSA, resultado tipado sin excepciones tragadas: `MALFORMED_JWS`/`UNSUPPORTED_ALG`/`INVALID_SIGNATURE`/`INVALID_PAYLOAD`),
+`deriveFingerprint` (huella sha256 canónica de señales del host; el clon perfecto de VM se DETECTA en L4, no se previene —
+documentado), `evaluateLicense` + helpers puros (`isExpired`/`isWithinGrace`/`isModuleLicensed`/`exceedsLimits`) con la
+máquina de estados de LICENSING.md §5 (precedencia BLOQUEADA→SOLO_LECTURA→EN_GRACIA→LIMITE_EXCEDIDO→MODULO_NO_LICENCIADO→
+POR_VENCER→VALIDA; **nunca destructivo**, tope = solo lectura), y tipos (`LicensePayload` con linaje `renewalCounter`/
+`nonce` declarado para L4, `LicenseLimits`, `LicenseState`, `LicenseEvaluation`, `MachineSignals`…). **Decisiones**
+(DECISIONS 2026-07-04 L0): paquete **source-only** espejo de `@lyra/permissions`; **tipos en licensing, NO en contracts**
+(web nunca ve el payload completo; DTO delgado recién en L2/L6); 3 endurecimientos sobre el PoC (verify/evaluate separados
+para verificación DISTRIBUIDA; `warnDays` parametrizable; `signatureAlg` FUERA del payload — alg fijado a EdDSA en el
+verificador, RFC 8725). **Tests: 42/42** (vitest; paridad con los 9 casos del PoC T1–T6 + bordes: notBefore futuro,
+límites excedidos, módulo no licenciado, JWS corrupto/truncado, payload no-JSON, llaves no-Ed25519, canonicidad de la
+huella, precedencia). Verde: typecheck/lint/test del paquete + monorepo completo. **No probado:** integración con la API
+(no existe aún — es L1); no se levantó Docker (lib pura). **USER_GUIDE no aplica** (L0 no es de cara al usuario).
+Docs vivos actualizados: `LICENSING.md` (estado L0, payload sin `signatureAlg` + huella/linaje, §9). **Siguiente:
+Licenciamiento L1 (LicenseService NestJS + máquina de estados + guard de arranque).**
+
 **2026-07-03 — 🏠 Inicio enterprise · cockpit del turno ✅** (`feat/inicio-enterprise`).
 Rediseño de la pantalla de Inicio (`features/home/HomePage.tsx`), que pintaba **6 tarjetas HARDCODEADAS** (`MODULES` +
 `STATUS_LABEL/CLASS`) con estados fijos: módulos ya listos (Plantillas/Incidencias) salían como «Pronto» y NO navegaban,

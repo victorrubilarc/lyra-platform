@@ -6,7 +6,9 @@
 > tope de instalaciones/nodos/usuarios y módulos habilitados. Es un **ítem de desarrollo cerrado**,
 > aún no construido.
 >
-> Última actualización: **2026-07-01**. Estado: **especificado, sin construir**. Estimación: ~80–160 HH.
+> Última actualización: **2026-07-04**. Estado: **L0 construido** — el núcleo puro (firma/verificación Ed25519,
+> huella, máquina de estados §5) existe como **`@lyra/licensing`** (`packages/licensing`, 42 tests). Pendientes
+> L1–L6 (servicio NestJS, gating, CLI, linaje, anti-tamper, UI). Estimación total: ~80–160 HH.
 
 ---
 
@@ -78,10 +80,18 @@ El archivo es un **payload JSON firmado** (JWS/Ed25519, §4). Ejemplo del payloa
 
   "whiteLabel": true,
   "supportTier": "L2",
-  "signatureAlg": "Ed25519",
-  "schemaVersion": 1
+  "schemaVersion": 1,
+
+  "fingerprint": "3f9c…(huella de máquina, node-lock)",
+  "renewalCounter": 1,
+  "nonce": "…(linaje rotatorio, capa 4)"
 }
 ```
+
+> **Nota (L0, 2026-07-04):** el payload **no lleva campo de algoritmo** (`signatureAlg` se eliminó del ejemplo
+> original): el algoritmo vive SOLO en la cabecera JWS y el **verificador lo fija a EdDSA** — la cabecera del archivo
+> no se obedece, se valida (mitiga la confusión de algoritmo, RFC 8725 §3.1). Se agregaron al esquema `fingerprint`
+> (node-lock, capa 2) y los campos de **linaje** `renewalCounter`/`nonce` (capa 4; su flujo se construye en L4).
 
 **Campos clave:**
 - `expiresAt` + `graceDays` → vencimiento y periodo de gracia (§5).
@@ -96,9 +106,13 @@ El archivo es un **payload JSON firmado** (JWS/Ed25519, §4). Ejemplo del payloa
 
 ## 4. Firma y verificación
 
-- **Algoritmo recomendado: Ed25519** (firma asimétrica moderna: llaves pequeñas, rápida, soportada
-  nativamente por el módulo `crypto` de Node ≥ 22). Alternativa: RSA-2048/PSS si se prefiere algo más
-  clásico. Formato de sobre: **JWS** (JSON Web Signature) compacto o `.lic` propio equivalente.
+- **Algoritmo: Ed25519** (firma asimétrica moderna: llaves pequeñas, rápida, soportada nativamente por
+  el módulo `crypto` de Node ≥ 22). Formato de sobre: **JWS compacto** (`cabecera.payload.firma` en
+  base64url). **Implementado en L0** como el paquete puro **`@lyra/licensing`** (`packages/licensing`):
+  `signLicense`/`verifyLicense` (resultado tipado, alg fijado a EdDSA en el verificador),
+  `deriveFingerprint` (huella canónica sha256 de señales del host, capa 2) y `evaluateLicense` + helpers
+  (`isExpired`/`isWithinGrace`/`isModuleLicensed`/`exceedsLimits`) para la máquina de estados §5. Las
+  llaves entran SIEMPRE por parámetro (puro y testeable); cero dependencias externas.
 - **Emisión (ITESICWS):** una **CLI/servicio interno** (`lyra-license issue --customer … --expires …
   --modules …`) toma los parámetros, arma el payload, lo firma con la clave privada y produce el
   `license.lic`. Registro interno de licencias emitidas (a quién, cuándo, con qué límites).
@@ -178,7 +192,7 @@ chequeo. No se puede volver imposible al 100%, pero se encarece por capas:
 
 | Sub-ítem | HH aprox. |
 |---|---|
-| Formato de licencia + firma/verificación (Ed25519, JWS) | 15–25 |
+| Formato de licencia + firma/verificación (Ed25519, JWS) — **✅ hecho en L0 (`@lyra/licensing`)** | 15–25 |
 | CLI de emisión + custodia de clave privada | 10–20 |
 | `LicenseService` + máquina de estados + caché + re-evaluación | 20–35 |
 | Gating de módulos por entitlement (backend) + UI de estado/aviso | 15–30 |
