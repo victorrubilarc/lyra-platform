@@ -4,6 +4,42 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-05 · Licenciamiento L2 · gating de módulos por entitlement en API + web (decisiones a–e, aprobadas por el dueño antes de codificar)
+Sesión L2 (`feat/licenciamiento-l2`): se activan los gates LATENTES de L1 — un módulo fuera de `modules[]` de la
+licencia no se puede operar ni aparece, sin secuestrar jamás sus datos. Decisiones:
+- **(a) Catálogo canónico de claves de módulo en `@lyra/contracts`** (`src/licensing/modules.ts`,
+  `LICENSED_MODULE_KEYS`, 13 claves = las de la licencia DEV), NO en `@lyra/licensing`: el web lo necesita para
+  ocultar y esa librería es server-only (`node:crypto`, se hornea anti-tamper en L5). No contradice la decisión L0
+  («tipos en licensing, no en contracts»): aquélla protege el PAYLOAD (huella/linaje); las claves de módulo son
+  vocabulario comercial público. El payload sigue LIBRE (`LicenseModule = string`): una licencia más nueva puede
+  traer claves que este build no conoce sin romper verificación ni DTO. Granularidad: por módulo de producto
+  (mapeo módulo→controladores/rutas documentado en `LICENSING.md §5.1`; `workflows` y calendarios = `core` por ser
+  infra compartida — un flujo lo usan plantillas E incidencias).
+- **(b) Módulo no licenciado = mutación 403 + lectura/exportación intactas** (coherente con «nunca secuestrar
+  datos», p. ej. downgrade de edición): `@RequireModule(<clave>)` a nivel de controlador + `ModuleEntitlementGuard`
+  GLOBAL (5.º, tras el de estados de L1) que lee el snapshot cacheado — `403 { code: "MODULE_NOT_LICENSED",
+  module }` solo en POST/PUT/PATCH/DELETE. **Matiz aprobado:** el guard solo enforcea CON payload verificado
+  (`licensedModules` presente); sin payload gobierna el guard L1 (`LICENSE_RESTRICTED`) ⇒ un estado global nunca se
+  enmascara como problema de módulo (precedencia testeada en smoke C3). Defensa en profundidad: RBAC y entitlement
+  corren AMBOS; y el gate es DISTRIBUIDO — los workers re-chequean (`moduleOperational`): notificaciones no
+  genera/despacha/envía sin `notifications`; acciones de regla no materializa excepciones sin `exceptions` (las
+  órdenes quedan PENDING, nunca se descartan).
+- **(c) `GET /api/license/status` AUTENTICADO sin permiso** (todo usuario logueado necesita `modules[]` para su
+  sidebar; sin token = 401). DTO delgado en contracts (`licenseStatusSchema`): `{ status, reason?, edition?,
+  modules[] | null, expiresAt?, daysToExpiry? }`, mapeado CAMPO A CAMPO (`toLicenseStatus`, jamás spread) — sin
+  huella/linaje/installationId/licenseId/customer (mínimo privilegio, unit + smoke lo afirman). `modules: null` =
+  sin payload verificado ⇒ el front NO oculta por módulo. Es el cimiento del banner L6. La web consume con
+  `useLicenseStatus`/`useLicensedModules` (react-query) y oculta en el REGISTRO (`SIDEBAR_ROUTES.module`):
+  sidebar + Inicio (tiles y accesos) + ⌘K + campanita — **visible = módulo licenciado ∧ permiso del usuario**.
+- **(d) Enforcement de LÍMITES numéricos DIFERIDO** (crear por encima de `maxNodes`/`maxNamedUsers`): es otro
+  mecanismo (chequeo por endpoint de creación + conteo), tocaría structure/security y agranda la sesión. L1 ya lo
+  registra/audita (`LIMITE_EXCEDIDO`). Queda en BACKLOG §2(1) como ítem propio.
+- **(e) SIN migración y SIN permiso nuevo** ⇒ sin `db:seed`/FLUSHALL. Solo rebuild de `@lyra/contracts` (dist).
+- **Extra:** `pnpm license:dev -- --modules=a,b` genera licencias DEV con entitlement acotado (para smokes).
+Verde: typecheck/lint/build/test (API 286 = 276+10 guard/DTO; web 11 = +3 registro; contracts 513 = +5 catálogo/DTO)
++ **smoke-licencia-modulos.py 23/23** (licencia acotada opera lo licenciado, 403 con clave en lo no licenciado,
+lectura/export intactas, DTO exacto y sin campos sensibles, precedencia L1) + regresión **smoke-licencia.py 28/28**.
+
 ### 2026-07-05 · Licenciamiento L1 · runtime de la licencia en la API (decisiones a–e, aprobadas por el dueño antes de codificar)
 Sesión L1 (`feat/licenciamiento-l1`): la API carga/verifica/evalúa/cachea la licencia con `@lyra/licensing` y hace
 cumplir la máquina de estados. Decisiones:

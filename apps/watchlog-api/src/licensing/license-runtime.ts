@@ -4,6 +4,7 @@ import type {
   LicenseState,
   VerifyFailureReason,
 } from "@lyra/licensing";
+import type { LicenseStatus } from "@lyra/contracts";
 
 /**
  * Estado de licencia en RUNTIME de la API. Extiende los 7 estados puros de
@@ -46,7 +47,7 @@ export interface LicenseSnapshot {
   evaluation?: LicenseEvaluation;
   /** Módulos habilitados por la licencia (para `isModuleLicensed`, L2). */
   licensedModules?: readonly string[];
-  /** Datos presentables (log/auditoría; el DTO delgado para la web es L6). */
+  /** Datos presentables (log/auditoría; a la web solo viaja `toLicenseStatus`). */
   licenseId?: string;
   customer?: string;
   edition?: string;
@@ -55,4 +56,23 @@ export interface LicenseSnapshot {
   fingerprint: string;
   installationId: string;
   checkedAt: Date;
+}
+
+/**
+ * Mapea el snapshot interno al DTO DELGADO que consume la web (L2; cimiento
+ * del banner L6). MÍNIMO PRIVILEGIO (DECISIONS 2026-07-05): construye el
+ * objeto campo a campo — jamás un spread del snapshot — para que huella,
+ * linaje, installationId, licenseId y customer NO puedan filtrarse aunque el
+ * snapshot crezca. `modules: null` = sin payload verificado (el front entonces
+ * no oculta por módulo; los estados restringidos ya los gobierna el guard L1).
+ */
+export function toLicenseStatus(snap: LicenseSnapshot): LicenseStatus {
+  return {
+    status: snap.status,
+    reason: snap.reason,
+    edition: snap.edition,
+    modules: snap.licensedModules === undefined ? null : [...snap.licensedModules],
+    expiresAt: snap.expiresAt,
+    daysToExpiry: snap.evaluation?.daysToExpiry,
+  };
 }

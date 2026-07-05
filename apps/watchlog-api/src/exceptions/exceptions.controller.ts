@@ -21,7 +21,9 @@ import type { RequestUser } from "../authz/auth-user";
 import { CurrentUser, RequireAnyPermission, RequirePermission } from "../authz/authz.decorators";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { ExceptionsService } from "./exceptions.service";
+import { RequireModule } from "../licensing/module-entitlement.guard";
 
+@RequireModule("exceptions")
 @Controller("exceptions")
 export class ExceptionsController {
   constructor(private readonly exceptions: ExceptionsService) {}

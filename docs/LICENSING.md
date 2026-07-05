@@ -6,11 +6,12 @@
 > tope de instalaciones/nodos/usuarios y módulos habilitados. Es un **ítem de desarrollo cerrado**,
 > aún no construido.
 >
-> Última actualización: **2026-07-05**. Estado: **L0 + L1 construidos** — el núcleo puro (firma/verificación
-> Ed25519, huella, máquina de estados §5) existe como **`@lyra/licensing`** (`packages/licensing`, 42 tests) y la
-> API ya **vive la licencia en runtime** (L1: `LicenseService` + guard global + chequeo distribuido en el worker +
-> auditoría; ver §4/§5). Pendientes L2–L6 (gating por entitlement, CLI de emisión, linaje/challenge-response,
-> anti-tamper, UI). Estimación total: ~80–160 HH.
+> Última actualización: **2026-07-05**. Estado: **L0 + L1 + L2 construidos** — el núcleo puro (firma/verificación
+> Ed25519, huella, máquina de estados §5) existe como **`@lyra/licensing`** (`packages/licensing`, 42 tests), la
+> API **vive la licencia en runtime** (L1: `LicenseService` + guard global + chequeo distribuido en el worker +
+> auditoría; ver §4/§5) y el **gating de módulos por entitlement está ACTIVO** (L2: catálogo canónico §5.1 +
+> `@RequireModule`/`ModuleEntitlementGuard` + `GET /license/status` + ocultamiento en la web). Pendientes L3–L6
+> (CLI de emisión, linaje/challenge-response, anti-tamper, UI de estado). Estimación total: ~80–160 HH.
 
 ---
 
@@ -144,7 +145,7 @@ El archivo es un **payload JSON firmado** (JWS/Ed25519, §4). Ejemplo del payloa
 | **EN GRACIA** | `expiresAt` pasó pero dentro de `graceDays` | Funciona + **aviso prominente** "licencia vencida, renovar en X días". No corta la operación (no dejar una planta a ciegas de golpe). |
 | **VENCIDA / BLOQUEADA** | Pasó la gracia, o firma inválida, o falta el archivo | **Modo restringido**: bloquea el ingreso de datos nuevos y las funciones premium; permite **solo lectura/exportación** para no secuestrar los datos del cliente. Mensaje claro de renovación. |
 | **LÍMITE EXCEDIDO** | Supera `maxNodes`/`maxNamedUsers`/`maxInstallations` | Bloquea **crear** por encima del límite (no rompe lo existente); avisa al admin. |
-| **MÓDULO NO LICENCIADO** | Se usa un módulo fuera de `modules` | El módulo no aparece / se rechaza en el backend (gating por entitlement, distinto del permiso de usuario). |
+| **MÓDULO NO LICENCIADO** | Se usa un módulo fuera de `modules` | **✅ construido en L2:** las **MUTACIONES** del módulo se rechazan en el backend con `403 { code: "MODULE_NOT_LICENSED", module }`; la **lectura y exportación de sus datos SIGUEN disponibles** (GET pasa — jamás se secuestran datos, ni por downgrade de edición). La web además lo **oculta** (sidebar/Inicio/⌘K: visible = licenciado ∧ permiso). Aplica con la licencia OPERATIVA; es un eje distinto del permiso de usuario (ambos guards corren). |
 
 **Principios de degradación (importantes por regulación/ética):**
 - Nunca **borrar** ni **secuestrar** datos por licencia vencida: en el peor caso, **solo lectura +
@@ -170,6 +171,55 @@ El archivo es un **payload JSON firmado** (JWS/Ed25519, §4). Ejemplo del payloa
 - Cambio de estado ⇒ `AuditLog` `license.state.changed` (actor `system@license`, antes/después) + log nítido al
   arranque (estado · motivo · licenseId · cliente · edición · vencimiento · huella). La notificación a
   administradores (banner/aviso) llega con la UI de L6.
+
+### 5.1 Gating de módulos por entitlement (✅ construido en L2)
+
+**Catálogo canónico de claves de módulo** — vive en **`@lyra/contracts`** (`src/licensing/modules.ts`,
+`LICENSED_MODULE_KEYS`): es el vocabulario compartido de backend y web. NO vive en `@lyra/licensing` a propósito
+(el web lo necesita y esa librería es server-only + se hornea en L5); el payload sigue siendo dato LIBRE
+(`LicenseModule = string`): una licencia futura puede traer claves que un build viejo no conoce sin romper nada.
+Regla de CLAUDE.md: **todo módulo nuevo de producto registra su clave aquí** (y etiqueta su controlador y su ruta).
+
+Claves (13): `core` · `structure` · `templates` · `logbook` · `schedules` · `incidents` · `exceptions` ·
+`work-orders` · `shift-handover` · `notifications` · `themes` · `ai` · `dashboards`.
+
+**Mapeo módulo → superficie del producto** (decorator `@RequireModule` a nivel de CONTROLADOR + etiqueta
+`module` en el registro `SIDEBAR_ROUTES` de la web):
+
+| Clave | Backend (controladores) | Web (rutas) |
+|---|---|---|
+| `core` (JAMÁS se gatea) | auth, health, security, settings, saved-views, calendarios (operacional/fiscal/períodos), workflows (motor compartido por plantillas E incidencias) | Inicio, Seguridad, Configuración, Flujos, Calendarios, perfil |
+| `structure` | structure, equipment | /estructura |
+| `templates` | templates, reference-lists | /plantillas, /datos-referencia |
+| `logbook` | log-entries | /bitacoras, /nueva-entrada |
+| `schedules` | schedules | /rondas, /mis-rondas |
+| `incidents` | incidents | /incidencias (+catálogos) |
+| `exceptions` | exceptions, rule-actions (worker de reglas: sin el módulo NO materializa excepciones nuevas — las órdenes quedan PENDING, nunca se descartan) | /excepciones |
+| `work-orders` | work-orders, persons, competencies | /ordenes-trabajo (+catálogos) |
+| `shift-handover` | shift-handover | /cambio-turno |
+| `notifications` | notifications, email (SMTP); el worker tampoco genera/despacha/envía sin el módulo | /notificaciones, campanita, tile |
+| `themes` | theme | pestaña temas |
+| `ai` | ai (config IA) | pestaña IA |
+| `dashboards` | (solo GETs analíticos — el gate de mutación no aplica) | /panorama, /incidencias/dashboard |
+
+**Semántica del guard (`ModuleEntitlementGuard`, 5.º guard global, tras el de estados de L1):**
+- Módulo NO licenciado ⇒ mutaciones (POST/PUT/PATCH/DELETE) `403 { code: "MODULE_NOT_LICENSED", module }`;
+  **GET/HEAD/OPTIONS pasan SIEMPRE** (lectura + exportación garantizadas: la licencia jamás secuestra datos).
+- Aplica **aun con la licencia VÁLIDA** (downgrade de edición no vencida). `core` y endpoints sin decorator no
+  se gatean nunca.
+- **Precedencia:** SIN payload verificado (PENDIENTE_ACTIVACION / BLOQUEADA) este guard NO opina — el guard
+  global de L1 ya restringe con `LICENSE_RESTRICTED`; un estado global nunca se enmascara como problema de módulo.
+- **Defensa en profundidad:** el gate por módulo es ADICIONAL al RBAC (`@RequirePermission`) — ambos corren.
+  Y es DISTRIBUIDO: además del guard HTTP, los workers (notificaciones, acciones de regla) re-chequean el
+  entitlement (`LicenseService.moduleOperational`).
+
+**DTO delgado + endpoint (`GET /api/license/status`, autenticado sin permiso):** la web consume
+`{ status, reason?, edition?, modules[] | null, expiresAt?, daysToExpiry? }` (`licenseStatusSchema` en
+`@lyra/contracts`), **mapeado campo a campo desde el snapshot** (`toLicenseStatus`) — JAMÁS el payload: sin
+huella, sin linaje, sin installationId, sin customer/licenseId (mínimo privilegio, testeado). `modules: null` =
+sin payload verificado ⇒ el front NO oculta por módulo (gobiernan los estados globales). Este DTO es el cimiento
+del banner de L6. La web oculta con `useLicensedModules()` en el registro de navegación (sidebar, Inicio, ⌘K,
+campanita): **visible = módulo licenciado ∧ permiso del usuario**; el candado real sigue siendo el 403 del backend.
 
 ---
 
@@ -224,7 +274,7 @@ chequeo. No se puede volver imposible al 100%, pero se encarece por capas:
 | Formato de licencia + firma/verificación (Ed25519, JWS) — **✅ hecho en L0 (`@lyra/licensing`)** | 15–25 |
 | CLI de emisión + custodia de clave privada | 10–20 |
 | `LicenseService` + máquina de estados + caché + re-evaluación — **✅ hecho en L1** (+ guard global, señales estables bajo Docker, `LicenseInstallation`, auditoría, `solicitud.lreq`, licencia dev `pnpm license:dev`, smoke 28/28) | 20–35 |
-| Gating de módulos por entitlement (backend) + UI de estado/aviso | 15–30 |
+| Gating de módulos por entitlement (backend + web) — **✅ hecho en L2** (catálogo canónico en contracts, `@RequireModule`/guard 5.º, `GET /license/status` DTO delgado, ocultamiento sidebar/Inicio/⌘K, workers module-aware; smoke 23/23). La UI RICA de estado/avisos queda para L6 | 15–30 |
 | Enforcement de límites (nodos/usuarios/instalaciones) | 10–20 |
 | Empaquetado anti-tamper (bytecode/native del módulo crítico) | 10–30 |
 | **Total** | **~80–160 HH** |

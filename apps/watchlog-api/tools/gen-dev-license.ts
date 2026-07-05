@@ -26,6 +26,8 @@ const DEV_PRIVATE_KEY = readFileSync(
 
 async function main(): Promise<void> {
   const expired = process.argv.includes("--expired");
+  // --modules=core,incidents ⇒ entitlement ACOTADO (smoke del gating L2).
+  const modulesArg = process.argv.find((a) => a.startsWith("--modules="));
   const machineIdFile = process.env.LICENSE_MACHINE_ID_FILE ?? "/etc/machine-id";
   const licenseFile = process.env.LICENSE_FILE ?? ".license/license.lic";
 
@@ -48,22 +50,29 @@ async function main(): Promise<void> {
     installationId: "inst_dev_local",
     fingerprint,
     edition: "enterprise",
-    // Entitlement amplio para dev (dato del payload; el gating fino es L2).
-    modules: [
-      "core",
-      "structure",
-      "templates",
-      "logbook",
-      "schedules",
-      "incidents",
-      "exceptions",
-      "work-orders",
-      "shift-handover",
-      "notifications",
-      "themes",
-      "ai",
-      "dashboards",
-    ],
+    // Entitlement: amplio para dev (default) o acotado vía --modules=a,b (smoke
+    // del gating L2). El default es el catálogo completo de @lyra/contracts.
+    modules: modulesArg
+      ? modulesArg
+          .slice("--modules=".length)
+          .split(",")
+          .map((m) => m.trim())
+          .filter(Boolean)
+      : [
+          "core",
+          "structure",
+          "templates",
+          "logbook",
+          "schedules",
+          "incidents",
+          "exceptions",
+          "work-orders",
+          "shift-handover",
+          "notifications",
+          "themes",
+          "ai",
+          "dashboards",
+        ],
     limits: { maxInstallations: 1, maxNodes: 100_000, maxNamedUsers: 100_000 },
     whiteLabel: true,
     supportTier: "DEV",

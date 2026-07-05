@@ -51,7 +51,9 @@ import { WorkOrderChecklistsService } from "./work-order-checklists.service";
 import { WorkActivitiesService } from "./work-activities.service";
 import { WorkOrderRosterService } from "./work-order-roster.service";
 import { WorkOrderDashboardService } from "./work-order-dashboard.service";
+import { RequireModule } from "../licensing/module-entitlement.guard";
 
+@RequireModule("work-orders")
 @Controller("work-orders")
 export class WorkOrdersController {
   constructor(

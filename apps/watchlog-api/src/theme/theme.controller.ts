@@ -15,12 +15,14 @@ import type { RequestUser } from "../authz/auth-user";
 import { CurrentUser, RequirePermission } from "../authz/authz.decorators";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { ThemeService } from "./theme.service";
+import { RequireModule } from "../licensing/module-entitlement.guard";
 
 /**
  * Temas / paletas (EST-TEMAS). CONSTRUIR/PUBLICAR/DEFAULT exige `theme:manage`; LISTAR
  * publicadas y ELEGIR una NO requiere permiso (sólo sesión válida — preferencia del
  * usuario). El orden de las rutas pone las concretas (`palettes`, `me`) antes de `:id`.
  */
+@RequireModule("themes")
 @Controller("theme")
 export class ThemeController {
   constructor(private readonly theme: ThemeService) {}

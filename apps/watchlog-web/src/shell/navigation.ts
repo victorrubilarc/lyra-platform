@@ -1,5 +1,6 @@
 import { AlertOctagon, AlertTriangle, ArrowLeftRight, BarChart3, Bell, BookOpenCheck, CalendarClock, CalendarRange, ClipboardList, FilePlus2, Gauge, GitBranch, LayoutDashboard, Layers, ListChecks, ListTodo, Network, Route, Settings, ShieldCheck, Tags, UserCog, type LucideIcon } from "lucide-react";
 import type { Permission } from "@lyra/permissions";
+import type { LicensedModuleKey } from "@lyra/contracts";
 
 /**
  * Registro central de rutas del shell: una sola fuente de verdad para sidebar,
@@ -39,6 +40,14 @@ export interface NavRoute {
   icon: LucideIcon;
   /** Permiso de módulo que habilita la sección (la UI solo oculta). */
   permission?: Permission;
+  /**
+   * Módulo LICENCIABLE al que pertenece la ruta (catálogo de @lyra/contracts).
+   * Eje de la INSTALACIÓN (entitlement de la licencia), distinto y ADICIONAL al
+   * permiso del usuario: visible = módulo licenciado ∧ permiso. Sin `module` la
+   * ruta es transversal (core) y nunca se oculta por licencia. El backend sigue
+   * siendo la fuente de verdad (guard ModuleEntitlement, L2).
+   */
+  module?: LicensedModuleKey;
   /** Aparece en la lista de módulos del sidebar. */
   inSidebar?: boolean;
   /** Grupo del sidebar al que pertenece (solo para rutas `inSidebar`). */
@@ -53,6 +62,7 @@ export const ROUTES: readonly NavRoute[] = [
   // accesibles. Solo aparece con el permiso de alto nivel `module:dashboard:cross-view`.
   {
     path: "/panorama",
+    module: "dashboards",
     labelKey: "nav.panorama",
     descKey: "nav.desc.panorama",
     icon: Gauge,
@@ -62,6 +72,7 @@ export const ROUTES: readonly NavRoute[] = [
   },
   {
     path: "/estructura",
+    module: "structure",
     labelKey: "nav.structure",
     descKey: "nav.desc.structure",
     icon: Network,
@@ -71,6 +82,7 @@ export const ROUTES: readonly NavRoute[] = [
   },
   {
     path: "/plantillas",
+    module: "templates",
     labelKey: "nav.templates",
     descKey: "nav.desc.templates",
     icon: Layers,
@@ -80,6 +92,7 @@ export const ROUTES: readonly NavRoute[] = [
   },
   {
     path: "/nueva-entrada",
+    module: "logbook",
     labelKey: "nav.newEntry",
     descKey: "nav.desc.newEntry",
     icon: FilePlus2,
@@ -91,6 +104,7 @@ export const ROUTES: readonly NavRoute[] = [
   },
   {
     path: "/bitacoras",
+    module: "logbook",
     labelKey: "nav.logbook",
     descKey: "nav.desc.logbook",
     icon: BookOpenCheck,
@@ -102,6 +116,7 @@ export const ROUTES: readonly NavRoute[] = [
   // de ejecución, distinto del de planificación (schedule:view).
   {
     path: "/mis-rondas",
+    module: "schedules",
     labelKey: "nav.myRounds",
     descKey: "nav.desc.myRounds",
     icon: ListTodo,
@@ -112,6 +127,7 @@ export const ROUTES: readonly NavRoute[] = [
   // Admin del PLANIFICADOR: CRUD de horarios (junto al resto de la configuración).
   {
     path: "/rondas",
+    module: "schedules",
     labelKey: "nav.rounds",
     descKey: "nav.desc.rounds",
     icon: Route,
@@ -122,6 +138,7 @@ export const ROUTES: readonly NavRoute[] = [
   // Incidencias operacionales / HSE (Fase 4): lista + tablero kanban + detalle.
   {
     path: "/incidencias",
+    module: "incidents",
     labelKey: "nav.incidents",
     descKey: "nav.desc.incidents",
     icon: AlertTriangle,
@@ -133,6 +150,7 @@ export const ROUTES: readonly NavRoute[] = [
   // bitácora pendientes de triage. Mismo gate que incidencias.
   {
     path: "/excepciones",
+    module: "exceptions",
     labelKey: "nav.exceptions",
     descKey: "nav.desc.exceptions",
     icon: AlertOctagon,
@@ -144,6 +162,7 @@ export const ROUTES: readonly NavRoute[] = [
   // firmada de dos partes + historial. Operación diaria de los supervisores.
   {
     path: "/cambio-turno",
+    module: "shift-handover",
     labelKey: "nav.shiftHandover",
     descKey: "nav.desc.shiftHandover",
     icon: ArrowLeftRight,
@@ -154,6 +173,7 @@ export const ROUTES: readonly NavRoute[] = [
   // Órdenes de Trabajo / Work Orders (OT / PTW) — S1: solicitudes + lista.
   {
     path: "/ordenes-trabajo",
+    module: "work-orders",
     labelKey: "nav.workOrders",
     descKey: "nav.desc.workOrders",
     icon: ClipboardList,
@@ -166,6 +186,7 @@ export const ROUTES: readonly NavRoute[] = [
   // que /incidencias/catalogos); se accede por el botón del header de /ordenes-trabajo.
   {
     path: "/ordenes-trabajo/catalogos",
+    module: "work-orders",
     labelKey: "nav.workOrderCatalogs",
     icon: Tags,
     permission: "workordercatalog:manage",
@@ -177,6 +198,7 @@ export const ROUTES: readonly NavRoute[] = [
   // /incidencias. Registrada para resolver título/pestaña/breadcrumb.
   {
     path: "/incidencias/catalogos",
+    module: "incidents",
     labelKey: "nav.incidentCatalogs",
     icon: Tags,
     permission: "incidentcatalog:manage",
@@ -187,6 +209,7 @@ export const ROUTES: readonly NavRoute[] = [
   // accede por el botón del header de /incidencias. Mismo gate que la lista.
   {
     path: "/incidencias/dashboard",
+    module: "dashboards",
     labelKey: "nav.incidentDashboard",
     icon: BarChart3,
     permission: "module:incidents:view",
@@ -203,6 +226,7 @@ export const ROUTES: readonly NavRoute[] = [
   },
   {
     path: "/datos-referencia",
+    module: "templates",
     labelKey: "nav.referenceData",
     descKey: "nav.desc.referenceData",
     icon: ListChecks,
@@ -240,6 +264,7 @@ export const ROUTES: readonly NavRoute[] = [
   // Motor de avisos por correo (Bloque N): plantillas + bandeja de salida + preferencias.
   {
     path: "/notificaciones",
+    module: "notifications",
     labelKey: "nav.notifications",
     descKey: "nav.desc.notifications",
     icon: Bell,

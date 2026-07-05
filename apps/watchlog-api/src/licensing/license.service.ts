@@ -12,6 +12,7 @@ import {
   type LicenseActuals,
   type LicensePayload,
 } from "@lyra/licensing";
+import type { LicensedModuleKey } from "@lyra/contracts";
 import type { Env } from "../config/env.schema";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
@@ -99,11 +100,23 @@ export class LicenseService implements OnApplicationBootstrap {
 
   /**
    * Entitlement de módulo (eje de la INSTALACIÓN, distinto del RBAC del
-   * usuario). LATENTE en L1: el gating por endpoint/web se construye en L2;
-   * hoy no hay consumidores que bloqueen por esto.
+   * usuario). Lo consumen el `ModuleEntitlementGuard` (L2) y los chequeos
+   * distribuidos. Sin payload verificado devuelve false (no hay entitlement
+   * que afirmar); para «sin payload NO opines» usar `moduleOperational`.
    */
   isModuleLicensed(moduleKey: string): boolean {
     return this.payload !== undefined && isModuleLicensed(this.payload, moduleKey);
+  }
+
+  /**
+   * Entitlement de módulo para PROCESOS DE FONDO (verificación distribuida,
+   * L2): con payload verificado exige que el módulo esté en `modules[]`; SIN
+   * payload no opina (true) — esos estados los gobierna la máquina de estados
+   * global (`workersOperational` / guard L1), y así un estado global nunca se
+   * enmascara como problema de módulo. Mismo criterio que el guard HTTP.
+   */
+  moduleOperational(moduleKey: LicensedModuleKey): boolean {
+    return this.snapshot?.licensedModules === undefined || this.isModuleLicensed(moduleKey);
   }
 
   /**

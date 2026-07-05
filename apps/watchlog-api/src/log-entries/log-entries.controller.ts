@@ -32,6 +32,7 @@ import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { TemplatesService } from "../templates/templates.service";
 import { LogEntriesService } from "./log-entries.service";
 import { LogbookQueryService } from "./logbook-query.service";
+import { RequireModule } from "../licensing/module-entitlement.guard";
 
 /**
  * Llenado de bitácoras (Fase 2.4/2.5) + módulo de Bitácoras read-only (Fase 2.6).
@@ -39,6 +40,7 @@ import { LogbookQueryService } from "./logbook-query.service";
  * deciden los services. Las rutas estáticas (`stats`, `export`) van ANTES de
  * `:id` (Nest resuelve en orden de declaración).
  */
+@RequireModule("logbook")
 @Controller("log-entries")
 export class LogEntriesController {
   constructor(

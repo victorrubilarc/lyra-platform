@@ -5,6 +5,7 @@ import { Boxes, ChevronDown, ChevronLeft, ChevronRight, Star } from "lucide-reac
 import { useTranslation } from "react-i18next";
 import { cx } from "@lyra/ui";
 import { usePermissions } from "../auth/use-permissions.js";
+import { useLicensedModules } from "../auth/use-license.js";
 import { useUIStore } from "./ui-store.js";
 import { useFavoritesStore } from "./favorites-store.js";
 import { SIDEBAR_ROUTES, buildNavGroups, isRouteActive, type NavRoute } from "./navigation.js";
@@ -77,6 +78,7 @@ function RailNavItem({ route, label, isActive }: { route: NavRoute; label: strin
 export function Sidebar() {
   const { t } = useTranslation();
   const perms = usePermissions();
+  const licensed = useLicensedModules();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const collapsed = useUIStore((s) => s.sidebarCollapsed);
@@ -86,7 +88,11 @@ export function Sidebar() {
   const favorites = useFavoritesStore((s) => s.favorites);
   const toggleFavorite = useFavoritesStore((s) => s.toggleFavorite);
 
-  const visible = SIDEBAR_ROUTES.filter((r) => !r.permission || perms.can(r.permission));
+  // Visible = módulo LICENCIADO (entitlement de la instalación, L2) ∧ permiso
+  // del USUARIO (RBAC). Ambos ejes solo OCULTAN aquí; el backend decide.
+  const visible = SIDEBAR_ROUTES.filter(
+    (r) => licensed(r.module) && (!r.permission || perms.can(r.permission)),
+  );
   const groups = buildNavGroups(visible);
 
   /** Render de ítem para el menú EXPANDIDO (texto + estrella de favorito). */

@@ -85,6 +85,9 @@ export class NotificationWorkerService {
     // la firma desde disco. En estado restringido el worker no genera trabajo
     // operacional NUEVO (avisos/barridos); leer y exportar datos no pasa por aquí.
     if (!(await this.license.workersOperational("notificaciones"))) return 0;
+    // Gate de ENTITLEMENT (L2): licencia operativa pero módulo `notifications`
+    // fuera de modules[] ⇒ el motor no genera/despacha/envía trabajo nuevo.
+    if (!this.license.moduleOperational("notifications")) return 0;
     if (this.busy.sweep) return 0;
     this.busy.sweep = true;
     let emitted = 0;
@@ -167,6 +170,9 @@ export class NotificationWorkerService {
 
   async dispatchPending(): Promise<number> {
     if (!(await this.license.workersOperational("notificaciones"))) return 0;
+    // Gate de ENTITLEMENT (L2): licencia operativa pero módulo `notifications`
+    // fuera de modules[] ⇒ el motor no genera/despacha/envía trabajo nuevo.
+    if (!this.license.moduleOperational("notifications")) return 0;
     if (this.busy.dispatch) return 0;
     this.busy.dispatch = true;
     let dispatched = 0;
@@ -225,6 +231,9 @@ export class NotificationWorkerService {
 
   async sendPending(): Promise<number> {
     if (!(await this.license.workersOperational("notificaciones"))) return 0;
+    // Gate de ENTITLEMENT (L2): licencia operativa pero módulo `notifications`
+    // fuera de modules[] ⇒ el motor no genera/despacha/envía trabajo nuevo.
+    if (!this.license.moduleOperational("notifications")) return 0;
     if (this.busy.send) return 0;
     this.busy.send = true;
     let sent = 0;

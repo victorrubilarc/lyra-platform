@@ -13,6 +13,7 @@ import { CurrentUser, RequirePermission } from "../authz/authz.decorators";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { EmailConfigService } from "./email-config.service";
 import { SmtpEmailService } from "./smtp-email.service";
+import { RequireModule } from "../licensing/module-entitlement.guard";
 
 /**
  * Configuración del correo saliente (SMTP) — pantalla de `/configuracion`, permiso
@@ -20,6 +21,7 @@ import { SmtpEmailService } from "./smtp-email.service";
  * y se guarda cifrada. "Probar conexión/envío" usan los valores del formulario sin
  * guardarlos; auditado sin registrar la contraseña.
  */
+@RequireModule("notifications")
 @Controller("settings/email")
 export class EmailController {
   constructor(

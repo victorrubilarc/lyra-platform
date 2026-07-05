@@ -31,7 +31,9 @@ import type { RequestUser } from "../authz/auth-user";
 import { CurrentUser, RequirePermission } from "../authz/authz.decorators";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { TemplatesService } from "./templates.service";
+import { RequireModule } from "../licensing/module-entitlement.guard";
 
+@RequireModule("templates")
 @Controller("templates")
 export class TemplatesController {
   constructor(private readonly templates: TemplatesService) {}

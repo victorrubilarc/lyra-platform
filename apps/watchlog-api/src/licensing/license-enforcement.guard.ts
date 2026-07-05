@@ -13,8 +13,9 @@ import { PENDING_ACTIVATION, RESTRICTED_STATUSES } from "./license-runtime";
  * garantizadas en cualquier estado (la licencia jamás secuestra datos —
  * LICENSING.md §5). Toda exportación del producto es GET (acta PDF, presigned
  * de adjuntos, export de auditoría), así que no necesita casos especiales.
+ * Lo comparte el gate por módulo de L2 (`ModuleEntitlementGuard`).
  */
-const READ_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+export const READ_METHODS: ReadonlySet<string> = new Set(["GET", "HEAD", "OPTIONS"]);
 
 /**
  * Lista blanca EXPLÍCITA de rutas cuyas mutaciones (POST) siguen permitidas en

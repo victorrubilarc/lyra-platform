@@ -58,7 +58,9 @@ import { IncidentInvestigationService } from "./incident-investigation.service";
 import { IncidentReportsService } from "./incident-reports.service";
 import { IncidentsService } from "./incidents.service";
 import { WorkOrdersService } from "../work-orders/work-orders.service";
+import { RequireModule } from "../licensing/module-entitlement.guard";
 
+@RequireModule("incidents")
 @Controller("incidents")
 export class IncidentsController {
   constructor(

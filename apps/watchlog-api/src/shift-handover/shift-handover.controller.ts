@@ -29,6 +29,7 @@ import type { AccessTokenClaims, RequestUser } from "../authz/auth-user";
 import { CurrentUser, Public, RequireAnyPermission, RequirePermission } from "../authz/authz.decorators";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { ShiftHandoverService } from "./shift-handover.service";
+import { RequireModule } from "../licensing/module-entitlement.guard";
 
 /** Heartbeat del stream SSE del resumen: mantiene viva la conexión tras proxies/timeouts. */
 const SSE_HEARTBEAT_MS = 15_000;
@@ -40,6 +41,7 @@ const SSE_HEARTBEAT_MS = 15_000;
  * ver/historial (`shifthandover:view`). El alcance de dato (nodo) lo resuelve el
  * servicio (ABAC): la compilación NUNCA muestra lo no autorizado.
  */
+@RequireModule("shift-handover")
 @Controller("shift-handover")
 export class ShiftHandoverController {
   constructor(

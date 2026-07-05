@@ -145,6 +145,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 
 ### 18. Licencia de la instalación  [Admin]
 - ✅ **Estados de la licencia y qué se puede hacer en cada uno** (activación, vencimiento, solo lectura; los datos NUNCA se bloquean) (§ Licencia de la instalación)
+- ✅ **Módulos incluidos en la licencia (edición)** (los módulos no contratados no aparecen en el menú; si se pierde un módulo por cambio de edición, sus datos siguen consultables y exportables) (§ Licencia de la instalación ▸ Módulos incluidos)
 
 ### 19. Órdenes de trabajo (OT / PTW)  [todos los roles operativos]
 - ✅ **Crear y listar solicitudes de trabajo** (asistente de 2 pasos, grilla con filtros/facetas, detalle con reasignar/prioridad/anular) (§ Órdenes de trabajo)
@@ -198,6 +199,39 @@ permiso dentro de la app — es un archivo del despliegue).
 - La licencia va amarrada al servidor (huella de máquina): copiarla a otra máquina no la hace
   funcionar. Si migras de servidor, pide una re-activación al proveedor.
 - Cada cambio de estado de la licencia queda en la **auditoría** (`license.state.changed`).
+
+### Módulos incluidos (edición de la licencia)
+
+**Para qué sirve.** La licencia no solo define *hasta cuándo* opera la instalación, sino **qué módulos
+incluye** (la "edición" contratada: por ejemplo, una edición con Bitácoras e Incidencias pero sin
+Órdenes de trabajo). Los módulos son de la **instalación**, distinto de los **permisos** de cada
+usuario: para usar un módulo deben cumplirse ambos — que esté en la licencia Y que tu perfil tenga el
+permiso.
+
+**Cómo se usa (casos paso a paso).**
+- *Uso normal:* no tienes que hacer nada. El menú lateral, el Inicio y el buscador (⌘K) muestran solo
+  los módulos que tu licencia incluye y tu perfil permite. Un módulo no contratado simplemente **no
+  aparece**.
+- *Cambio de edición (upgrade):* tu proveedor emite una licencia nueva con más módulos; al
+  reemplazar el archivo y reiniciar (o dentro de las próximas horas), los módulos nuevos aparecen
+  solos para quienes tengan permiso.
+- *Cambio de edición (downgrade) o módulo que sale del contrato:* el módulo desaparece del menú, pero
+  **sus datos NO se pierden ni se bloquean**: siguen disponibles para **consulta y exportación**
+  (por enlace directo o informes). Lo que se bloquea es *crear o modificar* datos de ese módulo — si
+  alguien lo intenta (por ejemplo, con un enlace guardado) verá el mensaje «Este módulo no está
+  incluido en la licencia de la instalación…».
+
+**Quién puede.** Ver los módulos licenciados: todos (es lo que define qué menú ve cada uno). Cambiar
+los módulos incluidos: solo el proveedor, emitiendo una licencia nueva (no es configurable dentro de
+la app).
+
+**Importante.**
+- **Regla de oro:** perder un módulo por licencia NUNCA significa perder sus datos. Consulta y
+  exportación quedan garantizadas siempre.
+- Lo transversal (inicio de sesión, seguridad/usuarios, configuración, calendarios, flujos) forma
+  parte del **núcleo** y funciona con cualquier edición.
+- El candado real está en el servidor: ocultar el menú es solo cortesía visual — aunque alguien
+  "adivine" la dirección, el servidor rechaza las modificaciones de un módulo no licenciado.
 
 ## Órdenes de trabajo (OT / PTW)  [todos los roles operativos]
 
