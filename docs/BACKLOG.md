@@ -840,10 +840,11 @@ nunca queda más de una sesión atrás.
             `git pull` + `up -d api`, health 200) — la imagen desplegada (v0.1.12) es pre-L1 y aún no verifica:
             la **confirmación en vivo VALIDA queda para el primer tag `v*` post-L3** (paso registrado abajo);
             (ii) la imagen de release embebe la pública PROD desde el primer tag post-L3 (codegen en release.yml).
-      - [ ] **Pendiente L3 (operacional): primer tag `v*` post-L3** — al cortarlo: el release embebe la pública
-            PROD, el deploy recrea el api y debe arrancar **VALIDA** con el `license.lic` ya instalado en
-            `/opt/watchlog/deploy/license/` (verificar log de arranque + `GET /api/license/status`). Si algo no
-            calza (huella), regenerar `solicitud.lreq` real de la app y reemitir con la CLI.
+      - [x] ~~Pendiente L3 (operacional): primer tag `v*` post-L3~~ **CERRADO 2026-07-05 con `v0.1.13`:** release
+            en verde (imagen con la pública PROD embebida) + deploy automático al EC2; el api arrancó
+            **`estado=VALIDA · lic_2026_demo_ec2_001 · huella=e271ce4b…`** (log de arranque verificado, health 200
+            interno y público). **La cadena de confianza quedó probada END-TO-END en producción**: keygen PROD →
+            issue → embed en release → node-lock real → VALIDA. La imagen `v0.1.13` es la primera VENDIBLE.
       - [ ] **Pendiente L1 (iii):** notificación in-app/correo a admins al cambiar el estado de licencia
             (hoy: log + AuditLog; el aviso llega con L6/Bloque N).
 - [ ] **(2) Modo marca blanca COMPLETO** (~60–120 HH) — hoy los temas son override PARCIAL en runtime y el **login

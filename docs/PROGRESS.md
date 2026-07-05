@@ -25,9 +25,12 @@ públicas embebidas). **.gitignore endurecido** (`*.enc.pem`, `prod-private*`, `
 **Verde:** typecheck/lint/build/test (CLI **22** nuevos · API 286 · contracts 513 · licensing 42 intactos) +
 **smoke-licencia-emision.py 20/20** (ceremonia real: API sin licencia escribe solicitud → keygen → issue DEV →
 VALIDA y opera → **keygen del atacante BLOQUEADO end-to-end** → inspect acepta/rechaza → ledger íntegro y
-tamper-evident). **No probado:** arranque VALIDA del EC2 con imagen post-L3 (no existe tag aún — primer release lo
-confirma); prompt interactivo de passphrase (los flujos automatizados usan env). Decisiones a–f en DECISIONS
-2026-07-05 (L3). **Siguiente: Licenciamiento L4 (challenge-response de renovación + linaje rotatorio).**
+tamper-evident). **(7) Tag `v0.1.13` cortado EN LA MISMA SESIÓN** (a pedido del dueño): release en verde → deploy automático → el
+EC2 arrancó **`estado=VALIDA · lic_2026_demo_ec2_001`** con la imagen que embebe la pública PROD ⇒ **cadena de
+confianza probada END-TO-END en producción; `v0.1.13` = primera imagen VENDIBLE** (cierra también el pendiente
+operacional de BACKLOG §2(1)). **No probado:** prompt interactivo de passphrase (los flujos automatizados usan
+env). Decisiones a–f en DECISIONS 2026-07-05 (L3). **Siguiente: Licenciamiento L4 (challenge-response de
+renovación + linaje rotatorio).**
 
 **2026-07-05 — 🔐 Licenciamiento L2 · gating de módulos por entitlement en API + web ✅** (`feat/licenciamiento-l2`).
 Se ACTIVARON los gates latentes de L1: un módulo fuera de `modules[]` de la licencia **no se puede operar ni aparece**,

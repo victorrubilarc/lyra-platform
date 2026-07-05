@@ -40,11 +40,12 @@ con los mounts de licencia ya está APLICADO en el host (`git pull` del clon `/o
 200). **OJO — el compose del host es un clon git y `update.sh` NO hace `git pull`:** cuando cambie
 `deploy/docker-compose.prod.yml` en el repo hay que jalar manualmente en el host.
 
-⚠️ **Verificación pendiente en el PRIMER tag `v*` post-L3:** la imagen desplegada hoy (v0.1.12) es **pre-L1** y no
-verifica licencias; el primer release post-L3 (que ya **embebe la pública de PROD** vía
-`scripts/license/embed-public-key.mjs` en `release.yml`) debe arrancar **VALIDA** con ese archivo — confirmar con el
-log de arranque (`estado=VALIDA`) y `GET /api/license/status`. Si la huella no calzara, borrar el `license.lic`,
-dejar que la app escriba su `solicitud.lreq` real y reemitir con `pnpm license issue` (BACKLOG §2(1)).
+✅ **Verificado END-TO-END con `v0.1.13` (2026-07-05):** el primer release post-L3 (imagen con la **pública de PROD
+embebida** vía `scripts/license/embed-public-key.mjs` en `release.yml`) se desplegó automáticamente y el api arrancó
+**`estado=VALIDA · lic_2026_demo_ec2_001 · huella=e271ce4b…`** (health 200 interno y público). Desde `v0.1.13` las
+imágenes publicadas son **vendibles** (solo aceptan licencias firmadas por la privada de PROD bajo custodia). Si en
+un host nuevo la huella no calzara: borrar el `license.lic`, dejar que la app escriba su `solicitud.lreq` real y
+reemitir con `pnpm license issue`.
 
 **Emitir la licencia de una instalación on-premise (runbook corto):** el cliente/socio manda el `solicitud.lreq`
 que la app dejó junto a la ruta de la licencia → en la máquina del emisor: `pnpm license issue --request
