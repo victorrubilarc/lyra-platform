@@ -4,6 +4,24 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-04 · Licenciamiento L0 · `@lyra/licensing` = paquete **source-only** con tipos PROPIOS (no en contracts); 3 endurecimientos sobre el PoC
+Se construyó el núcleo puro del licenciamiento (`packages/licensing`, sesión L0 del plan L0–L6), aprobado por el dueño
+antes de codificar. Decisiones registradas:
+- **Source-only, espejo de `@lyra/permissions`** (`exports: "./src/index.ts"`, sin `build`): lo consumen solo la API (L1)
+  y la futura CLI de emisión (L3) — nada del navegador. Evita el gotcha "reconstruir dist" de `@lyra/contracts`. El
+  horneado anti-tamper (L5) ocurre sobre el bundle del CI, no cambia esto.
+- **Los tipos viven en `@lyra/licensing`, NO en `@lyra/contracts`:** (1) el web nunca debe consumir `LicensePayload`
+  completo (contiene huella y linaje) — el banner de estado (L6) usará un DTO delgado que se definirá en contracts recién
+  en L2/L6, mapeado desde `LicenseEvaluation` (mínimo privilegio); (2) el paquete queda autocontenido con CERO
+  dependencias (ni contracts/zod ⇒ un solo módulo crítico que hornear en L5); (3) usa `node:crypto` ⇒ server-only.
+- **Endurecimientos sobre el PoC** (la spec manda; diferencias registradas): (a) se separan `verifyLicense`
+  (criptografía) de `evaluateLicense` (política) — la verificación DISTRIBUIDA de L1/L2 reusa cada pieza por separado,
+  sin un único `if`; (b) el umbral de POR_VENCER entra como `warnDays` en el contexto (default 30, parametrizable — el
+  payload no lo trae y la spec §5 decía "N días"); (c) se ELIMINA `signatureAlg` del payload (ejemplo de LICENSING.md §3):
+  el algoritmo vive SOLO en la cabecera JWS y el verificador lo FIJA a EdDSA (mitiga confusión de algoritmo, RFC 8725
+  §3.1 — no se obedece la cabecera del archivo). Además la huella canonicaliza señales (orden de MACs/claves irrelevante)
+  y `verifyLicense` valida la forma del payload (resultado tipado, sin excepciones tragadas).
+
 ### 2026-07-04 · Licenciamiento · Estrategia anti-pirateo = **Opción C (solo software, defensa en 6 capas)**; dongle diferido como upsell
 Tras análisis profundo (investigación multi-fuente verificada + PoC ejecutable 9/9), documentado en
 [`LICENSING_STRATEGY.md`](./LICENSING_STRATEGY.md), el dueño **elige la Opción C**: protección 100% software, sin dongle

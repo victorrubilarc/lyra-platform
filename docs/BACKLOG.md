@@ -769,7 +769,23 @@ nunca queda más de una sesión atrás.
       Antipirateo = disuasión por capas + dependencia de updates, **no bóveda** (LICENSING_STRATEGY §0/§9). Núcleo
       probado en PoC `docs/poc/licencia-poc.mjs` (9/9). **Dongle USB (Opción F) DIFERIDO** como capa 0 enchufable / upsell:
       única defensa que *previene* (no solo detecta) el clon perfecto de VM; se evalúa si aparece un segmento de grado
-      máximo o un socio problemático. Plan de implementación por sesiones L0–L6 (pendiente de arranque).
+      máximo o un socio problemático. **Plan por sesiones L0–L6 — avance:**
+      - [x] **L0 · núcleo `@lyra/licensing`** ✅ 2026-07-04 (`feat/licenciamiento-l0`): `packages/licensing` librería
+            PURA source-only, cero deps (`node:crypto`); `signLicense`/`verifyLicense` (JWS EdDSA, resultado tipado),
+            `deriveFingerprint` (canónica), `evaluateLicense`+helpers (máquina de estados §5, nunca destructiva),
+            tipos con linaje declarado (`renewalCounter`/`nonce`); **42 tests** (9 casos del PoC + bordes). Decisiones
+            en DECISIONS 2026-07-04 (source-only; tipos en licensing NO contracts; alg fijado en verificador RFC 8725).
+      - [ ] **L1 (PRÓXIMA):** `LicenseService` NestJS (carga `license.lic` + clave pública embebida, recolección real
+            de señales del SO, caché + re-evaluación periódica y al arranque, guard de arranque, auditoría de cambios
+            de estado).
+      - [ ] **L2:** gating de módulos por entitlement en API/web (activar los gates latentes `modules[]`/`edition`).
+      - [ ] **L3:** CLI de emisión (`lyra-license issue`) + custodia de clave privada (HSM/secret manager) + registro
+            de emisiones.
+      - [ ] **L4:** flujo challenge-response por USB (`solicitud.lreq`→`license.lic`) + linaje rotatorio (detección
+            de clon; invariante ya protegido por test en L0 `lineage.spec.ts`).
+      - [ ] **L5:** anti-tamper en CI (bytecode V8/nativo del módulo crítico + verificación distribuida + integridad).
+      - [ ] **L6:** UI de estado/avisos (banner POR_VENCER/EN_GRACIA/SOLO_LECTURA; DTO delgado en contracts) + marca
+            blanca gobernada por `whiteLabel`.
 - [ ] **(2) Modo marca blanca COMPLETO** (~60–120 HH) — hoy los temas son override PARCIAL en runtime y el **login
       queda con marca Lyra** (ver memoria `theme-system`). Falta: **nombre de producto configurable** en toda la app,
       **login personalizable**, branding en el **acta PDF** y en los **correos** salientes. Sin rebuild (runtime),
