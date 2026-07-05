@@ -6,12 +6,35 @@ Este archivo define cómo debes trabajar en este repositorio. Léelo al inicio d
 Plataforma de bitácoras operacionales para industria (minería, manufactura, energía, etc.). On-premise, dockerizada, PostgreSQL, multi-módulo: estructura organizacional, plantillas/form builder, entradas por turno, cambio de turno, incidencias con workflow, orígenes de datos externos y base de conocimiento.
 
 ## Rutina obligatoria de cada sesión
-1. Al EMPEZAR: lee `docs/PROGRESS.md`, `docs/ARCHITECTURE.md`, `docs/DATA_MODEL.md`, `docs/SECURITY.md`, `docs/DECISIONS.md`, `docs/AUTH_FLOW.md` y **`docs/BACKLOG.md`** (el registro de todo lo abierto: por hacer, por probar y por publicar). Si el backlog muestra trabajo de la sesión anterior **sin publicar** (commits/ramas que no están en `origin`), resuélvelo ANTES de empezar lo nuevo.
+1. Al EMPEZAR: lee `docs/PROGRESS.md`, `docs/ARCHITECTURE.md`, `docs/DATA_MODEL.md`, `docs/SECURITY.md`, `docs/DECISIONS.md`, `docs/AUTH_FLOW.md`, **`docs/LICENSING_STRATEGY.md`** (+ `docs/LICENSING.md`: reglas de licenciamiento/anti-pirateo, LECTURA OBLIGADA — ver §"Licenciamiento" abajo) y **`docs/BACKLOG.md`** (el registro de todo lo abierto: por hacer, por probar y por publicar). Si el backlog muestra trabajo de la sesión anterior **sin publicar** (commits/ramas que no están en `origin`), resuélvelo ANTES de empezar lo nuevo.
 2. Confirma en dos líneas dónde estamos y qué vamos a hacer en esta sesión antes de escribir cualquier código.
 3. Durante el trabajo: si tomas una decisión de diseño, regístrala en `docs/DECISIONS.md` con fecha y motivo. Si detectas deuda o algo que queda fuera de alcance, anótalo en `docs/BACKLOG.md` (no lo dejes solo "en la cabeza").
 4. Al TERMINAR: actualiza `docs/PROGRESS.md` (qué quedó hecho) y **`docs/BACKLOG.md`** (qué queda por hacer/probar/publicar), más cualquier doc afectado. Si la sesión **completó una funcionalidad de cara al usuario**, actualiza también **`docs/USER_GUIDE.md`** (manual de uso VIVO): agrega/actualiza su sección con las 4 partes (para qué sirve · cómo se usa · quién puede · importante) y marca la entrada del índice como redactada (✅). Si quedan funcionalidades antiguas sin redactar (✍️), aprovecha de rellenar 1–2 por sesión (backfill incremental). Si la sesión **agregó, cambió o eliminó un objeto del FORMULARIO** (tipo de campo, opción de configuración, validación) o una capacidad transversal del formulario (layout, lógica condicional, motor de reglas, gobernanza), actualiza también **`docs/FORM_GUIDE.md`** (mapa de capacidades VIVO, para ENTENDER el sistema a fondo): su ficha de 7 partes del objeto afectado, el índice y el Apéndice A (tabla resumen). Ver la regla de doc vivo en `FORM_GUIDE.md` §0.3.
 5. **Publica siempre antes de cerrar** (regla "nada se queda atrás"): haz push de la rama y/o merge a `main` + push de `main`. Un commit que solo vive en el disco local es trabajo en riesgo. Si por instrucción explícita no se publica, queda registrado en `docs/BACKLOG.md` §1 como pendiente.
 6. No asumas contexto que no esté en los docs o en el código. Si falta información, pregúntame.
+
+## Licenciamiento y anti-pirateo (LECTURA OBLIGADA — regla permanente)
+**Antes de escribir CUALQUIER código** —módulo nuevo, mejora, refactor o corrección de bug— debes tener presentes
+`docs/LICENSING_STRATEGY.md` (el porqué de la estrategia) y `docs/LICENSING.md` (el cómo técnico). El software se
+distribuye por un **canal con marca blanca** y corre en **infraestructura ajena, air-gapped**: la protección de la
+licencia es transversal, no un módulo aislado. Reglas que TODO cambio debe respetar:
+- **Estrategia decidida = Opción C (solo software, defensa en 6 capas):** firma Ed25519 + node-lock por huella +
+  anti-tamper + detección de sobre-despliegue (linaje) + candado de negocio + legal. NO propongas dongle salvo que se
+  reabra la decisión (ver DECISIONS 2026-07-04).
+- **Todo módulo nuevo nace *entitlement-aware*:** su visibilidad/activación se gobierna por el `modules[]`/`edition` de
+  la licencia (eje **distinto** del RBAC/ABAC, que gobierna al USUARIO). Registra la clave de módulo al crearlo; no
+  hardcodees "siempre activo". Mientras el módulo de licenciamiento §2(1) no exista, deja el *gate* de entitlement
+  preparado (constante/flag) aunque de momento resuelva a `true`, para no tener que reabrir cada módulo después.
+- **La licencia NUNCA secuestra datos:** el peor estado es **solo lectura + exportación**, jamás borrar/cifrar. Cualquier
+  degradación por licencia respeta la máquina de estados de `LICENSING.md §5`.
+- **La verificación es DISTRIBUIDA, no un solo `if`:** si tu cambio toca un punto sensible (arranque, generación de acta
+  PDF, tareas programadas, activación de módulo), considera si debe participar del chequeo de licencia. No centralices el
+  candado en un único punto desactivable.
+- **Nada que rompa el air-gap:** ninguna feature puede *exigir* internet saliente desde la planta. El "llamar a casa"
+  (heartbeat/telemetría) es siempre **opcional y aditivo**; el camino base es archivos por USB (challenge-response).
+- **Clave privada de emisión JAMÁS en el repo/imagen/.env.** Solo la clave **pública** se embebe en la app.
+- Si un cambio tuyo afecta el licenciamiento (nuevo módulo licenciable, nuevo punto de verificación, cambio en la máquina
+  de estados o en la huella), **actualiza `LICENSING.md`/`LICENSING_STRATEGY.md`** como docs VIVOS, igual que USER_GUIDE.
 
 ## Stack (completar tras aprobación del plan)
 - Backend: <pendiente — propuesto y justificado por el agente>
@@ -179,6 +202,8 @@ No es una app genérica: es software industrial de alto estándar.
 ## Qué NO hacer
 - No programar antes de que yo apruebe el plan de arquitectura.
 - No hardcodear roles, permisos, ni reglas de negocio que deban ser configurables.
+- No escribir código de un módulo/feature sin considerar la §"Licenciamiento y anti-pirateo": todo módulo nuevo nace *entitlement-aware*, la licencia nunca secuestra datos, y ninguna feature exige internet saliente desde la planta.
+- No centralizar el chequeo de licencia en un único `if` desactivable, ni meter la clave privada de emisión en repo/imagen/.env.
 - No introducir dependencias de servicios SaaS obligatorios (rompe el requisito on-premise).
 - No avanzar varios módulos a la vez ni hacer refactors masivos sin acordarlo.
 - No duplicar lógica o UI entre apps cuando deba estar en `packages/`.

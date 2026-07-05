@@ -4,6 +4,26 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-04 · Licenciamiento · Estrategia anti-pirateo = **Opción C (solo software, defensa en 6 capas)**; dongle diferido como upsell
+Tras análisis profundo (investigación multi-fuente verificada + PoC ejecutable 9/9), documentado en
+[`LICENSING_STRATEGY.md`](./LICENSING_STRATEGY.md), el dueño **elige la Opción C**: protección 100% software, sin dongle
+USB, para el módulo de licenciamiento §2(1) del canal.
+- **Qué se construye:** firma **Ed25519** (capa 1) + **node-lock por huella de máquina** (capa 2) + **anti-tamper**
+  (bytecode/verificación distribuida, capa 3) + **detección de sobre-despliegue por linaje rotatorio** en la renovación
+  challenge-response offline (capa 4) + **candado de negocio** (updates/soporte indispensables, capa 5) + **legal**
+  (contrato de canal, capa 6). Todo funciona **air-gapped** (activación/renovación por archivo en USB, patrón
+  AVEVA/CodeMeter). Núcleo probado en `docs/poc/licencia-poc.mjs`.
+- **Motivo:** el atacante #1 es el **socio del canal** (avaro o con dev), no un cracker anónimo; la Opción C lo frena en
+  ~95% con **cero fricción de hardware**. El dongle solo aporta contra el cracker experto y el **clon perfecto de VM**
+  (perfiles de menor probabilidad) a cambio de **la mayor fricción operacional** (enviar USBs a faenas mineras remotas).
+- **Honestidad registrada:** con solo software el **clon perfecto de VM se *detecta*, no se *previene*** (VMware confirma
+  que clonar la VM clona el vTPM → por eso el TPM se **descarta** como ancla). Prevención absoluta del clon = dongle.
+- **Dongle (Opción F) = capa 0 enchufable a futuro** sin rehacer nada; queda como upsell para un segmento que exija grado
+  máximo o un socio problemático. Registrado en `BACKLOG.md §2(1)`.
+- **GOBERNANZA:** `LICENSING_STRATEGY.md` + `LICENSING.md` pasan a ser **lectura obligada antes de escribir cualquier
+  código** (nuevo módulo, mejora, bug). Regla añadida a `CLAUDE.md` (rutina de sesión + "qué NO hacer"): todo módulo
+  nuevo nace **entitlement-aware** y todo chequeo de licencia respeta la máquina de estados (nunca secuestra datos).
+
 ### 2026-07-03 · UX · Pantalla de Inicio = cockpit del turno, NO directorio de módulos (`feat/inicio-enterprise`)
 Se rediseñó el Inicio (`features/home/HomePage.tsx`), que pintaba 6 tarjetas HARDCODEADAS con estados fijos ("Pronto") que no
 navegaban y desincronizadas de los módulos reales.

@@ -756,14 +756,20 @@ nunca queda más de una sesión atrás.
 > cadena de suministro. La orquestación de flota (3) se puede diferir hasta tener ~3–5 clientes (con 1–2 se hace a
 > mano con el `update.sh` actual).
 
-- [ ] **(1) Módulo de licenciamiento / activación** (~80–160 HH) — **spec cerrada en `docs/LICENSING.md`.**
+- [ ] **(1) Módulo de licenciamiento / activación** (~80–160 HH) — **estrategia decidida: Opción C (solo software,
+      6 capas)**, análisis en `docs/LICENSING_STRATEGY.md`; spec técnica en `docs/LICENSING.md` (DECISIONS 2026-07-04).
       Llave firmada **Ed25519 OFFLINE** (JWS): `installationId`, vencimiento + `graceDays`, topes
       (`maxInstallations`/`maxNodes`/`maxNamedUsers`), `modules[]` habilitados, `edition`, `whiteLabel`. Verificación
       al arranque + periódica → máquina de estados (VÁLIDA/POR VENCER/GRACIA/BLOQUEADA=solo lectura, nunca borra
-      datos) + gating de módulos por *entitlement* (eje distinto del RBAC). CLI de emisión. **SEGURIDAD:** custodia
-      de la clave privada en **HSM/secret manager** (NUNCA en repo/imagen/.env), verificación **distribuida** (no un
-      solo `if`), empaquetado anti-tamper del módulo crítico (bytecode V8 / binario nativo). Antipirateo = disuasión
-      por capas + dependencia de updates, **no bóveda** (documentado honestamente en LICENSING §7).
+      datos) + gating de módulos por *entitlement* (eje distinto del RBAC). CLI de emisión. **NODE-LOCK por huella de
+      máquina** (una licencia no sirve copiada a otro server) + **activación/renovación challenge-response por USB**
+      (air-gapped) con **linaje rotatorio (counter+nonce)** ⇒ el clon de VM queda **detectado** en la renovación.
+      **SEGURIDAD:** custodia de la clave privada en **HSM/secret manager** (NUNCA en repo/imagen/.env), verificación
+      **distribuida** (no un solo `if`), empaquetado anti-tamper del módulo crítico (bytecode V8 / binario nativo).
+      Antipirateo = disuasión por capas + dependencia de updates, **no bóveda** (LICENSING_STRATEGY §0/§9). Núcleo
+      probado en PoC `docs/poc/licencia-poc.mjs` (9/9). **Dongle USB (Opción F) DIFERIDO** como capa 0 enchufable / upsell:
+      única defensa que *previene* (no solo detecta) el clon perfecto de VM; se evalúa si aparece un segmento de grado
+      máximo o un socio problemático. Plan de implementación por sesiones L0–L6 (pendiente de arranque).
 - [ ] **(2) Modo marca blanca COMPLETO** (~60–120 HH) — hoy los temas son override PARCIAL en runtime y el **login
       queda con marca Lyra** (ver memoria `theme-system`). Falta: **nombre de producto configurable** en toda la app,
       **login personalizable**, branding en el **acta PDF** y en los **correos** salientes. Sin rebuild (runtime),
