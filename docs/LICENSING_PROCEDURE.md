@@ -6,11 +6,14 @@
 > la estrategia está en [`LICENSING_STRATEGY.md`](./LICENSING_STRATEGY.md); el **cómo técnico interno**
 > en [`LICENSING.md`](./LICENSING.md); el modelo comercial en [`estrategia-canal.md`](./estrategia-canal.md).
 >
-> Fecha: **2026-07-05**. Estado: **parcialmente operativo** — L0 (núcleo `@lyra/licensing`) y **L1 (runtime en
-> la API)** están construidos: la app ya arranca en PENDIENTE_DE_ACTIVACIÓN sin licencia, **genera
-> `solicitud.lreq` sola** (§2 Fase B paso 2 = real), verifica firma/huella y hace cumplir la máquina de
-> estados. Falta la CLI de emisión (L3: hoy solo existe `pnpm license:dev` con el par DEV, NO apto para
-> vender), el challenge-response de renovación (L4) y la UI de estado (L6). Plan L0–L6 en `BACKLOG.md §2(1)`.
+> Fecha: **2026-07-05**. Estado: **OPERATIVO para la primera emisión** — L0 (núcleo `@lyra/licensing`), **L1
+> (runtime en la API)**, L2 (gating por entitlement) y **L3 (emisión real)** están construidos: la app arranca en
+> PENDIENTE_DE_ACTIVACIÓN sin licencia, **genera `solicitud.lreq` sola** (§2 Fase B paso 2 = real), verifica
+> firma/huella, hace cumplir la máquina de estados, y **ITESICWS ya emite con `lyra-license`** (`pnpm license
+> keygen|issue|inspect|ledger` — §2 paso 4 y §5-bis = reales; primera emisión real: el EC2 demo). La imagen de
+> release **embebe la pública de PROD** desde el primer tag post-L3 (antes de eso, solo aceptaba licencias DEV).
+> Falta el challenge-response de renovación con linaje (L4), el anti-tamper (L5) y la UI de estado (L6).
+> Plan L0–L6 en `BACKLOG.md §2(1)`.
 
 ---
 
@@ -106,11 +109,21 @@ Esto se repite **una vez por cada servidor** que el socio levanta (una por licen
    - Con internet: lo sube a tu **portal de licencias** (o te lo manda).
    - Air-gapped: lo copia a un USB, lo lleva a un PC con internet, y lo sube. **El servidor de la
      planta nunca toca internet** — solo viaja un archivito.
-4. **ITESICWS emite la licencia:** con la CLI (`lyra-license issue …`) y tu **clave privada**:
-   - Verificas que el socio **tiene cupo en su banda** (ej. va en 7 de 10).
-   - Generas `license.lic` **firmado y amarrado a esa huella exacta**, con: vencimiento + gracia,
-     `modules[]` habilitados según lo que compró, límites (`maxNodes`, `maxNamedUsers`), `whiteLabel`.
-   - Queda **registrado** en tu sistema: quién, cuándo, para qué instalación, con qué límites.
+4. **ITESICWS emite la licencia** (✅ real desde L3) con la CLI y tu **clave privada bajo custodia**:
+   ```bash
+   pnpm license ledger                      # ¿cuánto lleva el socio contra su banda? (§3)
+   pnpm license issue --request solicitud.lreq \
+     --customer "Minera Acme" --channel-partner SOCIO_XYZ \
+     --edition professional --modules core,logbook,incidents,shift-handover,notifications \
+     --max-nodes 200 --max-named-users 80 --expires 2027-07-01T00:00:00Z \
+     --out license.lic
+   pnpm license inspect license.lic --request solicitud.lreq   # QA: VALIDA contra esa huella
+   ```
+   - La CLI pide la **passphrase de la privada** (prompt sin eco; jamás por flag) y la descifra solo en memoria.
+   - Genera `license.lic` **firmado y amarrado a la huella exacta de la solicitud** (node-lock), con vencimiento +
+     gracia, `modules[]` según lo comprado (validados contra el catálogo), límites y `whiteLabel`.
+   - Queda **registrado automáticamente en el ledger** (`~/.lyra-license/ledger.jsonl`, append-only con cadena de
+     hashes): quién, cuándo, para qué instalación/huella, con qué límites y con qué par se firmó.
 5. **El `license.lic` vuelve a la instalación** (USB o descarga) y se importa (se monta como archivo/
    secreto del stack).
 6. **La app verifica** la firma (con la clave pública embebida) + que la huella calce + vencimiento →
@@ -191,8 +204,33 @@ Decisión de gobernanza. **Recomendación fuerte: emisión CENTRALIZADA en ITESI
 
 Para que el modelo centralizado **no sea lento**, se automatiza con un **portal de licencias**
 (sube solicitud → recibe licencia en segundos) respaldado por la CLI. Tú mantienes el control sin ser
-un cuello de botella. La clave privada vive en un **HSM o gestor de secretos**, nunca en un repo,
+un cuello de botella. La clave privada vive **cifrada bajo custodia** (§5-bis), nunca en un repo,
 imagen o `.env`.
+
+## 5-bis. Custodia de la clave privada de PROD (✅ operativa desde L3)
+
+**Dónde vive:** `LYRA_LICENSE_HOME` (def. `~/.lyra-license/` en la máquina del emisor), FUERA del repo:
+
+| Archivo | Qué es | Secreto |
+|---|---|---|
+| `prod-private.enc.pem` | Privada Ed25519 de emisión, **PKCS#8 CIFRADO** (aes-256-cbc + passphrase) | **SÍ** — jamás repo/imagen/.env/logs |
+| `prod-public.pem` | La pública correspondiente | No (también está committeada en `scripts/license/prod-keys/`) |
+| `ledger.jsonl` | Registro append-only de emisiones (cadena de hashes) | Confidencial comercial (no al repo) |
+
+**Reglas de operación:**
+- La **passphrase** la generó `keygen` (alta entropía, se mostró UNA vez) y vive en el **gestor de contraseñas del
+  dueño**. Entra a la CLI por prompt sin eco, `LYRA_LICENSE_PASSPHRASE` (env efímera) o
+  `LYRA_LICENSE_PASSPHRASE_FILE` — **nunca por flag** (quedaría en el historial de shell).
+- La privada se **descifra solo en memoria** en el instante de firmar (`lyra-license issue`); nunca se escribe en
+  claro a disco. El formato PKCS#8 es estándar: recuperable con `openssl pkcs8` si la CLI no existiera.
+- **Respaldo:** copiar `prod-private.enc.pem` (cifrada) a un segundo medio seguro (p. ej. USB en caja fuerte).
+  Perderla + perder la passphrase = no poder emitir ni renovar (habría que rotar el par y re-emitir con un release).
+- **`keygen` se niega a sobreescribir** un par existente (sin `--force`): pisarlo invalidaría toda licencia emitida.
+- **Rotación (procedimiento futuro, sin `kid`):** generar par nuevo → embeber AMBAS públicas en el build (el
+  verificador prueba en orden; `verifyLicense` recibe el PEM por parámetro, retrocompatible) → emitir lo nuevo con
+  la privada nueva → retirar la pública vieja cuando ya no queden licencias vigentes firmadas con ella.
+- El `.gitignore` del repo tiene red de seguridad (`*.enc.pem`, `prod-private*`, `.lyra-license/`, `ledger.jsonl`) y
+  el codegen del release **rechaza claves privadas** y **rechaza la pública DEV**.
 
 ---
 
@@ -218,6 +256,8 @@ imagen Docker** que se publica:
 
 ```
    [CI de ITESICWS — GitHub Actions, al cortar una versión vX.Y.Z]
+      0. EMBEBER la pública de PROD           (embed-public-key.mjs — ✅ real desde L3;
+                                               la imagen deja de aceptar licencias DEV)
       1. TypeScript ──▶ JavaScript            (transpilar)
       2. bundle + MINIFICAR todo el código    (esbuild/webpack)   ← IP general protegida
       3. el MÓDULO DE LICENCIA crítico ──▶ BYTECODE V8 / nativo   (bytenode)  ← anti-tamper reforzado

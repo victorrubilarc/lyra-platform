@@ -6,12 +6,14 @@
 > tope de instalaciones/nodos/usuarios y módulos habilitados. Es un **ítem de desarrollo cerrado**,
 > aún no construido.
 >
-> Última actualización: **2026-07-05**. Estado: **L0 + L1 + L2 construidos** — el núcleo puro (firma/verificación
+> Última actualización: **2026-07-05**. Estado: **L0 + L1 + L2 + L3 construidos** — el núcleo puro (firma/verificación
 > Ed25519, huella, máquina de estados §5) existe como **`@lyra/licensing`** (`packages/licensing`, 42 tests), la
 > API **vive la licencia en runtime** (L1: `LicenseService` + guard global + chequeo distribuido en el worker +
-> auditoría; ver §4/§5) y el **gating de módulos por entitlement está ACTIVO** (L2: catálogo canónico §5.1 +
-> `@RequireModule`/`ModuleEntitlementGuard` + `GET /license/status` + ocultamiento en la web). Pendientes L3–L6
-> (CLI de emisión, linaje/challenge-response, anti-tamper, UI de estado). Estimación total: ~80–160 HH.
+> auditoría; ver §4/§5), el **gating de módulos por entitlement está ACTIVO** (L2: catálogo canónico §5.1 +
+> `@RequireModule`/`ModuleEntitlementGuard` + `GET /license/status` + ocultamiento en la web) y la **emisión REAL
+> existe** (L3: CLI `lyra-license` en `@lyra/licensing-cli` + custodia de la privada de PROD + ledger append-only +
+> pública de PROD embebida por el build de release ⇒ **la imagen del primer tag post-L3 es distribuible**; ver §4/§6).
+> Pendientes L4–L6 (linaje/challenge-response, anti-tamper, UI de estado). Estimación total: ~80–160 HH.
 
 ---
 
@@ -116,14 +118,20 @@ El archivo es un **payload JSON firmado** (JWS/Ed25519, §4). Ejemplo del payloa
   `deriveFingerprint` (huella canónica sha256 de señales del host, capa 2) y `evaluateLicense` + helpers
   (`isExpired`/`isWithinGrace`/`isModuleLicensed`/`exceedsLimits`) para la máquina de estados §5. Las
   llaves entran SIEMPRE por parámetro (puro y testeable); cero dependencias externas.
-- **Emisión (ITESICWS):** una **CLI/servicio interno** (`lyra-license issue --customer … --expires …
-  --modules …`) toma los parámetros, arma el payload, lo firma con la clave privada y produce el
-  `license.lic`. Registro interno de licencias emitidas (a quién, cuándo, con qué límites).
+- **Emisión (ITESICWS) — ✅ construida en L3** (`packages/licensing-cli`, `@lyra/licensing-cli`, herramienta del
+  EMISOR que **jamás llega a la imagen del cliente**): `pnpm license issue --request solicitud.lreq --customer …
+  --channel-partner … --edition … --modules … --max-nodes … --max-named-users … --expires …` parsea la solicitud de
+  activación (huella real → node-lock), valida la entrada (edición ∈ enum, módulos contra `LICENSED_MODULE_KEYS`,
+  fechas ISO), firma con `signLicense` de `@lyra/licensing` (la CLI no re-implementa criptografía), **auto-verifica**
+  (round-trip + huella) y produce `license.lic`, registrando la emisión en el **ledger** (JSONL append-only con
+  cadena de hashes en `~/.lyra-license/ledger.jsonl` — control de banda por socio, `lyra-license ledger`). Además:
+  `keygen` (genera el par de PROD con la privada CIFRADA) e `inspect` (QA del emisor). El flujo DEV
+  (`pnpm license:dev`) es un envoltorio delgado de la MISMA implementación con el par DEV committeado.
 - **Verificación (instalación) — ✅ construida en L1** (`apps/watchlog-api/src/licensing/`): al arrancar la
   API, `LicenseService` carga el archivo (`LICENSE_FILE`, def. `.license/license.lic`; en contenedor
   `/app/license/license.lic` montado como volumen), **verifica la firma con la clave pública EMBEBIDA como
-  constante compilada** (`license-public-key.ts` — jamás por env; hoy es la pública DEV, el build de prod la
-  reemplaza en L3/L5), deriva la **huella real** (`MachineSignalsCollector`: machine-id del HOST bind-monteado
+  constante compilada** (`license-public-key.ts` — jamás por env; en el árbol de trabajo es la pública DEV y el
+  build de RELEASE la reemplaza por la de PROD vía codegen, ver L3 abajo), deriva la **huella real** (`MachineSignalsCollector`: machine-id del HOST bind-monteado
   + cpuModel + osPlatform; MACs/hostname EXCLUIDOS por inestables bajo Docker) y evalúa con `evaluateLicense`
   + conteos reales (nodos / usuarios ACTIVE). Resultado → `LicenseSnapshot` **cacheado**, re-evaluado en cada
   arranque y cada `LICENSE_RECHECK_MINUTES` (def. 360 = 6 h) con `warnDays` = `LICENSE_WARN_DAYS` (def. 30).
@@ -131,8 +139,15 @@ El archivo es un **payload JSON firmado** (JWS/Ed25519, §4). Ejemplo del payloa
   (Postgres: el backup del runbook la respalda con los datos; clonar la BD clona el linaje = lo que L4 detecta).
   Sin archivo, el servicio escribe **`solicitud.lreq`** (installationId + huella) junto a la ruta de la
   licencia — deja lista la ceremonia de activación del runbook §2.
-- **Custodia de la clave privada:** HSM o gestor de secretos (no en repo, no en imagen, no en el
-  `.env` de despliegue). Rotación posible vía `schemaVersion` + varias claves públicas embebidas.
+- **Custodia de la clave privada — ✅ construida en L3:** la privada de PROD vive **PKCS#8 CIFRADA**
+  (aes-256-cbc + passphrase generada de alta entropía, guardada en el gestor de contraseñas del dueño) en
+  `LYRA_LICENSE_HOME` (def. `~/.lyra-license/`), FUERA del repo/imagen/.env; la CLI la descifra SOLO en memoria al
+  firmar (passphrase por prompt sin eco / `LYRA_LICENSE_PASSPHRASE` / `LYRA_LICENSE_PASSPHRASE_FILE`, nunca por
+  flag). La **pública de PROD sí está committeada** (`scripts/license/prod-keys/` — no es secreto: viaja en cada
+  imagen) y el **release la embebe en build** (`scripts/license/embed-public-key.mjs` reescribe
+  `license-public-key.ts` antes del `docker build`; dev/CI siguen con la DEV). **Rotación (diferida, sin `kid`):**
+  cuando haga falta, el verificador puede probar N públicas embebidas en orden — `verifyLicense` recibe el PEM por
+  parámetro, así que es retrocompatible sin tocar el formato JWS (DECISIONS 2026-07-05 L3, decisión d).
 
 ---
 
@@ -272,7 +287,7 @@ chequeo. No se puede volver imposible al 100%, pero se encarece por capas:
 | Sub-ítem | HH aprox. |
 |---|---|
 | Formato de licencia + firma/verificación (Ed25519, JWS) — **✅ hecho en L0 (`@lyra/licensing`)** | 15–25 |
-| CLI de emisión + custodia de clave privada | 10–20 |
+| CLI de emisión + custodia de clave privada — **✅ hecho en L3** (`@lyra/licensing-cli`: keygen/issue/inspect/ledger; privada PROD cifrada bajo custodia; pública PROD embebida por el release ⇒ imagen vendible; ledger hash-chain; CLI 22 tests + smoke-emisión 20/20) | 10–20 |
 | `LicenseService` + máquina de estados + caché + re-evaluación — **✅ hecho en L1** (+ guard global, señales estables bajo Docker, `LicenseInstallation`, auditoría, `solicitud.lreq`, licencia dev `pnpm license:dev`, smoke 28/28) | 20–35 |
 | Gating de módulos por entitlement (backend + web) — **✅ hecho en L2** (catálogo canónico en contracts, `@RequireModule`/guard 5.º, `GET /license/status` DTO delgado, ocultamiento sidebar/Inicio/⌘K, workers module-aware; smoke 23/23). La UI RICA de estado/avisos queda para L6 | 15–30 |
 | Enforcement de límites (nodos/usuarios/instalaciones) | 10–20 |
