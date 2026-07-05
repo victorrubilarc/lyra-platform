@@ -43,10 +43,12 @@ import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { NotificationsService } from "./notifications.service";
 import { NotificationWorkerService } from "./notification-worker.service";
 import { NotificationRealtimeService } from "./notification-realtime.service";
+import { RequireModule } from "../licensing/module-entitlement.guard";
 
 /** Heartbeat del stream SSE: mantiene viva la conexión tras proxies/timeouts. */
 const SSE_HEARTBEAT_MS = 25_000;
 
+@RequireModule("notifications")
 @Controller("notifications")
 export class NotificationsController {
   constructor(

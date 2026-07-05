@@ -1,11 +1,13 @@
 import { Controller, Post } from "@nestjs/common";
 import { RequirePermission } from "../authz/authz.decorators";
 import { RuleActionWorkerService } from "./rule-action-worker.service";
+import { RequireModule } from "../licensing/module-entitlement.guard";
 
 /**
  * Endpoint de OPERACIÓN/diagnóstico del worker de acciones de regla (Fase 4.1.2).
  * El cron lo corre solo cada 30 s; este `run` lo dispara a demanda (smoke/ops).
  */
+@RequireModule("exceptions")
 @Controller("rule-actions")
 export class RuleActionsController {
   constructor(private readonly worker: RuleActionWorkerService) {}

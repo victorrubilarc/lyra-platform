@@ -17,7 +17,9 @@ import type { RequestUser } from "../authz/auth-user";
 import { CurrentUser, RequirePermission } from "../authz/authz.decorators";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { SchedulesService } from "./schedules.service";
+import { RequireModule } from "../licensing/module-entitlement.guard";
 
+@RequireModule("schedules")
 @Controller("schedules")
 export class SchedulesController {
   constructor(private readonly schedules: SchedulesService) {}

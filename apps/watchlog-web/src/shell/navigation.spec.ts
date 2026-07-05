@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { LICENSED_MODULE_KEYS } from "@lyra/contracts";
 import { buildNavGroups, NAV_GROUPS, ROUTES, SIDEBAR_ROUTES } from "./navigation.js";
 
 /**
@@ -45,5 +46,47 @@ describe("Inicio — accesos derivados del registro", () => {
     const operativos = SIDEBAR_ROUTES.filter((r) => r.group === "operation" && r.path !== "/");
     expect(operativos.length).toBeGreaterThan(0);
     expect(operativos.some((r) => r.path === "/")).toBe(false);
+  });
+});
+
+/**
+ * Licenciamiento L2: el registro etiqueta cada ruta con su módulo LICENCIABLE
+ * (`module`, catálogo de @lyra/contracts). Es el eje del ENTITLEMENT de la
+ * instalación, ADICIONAL al permiso del usuario: visible = licenciado ∧ permiso.
+ */
+describe("navegación — gate por módulo licenciado (L2)", () => {
+  it("toda clave `module` del registro existe en el catálogo canónico", () => {
+    const keys = new Set<string>(LICENSED_MODULE_KEYS);
+    const invalidas = ROUTES.filter((r) => r.module !== undefined && !keys.has(r.module));
+    expect(invalidas.map((r) => r.path)).toEqual([]);
+  });
+
+  it("las rutas operacionales de módulo de pago están etiquetadas (no se cuelan sin gate)", () => {
+    // Fotografía deliberada: si un módulo licenciable pierde su etiqueta, este
+    // test lo grita (quedaría visible con una licencia que no lo incluye).
+    const esperadas: Record<string, string> = {
+      "/estructura": "structure",
+      "/plantillas": "templates",
+      "/bitacoras": "logbook",
+      "/nueva-entrada": "logbook",
+      "/mis-rondas": "schedules",
+      "/rondas": "schedules",
+      "/incidencias": "incidents",
+      "/excepciones": "exceptions",
+      "/cambio-turno": "shift-handover",
+      "/ordenes-trabajo": "work-orders",
+      "/notificaciones": "notifications",
+      "/panorama": "dashboards",
+      "/datos-referencia": "templates",
+    };
+    for (const [path, moduleKey] of Object.entries(esperadas)) {
+      expect(ROUTES.find((r) => r.path === path)?.module, path).toBe(moduleKey);
+    }
+  });
+
+  it("las rutas transversales (core) NO llevan módulo: nunca se ocultan por licencia", () => {
+    for (const path of ["/", "/seguridad", "/configuracion", "/flujos", "/calendario-operacional"]) {
+      expect(ROUTES.find((r) => r.path === path)?.module, path).toBeUndefined();
+    }
   });
 });

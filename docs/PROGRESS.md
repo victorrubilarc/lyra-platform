@@ -1,5 +1,30 @@
 # Progreso — Lyra WatchLog
 
+**2026-07-05 — 🔐 Licenciamiento L2 · gating de módulos por entitlement en API + web ✅** (`feat/licenciamiento-l2`).
+Se ACTIVARON los gates latentes de L1: un módulo fuera de `modules[]` de la licencia **no se puede operar ni aparece**,
+respetando «nunca secuestrar datos». **(1) Catálogo canónico** (decisión a): `LICENSED_MODULE_KEYS` (13 claves) +
+`licenseStatusSchema` en **`@lyra/contracts`** (`src/licensing/`) — el web lo necesita y `@lyra/licensing` es
+server-only; el payload sigue libre (claves futuras no rompen). **(2) Gate backend** (decisión b):
+`@RequireModule(<clave>)` a nivel de controlador (17 controladores etiquetados; mapeo en `LICENSING.md §5.1` —
+workflows/calendarios = `core` por ser infra compartida) + **`ModuleEntitlementGuard`** global (5.º, tras el de estados):
+módulo no licenciado ⇒ mutaciones `403 {code: MODULE_NOT_LICENSED, module}`, **GET/HEAD/OPTIONS pasan SIEMPRE**
+(lectura/exportación intactas, aun con downgrade de edición); `core` jamás se gatea; **sin payload verificado el guard
+NO opina** (precedencia del `LICENSE_RESTRICTED` de L1). Workers module-aware (`LicenseService.moduleOperational`):
+notificaciones no genera/despacha/envía sin su módulo; acciones de regla no materializa excepciones (órdenes quedan
+PENDING, nunca se descartan). **(3) DTO delgado + endpoint** (decisión c): `GET /api/license/status` autenticado SIN
+permiso — `toLicenseStatus` mapea CAMPO A CAMPO desde el snapshot (jamás huella/linaje/installationId/licenseId/
+customer; testeado); `modules: null` = sin payload. **(4) Gate frontend:** `NavRoute.module` en el REGISTRO +
+`useLicenseStatus`/`useLicensedModules` (`auth/use-license.ts`) ⇒ **visible = módulo licenciado ∧ permiso** en sidebar,
+Inicio (tiles con su `enabled` + accesos), ⌘K y campanita; mientras no llega el DTO no se oculta (el candado real es el
+403). **(5) Extra:** `pnpm license:dev -- --modules=a,b` (licencias DEV acotadas). **SIN migración, SIN permiso nuevo,
+SIN FLUSHALL** (decisión e); límites numéricos DIFERIDOS (decisión d, BACKLOG). **Verde:** typecheck/lint/build/test
+(API **286** = 276+10 · web 11 = +3 · contracts 513 = +5 · licensing 42 intactos) + **smoke-licencia-modulos.py 23/23**
+(acotada `[core,incidents,notifications]`: licenciado opera [gate pasa → 400 de validación], no licenciado 403 con
+clave + GET 200 + export CSV viva, DTO exacto sin campos sensibles, 401 sin token, precedencia C3) + regresión
+**smoke-licencia.py 28/28**. **No probado:** smoke VISUAL del sidebar ocultando módulos (requiere licencia acotada en
+el dev server — el dueño puede generarla con `--modules` y recargar). USER_GUIDE § Licencia ampliada (módulo no
+incluido). **Siguiente: Licenciamiento L3 (CLI de emisión + custodia de clave privada).**
+
 **2026-07-05 — 🔐 Licenciamiento L1 · runtime de la licencia en la API ✅** (`feat/licenciamiento-l1`).
 La API ahora **vive la licencia** consumiendo `@lyra/licensing` (L0 intacto, cero re-implementación de lógica pura).
 **(1) `LicenseModule` global** (`src/licensing/`): `LicenseService` carga `LICENSE_FILE` (def. `.license/license.lic`;

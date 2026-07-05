@@ -15,6 +15,7 @@ import type { RequestUser } from "../authz/auth-user";
 import { CurrentUser, RequirePermission } from "../authz/authz.decorators";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { CompetenciesService } from "./competencies.service";
+import { RequireModule } from "../licensing/module-entitlement.guard";
 
 /**
  * DOTACIÓN · Slice 2 — competencias/certificaciones con vigencia, restricciones y reglas.
@@ -22,6 +23,7 @@ import { CompetenciesService } from "./competencies.service";
  * para mutar, `workorder:view` para leer/poblar pickers). `PersonCompetency` +
  * `PersonRestriction` = gestión de la persona (gate `worker:manage`). Sin permiso nuevo.
  */
+@RequireModule("work-orders")
 @Controller()
 export class CompetenciesController {
   constructor(private readonly competencies: CompetenciesService) {}

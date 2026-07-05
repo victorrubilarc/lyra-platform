@@ -104,3 +104,8 @@ export * from "./work-orders/activities.js";
 export * from "./work-orders/sla.js";
 export * from "./work-orders/roster.js";
 export * from "./work-orders/dashboard.js";
+
+// Licenciamiento L2 — catálogo de módulos licenciables + DTO delgado de estado
+// (el payload completo de la licencia NUNCA viaja aquí: vive en @lyra/licensing)
+export * from "./licensing/modules.js";
+export * from "./licensing/license-status.js";

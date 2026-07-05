@@ -5,7 +5,14 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-07-05** — **🔐 Licenciamiento L1 · runtime en la API ✅** (`feat/licenciamiento-l1`):
+> actualización: **2026-07-05** — **🔐 Licenciamiento L2 · gating de módulos por entitlement ✅** (`feat/licenciamiento-l2`):
+> catálogo canónico `LICENSED_MODULE_KEYS` (13 claves) + DTO `licenseStatusSchema` en `@lyra/contracts` +
+> `@RequireModule`/`ModuleEntitlementGuard` (5.º global: módulo no licenciado ⇒ mutación 403 `MODULE_NOT_LICENSED`,
+> GET/export SIEMPRE vivos; core jamás; sin payload gobierna L1) + `GET /license/status` (autenticado sin permiso,
+> mapeo campo a campo sin huella/linaje) + web oculta por `SIDEBAR_ROUTES.module` (sidebar/Inicio/⌘K/campanita:
+> visible = licenciado ∧ permiso) + workers module-aware; `license:dev --modules=a,b`; SIN migración/permiso/FLUSHALL;
+> API 286 + smoke-licencia-modulos 23/23 + regresión 28/28. **L3 = PRÓXIMA** (CLI de emisión + custodia).
+> **DIFERIDO L2:** enforcement de límites numéricos (`maxNodes`/`maxNamedUsers`) — ver §2(1). — Antes: **🔐 Licenciamiento L1 · runtime en la API ✅** (`feat/licenciamiento-l1`):
 > LicenseService (pública EMBEBIDA, huella estable bajo Docker por machine-id del HOST, caché + re-eval 6 h) +
 > `LicenseInstallation` single-row + `solicitud.lreq` auto + guard global (PENDIENTE_ACTIVACION/SOLO_LECTURA/BLOQUEADA
 > bloquean mutaciones; export GET siempre vivo; whitelist `/api/auth/`) + 2.º chequeo distribuido en el worker +
@@ -789,10 +796,20 @@ nunca queda más de una sesión atrás.
             (re-verifica DESDE DISCO) · auditoría `license.state.changed` · par DEV committeado + `pnpm license:dev` ·
             **@lyra/licensing ganó build dist** (la API CJS no importa TS fuente; DECISIONS 2026-07-05). API 276 tests
             + smoke-licencia **28/28**. ⚠️ Deudas hijas: ver "pendientes L1" abajo.
-      - [ ] **L2 (PRÓXIMA):** gating de módulos por entitlement en API/web (activar los gates latentes
-            `modules[]`/`edition`; consumidores de `isModuleLicensed()` + DTO delgado si aplica).
-      - [ ] **L3:** CLI de emisión (`lyra-license issue`) + custodia de clave privada (HSM/secret manager) + registro
-            de emisiones.
+      - [x] **L2 · gating de módulos por entitlement en API/web** ✅ 2026-07-05 (`feat/licenciamiento-l2`): catálogo
+            canónico `LICENSED_MODULE_KEYS` (13 claves) + DTO delgado `licenseStatusSchema` en `@lyra/contracts` ·
+            `@RequireModule` en 17 controladores + `ModuleEntitlementGuard` global 5.º (mutación 403
+            `{code:MODULE_NOT_LICENSED, module}`; GET/export SIEMPRE; core jamás; sin payload verificado gobierna L1)
+            · `GET /license/status` autenticado sin permiso (`toLicenseStatus` campo a campo — sin huella/linaje/
+            installationId) · web: `SIDEBAR_ROUTES.module` + `useLicensedModules` ⇒ visible = licenciado ∧ permiso
+            (sidebar/Inicio/⌘K/campanita) · workers module-aware (`moduleOperational`) · `license:dev --modules=a,b`.
+            SIN migración/permiso. API 286 + web 11 + contracts 513 + smoke-licencia-modulos **23/23** + regresión 28/28.
+            Mapeo módulo→controladores en `LICENSING.md §5.1`. Decisiones a–e en DECISIONS 2026-07-05 (L2).
+      - [ ] **L2b (DIFERIDO en L2, decisión d):** enforcement de LÍMITES numéricos — bloquear crear nodo/usuario por
+            encima de `maxNodes`/`maxNamedUsers` (403 en los endpoints de creación de structure/security; hoy
+            LIMITE_EXCEDIDO solo se registra/audita). Mecanismo distinto del gate por módulo (conteo por creación).
+      - [ ] **L3 (PRÓXIMA):** CLI de emisión (`lyra-license issue`) + custodia de clave privada (HSM/secret manager) +
+            registro de emisiones.
       - [ ] **L4:** flujo challenge-response por USB (`solicitud.lreq`→`license.lic`) + linaje rotatorio (detección
             de clon; invariante ya protegido por test en L0 `lineage.spec.ts`).
       - [ ] **L5:** anti-tamper en CI (bytecode V8/nativo del módulo crítico + verificación distribuida + integridad).

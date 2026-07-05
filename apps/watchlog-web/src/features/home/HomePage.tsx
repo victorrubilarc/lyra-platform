@@ -13,6 +13,7 @@ import type { ExceptionListQuery } from "@lyra/contracts";
 import { Card, cx } from "@lyra/ui";
 import { useAuth } from "../../auth/use-auth.js";
 import { usePermissions } from "../../auth/use-permissions.js";
+import { useLicensedModules } from "../../auth/use-license.js";
 import { SIDEBAR_ROUTES } from "../../shell/navigation.js";
 import { useMyRoundsStats } from "../schedules/schedules-queries.js";
 import { useIncidentStats } from "../incidents/incidents-queries.js";
@@ -71,19 +72,23 @@ export function HomePage() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const { can } = usePermissions();
+  const licensed = useLicensedModules();
 
-  // Permisos de los tiles: gatean el fetch (enabled) y la visibilidad del tile.
-  const canRounds = can("round:execute");
-  const canIncidents = can("module:incidents:view");
-  const canWorkOrders = can("module:workorders:view");
+  // Gate de cada tile = módulo LICENCIADO (entitlement de la instalación, L2)
+  // ∧ permiso del usuario (RBAC). Gatea el fetch (enabled) y la visibilidad.
+  const canRounds = can("round:execute") && licensed("schedules");
+  const canIncidents = can("module:incidents:view") && licensed("incidents");
+  const canExceptions = can("module:incidents:view") && licensed("exceptions");
+  const canWorkOrders = can("module:workorders:view") && licensed("work-orders");
+  const canNotifications = licensed("notifications"); // bandeja propia: sin permiso
 
   // Conteos en vivo. Los hooks se llaman SIEMPRE (regla de hooks); `enabled`
   // decide si realmente consultan. Todos respetan estructura activa ∩ ABAC.
   const rounds = useMyRoundsStats(canRounds);
   const incidents = useIncidentStats(canIncidents);
   const workOrders = useWorkOrderStats(canWorkOrders);
-  const exceptions = useExceptions(EXCEPTIONS_SUMMARY_QUERY, canIncidents);
-  const inbox = useInboxUnreadCount(true); // bandeja propia: accesible a todos
+  const exceptions = useExceptions(EXCEPTIONS_SUMMARY_QUERY, canExceptions);
+  const inbox = useInboxUnreadCount(canNotifications);
 
   const tiles: WorklistTile[] = [];
 
@@ -146,7 +151,7 @@ export function HomePage() {
     });
   }
 
-  if (canIncidents) {
+  if (canExceptions) {
     const summary = exceptions.data?.summary;
     const open = summary?.open ?? 0;
     const critical = summary?.critical ?? 0;
@@ -166,7 +171,7 @@ export function HomePage() {
     });
   }
 
-  {
+  if (canNotifications) {
     const unread = inbox.data?.unread ?? 0;
     tiles.push({
       key: "notifications",
@@ -181,12 +186,14 @@ export function HomePage() {
   }
 
   // Accesos de «Operación»: módulos del grupo operativo del registro que NO son ya
-  // un tile (evita duplicar Incidencias/OT/Rondas/Excepciones). Filtrados por permiso.
+  // un tile (evita duplicar Incidencias/OT/Rondas/Excepciones). Filtrados igual que
+  // el sidebar: módulo licenciado ∧ permiso del usuario.
   const shortcuts = SIDEBAR_ROUTES.filter(
     (r) =>
       r.group === "operation" &&
       r.path !== "/" &&
       !TILE_PATHS.has(r.path) &&
+      licensed(r.module) &&
       (!r.permission || can(r.permission)),
   );
 

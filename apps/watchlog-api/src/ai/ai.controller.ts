@@ -11,6 +11,7 @@ import { CurrentUser, RequirePermission } from "../authz/authz.decorators";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { AiConfigService } from "./ai-config.service";
 import { AiService } from "./ai.service";
+import { RequireModule } from "../licensing/module-entitlement.guard";
 
 /**
  * Configuración de la IA del sistema — pantalla de `/configuracion` (tab "Inteligencia
@@ -18,6 +19,7 @@ import { AiService } from "./ai.service";
  * y se guarda cifrada. "Probar" hace una generación real corta con los valores del formulario
  * SIN guardarlos; auditado sin registrar la clave.
  */
+@RequireModule("ai")
 @Controller("settings/ai")
 export class AiController {
   constructor(

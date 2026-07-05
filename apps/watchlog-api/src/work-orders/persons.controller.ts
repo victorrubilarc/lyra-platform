@@ -13,12 +13,14 @@ import type { RequestUser } from "../authz/auth-user";
 import { CurrentUser, RequirePermission } from "../authz/authz.decorators";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { PersonsService } from "./persons.service";
+import { RequireModule } from "../licensing/module-entitlement.guard";
 
 /**
  * Catálogo de DOTACIÓN: Personas, Empresas contratistas y Roles de dotación (S1).
  * Gobernado por `worker:manage` (mutaciones); las lecturas también, salvo la de roles
  * que la usan los pickers de la OT (gate `workorder:view`). Una Persona ≠ User.
  */
+@RequireModule("work-orders")
 @Controller()
 export class PersonsController {
   constructor(private readonly persons: PersonsService) {}

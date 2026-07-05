@@ -23,7 +23,9 @@ import type { RequestUser } from "../authz/auth-user";
 import { CurrentUser, RequirePermission } from "../authz/authz.decorators";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { StructureService } from "./structure.service";
+import { RequireModule } from "../licensing/module-entitlement.guard";
 
+@RequireModule("structure")
 @Controller("structure")
 export class StructureController {
   constructor(private readonly structure: StructureService) {}

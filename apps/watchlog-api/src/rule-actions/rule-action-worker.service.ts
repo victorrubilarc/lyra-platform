@@ -5,6 +5,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { AuditService, type AuditContext } from "../audit/audit.service";
 import { ExceptionGeneratorService } from "../exceptions/exception-generator.service";
 import { IncidentsService } from "../incidents/incidents.service";
+import { LicenseService } from "../licensing/license.service";
 
 /** Tope de reintentos antes de marcar FAILED. */
 const MAX_ATTEMPTS = 5;
@@ -37,6 +38,7 @@ export class RuleActionWorkerService {
     private readonly audit: AuditService,
     private readonly exceptionGenerator: ExceptionGeneratorService,
     private readonly incidents: IncidentsService,
+    private readonly license: LicenseService,
   ) {}
 
   @Cron(CronExpression.EVERY_30_SECONDS)
@@ -50,6 +52,11 @@ export class RuleActionWorkerService {
   }
 
   async processPending(): Promise<number> {
+    // Gate de ENTITLEMENT (L2, verificación distribuida en tarea programada):
+    // sin el módulo `exceptions` en la licencia no se materializa trabajo nuevo
+    // (las órdenes quedan PENDING; un upgrade posterior las procesa — nunca se
+    // descartan). Sin payload verificado el gate no opina (gobierna L1).
+    if (!this.license.moduleOperational("exceptions")) return 0;
     if (this.busy) return 0;
     this.busy = true;
     let processed = 0;

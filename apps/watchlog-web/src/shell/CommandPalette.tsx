@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Check, Languages, LogOut, Monitor, Moon, PanelLeft, Rows3, Search, Sun } from "lucide-react";
 import { cx } from "@lyra/ui";
 import { usePermissions } from "../auth/use-permissions.js";
+import { useLicensedModules } from "../auth/use-license.js";
 import { useAuth } from "../auth/use-auth.js";
 import { useUIStore } from "./ui-store.js";
 import { useThemeStore } from "./theme-store.js";
@@ -21,6 +22,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const perms = usePermissions();
+  const licensed = useLicensedModules();
   const { signOut } = useAuth();
   const toggleDensity = useUIStore((s) => s.toggleDensity);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
@@ -35,7 +37,10 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     fn();
   };
 
-  const navRoutes = ROUTES.filter((r) => !r.permission || perms.can(r.permission));
+  // Igual que el sidebar: módulo LICENCIADO ∧ permiso del usuario (solo oculta).
+  const navRoutes = ROUTES.filter(
+    (r) => licensed(r.module) && (!r.permission || perms.can(r.permission)),
+  );
 
   return (
     <Command.Dialog

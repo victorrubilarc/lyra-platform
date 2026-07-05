@@ -28,7 +28,9 @@ import type { RequestUser } from "../authz/auth-user";
 import { CurrentUser, RequirePermission } from "../authz/authz.decorators";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { ReferenceListsService } from "./reference-lists.service";
+import { RequireModule } from "../licensing/module-entitlement.guard";
 
+@RequireModule("templates")
 @Controller("reference-lists")
 export class ReferenceListsController {
   constructor(private readonly lists: ReferenceListsService) {}

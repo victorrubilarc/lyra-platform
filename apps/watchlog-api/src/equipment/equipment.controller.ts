@@ -27,7 +27,9 @@ import type { RequestUser } from "../authz/auth-user";
 import { CurrentUser, RequirePermission } from "../authz/authz.decorators";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { EquipmentService } from "./equipment.service";
+import { RequireModule } from "../licensing/module-entitlement.guard";
 
+@RequireModule("structure")
 @Controller("structure/equipment")
 export class EquipmentController {
   constructor(private readonly equipment: EquipmentService) {}

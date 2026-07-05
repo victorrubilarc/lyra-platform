@@ -11,6 +11,7 @@ import {
 } from "../features/notifications/notifications-queries.js";
 import { useInboxRealtime } from "../features/notifications/use-inbox-realtime.js";
 import { useAuth } from "../auth/use-auth.js";
+import { useLicensedModules } from "../auth/use-license.js";
 import { formatRelativeTime } from "../lib/format.js";
 import styles from "./AppShell.module.css";
 
@@ -27,7 +28,10 @@ export function NotificationBell() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const enabled = Boolean(user);
+  const licensed = useLicensedModules();
+  // Mismo gate que el resto del shell: módulo `notifications` licenciado (L2).
+  // Sin él la campanita entera se oculta (return null, abajo) y no se consulta.
+  const enabled = Boolean(user) && licensed("notifications");
 
   useInboxRealtime(enabled);
   const unreadQ = useInboxUnreadCount(enabled);
@@ -43,6 +47,9 @@ export function NotificationBell() {
     const link = deepLinkForEntity(item.relatedEntityType, item.relatedEntityId);
     navigate(link ?? "/mis-notificaciones");
   }
+
+  // Módulo no licenciado ⇒ la campanita no existe (el motor no genera avisos).
+  if (!enabled) return null;
 
   return (
     <Menu
