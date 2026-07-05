@@ -4,6 +4,58 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-05 · Licenciamiento L3 · CLI de emisión + custodia de clave privada + pública PROD embebida (decisiones a–f, aprobadas por el dueño antes de codificar)
+Sesión L3 (`feat/licenciamiento-l3`): ITESICWS ya puede **emitir licencias reales** y la imagen de release **por fin
+es apta para venderse**. Decisiones:
+- **(a) La CLI vive en `packages/licensing-cli`** (`@lyra/licensing-cli`, privado, bin `lyra-license`, invocación
+  `pnpm license <cmd>` desde la raíz): entra al ciclo typecheck/lint/test/build del CI como cualquier paquete (para la
+  herramienta que firma licencias reales, scripts sueltos en `tools/` serían segunda clase). **JAMÁS se distribuye al
+  cliente:** es devDependency del api (solo por el envoltorio `license:dev`) y `pnpm deploy --prod` la excluye de la
+  imagen runtime; su manifiesto sí se copia al stage `deps` del Dockerfile (pnpm frozen-lockfile exige el grafo
+  completo). Reusa `@lyra/licensing` para TODA la criptografía — la CLI no re-implementa nada; aporta custodia,
+  validación de entrada (edición ∈ enum L0, módulos ⊆ `LICENSED_MODULE_KEYS` de contracts con `core` siempre, fechas
+  ISO, enteros positivos) y auto-verificación post-firma (round-trip + node-lock contra la huella de la solicitud).
+- **(b) Custodia de la privada de PROD = PEM PKCS#8 CIFRADO (aes-256-cbc) + passphrase GENERADA de alta entropía**
+  (~145 bits, mostrada UNA vez por `keygen` → gestor de contraseñas del dueño): formato estándar recuperable con
+  `openssl pkcs8` si la CLI no existiera; el KDF modesto de PKCS#8 queda neutralizado porque la passphrase no es
+  humana (contra fuerza bruta manda su entropía). Vive en `LYRA_LICENSE_HOME` (def. `~/.lyra-license/`), FUERA del
+  repo; `.gitignore` endurecido como red (`*.enc.pem`, `prod-private*`, `.lyra-license/`, `ledger.jsonl`). La
+  passphrase entra por prompt sin eco, env `LYRA_LICENSE_PASSPHRASE` (efímera) o `LYRA_LICENSE_PASSPHRASE_FILE` —
+  nunca por flag (quedaría en el historial de shell). La privada se descifra SOLO en memoria al firmar. Descartados:
+  `age`/`sops` (dependencia externa para una sola clave) y HSM (se reevalúa si el volumen lo justifica).
+- **(c) Pública de PROD COMMITTEADA en el repo + codegen en el release** — mejora sobre la spec aprobada por el
+  dueño: la PÚBLICA no es secreto (viaja dentro de cada imagen distribuida; solo sirve para verificar), así que vive
+  en `scripts/license/prod-keys/prod-public.pem` y `release.yml` corre `scripts/license/embed-public-key.mjs` ANTES
+  del `docker build`, reescribiendo `license-public-key.ts` en el checkout del runner (constante COMPILADA; jamás por
+  env en runtime — sería el bypass trivial). Sin GitHub Secret: build reproducible/auditable e independiente de
+  configuración externa. El codegen valida Ed25519, rechaza privadas y se NIEGA a embeber la DEV. `pnpm build` local
+  y `ci.yml` no corren el paso ⇒ dev/tests verdes sin la clave de PROD. **Desde el primer tag `v*` post-L3 la imagen
+  publicada SÍ es distribuible comercialmente** (cierra la deuda (ii) de L1).
+- **(d) Rotación multi-clave (`kid`) DIFERIDA — no toca el L0 congelado:** el día que haya que rotar, el verificador
+  de la API puede probar N públicas embebidas en orden (`verifyLicense` ya recibe el PEM por parámetro) —
+  retrocompatible con toda licencia emitida, sin cambiar el formato JWS. Documentado como el camino de rotación en
+  `LICENSING.md §4`.
+- **(e) Ledger de emisiones = JSONL APPEND-ONLY con cadena de hashes** (`~/.lyra-license/ledger.jsonl`, jamás en
+  repo/producto): cada entrada sella la anterior (`prevHash` + hash canónico) ⇒ editar/borrar una línea rompe la
+  cadena y `lyra-license ledger` lo acusa SIEMPRE al listar (exit ≠ 0). Registra quién/cuándo/licenseId/instalación/
+  huella/cliente/socio/límites/vencimiento + hash del `.lic` + id del par firmante. La banda del socio en L3 solo se
+  REGISTRA (resumen por socio); el enforcement contractual de banda es decisión comercial futura (hoy no hay
+  contratos modelados). Descartado SQLite (dependencia nativa, binario no diff-able, overkill para docenas de
+  emisiones/año).
+- **(f) EC2 demo licenciado EN VIVO — con el par PROD, no DEV (ajuste sobre lo planeado, con causa):** al entrar al
+  host se descubrió que corre **v0.1.12, imagen PRE-L1** (sin runtime de licencia) y el compose del host no tenía los
+  mounts — una licencia DEV hoy era inerte y además quedaría BLOQUEADA en el primer release post-L3 (que embebe la
+  PROD). Se hizo lo coherente: `git pull` del clon `/opt/watchlog` (trae el compose L1 con mounts), huella derivada
+  ejecutando la MISMA imagen del api con `/etc/machine-id` montado (`e271ce4b…`), `solicitud.lreq` +
+  `license.lic` firmado con la PRIVADA DE PROD (primera emisión real del ledger: `lic_2026_demo_ec2_001`, vence
+  2027-07-05), `inspect` = VALIDA contra la pública PROD, `up -d api` con mounts verificados y health 200 (público
+  incluido). La imagen actual ignora el archivo ⇒ la **confirmación VALIDA en vivo queda amarrada al primer tag
+  post-L3** (BACKLOG §2(1)). Beneficio: cero reemisiones futuras — demo y release quedan alineados de una vez.
+- **Extra:** `gen-dev-license.ts` pasó a ENVOLTORIO delgado de `issueLicense` de la CLI (una sola implementación de
+  emisión para DEV y PROD; el par DEV committeado sigue siendo el de dev/CI y no pasa por el ledger). El default de
+  `notBefore` al emitir vencidas (`--allow-past`, para smokes) es 24 h antes del VENCIMIENTO (no de hoy), o la
+  emisión vencida sería inválida por `notBefore ≥ expiresAt`.
+
 ### 2026-07-05 · Licenciamiento L2 · gating de módulos por entitlement en API + web (decisiones a–e, aprobadas por el dueño antes de codificar)
 Sesión L2 (`feat/licenciamiento-l2`): se activan los gates LATENTES de L1 — un módulo fuera de `modules[]` de la
 licencia no se puede operar ni aparece, sin secuestrar jamás sus datos. Decisiones:

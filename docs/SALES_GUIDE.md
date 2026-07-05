@@ -332,6 +332,13 @@ Preséntalo como evolución, no como funcionalidad actual:
 
 > Una línea por hito, en lenguaje de cliente. Lo más reciente arriba.
 
+- **2026-07-05** — **Licenciamiento formal por instalación 🔐 (disponible; para el CANAL, no es una feature del
+  usuario final):** cada instalación opera con una **licencia firmada digitalmente por ITESICWS**, amarrada a ese
+  servidor, con edición/módulos/vigencia — y la **activación funciona 100 % sin internet** (plantas air-gapped:
+  un archivo va y vuelve por USB). Para el socio de canal significa reglas claras (banda de licencias, registro
+  auditable de emisiones) y para el cliente final una **garantía ética verificable: la licencia jamás bloquea el
+  acceso a SUS datos** (vencida = solo lectura + exportación, nunca borrado). Honesto: hoy existe emisión y
+  activación inicial; la renovación asistida y los avisos en pantalla vienen en camino (L4/L6).
 - **2026-07-02** — **Checklists / permisos de trabajo en las Órdenes de Trabajo 🛠️ (disponible):** una OT puede exigir
   **checklists o permisos** (bloqueo de energías, altura, calidad/ITP, regulatorios…) que **bloquean el avance** hasta
   ser aprobados, con **firma y segregación de funciones** (revisa alguien distinto de quien ejecuta). Es el **mismo motor

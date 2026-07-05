@@ -114,6 +114,9 @@ importers:
       '@lyra/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@lyra/licensing-cli':
+        specifier: workspace:*
+        version: link:../../packages/licensing-cli
       '@nestjs/cli':
         specifier: ^11.0.0
         version: 11.0.21(@types/node@22.19.19)(lightningcss@1.32.0)(prettier@3.8.3)
@@ -308,6 +311,34 @@ importers:
       eslint:
         specifier: ^9.18.0
         version: 9.39.4(jiti@2.7.0)
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.6(@types/node@22.19.19)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.22.4)
+
+  packages/licensing-cli:
+    dependencies:
+      '@lyra/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@lyra/licensing':
+        specifier: workspace:*
+        version: link:../licensing
+    devDependencies:
+      '@lyra/config':
+        specifier: workspace:*
+        version: link:../config
+      '@types/node':
+        specifier: ^22.10.7
+        version: 22.19.19
+      eslint:
+        specifier: ^9.18.0
+        version: 9.39.4(jiti@2.7.0)
+      tsx:
+        specifier: ^4.22.4
+        version: 4.22.4
       typescript:
         specifier: ^5.7.3
         version: 5.9.3

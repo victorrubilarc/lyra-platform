@@ -41,3 +41,12 @@ docker/volumes/
 # Licencias locales (license.lic dev + solicitud.lreq). Las llaves DEV committeadas
 # viven en scripts/license/dev-keys (esas SÍ van al repo; no son secreto).
 .license/
+
+# Custodia del EMISOR (Licenciamiento L3): la clave PRIVADA de PROD, su
+# passphrase y el ledger viven FUERA del repo (~/.lyra-license). Estas reglas
+# son la red de seguridad por si alguien los copiara adentro por error. La
+# ÚNICA privada committeada es la DEV (scripts/license/dev-keys, no-secreto).
+*.enc.pem
+prod-private*
+.lyra-license/
+ledger.jsonl

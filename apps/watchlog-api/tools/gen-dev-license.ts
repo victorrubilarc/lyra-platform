@@ -5,16 +5,19 @@
  *
  *   pnpm --filter @lyra/watchlog-api run license:dev            # 1 año, válida
  *   pnpm --filter @lyra/watchlog-api run license:dev -- --expired   # vencida (smoke)
+ *   pnpm --filter @lyra/watchlog-api run license:dev -- --modules=core,incidents
  *
- * Recolecta las señales con el MISMO recolector de la API (la huella emitida
- * calza EXACTO con la de runtime) y escribe en LICENSE_FILE (def.
- * `.license/license.lic`, gitignoreada). Corre con tsx, como prisma/seed.ts.
- * La emisión REAL de producción es la CLI de L3 con custodia de clave privada.
+ * Desde L3 es un ENVOLTORIO DELGADO sobre `@lyra/licensing-cli` (`issueLicense`):
+ * una sola implementación de emisión para DEV y PROD, sin copiar/pegar. Lo único
+ * propio de este wrapper es recolectar las señales con el MISMO recolector de la
+ * API (la huella emitida calza EXACTO con la de runtime) y armar la solicitud
+ * sintética local. No pasa por el ledger del emisor (emisión de desarrollo).
  */
-import { randomUUID } from "node:crypto";
 import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { deriveFingerprint, signLicense, type LicensePayload } from "@lyra/licensing";
+import { deriveFingerprint } from "@lyra/licensing";
+import { issueLicense, type ActivationRequest } from "@lyra/licensing-cli";
+import { LICENSED_MODULE_KEYS } from "@lyra/contracts";
 import { collectMachineSignals } from "../src/licensing/machine-signals.collector";
 
 const DAY_MS = 86_400_000;
@@ -34,61 +37,49 @@ async function main(): Promise<void> {
   const signals = await collectMachineSignals(machineIdFile, undefined, (msg) =>
     console.warn(`⚠️  ${msg}`),
   );
-  const fingerprint = deriveFingerprint(signals);
   const now = Date.now();
-
-  const payload: LicensePayload = {
-    licenseId: `lic_dev_${new Date(now).toISOString().slice(0, 10)}`,
-    issuer: "ITESICWS (DEV)",
-    issuedAt: new Date(now).toISOString(),
-    notBefore: new Date(now - DAY_MS).toISOString(),
-    // --expired: venció hace 60 días con 14 de gracia ⇒ SOLO_LECTURA (smoke).
-    expiresAt: new Date(expired ? now - 60 * DAY_MS : now + 365 * DAY_MS).toISOString(),
-    graceDays: 14,
-    channelPartner: "DEV",
-    customer: "Desarrollo local",
-    installationId: "inst_dev_local",
-    fingerprint,
-    edition: "enterprise",
-    // Entitlement: amplio para dev (default) o acotado vía --modules=a,b (smoke
-    // del gating L2). El default es el catálogo completo de @lyra/contracts.
-    modules: modulesArg
-      ? modulesArg
-          .slice("--modules=".length)
-          .split(",")
-          .map((m) => m.trim())
-          .filter(Boolean)
-      : [
-          "core",
-          "structure",
-          "templates",
-          "logbook",
-          "schedules",
-          "incidents",
-          "exceptions",
-          "work-orders",
-          "shift-handover",
-          "notifications",
-          "themes",
-          "ai",
-          "dashboards",
-        ],
-    limits: { maxInstallations: 1, maxNodes: 100_000, maxNamedUsers: 100_000 },
-    whiteLabel: true,
-    supportTier: "DEV",
+  // Solicitud sintética local: en una instalación real esto viene del
+  // `solicitud.lreq` que la app escribe sola (ceremonia LICENSING_PROCEDURE §2).
+  const request: ActivationRequest = {
+    product: "lyra-watchlog",
     schemaVersion: 1,
-    renewalCounter: 0,
-    nonce: randomUUID(),
+    installationId: "inst_dev_local",
+    fingerprint: deriveFingerprint(signals),
+    generatedAt: new Date(now).toISOString(),
   };
 
-  const lic = signLicense(payload, DEV_PRIVATE_KEY);
+  const issued = issueLicense({
+    request,
+    privateKeyPem: DEV_PRIVATE_KEY,
+    params: {
+      customer: "Desarrollo local",
+      channelPartner: "DEV",
+      edition: "enterprise",
+      modules: modulesArg
+        ? modulesArg
+            .slice("--modules=".length)
+            .split(",")
+            .map((m) => m.trim())
+            .filter(Boolean)
+        : [...LICENSED_MODULE_KEYS],
+      limits: { maxInstallations: 1, maxNodes: 100_000, maxNamedUsers: 100_000 },
+      // --expired: venció hace 60 días con 14 de gracia ⇒ SOLO_LECTURA (smoke).
+      expiresAt: new Date(expired ? now - 60 * DAY_MS : now + 365 * DAY_MS).toISOString(),
+      graceDays: 14,
+      licenseId: `lic_dev_${new Date(now).toISOString().slice(0, 10)}`,
+      issuer: "ITESICWS (DEV)",
+      supportTier: "DEV",
+      allowPast: expired,
+    },
+  });
+
   mkdirSync(dirname(resolve(licenseFile)), { recursive: true });
-  writeFileSync(resolve(licenseFile), lic + "\n", "utf8");
+  writeFileSync(resolve(licenseFile), issued.lic + "\n", "utf8");
 
   console.log(`✅ Licencia DEV escrita en ${resolve(licenseFile)}`);
   console.log(`   estado esperado: ${expired ? "SOLO_LECTURA (vencida, --expired)" : "VALIDA"}`);
-  console.log(`   huella: ${fingerprint}`);
-  console.log(`   vence:  ${payload.expiresAt}`);
+  console.log(`   huella: ${request.fingerprint}`);
+  console.log(`   vence:  ${issued.payload.expiresAt}`);
 }
 
 void main().catch((err: unknown) => {

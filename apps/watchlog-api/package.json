@@ -54,6 +54,7 @@
   },
   "devDependencies": {
     "@lyra/config": "workspace:*",
+    "@lyra/licensing-cli": "workspace:*",
     "@nestjs/cli": "^11.0.0",
     "@nestjs/schematics": "^11.0.0",
     "@types/node": "^22.10.7",

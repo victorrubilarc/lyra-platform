@@ -1,5 +1,34 @@
 # Progreso — Lyra WatchLog
 
+**2026-07-05 — 🔐 Licenciamiento L3 · CLI de emisión + custodia de clave privada + pública PROD embebida ✅**
+(`feat/licenciamiento-l3`). ITESICWS ya **emite licencias reales** y la imagen de release **queda vendible**.
+**(1) `@lyra/licensing-cli`** (decisión a — `packages/licensing-cli`, privado, `pnpm license <cmd>`, JAMÁS en la
+imagen del cliente): `keygen` (par Ed25519; privada **PKCS#8 CIFRADA** aes-256-cbc con **passphrase generada de alta
+entropía** mostrada una vez → gestor del dueño; se niega a sobreescribir), `issue` (parsea `solicitud.lreq` →
+node-lock real; valida edición/módulos contra `LICENSED_MODULE_KEYS`/fechas ISO/enteros; firma con `signLicense` de
+L0 — cero re-implementación; **auto-verifica** round-trip + huella; registra en ledger), `inspect` (QA del emisor) y
+`ledger` (JSONL **append-only con cadena de hashes** — adulterar/borrar una línea la rompe y el listado lo acusa;
+resumen de banda por socio). Custodia en `LYRA_LICENSE_HOME` (def. `~/.lyra-license/`, decisión b); passphrase por
+prompt sin eco/env/archivo, nunca por flag. **(2) Pública de PROD committeada + codegen** (decisión c, mejora sobre
+la spec): `scripts/license/prod-keys/prod-public.pem` (la pública NO es secreto) + `embed-public-key.mjs` que
+`release.yml` corre ANTES del docker build (valida Ed25519, rechaza privadas y la DEV) ⇒ **desde el primer tag `v*`
+post-L3 la imagen SÍ es distribuible**; `pnpm build` local y ci.yml siguen con la DEV (todo verde sin clave de
+PROD). **(3) Par PROD REAL generado** (privada cifrada en la custodia del dueño). **(4) `license:dev` = envoltorio
+delgado** de `issueLicense` (una sola implementación DEV/PROD). **(5) EC2 demo LICENCIADO con el par PROD** (decisión
+f ajustada con causa: el host corría v0.1.12 **pre-L1** y el compose sin mounts — una licencia DEV era inerte y
+quedaría BLOQUEADA en el primer release): `git pull` del clon + huella real con la MISMA imagen del api
+(`e271ce4b…`) + `solicitud.lreq` + `issue` con la privada PROD (1.ª emisión real del ledger:
+`lic_2026_demo_ec2_001`) + `inspect`=VALIDA + `up -d api` con mounts (health 200 interno y público). La
+**confirmación VALIDA en vivo queda amarrada al primer tag post-L3** (imagen actual no verifica; BACKLOG §2(1)).
+**(6) Rotación multi-clave (`kid`) DIFERIDA** (decisión d — L0 congelado; el camino retrocompatible es probar N
+públicas embebidas). **.gitignore endurecido** (`*.enc.pem`, `prod-private*`, `.lyra-license/`, `ledger.jsonl`).
+**Verde:** typecheck/lint/build/test (CLI **22** nuevos · API 286 · contracts 513 · licensing 42 intactos) +
+**smoke-licencia-emision.py 20/20** (ceremonia real: API sin licencia escribe solicitud → keygen → issue DEV →
+VALIDA y opera → **keygen del atacante BLOQUEADO end-to-end** → inspect acepta/rechaza → ledger íntegro y
+tamper-evident). **No probado:** arranque VALIDA del EC2 con imagen post-L3 (no existe tag aún — primer release lo
+confirma); prompt interactivo de passphrase (los flujos automatizados usan env). Decisiones a–f en DECISIONS
+2026-07-05 (L3). **Siguiente: Licenciamiento L4 (challenge-response de renovación + linaje rotatorio).**
+
 **2026-07-05 — 🔐 Licenciamiento L2 · gating de módulos por entitlement en API + web ✅** (`feat/licenciamiento-l2`).
 Se ACTIVARON los gates latentes de L1: un módulo fuera de `modules[]` de la licencia **no se puede operar ni aparece**,
 respetando «nunca secuestrar datos». **(1) Catálogo canónico** (decisión a): `LICENSED_MODULE_KEYS` (13 claves) +

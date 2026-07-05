@@ -507,8 +507,14 @@ GxP: MHRA Data Integrity 2018 / FDA DI Q&A (corrección tardía justificada + at
 ### 9.2 Control de acceso a la distribución
 - **Registro privado** (no público). **Tokens read-only por cliente/socio**, revocables (si un cliente sale o un token
   se filtra, se corta sin afectar a los demás).
-- **Custodia de la clave privada de licencias** (Ed25519, ver `LICENSING.md`) en **HSM o secret manager** — NUNCA en el
-  repo, la imagen o el `.env`. Es la raíz de confianza del licenciamiento; su fuga comprometería todo el modelo.
+- **Custodia de la clave privada de licencias** (Ed25519, ver `LICENSING.md`) — **✅ implementada en L3
+  (2026-07-05):** la privada de PROD vive **PKCS#8 CIFRADA** (aes-256-cbc) con **passphrase generada de alta
+  entropía** (en el gestor de contraseñas del dueño) en `~/.lyra-license/` (`LYRA_LICENSE_HOME`), FUERA del repo —
+  NUNCA en el repo, la imagen o el `.env` (el `.gitignore` tiene red de seguridad y el codegen del release rechaza
+  privadas). La CLI `lyra-license` la descifra SOLO en memoria al firmar; la **pública de PROD se embebe COMPILADA**
+  en el build de release (jamás por env: sería un bypass). Procedimiento completo de custodia/respaldo/rotación en
+  `LICENSING_PROCEDURE.md §5-bis`. Es la raíz de confianza del licenciamiento; su fuga comprometería todo el modelo.
+  HSM queda como upgrade futuro si el volumen de emisión lo justifica.
 - **Secrets por instalación** (`.env` de cada cliente: BD, JWT, cifrado de campos, SMTP, IA) **cifrados en reposo** y
   con **rotación** documentada. Cada instalación tiene sus **propios** secretos (un compromiso no se propaga entre
   clientes — refuerza el aislamiento single-tenant).

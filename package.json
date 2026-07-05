@@ -20,6 +20,7 @@
     "infra:up": "docker compose -f docker-compose.dev.yml up -d",
     "infra:down": "docker compose -f docker-compose.dev.yml down",
     "infra:logs": "docker compose -f docker-compose.dev.yml logs -f",
+    "license": "pnpm --filter @lyra/licensing-cli run cli",
     "db:generate": "pnpm --filter @lyra/watchlog-api run db:generate",
     "db:migrate": "pnpm --filter @lyra/watchlog-api run db:migrate"
   },

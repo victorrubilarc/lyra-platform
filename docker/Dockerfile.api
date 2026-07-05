@@ -20,6 +20,10 @@ COPY pnpm-workspace.yaml package.json pnpm-lock.yaml .npmrc ./
 COPY packages/config/package.json packages/config/
 COPY packages/contracts/package.json packages/contracts/
 COPY packages/licensing/package.json packages/licensing/
+# licensing-cli es devDependency del api (envoltorio license:dev): su manifiesto
+# es necesario para el grafo de pnpm, pero el paquete JAMÁS llega a la imagen
+# runtime (deploy --prod excluye devDependencies; es la herramienta del EMISOR).
+COPY packages/licensing-cli/package.json packages/licensing-cli/
 COPY packages/llm/package.json packages/llm/
 COPY packages/permissions/package.json packages/permissions/
 COPY packages/ui/package.json packages/ui/

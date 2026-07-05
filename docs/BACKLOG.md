@@ -5,7 +5,15 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-07-05** — **🔐 Licenciamiento L2 · gating de módulos por entitlement ✅** (`feat/licenciamiento-l2`):
+> actualización: **2026-07-05** — **🔐 Licenciamiento L3 · CLI de emisión + custodia + pública PROD ✅** (`feat/licenciamiento-l3`):
+> paquete `@lyra/licensing-cli` (`pnpm license keygen|issue|inspect|ledger`; privado, jamás en la imagen) — privada de
+> emisión PROD **generada y CIFRADA** (PKCS#8+passphrase) en `~/.lyra-license/` (fuera del repo), pública PROD
+> **committeada** (`scripts/license/prod-keys/`, no-secreto) + codegen `embed-public-key.mjs` en `release.yml` ⇒ **la
+> imagen del primer tag post-L3 SÍ es vendible** (dev/CI siguen con la DEV); ledger JSONL append-only con cadena de
+> hashes (banda por socio); `license:dev` = envoltorio de la MISMA emisión; **EC2 demo licenciado con el par PROD**
+> (huella real, compose con mounts aplicado, health 200; VALIDA en vivo se confirma en el primer tag post-L3 — ver
+> §2(1)). CLI 22 tests + smoke-licencia-emision 20/20. **L4 = PRÓXIMA** (challenge-response + linaje). — Antes:
+> **🔐 Licenciamiento L2 · gating de módulos por entitlement ✅** (`feat/licenciamiento-l2`):
 > catálogo canónico `LICENSED_MODULE_KEYS` (13 claves) + DTO `licenseStatusSchema` en `@lyra/contracts` +
 > `@RequireModule`/`ModuleEntitlementGuard` (5.º global: módulo no licenciado ⇒ mutación 403 `MODULE_NOT_LICENSED`,
 > GET/export SIEMPRE vivos; core jamás; sin payload gobierna L1) + `GET /license/status` (autenticado sin permiso,
@@ -808,19 +816,35 @@ nunca queda más de una sesión atrás.
       - [ ] **L2b (DIFERIDO en L2, decisión d):** enforcement de LÍMITES numéricos — bloquear crear nodo/usuario por
             encima de `maxNodes`/`maxNamedUsers` (403 en los endpoints de creación de structure/security; hoy
             LIMITE_EXCEDIDO solo se registra/audita). Mecanismo distinto del gate por módulo (conteo por creación).
-      - [ ] **L3 (PRÓXIMA):** CLI de emisión (`lyra-license issue`) + custodia de clave privada (HSM/secret manager) +
-            registro de emisiones.
-      - [ ] **L4:** flujo challenge-response por USB (`solicitud.lreq`→`license.lic`) + linaje rotatorio (detección
-            de clon; invariante ya protegido por test en L0 `lineage.spec.ts`).
+      - [x] **L3 · CLI de emisión + custodia + pública PROD embebida** ✅ 2026-07-05 (`feat/licenciamiento-l3`):
+            paquete **`@lyra/licensing-cli`** (privado, JAMÁS en la imagen del cliente; `pnpm license <cmd>`) con
+            `keygen` (privada **PKCS#8 CIFRADO** aes-256-cbc + passphrase generada de alta entropía; custodia
+            `LYRA_LICENSE_HOME`, def. `~/.lyra-license/`, fuera del repo) · `issue` (parsea `solicitud.lreq`,
+            valida edición/módulos contra el catálogo/fechas ISO, firma con `signLicense` de L0, auto-verifica,
+            registra en ledger) · `inspect` (QA del emisor) · `ledger` (JSONL **append-only con cadena de hashes**,
+            resumen de banda por socio) · `license:dev` ahora es envoltorio delgado de `issueLicense` (una sola
+            implementación) · **pública de PROD committeada** (`scripts/license/prod-keys/`, no es secreto) +
+            codegen `scripts/license/embed-public-key.mjs` que el **release** corre antes del docker build ⇒
+            **desde el primer tag post-L3 la imagen SÍ es vendible** (dev/CI siguen con la DEV). Par PROD REAL
+            generado (privada cifrada en la custodia del dueño; passphrase en su gestor). CLI 22 tests +
+            smoke-licencia-emision **20/20** (keygen atacante BLOQUEADO end-to-end). Decisiones a–f en
+            DECISIONS 2026-07-05 (L3).
+      - [ ] **L4 (PRÓXIMA):** flujo challenge-response por USB (`solicitud.lreq`→`license.lic`) + linaje rotatorio
+            (detección de clon; invariante ya protegido por test en L0 `lineage.spec.ts`).
       - [ ] **L5:** anti-tamper en CI (bytecode V8/nativo del módulo crítico + verificación distribuida + integridad).
       - [ ] **L6:** UI de estado/avisos (banner POR_VENCER/EN_GRACIA/SOLO_LECTURA; DTO delgado en contracts) + marca
             blanca gobernada por `whiteLabel`.
-      - [ ] **Pendientes L1 (operacionales):** (i) el **EC2 demo** (`lyra.watchlog.itesicws.com`) arrancará en
-            PENDIENTE_ACTIVACION en el próximo deploy con tag — hay que emitirle su licencia con el par DEV
-            (recoger `solicitud.lreq` del host o derivar la huella por SSH, firmar, dejar `deploy/license/license.lic`)
-            y verificar los mounts nuevos del compose (`/etc/machine-id` + `./license`); (ii) **imagen NO vendible
-            hasta L3/L5**: la pública embebida es la DEV committeada — el build de prod debe reemplazarla por la
-            pública real (custodia L3); (iii) notificación in-app/correo a admins al cambiar el estado de licencia
+      - [x] ~~Pendientes L1 (i) EC2 demo sin licencia / (ii) imagen no vendible~~ **CERRADOS en L3 (2026-07-05):**
+            (i) el EC2 demo quedó **licenciado con el par PROD** (`lic_2026_demo_ec2_001`, huella real
+            `e271ce4b…` derivada con la MISMA imagen del api, `inspect`=VALIDA; compose con mounts aplicado vía
+            `git pull` + `up -d api`, health 200) — la imagen desplegada (v0.1.12) es pre-L1 y aún no verifica:
+            la **confirmación en vivo VALIDA queda para el primer tag `v*` post-L3** (paso registrado abajo);
+            (ii) la imagen de release embebe la pública PROD desde el primer tag post-L3 (codegen en release.yml).
+      - [ ] **Pendiente L3 (operacional): primer tag `v*` post-L3** — al cortarlo: el release embebe la pública
+            PROD, el deploy recrea el api y debe arrancar **VALIDA** con el `license.lic` ya instalado en
+            `/opt/watchlog/deploy/license/` (verificar log de arranque + `GET /api/license/status`). Si algo no
+            calza (huella), regenerar `solicitud.lreq` real de la app y reemitir con la CLI.
+      - [ ] **Pendiente L1 (iii):** notificación in-app/correo a admins al cambiar el estado de licencia
             (hoy: log + AuditLog; el aviso llega con L6/Bloque N).
 - [ ] **(2) Modo marca blanca COMPLETO** (~60–120 HH) — hoy los temas son override PARCIAL en runtime y el **login
       queda con marca Lyra** (ver memoria `theme-system`). Falta: **nombre de producto configurable** en toda la app,

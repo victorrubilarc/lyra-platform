@@ -31,9 +31,27 @@ El compose de prod (`deploy/docker-compose.prod.yml`) monta en el servicio `api`
 (señal dominante de la huella node-lock — sin este mount la huella sería la del contenedor y cambiaría en cada
 `down/up`, matando la licencia) y **`./license:/app/license` (rw)** con `LICENSE_FILE=/app/license/license.lic`.
 Sin `license.lic`, la API arranca en **PENDIENTE_ACTIVACION** (solo lectura + login; escribe `solicitud.lreq` en esa
-carpeta) — **no crashea**, pero no se puede operar. ⚠️ **Pendiente para el próximo deploy:** emitir la licencia del
-EC2 demo con el par DEV (`scripts/license/dev-keys/`) usando la huella de su `solicitud.lreq` y dejarla en
-`/opt/watchlog/deploy/license/license.lic` (registrado en `BACKLOG.md §2(1)`, pendientes L1).
+carpeta) — **no crashea**, pero no se puede operar.
+
+**✅ EC2 demo LICENCIADO (L3, 2026-07-05):** `/opt/watchlog/deploy/license/license.lic` contiene la licencia
+`lic_2026_demo_ec2_001` firmada con el **par PROD** (huella real `e271ce4b…` derivada ejecutando la misma imagen del
+api con `/etc/machine-id` montado; `lyra-license inspect` = VALIDA; registrada en el ledger del emisor). El compose
+con los mounts de licencia ya está APLICADO en el host (`git pull` del clon `/opt/watchlog` + `up -d api`, health
+200). **OJO — el compose del host es un clon git y `update.sh` NO hace `git pull`:** cuando cambie
+`deploy/docker-compose.prod.yml` en el repo hay que jalar manualmente en el host.
+
+⚠️ **Verificación pendiente en el PRIMER tag `v*` post-L3:** la imagen desplegada hoy (v0.1.12) es **pre-L1** y no
+verifica licencias; el primer release post-L3 (que ya **embebe la pública de PROD** vía
+`scripts/license/embed-public-key.mjs` en `release.yml`) debe arrancar **VALIDA** con ese archivo — confirmar con el
+log de arranque (`estado=VALIDA`) y `GET /api/license/status`. Si la huella no calzara, borrar el `license.lic`,
+dejar que la app escriba su `solicitud.lreq` real y reemitir con `pnpm license issue` (BACKLOG §2(1)).
+
+**Emitir la licencia de una instalación on-premise (runbook corto):** el cliente/socio manda el `solicitud.lreq`
+que la app dejó junto a la ruta de la licencia → en la máquina del emisor: `pnpm license issue --request
+solicitud.lreq --customer … --channel-partner … --edition … --modules … --max-nodes … --max-named-users …
+--expires …` (pide la passphrase de la custodia) → devolver `license.lic` → montarlo en `./license/` del stack →
+la app lo toma en el próximo arranque/recheck. Detalle completo en `LICENSING_PROCEDURE.md §2` y custodia en
+`§5-bis`.
 
 ### ✅ Checklist post-deploy (cada vez que se despliega WatchLog)
 1. **Verificar Lyra Pass** después (POS + admin) — comparten EC2.
