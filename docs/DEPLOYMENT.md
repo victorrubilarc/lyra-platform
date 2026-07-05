@@ -26,6 +26,15 @@ El primer deploy destapó 7 problemas reales de empaquetado de producción, todo
 ### Lección de coexistencia (CRÍTICA)
 Ambas apps tenían un servicio `web`. Al compartir la red `edge`, el `reverse_proxy web:3000` del Caddy de borde resolvía ambiguo → **rompió el POS de Lyra Pass**. **Regla: en la red `edge` NUNCA dos servicios con el mismo nombre.** El servicio web de WatchLog se llama **`watchlog-web`** (único). Y la red `edge` se dejó **persistente** en el compose de Lyra Pass (su Caddy vuelve solo a `edge` en cada redeploy).
 
+### 🔐 Licenciamiento L1 (desde 2026-07-05) — el stack REQUIERE licencia
+El compose de prod (`deploy/docker-compose.prod.yml`) monta en el servicio `api`: **`/etc/machine-id` del host (ro)**
+(señal dominante de la huella node-lock — sin este mount la huella sería la del contenedor y cambiaría en cada
+`down/up`, matando la licencia) y **`./license:/app/license` (rw)** con `LICENSE_FILE=/app/license/license.lic`.
+Sin `license.lic`, la API arranca en **PENDIENTE_ACTIVACION** (solo lectura + login; escribe `solicitud.lreq` en esa
+carpeta) — **no crashea**, pero no se puede operar. ⚠️ **Pendiente para el próximo deploy:** emitir la licencia del
+EC2 demo con el par DEV (`scripts/license/dev-keys/`) usando la huella de su `solicitud.lreq` y dejarla en
+`/opt/watchlog/deploy/license/license.lic` (registrado en `BACKLOG.md §2(1)`, pendientes L1).
+
 ### ✅ Checklist post-deploy (cada vez que se despliega WatchLog)
 1. **Verificar Lyra Pass** después (POS + admin) — comparten EC2.
 2. Cambios de **`deploy/`** (compose/update.sh/Caddyfile) **NO** son automáticos → `git pull` en `/opt/watchlog` antes/junto al deploy. Solo el **código de app** (imágenes) sube solo con el tag.

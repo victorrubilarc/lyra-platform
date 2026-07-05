@@ -5,7 +5,12 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-07-03** — **🎛️ UX · Pulido transversal pre-Slice 8 ✅** (`feat/ux-pulido-pre-s8`):
+> actualización: **2026-07-05** — **🔐 Licenciamiento L1 · runtime en la API ✅** (`feat/licenciamiento-l1`):
+> LicenseService (pública EMBEBIDA, huella estable bajo Docker por machine-id del HOST, caché + re-eval 6 h) +
+> `LicenseInstallation` single-row + `solicitud.lreq` auto + guard global (PENDIENTE_ACTIVACION/SOLO_LECTURA/BLOQUEADA
+> bloquean mutaciones; export GET siempre vivo; whitelist `/api/auth/`) + 2.º chequeo distribuido en el worker +
+> auditoría + `pnpm license:dev`; API 276 tests + smoke-licencia 28/28; **L2 = PRÓXIMA** (gating por entitlement).
+> Deudas L1 en §2(1): licencia del EC2 demo + pública PROD en L3/L5. — Antes: **🎛️ UX · Pulido transversal pre-Slice 8 ✅** (`feat/ux-pulido-pre-s8`):
 > 6 ítems de feedback + 2 hallazgos, TODO UI/consulta (SIN migración/permiso/FLUSHALL). (1) sin jerga «(Fase X)» en 6 hints;
 > (2) drawer incidencias 720→860; **(3) checklists de OT fuera de Bitácoras por el ENLACE** `{ workOrderChecklists: { none: {} } }`
 > en `buildWhere` (NO por `purpose`: una regla de checklist puede usar plantilla general y su instancia se colaba — fuga real
@@ -775,10 +780,17 @@ nunca queda más de una sesión atrás.
             `deriveFingerprint` (canónica), `evaluateLicense`+helpers (máquina de estados §5, nunca destructiva),
             tipos con linaje declarado (`renewalCounter`/`nonce`); **42 tests** (9 casos del PoC + bordes). Decisiones
             en DECISIONS 2026-07-04 (source-only; tipos en licensing NO contracts; alg fijado en verificador RFC 8725).
-      - [ ] **L1 (PRÓXIMA):** `LicenseService` NestJS (carga `license.lic` + clave pública embebida, recolección real
-            de señales del SO, caché + re-evaluación periódica y al arranque, guard de arranque, auditoría de cambios
-            de estado).
-      - [ ] **L2:** gating de módulos por entitlement en API/web (activar los gates latentes `modules[]`/`edition`).
+      - [x] **L1 · runtime de la licencia en la API** ✅ 2026-07-05 (`feat/licenciamiento-l1`): `LicenseModule` global
+            (`LicenseService` carga/verifica con **pública embebida** + evalúa con actuals + cachea + re-evalúa 6 h) ·
+            señales estables bajo Docker (**machine-id del HOST bind-monteado**; MACs/hostname excluidos) · tabla
+            single-row `LicenseInstallation` (installationId + linaje L4; migr. `20260705041924`) · `solicitud.lreq`
+            auto-generada · guard global (mutaciones 403 en SOLO_LECTURA/BLOQUEADA/**PENDIENTE_ACTIVACION**; whitelist
+            `/api/auth/`+`/api/health`; export=GET siempre vivo) · 2.º chequeo distribuido en worker de notificaciones
+            (re-verifica DESDE DISCO) · auditoría `license.state.changed` · par DEV committeado + `pnpm license:dev` ·
+            **@lyra/licensing ganó build dist** (la API CJS no importa TS fuente; DECISIONS 2026-07-05). API 276 tests
+            + smoke-licencia **28/28**. ⚠️ Deudas hijas: ver "pendientes L1" abajo.
+      - [ ] **L2 (PRÓXIMA):** gating de módulos por entitlement en API/web (activar los gates latentes
+            `modules[]`/`edition`; consumidores de `isModuleLicensed()` + DTO delgado si aplica).
       - [ ] **L3:** CLI de emisión (`lyra-license issue`) + custodia de clave privada (HSM/secret manager) + registro
             de emisiones.
       - [ ] **L4:** flujo challenge-response por USB (`solicitud.lreq`→`license.lic`) + linaje rotatorio (detección
@@ -786,6 +798,13 @@ nunca queda más de una sesión atrás.
       - [ ] **L5:** anti-tamper en CI (bytecode V8/nativo del módulo crítico + verificación distribuida + integridad).
       - [ ] **L6:** UI de estado/avisos (banner POR_VENCER/EN_GRACIA/SOLO_LECTURA; DTO delgado en contracts) + marca
             blanca gobernada por `whiteLabel`.
+      - [ ] **Pendientes L1 (operacionales):** (i) el **EC2 demo** (`lyra.watchlog.itesicws.com`) arrancará en
+            PENDIENTE_ACTIVACION en el próximo deploy con tag — hay que emitirle su licencia con el par DEV
+            (recoger `solicitud.lreq` del host o derivar la huella por SSH, firmar, dejar `deploy/license/license.lic`)
+            y verificar los mounts nuevos del compose (`/etc/machine-id` + `./license`); (ii) **imagen NO vendible
+            hasta L3/L5**: la pública embebida es la DEV committeada — el build de prod debe reemplazarla por la
+            pública real (custodia L3); (iii) notificación in-app/correo a admins al cambiar el estado de licencia
+            (hoy: log + AuditLog; el aviso llega con L6/Bloque N).
 - [ ] **(2) Modo marca blanca COMPLETO** (~60–120 HH) — hoy los temas son override PARCIAL en runtime y el **login
       queda con marca Lyra** (ver memoria `theme-system`). Falta: **nombre de producto configurable** en toda la app,
       **login personalizable**, branding en el **acta PDF** y en los **correos** salientes. Sin rebuild (runtime),

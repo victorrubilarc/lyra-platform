@@ -92,6 +92,14 @@ services:
       # V8 hace GC antes del tope del cgroup (el OOM-kill de cgroup es SIGKILL, no grácil).
       NODE_OPTIONS: "--max-old-space-size=384"
       TZ: "${TZ:-America/Santiago}"
+      LICENSE_FILE: "/app/license/license.lic"
+    volumes:
+      # Huella node-lock (L1): el machine-id del HOST, no el del contenedor —
+      # sin este mount la huella cambia en cada `down/up` y mata la licencia.
+      - /etc/machine-id:/etc/machine-id:ro
+      # Carpeta de licencia (rw): aquí se importa license.lic y la app deja
+      # solicitud.lreq cuando aún no hay licencia (ceremonia de activación).
+      - ./license:/app/license
     depends_on:
       migrate:
         condition: service_completed_successfully

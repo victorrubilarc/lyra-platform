@@ -547,6 +547,17 @@ tabla existente. El catálogo de EVENTOS vive en CÓDIGO (`@lyra/contracts NOTIF
   stream) y la columna `ShiftHandover.summaryProvider` (ya existente). El único cambio de contrato es el DTO `updateHandoverSummary`,
   que ahora acepta `summaryProvider` opcional para PERSISTIR el texto IA generado en vivo sin re-generar (no toca la BD/migraciones).
 
+### Licenciamiento (L1 — *implementado*)
+- **LicenseInstallation** *(implementado, migración `20260705041924_add_license_installation`)* — identidad y estado
+  LOCAL de la instalación, **singleton** (`id="system"`, patrón AiSettings). `installationId` (se genera en el PRIMER
+  arranque, `inst_<uuid>`; con él se pide/emite la licencia — runbook `LICENSING_PROCEDURE.md §2`), `createdAt`,
+  **linaje rotatorio para L4**: `renewalCounter` (def. 0), `nonce?`, `lastRenewalAt?`, `updatedAt`. **Vive en Postgres
+  a propósito** (DECISIONS 2026-07-05 b): el `pg_dump` del runbook la respalda junto a los datos (un restore legítimo
+  conserva el linaje) y clonar la BD clona el linaje — la evidencia que L4 detecta al renovar. Adulterarla no aporta:
+  el linaje se contrasta contra el registro del EMISOR y el `installationId` válido es el del payload FIRMADO
+  (`license.lic`). El archivo de licencia NO vive en la BD (volumen `LICENSE_FILE`); la evaluación en runtime es
+  cacheada por `LicenseService` (sin tabla de estado evaluado — deriva siempre de archivo+huella+reloj).
+
 ### Apariencia / Temas administrables (EST-TEMAS — *implementado*)
 - **ThemePalette** *(implementado, migración `20260624140000_add_theme_palettes`)* — paleta de color de marca construida
   por un admin (`theme:manage`). `name`, `description?`, **`tokensDark`/`tokensLight` (JSONB)** = override PARCIAL de los

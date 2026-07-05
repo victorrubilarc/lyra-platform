@@ -86,6 +86,20 @@ export const envSchema = z.object({
   // --- Admin de arranque (seed idempotente) ---
   BOOTSTRAP_ADMIN_EMAIL: z.string().email().optional(),
   BOOTSTRAP_ADMIN_PASSWORD: z.string().optional(),
+
+  // --- Licenciamiento (L1) ---
+  // Ruta del archivo de licencia firmado (license.lic). En contenedor se monta
+  // como volumen (/app/license/license.lic); en dev lo genera `pnpm license:dev`.
+  // Si no existe, la app ARRANCA en PENDIENTE_ACTIVACION (degradada, jamás crashea)
+  // y escribe `solicitud.lreq` junto a esta ruta para la ceremonia de activación.
+  LICENSE_FILE: z.string().default(".license/license.lic"),
+  // Re-evaluación periódica de la licencia, en minutos (def. 360 = 6 h).
+  LICENSE_RECHECK_MINUTES: z.coerce.number().int().positive().default(360),
+  // Umbral en días para el estado POR_VENCER (aviso previo al vencimiento).
+  LICENSE_WARN_DAYS: z.coerce.number().int().positive().default(30),
+  // Archivo del machine-id (señal dominante de la huella node-lock). Bajo Docker
+  // DEBE ser el del HOST, bind-monteado ro por el compose (¡no el del contenedor!).
+  LICENSE_MACHINE_ID_FILE: z.string().default("/etc/machine-id"),
 });
 
 export type Env = z.infer<typeof envSchema>;

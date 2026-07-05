@@ -6,8 +6,11 @@
 > la estrategia está en [`LICENSING_STRATEGY.md`](./LICENSING_STRATEGY.md); el **cómo técnico interno**
 > en [`LICENSING.md`](./LICENSING.md); el modelo comercial en [`estrategia-canal.md`](./estrategia-canal.md).
 >
-> Fecha: **2026-07-04**. Estado: **procedimiento propuesto** (el módulo de licenciamiento aún no se
-> construye — plan L0–L6 en `BACKLOG.md §2(1)`). Este runbook define cómo se operará una vez construido.
+> Fecha: **2026-07-05**. Estado: **parcialmente operativo** — L0 (núcleo `@lyra/licensing`) y **L1 (runtime en
+> la API)** están construidos: la app ya arranca en PENDIENTE_DE_ACTIVACIÓN sin licencia, **genera
+> `solicitud.lreq` sola** (§2 Fase B paso 2 = real), verifica firma/huella y hace cumplir la máquina de
+> estados. Falta la CLI de emisión (L3: hoy solo existe `pnpm license:dev` con el par DEV, NO apto para
+> vender), el challenge-response de renovación (L4) y la UI de estado (L6). Plan L0–L6 en `BACKLOG.md §2(1)`.
 
 ---
 
@@ -89,10 +92,15 @@ Esto se repite **una vez por cada servidor** que el socio levanta (una por licen
 **solicitud → emisión → importación** (challenge-response), que funciona **con o sin internet**:
 
 1. **Desplegar el stack** en el servidor del cliente final (las mismas imágenes de la Fase A).
-2. **Al primer arranque, la app genera un archivo de solicitud** — `solicitud.lreq` — que contiene:
-   - un `installationId` (identificador de esa instalación),
-   - la **huella de la máquina** (fingerprint: derivada de CPU, disco, machine-id, etc.),
-   - la versión del producto.
+   **Requisito del compose (ya incluido en los compose del repo):** el servicio `api` monta
+   `/etc/machine-id` del **host** (ro) — es la señal dominante de la huella; sin ese mount la huella
+   sería la del contenedor y cambiaría al recrearlo — y la carpeta `./license:/app/license` (rw),
+   donde vive `license.lic` y donde la app deja la solicitud.
+2. **Al primer arranque, la app genera un archivo de solicitud** — `solicitud.lreq` (✅ real desde L1:
+   lo escribe `LicenseService` en la carpeta de licencia) — que contiene:
+   - un `installationId` (identificador de esa instalación, persistido en la tabla `LicenseInstallation`),
+   - la **huella de la máquina** (fingerprint: machine-id del host + CPU + plataforma),
+   - la versión de esquema del producto.
    Es un archivo pequeño de texto. *No contiene datos del cliente ni secretos.*
 3. **El socio te hace llegar ese `solicitud.lreq`:**
    - Con internet: lo sube a tu **portal de licencias** (o te lo manda).

@@ -55,6 +55,14 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-info}
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
       REDIS_URL: redis://redis:6379
+      LICENSE_FILE: /app/license/license.lic
+    volumes:
+      # Huella node-lock (L1): el machine-id del HOST, no el del contenedor —
+      # sin este mount la huella cambia en cada `down/up` y mata la licencia.
+      - /etc/machine-id:/etc/machine-id:ro
+      # Carpeta de licencia (rw): aquí se importa license.lic y la app deja
+      # solicitud.lreq cuando aún no hay licencia (ceremonia de activación).
+      - ./license:/app/license
     # Aplica migraciones pendientes y luego arranca.
     command: ["sh", "-c", "node_modules/.bin/prisma migrate deploy && node dist/main.js"]
 

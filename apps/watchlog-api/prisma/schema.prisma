@@ -1312,6 +1312,30 @@ model AiSettings {
   updatedAt      DateTime  @updatedAt
 }
 
+// ===========================================================================
+//  Licenciamiento (L1) — identidad y estado LOCAL de la instalación
+// ===========================================================================
+// Singleton (id="system", patrón AiSettings). Se crea en el PRIMER arranque y
+// persiste el `installationId` con el que se pide/emite la licencia (runbook
+// LICENSING_PROCEDURE.md §2) + el LINAJE rotatorio de la capa 4 (renewalCounter/
+// nonce, declarado desde ya; su flujo challenge-response se construye en L4).
+// DECISIÓN (2026-07-05): vive en Postgres y NO en un archivo del volumen para que
+// el pg_dump del runbook lo respalde junto a los datos (un restore legítimo
+// conserva el linaje) y para que clonar la BD clone el linaje — exactamente lo
+// que L4 detecta como sobre-despliegue. Adulterarlo no sirve de nada: el linaje
+// se contrasta contra el registro del EMISOR al renovar, y el installationId
+// válido es el del payload FIRMADO (license.lic).
+model LicenseInstallation {
+  id             String    @id @default("system")
+  installationId String
+  createdAt      DateTime  @default(now())
+  // --- Linaje rotatorio (capa 4, flujo en L4) ---
+  renewalCounter Int       @default(0)
+  nonce          String?
+  lastRenewalAt  DateTime?
+  updatedAt      DateTime  @updatedAt
+}
+
 // Registro de cada GENERACIÓN de IA para gobernanza de costo (proveedor/modelo/tokens/
 // latencia/estado). Inmutable, append-only. `handoverId` es ref BLANDA al cambio de turno
 // (sin FK; single-tenant, sin borrado físico) para rastrear el resumen que la originó.

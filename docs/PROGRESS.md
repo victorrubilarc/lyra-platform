@@ -1,5 +1,35 @@
 # Progreso — Lyra WatchLog
 
+**2026-07-05 — 🔐 Licenciamiento L1 · runtime de la licencia en la API ✅** (`feat/licenciamiento-l1`).
+La API ahora **vive la licencia** consumiendo `@lyra/licensing` (L0 intacto, cero re-implementación de lógica pura).
+**(1) `LicenseModule` global** (`src/licensing/`): `LicenseService` carga `LICENSE_FILE` (def. `.license/license.lic`;
+contenedor `/app/license/license.lic`), verifica firma con **pública EMBEBIDA como constante** (`license-public-key.ts`,
+jamás por env), deriva huella real, evalúa con actuals (nodos/usuarios ACTIVE) + `LICENSE_WARN_DAYS`, **cachea**
+`LicenseSnapshot` y re-evalúa cada `LICENSE_RECHECK_MINUTES` (def. 6 h, interval vía SchedulerRegistry); expone
+`getEvaluation()`/`isModuleLicensed()` (LATENTE para L2) y `workersOperational()`. **(2) Señales estables bajo Docker**
+(decisión a): `MachineSignalsCollector` = machine-id del **HOST** (bind-mount ro en ambos compose) + cpuModel +
+osPlatform; MACs/hostname EXCLUIDOS (inestables al recrear contenedor); Windows dev = MachineGuid. **(3) Identidad local**
+(decisión b): tabla single-row **`LicenseInstallation`** (migr. `20260705041924`, patrón AiSettings) con linaje L4
+declarado; sin licencia escribe **`solicitud.lreq`** solo (ceremonia runbook §2 real). **(4) Enforcement** (decisión c):
+`LicenseEnforcementGuard` global (4.º, tras authz) — SOLO_LECTURA/BLOQUEADA/**PENDIENTE_ACTIVACION** (estado runtime,
+no del enum L0) bloquean mutaciones con `403 code=LICENSE_RESTRICTED+licenseStatus`; GET/HEAD/OPTIONS SIEMPRE pasan
+(export = GET); whitelist explícita testeada `/api/auth/` + `/api/health`; **2.º chequeo distribuido en el worker de
+notificaciones** (re-verifica firma DESDE DISCO por tick; el acta PDF NO se toca — es exportación). **(5) Auditoría**:
+`license.state.changed` (actor `system@license`, antes/después) + log nítido al arranque. **(6) Dev/CI** (decisión d):
+par DEV **committeado** (`scripts/license/dev-keys/`) + `pnpm license:dev` (tools/gen-dev-license.ts, mismo recolector;
+`--expired` para smokes); pública PROD = OTRA, nace en L3 con custodia (imagen actual NO vendible — BACKLOG).
+**Desviación registrada:** `@lyra/licensing` ganó **build dist** (espejo contracts) — la API CJS no puede importar TS
+fuente (el espejo source-only `@lyra/permissions` solo lo consume la web/Vite); mitigado por predev/CI/Dockerfile
+(+ `packages/licensing/package.json` en stage deps del Dockerfile.api). **Verde:** typecheck/lint/build/test monorepo
+(API **276** = 252+24 nuevos: service 11 con reloj falso / collector 6 / guard 7; licensing 42 intactos) +
+**smoke-licencia.py 28/28** (4 arranques reales: VÁLIDA opera + adulteración EN CALIENTE pausa el worker ·
+sin archivo = PENDIENTE_ACTIVACION + solicitud.lreq · adulterada = BLOQUEADA · vencida = SOLO_LECTURA con export CSV
+vivo · auditoría por arranque vía SQL). **Fix colateral:** `_prisma_migrations` del dev tenía checksum drift (fila
+duplicada + checksum viejo) que forzaba reset — corregido en la tabla de contabilidad, sin tocar esquema/datos.
+**No probado:** compose de prod con los mounts nuevos (se probará en el próximo deploy; el EC2 demo necesitará su
+licencia — ver BACKLOG). USER_GUIDE: sección "Licencia de la instalación" agregada. **Siguiente: Licenciamiento L2
+(gating de módulos por entitlement en API/web).**
+
 **2026-07-04 — 🔐 Licenciamiento L0 · núcleo `@lyra/licensing` ✅** (`feat/licenciamiento-l0`).
 Primera sesión del plan L0–L6 del módulo de licenciamiento (BACKLOG §2(1), estrategia **Opción C** decidida el
 2026-07-04). Se creó **`packages/licensing`** como librería **PURA** (sin NestJS/Prisma/infra/I-O; **cero dependencias**,

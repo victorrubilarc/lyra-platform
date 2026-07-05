@@ -41,6 +41,9 @@ importers:
       '@lyra/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@lyra/licensing':
+        specifier: workspace:*
+        version: link:../../packages/licensing
       '@lyra/llm':
         specifier: workspace:*
         version: link:../../packages/llm
