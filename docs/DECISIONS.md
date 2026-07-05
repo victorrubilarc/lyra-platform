@@ -4,7 +4,40 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
-### 2026-07-04 · Licenciamiento L0 · `@lyra/licensing` = paquete **source-only** con tipos PROPIOS (no en contracts); 3 endurecimientos sobre el PoC
+### 2026-07-05 · Licenciamiento L1 · runtime de la licencia en la API (decisiones a–e, aprobadas por el dueño antes de codificar)
+Sesión L1 (`feat/licenciamiento-l1`): la API carga/verifica/evalúa/cachea la licencia con `@lyra/licensing` y hace
+cumplir la máquina de estados. Decisiones:
+- **(a) Señales estables bajo Docker = bind-mount del `/etc/machine-id` del HOST** (ro, en ambos compose de prod) +
+  `cpuModel` + `osPlatform`; **MACs y hostname EXCLUIDOS** (dentro de un contenedor son del contenedor/veth y cambian
+  al recrearlo ⇒ matarían la licencia de un cliente legítimo en cada `down/up`). Se DESCARTÓ la semilla inyectada por
+  `install.sh` en `.env`: una semilla en un archivo **viaja con la carpeta de despliegue** — el socio avaro (perfil 1,
+  el 80% del riesgo) la copia junto con todo; el machine-id del host NO viaja. En Windows dev: `MachineGuid` del registro.
+- **(b) `installationId` + estado local = tabla single-row Postgres `LicenseInstallation`** (id="system", patrón
+  AiSettings), con columnas de **linaje L4** (`renewalCounter`/`nonce`/`lastRenewalAt`) declaradas desde ya. Contra el
+  archivo-en-volumen: el `pg_dump` del runbook la respalda JUNTO a los datos (un restore legítimo conserva el linaje y
+  no mata la licencia) y **clonar la BD clona el linaje** — exactamente la evidencia que L4 detecta al renovar.
+  Adulterarla no sirve: el linaje se contrasta contra el registro del EMISOR y el installationId válido es el del
+  payload FIRMADO.
+- **(c) Guard global (4.º `APP_GUARD`, tras authz — un 401 sigue siendo 401):** SOLO_LECTURA = BLOQUEADA =
+  PENDIENTE_ACTIVACION ⇒ mutaciones 403 (`code=LICENSE_RESTRICTED` + `licenseStatus`); GET/HEAD/OPTIONS pasan SIEMPRE
+  (toda exportación es GET). **Lista blanca explícita testeada**: prefijo `/api/auth/` + `/api/health` exacto.
+  **PENDIENTE_ACTIVACION** es estado del RUNTIME (`LicenseRuntimeStatus`), NO se agregó al enum de L0 (no hay payload
+  que evaluar); sin archivo, la app además escribe `solicitud.lreq` sola. **2.º chequeo distribuido en el worker de
+  notificaciones** (re-verifica firma DESDE DISCO cada tick, no el caché del guard) y **NO en el acta PDF**, objeción
+  registrada a los ejemplos de la spec: el acta es EXPORTACIÓN y bloquearla violaría "jamás secuestrar datos".
+  EN_GRACIA/POR_VENCER/LIMITE_EXCEDIDO no bloquean en L1 (registran; enforcement fino = L2).
+- **(d) Llaves: pública EMBEBIDA como constante compilada** (`license-public-key.ts`; jamás por env = bypass keygen).
+  HOY es la pública del **par DEV committeado** (`scripts/license/dev-keys/`, su privada NO es secreto) y
+  `pnpm license:dev` firma una licencia local con el MISMO recolector de señales. La pública de **PROD será OTRA**,
+  nace en L3 bajo custodia y el build de CI la reemplaza (L3/L5); hasta entonces **ninguna imagen del repo es apta
+  para venderse** (BACKLOG §2(1)). Generar el par prod ahora habría dejado la privada sin custodia en una máquina dev.
+- **(e) Migración aditiva** (`20260705041924_add_license_installation`), **SIN permiso nuevo** ⇒ sin `db:seed` extra ni
+  FLUSHALL (L1 no expone endpoints de usuario; la auditoría usa el visor existente).
+- **Desviación registrada sobre L0:** `@lyra/licensing` deja de ser *source-only* y **gana build a `dist`** (espejo
+  exacto de `@lyra/contracts`). Motivo técnico verificado: el que consume el paquete es la **API** (tsc CommonJS,
+  `rootDir: src`), que NO puede importar TS fuente de otro paquete (el espejo `@lyra/permissions` solo lo consume la
+  web, que transpila con Vite). El gotcha "reconstruir dist" queda mitigado: `predev`, el CI y el Dockerfile ya
+  compilan `packages/**` antes de usar.
 Se construyó el núcleo puro del licenciamiento (`packages/licensing`, sesión L0 del plan L0–L6), aprobado por el dueño
 antes de codificar. Decisiones registradas:
 - **Source-only, espejo de `@lyra/permissions`** (`exports: "./src/index.ts"`, sin `build`): lo consumen solo la API (L1)

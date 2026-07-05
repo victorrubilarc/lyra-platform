@@ -19,6 +19,7 @@ COPY pnpm-workspace.yaml package.json pnpm-lock.yaml .npmrc ./
 # `llm` ⇒ el build del api fallaba al resolver @lyra/llm.
 COPY packages/config/package.json packages/config/
 COPY packages/contracts/package.json packages/contracts/
+COPY packages/licensing/package.json packages/licensing/
 COPY packages/llm/package.json packages/llm/
 COPY packages/permissions/package.json packages/permissions/
 COPY packages/ui/package.json packages/ui/

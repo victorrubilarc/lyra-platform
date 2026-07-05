@@ -6,9 +6,11 @@
 > tope de instalaciones/nodos/usuarios y módulos habilitados. Es un **ítem de desarrollo cerrado**,
 > aún no construido.
 >
-> Última actualización: **2026-07-04**. Estado: **L0 construido** — el núcleo puro (firma/verificación Ed25519,
-> huella, máquina de estados §5) existe como **`@lyra/licensing`** (`packages/licensing`, 42 tests). Pendientes
-> L1–L6 (servicio NestJS, gating, CLI, linaje, anti-tamper, UI). Estimación total: ~80–160 HH.
+> Última actualización: **2026-07-05**. Estado: **L0 + L1 construidos** — el núcleo puro (firma/verificación
+> Ed25519, huella, máquina de estados §5) existe como **`@lyra/licensing`** (`packages/licensing`, 42 tests) y la
+> API ya **vive la licencia en runtime** (L1: `LicenseService` + guard global + chequeo distribuido en el worker +
+> auditoría; ver §4/§5). Pendientes L2–L6 (gating por entitlement, CLI de emisión, linaje/challenge-response,
+> anti-tamper, UI). Estimación total: ~80–160 HH.
 
 ---
 
@@ -116,10 +118,18 @@ El archivo es un **payload JSON firmado** (JWS/Ed25519, §4). Ejemplo del payloa
 - **Emisión (ITESICWS):** una **CLI/servicio interno** (`lyra-license issue --customer … --expires …
   --modules …`) toma los parámetros, arma el payload, lo firma con la clave privada y produce el
   `license.lic`. Registro interno de licencias emitidas (a quién, cuándo, con qué límites).
-- **Verificación (instalación):** al arrancar la API, un `LicenseService` (NestJS) carga el archivo,
-  **verifica la firma con la clave pública**, valida `notBefore`/`expiresAt`, `installationId` y los
-  `limits` contra el estado real (nº de instalaciones/nodos/usuarios). Resultado → un **estado de
-  licencia** (§5) cacheado y re-evaluado periódicamente (p. ej. cada 6–24 h) y en cada arranque.
+- **Verificación (instalación) — ✅ construida en L1** (`apps/watchlog-api/src/licensing/`): al arrancar la
+  API, `LicenseService` carga el archivo (`LICENSE_FILE`, def. `.license/license.lic`; en contenedor
+  `/app/license/license.lic` montado como volumen), **verifica la firma con la clave pública EMBEBIDA como
+  constante compilada** (`license-public-key.ts` — jamás por env; hoy es la pública DEV, el build de prod la
+  reemplaza en L3/L5), deriva la **huella real** (`MachineSignalsCollector`: machine-id del HOST bind-monteado
+  + cpuModel + osPlatform; MACs/hostname EXCLUIDOS por inestables bajo Docker) y evalúa con `evaluateLicense`
+  + conteos reales (nodos / usuarios ACTIVE). Resultado → `LicenseSnapshot` **cacheado**, re-evaluado en cada
+  arranque y cada `LICENSE_RECHECK_MINUTES` (def. 360 = 6 h) con `warnDays` = `LICENSE_WARN_DAYS` (def. 30).
+  La identidad local (`installationId` + linaje L4) persiste en la tabla single-row **`LicenseInstallation`**
+  (Postgres: el backup del runbook la respalda con los datos; clonar la BD clona el linaje = lo que L4 detecta).
+  Sin archivo, el servicio escribe **`solicitud.lreq`** (installationId + huella) junto a la ruta de la
+  licencia — deja lista la ceremonia de activación del runbook §2.
 - **Custodia de la clave privada:** HSM o gestor de secretos (no en repo, no en imagen, no en el
   `.env` de despliegue). Rotación posible vía `schemaVersion` + varias claves públicas embebidas.
 
@@ -141,6 +151,25 @@ El archivo es un **payload JSON firmado** (JWS/Ed25519, §4). Ejemplo del payloa
   exportación**. Los datos son del cliente.
 - La operación crítica no se corta **de golpe**: hay aviso previo (POR VENCER) y gracia.
 - Todo cambio de estado de licencia se **audita** (`AuditLog`) y notifica a administradores.
+
+**Enforcement construido en L1 (cómo se aplica esta tabla en runtime):**
+- **`LicenseEnforcementGuard` GLOBAL** (4.º guard, corre tras JWT/permisos): en estados **restringidos**
+  (SOLO_LECTURA · BLOQUEADA · PENDIENTE_ACTIVACION) bloquea las **MUTACIONES** (POST/PUT/PATCH/DELETE) con
+  `403 { code: "LICENSE_RESTRICTED", licenseStatus }`; **GET/HEAD/OPTIONS pasan SIEMPRE** (toda exportación del
+  producto es GET: acta PDF, presigned de adjuntos, export de auditoría). **Lista blanca explícita** (constante
+  testeada, sin regex): prefijo `/api/auth/` (login/refresh/logout/contraseña/MFA — sin ellos ni se podría leer)
+  y `/api/health` exacto. EN_GRACIA / POR_VENCER / LIMITE_EXCEDIDO **no** bloquean en L1 (se registran; el
+  enforcement fino "no crear por encima del límite" y el gating por módulo son L2).
+- **`PENDIENTE_ACTIVACION`** = variante presentable de BLOQUEADA cuando **no hay archivo de licencia**
+  (instalación recién desplegada): mismo enforcement, estado/mensaje propio. Es un estado del RUNTIME de la API
+  (`LicenseRuntimeStatus`), NO del enum puro de `@lyra/licensing` (no hay payload que evaluar).
+- **Verificación DISTRIBUIDA, no un solo `if`:** además del guard HTTP, el **worker de notificaciones** re-verifica
+  la firma **desde disco** en cada tick (`LicenseService.workersOperational`) y en estados restringidos NO genera
+  trabajo operacional nuevo (avisos/barridos SLA). Dos rutas de código independientes; el acta PDF NO se bloquea
+  a propósito (es EXPORTACIÓN — bloquearla violaría "jamás secuestrar datos").
+- Cambio de estado ⇒ `AuditLog` `license.state.changed` (actor `system@license`, antes/después) + log nítido al
+  arranque (estado · motivo · licenseId · cliente · edición · vencimiento · huella). La notificación a
+  administradores (banner/aviso) llega con la UI de L6.
 
 ---
 
@@ -194,7 +223,7 @@ chequeo. No se puede volver imposible al 100%, pero se encarece por capas:
 |---|---|
 | Formato de licencia + firma/verificación (Ed25519, JWS) — **✅ hecho en L0 (`@lyra/licensing`)** | 15–25 |
 | CLI de emisión + custodia de clave privada | 10–20 |
-| `LicenseService` + máquina de estados + caché + re-evaluación | 20–35 |
+| `LicenseService` + máquina de estados + caché + re-evaluación — **✅ hecho en L1** (+ guard global, señales estables bajo Docker, `LicenseInstallation`, auditoría, `solicitud.lreq`, licencia dev `pnpm license:dev`, smoke 28/28) | 20–35 |
 | Gating de módulos por entitlement (backend) + UI de estado/aviso | 15–30 |
 | Enforcement de límites (nodos/usuarios/instalaciones) | 10–20 |
 | Empaquetado anti-tamper (bytecode/native del módulo crítico) | 10–30 |

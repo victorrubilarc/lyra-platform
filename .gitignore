@@ -37,3 +37,7 @@ docker/volumes/
 # Backups de Postgres generados en el host (nunca al repo)
 /deploy/backups/*
 !/deploy/backups/.gitkeep
+
+# Licencias locales (license.lic dev + solicitud.lreq). Las llaves DEV committeadas
+# viven en scripts/license/dev-keys (esas SÍ van al repo; no son secreto).
+.license/

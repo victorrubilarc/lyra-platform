@@ -3,6 +3,7 @@ import { Cron, CronExpression } from "@nestjs/schedule";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
+import { LicenseService } from "../licensing/license.service";
 import { EmailConfigService } from "../email/email-config.service";
 import { SchedulesService } from "../schedules/schedules.service";
 import { IncidentSlaService } from "../incidents/incident-sla.service";
@@ -51,6 +52,7 @@ export class NotificationWorkerService {
     private readonly channels: NotificationChannelRegistry,
     private readonly realtime: NotificationRealtimeService,
     private readonly emailConfig: EmailConfigService,
+    private readonly license: LicenseService,
   ) {}
 
   @Cron(CronExpression.EVERY_MINUTE)
@@ -79,6 +81,10 @@ export class NotificationWorkerService {
   // --- 1. Sweeper de eventos DERIVED -----------------------------------------
 
   async sweep(): Promise<number> {
+    // Chequeo DISTRIBUIDO de licencia (independiente del guard HTTP): re-verifica
+    // la firma desde disco. En estado restringido el worker no genera trabajo
+    // operacional NUEVO (avisos/barridos); leer y exportar datos no pasa por aquí.
+    if (!(await this.license.workersOperational("notificaciones"))) return 0;
     if (this.busy.sweep) return 0;
     this.busy.sweep = true;
     let emitted = 0;
@@ -160,6 +166,7 @@ export class NotificationWorkerService {
   // --- 2. Dispatcher (evento → filas de bandeja) -----------------------------
 
   async dispatchPending(): Promise<number> {
+    if (!(await this.license.workersOperational("notificaciones"))) return 0;
     if (this.busy.dispatch) return 0;
     this.busy.dispatch = true;
     let dispatched = 0;
@@ -217,6 +224,7 @@ export class NotificationWorkerService {
   // --- 3. Sender (bandeja → canal) -------------------------------------------
 
   async sendPending(): Promise<number> {
+    if (!(await this.license.workersOperational("notificaciones"))) return 0;
     if (this.busy.send) return 0;
     this.busy.send = true;
     let sent = 0;

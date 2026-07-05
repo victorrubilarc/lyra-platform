@@ -13,6 +13,7 @@ import { AiModule } from "./ai/ai.module";
 import { StorageModule } from "./storage/storage.module";
 import { AuthzModule } from "./authz/authz.module";
 import { AuthModule } from "./auth/auth.module";
+import { LicenseModule } from "./licensing/license.module";
 import { StructureModule } from "./structure/structure.module";
 import { EquipmentModule } from "./equipment/equipment.module";
 import { TemplatesModule } from "./templates/templates.module";
@@ -68,6 +69,9 @@ import { WorkOrdersModule } from "./work-orders/work-orders.module";
     StorageModule,
     AuthzModule,
     AuthModule,
+    // Tras AuthzModule a propósito: su guard de enforcement corre DESPUÉS de
+    // JwtAccess/Permissions/MfaEnrollment (un 401 sigue siendo 401).
+    LicenseModule,
     StructureModule,
     EquipmentModule,
     TemplatesModule,

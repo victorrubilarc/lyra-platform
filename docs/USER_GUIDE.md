@@ -143,7 +143,10 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 - ✅ **Resumen de turno por IA EN VIVO** (botón "Generar con IA": el brief se escribe palabra por palabra, cancelable; grounded al turno, revisable; el crudo determinista siempre visible; la firma sigue siendo tuya) (§ Cambio de turno)
 - ✅ **Descargar el acta de entrega (PDF)** (documento de grado auditoría desde una entrega firmada: identidad Lyra, snapshot congelado, dos firmas Part 11, folio + hash verificable; on-premise) (§ Cambio de turno ▸ Descargar el acta)
 
-### 18. Órdenes de trabajo (OT / PTW)  [todos los roles operativos]
+### 18. Licencia de la instalación  [Admin]
+- ✅ **Estados de la licencia y qué se puede hacer en cada uno** (activación, vencimiento, solo lectura; los datos NUNCA se bloquean) (§ Licencia de la instalación)
+
+### 19. Órdenes de trabajo (OT / PTW)  [todos los roles operativos]
 - ✅ **Crear y listar solicitudes de trabajo** (asistente de 2 pasos, grilla con filtros/facetas, detalle con reasignar/prioridad/anular) (§ Órdenes de trabajo)
 - ✅ **Personalizar el folio del tipo de OT** (prefijo/ámbito/reinicio/máscara + vista previa en vivo + elegir en qué estado se emite; en el mantenedor de tipos) (§ Plantillas ▸ Folio del documento por plantilla)
 - ✅ **Enviar, aprobar (con firma y folio oficial) o rechazar la solicitud — Puerta 1** (flujo de estados con stepper, firma electrónica, folio OT-AAAA-#### emitido al aprobar, rechazo con motivo, historial) (§ Órdenes de trabajo ▸ Aprobación)
@@ -160,6 +163,41 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 - ✅ **Enlace con incidencias** (crear una OT desde una incidencia con los datos pre-rellenados; ver las OT relacionadas —folio, estado, criticidad, semáforo— en la ficha de la incidencia; volver desde la OT a la incidencia de origen) (§ Órdenes de trabajo ▸ Enlace con incidencias)
 
 ---
+
+## Licencia de la instalación  [Admin]
+
+**Para qué sirve.** Cada instalación de Lyra WatchLog funciona con una **licencia** emitida por el
+fabricante (un archivo firmado, `license.lic`, amarrado a ese servidor). La licencia define hasta
+cuándo opera la instalación y con qué límites. Este apartado explica qué ves y qué puedes hacer en
+cada estado.
+
+**Cómo se usa (casos paso a paso).**
+- *Instalación nueva (aún sin licencia):* el sistema arranca en **"Pendiente de activación"**: puedes
+  iniciar sesión y consultar, pero al intentar crear o editar algo verás el mensaje «Instalación
+  pendiente de activación: importa el archivo de licencia para operar». El sistema deja un archivo
+  `solicitud.lreq` en la carpeta de licencia del servidor — tu implementador lo envía al proveedor,
+  recibe el `license.lic` y lo deposita en esa misma carpeta. Al siguiente arranque (o dentro de las
+  próximas horas) la instalación queda operativa.
+- *Licencia por vencer:* el sistema sigue funcionando normal. Coordina la renovación con tu proveedor
+  ANTES del vencimiento (el aviso visible en pantalla llega en una versión próxima; hoy queda
+  registrado en el log y la auditoría).
+- *Licencia vencida:* hay un periodo de gracia (definido en tu licencia) en el que TODO sigue
+  funcionando. Pasada la gracia, la instalación entra en **solo lectura**: puedes consultar y
+  **exportar todo** (actas PDF, CSV, adjuntos), pero no crear ni editar. Al renovar, vuelve sola a la
+  normalidad.
+
+**Quién puede.** Consultar datos y exportar: todos los usuarios con sus permisos de siempre, en
+cualquier estado. Importar/renovar el archivo de licencia: quien administre el servidor (no requiere
+permiso dentro de la app — es un archivo del despliegue).
+
+**Importante.**
+- **Tus datos JAMÁS se bloquean, borran ni cifran por un tema de licencia.** El peor estado posible es
+  "solo lectura + exportación": los datos son del cliente, siempre.
+- Iniciar sesión, cambiar contraseña y el MFA funcionan en cualquier estado (sin eso ni siquiera
+  podrías consultar).
+- La licencia va amarrada al servidor (huella de máquina): copiarla a otra máquina no la hace
+  funcionar. Si migras de servidor, pide una re-activación al proveedor.
+- Cada cambio de estado de la licencia queda en la **auditoría** (`license.state.changed`).
 
 ## Órdenes de trabajo (OT / PTW)  [todos los roles operativos]
 
