@@ -395,6 +395,8 @@ inicial. Pero es **tu** llamada comercial, y por eso te la dejo explícita.
 
 ---
 
-*Documento vivo. La especificación de construcción está en [`LICENSING.md`](./LICENSING.md); la
-cadena de suministro segura (firma de imágenes, SBOM, distribución) en
-[`SECURITY.md §9`](./SECURITY.md); el modelo de canal en [`estrategia-canal.md`](./estrategia-canal.md).*
+*Documento vivo. La especificación de construcción está en [`LICENSING.md`](./LICENSING.md); el
+**procedimiento operacional paso a paso** (cómo se entrega y activa, "10 licencias", dónde se ofusca) en
+[`LICENSING_PROCEDURE.md`](./LICENSING_PROCEDURE.md); la cadena de suministro segura (firma de imágenes,
+SBOM, distribución) en [`SECURITY.md §9`](./SECURITY.md); el modelo de canal en
+[`estrategia-canal.md`](./estrategia-canal.md).*
