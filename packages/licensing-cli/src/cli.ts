@@ -6,6 +6,9 @@
  *
  *   keygen   genera el par Ed25519 de emisión (privada CIFRADA en la custodia)
  *   issue    emite `license.lic` desde un `solicitud.lreq` + parámetros comerciales
+ *   renew    renueva desde un `renovacion.lreq` (L4: valida LINAJE contra el
+ *            ledger — linaje repetido = CLON DETECTADO, deniega por defecto —
+ *            y hereda los términos comerciales de la última emisión)
  *   inspect  verifica/muestra un `license.lic` (QA del emisor)
  *   ledger   lista el registro append-only de emisiones (banda del socio)
  *
@@ -25,6 +28,7 @@ import { LicenseState, type LicenseEdition } from "@lyra/licensing";
 import { inspectLicense } from "./inspect.js";
 import { issueLicense } from "./issue.js";
 import { generatePassphrase, keygen, loadPrivateKeyPem } from "./keystore.js";
+import { renewLicense } from "./renew.js";
 import { appendLedgerEntry, readLedger, summarizeByPartner, verifyLedgerChain } from "./ledger.js";
 import {
   ledgerPath,
@@ -34,7 +38,7 @@ import {
   privateKeyPath,
   publicKeyPath,
 } from "./paths.js";
-import { readActivationRequest } from "./request.js";
+import { readActivationRequest, readRenewalRequest } from "./request.js";
 
 const USAGE = `lyra-license — emisión de licencias Lyra WatchLog (ITESICWS)
 
@@ -47,6 +51,16 @@ Uso:
                        [--not-before <ISO>] [--license-id <id>] [--issuer ITESICWS]
                        [--support-tier L2] [--no-white-label] [--allow-past]
                        [--out <license.lic>] [--private-key <pem>] [--no-ledger] [--home <dir>]
+  lyra-license renew   --request <renovacion.lreq> --expires <ISO 8601>
+                       [--modules <a,b,c>] [--edition <…>] [--max-nodes <n>]
+                       [--max-named-users <n>] [--max-installations <n>]
+                       [--grace-days <n>] [--not-before <ISO>] [--license-id <id>]
+                       [--customer <nombre>] [--channel-partner <socio>]
+                       [--support-tier <t>] [--no-white-label] [--allow-past]
+                       [--force-duplicate] [--accept-new-fingerprint]
+                       [--out <license.lic>] [--private-key <pem>] [--home <dir>]
+                       (sin flags comerciales HEREDA la última emisión del ledger;
+                        linaje repetido = CLON DETECTADO ⇒ deniega salvo override)
   lyra-license inspect <license.lic> [--public-key <pem> | --dev] [--request <solicitud.lreq>] [--home <dir>]
   lyra-license ledger  [--partner <socio>] [--home <dir>]
 
@@ -221,6 +235,7 @@ async function cmdIssue(argv: string[]): Promise<void> {
 
   if (!values["no-ledger"]) {
     appendLedgerEntry(ledgerFile, {
+      type: "issue",
       issuedAt: issued.payload.issuedAt,
       licenseId: issued.payload.licenseId,
       installationId: issued.payload.installationId,
@@ -234,6 +249,9 @@ async function cmdIssue(argv: string[]): Promise<void> {
       expiresAt: issued.payload.expiresAt,
       graceDays: issued.payload.graceDays,
       issuer: issued.payload.issuer,
+      whiteLabel: issued.payload.whiteLabel,
+      supportTier: issued.payload.supportTier,
+      renewalCounter: issued.payload.renewalCounter,
       licSha256: issued.licSha256,
       publicKeyId: issued.publicKeyId,
     });
@@ -252,6 +270,139 @@ async function cmdIssue(argv: string[]): Promise<void> {
       ? "   ledger:         OMITIDO (--no-ledger)"
       : `   ledger:         ${ledgerFile} (${priorEntries.length + 1} emisiones)`,
   );
+}
+
+async function cmdRenew(argv: string[]): Promise<void> {
+  const { values } = parseArgs({
+    args: argv,
+    options: {
+      request: { type: "string" },
+      expires: { type: "string" },
+      customer: { type: "string" },
+      "channel-partner": { type: "string" },
+      edition: { type: "string" },
+      modules: { type: "string" },
+      "max-nodes": { type: "string" },
+      "max-named-users": { type: "string" },
+      "max-installations": { type: "string" },
+      "grace-days": { type: "string" },
+      "not-before": { type: "string" },
+      "license-id": { type: "string" },
+      issuer: { type: "string" },
+      "support-tier": { type: "string" },
+      "no-white-label": { type: "boolean", default: false },
+      "allow-past": { type: "boolean", default: false },
+      "force-duplicate": { type: "boolean", default: false },
+      "accept-new-fingerprint": { type: "boolean", default: false },
+      out: { type: "string", default: "license.lic" },
+      "private-key": { type: "string" },
+      home: { type: "string" },
+    },
+  });
+
+  const home = values.home ?? licenseHome();
+  const requestPath = values.request ?? fail("falta --request <renovacion.lreq>");
+  const request = readRenewalRequest(requestPath);
+
+  // La renovación EXIGE el ledger (sin --no-ledger a propósito): sin historial
+  // no hay linaje que validar ni términos que heredar — el control ES el ledger.
+  const ledgerFile = ledgerPath(home);
+  const entries = readLedger(ledgerFile);
+  const chainDefect = verifyLedgerChain(entries);
+  if (chainDefect !== null) {
+    fail(`ledger adulterado o corrupto (${chainDefect}) — no se renueva contra un ledger roto`);
+  }
+
+  const keyPath = values["private-key"] ?? privateKeyPath(home);
+  if (!existsSync(keyPath)) {
+    fail(`no existe la clave privada ${keyPath} (¿corriste \`lyra-license keygen\`?)`);
+  }
+  const needsPassphrase = readFileSync(keyPath, "utf8").includes("ENCRYPTED");
+  const passphrase = needsPassphrase
+    ? await obtainPassphrase(`Passphrase de ${keyPath}: `)
+    : undefined;
+  const privateKeyPem = loadPrivateKeyPem(keyPath, passphrase);
+
+  const toOptionalInt = (raw: string | undefined, field: string): number | undefined => {
+    if (raw === undefined) return undefined;
+    const n = Number(raw);
+    if (!Number.isInteger(n)) fail(`--${field} debe ser un entero (recibido: ${raw})`);
+    return n;
+  };
+
+  const renewed = renewLicense({
+    request,
+    privateKeyPem,
+    ledgerEntries: entries,
+    params: {
+      expiresAt: values.expires ?? fail("falta --expires (ISO 8601)"),
+      customer: values.customer,
+      channelPartner: values["channel-partner"],
+      edition: values.edition as LicenseEdition | undefined,
+      modules: values.modules?.split(","),
+      maxInstallations: toOptionalInt(values["max-installations"], "max-installations"),
+      maxNodes: toOptionalInt(values["max-nodes"], "max-nodes"),
+      maxNamedUsers: toOptionalInt(values["max-named-users"], "max-named-users"),
+      graceDays: toOptionalInt(values["grace-days"], "grace-days"),
+      notBefore: values["not-before"],
+      licenseId: values["license-id"],
+      issuer: values.issuer,
+      supportTier: values["support-tier"],
+      whiteLabel: values["no-white-label"] ? false : undefined,
+      allowPast: values["allow-past"],
+      forceDuplicate: values["force-duplicate"],
+      acceptNewFingerprint: values["accept-new-fingerprint"],
+    },
+  });
+
+  const outPath = resolve(values.out ?? "license.lic");
+  mkdirSync(dirname(outPath), { recursive: true });
+  writeFileSync(outPath, `${renewed.lic}\n`, "utf8");
+
+  appendLedgerEntry(ledgerFile, {
+    type: "renewal",
+    issuedAt: renewed.payload.issuedAt,
+    licenseId: renewed.payload.licenseId,
+    installationId: renewed.payload.installationId,
+    fingerprint: renewed.payload.fingerprint,
+    customer: renewed.payload.customer,
+    channelPartner: renewed.payload.channelPartner,
+    edition: renewed.payload.edition,
+    modules: renewed.payload.modules,
+    limits: renewed.payload.limits,
+    notBefore: renewed.payload.notBefore,
+    expiresAt: renewed.payload.expiresAt,
+    graceDays: renewed.payload.graceDays,
+    issuer: renewed.payload.issuer,
+    whiteLabel: renewed.payload.whiteLabel,
+    supportTier: renewed.payload.supportTier,
+    renewalCounter: renewed.payload.renewalCounter,
+    presentedCounter: renewed.presented.renewalCounter,
+    presentedNonce: renewed.presented.nonce,
+    ...(renewed.forcedDuplicate ? { forcedDuplicate: true } : {}),
+    ...(renewed.acceptedNewFingerprint ? { acceptedNewFingerprint: true } : {}),
+    licSha256: renewed.licSha256,
+    publicKeyId: renewed.publicKeyId,
+  });
+
+  console.log(`✅ Renovación emitida: ${outPath}`);
+  console.log(`   licenseId:      ${renewed.payload.licenseId} (hereda de ledger #${renewed.base.seq})`);
+  console.log(`   cliente/socio:  ${renewed.payload.customer} / ${renewed.payload.channelPartner}`);
+  console.log(`   installationId: ${renewed.payload.installationId}`);
+  console.log(`   huella:         ${renewed.payload.fingerprint}`);
+  console.log(`   edición:        ${renewed.payload.edition} · módulos: ${renewed.payload.modules.join(", ")}`);
+  console.log(`   vence:          ${renewed.payload.expiresAt} (+${renewed.payload.graceDays}d gracia)`);
+  console.log(
+    `   linaje:         counter ${renewed.presented.renewalCounter} → ${renewed.payload.renewalCounter} ` +
+      "(atada al nonce presentado: importable UNA sola vez, solo en esa instalación)",
+  );
+  if (renewed.forcedDuplicate) {
+    console.log("   ⚠️  EMITIDA CON --force-duplicate (linaje repetido/desfasado) — auditado en el ledger.");
+  }
+  if (renewed.acceptedNewFingerprint) {
+    console.log("   ⚠️  Huella NUEVA aceptada (--accept-new-fingerprint) — auditado en el ledger.");
+  }
+  console.log(`   ledger:         ${ledgerFile} (${entries.length + 1} emisiones)`);
 }
 
 async function cmdInspect(argv: string[]): Promise<void> {
@@ -346,6 +497,8 @@ async function main(): Promise<void> {
       return cmdKeygen(rest);
     case "issue":
       return cmdIssue(rest);
+    case "renew":
+      return cmdRenew(rest);
     case "inspect":
       return cmdInspect(rest);
     case "ledger":

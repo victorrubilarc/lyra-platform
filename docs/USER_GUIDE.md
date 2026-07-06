@@ -182,6 +182,11 @@ cada estado.
 - *Licencia por vencer:* el sistema sigue funcionando normal. Coordina la renovación con tu proveedor
   ANTES del vencimiento (el aviso visible en pantalla llega en una versión próxima; hoy queda
   registrado en el log y la auditoría).
+- *Renovar la licencia:* el sistema mantiene listo un archivo **`renovacion.lreq`** junto al
+  `license.lic` del servidor. Tu implementador se lo envía al proveedor (correo o USB — no se necesita
+  internet en la planta), recibe el `license.lic` renovado y lo deposita en la misma carpeta. La
+  renovación **vale una sola vez y solo para ese servidor**: no sirve copiarla a otra instalación ni
+  volver a usar una anterior.
 - *Licencia vencida:* hay un periodo de gracia (definido en tu licencia) en el que TODO sigue
   funcionando. Pasada la gracia, la instalación entra en **solo lectura**: puedes consultar y
   **exportar todo** (actas PDF, CSV, adjuntos), pero no crear ni editar. Al renovar, vuelve sola a la
@@ -198,7 +203,12 @@ permiso dentro de la app — es un archivo del despliegue).
   podrías consultar).
 - La licencia va amarrada al servidor (huella de máquina): copiarla a otra máquina no la hace
   funcionar. Si migras de servidor, pide una re-activación al proveedor.
-- Cada cambio de estado de la licencia queda en la **auditoría** (`license.state.changed`).
+- Tras renovar, la licencia **anterior** deja de servir en ese servidor (y una renovación no se puede
+  importar dos veces). Si el sistema queda bloqueado con motivo «linaje no calza» (`LINEAGE_MISMATCH`)
+  —por ejemplo tras restaurar un respaldo antiguo—, la consulta y la exportación siguen disponibles:
+  envía el `renovacion.lreq` vigente al proveedor para que lo resuelva.
+- Cada cambio de estado de la licencia queda en la **auditoría** (`license.state.changed`; cada
+  renovación importada, como `license.renewed`).
 
 ### Módulos incluidos (edición de la licencia)
 

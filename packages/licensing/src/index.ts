@@ -21,6 +21,8 @@ export {
   isModuleLicensed,
   isWithinGrace,
 } from "./evaluate.js";
+export { evaluateLineage } from "./lineage.js";
+export type { LineageOutcome, LocalLineage } from "./lineage.js";
 export { LicenseState } from "./types.js";
 export type {
   EvaluationContext,

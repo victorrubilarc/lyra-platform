@@ -46,6 +46,13 @@ export interface IssueParams {
   supportTier?: string;
   /** SOLO para dev/tests (licencias vencidas de smoke). La CLI lo expone como --allow-past. */
   allowPast?: boolean;
+  /**
+   * Linaje de RENOVACIÓN (L4): counter = presentado + 1 y nonce = el nonce
+   * PRESENTADO en la solicitud (el binding que hace la respuesta importable
+   * UNA sola vez — el nonce nuevo lo genera la instalación al rotar y nunca
+   * viaja). Ausente = emisión de activación (counter 0, nonce fresco inerte).
+   */
+  lineage?: { renewalCounter: number; nonce: string };
 }
 
 export interface IssuedLicense {
@@ -139,6 +146,18 @@ export function issueLicense(opts: {
   }
   const modules = normalizeModules(params.modules);
 
+  const lineage = params.lineage;
+  if (lineage !== undefined) {
+    if (!Number.isInteger(lineage.renewalCounter) || lineage.renewalCounter < 1) {
+      throw new Error(
+        `"lineage.renewalCounter" debe ser un entero ≥ 1 (recibido: ${lineage.renewalCounter})`,
+      );
+    }
+    if (lineage.nonce.trim().length === 0) {
+      throw new Error('"lineage.nonce" no puede estar vacío');
+    }
+  }
+
   const expiresMs = parseIsoInstant(params.expiresAt, "expires");
   if (!params.allowPast && expiresMs <= now.getTime()) {
     throw new Error(`"expires" ya pasó (${params.expiresAt}); usa --allow-past solo para pruebas`);
@@ -182,10 +201,10 @@ export function issueLicense(opts: {
     whiteLabel: params.whiteLabel ?? true,
     supportTier: params.supportTier?.trim() || "L2",
     schemaVersion: 1,
-    // Linaje inicial (capa 4): la ROTACIÓN de counter+nonce es el flujo de
-    // renovación de L4; la emisión inicial parte en 0 con nonce fresco.
-    renewalCounter: 0,
-    nonce: randomUUID(),
+    // Linaje (capa 4): la activación parte en 0 con nonce fresco (inerte para
+    // el runtime); la renovación viene atada al linaje presentado (`lineage`).
+    renewalCounter: lineage?.renewalCounter ?? 0,
+    nonce: lineage?.nonce ?? randomUUID(),
   };
 
   const lic = signLicense(payload, privateKeyPem);

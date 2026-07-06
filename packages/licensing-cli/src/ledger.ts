@@ -31,6 +31,22 @@ export interface LedgerEntryInput {
   licSha256: string;
   /** Identificador corto del par firmante (sha256 del SPKI de la pública). */
   publicKeyId: string;
+  // --- Campos ADITIVOS de L4 (renovación con linaje). Ausentes en entradas
+  // --- pre-L4 = emisión de activación (counter 0). La cadena de hashes no se
+  // --- ve afectada: el hash de cada entrada sella SUS propios campos.
+  /** "issue" (activación) | "renewal". Ausente = "issue" (entradas L3). */
+  type?: "issue" | "renewal";
+  /** Linaje del payload emitido (counter de la licencia que salió). */
+  renewalCounter?: number;
+  /** Linaje PRESENTADO por la solicitud de renovación — la evidencia anti-clon. */
+  presentedCounter?: number;
+  presentedNonce?: string;
+  /** true si el humano forzó la emisión pese a linaje repetido (--force-duplicate). */
+  forcedDuplicate?: boolean;
+  /** true si se aceptó un cambio de huella (--accept-new-fingerprint). */
+  acceptedNewFingerprint?: boolean;
+  whiteLabel?: boolean;
+  supportTier?: string;
 }
 
 export interface LedgerEntry extends LedgerEntryInput {
@@ -115,6 +131,36 @@ export function verifyLedgerChain(entries: LedgerEntry[]): string | null {
     prevHash = hash;
   }
   return null;
+}
+
+/** Última emisión (activación o renovación) registrada para una instalación. */
+export function lastEntryForInstallation(
+  entries: LedgerEntry[],
+  installationId: string,
+): LedgerEntry | undefined {
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const entry = entries[i];
+    if (entry !== undefined && entry.installationId === installationId) return entry;
+  }
+  return undefined;
+}
+
+/**
+ * Detección del CLON en el emisor (PoC T6): ¿ya se registró una RENOVACIÓN
+ * para esta instalación con este MISMO counter presentado? Dos solicitudes con
+ * el mismo linaje = sobre-despliegue detectado, con evidencia en el ledger.
+ */
+export function findDuplicateLineage(
+  entries: LedgerEntry[],
+  installationId: string,
+  presentedCounter: number,
+): LedgerEntry | undefined {
+  return entries.find(
+    (e) =>
+      e.type === "renewal" &&
+      e.installationId === installationId &&
+      e.presentedCounter === presentedCounter,
+  );
 }
 
 /** Resumen de emisiones por socio (control de banda, LICENSING_PROCEDURE §3). */
