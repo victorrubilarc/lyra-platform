@@ -212,6 +212,27 @@ describe("LicenseService", () => {
     ]);
   });
 
+  it("cuenta nodos VIVOS y usuarios ACTIVE para los topes (L2b: el borrado lógico libera cupo)", async () => {
+    writeFileSync(licPath, signLicense(payload(), DEV_PRIVATE_KEY));
+    await boot(service);
+    expect(prisma.orgNode.count).toHaveBeenCalledWith({ where: { deletedAt: null } });
+    expect(prisma.user.count).toHaveBeenCalledWith({ where: { status: "ACTIVE" } });
+  });
+
+  it("verifiedLimits: topes del payload VERIFICADO; undefined sin payload (gobierna L1)", async () => {
+    writeFileSync(licPath, signLicense(payload(), DEV_PRIVATE_KEY));
+    await boot(service);
+    expect(service.verifiedLimits()).toEqual({
+      maxInstallations: 1,
+      maxNodes: 1000,
+      maxNamedUsers: 100,
+    });
+
+    rmSync(licPath); // sin archivo ⇒ sin payload ⇒ el enforcement L2b no opina
+    await service.refresh("test");
+    expect(service.verifiedLimits()).toBeUndefined();
+  });
+
   it("AUDITA cada cambio de estado (actor sistema, antes/después) y no repite sin cambio", async () => {
     writeFileSync(licPath, signLicense(payload(), DEV_PRIVATE_KEY));
     await boot(service);

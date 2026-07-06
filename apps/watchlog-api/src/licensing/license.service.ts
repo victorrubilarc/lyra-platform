@@ -12,6 +12,7 @@ import {
   LicenseState,
   verifyLicense,
   type LicenseActuals,
+  type LicenseLimits,
   type LicensePayload,
   type LocalLineage,
 } from "@lyra/licensing";
@@ -277,6 +278,17 @@ export class LicenseService implements OnApplicationBootstrap {
   }
 
   /**
+   * Topes numéricos del payload VERIFICADO (L2b). `undefined` sin payload
+   * (PENDIENTE_ACTIVACION / BLOQUEADA por firma): el enforcement de límites
+   * entonces NO opina — esos estados los gobierna el guard global de L1, y un
+   * estado global nunca se enmascara como problema de límite (misma
+   * precedencia que el gate por módulo de L2).
+   */
+  verifiedLimits(): LicenseLimits | undefined {
+    return this.payload?.limits;
+  }
+
+  /**
    * Detección de AVISOS DERIVED de licencia (L6): órdenes para el sweeper del
    * Bloque N (espejo de `IncidentSlaService.findBreaches`). La cadencia vive en
    * la dedupeKey (índice único del evento): POR_VENCER re-avisa por SEMANA ISO
@@ -533,13 +545,16 @@ export class LicenseService implements OnApplicationBootstrap {
 
   /**
    * Conteos reales contra los topes de la licencia. Solo lo medible aquí:
-   * `installations` no se mide desde adentro (es un tope del EMISOR). Un fallo
+   * `installations` no se mide desde adentro (es un tope del EMISOR). Se
+   * cuentan los nodos VIVOS (L2b, decisión b): el borrado lógico libera cupo —
+   * si contara los eliminados, el cliente jamás podría regularizar bajando del
+   * tope (contradiría la fila LÍMITE EXCEDIDO de LICENSING.md §5). Un fallo
    * de BD no bloquea la evaluación (se evalúa sin actuals).
    */
   private async collectActuals(): Promise<LicenseActuals | undefined> {
     try {
       const [nodes, namedUsers] = await Promise.all([
-        this.prisma.orgNode.count(),
+        this.prisma.orgNode.count({ where: { deletedAt: null } }),
         this.prisma.user.count({ where: { status: "ACTIVE" } }),
       ]);
       return { nodes, namedUsers };

@@ -4,6 +4,7 @@ import { Download, Plus, Search, TriangleAlert, Users as UsersIcon } from "lucid
 import { Button, Chip, EmptyState, Input, ResizableSplit, Table, cx, type TableColumn } from "@lyra/ui";
 import type { UserStatus, UserSummary } from "@lyra/contracts";
 import { Can } from "../../auth/Can.js";
+import { useLicenseQuotas } from "../../auth/use-license.js";
 import { downloadText, fileStamp, toCsv } from "../../lib/download.js";
 import { useUsers } from "./security-queries.js";
 import { UserDetail } from "./UserDetail.js";
@@ -21,6 +22,9 @@ const STATUS_VARIANT: Record<UserStatus, "success" | "default" | "error" | "info
 export function UsersPage() {
   const { t } = useTranslation();
   const { data: users = [], isLoading, isError } = useUsers();
+  // Cupo de la licencia (L2b): sin cupo se deshabilita "crear" con hint. El
+  // candado real es el 403 LICENSE_LIMIT_EXCEEDED del backend.
+  const { namedUsers: userQuota } = useLicenseQuotas();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -88,7 +92,17 @@ export function UsersPage() {
             {t("common.export")}
           </Button>
           <Can perform="user:create">
-            <Button variant="primary" leftIcon={<Plus size={16} />} onClick={() => setDrawerOpen(true)}>
+            <Button
+              variant="primary"
+              leftIcon={<Plus size={16} />}
+              onClick={() => setDrawerOpen(true)}
+              disabled={userQuota?.atLimit}
+              title={
+                userQuota?.atLimit
+                  ? t("license.quota.usersFull", { max: userQuota.max, inUse: userQuota.inUse })
+                  : undefined
+              }
+            >
               {t("security.users.new")}
             </Button>
           </Can>

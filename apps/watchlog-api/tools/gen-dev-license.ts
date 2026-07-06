@@ -7,6 +7,7 @@
  *   pnpm --filter @lyra/watchlog-api run license:dev -- --expired   # vencida (smoke)
  *   pnpm --filter @lyra/watchlog-api run license:dev -- --modules=core,incidents
  *   pnpm --filter @lyra/watchlog-api run license:dev -- --expires-in-days=10   # POR_VENCER (banner L6)
+ *   pnpm --filter @lyra/watchlog-api run license:dev -- --max-nodes=50 --max-named-users=10   # topes L2b
  *
  * Desde L3 es un ENVOLTORIO DELGADO sobre `@lyra/licensing-cli` (`issueLicense`):
  * una sola implementación de emisión para DEV y PROD, sin copiar/pegar. Lo único
@@ -32,6 +33,19 @@ async function main(): Promise<void> {
   const expired = process.argv.includes("--expired");
   // --modules=core,incidents ⇒ entitlement ACOTADO (smoke del gating L2).
   const modulesArg = process.argv.find((a) => a.startsWith("--modules="));
+  // --max-nodes=N / --max-named-users=N ⇒ topes ACOTADOS (smoke del
+  // enforcement de límites L2b). Default: holgura total (100 000).
+  const intFlag = (flag: string): number | undefined => {
+    const arg = process.argv.find((a) => a.startsWith(`${flag}=`));
+    if (!arg) return undefined;
+    const value = Number.parseInt(arg.slice(flag.length + 1), 10);
+    if (!Number.isFinite(value) || value < 0) {
+      throw new Error(`${flag} exige un entero ≥ 0`);
+    }
+    return value;
+  };
+  const maxNodes = intFlag("--max-nodes");
+  const maxNamedUsers = intFlag("--max-named-users");
   // --expires-in-days=N ⇒ vence en N días (N ≤ 30 = POR_VENCER; para el banner
   // L6). Un N NEGATIVO significa que YA venció hace |N| días: con la gracia
   // default de 14, -5 ⇒ EN_GRACIA y -60 equivale a --expired (SOLO_LECTURA).
@@ -76,7 +90,11 @@ async function main(): Promise<void> {
             .map((m) => m.trim())
             .filter(Boolean)
         : [...LICENSED_MODULE_KEYS],
-      limits: { maxInstallations: 1, maxNodes: 100_000, maxNamedUsers: 100_000 },
+      limits: {
+        maxInstallations: 1,
+        maxNodes: maxNodes ?? 100_000,
+        maxNamedUsers: maxNamedUsers ?? 100_000,
+      },
       // --expired: venció hace 60 días con 14 de gracia ⇒ SOLO_LECTURA (smoke).
       // --expires-in-days=N: vence en N días (≤ warnDays ⇒ POR_VENCER, banner L6).
       expiresAt: new Date(

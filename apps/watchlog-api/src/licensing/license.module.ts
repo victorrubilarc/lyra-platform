@@ -2,6 +2,7 @@ import { Global, Module } from "@nestjs/common";
 import { APP_GUARD } from "@nestjs/core";
 import { MachineSignalsCollector } from "./machine-signals.collector";
 import { LicenseService } from "./license.service";
+import { LicenseLimitsService } from "./license-limits.service";
 import { LicenseEnforcementGuard } from "./license-enforcement.guard";
 import { ModuleEntitlementGuard } from "./module-entitlement.guard";
 import { LicenseController } from "./license.controller";
@@ -23,9 +24,10 @@ import { LicenseController } from "./license.controller";
   providers: [
     MachineSignalsCollector,
     LicenseService,
+    LicenseLimitsService,
     { provide: APP_GUARD, useClass: LicenseEnforcementGuard },
     { provide: APP_GUARD, useClass: ModuleEntitlementGuard },
   ],
-  exports: [LicenseService],
+  exports: [LicenseService, LicenseLimitsService],
 })
 export class LicenseModule {}

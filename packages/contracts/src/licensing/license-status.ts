@@ -26,6 +26,13 @@ export const licenseRuntimeStatusSchema = z.enum([
 ]);
 export type LicenseRuntimeStatusDto = z.infer<typeof licenseRuntimeStatusSchema>;
 
+/** Un tope numérico de la licencia: máximo contratado + unidades en uso (vivas). */
+export const licenseLimitUsageSchema = z.object({
+  max: z.number().int().min(0),
+  inUse: z.number().int().min(0),
+});
+export type LicenseLimitUsage = z.infer<typeof licenseLimitUsageSchema>;
+
 export const licenseStatusSchema = z.object({
   status: licenseRuntimeStatusSchema,
   /** Motivo legible-por-máquina (ej. EXPIRED_IN_GRACE, LICENSE_FILE_MISSING). */
@@ -52,5 +59,18 @@ export const licenseStatusSchema = z.object({
    * huella/linaje/identidad).
    */
   graceDaysRemaining: z.number().int().min(0).optional(),
+  /**
+   * Cupo numérico contratado + uso VIVO (L2b): deja que la UI deshabilite
+   * "crear" con un hint ANTES del 403 `LICENSE_LIMIT_EXCEEDED` del backend
+   * (que sigue siendo el candado real). SOLO viaja con payload verificado.
+   * `maxInstallations` NO viaja: es un tope del EMISOR, no medible desde
+   * adentro. Números agregados de presentación — mínimo privilegio intacto.
+   */
+  limits: z
+    .object({
+      nodes: licenseLimitUsageSchema,
+      namedUsers: licenseLimitUsageSchema,
+    })
+    .optional(),
 });
 export type LicenseStatus = z.infer<typeof licenseStatusSchema>;

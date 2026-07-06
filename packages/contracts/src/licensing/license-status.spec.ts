@@ -57,6 +57,25 @@ describe("licenseStatusSchema (DTO delgado)", () => {
     ).toThrow();
   });
 
+  it("limits (L2b): cupo contratado + uso vivo, opcional y solo enteros ≥ 0", () => {
+    const withLimits = {
+      ...valid,
+      limits: {
+        nodes: { max: 200, inUse: 37 },
+        namedUsers: { max: 80, inUse: 80 },
+      },
+    };
+    expect(licenseStatusSchema.parse(withLimits)).toEqual(withLimits);
+    // Sin payload verificado el cupo simplemente no viaja (como modules null).
+    expect(licenseStatusSchema.parse(valid)).not.toHaveProperty("limits");
+    expect(() =>
+      licenseStatusSchema.parse({
+        ...valid,
+        limits: { nodes: { max: -1, inUse: 0 }, namedUsers: { max: 1, inUse: 0 } },
+      }),
+    ).toThrow();
+  });
+
   it("mínimo privilegio: strip de campos sensibles si llegaran (huella/linaje/installationId)", () => {
     const leaked = {
       ...valid,

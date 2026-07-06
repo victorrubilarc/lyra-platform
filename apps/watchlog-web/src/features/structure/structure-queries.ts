@@ -8,6 +8,7 @@ import type {
   UpdateOrgNodeRequest,
   UpdateOrgStructureRequest,
 } from "@lyra/contracts";
+import { LICENSE_KEYS } from "../../auth/use-license.js";
 import { useStructureStore } from "../../shell/structure-store.js";
 import {
   createLevel,
@@ -97,6 +98,8 @@ export function useProvisionStructure() {
       qc.invalidateQueries({ queryKey: ["structure", "levels"] });
       qc.invalidateQueries({ queryKey: ["structure", "tree"] });
       qc.invalidateQueries({ queryKey: ["structure", "accessible-tree"] });
+      // El nodo raíz nuevo consume cupo de la licencia (L2b) ⇒ refresca el hint.
+      qc.invalidateQueries({ queryKey: LICENSE_KEYS.status });
     },
   });
 }
@@ -168,6 +171,8 @@ export function useCreateNode() {
       qc.invalidateQueries({ queryKey: ["structure", "accessible-tree"] });
       // El nodeCount por estructura cambió ⇒ refresca el selector (configuradas vs vacías).
       qc.invalidateQueries({ queryKey: QUERY_KEYS.structures });
+      // El conteo de nodos mueve el cupo de la licencia (L2b) ⇒ refresca el hint.
+      qc.invalidateQueries({ queryKey: LICENSE_KEYS.status });
     },
   });
 }
@@ -191,6 +196,8 @@ export function useDeleteNode() {
       qc.invalidateQueries({ queryKey: ["structure", "tree"] });
       qc.invalidateQueries({ queryKey: ["structure", "accessible-tree"] });
       qc.invalidateQueries({ queryKey: QUERY_KEYS.structures });
+      // Eliminar un nodo LIBERA cupo de la licencia (L2b) ⇒ refresca el hint.
+      qc.invalidateQueries({ queryKey: LICENSE_KEYS.status });
     },
   });
 }

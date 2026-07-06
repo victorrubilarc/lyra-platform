@@ -16,8 +16,9 @@
 > los avisos** (banner + Configuración › Licencia + correos/campanita del Bloque N — `LICENSING.md §5.2`). La imagen
 > de release **embebe la pública de PROD** desde el primer tag post-L3 y, **desde L5, hornea el anti-tamper**: la API
 > viaja como un bundle único minificado con nombres destruidos (módulo de licencia inlineado, fuente legible borrado) y
-> **auto-verifica su integridad** (§6, `LICENSING.md §7.4`). Falta el enforcement de límites (L2b). Plan L0–L6 en
-> `BACKLOG.md §2(1)`.
+> **auto-verifica su integridad** (§6, `LICENSING.md §7.4`). Desde L2b los **límites numéricos se hacen cumplir**:
+> crear nodos/usuarios por encima de `maxNodes`/`maxNamedUsers` se rechaza en el producto (`LICENSING.md §5.3`) —
+> lo existente jamás se rompe. **Plan L0–L6 COMPLETO** (`BACKLOG.md §2(1)`).
 
 ---
 

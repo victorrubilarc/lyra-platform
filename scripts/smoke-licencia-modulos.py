@@ -49,8 +49,10 @@ LIMITED = ["core", "incidents", "notifications"]
 FULL = ["core", "structure", "templates", "logbook", "schedules", "incidents",
         "exceptions", "work-orders", "shift-handover", "notifications",
         "themes", "ai", "dashboards"]
+# Desde L2b el DTO SÍ trae `limits`, pero como AGREGADO {nodes,namedUsers:{max,inUse}}
+# (cupo para el hint web) — jamás el objeto del payload (sin maxInstallations).
 SENSITIVE = ["fingerprint", "installationId", "licenseId", "customer",
-             "channelPartner", "nonce", "renewalCounter", "limits", "whiteLabel"]
+             "channelPartner", "nonce", "renewalCounter", "whiteLabel"]
 
 OK, FAIL = [], []
 
@@ -189,6 +191,11 @@ def main():
         leaked = [k for k in SENSITIVE if isinstance(dto, dict) and k in dto]
         check("A6 DTO SIN campos sensibles (huella/linaje/installationId/…)",
               leaked == [], f"filtrados={leaked}")
+        # `limits` es el agregado L2b (cupo web), NUNCA el del payload firmado.
+        lims = dto.get("limits") if isinstance(dto, dict) else None
+        check("A6b limits = agregado {nodes,namedUsers} sin maxInstallations",
+              isinstance(lims, dict) and set(lims.keys()) == {"nodes", "namedUsers"}
+              and "maxInstallations" not in json.dumps(lims), f"limits={lims}")
         st, _ = call("GET", "/license/status")
         check("A7 /license/status exige autenticación (sin token ⇒ 401)", st == 401, f"st={st}")
 

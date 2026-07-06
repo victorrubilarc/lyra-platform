@@ -93,6 +93,13 @@ const MANGLE_LICENSE_PROPS = [
   "logLicenseStatus",
   "sealRequired",
   "isWhiteLabelEnabled",
+  "collectActuals",
+  // límites numéricos (L2b)
+  "LicenseLimitsService",
+  "assertHeadroom",
+  "currentUsage",
+  "verifiedLimits",
+  "limitsDto",
   // integridad (L5)
   "verifyArtifactIntegrity",
   "computeSealHash",
