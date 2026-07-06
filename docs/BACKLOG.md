@@ -857,8 +857,21 @@ nunca queda más de una sesión atrás.
             `renovacion.lreq`, `pnpm license renew` con la custodia PROD, importar y verificar VALIDA + linaje rotado
             (decisión (f) L4: no se hizo contra el demo en esta sesión porque v0.1.13 es pre-L4 y no ejercita nada).
       - [ ] **L5:** anti-tamper en CI (bytecode V8/nativo del módulo crítico + verificación distribuida + integridad).
-      - [ ] **L6:** UI de estado/avisos (banner POR_VENCER/EN_GRACIA/SOLO_LECTURA; DTO delgado en contracts) + marca
-            blanca gobernada por `whiteLabel`.
+      - [x] **L6 · UI de estado + avisos de licencia** ✅ 2026-07-06 (`feat/licenciamiento-l6`): **banner global**
+            en el shell (`LicenseBanner` + presentación PURA `licenseBannerFor` testeada; audiencia por estado:
+            restringidos y EN_GRACIA = todos, POR_VENCER/LIMITE_EXCEDIDO = solo admins vía `settings:manage`;
+            descartable por sesión salvo restringidos; `LINEAGE_MISMATCH` con texto propio) · **pestaña Licencia en
+            /configuracion** (solo lectura + instrucciones de renovación del runbook; gate `module:settings:view`,
+            SIN permiso nuevo; deep link `?tab=license`) · **avisos por el Bloque N** (3 eventos `license.state.
+            changed`/`license.expiring`/`license.restricted` + 3 plantillas seed; destinatarios = roles con
+            `settings:manage` sin ABAC de nodo; cadencia semanal/diaria en la dedupeKey; **CARVE-OUT del worker**:
+            los eventos license.* fluyen aunque la licencia esté restringida — cierra el **pendiente L1(iii)**) ·
+            DTO delgado +`graceDaysRemaining` (solo EN_GRACIA, decisión explícita) · gate latente `whiteLabel`
+            (`isWhiteLabelEnabled`, sin efecto visible) · `gen-dev-license --expires-in-days=N` para probar el
+            banner. SIN migración/permiso (solo db:seed). contracts 518 + API 296 + web 17 +
+            **smoke-licencia-avisos 25/25** (:3404) + regresión 28/23/20/29 + notif 18/22/18 (fix de deriva de
+            datos en el arnés de smoke-notificaciones: el demo acumula 400+ rondas vencidas y el lote del sweeper
+            es 200 — fallo PREEXISTENTE, no de L6). Decisiones a–f en DECISIONS 2026-07-06.
       - [x] ~~Pendientes L1 (i) EC2 demo sin licencia / (ii) imagen no vendible~~ **CERRADOS en L3 (2026-07-05):**
             (i) el EC2 demo quedó **licenciado con el par PROD** (`lic_2026_demo_ec2_001`, huella real
             `e271ce4b…` derivada con la MISMA imagen del api, `inspect`=VALIDA; compose con mounts aplicado vía
@@ -870,8 +883,10 @@ nunca queda más de una sesión atrás.
             **`estado=VALIDA · lic_2026_demo_ec2_001 · huella=e271ce4b…`** (log de arranque verificado, health 200
             interno y público). **La cadena de confianza quedó probada END-TO-END en producción**: keygen PROD →
             issue → embed en release → node-lock real → VALIDA. La imagen `v0.1.13` es la primera VENDIBLE.
-      - [ ] **Pendiente L1 (iii):** notificación in-app/correo a admins al cambiar el estado de licencia
-            (hoy: log + AuditLog; el aviso llega con L6/Bloque N).
+      - [x] ~~Pendiente L1 (iii): notificación in-app/correo a admins al cambiar el estado de licencia~~
+            **CERRADO en L6 (2026-07-06):** `license.state.changed` (tx en caliente) + `license.expiring`/
+            `license.restricted` (derived con re-aviso) vía el motor del Bloque N, EMAIL+INAPP, destinatarios por
+            permiso `settings:manage` (configurable), con carve-out del worker para estados restringidos.
 - [ ] **(2) Modo marca blanca COMPLETO** (~60–120 HH) — hoy los temas son override PARCIAL en runtime y el **login
       queda con marca Lyra** (ver memoria `theme-system`). Falta: **nombre de producto configurable** en toda la app,
       **login personalizable**, branding en el **acta PDF** y en los **correos** salientes. Sin rebuild (runtime),
@@ -2417,6 +2432,15 @@ implementación esperada:
 
 > Lo construido puede estar "verde en tests" pero no ejercido en condiciones reales.
 
+- [ ] **Licenciamiento L6 — smoke VISUAL del dueño** (se verificó typecheck/lint/build/test + smoke API 25/25 +
+      regresiones; falta el clic). El dev queda con **licencia POR_VENCER** (banner warning para el admin demo):
+      ver el banner arriba (descartarlo → no vuelve en la sesión; recargar sesión → vuelve), botón «Ver detalle» →
+      **`/configuracion?tab=license`** (estado/motivo/edición/módulos/vencimiento + instrucciones de renovación),
+      campanita con el aviso `Licencia: renovación pendiente` (deep link a la pestaña), y `/notificaciones` ▸
+      Plantillas con el grupo «Licencia» (3 plantillas seed). Probar claro+oscuro y tablet. **Restaurar la licencia
+      normal:** `pnpm license:dev` (raíz del monorepo la delega al api) + reiniciar el api dev — el banner desaparece
+      (VALIDA). Variantes: `pnpm license:dev -- --expires-in-days=-5` (EN_GRACIA, banner para todos) y `--expired`
+      (SOLO_LECTURA, banner persistente rojo).
 - [ ] **Notificaciones — hardening — smoke VISUAL** (se verificó typecheck/lint/build + smokes 8/8 y 17/17; falta el clic).
       **`/configuracion` ▸ Correo saliente** (gate `notification:config`): elegir un preset (Gmail/Mailpit…) que rellena host/puerto
       + muestra su pista; guardar (la clave no se muestra, queda "configurada"); **Probar conexión** y **Enviar prueba** (verlo en

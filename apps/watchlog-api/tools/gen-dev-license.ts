@@ -6,6 +6,7 @@
  *   pnpm --filter @lyra/watchlog-api run license:dev            # 1 año, válida
  *   pnpm --filter @lyra/watchlog-api run license:dev -- --expired   # vencida (smoke)
  *   pnpm --filter @lyra/watchlog-api run license:dev -- --modules=core,incidents
+ *   pnpm --filter @lyra/watchlog-api run license:dev -- --expires-in-days=10   # POR_VENCER (banner L6)
  *
  * Desde L3 es un ENVOLTORIO DELGADO sobre `@lyra/licensing-cli` (`issueLicense`):
  * una sola implementación de emisión para DEV y PROD, sin copiar/pegar. Lo único
@@ -31,6 +32,19 @@ async function main(): Promise<void> {
   const expired = process.argv.includes("--expired");
   // --modules=core,incidents ⇒ entitlement ACOTADO (smoke del gating L2).
   const modulesArg = process.argv.find((a) => a.startsWith("--modules="));
+  // --expires-in-days=N ⇒ vence en N días (N ≤ 30 = POR_VENCER; para el banner
+  // L6). Un N NEGATIVO significa que YA venció hace |N| días: con la gracia
+  // default de 14, -5 ⇒ EN_GRACIA y -60 equivale a --expired (SOLO_LECTURA).
+  const expiresInArg = process.argv.find((a) => a.startsWith("--expires-in-days="));
+  const expiresInDays = expiresInArg
+    ? Number.parseInt(expiresInArg.slice("--expires-in-days=".length), 10)
+    : undefined;
+  if (expiresInArg && (!Number.isFinite(expiresInDays) || expiresInDays === 0)) {
+    throw new Error("--expires-in-days exige un entero ≠ 0 (negativo = ya vencida hace |N| días)");
+  }
+  if (expired && expiresInDays !== undefined) {
+    throw new Error("--expired y --expires-in-days son excluyentes");
+  }
   const machineIdFile = process.env.LICENSE_MACHINE_ID_FILE ?? "/etc/machine-id";
   const licenseFile = process.env.LICENSE_FILE ?? ".license/license.lic";
 
@@ -64,20 +78,32 @@ async function main(): Promise<void> {
         : [...LICENSED_MODULE_KEYS],
       limits: { maxInstallations: 1, maxNodes: 100_000, maxNamedUsers: 100_000 },
       // --expired: venció hace 60 días con 14 de gracia ⇒ SOLO_LECTURA (smoke).
-      expiresAt: new Date(expired ? now - 60 * DAY_MS : now + 365 * DAY_MS).toISOString(),
+      // --expires-in-days=N: vence en N días (≤ warnDays ⇒ POR_VENCER, banner L6).
+      expiresAt: new Date(
+        expired
+          ? now - 60 * DAY_MS
+          : now + (expiresInDays ?? 365) * DAY_MS,
+      ).toISOString(),
       graceDays: 14,
       licenseId: `lic_dev_${new Date(now).toISOString().slice(0, 10)}`,
       issuer: "ITESICWS (DEV)",
       supportTier: "DEV",
-      allowPast: expired,
+      allowPast: expired || (expiresInDays !== undefined && expiresInDays < 0),
     },
   });
 
   mkdirSync(dirname(resolve(licenseFile)), { recursive: true });
   writeFileSync(resolve(licenseFile), issued.lic + "\n", "utf8");
 
+  const expectedState = expired
+    ? "SOLO_LECTURA (vencida, --expired)"
+    : expiresInDays !== undefined && expiresInDays < 0
+      ? `${-expiresInDays <= 14 ? "EN_GRACIA" : "SOLO_LECTURA"} (venció hace ${-expiresInDays} días, gracia 14)`
+      : expiresInDays !== undefined && expiresInDays <= 30
+        ? `POR_VENCER (vence en ${expiresInDays} días)`
+        : "VALIDA";
   console.log(`✅ Licencia DEV escrita en ${resolve(licenseFile)}`);
-  console.log(`   estado esperado: ${expired ? "SOLO_LECTURA (vencida, --expired)" : "VALIDA"}`);
+  console.log(`   estado esperado: ${expectedState}`);
   console.log(`   huella: ${request.fingerprint}`);
   console.log(`   vence:  ${issued.payload.expiresAt}`);
 }

@@ -52,6 +52,7 @@ describe("LicenseService", () => {
     user: { count: ReturnType<typeof vi.fn> };
   };
   let scheduler: { addInterval: ReturnType<typeof vi.fn> };
+  let emitter: { emit: ReturnType<typeof vi.fn> };
   let service: LicenseService;
 
   function build(cfg: Record<string, unknown> = {}): LicenseService {
@@ -69,12 +70,14 @@ describe("LicenseService", () => {
     };
     const collector = { collect: vi.fn(async () => SIGNALS) };
     scheduler = { addInterval: vi.fn() };
+    emitter = { emit: vi.fn(async () => undefined) };
     const svc = new LicenseService(
       config as never,
       prisma as never,
       audit as never,
       collector as never,
       scheduler as never,
+      emitter as never,
     );
     svc.clock = () => NOW;
     return svc;
@@ -255,6 +258,106 @@ describe("LicenseService", () => {
     expect(prisma.licenseInstallation.upsert).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: "system" } }),
     );
+  });
+
+  describe("avisos de licencia (L6)", () => {
+    it("el ARRANQUE no emite aviso (previous undefined); la transición EN CALIENTE sí, con dedupe diario", async () => {
+      writeFileSync(licPath, signLicense(payload(), DEV_PRIVATE_KEY));
+      await boot(service);
+      expect(emitter.emit).not.toHaveBeenCalled(); // arrancar en VALIDA no avisa
+
+      rmSync(licPath); // le quitan el archivo en caliente ⇒ transición real
+      await service.refresh("tick");
+      expect(emitter.emit).toHaveBeenCalledWith(
+        "license.state.changed",
+        // El payload congela el estado PRESENTABLE (multi-instancia: el
+        // dispatcher que tome el evento puede tener otro snapshot local).
+        expect.objectContaining({
+          from: "VALIDA",
+          to: PENDING_ACTIVATION,
+          status: PENDING_ACTIVATION,
+          reason: "LICENSE_FILE_MISSING",
+        }),
+        { dedupeKey: `license.state.changed|VALIDA->${PENDING_ACTIVATION}|2026-07-05` },
+      );
+
+      await service.refresh("tick"); // sin cambio ⇒ sin nuevo evento
+      expect(emitter.emit).toHaveBeenCalledTimes(1);
+    });
+
+    it("findLicenseNotices: VALIDA nada; POR_VENCER semanal; EN_GRACIA diario; restringidos diarios", async () => {
+      writeFileSync(licPath, signLicense(payload(), DEV_PRIVATE_KEY));
+      await boot(service);
+      expect(service.findLicenseNotices()).toEqual([]);
+
+      writeFileSync(
+        licPath,
+        signLicense(
+          payload({ expiresAt: new Date(NOW.getTime() + 10 * DAY_MS).toISOString() }),
+          DEV_PRIVATE_KEY,
+        ),
+      );
+      await service.refresh("tick");
+      expect(service.findLicenseNotices()).toEqual([
+        expect.objectContaining({
+          eventKey: "license.expiring",
+          dedupeKey: "license.expiring|POR_VENCER|2026-W27",
+        }),
+      ]);
+
+      writeFileSync(
+        licPath,
+        signLicense(
+          payload({ expiresAt: new Date(NOW.getTime() - 5 * DAY_MS).toISOString(), graceDays: 14 }),
+          DEV_PRIVATE_KEY,
+        ),
+      );
+      await service.refresh("tick");
+      expect(service.findLicenseNotices()).toEqual([
+        expect.objectContaining({
+          eventKey: "license.expiring",
+          dedupeKey: "license.expiring|EN_GRACIA|2026-07-05",
+        }),
+      ]);
+
+      rmSync(licPath); // PENDIENTE_ACTIVACION ⇒ license.restricted diario
+      await service.refresh("tick");
+      expect(service.findLicenseNotices()).toEqual([
+        expect.objectContaining({
+          eventKey: "license.restricted",
+          dedupeKey: `license.restricted|${PENDING_ACTIVATION}|2026-07-05`,
+        }),
+      ]);
+    });
+
+    it("EN_GRACIA calcula graceDaysRemaining (graceDays + daysToExpiry negativo); otros estados no lo llevan", async () => {
+      writeFileSync(
+        licPath,
+        signLicense(
+          payload({ expiresAt: new Date(NOW.getTime() - 5 * DAY_MS).toISOString(), graceDays: 14 }),
+          DEV_PRIVATE_KEY,
+        ),
+      );
+      await boot(service);
+      const snap = service.getEvaluation();
+      expect(snap.status).toBe("EN_GRACIA");
+      expect(snap.graceDaysRemaining).toBe(9);
+
+      service.clock = () => new Date(NOW.getTime() + 30 * DAY_MS);
+      await service.refresh("tick");
+      expect(service.getEvaluation().status).toBe("SOLO_LECTURA");
+      expect(service.getEvaluation().graceDaysRemaining).toBeUndefined();
+    });
+
+    it("gate latente de marca blanca (L6d): refleja whiteLabel del payload verificado", async () => {
+      writeFileSync(licPath, signLicense(payload({ whiteLabel: true }), DEV_PRIVATE_KEY));
+      await boot(service);
+      expect(service.isWhiteLabelEnabled()).toBe(true);
+
+      rmSync(licPath);
+      await service.refresh("tick");
+      expect(service.isWhiteLabelEnabled()).toBe(false); // sin payload no se afirma
+    });
   });
 
   describe("linaje rotatorio (L4)", () => {

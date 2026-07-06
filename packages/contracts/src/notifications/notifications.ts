@@ -289,6 +289,9 @@ export function deepLinkForEntity(type: string | null, id: string | null): strin
       return `/ordenes-trabajo/${id}`;
     case "ShiftHandover":
       return `/cambio-turno?handoverId=${id}`;
+    case "LicenseInstallation":
+      // Avisos de licencia (L6): el destino es el detalle de Configuración › Licencia.
+      return "/configuracion?tab=license";
     default:
       return null;
   }

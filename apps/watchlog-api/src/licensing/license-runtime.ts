@@ -59,6 +59,14 @@ export interface LicenseSnapshot {
   customer?: string;
   edition?: string;
   expiresAt?: string;
+  /**
+   * Días que quedan de la ventana de gracia (solo en EN_GRACIA, L6): derivado
+   * de `graceDays + daysToExpiry` (negativo). Alimenta el banner "renovar en X
+   * días" — decisión L6a, único campo nuevo del DTO delgado.
+   */
+  graceDaysRemaining?: number;
+  /** Gate LATENTE de marca blanca (L6d): `whiteLabel` del payload verificado. Hoy sin efecto visible. */
+  whiteLabel?: boolean;
   /** Huella derivada de la máquina real en este arranque. */
   fingerprint: string;
   installationId: string;
@@ -81,5 +89,7 @@ export function toLicenseStatus(snap: LicenseSnapshot): LicenseStatus {
     modules: snap.licensedModules === undefined ? null : [...snap.licensedModules],
     expiresAt: snap.expiresAt,
     daysToExpiry: snap.evaluation?.daysToExpiry,
+    // L6a: solo en EN_GRACIA ("renovar en X días"). `whiteLabel` NO viaja (gate latente).
+    graceDaysRemaining: snap.graceDaysRemaining,
   };
 }

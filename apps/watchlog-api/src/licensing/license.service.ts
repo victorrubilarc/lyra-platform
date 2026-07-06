@@ -19,6 +19,7 @@ import type { LicensedModuleKey } from "@lyra/contracts";
 import type { Env } from "../config/env.schema";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
+import { NotificationEmitterService } from "../notifications/notification-emitter.service";
 import { MachineSignalsCollector } from "./machine-signals.collector";
 import { LICENSE_PUBLIC_KEY_PEM } from "./license-public-key";
 import {
@@ -32,6 +33,28 @@ const RECHECK_INTERVAL_NAME = "license-recheck";
 const REQUEST_FILE_NAME = "solicitud.lreq";
 /** Nombre del archivo de solicitud de RENOVACIÓN con linaje (L4, runbook §4). */
 const RENEWAL_REQUEST_FILE_NAME = "renovacion.lreq";
+
+/** Una orden de aviso de licencia a encolar (L6; espejo de IncidentBreachEmit). */
+export interface LicenseNoticeEmit {
+  eventKey: "license.expiring" | "license.restricted";
+  payload: Record<string, string | number | null>;
+  dedupeKey: string;
+}
+
+/** Clave de día local (cadencia diaria de los re-avisos, patrón incident.overdue). */
+function dayKey(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+/** Clave de semana ISO-8601 (cadencia SEMANAL del re-aviso POR_VENCER, decisión L6c). */
+function isoWeekKey(date: Date): string {
+  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  const day = d.getUTCDay() || 7; // lunes=1 … domingo=7
+  d.setUTCDate(d.getUTCDate() + 4 - day); // jueves de la semana ISO
+  const yearStart = Date.UTC(d.getUTCFullYear(), 0, 1);
+  const week = Math.ceil(((d.getTime() - yearStart) / 86_400_000 + 1) / 7);
+  return `${d.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
+}
 
 /**
  * Runtime de la licencia en la API (Licenciamiento L1). Al ARRANQUE y luego
@@ -77,6 +100,7 @@ export class LicenseService implements OnApplicationBootstrap {
     private readonly audit: AuditService,
     private readonly signals: MachineSignalsCollector,
     private readonly scheduler: SchedulerRegistry,
+    private readonly notificationEmitter: NotificationEmitterService,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -206,8 +230,98 @@ export class LicenseService implements OnApplicationBootstrap {
         },
         metadata: { trigger },
       });
+      // Aviso a administradores (L6, cierra el pendiente L1(iii)): SOLO en una
+      // transición EN CALIENTE (`previous` definido). En el arranque `previous`
+      // es undefined y emitir spamearía en cada reinicio; el caso "arrancó ya en
+      // mal estado" lo cubren los eventos DERIVED de `findLicenseNotices()`.
+      if (previous !== undefined) {
+        await this.notificationEmitter.emit(
+          "license.state.changed",
+          {
+            from: previous.status,
+            to: next.status,
+            ...this.noticePayload(next),
+          },
+          {
+            dedupeKey: `license.state.changed|${previous.status}->${next.status}|${dayKey(this.clock())}`,
+          },
+        );
+      }
     }
     return next;
+  }
+
+  /**
+   * Gate LATENTE de marca blanca (decisión L6d): lee `whiteLabel` del payload
+   * VERIFICADO. Hoy ningún consumidor cambia comportamiento; el épico de marca
+   * blanca (BACKLOG §2(2)) lo cablea sin reabrir el licenciamiento.
+   */
+  isWhiteLabelEnabled(): boolean {
+    return this.snapshot?.whiteLabel === true;
+  }
+
+  /**
+   * Detección de AVISOS DERIVED de licencia (L6): órdenes para el sweeper del
+   * Bloque N (espejo de `IncidentSlaService.findBreaches`). La cadencia vive en
+   * la dedupeKey (índice único del evento): POR_VENCER re-avisa por SEMANA ISO
+   * (con 30 días de ventana, diario = fatiga), EN_GRACIA y los estados
+   * restringidos re-avisan por DÍA. VALIDA no genera nada. Cubre además el
+   * arranque directo en mal estado (donde `license.state.changed` no dispara).
+   */
+  findLicenseNotices(): LicenseNoticeEmit[] {
+    const snap = this.snapshot;
+    if (!snap) return [];
+    const now = this.clock();
+    const base = this.noticePayload(snap);
+    switch (snap.status) {
+      case "POR_VENCER":
+        return [
+          {
+            eventKey: "license.expiring",
+            payload: base,
+            dedupeKey: `license.expiring|POR_VENCER|${isoWeekKey(now)}`,
+          },
+        ];
+      case "EN_GRACIA":
+        return [
+          {
+            eventKey: "license.expiring",
+            payload: base,
+            dedupeKey: `license.expiring|EN_GRACIA|${dayKey(now)}`,
+          },
+        ];
+      case "SOLO_LECTURA":
+      case "BLOQUEADA":
+      case PENDING_ACTIVATION:
+      case "LIMITE_EXCEDIDO":
+        return [
+          {
+            eventKey: "license.restricted",
+            payload: base,
+            dedupeKey: `license.restricted|${snap.status}|${dayKey(now)}`,
+          },
+        ];
+      default:
+        return [];
+    }
+  }
+
+  /**
+   * Datos PRESENTABLES del aviso, congelados EN EL EVENTO al emitir: el
+   * resolver formatea desde el payload y NO desde su snapshot local — con BD
+   * compartida entre instancias (dev y smoke; mañana multi-réplica) el
+   * dispatcher de OTRA instancia puede tomar el evento y su estado local no es
+   * el que originó el aviso. Sin licenseId/customer/huella/linaje (L2c/L6c).
+   */
+  private noticePayload(snap: LicenseSnapshot): Record<string, string | number | null> {
+    return {
+      status: snap.status,
+      reason: snap.reason ?? null,
+      edition: snap.edition ?? null,
+      expiresAt: snap.expiresAt ?? null,
+      daysToExpiry: snap.evaluation?.daysToExpiry ?? null,
+      graceDaysRemaining: snap.graceDaysRemaining ?? null,
+    };
   }
 
   // --- internos ---------------------------------------------------------------
@@ -287,6 +401,14 @@ export class LicenseService implements OnApplicationBootstrap {
       customer: verified.payload.customer,
       edition: verified.payload.edition,
       expiresAt: verified.payload.expiresAt,
+      // L6a: días de gracia restantes ("renovar en X días") — solo EN_GRACIA.
+      // daysToExpiry es negativo tras vencer: graceDays + daysToExpiry = resto.
+      graceDaysRemaining:
+        evaluation.state === LicenseState.EN_GRACIA && evaluation.daysToExpiry !== undefined
+          ? Math.max(0, verified.payload.graceDays + evaluation.daysToExpiry)
+          : undefined,
+      // L6d: gate latente de marca blanca (sin efecto visible hoy).
+      whiteLabel: verified.payload.whiteLabel,
     };
   }
 

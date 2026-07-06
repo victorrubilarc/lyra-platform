@@ -332,13 +332,20 @@ Preséntalo como evolución, no como funcionalidad actual:
 
 > Una línea por hito, en lenguaje de cliente. Lo más reciente arriba.
 
+- **2026-07-06** — **Licencia visible y renovación sin sorpresas 🔔 (disponible):** la plataforma ahora **avisa sola**
+  antes de que la licencia venza — banner en pantalla para los administradores, recordatorios por correo y campanita
+  (semanal por vencer, diario en gracia) y una pestaña **Configuración › Licencia** con el estado en lenguaje claro y
+  el paso a paso de renovación (todo por archivos, sin internet en la planta). Para el cliente final: **cero cortes
+  por olvido** — el sistema anuncia el vencimiento con 30 días, opera un período de gracia y, en el peor caso, queda
+  en solo lectura con TODOS sus datos consultables y exportables. La renovación con detección de copia (L4) también
+  está operativa: una respuesta de renovación sirve **una sola vez y solo en esa instalación**.
 - **2026-07-05** — **Licenciamiento formal por instalación 🔐 (disponible; para el CANAL, no es una feature del
   usuario final):** cada instalación opera con una **licencia firmada digitalmente por ITESICWS**, amarrada a ese
   servidor, con edición/módulos/vigencia — y la **activación funciona 100 % sin internet** (plantas air-gapped:
   un archivo va y vuelve por USB). Para el socio de canal significa reglas claras (banda de licencias, registro
   auditable de emisiones) y para el cliente final una **garantía ética verificable: la licencia jamás bloquea el
-  acceso a SUS datos** (vencida = solo lectura + exportación, nunca borrado). Honesto: hoy existe emisión y
-  activación inicial; la renovación asistida y los avisos en pantalla vienen en camino (L4/L6).
+  acceso a SUS datos** (vencida = solo lectura + exportación, nunca borrado). Actualización: la renovación
+  asistida (L4) y los avisos en pantalla (L6) ya están disponibles — ver la entrada 2026-07-06.
 - **2026-07-02** — **Checklists / permisos de trabajo en las Órdenes de Trabajo 🛠️ (disponible):** una OT puede exigir
   **checklists o permisos** (bloqueo de energías, altura, calidad/ITP, regulatorios…) que **bloquean el avance** hasta
   ser aprobados, con **firma y segregación de funciones** (revisa alguien distinto de quien ejecuta). Es el **mismo motor

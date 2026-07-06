@@ -1,5 +1,37 @@
 # Progreso — Lyra WatchLog
 
+**2026-07-06 — 🔐 Licenciamiento L6 · UI de estado + avisos de licencia ✅** (`feat/licenciamiento-l6`). El estado de
+la licencia por fin es **VISIBLE y ACCIONABLE** para quien opera la planta — hasta hoy solo vivía en logs/auditoría
+y en el DTO. **(1) Banner global** en el shell (`LicenseBanner` bajo el Topbar) alimentado por `useLicenseStatus`;
+mapeo estado→presentación = función PURA `licenseBannerFor` (6 tests): VALIDA sin banner · POR_VENCER/
+LIMITE_EXCEDIDO solo admins (`settings:manage`, filtro de UI) descartables por sesión · EN_GRACIA todos, prominente
+("renovar en **X días**" con el campo NUEVO `graceDaysRemaining`, única adición al DTO delgado — decisión explícita
+L6a, sin huella/linaje) · SOLO_LECTURA/BLOQUEADA/PENDIENTE_ACTIVACION todos y PERSISTENTES; `LINEAGE_MISMATCH` con
+texto humano propio. i18n `license.*` + tokens DS. **(2) Pestaña Licencia en /configuracion** (solo lectura: estado+
+motivo humanizado, edición, módulos en chips, vencimiento+días, instrucciones de renovación del runbook §4; gate
+`module:settings:view` — SIN permiso nuevo, decisión L6b; deep link `?tab=license` desde banner y campanita).
+**(3) Avisos por el Bloque N (cierra el pendiente L1(iii)):** 3 eventos granulares — `license.state.changed` (tx:
+transición EN CALIENTE en `LicenseService.refresh`; el arranque NO emite para no spamear cada reinicio) ·
+`license.expiring` (derived: POR_VENCER semanal por semana ISO / EN_GRACIA diario) · `license.restricted` (derived
+diario) — detección en el dominio (`findLicenseNotices`, espejo de IncidentSlaService) + 3 plantillas seed;
+destinatarios = usuarios con rol que concede `settings:manage` (configurable, sin roles en duro) ∪ suscripciones,
+SIN ABAC de nodo; EMAIL+INAPP con preferencias. **CARVE-OUT del worker** (hallazgo de la sesión): en estados
+restringidos las 3 etapas procesan SOLO eventos `license.*` — sin esto la licencia restringida silenciaba su propia
+alarma (probado EN VIVO: smoke C4). **El payload del evento congela el estado presentable** (multi-instancia con BD
+compartida: el dispatcher de otra instancia no puede resolver desde SU snapshot); bandeja/contexto sin
+licenseId/customer/huella/linaje (deep link = `LicenseInstallation/"system"`). **(4) Gate latente `whiteLabel`**
+(decisión L6d: `isWhiteLabelEnabled()`, sin efecto visible; épico §2(2) lo cablea). **(5)**
+`gen-dev-license --expires-in-days=N` (N<0 = vencida hace |N| días) para probar el banner. **SIN migración ni
+permiso nuevo** (solo `db:seed`). **Verde:** typecheck/lint/build/test (contracts **518** = +5 · API **296** = +4 ·
+web **17** = +6) + **smoke-licencia-avisos.py 25/25 NUEVO** (:3404 — DTO por estado, aviso al admin y NO a un
+usuario sin criterio, dedupe semanal, carve-out vía cron real, VALIDA en silencio) + regresión licencia
+**28/28 · 23/23 · 20/20 · 29/29** + notificaciones **18/18 · 22/22 · 18/18** — el 18/18 exigió un **fix de DERIVA DE
+DATOS preexistente** en el arnés (el demo acumula 400+ rondas vencidas y el lote del sweeper es 200: la ocurrencia
+del smoke ahora se inserta como la MÁS antigua; deuda de reseed sigue en BACKLOG §3). **No probado:** smoke VISUAL
+del banner/pestaña (lo hace el dueño — dev queda con licencia POR_VENCER y restauración = `pnpm license:dev` +
+reiniciar api); re-aviso multi-día real (la cadencia se afirma por dedupeKey). Decisiones a–f en DECISIONS
+2026-07-06. **Siguiente: prueba de fuego L4 (tag v0.1.14 → EC2 → renovar counter 0→1) y luego L5 anti-tamper.**
+
 **2026-07-05 — 🔐 Licenciamiento L4 · challenge-response de RENOVACIÓN + linaje rotatorio (detección de clon) ✅**
 (`feat/licenciamiento-l4`). La capa 4 de la defensa (STRATEGY §4, patrón CodeMeter, **PoC T6 ahora EN VIVO**): la
 licencia se **renueva por archivos** (air-gap intacto) y el **clon de la instalación queda DETECTADO al renovar**.

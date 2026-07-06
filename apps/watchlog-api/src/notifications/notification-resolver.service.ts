@@ -139,6 +139,11 @@ export class NotificationResolverService {
       case "handover.ready":
         resolution = await this.resolveHandoverReady(payload);
         break;
+      case "license.state.changed":
+      case "license.expiring":
+      case "license.restricted":
+        resolution = await this.resolveLicenseEvent(event.eventKey, payload);
+        break;
       default:
         resolution = null;
     }
@@ -618,6 +623,64 @@ export class NotificationResolverService {
       default:
         return "—";
     }
+  }
+
+  // --- Resolver de LICENCIA (L6) ---------------------------------------------
+
+  /**
+   * Avisos de licencia de la instalación. Destinatarios = usuarios con un rol
+   * que concede `settings:manage` (los administradores del sistema — permiso
+   * CONFIGURABLE, jamás un nombre de rol en duro), SIN filtro ABAC de nodo: la
+   * licencia es de la INSTALACIÓN completa, no de un área. El contexto se
+   * formatea DESDE EL PAYLOAD del evento (congelado por la instancia que
+   * detectó el estado, `LicenseService.noticePayload`): con BD compartida
+   * entre instancias, el dispatcher que toma el evento puede tener OTRO estado
+   * local — el suceso manda. Sin licenseId/customer/huella/linaje (L2c/L6c).
+   */
+  private async resolveLicenseEvent(
+    eventKey: string,
+    payload: Record<string, unknown>,
+  ): Promise<EventResolution | null> {
+    const status = typeof payload.status === "string" ? payload.status : "";
+    if (!status) return null;
+
+    const roleIds = await this.rolesWithPermission("settings:manage");
+    const userIds = new Set(await this.usersOfRoleIds(roleIds));
+
+    const graceDaysRemaining = typeof payload.graceDaysRemaining === "number" ? payload.graceDaysRemaining : undefined;
+    const daysToExpiry = typeof payload.daysToExpiry === "number" ? payload.daysToExpiry : undefined;
+    const daysLeft =
+      status === "EN_GRACIA"
+        ? graceDaysRemaining
+        : daysToExpiry !== undefined && daysToExpiry >= 0
+          ? daysToExpiry
+          : undefined;
+    const context: Record<string, string> = {
+      "license.status": licenseStatusLabel(status),
+      "license.reason": typeof payload.reason === "string" && payload.reason ? licenseReasonLabel(payload.reason) : "—",
+      "license.edition": typeof payload.edition === "string" && payload.edition ? payload.edition : "—",
+      "license.expiresAt":
+        typeof payload.expiresAt === "string" && payload.expiresAt
+          ? this.formatDateTime(new Date(payload.expiresAt))
+          : "—",
+      "license.daysLeft": daysLeft !== undefined ? String(daysLeft) : "—",
+    };
+    if (eventKey === "license.state.changed") {
+      context["license.fromStatus"] = licenseStatusLabel(String(payload.from ?? ""));
+      context["license.toStatus"] = licenseStatusLabel(String(payload.to ?? ""));
+    }
+
+    return {
+      userIds,
+      externalEmails: [],
+      // Sin nodo/plantilla: los suscriptores explícitos no se filtran por ABAC.
+      orgNodeId: null,
+      templateId: null,
+      // Id FIJO "system" (fila única): el installationId real NO viaja a la bandeja.
+      relatedEntityType: "LicenseInstallation",
+      relatedEntityId: "system",
+      context,
+    };
   }
 
   /** Roles que conceden un permiso (por su clave del catálogo). */
@@ -1272,6 +1335,41 @@ interface LoadedWorkOrder {
   escalationAfterMinutes: number | null;
   escalationRoleId: string | null;
   transitions: Array<{ fromStateKey: string; roleIds: string[] }>;
+}
+
+/** Estados de licencia humanizados (es-CL) para las plantillas de aviso (L6). */
+const LICENSE_STATUS_LABELS: Record<string, string> = {
+  VALIDA: "Válida",
+  POR_VENCER: "Por vencer",
+  EN_GRACIA: "En gracia (vencida)",
+  SOLO_LECTURA: "Solo lectura",
+  BLOQUEADA: "Bloqueada",
+  PENDIENTE_ACTIVACION: "Pendiente de activación",
+  LIMITE_EXCEDIDO: "Límite excedido",
+  MODULO_NO_LICENCIADO: "Módulo no licenciado",
+};
+
+/** Motivos de estado humanizados (es-CL); un motivo desconocido se muestra en crudo. */
+const LICENSE_REASON_LABELS: Record<string, string> = {
+  EXPIRING_SOON: "La licencia está por vencer",
+  EXPIRED_IN_GRACE: "Licencia vencida, dentro del período de gracia",
+  EXPIRED_BEYOND_GRACE: "Licencia vencida y período de gracia agotado",
+  LIMITS_EXCEEDED: "La instalación supera los límites contratados",
+  LICENSE_FILE_MISSING: "No hay archivo de licencia (instalación sin activar)",
+  LINEAGE_MISMATCH: "La licencia no corresponde a esta instalación",
+  FINGERPRINT_MISMATCH: "La licencia no corresponde a este servidor",
+  INVALID_SIGNATURE: "La firma de la licencia no es válida",
+  MALFORMED_JWS: "El archivo de licencia está dañado",
+  INVALID_TEMPORAL_FIELDS: "El archivo de licencia tiene fechas inválidas",
+  NOT_YET_VALID: "La licencia aún no entra en vigencia",
+};
+
+function licenseStatusLabel(status: string): string {
+  return (status && LICENSE_STATUS_LABELS[status]) || status || "—";
+}
+
+function licenseReasonLabel(reason: string): string {
+  return LICENSE_REASON_LABELS[reason] ?? reason;
 }
 
 /** Parsea (defensivo) la config de aviso congelada de una transición. JSON corrupto ⇒ null. */

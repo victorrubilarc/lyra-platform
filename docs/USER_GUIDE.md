@@ -30,7 +30,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 ## Índice de funcionalidades
 
 ### 1. Acceso y cuenta  [todos]
-- ✍️ Iniciar sesión (correo + contraseña)
+- ✅ **Iniciar sesión (correo + contraseña)** (ingreso, MFA, contraseña temporal, olvido, salir) (§ Acceso ▸ Iniciar sesión)
 - ✍️ Segundo factor (MFA / código TOTP) y códigos de recuperación
 - ✍️ Recuperar contraseña (autoservicio por correo)
 - ✍️ Cambio de contraseña forzado en el primer ingreso
@@ -107,7 +107,8 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 - ✍️ Ficha del registro (visor), verificación de firmas, línea de tiempo, exportar
 
 ### 12. Configuración del sistema  [Admin]
-- ✍️ `/configuracion`: MFA por acción, ventana de edición global
+- ✅ **Seguridad y registro** (`/configuracion`: MFA por acción de período, ventana de edición global) (§ Configuración del sistema ▸ Seguridad y registro)
+- ✅ **Licencia** (estado, módulos, vencimiento e instrucciones de renovación — solo lectura) (§ Licencia de la instalación ▸ Estado visible y avisos)
 - ✅ **Notificaciones**: comportamiento por defecto de los avisos de transición (§ Notificaciones ▸ Avisos a la medida)
 - ✅ **Servidor de correo (SMTP)**: proveedor, credenciales cifradas, probar (§ Configuración ▸ Servidor de correo)
 - ✅ **Inteligencia Artificial**: proveedor (ninguno/Anthropic/local), clave cifrada, "Probar" en vivo (§ Configuración ▸ Inteligencia Artificial)
@@ -146,6 +147,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 ### 18. Licencia de la instalación  [Admin]
 - ✅ **Estados de la licencia y qué se puede hacer en cada uno** (activación, vencimiento, solo lectura; los datos NUNCA se bloquean) (§ Licencia de la instalación)
 - ✅ **Módulos incluidos en la licencia (edición)** (los módulos no contratados no aparecen en el menú; si se pierde un módulo por cambio de edición, sus datos siguen consultables y exportables) (§ Licencia de la instalación ▸ Módulos incluidos)
+- ✅ **Banner de estado, detalle en Configuración y avisos a administradores** (banner arriba de la pantalla según el estado; Configuración › Licencia con instrucciones de renovación; correo + campanita a los admins cuando hay que actuar) (§ Licencia de la instalación ▸ Estado visible y avisos)
 
 ### 19. Órdenes de trabajo (OT / PTW)  [todos los roles operativos]
 - ✅ **Crear y listar solicitudes de trabajo** (asistente de 2 pasos, grilla con filtros/facetas, detalle con reasignar/prioridad/anular) (§ Órdenes de trabajo)
@@ -179,9 +181,10 @@ cada estado.
   `solicitud.lreq` en la carpeta de licencia del servidor — tu implementador lo envía al proveedor,
   recibe el `license.lic` y lo deposita en esa misma carpeta. Al siguiente arranque (o dentro de las
   próximas horas) la instalación queda operativa.
-- *Licencia por vencer:* el sistema sigue funcionando normal. Coordina la renovación con tu proveedor
-  ANTES del vencimiento (el aviso visible en pantalla llega en una versión próxima; hoy queda
-  registrado en el log y la auditoría).
+- *Licencia por vencer:* el sistema sigue funcionando normal. Los administradores ven un **banner de
+  aviso** en la parte superior ("vence en X días") y reciben un recordatorio semanal por correo y en la
+  campanita. Coordina la renovación con tu proveedor ANTES del vencimiento (ver § Estado visible y
+  avisos, más abajo).
 - *Renovar la licencia:* el sistema mantiene listo un archivo **`renovacion.lreq`** junto al
   `license.lic` del servidor. Tu implementador se lo envía al proveedor (correo o USB — no se necesita
   internet en la planta), recibe el `license.lic` renovado y lo deposita en la misma carpeta. La
@@ -242,6 +245,48 @@ la app).
   parte del **núcleo** y funciona con cualquier edición.
 - El candado real está en el servidor: ocultar el menú es solo cortesía visual — aunque alguien
   "adivine" la dirección, el servidor rechaza las modificaciones de un módulo no licenciado.
+
+### Estado visible y avisos (banner · Configuración › Licencia · correo/campanita)
+
+**Para qué sirve.** Que nadie se entere de un problema de licencia "cuando ya no puede escribir":
+la plataforma **muestra** el estado (banner + detalle en Configuración) y **avisa** a los
+administradores con anticipación (correo y campanita), con las instrucciones de renovación a mano.
+
+**Cómo se usa (casos paso a paso).**
+- *Banner de estado:* aparece como una franja bajo la barra superior, según el estado:
+  - **Por vencer** (solo administradores, amarillo): "vence en X días". Puedes **descartarlo** con la
+    ✕ — no vuelve a aparecer en tu sesión (sí en la próxima, mientras el estado siga).
+  - **En gracia** (todos, amarillo prominente): "la licencia venció el …; la plataforma seguirá
+    operando X días más". También descartable por sesión.
+  - **Solo lectura / Bloqueada / Pendiente de activación** (todos, persistente): explica por qué la
+    plataforma no acepta cambios y qué hacer. **No se puede descartar** (es la explicación de por qué
+    los botones de guardar fallan). Si el motivo es "esta licencia no corresponde a esta instalación",
+    contacta a tu proveedor para regularizar la activación.
+  - **Límite excedido** (solo administradores): la instalación supera los nodos/usuarios contratados.
+  - Con la licencia **Válida** no hay banner.
+- *Ver el detalle:* botón **«Ver detalle»** del banner, o `Configuración › Licencia` (también al tocar
+  el aviso de la campanita). Verás el estado con su motivo en lenguaje claro, la edición, los módulos
+  incluidos, el vencimiento con los días restantes y el **paso a paso de renovación** (dónde queda el
+  `renovacion.lreq`, a quién enviarlo y cómo se importa la respuesta). Es solo lectura: la licencia no
+  se administra desde la app, sino por archivos del despliegue.
+- *Avisos a administradores:* quienes tienen el permiso de administrar la configuración reciben, por
+  correo y campanita: **cambio de estado** de la licencia (incluida la vuelta a Válida tras renovar),
+  **renovación pendiente** (semanal mientras esté por vencer; diario durante la gracia) y **estado
+  restringido** (diario). Como cualquier evento, cada quien puede ajustar sus canales en
+  «Mis notificaciones»; y se puede suscribir a más gente desde las suscripciones de notificaciones.
+
+**Quién puede.** Ver el banner de estados restringidos y en gracia: **todos** (explican la operación).
+Ver los avisos "por vencer" y "límite excedido" y recibir los correos/campanita: usuarios cuyo rol
+concede **administrar la configuración** (`settings:manage` — configurable por rol, como todo). Ver la
+pestaña `Configuración › Licencia`: quien puede entrar a Configuración.
+
+**Importante.**
+- El banner **informa**; no bloquea nada por sí mismo. El control real siempre está en el servidor.
+- Los avisos de licencia se entregan **incluso si la instalación está en solo lectura o bloqueada**
+  (el motor de notificaciones pausa el trabajo normal en esos estados, pero la alarma de licencia
+  tiene paso garantizado).
+- El aviso nunca incluye datos internos de la licencia (identificadores, huella del servidor): solo el
+  estado y qué hacer.
 
 ## Órdenes de trabajo (OT / PTW)  [todos los roles operativos]
 
@@ -2336,3 +2381,54 @@ que puedes **imprimir o adjuntar** sin depender de la app.
   certificación es de las personas que entregaron y recibieron el turno. Si el entrante aún no
   reconoce, el acta lo indica como **"Pendiente de reconocimiento"**.
 - **Se genera en el servidor, on-premise:** el documento no sale de tu instalación.
+
+## Acceso ▸ Iniciar sesión (correo + contraseña)  [todos]
+
+**Para qué sirve.** Entrar a la plataforma con tu cuenta personal. Cada acción que hagas queda a tu
+nombre (firmas, auditoría), por eso las cuentas nunca se comparten.
+
+**Cómo se usa (casos paso a paso).**
+- *Ingreso normal:* abre la dirección de la plataforma, escribe tu **correo** y **contraseña** y
+  presiona «Ingresar». Si tu cuenta tiene segundo factor (MFA), a continuación te pedirá el código de
+  6 dígitos de tu app autenticadora (o un código de recuperación).
+- *Primera vez / contraseña temporal:* si un administrador te creó la cuenta con una contraseña
+  temporal, el sistema te obligará a **definir la tuya** antes de operar (debe cumplir la política de
+  contraseñas de la instalación; la pantalla te indica los requisitos en vivo).
+- *Contraseña olvidada:* usa «¿Olvidaste tu contraseña?» en la pantalla de ingreso; recibirás un
+  correo con un enlace para definir una nueva (si el correo saliente de la instalación está activo —
+  si no, pídele el reinicio a tu administrador).
+- *Salir:* menú de tu avatar (arriba a la derecha) → «Cerrar sesión».
+
+**Quién puede.** Cualquier usuario **activo** de la instalación. Una cuenta deshabilitada no puede
+entrar (el administrador puede reactivarla).
+
+**Importante.**
+- Tras varios intentos fallidos la cuenta se **bloquea temporalmente** (protección de fuerza bruta):
+  espera unos minutos o contacta a tu administrador.
+- La sesión se renueva sola mientras trabajas y expira con inactividad prolongada.
+- La pantalla de ingreso es siempre oscura (identidad de la plataforma); el tema claro/oscuro aplica
+  una vez adentro.
+
+## Configuración del sistema ▸ Seguridad y registro (/configuracion)  [Admin]
+
+**Para qué sirve.** Los ajustes globales que gobiernan cómo se registra y protege la operación:
+qué acciones sensibles exigen **MFA** y cuál es la **ventana de edición** de las entradas (el plazo
+para corregir un registro después de creado).
+
+**Cómo se usa (casos paso a paso).**
+- *Exigir MFA para gobernar períodos (pestaña Seguridad):* activa el interruptor de cada acción que
+  quieras endurecer — cerrar, reabrir, bloquear o desbloquear un período contable. Con el interruptor
+  activo, esa acción pedirá el código MFA del usuario en el momento, aunque ya tenga sesión iniciada.
+- *Ventana de edición global (pestaña Bitácoras):* define cuántos minutos/horas se puede editar una
+  entrada después de registrada (vacío = sin límite), desde cuándo se cuenta (fecha de registro o
+  fecha efectiva del evento) y si el **override** de una entrada vencida exige MFA. Las plantillas
+  pueden afinar su propia ventana; este es el valor por defecto de la instalación.
+- Cada cambio se guarda al tocar el control y queda **auditado** (verás "Actualizado por…" al pie).
+
+**Quién puede.** Ver la pantalla: permiso `module:settings:view`. Modificar: `settings:manage`.
+Las demás pestañas (Correo saliente, IA, Apariencia, Licencia) tienen su propia sección en este manual.
+
+**Importante.**
+- Estos ajustes aplican de inmediato, sin reiniciar.
+- Endurecer con MFA una acción NO la quita a nadie: solo agrega la verificación en el momento (el
+  permiso de la acción sigue gobernado por los roles).
