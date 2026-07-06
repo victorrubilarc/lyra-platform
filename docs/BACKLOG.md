@@ -5,7 +5,16 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-07-05** — **🔐 Licenciamiento L4 · renovación challenge-response + linaje rotatorio ✅**
+> actualización: **2026-07-06** — **🔐 Licenciamiento L5 · anti-tamper del módulo crítico en el build de release ✅**
+> (`feat/licenciamiento-l5`): el build de imagen empaqueta la API en un **bundle único minificado con nombres
+> destruidos** (esbuild) que **inlinea `@lyra/licensing`** y **borra el fuente legible** (src + copia del módulo crítico,
+> también en la imagen migrate) · **auto-verificación de integridad DISTRIBUIDA** (sello SHA-256 releído sin caché en
+> `evaluateNow` + worker; `requireSeal` solo en prod) ⇒ artefacto adulterado = **BLOQUEADA `INTEGRITY_MISMATCH`**
+> (restringido, jamás destructivo, auditado/avisado) · **NO bytecode** (descartado con fundamento) · Dockerfile hornea,
+> release.yml/dev/ci.yml sin tocar · L0/máquina de estados INTACTOS. API 309 + web 18 + **smoke-licencia-integridad
+> 32/32** + imagen linux real + regresión 28/23/20/29/25 + notif 18/22/18. SIN migración/permiso; devDep raíz `esbuild`.
+> **SIGUE: L2b (límites numéricos) cierra el plan L0–L6**, o retomar roadmap de producto (QA del dueño / reversa GxP).
+> — Antes: **🔐 Licenciamiento L4 · renovación challenge-response + linaje rotatorio ✅**
 > (`feat/licenciamiento-l4`, PoC T6 EN VIVO): la app deja/refresca **`renovacion.lreq`** (linaje local counter+nonce,
 > nonce jamás viaja hasta la solicitud) · CLI **`lyra-license renew`** (valida linaje contra el LEDGER: linaje
 > repetido = **CLON DETECTADO ⇒ deniega**, override `--force-duplicate` auditado; hereda términos comerciales; ata la
@@ -864,7 +873,21 @@ nunca queda más de una sesión atrás.
             pre-renovación conservado (`license.lic.bak-pre-renew-v0114` en el host + copia local); la vieja ya no
             calza POR DISEÑO. Lección operacional en PROCEDURE §2: **emitir SIEMPRE contra la `solicitud.lreq`
             generada por la app** (identidad real), jamás con ids inventados.
-      - [ ] **L5:** anti-tamper en CI (bytecode V8/nativo del módulo crítico + verificación distribuida + integridad).
+      - [x] **L5 · anti-tamper del módulo crítico en el build de release** ✅ 2026-07-06 (`feat/licenciamiento-l5`):
+            el build de imagen (Dockerfile.api, NO release.yml aparte; dev/ci.yml intactos) empaqueta la API en UN
+            `dist/main.js` **minificado con nombres destruidos** (`scripts/license/bundle-api.mjs`, esbuild sobre el
+            DIST ya transpilado ⇒ esquiva el campo minado NestJS+`emitDecoratorMetadata`) que **INLINEA
+            `@lyra/licensing`** (node_modules external: Prisma/argon2/pdfmake+fuentes/minio/contracts/llm), y **borra
+            de la imagen el fuente TS (`src`) + la copia legible del módulo crítico** (también en la imagen migrate).
+            **Auto-verificación de integridad DISTRIBUIDA** (`integrity.ts` + `seal-integrity.mjs`): sello SHA-256
+            embebido en el bundle (marcador único, normalizado), releído SIN caché en `LicenseService.evaluateNow` y
+            en `workersOperational`; `requireSeal` solo en producción; adulterar ⇒ **BLOQUEADA reason nuevo
+            `INTEGRITY_MISMATCH`** (restringido = solo lectura + exportación, JAMÁS destructivo; auditado y avisado por
+            la cañería de L6). **NO bytecode V8** (`bytenode` descartado con fundamento: ata a la versión de Node,
+            loader en runtime, se desensambla igual — DECISIONS 2026-07-06 L5-a). L0/máquina de estados INTACTOS.
+            SIN migración/permiso; nueva devDep raíz `esbuild`; sello GENERADO en build (jamás committeado). API 309
+            (+13 integridad) + web 18 (+1 banner) + **smoke-licencia-integridad 32/32** (:3405) + **imagen linux REAL
+            construida a mano** + regresión 28/23/20/29/25 + notif 18/22/18. Decisiones a–f en DECISIONS 2026-07-06 (L5).
       - [x] **L6 · UI de estado + avisos de licencia** ✅ 2026-07-06 (`feat/licenciamiento-l6`): **banner global**
             en el shell (`LicenseBanner` + presentación PURA `licenseBannerFor` testeada; audiencia por estado:
             restringidos y EN_GRACIA = todos, POR_VENCER/LIMITE_EXCEDIDO = solo admins vía `settings:manage`;

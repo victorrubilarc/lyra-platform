@@ -39,6 +39,14 @@ COPY . .
 RUN pnpm --filter "./packages/**" run build \
  && pnpm --filter @lyra/watchlog-api exec prisma generate \
  && pnpm --filter @lyra/watchlog-api build
+# --- Licenciamiento L5 · anti-tamper (SOLO en el build de imagen; dev/ci.yml no
+# --- pasan por aquí, LICENSING_PROCEDURE §6). Empaqueta la API en UN único
+# --- dist-bundle/main.js minificado con nombres destruidos, INLINEA el módulo
+# --- crítico @lyra/licensing (deja de ser texto editable) y SELLA el artefacto
+# --- (SHA-256 embebido) para la auto-verificación de integridad del runtime.
+# --- Se cuelga del MISMO punto donde el release ya horneó la pública de PROD.
+RUN node scripts/license/bundle-api.mjs \
+ && node scripts/license/seal-integrity.mjs apps/watchlog-api/dist-bundle/main.js
 # Empaqueta el API con solo sus dependencias de producción. `--legacy`: pnpm v10+
 # exige inject-workspace-packages para `deploy` por defecto; con --legacy usa el
 # modo clásico (copia el paquete + sus deps de prod, incl. los @lyra/* compilados).
@@ -46,6 +54,17 @@ RUN pnpm --filter "./packages/**" run build \
 # del workspace ⇒ sin esto pnpm 11 BLOQUEA los builds nativos (argon2, prisma) y
 # falla sin TTY. Contexto de build confiable (deps propias), así que se permite.
 RUN pnpm --filter @lyra/watchlog-api deploy --prod --legacy --config.dangerouslyAllowAllBuilds=true /app
+# --- L5 · en el /app desplegado: sustituye el dist LEGIBLE (un .js por archivo,
+# --- con el árbol de licensing en claro) por el bundle ÚNICO sellado, y borra
+# --- el fuente TypeScript (src/tools) y la copia legible del módulo crítico
+# --- (@lyra/licensing quedó inlineado en el bundle ⇒ ya no se requiere). Así la
+# --- imagen distribuida no reparte la lógica de licencia en texto editable.
+RUN cp apps/watchlog-api/dist-bundle/main.js /tmp/main.sealed.js \
+ && rm -rf /app/dist /app/dist-bundle /app/src /app/tools /app/nest-cli.json \
+           /app/tsconfig.json /app/tsconfig.build.json /app/vitest.config.ts \
+           /app/eslint.config.mjs /app/node_modules/@lyra/licensing \
+ && mkdir /app/dist \
+ && mv /tmp/main.sealed.js /app/dist/main.js
 
 # ---- Imagen final ----
 FROM base AS runtime
@@ -71,6 +90,18 @@ CMD ["node", "dist/main.js"]
 FROM build AS migrate
 ENV NODE_ENV=production
 WORKDIR /repo/apps/watchlog-api
+# --- L5 · la imagen migrate es un toolchain (prisma CLI + tsx + seed); NO hace
+# --- cumplir la licencia (no es el punto de enforcement) pero igual viaja al
+# --- cliente. Se elimina el fuente legible del módulo crítico (no lo necesita
+# --- para migrar/sembrar: el seed no importa @lyra/licensing) para no repartir
+# --- la lógica de licencia en texto claro. El resto del toolchain (contracts,
+# --- prisma) permanece porque el seed sí lo usa. `; true`: idempotente aunque
+# --- alguna ruta no exista.
+RUN rm -rf /repo/packages/licensing \
+           /repo/apps/watchlog-api/src /repo/apps/watchlog-api/dist \
+           /repo/apps/watchlog-api/dist-bundle \
+           /repo/node_modules/@lyra/licensing \
+           /repo/apps/watchlog-api/node_modules/@lyra/licensing 2>/dev/null; true
 # Invoca los binarios DIRECTO (no `pnpm exec`): con NODE_ENV=production, `pnpm exec`
 # intenta reconciliar node_modules a solo-producción (poda tsx/prisma CLI) y, sin
 # TTY, aborta con ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY. Los .bin ya existen

@@ -22,6 +22,7 @@ import { AuditService } from "../audit/audit.service";
 import { NotificationEmitterService } from "../notifications/notification-emitter.service";
 import { MachineSignalsCollector } from "./machine-signals.collector";
 import { LICENSE_PUBLIC_KEY_PEM } from "./license-public-key";
+import { verifyArtifactIntegrity } from "./integrity";
 import {
   PENDING_ACTIVATION,
   RESTRICTED_STATUSES,
@@ -106,6 +107,17 @@ export class LicenseService implements OnApplicationBootstrap {
   async onApplicationBootstrap(): Promise<void> {
     await this.ensureInstallation();
     this.fingerprint = deriveFingerprint(await this.signals.collect());
+    // Log informativo ÚNICO del sello (L5). El enforcement vive en evaluateNow
+    // y en workersOperational; aquí solo se deja constancia nítida al arrancar.
+    const integrity = await verifyArtifactIntegrity({ requireSeal: this.sealRequired() });
+    if (integrity === "UNSEALED") {
+      this.logger.log(
+        "Artefacto sin sello de integridad (build de desarrollo/CI): la " +
+          "auto-verificación L5 queda inerte. Las imágenes de release van selladas.",
+      );
+    } else if (integrity === "SEALED_OK") {
+      this.logger.log("Sello de integridad del artefacto verificado (L5).");
+    }
     await this.refresh("arranque");
 
     const minutes = this.config.get("LICENSE_RECHECK_MINUTES", { infer: true });
@@ -166,7 +178,11 @@ export class LicenseService implements OnApplicationBootstrap {
   async workersOperational(context: string): Promise<boolean> {
     let operational = false;
     try {
-      const raw = await this.readLicenseFile();
+      // Integridad del artefacto (L5): SEGUNDO punto de la verificación
+      // distribuida — recomputa el hash DESDE DISCO en cada llamada, igual que
+      // la firma; no reusa el snapshot del guard ni ningún booleano cacheado.
+      const integrity = await verifyArtifactIntegrity({ requireSeal: this.sealRequired() });
+      const raw = integrity === "MISMATCH" ? undefined : await this.readLicenseFile();
       if (raw !== undefined) {
         const verified = verifyLicense(raw, LICENSE_PUBLIC_KEY_PEM);
         // El linaje también participa del chequeo distribuido (L4): una
@@ -333,6 +349,23 @@ export class LicenseService implements OnApplicationBootstrap {
       checkedAt: this.clock(),
     };
 
+    // --- Integridad del artefacto (L5): PRIMER punto de la verificación
+    // --- distribuida (arranque + re-evaluación periódica). Un bundle sellado
+    // --- que no calza con su sello ⇒ BLOQUEADA (restringido = solo lectura +
+    // --- exportación, jamás destructivo) y se audita/avisa por la MISMA
+    // --- cañería de license.state.changed / license.restricted de L6.
+    const integrity = await verifyArtifactIntegrity({ requireSeal: this.sealRequired() });
+    if (integrity === "MISMATCH") {
+      this.payload = undefined;
+      this.logger.error(
+        "El artefacto de la aplicación NO calza con su sello de integridad " +
+          "(build adulterado, corrupto o actualización a medias). La instalación " +
+          "queda BLOQUEADA en solo lectura + exportación; los datos no se tocan. " +
+          "Reinstale la imagen original distribuida por su proveedor.",
+      );
+      return { ...base, status: "BLOQUEADA", reason: "INTEGRITY_MISMATCH" };
+    }
+
     let raw: string | undefined;
     try {
       raw = await this.readLicenseFile();
@@ -410,6 +443,16 @@ export class LicenseService implements OnApplicationBootstrap {
       // L6d: gate latente de marca blanca (sin efecto visible hoy).
       whiteLabel: verified.payload.whiteLabel,
     };
+  }
+
+  /**
+   * ¿El sello de integridad es OBLIGATORIO? Solo en producción: el build de
+   * release SIEMPRE sella, así que un sello en ceros ahí es adulteración
+   * (cierra el bypass "borro el hash y quedo como build de desarrollo"). En
+   * dev/CI/tests no hay sello y el chequeo queda inerte (UNSEALED).
+   */
+  private sealRequired(): boolean {
+    return this.config.get("NODE_ENV", { infer: true }) === "production";
   }
 
   /** Contenido de LICENSE_FILE, o undefined si el archivo no existe (ENOENT). */

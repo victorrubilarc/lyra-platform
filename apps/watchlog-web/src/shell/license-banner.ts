@@ -18,7 +18,15 @@ export type LicenseBannerTone = "info" | "warning" | "error";
 
 export interface LicenseBannerPresentation {
   /** Sufijo de la clave i18n (`license.banner.<key>`). */
-  key: "expiring" | "grace" | "readonly" | "blocked" | "lineage" | "pending" | "limits";
+  key:
+    | "expiring"
+    | "grace"
+    | "readonly"
+    | "blocked"
+    | "lineage"
+    | "integrity"
+    | "pending"
+    | "limits";
   tone: LicenseBannerTone;
   /** `admins` = solo usuarios con `settings:manage` (filtro de UI; el DTO es de todos). */
   audience: "all" | "admins";
@@ -56,10 +64,16 @@ export function licenseBannerFor(
     case "SOLO_LECTURA":
       return { key: "readonly", tone: "error", audience: "all", dismissible: false };
     case "BLOQUEADA":
-      // LINEAGE_MISMATCH tiene texto humano PROPIO (spec §5, L4): "esta licencia
-      // no corresponde a esta instalación", distinto de una firma inválida.
+      // LINEAGE_MISMATCH (L4) e INTEGRITY_MISMATCH (L5) tienen texto humano
+      // PROPIO: el admin legítimo debe saber QUÉ escalar (activación que no
+      // corresponde vs software adulterado/corrupto), sin detalle técnico.
       return {
-        key: status.reason === "LINEAGE_MISMATCH" ? "lineage" : "blocked",
+        key:
+          status.reason === "LINEAGE_MISMATCH"
+            ? "lineage"
+            : status.reason === "INTEGRITY_MISMATCH"
+              ? "integrity"
+              : "blocked",
         tone: "error",
         audience: "all",
         dismissible: false,

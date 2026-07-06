@@ -6,7 +6,7 @@
 > tope de instalaciones/nodos/usuarios y módulos habilitados. Es un **ítem de desarrollo cerrado**,
 > aún no construido.
 >
-> Última actualización: **2026-07-06**. Estado: **L0 + L1 + L2 + L3 + L4 + L6 construidos** — el núcleo puro (firma/verificación
+> Última actualización: **2026-07-06**. Estado: **L0 + L1 + L2 + L3 + L4 + L5 + L6 construidos** — el núcleo puro (firma/verificación
 > Ed25519, huella, máquina de estados §5, linaje) existe como **`@lyra/licensing`** (`packages/licensing`, 50 tests), la
 > API **vive la licencia en runtime** (L1: `LicenseService` + guard global + chequeo distribuido en el worker +
 > auditoría; ver §4/§5), el **gating de módulos por entitlement está ACTIVO** (L2: catálogo canónico §5.1 +
@@ -17,7 +17,11 @@
 > renew` + rotación/`LINEAGE_MISMATCH` en runtime ⇒ **el clon de la instalación queda DETECTADO al renovar**; ver
 > §4.1/§5) y la **UI de estado + avisos es REAL** (L6: banner global por estado + pestaña Licencia en Configuración +
 > 3 eventos `license.*` por el motor de notificaciones a los administradores, con carve-out para que una licencia
-> restringida no silencie su propia alarma; ver §5.2). Pendientes L5 (anti-tamper) y L2b (límites numéricos).
+> restringida no silencie su propia alarma; ver §5.2), y el **anti-tamper del build de release es REAL** (L5: el build
+> de imagen empaqueta la API en un bundle único minificado con nombres destruidos que **inlinea `@lyra/licensing`** y
+> borra el fuente legible, más **auto-verificación de integridad distribuida** —sello SHA-256 releído en `evaluateNow`
+> y en el worker— que degrada a **BLOQUEADA `INTEGRITY_MISMATCH`** ante un artefacto adulterado, jamás destructivo; ver
+> §7/§7.4). Pendiente L2b (enforcement de límites numéricos).
 > Estimación total: ~80–160 HH.
 
 ---
@@ -342,18 +346,38 @@ verificado; hoy sin efecto visible y sin viajar al DTO — el épico de marca bl
 El riesgo real que preocupa al negocio: que el socio (o su dev) **edite el código** para saltarse el
 chequeo. No se puede volver imposible al 100%, pero se encarece por capas:
 
-| Capa | Qué hace |
-|---|---|
-| **1. No entregar código fuente** (la principal) | Se entregan **imágenes Docker compiladas** (bundle minificado), no el repo. El módulo de licencia crítico puede compilarse a **bytecode V8** (`bytenode`) o binario nativo (Node SEA / Bun) para que no sea texto editable. |
-| **2. Firma asimétrica** | Aunque vean el `license.lic`, no pueden emitir uno válido ni extender el vencimiento (no tienen la clave privada). |
-| **3. Verificación distribuida** | El chequeo NO es un solo `if` desactivable: se reparte (arranque, gating de módulos, generación del acta PDF, tareas programadas). Hay que romperlos todos. |
-| **4. Marca blanca = config, no código** | El socio personaliza por **temas/config en runtime**, nunca tocando fuente. Nunca necesita ni recibe el código. |
-| **5. Disuasivo económico (el lock real)** | Un binario parcheado queda **congelado**: sin parches de seguridad, sin updates, sin módulos nuevos, sin soporte. En industria regulada es inaceptable para el cliente final. Renovar sale más barato que mantener un fork pirata. |
-| **6. Legal** | Contrato de canal + auditoría de instalaciones + prohibición de descompilar (§6 de estrategia-canal). |
+| Capa | Qué hace | Estado |
+|---|---|---|
+| **1. No entregar código fuente** (la principal) | Se entregan **imágenes Docker compiladas**, no el repo. **✅ construido en L5:** el build de imagen empaqueta la API en UN `dist/main.js` **minificado con nombres destruidos** (esbuild) que **INLINEA `@lyra/licensing`** (el núcleo cripto deja de ser texto editable) y **elimina de la imagen el fuente TS (`src`) y la copia legible del módulo crítico**. NO bytecode V8 (`bytenode` se descartó: ata el artefacto a la versión exacta de V8/Node, exige loader en runtime y su bytecode igual se desensambla — mucho riesgo operacional para un obstáculo rompible; DECISIONS 2026-07-06 L5-a). | ✅ L5 |
+| **2. Firma asimétrica** | Aunque vean el `license.lic`, no pueden emitir uno válido ni extender el vencimiento (no tienen la clave privada). | ✅ L0/L3 |
+| **3. Verificación distribuida** | El chequeo NO es un solo `if` desactivable: se reparte (arranque, gating de módulos, worker de fondo, linaje). Hay que romperlos todos. **✅ reforzado en L5:** además, cada punto **auto-verifica la INTEGRIDAD** del artefacto (SHA-256 sellado en el build, releído desde disco sin caché) en ≥2 puntos independientes (`LicenseService.evaluateNow` + `workersOperational`); adulterar el bundle ⇒ **BLOQUEADA `INTEGRITY_MISMATCH`** (restringido = solo lectura + exportación, **jamás destructivo**), auditado y avisado. | ✅ L1/L5 |
+| **4. Marca blanca = config, no código** | El socio personaliza por **temas/config en runtime**, nunca tocando fuente. Nunca necesita ni recibe el código. | ⏳ épico §2(2) |
+| **5. Disuasivo económico (el lock real)** | Un binario parcheado queda **congelado**: sin parches de seguridad, sin updates, sin módulos nuevos, sin soporte. En industria regulada es inaceptable para el cliente final. Renovar sale más barato que mantener un fork pirata. | ✅ negocio |
+| **6. Legal** | Contrato de canal + auditoría de instalaciones + prohibición de descompilar (§6 de estrategia-canal). | ⏳ contrato |
 
-> **Verdad de fondo:** el candado técnico frena el ~95% (sobre-despliegue casual, copiar la llave,
-> "instalé 12 pagando 8"). El 5% restante (un experto decidido con tiempo) lo cubre el modelo de
-> negocio (dependencia de updates/soporte) y el contrato. No prometer "imposible de piratear".
+> **Verdad de fondo (sin adornos, STRATEGY §5/§9):** L5 es **capa de REFUERZO, no bóveda**. La
+> minificación/mangle **encarece y retrasa** al que quiere editar un `if` en una tarde; NO lo vuelve
+> imposible — quien entienda el bundle minificado puede re-sellar o extirpar el chequeo (por eso el
+> sello se releé en VARIOS puntos, para que haya que encontrarlos y romperlos todos). El candado
+> técnico frena el ~95% (sobre-despliegue casual, copiar la llave, "instalé 12 pagando 8"). El 5%
+> restante (un experto decidido con tiempo) lo cubren el modelo de negocio (dependencia de updates/
+> soporte) y el contrato. No prometer "imposible de piratear".
+
+### 7.4 Auto-verificación de integridad (✅ construida en L5)
+
+El artefacto de la aplicación lleva **su propio sello**: `apps/watchlog-api/src/licensing/integrity.ts`
+declara el marcador `LYRA-INTEGRITY-SEAL::<64 hex>` en CEROS (dev/CI = sin sellar, el chequeo queda
+inerte). El **build de imagen** empaqueta la API (`scripts/license/bundle-api.mjs`, esbuild: bundle
+único minificado + `@lyra/licensing` inlineado + externals de node_modules) y luego
+`scripts/license/seal-integrity.mjs` escribe el **SHA-256 del bundle con la región del sello
+normalizada a ceros** dentro del marcador (el sello vive DENTRO del artefacto sellado — no hay archivo
+aparte que adulterar por separado; el sellador exige el marcador ÚNICO y no es re-aplicable). En
+runtime, `verifyArtifactIntegrity` **relee el artefacto (`__filename`) en cada llamada, sin booleano
+cacheado**, y solo EXIGE sello en `NODE_ENV=production` (un sello en ceros ahí = adulteración: cierra
+el bypass "borro el hash y quedo como build de desarrollo"). Un fallo ⇒ **BLOQUEADA `INTEGRITY_MISMATCH`**
+por la máquina de estados §5 (solo lectura + exportación, nunca destructivo), auditado y avisado (§5.2).
+El horneado ocurre **una vez por versión en el build de imagen, jamás por-cliente ni en dev**
+(LICENSING_PROCEDURE §6).
 
 ---
 
@@ -379,7 +403,7 @@ chequeo. No se puede volver imposible al 100%, pero se encarece por capas:
 | Renovación challenge-response + linaje rotatorio (detección de clon) — **✅ hecho en L4** (`renovacion.lreq` + `lyra-license renew` + `evaluateLineage`/rotación/`LINEAGE_MISMATCH`; ciclo corto como política del runbook; smoke-renovación 29/29 — PoC T6 en vivo) | 10–20 |
 | Gating de módulos por entitlement (backend + web) — **✅ hecho en L2** (catálogo canónico en contracts, `@RequireModule`/guard 5.º, `GET /license/status` DTO delgado, ocultamiento sidebar/Inicio/⌘K, workers module-aware; smoke 23/23) — **+ UI de estado/avisos ✅ hecha en L6** (banner por estado + pestaña Licencia en Configuración + 3 eventos `license.*` al Bloque N con carve-out del worker y destinatarios por `settings:manage`; smoke-avisos 25/25; ver §5.2) | 15–30 |
 | Enforcement de límites (nodos/usuarios/instalaciones) | 10–20 |
-| Empaquetado anti-tamper (bytecode/native del módulo crítico) | 10–30 |
+| Empaquetado anti-tamper (bundle+minify+mangle del módulo crítico + auto-verificación de integridad) — **✅ hecho en L5** (`bundle-api.mjs` esbuild + `seal-integrity.mjs` + `integrity.ts` distribuido en `evaluateNow`/worker; Dockerfile hornea y borra el fuente; NO bytecode — riesgo operacional; smoke-integridad 32/32 + imagen linux real) | 10–30 |
 | **Total** | **~80–160 HH** |
 
 Fase 2 (fingerprint/phone-home/revocación): +40–80 HH si se pide.

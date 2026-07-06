@@ -22,13 +22,16 @@ export type LicenseRuntimeStatus = LicenseState | typeof PENDING_ACTIVATION;
  * de archivo + linaje que no calza (L4: la respuesta de renovación solo se
  * importa UNA vez y solo en la instalación que la pidió; una licencia cuyo
  * linaje no corresponde al local ⇒ BLOQUEADA con este motivo — restringido,
- * jamás destructivo).
+ * jamás destructivo) + integridad rota (L5: el artefacto sellado en el build
+ * de release no calza con su sello ⇒ BLOQUEADA, también restringido: el
+ * fallo de integridad NUNCA se vuelve destructivo).
  */
 export type LicenseRuntimeReason =
   | EvaluationReason
   | VerifyFailureReason
   | "LICENSE_FILE_MISSING"
-  | "LINEAGE_MISMATCH";
+  | "LINEAGE_MISMATCH"
+  | "INTEGRITY_MISMATCH";
 
 /**
  * Estados en los que la instalación queda RESTRINGIDA: se bloquean las

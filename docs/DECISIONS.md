@@ -4,6 +4,67 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-06 · Licenciamiento L5 · anti-tamper del módulo crítico en el build de release (decisiones a–f, aprobadas por el dueño antes de codificar)
+Sesión L5 (`feat/licenciamiento-l5`): la capa 3 de la defensa (LICENSING_STRATEGY §5, LICENSING.md §7). El módulo de
+licencia deja de ser texto editable en la imagen distribuida y adulterar el chequeo se AUTO-DETECTA. **Honestidad
+intacta (STRATEGY §5/§9):** es CAPA DE REFUERZO, no bóveda — encarece y retrasa, no vuelve imposible; la verificación
+sigue DISTRIBUIDA (no la centraliza, la endurece) y **jamás destructiva** (el peor estado sigue siendo solo lectura +
+exportación). `signLicense`/`verifyLicense`/`evaluateLicense`/`evaluateLineage` y la máquina de estados quedaron
+INTACTOS: L5 protege el ENVOLTORIO. Decisiones:
+- **(a) Técnica = bundle+minify agresivo, NO bytecode V8** (investigación con evidencia en el repo + imagen real del
+  EC2). Se descartó `bytenode`: ata el artefacto a la versión EXACTA de V8/Node (habría que fijar la base image),
+  exige un loader en runtime, se lleva mal con el ecosistema y su bytecode igual se DESENSAMBLA (dev.to, citado en
+  STRATEGY §5) — mucho riesgo operacional para un obstáculo que sigue siendo rompible. Se **bundlea el DIST ya
+  transpilado por tsc** (no el TS): así los decoradores y su `emitDecoratorMetadata` YA fueron materializados y
+  esbuild no necesita soportarlos (el campo minado NestJS+esbuild se esquiva por completo). esbuild produce UN
+  `dist-bundle/main.js` minificado; **`mangleProps` con lista CURADA** destruye los nombres license-críticos (métodos/
+  exports que el minify de identificadores no toca por ser claves de propiedad). **Desviación verificada
+  (challenge-dont-please):** los exports de `@lyra/licensing` (ESM inlineado) NO se manglan — cruzan una frontera de
+  interop ESM→CJS y desincronizar call-site vs. el mapa `__export` ROMPE el runtime (`(0,qr.Y) is not a function`,
+  cazado corriendo el bundle real); sobreviven UNA vez como nombre en el mapa de exports, sin lógica legible.
+- **(b) Alcance del bundle = TODA la API, con node_modules EXTERNAL** (Prisma client + engines nativos, argon2/bcrypt,
+  pdfmake + sus fuentes TTF por `require.resolve`, minio, @lyra/contracts, @lyra/llm quedan fuera; solo se INLINEA
+  nuestro código + `@lyra/licensing` — cero deps, inlining seguro — vía alias a su dist, porque las rutas de archivo
+  siempre se bundlean). Validación en el propio `bundle-api.mjs`: aborta si `@lyra/licensing` sobrevive o si se perdió
+  un external (contracts/pdfmake/fuentes).
+- **(c) Integridad = sello SHA-256 embebido + verificación en ≥2 puntos ya existentes** (`integrity.ts`): el marcador
+  `LYRA-INTEGRITY-SEAL::<64 hex>` nace EN CEROS (dev/CI = sin sellar) y `seal-integrity.mjs` escribe el hash real del
+  bundle CON LA REGIÓN DEL SELLO NORMALIZADA A CEROS (el sello vive DENTRO del artefacto sellado, no hay archivo
+  aparte que adulterar por separado; sellado no re-aplicable, marcador ÚNICO exigido). Runtime: `verifyArtifactIntegrity`
+  RELEE el artefacto (`__filename`) en CADA llamada — SIN booleano cacheado — en DOS puntos distribuidos ya presentes:
+  `LicenseService.evaluateNow` (arranque + re-eval periódica) y `workersOperational` (worker). **NO se creó un
+  verificador central único.** `requireSeal` solo en `NODE_ENV=production`: un sello en ceros ahí = adulteración (cierra
+  el bypass "borro el hash y quedo como dev"); en dev/CI el chequeo queda inerte (`UNSEALED`). El algoritmo de normalización/
+  hash NO se re-implementa: el sellador reusa la MISMA `integrity.js` compilada que el runtime.
+- **(d) Estado = BLOQUEADA + reason nuevo `INTEGRITY_MISMATCH` con texto humano PROPIO** (en `LicenseRuntimeReason` de
+  L1, NO en el enum L0). Restringido = solo lectura + exportación, JAMÁS destructivo; se AUDITA y avisa por la MISMA
+  cañería `license.state.changed`/`license.restricted` de L6. Banner/Configuración con wording propio ("el software no
+  superó la verificación de integridad — reinstala la versión original de tu proveedor"): el admin legítimo sabe QUÉ
+  escalar, sin detalle técnico.
+- **(e) Horneado SOLO en el build de imagen (Dockerfile.api), NO en release.yml aparte** (mejora sobre la propuesta):
+  como el bundle+seal viven en el stage `build` del Dockerfile, corren en CUALQUIER `docker build` de la imagen y
+  release.yml NO necesitó tocarse (solo su `embed-public-key` previo, que ya existía). ci.yml y `pnpm dev` NO
+  construyen imagen ⇒ el carril dev queda intacto y verde. En el `/app` desplegado se SUSTITUYE el dist legible por el
+  bundle único sellado y se BORRA el fuente TS (`src`/`tools`) y la copia legible de `@lyra/licensing`. La imagen
+  **migrate** (toolchain, no enforce licencia) también pierde el fuente del módulo crítico (el seed no lo importa).
+- **(f) Tag `v0.1.15` en ESTA sesión** (aprobado): merge en verde → release automático → EC2. Verificar health 200,
+  estado=VALIDA con **counter=1 intacto** (NO se toca la licencia ni el linaje del EC2) y que el JS de la imagen ya no
+  sea legible. Reversa: re-taggear v0.1.14 (el EC2 sigue con v0.1.14 operando — nada urge).
+- **Verificación de que QUEDÓ protegido (no se confía en el build verde):** `bundle-api.mjs` + `seal-integrity.mjs`
+  nuevos; `integrity.ts` (13 tests: `integrity.spec` 8 + `license.service.integrity.spec` 5); **imagen linux REAL
+  construida a mano** (`docker build --target runtime` y `--target migrate`): `/app/dist` = solo el bundle, sin `src`,
+  sin `@lyra/licensing`, sello único, `node --check` OK; el bundle sellado corrido bajo `NODE_ENV=production` arranca
+  VALIDA y un byte adulterado ⇒ BLOQUEADA/INTEGRITY_MISMATCH con lectura viva. **`smoke-licencia-integridad.py` 32/32
+  NUEVO** (:3405 — reproduce el horneado, afirma (i) nombres/strings críticos no localizables + externals intactos +
+  @lyra/licensing inlineado, (ii) bundle sellado VALIDA, (iii) tamper ⇒ BLOQUEADA con GET vivo y mutación 403).
+- **SIN migración** (reason es string libre en el runtime; el DTO no cambió) **ni permiso nuevo** ⇒ sin db:seed/FLUSHALL.
+  Nueva devDependency raíz `esbuild`. El sello se GENERA en el build (jamás committeado); el árbol de trabajo queda
+  siempre con el marcador en ceros. Ninguna clave nueva; la privada de emisión sigue JAMÁS en repo/imagen/.env.
+Verde: typecheck/lint(0)/build/test (API 309 = +13 integridad · web 18 = +1 banner INTEGRITY · contracts 518 intactos)
++ **smoke-licencia-integridad 32/32 NUEVO** + las 5 regresiones de licencia 28/23/20/29/25 + notificaciones 18/22/18.
+**NO hecho a propósito (fuera de alcance L5):** firma de imágenes/cosign/SBOM/digest-pinning (épico §2(4) cadena de
+suministro — proteger el CANAL, no el contenido); enforcement de límites numéricos (L2b); marca blanca (§2(2)).
+
 ### 2026-07-06 · Licenciamiento L6 · UI de estado + avisos de licencia (decisiones a–f, aprobadas por el dueño antes de codificar)
 Sesión L6 (`feat/licenciamiento-l6`): el estado de la licencia se vuelve VISIBLE y ACCIONABLE para la planta — banner
 global, detalle en Configuración y aviso a administradores por el motor del Bloque N (cierra el pendiente L1(iii)).
