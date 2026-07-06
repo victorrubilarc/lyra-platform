@@ -21,7 +21,10 @@
 > de imagen empaqueta la API en un bundle único minificado con nombres destruidos que **inlinea `@lyra/licensing`** y
 > borra el fuente legible, más **auto-verificación de integridad distribuida** —sello SHA-256 releído en `evaluateNow`
 > y en el worker— que degrada a **BLOQUEADA `INTEGRITY_MISMATCH`** ante un artefacto adulterado, jamás destructivo; ver
-> §7/§7.4). Pendiente L2b (enforcement de límites numéricos).
+> §7/§7.4), y el **enforcement de límites numéricos está ACTIVO** (L2b: crear un nodo o un usuario por
+> encima de `maxNodes`/`maxNamedUsers` se rechaza con `403 LICENSE_LIMIT_EXCEEDED` en los servicios de
+> creación — incluidos el wizard de provisión y la REACTIVACIÓN de usuarios —, sin romper jamás lo
+> existente; ver §5.3). **Plan L0–L6 COMPLETO.**
 > Estimación total: ~80–160 HH.
 
 ---
@@ -204,7 +207,7 @@ La renovación usa el **mismo baile por archivos** de la activación (air-gap in
 | **POR VENCER** | Faltan ≤ N días para `expiresAt` | Funciona normal + **banner de aviso** a administradores (y notificación). |
 | **EN GRACIA** | `expiresAt` pasó pero dentro de `graceDays` | Funciona + **aviso prominente** "licencia vencida, renovar en X días". No corta la operación (no dejar una planta a ciegas de golpe). |
 | **VENCIDA / BLOQUEADA** | Pasó la gracia, o firma inválida, o falta el archivo, o el **linaje no calza** (`LINEAGE_MISMATCH`, L4: licencia anterior tras una renovación, respuesta re-importada o instalación clonada) | **Modo restringido**: bloquea el ingreso de datos nuevos y las funciones premium; permite **solo lectura/exportación** para no secuestrar los datos del cliente. Mensaje claro de renovación. |
-| **LÍMITE EXCEDIDO** | Supera `maxNodes`/`maxNamedUsers`/`maxInstallations` | Bloquea **crear** por encima del límite (no rompe lo existente); avisa al admin. |
+| **LÍMITE EXCEDIDO** | Supera `maxNodes`/`maxNamedUsers`/`maxInstallations` | **✅ construido en L2b:** crear el recurso excedido se rechaza con `403 { code: "LICENSE_LIMIT_EXCEEDED", limit, max, current, requested }` (nodo, wizard de provisión, usuario y REACTIVACIÓN de usuario); **TODO lo existente sigue operando** (leer, editar, borrar, otros módulos — jamás se rompe ni se borra nada) y bajar del tope (eliminar nodos / deshabilitar usuarios) libera cupo al instante; avisa al admin (banner + Bloque N, L6). El borde también aplica con la licencia VÁLIDA: `current + solicitados > max` ⇒ el siguiente se rechaza. Ver §5.3. |
 | **MÓDULO NO LICENCIADO** | Se usa un módulo fuera de `modules` | **✅ construido en L2:** las **MUTACIONES** del módulo se rechazan en el backend con `403 { code: "MODULE_NOT_LICENSED", module }`; la **lectura y exportación de sus datos SIGUEN disponibles** (GET pasa — jamás se secuestran datos, ni por downgrade de edición). La web además lo **oculta** (sidebar/Inicio/⌘K: visible = licenciado ∧ permiso). Aplica con la licencia OPERATIVA; es un eje distinto del permiso de usuario (ambos guards corren). |
 
 **Principios de degradación (importantes por regulación/ética):**
@@ -220,7 +223,7 @@ La renovación usa el **mismo baile por archivos** de la activación (air-gap in
   producto es GET: acta PDF, presigned de adjuntos, export de auditoría). **Lista blanca explícita** (constante
   testeada, sin regex): prefijo `/api/auth/` (login/refresh/logout/contraseña/MFA — sin ellos ni se podría leer)
   y `/api/health` exacto. EN_GRACIA / POR_VENCER / LIMITE_EXCEDIDO **no** bloquean en L1 (se registran; el
-  enforcement fino "no crear por encima del límite" y el gating por módulo son L2).
+  gating por módulo es L2 y el enforcement fino "no crear por encima del límite" es L2b, §5.3 — ambos ✅).
 - **`PENDIENTE_ACTIVACION`** = variante presentable de BLOQUEADA cuando **no hay archivo de licencia**
   (instalación recién desplegada): mismo enforcement, estado/mensaje propio. Es un estado del RUNTIME de la API
   (`LicenseRuntimeStatus`), NO del enum puro de `@lyra/licensing` (no hay payload que evaluar).
@@ -274,9 +277,12 @@ Claves (13): `core` · `structure` · `templates` · `logbook` · `schedules` ·
   entitlement (`LicenseService.moduleOperational`).
 
 **DTO delgado + endpoint (`GET /api/license/status`, autenticado sin permiso):** la web consume
-`{ status, reason?, edition?, modules[] | null, expiresAt?, daysToExpiry?, graceDaysRemaining? }`
+`{ status, reason?, edition?, modules[] | null, expiresAt?, daysToExpiry?, graceDaysRemaining?, limits? }`
 (`licenseStatusSchema` en `@lyra/contracts`), **mapeado campo a campo desde el snapshot** (`toLicenseStatus`) —
 JAMÁS el payload: sin huella, sin linaje, sin installationId, sin customer/licenseId (mínimo privilegio, testeado).
+`limits` (L2b) es un AGREGADO de presentación `{ nodes: {max,inUse}, namedUsers: {max,inUse} }` con conteo VIVO por
+request — no es el objeto del payload (sin `maxInstallations`, que es tope del emisor) y solo viaja con payload
+verificado; alimenta el hint proactivo de la web (§5.3).
 `graceDaysRemaining` (entero ≥0) viaja SOLO en EN_GRACIA (decisión L6a: la spec §5 exige "renovar en X días" y con
 `daysToExpiry` negativo la UI no puede calcular el fin de la gracia; es un derivado de presentación).
 `modules: null` = sin payload verificado ⇒ el front NO oculta por módulo (gobiernan los estados globales). Este DTO
@@ -325,6 +331,44 @@ restringida silenciaría su propia alarma. Los eventos de licencia tampoco se ga
 
 **Gate latente de marca blanca (decisión L6d):** `LicenseService.isWhiteLabelEnabled()` lee `whiteLabel` del payload
 verificado; hoy sin efecto visible y sin viajar al DTO — el épico de marca blanca (BACKLOG §2(2)) lo cablea después.
+
+### 5.3 Enforcement de límites numéricos (✅ construido en L2b)
+
+Cierra el plan L0–L6: los topes `maxNodes`/`maxNamedUsers` del payload dejan de ser solo un estado
+que se registra (L1) y pasan a **hacerse cumplir en los puntos de creación**. `maxInstallations` NO
+se mide desde adentro: es un tope del EMISOR (se controla en el ledger al emitir, PROCEDURE §3).
+
+- **Dónde vive (decisión L2b-a):** helper compartido **`LicenseLimitsService.assertHeadroom(limit,
+  solicitados)`** llamado EXPLÍCITAMENTE por los servicios de creación — NO un guard HTTP como
+  `@RequireModule`, porque este gate depende de datos del request y del estado previo (tamaño del
+  lote; ¿esta edición REACTIVA a un usuario?). Cuatro puntos: `StructureService.createNode`,
+  `StructureService.provisionStructure` (el wizard chequea el LOTE completo ANTES de abrir la
+  transacción: o cabe entero o no se crea nada), `UsersService.create` y `UsersService.update`
+  cuando **reactiva** un usuario no-ACTIVE (la puerta trasera del conteo named-user). Sigue siendo
+  verificación DISTRIBUIDA: el helper recuenta FRESCO desde la BD en cada llamada (sin booleano
+  cacheado) y es independiente del estado LIMITE_EXCEDIDO que `evaluateLicense` + los avisos L6
+  calculan por su propia vía; sus nombres están en la lista curada de mangle de L5.
+- **Qué se cuenta (decisión L2b-b):** nodos **vivos** (`deletedAt: null`) de TODAS las estructuras
+  (el tope es de la INSTALACIÓN) y usuarios **ACTIVE** (licencia *named user*: el deshabilitado no
+  consume — igual que `collectActuals`, que en L2b se corrigió para excluir nodos borrados: si el
+  borrado lógico consumiera cupo, el cliente jamás podría regularizar bajando del tope). **Borde:**
+  `current + solicitados > max` ⇒ 403 (llegar JUSTO al tope es legal y deja VALIDA; el siguiente se
+  rechaza). El chequeo es *check-then-create* sin serialización: bajo concurrencia extrema puede
+  colarse 1 (la re-evaluación periódica lo marca LIMITE_EXCEDIDO y desde ahí se bloquea) — costo
+  aceptado, no amerita transacciones serializables.
+- **Forma del rechazo (decisión L2b-c):** `403 { code: "LICENSE_LIMIT_EXCEEDED", limit, max,
+  current, requested, message }` — código legible por máquina distinto de `LICENSE_RESTRICTED` (L1)
+  y `MODULE_NOT_LICENSED` (L2); mensaje es-CL presentable y honesto («…ya hay N en uso. Todo lo
+  existente sigue operando. Para crear más, contacta a tu proveedor… o elimina/deshabilita…»).
+- **Precedencia:** SIN payload verificado (PENDIENTE_ACTIVACION / BLOQUEADA) el helper **no opina** —
+  el guard global de L1 ya restringe toda mutación; un estado global jamás se enmascara como límite
+  (misma regla que el gate por módulo).
+- **Nunca rompe lo existente:** editar, borrar, leer, exportar y las mutaciones de otros recursos
+  pasan SIEMPRE (probado en el smoke: en LIMITE_EXCEDIDO el producto entero sigue operando salvo
+  crear el recurso excedido). Eliminar nodos / deshabilitar usuarios **libera cupo al instante**.
+- **Web (hint proactivo):** `useLicenseQuotas()` deriva del DTO (`limits`) y deshabilita los botones
+  de crear (nodo raíz, agregar hijo, wizard de área, nuevo usuario) con tooltip cuando `inUse >= max`;
+  las mutaciones que mueven el conteo invalidan la query. El candado real sigue en el backend.
 
 ---
 
@@ -402,7 +446,7 @@ El horneado ocurre **una vez por versión en el build de imagen, jamás por-clie
 | `LicenseService` + máquina de estados + caché + re-evaluación — **✅ hecho en L1** (+ guard global, señales estables bajo Docker, `LicenseInstallation`, auditoría, `solicitud.lreq`, licencia dev `pnpm license:dev`, smoke 28/28) | 20–35 |
 | Renovación challenge-response + linaje rotatorio (detección de clon) — **✅ hecho en L4** (`renovacion.lreq` + `lyra-license renew` + `evaluateLineage`/rotación/`LINEAGE_MISMATCH`; ciclo corto como política del runbook; smoke-renovación 29/29 — PoC T6 en vivo) | 10–20 |
 | Gating de módulos por entitlement (backend + web) — **✅ hecho en L2** (catálogo canónico en contracts, `@RequireModule`/guard 5.º, `GET /license/status` DTO delgado, ocultamiento sidebar/Inicio/⌘K, workers module-aware; smoke 23/23) — **+ UI de estado/avisos ✅ hecha en L6** (banner por estado + pestaña Licencia en Configuración + 3 eventos `license.*` al Bloque N con carve-out del worker y destinatarios por `settings:manage`; smoke-avisos 25/25; ver §5.2) | 15–30 |
-| Enforcement de límites (nodos/usuarios/instalaciones) | 10–20 |
+| Enforcement de límites (nodos/usuarios/instalaciones) — **✅ hecho en L2b** (`LicenseLimitsService` en los 4 puntos de creación + conteo VIVO + DTO `limits` + hint web; `maxInstallations` queda en el emisor/ledger por diseño; smoke-límites 30/30) | 10–20 |
 | Empaquetado anti-tamper (bundle+minify+mangle del módulo crítico + auto-verificación de integridad) — **✅ hecho en L5** (`bundle-api.mjs` esbuild + `seal-integrity.mjs` + `integrity.ts` distribuido en `evaluateNow`/worker; Dockerfile hornea y borra el fuente; NO bytecode — riesgo operacional; smoke-integridad 32/32 + imagen linux real) | 10–30 |
 | **Total** | **~80–160 HH** |
 

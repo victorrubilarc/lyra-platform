@@ -1,5 +1,35 @@
 # Progreso — Lyra WatchLog
 
+**2026-07-06 — 🔐 Licenciamiento L2b · enforcement de límites numéricos ✅ ⇒ PLAN L0–L6 COMPLETO** (`feat/licenciamiento-l2b`).
+El ítem diferido en L2 (decisión d): crear un **nodo** o un **usuario** por encima de `maxNodes`/`maxNamedUsers` de la
+licencia ahora se **rechaza en el backend** con `403 { code:"LICENSE_LIMIT_EXCEEDED", limit, max, current, requested }`
+y mensaje es-CL presentable ("tu proveedor", jamás ITESICWS) — **sin romper JAMÁS lo existente**: una instalación sobre
+el tope (downgrade) sigue operando con todo lo que tiene (leer/editar/borrar/otros módulos), solo no crea MÁS; bajar
+del tope (eliminar nodos / deshabilitar usuarios) libera cupo al instante. **(1) Helper `LicenseLimitsService.
+assertHeadroom(limit, solicitados)`** llamado EXPLÍCITAMENTE en los 4 puntos de creación (decisión a — NO guard: el
+gate depende del body y del estado previo): `createNode`, `provisionStructure` (chequea el LOTE antes de la
+transacción), `UsersService.create` y la **REACTIVACIÓN** de usuario (status→ACTIVE) — hallazgo: era la única puerta
+trasera real (NO existe bulk/CSV de usuarios ni nodos). Distribuido: conteo FRESCO por llamada + estado
+LIMITE_EXCEDIDO independiente (L0/L6) + nombres en el mangle L5. **(2) Semántica (decisión b):** nodos VIVOS
+installation-wide + usuarios ACTIVE; **FIX a `collectActuals`** (contaba nodos borrados ⇒ regularizar bajando del tope
+habría sido imposible); borde `current + solicitados > max` (llegar justo al tope = VALIDA, el siguiente 403).
+**Precedencia:** sin payload verificado L2b NO opina (gobierna L1). **(3) Web (pedido del dueño):** DTO delgado gana
+`limits` = agregado `{nodes:{max,inUse}, namedUsers:{max,inUse}}` VIVO por request (sin `maxInstallations` — tope del
+EMISOR/ledger, fuera de alcance por diseño) + `useLicenseQuotas()` ⇒ botones de crear (nodo raíz, agregar hijo, wizard
+de área, nuevo usuario) DESHABILITADOS con tooltip al tope; mutaciones que mueven el conteo invalidan la query; el
+candado real sigue siendo el 403. **(4) Tooling:** `gen-dev-license --max-nodes/--max-named-users`. **Verde:**
+typecheck/lint(0)/build/test (API **318** = +9 · contracts **519** = +1 · web 18 · licensing 50 · CLI 38) +
+**smoke-licencia-limites.py 30/30 NUEVO** (:3406 — holgura crea OK · borde 403 en los 4 caminos · eliminar libera cupo
+· LIMITE_EXCEDIDO opera todo salvo crear · precedencia) + regresión licencia **28/24/20/29/25** (el 24 = +1: el DTO
+`limits` es agregado sin campos del payload) + **integridad 35/35** (+3 nombres L2b destruidos en el bundle) + notif
+**18/22/18** + estructura/seguridad **15/33/29/17/14**. **SIN migración/permiso/FLUSHALL. Tag v0.1.16 DIFERIDO**
+(decisión del dueño: enforcement puro, sin efecto observable en el EC2 demo; el próximo tag lo lleva). **No probado:**
+smoke VISUAL del hint web (dueño; dev queda con licencia VALIDA holgada — para verlo: `pnpm license:dev --
+--max-nodes=<N al tope>` + reiniciar api). Decisiones a–f en DECISIONS 2026-07-06 (L2b). USER_GUIDE: §18 gana "Límites
+contratados" + backfill de **Seguridad ▸ Usuarios** (✍️→✅). **Con esto el plan L0–L6 está COMPLETO; queda el épico de
+distribución §2(2) marca blanca / §2(4) cadena de suministro. Siguiente: roadmap de producto (QA del dueño / reversa
+GxP) o ese épico.**
+
 **2026-07-06 — 🔐 Licenciamiento L5 · anti-tamper del módulo crítico en el build de release ✅** (`feat/licenciamiento-l5`).
 La **capa 3** de la defensa (LICENSING_STRATEGY §5, LICENSING.md §7): el módulo de licencia deja de ser texto editable
 en la imagen distribuida y adulterar el chequeo se AUTO-DETECTA. **Honestidad intacta:** es REFUERZO, no bóveda

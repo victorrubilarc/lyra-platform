@@ -12,6 +12,7 @@ import type {
 import type { OrgLevel, OrgNode, OrgStructure } from "@prisma/client";
 import { AuditService, type AuditContext } from "../audit/audit.service";
 import { ScopeService } from "../authz/scope.service";
+import { LicenseLimitsService } from "../licensing/license-limits.service";
 import { PrismaService } from "../prisma/prisma.service";
 
 /**
@@ -29,6 +30,7 @@ export class StructureService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly scope: ScopeService,
+    private readonly licenseLimits: LicenseLimitsService,
   ) {}
 
   // --- Estructuras ---
@@ -146,6 +148,10 @@ export class StructureService {
     await this.scope.assertSuperStructureAdmin(this.requireActor(ctx));
     const dup = await this.prisma.orgStructure.count({ where: { key: dto.key } });
     if (dup > 0) throw new BadRequestException(`Ya existe una estructura con la clave "${dto.key}"`);
+    // Tope de la licencia (L2b) ANTES de abrir la transacción, con el total del
+    // lote que este asistente crea (hoy: 1 nodo raíz; los niveles no son
+    // nodos): o cabe el lote completo, o no se aprovisiona NADA.
+    await this.licenseLimits.assertHeadroom("maxNodes", 1);
 
     const { structure, rootNode } = await this.prisma.$transaction(async (tx) => {
       const structure = await tx.orgStructure.create({
@@ -377,6 +383,9 @@ export class StructureService {
     const structureId = parent ? parent.structureId : await this.resolveStructureId(dto.structureId ?? null);
     await this.scope.assertCanAdministerStructure(this.requireActor(ctx), structureId);
     await this.assertLevelInStructure(dto.levelId, structureId);
+    // Tope de la licencia (L2b): crear por encima de `maxNodes` se rechaza; lo
+    // existente (editar/borrar/leer) jamás se toca por licencia.
+    await this.licenseLimits.assertHeadroom("maxNodes");
     const parentPath = parent ? parent.path : "/";
 
     // El path incluye el propio id, que solo se conoce tras crear: 2 pasos.

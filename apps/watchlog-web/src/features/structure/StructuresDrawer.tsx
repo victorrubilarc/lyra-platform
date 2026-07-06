@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Button, Chip, Drawer, EmptyState, FormField, Input, Modal, Textarea, Toggle, useToast } from "@lyra/ui";
 import type { OrgStructure, StructureAccent, StructureIcon } from "@lyra/contracts";
+import { useLicenseQuotas } from "../../auth/use-license.js";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { ApiError } from "../../lib/api-client.js";
 import { useStructureStore } from "../../shell/structure-store.js";
@@ -70,6 +71,8 @@ export function StructuresDrawer({ open, onClose }: StructuresDrawerProps) {
   // provisión global). El delegado administra únicamente las suyas (lo marca el backend
   // por fila vía `canAdminister`); el backend es la fuente de verdad y re-autoriza.
   const isSuperAdmin = perms.can("module:structure:manage");
+  // Cupo de nodos de la licencia (L2b): el asistente crea el nodo raíz.
+  const { nodes: nodeQuota } = useLicenseQuotas();
   const { data: structures = [], isLoading } = useOrgStructures();
   const updateStructure = useUpdateStructure();
   const deleteStructure = useDeleteStructure();
@@ -446,9 +449,19 @@ export function StructuresDrawer({ open, onClose }: StructuresDrawerProps) {
           )}
 
           {/* Crear un "área" nueva = asistente que arma estructura + niveles + nodo raíz
-              de una vez (operativa). Provisión de un dominio ⇒ solo super-admin. */}
+              de una vez (operativa). Provisión de un dominio ⇒ solo super-admin. El
+              asistente crea 1 nodo: sin cupo de licencia (L2b) se deshabilita con hint. */}
           {isSuperAdmin && (
-            <Button variant="primary" onClick={() => setWizardOpen(true)}>
+            <Button
+              variant="primary"
+              onClick={() => setWizardOpen(true)}
+              disabled={nodeQuota?.atLimit}
+              title={
+                nodeQuota?.atLimit
+                  ? t("license.quota.nodesFull", { max: nodeQuota.max, inUse: nodeQuota.inUse })
+                  : undefined
+              }
+            >
               <Plus size={15} />
               {t("structure.wizard.newArea")}
             </Button>

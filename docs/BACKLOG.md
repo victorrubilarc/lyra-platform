@@ -5,7 +5,19 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-07-06** — **🔐 Licenciamiento L5 · anti-tamper del módulo crítico en el build de release ✅**
+> actualización: **2026-07-06 (2)** — **🔐 Licenciamiento L2b · enforcement de límites numéricos ✅ ⇒ PLAN L0–L6
+> COMPLETO** (`feat/licenciamiento-l2b`): crear nodo/usuario sobre `maxNodes`/`maxNamedUsers` = **403
+> `LICENSE_LIMIT_EXCEEDED`** (+limit/max/current/requested, mensaje es-CL) vía `LicenseLimitsService.assertHeadroom`
+> en los 4 puntos de creación (createNode · provision con LOTE pre-transacción · createUser · **REACTIVACIÓN** de
+> usuario — la única puerta trasera; NO hay bulk/CSV) · conteo = nodos VIVOS installation-wide + usuarios ACTIVE
+> (**fix `collectActuals`**: contaba borrados lógicos) · sin payload NO opina (gobierna L1) · **JAMÁS rompe lo
+> existente** (sobre el tope todo sigue operando; eliminar/deshabilitar LIBERA cupo) · web: DTO `limits` agregado
+> vivo + `useLicenseQuotas` deshabilita botones de crear con tooltip · `gen-dev-license --max-nodes/--max-named-users`.
+> API 318 + contracts 519 + **smoke-licencia-limites 30/30 NUEVO** (:3406) + regresión 28/24/20/29/25 + integridad
+> 35/35 + notif 18/22/18 + estructura 15/33/29/17/14. SIN migración/permiso. **Tag v0.1.16 DIFERIDO** (sin efecto en
+> el EC2 demo). Pendiente: smoke VISUAL del hint (dueño). **SIGUE: roadmap de producto (QA del dueño / reversa GxP) o
+> el épico de distribución §2(2)/(4).**
+> — Antes: **🔐 Licenciamiento L5 · anti-tamper del módulo crítico en el build de release ✅**
 > (`feat/licenciamiento-l5`): el build de imagen empaqueta la API en un **bundle único minificado con nombres
 > destruidos** (esbuild) que **inlinea `@lyra/licensing`** y **borra el fuente legible** (src + copia del módulo crítico,
 > también en la imagen migrate) · **auto-verificación de integridad DISTRIBUIDA** (sello SHA-256 releído sin caché en
@@ -831,9 +843,21 @@ nunca queda más de una sesión atrás.
             (sidebar/Inicio/⌘K/campanita) · workers module-aware (`moduleOperational`) · `license:dev --modules=a,b`.
             SIN migración/permiso. API 286 + web 11 + contracts 513 + smoke-licencia-modulos **23/23** + regresión 28/28.
             Mapeo módulo→controladores en `LICENSING.md §5.1`. Decisiones a–e en DECISIONS 2026-07-05 (L2).
-      - [ ] **L2b (DIFERIDO en L2, decisión d):** enforcement de LÍMITES numéricos — bloquear crear nodo/usuario por
-            encima de `maxNodes`/`maxNamedUsers` (403 en los endpoints de creación de structure/security; hoy
-            LIMITE_EXCEDIDO solo se registra/audita). Mecanismo distinto del gate por módulo (conteo por creación).
+      - [x] **L2b · enforcement de LÍMITES numéricos** ✅ 2026-07-06 (`feat/licenciamiento-l2b`) **⇒ PLAN L0–L6
+            COMPLETO:** `LicenseLimitsService.assertHeadroom(limit, solicitados)` llamado EXPLÍCITAMENTE (no guard —
+            el gate depende del body/estado previo) en los 4 puntos de creación: `createNode` · `provisionStructure`
+            (LOTE completo ANTES de la transacción) · `UsersService.create` · **REACTIVACIÓN** de usuario
+            (status→ACTIVE, la única puerta trasera; NO existe bulk/CSV de usuarios/nodos). 403
+            `{code:LICENSE_LIMIT_EXCEEDED, limit, max, current, requested}` + mensaje es-CL ("tu proveedor").
+            Conteo VIVO: nodos `deletedAt:null` de TODAS las estructuras + usuarios ACTIVE (fix a `collectActuals`,
+            que contaba borrados ⇒ bajar del tope habría sido imposible); borde `current+solicitados > max`;
+            sin payload verificado NO opina (precedencia L1); **jamás rompe lo existente** (LIMITE_EXCEDIDO = solo
+            se bloquea CREAR el recurso excedido; eliminar/deshabilitar libera cupo al instante). Web: DTO delgado
+            +`limits` agregado `{nodes,namedUsers:{max,inUse}}` (sin maxInstallations — tope del EMISOR/ledger,
+            fuera de alcance por diseño) + `useLicenseQuotas()` deshabilita crear con tooltip. `gen-dev-license`
+            +`--max-nodes/--max-named-users`; mangle L5 + smoke-integridad ganan los nombres nuevos. API 318 +
+            contracts 519 + **smoke-licencia-limites 30/30** (:3406) + regresiones completas. SIN migración/permiso.
+            Tag v0.1.16 DIFERIDO. Decisiones a–f en DECISIONS 2026-07-06 (L2b).
       - [x] **L3 · CLI de emisión + custodia + pública PROD embebida** ✅ 2026-07-05 (`feat/licenciamiento-l3`):
             paquete **`@lyra/licensing-cli`** (privado, JAMÁS en la imagen del cliente; `pnpm license <cmd>`) con
             `keygen` (privada **PKCS#8 CIFRADO** aes-256-cbc + passphrase generada de alta entropía; custodia
@@ -2463,6 +2487,14 @@ implementación esperada:
 
 > Lo construido puede estar "verde en tests" pero no ejercido en condiciones reales.
 
+- [ ] **Licenciamiento L2b — smoke VISUAL del hint de cupo (dueño)** (se verificó typecheck/lint/build/test +
+      smoke-limites 30/30 + regresiones; falta el clic). Para verlo: generar una licencia dev AL TOPE —
+      `pnpm license:dev -- --max-nodes=<N> --max-named-users=<U>` con N/U = los `inUse` que muestra
+      `GET /api/license/status` — y reiniciar el api dev. Verificar: botones deshabilitados con tooltip
+      ("Alcanzaste el máximo…") en **Estructura** (Nuevo nodo raíz · Agregar <nivel> del detalle · asistente
+      «Nueva área» del mantenedor de estructuras) y **Seguridad › Usuarios** (Nuevo usuario); reactivar un usuario
+      deshabilitado → toast con el 403 claro; eliminar un nodo → el botón de crear se REACTIVA solo (cupo liberado).
+      **Restaurar:** `pnpm license:dev` + reiniciar api.
 - [ ] **Licenciamiento L6 — smoke VISUAL del dueño** (se verificó typecheck/lint/build/test + smoke API 25/25 +
       regresiones; falta el clic). El dev queda con **licencia POR_VENCER** (banner warning para el admin demo):
       ver el banner arriba (descartarlo → no vuelve en la sesión; recargar sesión → vuelve), botón «Ver detalle» →

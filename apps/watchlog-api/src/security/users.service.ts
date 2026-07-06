@@ -12,6 +12,7 @@ import type {
 import type { Prisma } from "@prisma/client";
 import { AuditService, type AuditContext } from "../audit/audit.service";
 import { PermissionService } from "../authz/permission.service";
+import { LicenseLimitsService } from "../licensing/license-limits.service";
 import { PasswordService } from "../crypto/password.service";
 import { AuthService } from "../auth/auth.service";
 import { MfaRequirementService } from "../auth/mfa-requirement.service";
@@ -32,6 +33,7 @@ export class UsersService {
     private readonly mfaRequirement: MfaRequirementService,
     private readonly auth: AuthService,
     private readonly audit: AuditService,
+    private readonly licenseLimits: LicenseLimitsService,
   ) {}
 
   async list(): Promise<UserSummary[]> {
@@ -87,6 +89,9 @@ export class UsersService {
     const email = dto.email.trim().toLowerCase();
     const existing = await this.prisma.user.findUnique({ where: { email } });
     if (existing) throw new BadRequestException("Ya existe un usuario con ese email");
+    // Tope de la licencia (L2b): un usuario nuevo nace ACTIVE y consume cupo
+    // de `maxNamedUsers`. Los existentes jamás se tocan por licencia.
+    await this.licenseLimits.assertHeadroom("maxNamedUsers");
 
     await this.policy.assertComplexity(dto.password);
     await this.assertRolesExist(dto.roleIds);
@@ -109,6 +114,14 @@ export class UsersService {
   async update(id: string, dto: UpdateUserRequest, ctx: AuditContext): Promise<UserDetail> {
     const before = await this.prisma.user.findUnique({ where: { id } });
     if (!before) throw new NotFoundException("Usuario no encontrado");
+
+    // Tope de la licencia (L2b): REACTIVAR un usuario deshabilitado sube el
+    // conteo de usuarios nominados igual que crearlo — sin este chequeo sería
+    // la puerta trasera del gate de creación (licencia named-user: solo los
+    // ACTIVE consumen cupo). Deshabilitar/editar jamás se bloquea.
+    if (dto.status === "ACTIVE" && before.status !== "ACTIVE") {
+      await this.licenseLimits.assertHeadroom("maxNamedUsers");
+    }
 
     // CANDADO C (red anti-lockout): no dejar la instalación sin NINGÚN administrador
     // activo. Si esta edición DESHABILITA (status ≠ ACTIVE) a quien hoy es el último

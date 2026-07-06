@@ -83,8 +83,13 @@ export interface LicenseSnapshot {
  * linaje, installationId, licenseId y customer NO puedan filtrarse aunque el
  * snapshot crezca. `modules: null` = sin payload verificado (el front entonces
  * no oculta por módulo; los estados restringidos ya los gobierna el guard L1).
+ * `limits` (L2b: cupo contratado + uso vivo, para el hint de la web) lo aporta
+ * el controlador — el conteo es fresco por request, no vive en el snapshot.
  */
-export function toLicenseStatus(snap: LicenseSnapshot): LicenseStatus {
+export function toLicenseStatus(
+  snap: LicenseSnapshot,
+  limits?: LicenseStatus["limits"],
+): LicenseStatus {
   return {
     status: snap.status,
     reason: snap.reason,
@@ -94,5 +99,6 @@ export function toLicenseStatus(snap: LicenseSnapshot): LicenseStatus {
     daysToExpiry: snap.evaluation?.daysToExpiry,
     // L6a: solo en EN_GRACIA ("renovar en X días"). `whiteLabel` NO viaja (gate latente).
     graceDaysRemaining: snap.graceDaysRemaining,
+    limits,
   };
 }

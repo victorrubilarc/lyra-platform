@@ -56,7 +56,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 ### 5. Seguridad: usuarios, roles y permisos  [Admin]
 - ✅ **Alcance del rol (por nodo y por plantilla)** — define el recorte una vez en el rol; se une al del usuario (§ Seguridad ▸ Alcance del rol)
 - ✅ **Administración delegada por estructura** — un rol/usuario administra SOLO las estructuras que se le delegan; el super-admin, todas; red anti-bloqueo del último administrador (§ Seguridad ▸ Administración delegada por estructura)
-- ✍️ Usuarios (alta, contraseña temporal, asignar roles y alcance)
+- ✅ **Usuarios** (alta con contraseña temporal, roles, alcance por nodo/plantilla, habilitar/deshabilitar) (§ Seguridad ▸ Usuarios)
 - ✍️ Roles y matriz de permisos (4 dimensiones), `requireMfa` por rol
 - ✍️ Política de contraseñas y modo de MFA global
 - ✍️ Reset de contraseña / reset de MFA por administrador
@@ -148,6 +148,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 - ✅ **Estados de la licencia y qué se puede hacer en cada uno** (activación, vencimiento, solo lectura; los datos NUNCA se bloquean) (§ Licencia de la instalación)
 - ✅ **Módulos incluidos en la licencia (edición)** (los módulos no contratados no aparecen en el menú; si se pierde un módulo por cambio de edición, sus datos siguen consultables y exportables) (§ Licencia de la instalación ▸ Módulos incluidos)
 - ✅ **Banner de estado, detalle en Configuración y avisos a administradores** (banner arriba de la pantalla según el estado; Configuración › Licencia con instrucciones de renovación; correo + campanita a los admins cuando hay que actuar) (§ Licencia de la instalación ▸ Estado visible y avisos)
+- ✅ **Límites contratados de nodos y usuarios** (al llegar al tope, crear se bloquea con un mensaje claro; TODO lo existente sigue operando — deshabilitar usuarios o eliminar nodos libera cupo) (§ Licencia de la instalación ▸ Límites contratados)
 
 ### 19. Órdenes de trabajo (OT / PTW)  [todos los roles operativos]
 - ✅ **Crear y listar solicitudes de trabajo** (asistente de 2 pasos, grilla con filtros/facetas, detalle con reasignar/prioridad/anular) (§ Órdenes de trabajo)
@@ -246,6 +247,37 @@ la app).
 - El candado real está en el servidor: ocultar el menú es solo cortesía visual — aunque alguien
   "adivine" la dirección, el servidor rechaza las modificaciones de un módulo no licenciado.
 
+### Límites contratados (nodos y usuarios)
+
+**Para qué sirve.** Además de los módulos, la licencia define **cuántos nodos de estructura** y
+**cuántos usuarios activos** incluye el contrato (según la edición). La plataforma cuenta lo que hay
+**en uso** — nodos vigentes de todas las estructuras y usuarios habilitados — y, al llegar al tope,
+**bloquea crear más**, nunca lo que ya existe.
+
+**Cómo se usa (casos paso a paso).**
+- *Uso normal:* nada que hacer. Si te acercas al tope no pasa nada; al **llegar** al tope, los botones
+  de crear (nuevo nodo, nueva área, nuevo usuario) se deshabilitan con un aviso que explica el máximo
+  contratado y cuántos hay en uso. Si igual llega una solicitud (por ejemplo, por un enlace guardado),
+  el servidor la rechaza con el mismo mensaje.
+- *Liberar cupo:* **deshabilitar un usuario** libera su cupo al instante (los usuarios deshabilitados
+  no cuentan — puedes tener el historial de ex-empleados sin gastar licencia). **Eliminar un nodo** que
+  ya no uses también libera cupo. Volver a habilitar un usuario vuelve a consumirlo (y se bloquea si no
+  hay cupo).
+- *Quedé sobre el tope (por ejemplo, tras un cambio de edición a la baja):* la instalación queda en
+  estado **"Límite excedido"** — un aviso para administradores, NO un bloqueo general: todo lo que ya
+  existe sigue funcionando con normalidad (consultar, editar, registrar en bitácoras, flujos). Lo único
+  bloqueado es **crear más** nodos/usuarios hasta bajar del tope o ampliar el plan con tu proveedor.
+
+**Quién puede.** El tope es de la **instalación**: aplica a cualquier usuario con permiso de crear
+nodos o usuarios. Ampliarlo: solo el proveedor, emitiendo una licencia nueva (upgrade de plan).
+
+**Importante.**
+- **Nunca se rompe lo existente.** Superar el tope jamás borra, bloquea ni "apaga" nodos o usuarios ya
+  creados: solo impide crear MÁS. Los datos son del cliente, siempre.
+- Cuentan los usuarios **activos** (deshabilitados no) y los nodos **vigentes** (eliminados no) — de
+  todas las estructuras de la instalación en conjunto.
+- El límite de "cuántas instalaciones" no se ve aquí: lo controla el proveedor al emitir licencias.
+
 ### Estado visible y avisos (banner · Configuración › Licencia · correo/campanita)
 
 **Para qué sirve.** Que nadie se entere de un problema de licencia "cuando ya no puede escribir":
@@ -267,6 +299,8 @@ administradores con anticipación (correo y campanita), con las instrucciones de
     contáctalo — la plataforma queda en solo lectura por seguridad, pero **tus datos siguen intactos** y
     disponibles para consulta y exportación.
   - **Límite excedido** (solo administradores): la instalación supera los nodos/usuarios contratados.
+    Todo lo existente sigue operando; lo único bloqueado es **crear más** de lo excedido (ver
+    § Límites contratados, más abajo).
   - Con la licencia **Válida** no hay banner.
 - *Ver el detalle:* botón **«Ver detalle»** del banner, o `Configuración › Licencia` (también al tocar
   el aviso de la campanita). Verás el estado con su motivo en lenguaje claro, la edición, los módulos
@@ -1105,6 +1139,44 @@ error o a propósito, siempre queda al menos una cuenta capaz de administrarlo t
   administrar una estructura no delegada se rechaza en el servidor.
 
 ---
+
+## Seguridad ▸ Usuarios (alta, contraseña temporal, roles, alcance y estado)  [Admin]
+
+**Para qué sirve.** Administrar **quién entra** a la plataforma y **con qué perfil**: crear cuentas,
+asignarles roles (lo que pueden hacer), acotar su alcance (qué nodos y plantillas ven) y
+habilitarlas/deshabilitarlas cuando alguien llega o se va. Vive en **Seguridad › Usuarios**.
+
+**Cómo se usa (casos paso a paso).**
+- *Crear un usuario:* botón **«Nuevo usuario»** → correo, nombre y una **contraseña temporal** (debe
+  cumplir la política de contraseñas vigente). En el primer ingreso el sistema **obliga a cambiarla**
+  (la temporal es de un solo uso práctico: tú la conoces, la definitiva no). Asigna de inmediato al
+  menos un **rol**, o la cuenta entrará sin permisos.
+- *Asignar roles:* en el detalle del usuario, pestaña de roles — un usuario puede tener **varios**
+  (sus permisos se suman). Los roles y su matriz de permisos se administran en Seguridad › Roles.
+- *Acotar el alcance:* en el detalle puedes fijar **alcance por nodo** (en qué parte del árbol opera,
+  con o sin descendientes) y **alcance por plantilla** (qué bitácoras ve). Sin alcance definido, el
+  usuario ve lo que sus roles permitan en toda la instalación; el alcance del usuario se **une** con el
+  de sus roles. También puedes delegarle la **administración de estructuras** específicas.
+- *Se fue de la empresa:* **deshabilita** la cuenta (no se borra: su historial y firmas quedan
+  intactos, exigencia de auditoría). Un usuario deshabilitado no puede entrar y **no consume cupo de
+  licencia**; puedes volver a habilitarlo cuando quieras (si hay cupo).
+- *Perdió la contraseña o el teléfono del MFA:* desde el detalle, **restablecer contraseña** (le das
+  una temporal nueva y el sistema fuerza el cambio) o **restablecer MFA** (podrá enrolar un
+  dispositivo nuevo). Ambas acciones cierran sus sesiones abiertas y quedan auditadas.
+
+**Quién puede.** Ver usuarios: permiso de lectura de seguridad. Crear/editar/asignar roles y alcance:
+permiso de gestión de usuarios (`user:manage` / `user:create`, configurable por rol como todo).
+
+**Importante.**
+- **Nunca te puedes quedar sin administrador:** el sistema rechaza deshabilitar al último
+  administrador activo o quitarle su rol de sistema (red anti-bloqueo).
+- Los usuarios **no se borran** (trazabilidad Part 11): el estado correcto para una baja es
+  Deshabilitado.
+- La cuenta se **bloquea sola** tras varios intentos fallidos de contraseña (protección de fuerza
+  bruta) y se desbloquea con el tiempo o con un reset del administrador.
+- Crear o rehabilitar usuarios consume **cupo de licencia** (usuarios activos): si llegaste al tope,
+  primero deshabilita a quien no use la plataforma o amplía el plan (§ Licencia de la instalación ▸
+  Límites contratados).
 
 ## El espacio de trabajo ▸ Pantalla de Inicio  [todos]
 

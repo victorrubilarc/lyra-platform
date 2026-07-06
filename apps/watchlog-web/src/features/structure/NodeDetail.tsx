@@ -11,6 +11,7 @@ import {
 import { Button, Chip, EmptyState, Table } from "@lyra/ui";
 import type { OrgLevel, OrgNodeTree } from "@lyra/contracts";
 import type { TableColumn, TableSort } from "@lyra/ui";
+import { useLicenseQuotas } from "../../auth/use-license.js";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { useUpdateNode } from "./structure-queries.js";
 import { useEquipmentByNode } from "./equipment-queries.js";
@@ -133,6 +134,13 @@ export function NodeDetail({
   const canCreate = perms.can("orgnode:create");
   const canEdit   = perms.can("orgnode:edit");
   const canDelete = perms.can("orgnode:delete");
+  // Cupo de nodos de la licencia (L2b): sin cupo, "agregar hijo" se deshabilita
+  // con hint. El candado real es el 403 LICENSE_LIMIT_EXCEEDED del backend.
+  const { nodes: nodeQuota } = useLicenseQuotas();
+  const nodesAtLimit = nodeQuota?.atLimit === true;
+  const quotaHint = nodeQuota?.atLimit
+    ? t("license.quota.nodesFull", { max: nodeQuota.max, inUse: nodeQuota.inUse })
+    : undefined;
 
   // Orden de la grilla de hijos. Por defecto: orden en informes (asc).
   const [sort, setSort] = useState<TableSort>({ key: "reportOrder", direction: "asc" });
@@ -403,7 +411,7 @@ export function NodeDetail({
             <section className={styles.section}>
               {canCreate && (
                 <div className={styles.sectionHeader} style={{ justifyContent: "flex-end" }}>
-                  <Button variant="primary" onClick={onCreateChild}>
+                  <Button variant="primary" onClick={onCreateChild} disabled={nodesAtLimit} title={quotaHint}>
                     <Plus size={14} />
                     {childLevel
                       ? `${t("common.add")} ${childLevel.name}`
@@ -427,7 +435,7 @@ export function NodeDetail({
                     }
                     action={
                       canCreate ? (
-                        <Button variant="primary" onClick={onCreateChild}>
+                        <Button variant="primary" onClick={onCreateChild} disabled={nodesAtLimit} title={quotaHint}>
                           <Plus size={14} />
                           {childLevel
                             ? `${t("common.add")} ${childLevel.name}`

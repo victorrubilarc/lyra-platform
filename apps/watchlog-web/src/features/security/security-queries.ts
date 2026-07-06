@@ -41,6 +41,7 @@ import {
   updateRole,
   updateUser,
 } from "./security-api.js";
+import { LICENSE_KEYS } from "../../auth/use-license.js";
 
 export const SECURITY_KEYS = {
   users: ["security", "users"] as const,
@@ -79,7 +80,11 @@ export function useCreateUser() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (dto: CreateUserRequest) => createUser(dto),
-    onSuccess: () => qc.invalidateQueries({ queryKey: SECURITY_KEYS.users }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: SECURITY_KEYS.users });
+      // El usuario nuevo consume cupo de la licencia (L2b) ⇒ refresca el hint.
+      void qc.invalidateQueries({ queryKey: LICENSE_KEYS.status });
+    },
   });
 }
 
@@ -87,7 +92,11 @@ export function useUpdateUser() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, dto }: { id: string; dto: UpdateUserRequest }) => updateUser(id, dto),
-    onSuccess: (u) => invalidateUser(qc, u.id),
+    onSuccess: (u) => {
+      invalidateUser(qc, u.id);
+      // Habilitar/deshabilitar mueve el conteo de usuarios ACTIVOS (cupo L2b).
+      void qc.invalidateQueries({ queryKey: LICENSE_KEYS.status });
+    },
   });
 }
 

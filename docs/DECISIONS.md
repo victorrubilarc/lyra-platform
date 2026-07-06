@@ -4,6 +4,49 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-06 · Licenciamiento L2b · enforcement de límites numéricos (decisiones a–f, aprobadas por el dueño antes de codificar) — CIERRA EL PLAN L0–L6
+Sesión L2b (`feat/licenciamiento-l2b`): el ítem diferido en L2 (decisión d, 2026-07-05). Crear un nodo o un usuario
+por encima de `maxNodes`/`maxNamedUsers` se rechaza en el backend; **jamás se rompe lo existente** (una instalación
+sobre el tope — p. ej. tras un downgrade — sigue operando con todo lo que tiene, solo no crea MÁS). Decisiones:
+- **(a) Enforcement = chequeos EXPLÍCITOS en los servicios de creación vía helper compartido
+  `LicenseLimitsService.assertHeadroom(limit, solicitados)`** (src/licensing), NO guard+decorator al estilo
+  `@RequireModule`. Motivo: este gate depende de DATOS del request y del ESTADO PREVIO (tamaño del lote; ¿esta PATCH
+  reactiva un usuario?), no de metadata estática — un guard tendría que parsear bodies y duplicar consultas. Cuatro
+  call-sites: `StructureService.createNode`, `provisionStructure` (lote ANTES de la transacción), `UsersService.create`
+  y `UsersService.update` cuando **REACTIVA** (status→ACTIVE) — hallazgo de la sesión: la reactivación era la única
+  puerta trasera real (NO existe import CSV/bulk de usuarios ni nodos; verificado en el árbol). Sigue DISTRIBUIDO:
+  conteo FRESCO por llamada (sin caché), independiente del estado LIMITE_EXCEDIDO que `evaluateLicense`+avisos L6
+  calculan por su vía, y nombres nuevos en la lista curada de mangle L5 (smoke-integridad ahora los afirma: 35).
+- **(b) Semántica del conteo:** nodos VIVOS (`deletedAt: null`) de TODAS las estructuras (tope de la INSTALACIÓN) y
+  usuarios ACTIVE (*named user*: el deshabilitado no consume — puedes conservar ex-empleados sin gastar cupo).
+  **FIX con fundamento a `collectActuals` (L1, no L0):** contaba `orgNode.count()` SIN filtrar borrados lógicos ⇒
+  eliminar nodos jamás habría liberado cupo y "regulariza bajando del tope" (§5) sería imposible. **Borde:**
+  `current + solicitados > max` ⇒ 403 (llegar JUSTO al tope = VALIDA; el siguiente se rechaza). Check-then-create sin
+  serialización: bajo concurrencia extrema puede colarse 1 (la re-evaluación lo marca LIMITE_EXCEDIDO) — aceptado.
+- **(c) Forma del 403:** `{ code: "LICENSE_LIMIT_EXCEEDED", limit, max, current, requested, message }` — literal en
+  el código (como MODULE_NOT_LICENSED, sin tocar contracts para el error); mensaje es-CL honesto y presentable
+  («…ya hay N en uso. Todo lo existente sigue operando… contacta a tu proveedor… o elimina/deshabilita…»); jamás
+  "ITESICWS" (marca blanca). **Precedencia:** sin payload verificado el helper NO opina (gobierna L1; probado).
+- **(d) Wizard/lotes:** `provisionStructure` chequea el TOTAL del lote antes de abrir la transacción (hoy 1 nodo
+  raíz); si no cabe se rechaza COMPLETO y el mensaje dice cuántos caben (`requested` vs cupo).
+- **(e) Verificación:** smoke NUEVO **`smoke-licencia-limites.py` 30/30** (:3406, arnés de -modulos; topes calculados
+  del conteo real vía `gen-dev-license --max-nodes/--max-named-users`, flags nuevos): holgura crea OK · borde exacto
+  403 en los 4 caminos con max/current/requested · eliminar LIBERA cupo y crear vuelve a pasar · sobre el tope =
+  LIMITE_EXCEDIDO con lectura/edición/otras mutaciones VIVAS y solo crear bloqueado · precedencia sin archivo.
+  + unit: `license-limits.service.spec` (7) y 2 en license.service (conteo vivo, `verifiedLimits`).
+- **(f) Web INCLUIDA en la sesión (pedido del dueño; la recomendación era diferirla):** el DTO delgado gana `limits`
+  = AGREGADO `{nodes:{max,inUse}, namedUsers:{max,inUse}}` con conteo VIVO por request (compuesto en el controlador;
+  NO es el objeto del payload — sin `maxInstallations`, tope del EMISOR no medible desde adentro; el smoke L2 ahora
+  afirma la forma). `useLicenseQuotas()` deshabilita los botones de crear (nodo raíz, agregar hijo, wizard de área,
+  nuevo usuario) con tooltip al llegar al tope; las mutaciones que mueven el conteo invalidan la query. El candado
+  real sigue siendo el 403. **Tag v0.1.16 DIFERIDO** (decisión del dueño): L2b no cambia nada observable en el EC2
+  demo (límites 200/80 vs. actuals mínimos); el próximo tag de producto lo lleva dentro.
+Verde: typecheck/lint/build/test (API **318** = +9 · contracts **519** = +1 DTO · web 18 · licensing 50 · CLI 38) +
+smoke-limites **30/30** + regresión licencia **28/28 · 24/24** (23+1 forma del DTO) **· 20/20 · 29/29 · 25/25** +
+integridad **35/35** (32+3 nombres L2b destruidos) + notif **18/18 · 22/22 · 18/18** + estructura/seguridad
+**15/15 · 33/33 · 29/29 · 17/17 · 14/14** (asistente, multi-estructura, admin delegada, ciclo de vida, rol-alcance).
+SIN migración ni permiso nuevo (reusa orgnode:create/user:manage; sin FLUSHALL).
+
 ### 2026-07-06 · Licenciamiento L5 · anti-tamper del módulo crítico en el build de release (decisiones a–f, aprobadas por el dueño antes de codificar)
 Sesión L5 (`feat/licenciamiento-l5`): la capa 3 de la defensa (LICENSING_STRATEGY §5, LICENSING.md §7). El módulo de
 licencia deja de ser texto editable en la imagen distribuida y adulterar el chequeo se AUTO-DETECTA. **Honestidad

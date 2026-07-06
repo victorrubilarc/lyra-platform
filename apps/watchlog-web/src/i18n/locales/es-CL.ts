@@ -152,6 +152,12 @@ export const esCL = {
       detail: "Ver detalle",
       dismiss: "Descartar aviso",
     },
+    quota: {
+      nodesFull:
+        "Alcanzaste el máximo de {{max}} nodos de estructura contratado en la licencia ({{inUse}} en uso). Para crear más, regulariza con tu proveedor o elimina nodos que ya no uses.",
+      usersFull:
+        "Alcanzaste el máximo de {{max}} usuarios activos contratado en la licencia ({{inUse}} en uso). Para crear más, regulariza con tu proveedor o deshabilita usuarios que ya no uses.",
+    },
     status: {
       VALIDA: "Válida",
       POR_VENCER: "Por vencer",

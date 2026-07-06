@@ -4,6 +4,7 @@ import { Building2, Layers, Lock, Network, Plus, Search, TriangleAlert } from "l
 import { Button, Chip, EmptyState, Input, ResizableSplit, Skeleton } from "@lyra/ui";
 import type { OrgNodeTree } from "@lyra/contracts";
 import { Can } from "../../auth/Can.js";
+import { useLicenseQuotas } from "../../auth/use-license.js";
 import { usePermissions } from "../../auth/use-permissions.js";
 import { useActiveStructureId, useOrgLevels, useOrgStructures, useOrgTree } from "./structure-queries.js";
 import { useEquipmentSearch } from "./equipment-queries.js";
@@ -35,6 +36,9 @@ function flattenTree(nodes: OrgNodeTree[]): Map<string, OrgNodeTree> {
 export function StructurePage() {
   const { t } = useTranslation();
   const perms = usePermissions();
+  // Cupo de nodos de la licencia (L2b): sin cupo se deshabilita "crear" con
+  // hint. El candado real es el 403 LICENSE_LIMIT_EXCEEDED del backend.
+  const { nodes: nodeQuota } = useLicenseQuotas();
 
   const { data: tree = [], isLoading: treeLoading, isError: treeError } = useOrgTree();
   const { data: levels = [], isLoading: levelsLoading } = useOrgLevels();
@@ -130,7 +134,12 @@ export function StructurePage() {
             <Button
               variant="primary"
               onClick={() => setNodeDrawer({ open: true, mode: "create-root", node: null })}
-              disabled={levels.length === 0}
+              disabled={levels.length === 0 || nodeQuota?.atLimit}
+              title={
+                nodeQuota?.atLimit
+                  ? t("license.quota.nodesFull", { max: nodeQuota.max, inUse: nodeQuota.inUse })
+                  : undefined
+              }
             >
               <Plus size={16} />
               {t("structure.newRoot")}

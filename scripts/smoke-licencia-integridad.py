@@ -52,7 +52,9 @@ ADMIN = "demo@watchlog.local"
 # exports, sin lógica — documentado en bundle-api.mjs).
 MANGLED = ["workersOperational", "getEvaluation", "evaluateNow", "sealRequired",
            "verifyArtifactIntegrity", "LICENSE_PUBLIC_KEY_PEM", "writeRenewalRequest",
-           "rotateLineage", "toLicenseStatus"]
+           "rotateLineage", "toLicenseStatus",
+           # límites numéricos (L2b)
+           "assertHeadroom", "verifiedLimits", "LicenseLimitsService"]
 # Cadenas-guía humanas (JSDoc/comentarios) que el minify debe haber borrado.
 GIVEAWAY_STRINGS = ["verifica la firma con la clave", "node-lock por huella",
                     "auto-verificación", "verificación DISTRIBUIDA"]
