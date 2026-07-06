@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { Sidebar } from "./Sidebar.js";
 import { Topbar } from "./Topbar.js";
+import { LicenseBanner } from "./LicenseBanner.js";
 import { WorkspaceTabs } from "./WorkspaceTabs.js";
 import { CommandPalette } from "./CommandPalette.js";
 import { useUIStore } from "./ui-store.js";
@@ -54,6 +55,7 @@ export function AppShell() {
       <Sidebar />
       <div className={styles.main}>
         <Topbar onOpenSearch={() => setPaletteOpen(true)} />
+        <LicenseBanner />
         <WorkspaceTabs />
         <div className={styles.content}>
           <Outlet />

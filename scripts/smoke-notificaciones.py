@@ -122,8 +122,12 @@ def main():
     sql("INSERT INTO \"LogSchedule\" (id,name,\"templateId\",\"orgNodeId\",\"responsibleRoleId\","
         "\"recurrenceKind\",\"recurrenceConfig\",\"dueWindowMinutes\",\"horizonDays\",active,\"createdAt\",\"updatedAt\") "
         f"VALUES ('{sched_id}','{marker}','{tpl_id}','{node_id}','{role_id}','NONE','{{}}'::jsonb,60,2,true,now(),now());")
+    # dueAt MUY antiguo a propósito: el sweeper toma las 200 vencidas MÁS VIEJAS
+    # (orderBy dueAt asc, take 200) y el demo acumula cientos de rondas vencidas
+    # (deuda de DATA, BACKLOG §3) — una ocurrencia "vencida hace 2 h" quedaría
+    # fuera del lote y el smoke fallaría por deriva de datos, no por el motor.
     sql("INSERT INTO \"RoundOccurrence\" (id,\"scheduleId\",\"templateId\",\"orgNodeId\",\"scheduledFor\",\"dueAt\",status,\"generatedAt\") "
-        f"VALUES ('{occ_id}','{sched_id}','{tpl_id}','{node_id}',now()-interval '3 hours',now()-interval '2 hours','PENDING',now());")
+        f"VALUES ('{occ_id}','{sched_id}','{tpl_id}','{node_id}',now()-interval '731 days',now()-interval '730 days','PENDING',now());")
 
     s, r = call("POST", "/notifications/run", tok)
     check("3a POST /run → 2xx y barrió ≥1", s in (200, 201) and r.get("swept", 0) >= 1, f"{s} {r}")
@@ -155,7 +159,7 @@ def main():
     s, r = call("PUT", "/notifications/preferences", tok, {"eventKey": "round.overdue", "channel": "EMAIL", "mode": "OFF"})
     check("5a preferencia round.overdue = OFF", s == 200 and r.get("mode") == "OFF", f"{s}")
     sql("INSERT INTO \"RoundOccurrence\" (id,\"scheduleId\",\"templateId\",\"orgNodeId\",\"scheduledFor\",\"dueAt\",status,\"generatedAt\") "
-        f"VALUES ('{occ2_id}','{sched_id}','{tpl_id}','{node_id}',now()-interval '3 hours',now()-interval '2 hours','PENDING',now());")
+        f"VALUES ('{occ2_id}','{sched_id}','{tpl_id}','{node_id}',now()-interval '731 days',now()-interval '729 days','PENDING',now());")
     call("POST", "/notifications/run", tok)
     # Opt-out es POR CANAL (Fase B): silencia el CORREO; la campanita (INAPP) sigue ON.
     cnt_demo = sql(f"SELECT count(*) FROM \"NotificationOutbox\" WHERE \"relatedEntityId\"='{occ2_id}' AND \"recipientUserId\"='{demo_id}' AND channel='EMAIL';")

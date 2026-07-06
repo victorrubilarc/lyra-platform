@@ -81,17 +81,28 @@ export class NotificationWorkerService {
   // --- 1. Sweeper de eventos DERIVED -----------------------------------------
 
   async sweep(): Promise<number> {
-    // Chequeo DISTRIBUIDO de licencia (independiente del guard HTTP): re-verifica
-    // la firma desde disco. En estado restringido el worker no genera trabajo
-    // operacional NUEVO (avisos/barridos); leer y exportar datos no pasa por aquí.
-    if (!(await this.license.workersOperational("notificaciones"))) return 0;
-    // Gate de ENTITLEMENT (L2): licencia operativa pero módulo `notifications`
-    // fuera de modules[] ⇒ el motor no genera/despacha/envía trabajo nuevo.
-    if (!this.license.moduleOperational("notifications")) return 0;
     if (this.busy.sweep) return 0;
     this.busy.sweep = true;
     let emitted = 0;
     try {
+      // Avisos de LICENCIA (L6) — carve-out ESTRECHO, antes de los gates: se
+      // barren SIEMPRE, incluso con la licencia restringida o sin el módulo
+      // `notifications`. Una licencia restringida no puede silenciar su propia
+      // alarma (sería un deadlock del aviso); el resto del motor sí respeta el
+      // chequeo distribuido de abajo.
+      for (const notice of this.license.findLicenseNotices()) {
+        await this.emitter.emit(notice.eventKey, notice.payload, { dedupeKey: notice.dedupeKey });
+        emitted++;
+      }
+
+      // Chequeo DISTRIBUIDO de licencia (independiente del guard HTTP): re-verifica
+      // la firma desde disco. En estado restringido el worker no genera trabajo
+      // operacional NUEVO (avisos/barridos); leer y exportar datos no pasa por aquí.
+      if (!(await this.license.workersOperational("notificaciones"))) return emitted;
+      // Gate de ENTITLEMENT (L2): licencia operativa pero módulo `notifications`
+      // fuera de modules[] ⇒ el motor no genera/despacha/envía trabajo nuevo.
+      if (!this.license.moduleOperational("notifications")) return emitted;
+
       // (corrección #2) GENERAR antes de escanear: las ocurrencias son lazy.
       await this.schedules.generateAllActive();
 
@@ -169,16 +180,20 @@ export class NotificationWorkerService {
   // --- 2. Dispatcher (evento → filas de bandeja) -----------------------------
 
   async dispatchPending(): Promise<number> {
-    if (!(await this.license.workersOperational("notificaciones"))) return 0;
-    // Gate de ENTITLEMENT (L2): licencia operativa pero módulo `notifications`
-    // fuera de modules[] ⇒ el motor no genera/despacha/envía trabajo nuevo.
-    if (!this.license.moduleOperational("notifications")) return 0;
+    // Carve-out L6: en estado no operativo (licencia restringida o módulo
+    // `notifications` fuera del entitlement) SOLO se despachan los eventos
+    // `license.*` — la alarma de licencia fluye; el resto espera.
+    const operational =
+      (await this.license.workersOperational("notificaciones")) &&
+      this.license.moduleOperational("notifications");
     if (this.busy.dispatch) return 0;
     this.busy.dispatch = true;
     let dispatched = 0;
     try {
       const events = await this.prisma.notificationEvent.findMany({
-        where: { status: "PENDING" },
+        where: operational
+          ? { status: "PENDING" }
+          : { status: "PENDING", eventKey: { startsWith: "license." } },
         orderBy: { createdAt: "asc" },
         take: BATCH,
       });
@@ -230,17 +245,22 @@ export class NotificationWorkerService {
   // --- 3. Sender (bandeja → canal) -------------------------------------------
 
   async sendPending(): Promise<number> {
-    if (!(await this.license.workersOperational("notificaciones"))) return 0;
-    // Gate de ENTITLEMENT (L2): licencia operativa pero módulo `notifications`
-    // fuera de modules[] ⇒ el motor no genera/despacha/envía trabajo nuevo.
-    if (!this.license.moduleOperational("notifications")) return 0;
+    // Carve-out L6 (espejo del dispatcher): en estado no operativo SOLO se
+    // envían las filas de bandeja de eventos `license.*`.
+    const operational =
+      (await this.license.workersOperational("notificaciones")) &&
+      this.license.moduleOperational("notifications");
     if (this.busy.send) return 0;
     this.busy.send = true;
     let sent = 0;
     try {
       const now = new Date();
       const rows = await this.prisma.notificationOutbox.findMany({
-        where: { status: "PENDING", OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now } }] },
+        where: {
+          status: "PENDING",
+          OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now } }],
+          ...(operational ? {} : { eventKey: { startsWith: "license." } }),
+        },
         orderBy: { createdAt: "asc" },
         take: BATCH,
       });

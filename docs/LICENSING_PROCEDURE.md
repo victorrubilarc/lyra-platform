@@ -6,14 +6,16 @@
 > la estrategia está en [`LICENSING_STRATEGY.md`](./LICENSING_STRATEGY.md); el **cómo técnico interno**
 > en [`LICENSING.md`](./LICENSING.md); el modelo comercial en [`estrategia-canal.md`](./estrategia-canal.md).
 >
-> Fecha: **2026-07-05**. Estado: **OPERATIVO para emisión Y renovación** — L0 (núcleo `@lyra/licensing`), **L1
-> (runtime en la API)**, L2 (gating por entitlement), **L3 (emisión real)** y **L4 (renovación con linaje)** están
-> construidos: la app arranca en PENDIENTE_DE_ACTIVACIÓN sin licencia, **genera `solicitud.lreq` sola** (§2 Fase B
-> paso 2 = real), verifica firma/huella, hace cumplir la máquina de estados, **ITESICWS ya emite con `lyra-license`**
-> (`pnpm license keygen|issue|renew|inspect|ledger` — §2 paso 4 y §5-bis = reales; primera emisión real: el EC2 demo)
-> y la **renovación por archivos con detección de clon es REAL** (§4 = real: la app deja `renovacion.lreq` sola y
-> `renew` acusa el linaje repetido). La imagen de release **embebe la pública de PROD** desde el primer tag post-L3.
-> Falta el anti-tamper (L5) y la UI de estado (L6). Plan L0–L6 en `BACKLOG.md §2(1)`.
+> Fecha: **2026-07-06**. Estado: **OPERATIVO para emisión Y renovación** — L0 (núcleo `@lyra/licensing`), **L1
+> (runtime en la API)**, L2 (gating por entitlement), **L3 (emisión real)**, **L4 (renovación con linaje)** y **L6
+> (UI de estado + avisos)** están construidos: la app arranca en PENDIENTE_DE_ACTIVACIÓN sin licencia, **genera
+> `solicitud.lreq` sola** (§2 Fase B paso 2 = real), verifica firma/huella, hace cumplir la máquina de estados,
+> **ITESICWS ya emite con `lyra-license`** (`pnpm license keygen|issue|renew|inspect|ledger` — §2 paso 4 y §5-bis =
+> reales; primera emisión real: el EC2 demo), la **renovación por archivos con detección de clon es REAL** (§4: la
+> app deja `renovacion.lreq` sola y `renew` acusa el linaje repetido) y **el admin de planta VE el estado y recibe
+> los avisos** (banner + Configuración › Licencia + correos/campanita del Bloque N — `LICENSING.md §5.2`). La imagen
+> de release **embebe la pública de PROD** desde el primer tag post-L3. Falta el anti-tamper (L5) y el enforcement
+> de límites (L2b). Plan L0–L6 en `BACKLOG.md §2(1)`.
 
 ---
 
@@ -177,8 +179,9 @@ Ese campo es un tope *interno* de esa licencia; el control de "cuántas licencia
 Las licencias **vencen** y se renuevan con el **mismo baile** de solicitud→emisión→importación (por
 archivos; cero internet exigido en la planta):
 
-1. Antes del vencimiento, la app avisa (estado POR VENCER) a los admins (aviso rico en L6; hoy log +
-   auditoría + estado en `GET /license/status`).
+1. Antes del vencimiento, la app avisa (estado POR VENCER) a los admins (✅ real desde L6: banner en la
+   web + correo/campanita semanal a quienes tienen `settings:manage`; en gracia el aviso es diario y
+   prominente — `LICENSING.md §5.2`). El detalle e instrucciones viven en **Configuración › Licencia**.
 2. **La app ya generó la solicitud sola:** mientras haya licencia, `LicenseService` deja/refresca
    **`renovacion.lreq`** junto a `license.lic` (misma carpeta `./license` del stack). Contiene el
    **linaje** de esa instalación (`renewalCounter` + un *nonce* que rota en cada renovación — ver

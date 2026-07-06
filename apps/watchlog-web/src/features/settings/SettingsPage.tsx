@@ -1,6 +1,7 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Bell, BookOpenCheck, BrainCircuit, Lock, Mail, Palette, ShieldCheck } from "lucide-react";
+import { BadgeCheck, Bell, BookOpenCheck, BrainCircuit, Lock, Mail, Palette, ShieldCheck } from "lucide-react";
 import { EmptyState, Select, Skeleton, Toggle, cx, useToast } from "@lyra/ui";
 import type { LucideIcon } from "lucide-react";
 import type { EditWindowAnchor, SystemSettingsDto, UpdateSystemSettingsRequest } from "@lyra/contracts";
@@ -10,6 +11,7 @@ import { EditWindowDurationField } from "./EditWindowDurationField.js";
 import { EmailSettingsPanel } from "./EmailSettingsPanel.js";
 import { AiSettingsPanel } from "./AiSettingsPanel.js";
 import { AppearanceSettingsPanel } from "./AppearanceSettingsPanel.js";
+import { LicenseSettingsPanel } from "./LicenseSettingsPanel.js";
 import { useSystemSettings, useUpdateSystemSettings } from "./settings-queries.js";
 import styles from "./SettingsPage.module.css";
 
@@ -21,7 +23,7 @@ const MFA_ACTIONS: { field: keyof UpdateSystemSettingsRequest; labelKey: string 
   { field: "requireMfaPeriodUnlock", labelKey: "settings.mfa.unlock" },
 ];
 
-type Category = "security" | "logbook" | "notifications" | "email" | "ai" | "appearance";
+type Category = "security" | "logbook" | "notifications" | "email" | "ai" | "appearance" | "license";
 
 interface CategoryDef {
   id: Category;
@@ -38,6 +40,9 @@ const CATEGORIES: CategoryDef[] = [
   { id: "email", labelKey: "settings.cat.email", icon: Mail, permission: "notification:config" },
   { id: "ai", labelKey: "settings.cat.ai", icon: BrainCircuit, permission: "ai:config" },
   { id: "appearance", labelKey: "settings.cat.appearance", icon: Palette, permission: "theme:manage" },
+  // Licencia (L6): SOLO LECTURA, sin permiso propio — el DTO delgado ya es
+  // visible para todo autenticado (decisión L6b); `module:settings:view` gatea la página.
+  { id: "license", labelKey: "settings.cat.license", icon: BadgeCheck },
 ];
 
 export function SettingsPage() {
@@ -49,7 +54,12 @@ export function SettingsPage() {
   const { data, isLoading } = useSystemSettings();
   const update = useUpdateSystemSettings();
 
-  const [tab, setTab] = useState<Category>("security");
+  // Deep link `?tab=<categoría>` (banner de licencia / campanita → Licencia).
+  const [searchParams] = useSearchParams();
+  const requested = searchParams.get("tab");
+  const [tab, setTab] = useState<Category>(
+    CATEGORIES.some((c) => c.id === requested) ? (requested as Category) : "security",
+  );
 
   if (!perms.can("module:settings:view")) {
     return (
@@ -256,6 +266,18 @@ export function SettingsPage() {
                 <p className={styles.sectionDesc}>{t("settings.appearanceDesc")}</p>
               </header>
               <AppearanceSettingsPanel />
+            </section>
+          )}
+
+          {tab === "license" && (
+            <section className={styles.section}>
+              <header className={styles.sectionHead}>
+                <h2 className={styles.sectionTitle}>
+                  <BadgeCheck size={18} /> {t("settings.cat.license")}
+                </h2>
+                <p className={styles.sectionDesc}>{t("license.settings.desc")}</p>
+              </header>
+              <LicenseSettingsPanel />
             </section>
           )}
         </div>

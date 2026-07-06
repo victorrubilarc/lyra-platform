@@ -98,8 +98,21 @@ const WORKORDER_VARIABLES: readonly NotificationVariableDef[] = [
 ] as const;
 
 /**
+ * Variables compartidas por los eventos de LICENCIA de la instalación (L6).
+ * Mínimo privilegio (decisión L2c/L6c): SIN licenseId/customer/huella/linaje —
+ * el aviso presenta el ESTADO, no la identidad de la licencia.
+ */
+const LICENSE_VARIABLES: readonly NotificationVariableDef[] = [
+  { name: "license.status", description: "Estado actual de la licencia (humanizado).", sample: "Por vencer" },
+  { name: "license.reason", description: "Motivo del estado (humanizado; «—» si no aplica).", sample: "Licencia vencida dentro de la gracia" },
+  { name: "license.edition", description: "Edición contratada (o «—» sin licencia).", sample: "professional" },
+  { name: "license.expiresAt", description: "Vencimiento de la licencia (o «—»).", sample: "1 oct 2026, 00:00" },
+  { name: "license.daysLeft", description: "Días restantes hasta el vencimiento (o de gracia, según el estado).", sample: "12" },
+] as const;
+
+/**
  * Catálogo de eventos del MVP (4) + incidencias (4, Fase 4.4) + órdenes de trabajo (3,
- * OT S6). Crece por fase.
+ * OT S6) + licencia (3, L6). Crece por fase.
  */
 export const NOTIFICATION_EVENTS = [
   {
@@ -348,6 +361,38 @@ export const NOTIFICATION_EVENTS = [
       { name: "company.accreditedUntil", description: "Fecha en que venció la acreditación.", sample: "1 jul 2026, 00:00" },
       { name: "company.expiresIn", description: "Tiempo transcurrido desde el vencimiento.", sample: "2 d" },
     ],
+  },
+  {
+    key: "license.state.changed",
+    group: "license",
+    labelKey: "notifications.events.licenseStateChanged",
+    description:
+      "La licencia de la instalación cambió de estado (p. ej. pasó a Por vencer, entró en gracia, quedó restringida o volvió a Válida tras renovar). Avisa a los administradores del sistema.",
+    origin: "tx",
+    variables: [
+      ...COMMON_VARIABLES,
+      ...LICENSE_VARIABLES,
+      { name: "license.fromStatus", description: "Estado anterior (humanizado).", sample: "Válida" },
+      { name: "license.toStatus", description: "Estado nuevo (humanizado).", sample: "Por vencer" },
+    ],
+  },
+  {
+    key: "license.expiring",
+    group: "license",
+    labelKey: "notifications.events.licenseExpiring",
+    description:
+      "La licencia está por vencer (re-aviso semanal) o ya venció y corre la gracia (re-aviso diario). Avisa a los administradores para gestionar la renovación con el proveedor.",
+    origin: "derived",
+    variables: [...COMMON_VARIABLES, ...LICENSE_VARIABLES],
+  },
+  {
+    key: "license.restricted",
+    group: "license",
+    labelKey: "notifications.events.licenseRestricted",
+    description:
+      "La instalación está en un estado restringido de licencia (solo lectura, bloqueada, pendiente de activación) o supera los límites contratados. Re-aviso diario a los administradores.",
+    origin: "derived",
+    variables: [...COMMON_VARIABLES, ...LICENSE_VARIABLES],
   },
 ] as const satisfies readonly NotificationEventDef[];
 

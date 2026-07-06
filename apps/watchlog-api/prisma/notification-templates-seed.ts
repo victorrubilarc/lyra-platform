@@ -426,6 +426,79 @@ export const NOTIFICATION_TEMPLATE_SEEDS: NotificationTemplateSeed[] = [
     ),
   },
   {
+    eventKey: "license.state.changed",
+    locale: "es-CL",
+    channel: "EMAIL",
+    subject: "Licencia: cambio de estado — {{license.fromStatus}} → {{license.toStatus}}",
+    bodyText:
+      "Hola {{recipient.name}}:\n\n" +
+      "La licencia de esta instalación cambió de estado: {{license.fromStatus}} → {{license.toStatus}}.\n" +
+      "Motivo: {{license.reason}}\n\n" +
+      "Edición: {{license.edition}}\nVence: {{license.expiresAt}}\nDías restantes: {{license.daysLeft}}\n\n" +
+      "Revise el detalle y las instrucciones de renovación en Configuración › Licencia: {{app.url}}/configuracion\n\n— {{app.name}}",
+    bodyHtml: htmlShell(
+      "La licencia cambió de estado",
+      "La licencia de esta instalación pasó de <strong>{{license.fromStatus}}</strong> a <strong>{{license.toStatus}}</strong>.",
+      [
+        ["Motivo", "{{license.reason}}"],
+        ["Edición", "{{license.edition}}"],
+        ["Vence", "{{license.expiresAt}}"],
+        ["Días restantes", "{{license.daysLeft}}"],
+      ],
+      { label: "Ver estado de licencia", url: "{{app.url}}/configuracion" },
+    ),
+  },
+  {
+    eventKey: "license.expiring",
+    locale: "es-CL",
+    channel: "EMAIL",
+    subject: "Renovación de licencia pendiente ({{license.status}}: {{license.daysLeft}} días)",
+    bodyText:
+      "Hola {{recipient.name}}:\n\n" +
+      "La licencia de esta instalación requiere renovación. Estado: {{license.status}} " +
+      "({{license.reason}}). Vence: {{license.expiresAt}}. Días restantes: {{license.daysLeft}}.\n\n" +
+      "La solicitud de renovación (renovacion.lreq) ya está generada junto al archivo de licencia " +
+      "de la instalación: hágala llegar a su proveedor para recibir la licencia renovada.\n\n" +
+      "Detalle e instrucciones en Configuración › Licencia: {{app.url}}/configuracion\n\n— {{app.name}}",
+    bodyHtml: htmlShell(
+      "Renovación de licencia pendiente",
+      "La licencia de esta instalación está <strong>{{license.status}}</strong>. Gestione la renovación con su proveedor para evitar interrupciones.",
+      [
+        ["Estado", "{{license.status}}"],
+        ["Motivo", "{{license.reason}}"],
+        ["Edición", "{{license.edition}}"],
+        ["Vence", "{{license.expiresAt}}"],
+        ["Días restantes", "{{license.daysLeft}}"],
+      ],
+      { label: "Ver instrucciones de renovación", url: "{{app.url}}/configuracion" },
+    ),
+  },
+  {
+    eventKey: "license.restricted",
+    locale: "es-CL",
+    channel: "EMAIL",
+    subject: "Licencia en estado restringido: {{license.status}}",
+    bodyText:
+      "Hola {{recipient.name}}:\n\n" +
+      "La instalación está en un estado restringido de licencia.\n" +
+      "Estado: {{license.status}}\nMotivo: {{license.reason}}\n\n" +
+      "La plataforma opera en modo solo lectura: los datos siguen disponibles para consulta y " +
+      "exportación (nunca se bloquean), pero el ingreso de información nueva está suspendido " +
+      "hasta regularizar la licencia con su proveedor.\n\n" +
+      "Detalle e instrucciones en Configuración › Licencia: {{app.url}}/configuracion\n\n— {{app.name}}",
+    bodyHtml: htmlShell(
+      "Licencia en estado restringido",
+      "La instalación está en <strong>{{license.status}}</strong>. Los datos siguen disponibles para consulta y exportación; el ingreso de información nueva está suspendido.",
+      [
+        ["Estado", "{{license.status}}"],
+        ["Motivo", "{{license.reason}}"],
+        ["Edición", "{{license.edition}}"],
+        ["Vence", "{{license.expiresAt}}"],
+      ],
+      { label: "Ver estado de licencia", url: "{{app.url}}/configuracion" },
+    ),
+  },
+  {
     eventKey: "handover.ready",
     locale: "es-CL",
     channel: "EMAIL",

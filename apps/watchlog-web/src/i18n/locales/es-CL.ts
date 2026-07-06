@@ -126,6 +126,92 @@ export const esCL = {
       incidentActionOverdue: "Incidencia: acción CAPA vencida",
       incidentReportDue: "Incidencia: reporte por vencer",
       handoverReady: "Entrega de turno lista para recibir",
+      licenseStateChanged: "Licencia: cambio de estado",
+      licenseExpiring: "Licencia: renovación pendiente",
+      licenseRestricted: "Licencia: estado restringido",
+    },
+  },
+  license: {
+    banner: {
+      expiring:
+        "La licencia de esta instalación vence en {{days}} días ({{date}}). Genera la renovación con tu proveedor para evitar interrupciones.",
+      grace:
+        "La licencia venció el {{date}}. La plataforma seguirá operando {{days}} días más mientras se renueva. Contacta a tu proveedor a la brevedad.",
+      readonly:
+        "Licencia vencida — modo solo lectura. Tus datos siguen disponibles para consulta y exportación; el ingreso de información nueva está suspendido hasta renovar la licencia con tu proveedor.",
+      blocked:
+        "La licencia de esta instalación no es válida — modo solo lectura. Tus datos siguen disponibles para consulta y exportación. Contacta a tu proveedor.",
+      lineage:
+        "Esta licencia no corresponde a esta instalación — modo solo lectura. Contacta a tu proveedor para regularizar la activación. Tus datos siguen disponibles para consulta y exportación.",
+      pending:
+        "Instalación pendiente de activación. Aún no se ha cargado una licencia; se generó una solicitud de activación para enviar a tu proveedor. Mientras tanto la plataforma opera en solo lectura.",
+      limits:
+        "La instalación supera los límites contratados de la licencia (nodos o usuarios). Regulariza con tu proveedor.",
+      detail: "Ver detalle",
+      dismiss: "Descartar aviso",
+    },
+    status: {
+      VALIDA: "Válida",
+      POR_VENCER: "Por vencer",
+      EN_GRACIA: "En gracia (vencida)",
+      SOLO_LECTURA: "Solo lectura",
+      BLOQUEADA: "Bloqueada",
+      PENDIENTE_ACTIVACION: "Pendiente de activación",
+      LIMITE_EXCEDIDO: "Límite excedido",
+      MODULO_NO_LICENCIADO: "Módulo no licenciado",
+    },
+    reason: {
+      EXPIRING_SOON: "La licencia está por vencer.",
+      EXPIRED_IN_GRACE: "Licencia vencida, dentro del período de gracia.",
+      EXPIRED_BEYOND_GRACE: "Licencia vencida y período de gracia agotado.",
+      LIMITS_EXCEEDED: "La instalación supera los límites contratados (nodos o usuarios).",
+      LICENSE_FILE_MISSING: "No hay archivo de licencia: la instalación aún no se activa.",
+      LINEAGE_MISMATCH: "La licencia no corresponde a esta instalación — contacta a tu proveedor.",
+      FINGERPRINT_MISMATCH: "La licencia no corresponde a este servidor.",
+      INVALID_SIGNATURE: "La firma de la licencia no es válida.",
+      MALFORMED_JWS: "El archivo de licencia está dañado.",
+      INVALID_TEMPORAL_FIELDS: "El archivo de licencia tiene fechas inválidas.",
+      NOT_YET_VALID: "La licencia aún no entra en vigencia.",
+    },
+    settings: {
+      desc: "Estado de la licencia de esta instalación: qué incluye, cuándo vence y cómo renovarla. Solo lectura — la licencia se administra por archivos con tu proveedor.",
+      loadError: "No se pudo cargar el estado de la licencia.",
+      statusLabel: "Estado",
+      reasonLabel: "Motivo",
+      editionLabel: "Edición",
+      expiresLabel: "Vencimiento",
+      daysLeftLabel: "Días restantes",
+      graceLabel: "Días de gracia restantes",
+      modulesTitle: "Módulos incluidos",
+      modulesNull:
+        "Sin licencia verificada: no hay módulos que listar. La disponibilidad la gobierna el estado global de arriba.",
+      renewTitle: "Cómo renovar",
+      renewIntro:
+        "La renovación se hace por archivos y no requiere internet en la planta:",
+      renewStep1:
+        "La plataforma mantiene una solicitud de renovación (renovacion.lreq) junto al archivo de licencia de la instalación (carpeta ./license del despliegue).",
+      renewStep2: "Haz llegar ese archivo a tu proveedor (correo, portal o USB).",
+      renewStep3:
+        "Tu proveedor te devuelve un license.lic renovado: reemplázalo en la misma carpeta.",
+      renewStep4:
+        "La plataforma lo toma en el próximo arranque o re-verificación periódica y vuelve al estado Válida.",
+      renewNote:
+        "La respuesta de renovación sirve una sola vez y solo en esta instalación. Si el estado indica que la licencia no corresponde, contacta a tu proveedor.",
+    },
+    modules: {
+      core: "Núcleo",
+      structure: "Estructura",
+      templates: "Plantillas",
+      logbook: "Bitácoras",
+      schedules: "Rondas",
+      incidents: "Incidencias",
+      exceptions: "Excepciones",
+      "work-orders": "Órdenes de trabajo",
+      "shift-handover": "Cambio de turno",
+      notifications: "Notificaciones",
+      themes: "Temas",
+      ai: "Inteligencia Artificial",
+      dashboards: "Dashboards",
     },
   },
   nav: {
@@ -1554,7 +1640,7 @@ export const esCL = {
     noAccess: "Sin acceso",
     noAccessDesc: "No tienes permiso para ver la configuración del sistema.",
     tabsAria: "Categorías de configuración",
-    cat: { security: "Seguridad", logbook: "Bitácoras", notifications: "Notificaciones", email: "Correo saliente", ai: "Inteligencia Artificial", appearance: "Apariencia" },
+    cat: { security: "Seguridad", logbook: "Bitácoras", notifications: "Notificaciones", email: "Correo saliente", ai: "Inteligencia Artificial", appearance: "Apariencia", license: "Licencia" },
     appearanceDesc:
       "Construye paletas de color de marca (variante clara y oscura), publícalas y elige la que reciben los usuarios por defecto. La vista previa se aplica al instante sobre todo el espacio de trabajo.",
     securityDesc: "Controles de seguridad que aplican a toda la plataforma. Los cambios quedan auditados.",

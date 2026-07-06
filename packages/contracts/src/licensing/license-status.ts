@@ -44,5 +44,13 @@ export const licenseStatusSchema = z.object({
   expiresAt: z.string().optional(),
   /** Días (enteros) hasta el vencimiento; negativo si ya venció. */
   daysToExpiry: z.number().int().optional(),
+  /**
+   * Días (enteros ≥ 0) que quedan de la ventana de gracia. SOLO viaja en
+   * EN_GRACIA (decisión L6a): la spec §5 exige "renovar en X días" y con
+   * `daysToExpiry` negativo la UI no puede saber cuándo termina la gracia.
+   * Es un número de PRESENTACIÓN derivado — mínimo privilegio intacto (sin
+   * huella/linaje/identidad).
+   */
+  graceDaysRemaining: z.number().int().min(0).optional(),
 });
 export type LicenseStatus = z.infer<typeof licenseStatusSchema>;

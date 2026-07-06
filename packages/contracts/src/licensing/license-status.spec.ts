@@ -42,6 +42,21 @@ describe("licenseStatusSchema (DTO delgado)", () => {
     expect(() => licenseStatusSchema.parse({ ...valid, status: "PIRATA" })).toThrow();
   });
 
+  it("graceDaysRemaining (L6): entero ≥ 0 opcional; rechaza negativos", () => {
+    const grace = {
+      status: "EN_GRACIA",
+      reason: "EXPIRED_IN_GRACE",
+      modules: ["core"],
+      daysToExpiry: -5,
+      graceDaysRemaining: 9,
+    };
+    expect(licenseStatusSchema.parse(grace)).toEqual(grace);
+    expect(licenseStatusSchema.parse(valid)).not.toHaveProperty("graceDaysRemaining");
+    expect(() =>
+      licenseStatusSchema.parse({ ...grace, graceDaysRemaining: -1 }),
+    ).toThrow();
+  });
+
   it("mínimo privilegio: strip de campos sensibles si llegaran (huella/linaje/installationId)", () => {
     const leaked = {
       ...valid,

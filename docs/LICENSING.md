@@ -6,16 +6,19 @@
 > tope de instalaciones/nodos/usuarios y módulos habilitados. Es un **ítem de desarrollo cerrado**,
 > aún no construido.
 >
-> Última actualización: **2026-07-05**. Estado: **L0 + L1 + L2 + L3 + L4 construidos** — el núcleo puro (firma/verificación
+> Última actualización: **2026-07-06**. Estado: **L0 + L1 + L2 + L3 + L4 + L6 construidos** — el núcleo puro (firma/verificación
 > Ed25519, huella, máquina de estados §5, linaje) existe como **`@lyra/licensing`** (`packages/licensing`, 50 tests), la
 > API **vive la licencia en runtime** (L1: `LicenseService` + guard global + chequeo distribuido en el worker +
 > auditoría; ver §4/§5), el **gating de módulos por entitlement está ACTIVO** (L2: catálogo canónico §5.1 +
 > `@RequireModule`/`ModuleEntitlementGuard` + `GET /license/status` + ocultamiento en la web), la **emisión REAL
 > existe** (L3: CLI `lyra-license` en `@lyra/licensing-cli` + custodia de la privada de PROD + ledger append-only +
-> pública de PROD embebida por el build de release ⇒ **la imagen del primer tag post-L3 es distribuible**; ver §4/§6)
-> y la **renovación challenge-response con LINAJE ROTATORIO está ACTIVA** (L4: `renovacion.lreq` + `lyra-license
+> pública de PROD embebida por el build de release ⇒ **la imagen del primer tag post-L3 es distribuible**; ver §4/§6),
+> la **renovación challenge-response con LINAJE ROTATORIO está ACTIVA** (L4: `renovacion.lreq` + `lyra-license
 > renew` + rotación/`LINEAGE_MISMATCH` en runtime ⇒ **el clon de la instalación queda DETECTADO al renovar**; ver
-> §4.1/§5). Pendientes L5–L6 (anti-tamper, UI de estado). Estimación total: ~80–160 HH.
+> §4.1/§5) y la **UI de estado + avisos es REAL** (L6: banner global por estado + pestaña Licencia en Configuración +
+> 3 eventos `license.*` por el motor de notificaciones a los administradores, con carve-out para que una licencia
+> restringida no silencie su propia alarma; ver §5.2). Pendientes L5 (anti-tamper) y L2b (límites numéricos).
+> Estimación total: ~80–160 HH.
 
 ---
 
@@ -223,7 +226,7 @@ La renovación usa el **mismo baile por archivos** de la activación (air-gap in
   a propósito (es EXPORTACIÓN — bloquearla violaría "jamás secuestrar datos").
 - Cambio de estado ⇒ `AuditLog` `license.state.changed` (actor `system@license`, antes/después) + log nítido al
   arranque (estado · motivo · licenseId · cliente · edición · vencimiento · huella). La notificación a
-  administradores (banner/aviso) llega con la UI de L6.
+  administradores y el banner son REALES desde L6 (§5.2).
 
 ### 5.1 Gating de módulos por entitlement (✅ construido en L2)
 
@@ -267,12 +270,57 @@ Claves (13): `core` · `structure` · `templates` · `logbook` · `schedules` ·
   entitlement (`LicenseService.moduleOperational`).
 
 **DTO delgado + endpoint (`GET /api/license/status`, autenticado sin permiso):** la web consume
-`{ status, reason?, edition?, modules[] | null, expiresAt?, daysToExpiry? }` (`licenseStatusSchema` en
-`@lyra/contracts`), **mapeado campo a campo desde el snapshot** (`toLicenseStatus`) — JAMÁS el payload: sin
-huella, sin linaje, sin installationId, sin customer/licenseId (mínimo privilegio, testeado). `modules: null` =
-sin payload verificado ⇒ el front NO oculta por módulo (gobiernan los estados globales). Este DTO es el cimiento
-del banner de L6. La web oculta con `useLicensedModules()` en el registro de navegación (sidebar, Inicio, ⌘K,
-campanita): **visible = módulo licenciado ∧ permiso del usuario**; el candado real sigue siendo el 403 del backend.
+`{ status, reason?, edition?, modules[] | null, expiresAt?, daysToExpiry?, graceDaysRemaining? }`
+(`licenseStatusSchema` en `@lyra/contracts`), **mapeado campo a campo desde el snapshot** (`toLicenseStatus`) —
+JAMÁS el payload: sin huella, sin linaje, sin installationId, sin customer/licenseId (mínimo privilegio, testeado).
+`graceDaysRemaining` (entero ≥0) viaja SOLO en EN_GRACIA (decisión L6a: la spec §5 exige "renovar en X días" y con
+`daysToExpiry` negativo la UI no puede calcular el fin de la gracia; es un derivado de presentación).
+`modules: null` = sin payload verificado ⇒ el front NO oculta por módulo (gobiernan los estados globales). Este DTO
+alimenta el banner de L6 (§5.2). La web oculta con `useLicensedModules()` en el registro de navegación (sidebar,
+Inicio, ⌘K, campanita): **visible = módulo licenciado ∧ permiso del usuario**; el candado real sigue siendo el 403
+del backend.
+
+### 5.2 UI de estado + avisos a administradores (✅ construido en L6)
+
+**Banner global (web, shell bajo el Topbar):** `LicenseBanner` alimentado por `useLicenseStatus`; el mapeo
+estado→presentación es la función PURA `licenseBannerFor` (testeada). Audiencia y comportamiento (decisión L6a):
+
+| Estado | Quién lo ve | Tono | Descartable |
+|---|---|---|---|
+| VALIDA | nadie (sin banner) | — | — |
+| POR_VENCER | solo admins (`settings:manage`, filtro de UI) | warning | ✅ por sesión |
+| EN_GRACIA | todos (prominente: "renovar en X días" con `graceDaysRemaining`) | warning | ✅ por sesión |
+| SOLO_LECTURA · BLOQUEADA · PENDIENTE_ACTIVACION | todos (explican el porqué del solo-lectura) | error / info | ❌ persistente |
+| LIMITE_EXCEDIDO | solo admins | warning | ✅ por sesión |
+
+`LINEAGE_MISMATCH` tiene texto humano propio ("esta licencia no corresponde a esta instalación — contacta a tu
+proveedor"). Textos por i18n (`license.banner.*`), tokens del DS, "tu proveedor" (jamás ITESICWS — marca blanca).
+El banner INFORMA; el candado real sigue siendo el guard del backend (L1/L2).
+
+**Detalle en Configuración › Licencia** (`?tab=license`, deep link del banner y de la campanita): solo lectura —
+estado + motivo humanizado, edición, módulos (chips), vencimiento + días y las instrucciones de renovación del
+runbook §4 en texto guía. Gate = `module:settings:view` (SIN permiso nuevo, decisión L6b: el DTO ya es visible para
+todo autenticado). NO expone ni sube archivos de licencia.
+
+**Avisos por el motor de notificaciones (Bloque N — cierra el pendiente L1(iii)):** 3 eventos del catálogo
+(plantillas default en el seed; preferencias por canal EMAIL/INAPP como todos):
+- `license.state.changed` (tx): transición EN CALIENTE detectada por `LicenseService.refresh` (incluida la vuelta a
+  VALIDA). En el arranque no emite (spamearía cada reinicio); ese caso lo cubren los derived.
+- `license.expiring` (derived): POR_VENCER re-avisa por SEMANA ISO; EN_GRACIA por DÍA (cadencia en la dedupeKey).
+- `license.restricted` (derived, diario): SOLO_LECTURA / BLOQUEADA / PENDIENTE_ACTIVACION / LIMITE_EXCEDIDO.
+
+**Destinatarios** = usuarios con un rol que concede `settings:manage` (permiso CONFIGURABLE, sin roles hardcodeados)
+∪ suscripciones explícitas, SIN filtro ABAC de nodo (la licencia es de la instalación). El payload del evento
+CONGELA el estado presentable (multi-instancia: el dispatcher que lo toma puede tener otro snapshot local) y JAMÁS
+lleva licenseId/customer/huella/linaje; el deep link de la campanita usa el id fijo `"system"`.
+
+**Carve-out del worker (clave):** en estados restringidos el motor pausa el trabajo operacional
+(`workersOperational`, L1), pero las tres etapas procesan IGUAL los eventos `license.*` — sin esto, la licencia
+restringida silenciaría su propia alarma. Los eventos de licencia tampoco se gatean por el módulo `notifications`
+(avisar la licencia es función de sistema, no una feature comprada).
+
+**Gate latente de marca blanca (decisión L6d):** `LicenseService.isWhiteLabelEnabled()` lee `whiteLabel` del payload
+verificado; hoy sin efecto visible y sin viajar al DTO — el épico de marca blanca (BACKLOG §2(2)) lo cablea después.
 
 ---
 
@@ -329,7 +377,7 @@ chequeo. No se puede volver imposible al 100%, pero se encarece por capas:
 | CLI de emisión + custodia de clave privada — **✅ hecho en L3** (`@lyra/licensing-cli`: keygen/issue/inspect/ledger; privada PROD cifrada bajo custodia; pública PROD embebida por el release ⇒ imagen vendible; ledger hash-chain; CLI 22 tests + smoke-emisión 20/20) | 10–20 |
 | `LicenseService` + máquina de estados + caché + re-evaluación — **✅ hecho en L1** (+ guard global, señales estables bajo Docker, `LicenseInstallation`, auditoría, `solicitud.lreq`, licencia dev `pnpm license:dev`, smoke 28/28) | 20–35 |
 | Renovación challenge-response + linaje rotatorio (detección de clon) — **✅ hecho en L4** (`renovacion.lreq` + `lyra-license renew` + `evaluateLineage`/rotación/`LINEAGE_MISMATCH`; ciclo corto como política del runbook; smoke-renovación 29/29 — PoC T6 en vivo) | 10–20 |
-| Gating de módulos por entitlement (backend + web) — **✅ hecho en L2** (catálogo canónico en contracts, `@RequireModule`/guard 5.º, `GET /license/status` DTO delgado, ocultamiento sidebar/Inicio/⌘K, workers module-aware; smoke 23/23). La UI RICA de estado/avisos queda para L6 | 15–30 |
+| Gating de módulos por entitlement (backend + web) — **✅ hecho en L2** (catálogo canónico en contracts, `@RequireModule`/guard 5.º, `GET /license/status` DTO delgado, ocultamiento sidebar/Inicio/⌘K, workers module-aware; smoke 23/23) — **+ UI de estado/avisos ✅ hecha en L6** (banner por estado + pestaña Licencia en Configuración + 3 eventos `license.*` al Bloque N con carve-out del worker y destinatarios por `settings:manage`; smoke-avisos 25/25; ver §5.2) | 15–30 |
 | Enforcement de límites (nodos/usuarios/instalaciones) | 10–20 |
 | Empaquetado anti-tamper (bytecode/native del módulo crítico) | 10–30 |
 | **Total** | **~80–160 HH** |
