@@ -30,7 +30,15 @@ DATOS preexistente** en el arnés (el demo acumula 400+ rondas vencidas y el lot
 del smoke ahora se inserta como la MÁS antigua; deuda de reseed sigue en BACKLOG §3). **No probado:** smoke VISUAL
 del banner/pestaña (lo hace el dueño — dev queda con licencia POR_VENCER y restauración = `pnpm license:dev` +
 reiniciar api); re-aviso multi-día real (la cadencia se afirma por dedupeKey). Decisiones a–f en DECISIONS
-2026-07-06. **Siguiente: prueba de fuego L4 (tag v0.1.14 → EC2 → renovar counter 0→1) y luego L5 anti-tamper.**
+2026-07-06. **PRUEBA DE FUEGO L4 EJECUTADA (misma sesión) ✅ — primera renovación real del producto:** `v0.1.14`
+(release+deploy automático) → EC2 VALIDA con pública PROD + `renovacion.lreq` auto-escrita → `renew` DENEGADO por el
+emisor (¡control correcto!: el ledger L3 tenía un installationId armado a mano pre-L1; la identidad real nació en
+v0.1.13) → re-emisión auditable con `--license-id` contra la identidad real (import = CURRENT sin rotar) → **`renew`
+counter 0→1** (herencia, vence 2027-07-06) → import en producción: **linaje ROTADO** (log «counter 0 → 1; la
+respuesta ya no es importable en otra instalación»), solicitud nueva con counter=1 + nonce fresco, VALIDA 364 días.
+Respaldos conservados; passphrase por archivo efímero borrado tras firmar; lección operacional en PROCEDURE §2
+(emitir SIEMPRE contra la solicitud generada por la app). **Siguiente: L5 anti-tamper** (con imagen vendible
+desplegada y renovación probada, el eslabón débil es el JS legible de la imagen).
 
 **2026-07-05 — 🔐 Licenciamiento L4 · challenge-response de RENOVACIÓN + linaje rotatorio (detección de clon) ✅**
 (`feat/licenciamiento-l4`). La capa 4 de la defensa (STRATEGY §4, patrón CodeMeter, **PoC T6 ahora EN VIVO**): la

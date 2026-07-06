@@ -852,10 +852,18 @@ nunca queda más de una sesión atrás.
             política documentada (PROCEDURE §4). SIN migración (columnas L1) ni permiso. licensing 50 + CLI 38 +
             API 292 tests + smoke-licencia-renovacion **29/29** + regresión 28/28+23/23+20/20. Decisiones a–f en
             DECISIONS 2026-07-05 (L4).
-      - [ ] **Pendiente L4 (operacional, prueba de fuego):** con el primer tag `v*` post-L4 (v0.1.14) desplegado,
-            hacer la **primera renovación REAL del EC2 demo** (`lic_2026_demo_ec2_001`, counter 0→1): bajar su
-            `renovacion.lreq`, `pnpm license renew` con la custodia PROD, importar y verificar VALIDA + linaje rotado
-            (decisión (f) L4: no se hizo contra el demo en esta sesión porque v0.1.13 es pre-L4 y no ejercita nada).
+      - [x] ~~Pendiente L4 (operacional, prueba de fuego)~~ **CERRADO 2026-07-06 — PRIMERA RENOVACIÓN REAL
+            DEL PRODUCTO ✅:** tag `v0.1.14` → release+deploy automático → EC2 arrancó VALIDA con la pública PROD y
+            **escribió `renovacion.lreq` solo** (runtime L4 en producción). El `renew` inicial fue **DENEGADO por el
+            emisor** — control funcionando: el ledger L3 registró un `installationId` ARMADO A MANO
+            (`inst_demo_ec2_watchlog`, el host era pre-L1 sin identidad persistida) y la instalación real nació en
+            v0.1.13 como `inst_f41f8aac…`. Corrección auditable: **re-emisión** (`issue --license-id
+            lic_2026_demo_ec2_001`, mismos términos) contra la identidad real → import = CURRENT (VALIDA, sin rotar)
+            → **`renew` counter 0→1** (herencia del ledger, vence 2027-07-06) → import = **«linaje rotado (counter
+            0 → 1)»** en el log de producción, nonce local FRESCO en la nueva solicitud, VALIDA 364 días. Respaldo
+            pre-renovación conservado (`license.lic.bak-pre-renew-v0114` en el host + copia local); la vieja ya no
+            calza POR DISEÑO. Lección operacional en PROCEDURE §2: **emitir SIEMPRE contra la `solicitud.lreq`
+            generada por la app** (identidad real), jamás con ids inventados.
       - [ ] **L5:** anti-tamper en CI (bytecode V8/nativo del módulo crítico + verificación distribuida + integridad).
       - [x] **L6 · UI de estado + avisos de licencia** ✅ 2026-07-06 (`feat/licenciamiento-l6`): **banner global**
             en el shell (`LicenseBanner` + presentación PURA `licenseBannerFor` testeada; audiencia por estado:

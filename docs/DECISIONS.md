@@ -69,6 +69,19 @@ Verde: typecheck/lint/build/test (contracts 518 = +5 DTO/eventos · API 296 = +4
 +6 presentación del banner) + **smoke-licencia-avisos.py 25/25 NUEVO** (:3404 — POR_VENCER semanal solo-admins +
 EN_GRACIA graceDaysRemaining + CARVE-OUT en vivo + VALIDA silencio) + regresión licencia 28/28 · 23/23 · 20/20 ·
 29/29 + notificaciones 18/18 (con el fix de deriva) · 22/22 · 18/18.
+- **(f) EJECUTADA — primera renovación REAL del producto (misma sesión, post-merge):** `v0.1.14` desplegado → EC2
+  VALIDA con la pública PROD y `renovacion.lreq` auto-escrita. **El `renew` inicial fue DENEGADO por el emisor y esa
+  denegación fue CORRECTA:** el ledger de L3 registró un `installationId` armado a mano (`inst_demo_ec2_watchlog` —
+  el host era pre-L1, sin identidad persistida) y la identidad REAL de la instalación nació en v0.1.13
+  (`inst_f41f8aac…`) ⇒ "no tiene emisiones en el ledger". Corrección auditable SIN tocar código: **re-emisión**
+  administrativa (`issue --license-id lic_2026_demo_ec2_001`, términos idénticos) contra la solicitud con la
+  identidad real → import evaluó **CURRENT** (VALIDA, sin rotación — retrocompat counter 0) → `renew` heredó del
+  ledger y emitió **counter 0→1 atado al nonce presentado** (vence 2027-07-06) → import en producción: **«linaje
+  rotado (counter 0 → 1); la respuesta ya no es importable en otra instalación»** + solicitud nueva con counter=1 y
+  nonce FRESCO. **Regla operacional derivada (PROCEDURE §2):** emitir SIEMPRE contra la `solicitud.lreq` que genera
+  la app (identidad persistida real); un id inventado deja la instalación sin historial y bloquea toda renovación
+  futura. Passphrase de custodia: por `LYRA_LICENSE_PASSPHRASE_FILE` efímero (creado por el dueño, borrado tras
+  firmar — jamás por chat/flag/log).
 
 ### 2026-07-05 · Licenciamiento L4 · challenge-response de RENOVACIÓN + linaje rotatorio / detección de clon (decisiones a–f, aprobadas por el dueño antes de codificar)
 Sesión L4 (`feat/licenciamiento-l4`): la capa 4 de la defensa (LICENSING_STRATEGY §4, patrón CodeMeter, PoC T6) quedó

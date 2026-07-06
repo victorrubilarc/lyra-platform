@@ -111,7 +111,13 @@ Esto se repite **una vez por cada servidor** que el socio levanta (una por licen
    - Con internet: lo sube a tu **portal de licencias** (o te lo manda).
    - Air-gapped: lo copia a un USB, lo lleva a un PC con internet, y lo sube. **El servidor de la
      planta nunca toca internet** — solo viaja un archivito.
-4. **ITESICWS emite la licencia** (✅ real desde L3) con la CLI y tu **clave privada bajo custodia**:
+4. **ITESICWS emite la licencia** (✅ real desde L3) con la CLI y tu **clave privada bajo custodia**.
+   > ⚠️ **Emite SIEMPRE contra la `solicitud.lreq` que generó la APP** (contiene la identidad
+   > persistida real de la instalación). Un `installationId` inventado a mano deja a esa instalación
+   > **sin historial en el ledger** y el `renew` le será DENEGADO ("no tiene emisiones") — le pasó al
+   > EC2 demo (emitido pre-L1 con un id manual) y hubo que re-emitir con `--license-id` para
+   > regularizar (2026-07-06). El control deniega por diseño; la corrección es re-emitir contra la
+   > identidad real, no saltarse el ledger.
    ```bash
    pnpm license ledger                      # ¿cuánto lleva el socio contra su banda? (§3)
    pnpm license issue --request solicitud.lreq \
