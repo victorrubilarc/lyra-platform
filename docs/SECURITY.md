@@ -527,8 +527,15 @@ GxP: MHRA Data Integrity 2018 / FDA DI Q&A (corrección tardía justificada + at
 - **TLS** obligatorio en todo el tráfico (ya vía Caddy de borde).
 
 ### 9.4 Anti-manipulación / antipirateo (honesto)
-- El módulo de licencia se empaqueta **anti-tamper** (bytecode V8 / binario nativo) y la verificación es **distribuida**
-  (no un solo `if` desactivable). **No se entrega código fuente** al socio (imágenes compiladas, no repo).
+- **Anti-tamper del build — ✅ implementado en L5 (2026-07-06):** el build de imagen empaqueta la API en UN
+  `dist/main.js` **minificado con nombres destruidos** (esbuild) que **INLINEA `@lyra/licensing`** y **borra de la
+  imagen el fuente TS y la copia legible del módulo crítico** (también en la imagen migrate). NO bytecode V8 (`bytenode`
+  descartado: ata a la versión exacta de Node, exige loader, se desensambla igual — DECISIONS 2026-07-06 L5-a). La
+  verificación es **distribuida** (no un solo `if`) y desde L5 cada punto **auto-verifica la integridad** del artefacto
+  (sello SHA-256 releído sin caché en `LicenseService.evaluateNow` y en el worker; adulterar ⇒ **BLOQUEADA
+  `INTEGRITY_MISMATCH`**, restringido = solo lectura + exportación, jamás destructivo, auditado). El horneado ocurre
+  **una vez por versión en el build de imagen** (Dockerfile.api; dev/ci.yml no lo corren). **No se entrega código
+  fuente** al socio (imágenes compiladas, no repo). Ver `LICENSING.md §7/§7.4`.
 - **Detección de sobre-despliegue por linaje rotatorio** — **✅ implementada en L4 (2026-07-05):** la renovación
   challenge-response por archivos ata cada respuesta al linaje presentado (counter + nonce de la instalación) ⇒
   **importable UNA sola vez y solo en esa instalación**; el emisor deniega el linaje repetido (**clon detectado**,

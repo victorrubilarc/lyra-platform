@@ -1,5 +1,38 @@
 # Progreso — Lyra WatchLog
 
+**2026-07-06 — 🔐 Licenciamiento L5 · anti-tamper del módulo crítico en el build de release ✅** (`feat/licenciamiento-l5`).
+La **capa 3** de la defensa (LICENSING_STRATEGY §5, LICENSING.md §7): el módulo de licencia deja de ser texto editable
+en la imagen distribuida y adulterar el chequeo se AUTO-DETECTA. **Honestidad intacta:** es REFUERZO, no bóveda
+(encarece/retrasa, no vuelve imposible); la verificación sigue DISTRIBUIDA y JAMÁS destructiva (peor estado = solo
+lectura + exportación); `signLicense`/`verifyLicense`/`evaluateLicense`/`evaluateLineage` y la máquina de estados
+INTACTOS (L5 protege el ENVOLTORIO). **(1) Horneado (`scripts/license/bundle-api.mjs`, esbuild):** empaqueta el DIST ya
+transpilado por tsc (los decoradores/`emitDecoratorMetadata` ya materializados ⇒ esquiva el campo minado NestJS+esbuild)
+en UN `dist-bundle/main.js` minificado; node_modules EXTERNAL (Prisma+engines, argon2, pdfmake+fuentes TTF por
+`require.resolve`, minio, contracts, llm), **@lyra/licensing INLINEADO** (cero deps) vía alias; **`mangleProps` con
+lista CURADA** destruye los nombres license-críticos (métodos/exports que el minify no toca). **(2) Sellado
+(`seal-integrity.mjs` + `integrity.ts`):** marcador `LYRA-INTEGRITY-SEAL::<64 hex>` nace en CEROS (dev/CI = sin sellar);
+el build escribe el SHA-256 del bundle con la región del sello normalizada a ceros (sello DENTRO del artefacto, marcador
+ÚNICO, no re-aplicable). **(3) Auto-verificación DISTRIBUIDA:** `verifyArtifactIntegrity` RELEE `__filename` en cada
+llamada (sin caché) en DOS puntos ya existentes — `LicenseService.evaluateNow` (arranque + re-eval) y
+`workersOperational` (worker); NO hay verificador central. `requireSeal` solo en `NODE_ENV=production` (sello en ceros
+ahí = adulteración; cierra el bypass "borro el hash"). **(4) Estado:** integridad rota ⇒ **BLOQUEADA + reason nuevo
+`INTEGRITY_MISMATCH`** (runtime L1, NO enum L0), restringido = solo lectura + exportación, JAMÁS destructivo; se AUDITA
+y avisa por la MISMA cañería de L6; banner/Configuración con texto humano propio. **(5) Docker (Dockerfile.api):** el
+bundle+seal viven en el stage `build` ⇒ corren en cualquier `docker build` y **release.yml no se tocó** (solo su
+`embed-public-key` previo); en `/app` se sustituye el dist legible por el bundle sellado y se BORRA el fuente TS + la
+copia legible de `@lyra/licensing`; la imagen **migrate** también pierde el fuente crítico. `pnpm dev`/ci.yml SIN
+cambio (carril dev intacto). **Desviación verificada (challenge-dont-please):** los exports de `@lyra/licensing` NO se
+manglan — frontera de interop ESM→CJS; desincronizar call-site vs. mapa `__export` ROMPE el runtime (`(0,qr.Y) is not a
+function`, cazado corriendo el bundle real). **Verde:** typecheck/lint(0)/build/test (API **309** = +13 integridad · web
+**18** = +1 banner INTEGRITY · contracts 518 intactos) + **imagen linux REAL construida a mano** (`/app/dist` = solo el
+bundle sellado, sin `src`/`@lyra/licensing`, `node --check` OK) + **`smoke-licencia-integridad.py 32/32` NUEVO** (:3405 —
+reproduce el horneado y afirma (i) nombres/strings críticos no localizables + externals intactos, (ii) bundle sellado
+VALIDA, (iii) tamper ⇒ BLOQUEADA con lectura viva/GET 200 y mutación 403 LICENSE_RESTRICTED) + regresión licencia
+**28/23/20/29/25** + notificaciones **18/22/18**. **SIN migración/permiso** (reason string libre); nueva devDep raíz
+`esbuild`; sello GENERADO en build (jamás committeado). Decisiones a–f en DECISIONS 2026-07-06 (L5). **NO hecho (fuera
+de alcance):** cosign/SBOM/digest-pinning (épico §2(4)), L2b límites, marca blanca §2(2). **Siguiente: L2b (límites
+numéricos) para cerrar el plan L0–L6, o retomar roadmap de producto (QA del dueño / reversa GxP).**
+
 **2026-07-06 — 🔐 Licenciamiento L6 · UI de estado + avisos de licencia ✅** (`feat/licenciamiento-l6`). El estado de
 la licencia por fin es **VISIBLE y ACCIONABLE** para quien opera la planta — hasta hoy solo vivía en logs/auditoría
 y en el DTO. **(1) Banner global** en el shell (`LicenseBanner` bajo el Topbar) alimentado por `useLicenseStatus`;

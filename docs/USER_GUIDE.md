@@ -261,7 +261,11 @@ administradores con anticipación (correo y campanita), con las instrucciones de
   - **Solo lectura / Bloqueada / Pendiente de activación** (todos, persistente): explica por qué la
     plataforma no acepta cambios y qué hacer. **No se puede descartar** (es la explicación de por qué
     los botones de guardar fallan). Si el motivo es "esta licencia no corresponde a esta instalación",
-    contacta a tu proveedor para regularizar la activación.
+    contacta a tu proveedor para regularizar la activación. Si el mensaje dice que el **software no
+    superó la verificación de integridad** (un caso raro: la instalación fue alterada, quedó corrupta o
+    una actualización se aplicó a medias), **reinstala la versión original** que entrega tu proveedor o
+    contáctalo — la plataforma queda en solo lectura por seguridad, pero **tus datos siguen intactos** y
+    disponibles para consulta y exportación.
   - **Límite excedido** (solo administradores): la instalación supera los nodos/usuarios contratados.
   - Con la licencia **Válida** no hay banner.
 - *Ver el detalle:* botón **«Ver detalle»** del banner, o `Configuración › Licencia` (también al tocar

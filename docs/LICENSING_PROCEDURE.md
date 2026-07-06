@@ -14,8 +14,10 @@
 > reales; primera emisión real: el EC2 demo), la **renovación por archivos con detección de clon es REAL** (§4: la
 > app deja `renovacion.lreq` sola y `renew` acusa el linaje repetido) y **el admin de planta VE el estado y recibe
 > los avisos** (banner + Configuración › Licencia + correos/campanita del Bloque N — `LICENSING.md §5.2`). La imagen
-> de release **embebe la pública de PROD** desde el primer tag post-L3. Falta el anti-tamper (L5) y el enforcement
-> de límites (L2b). Plan L0–L6 en `BACKLOG.md §2(1)`.
+> de release **embebe la pública de PROD** desde el primer tag post-L3 y, **desde L5, hornea el anti-tamper**: la API
+> viaja como un bundle único minificado con nombres destruidos (módulo de licencia inlineado, fuente legible borrado) y
+> **auto-verifica su integridad** (§6, `LICENSING.md §7.4`). Falta el enforcement de límites (L2b). Plan L0–L6 en
+> `BACKLOG.md §2(1)`.
 
 ---
 
@@ -300,12 +302,17 @@ imagen Docker** que se publica:
    [CI de ITESICWS — GitHub Actions, al cortar una versión vX.Y.Z]
       0. EMBEBER la pública de PROD           (embed-public-key.mjs — ✅ real desde L3;
                                                la imagen deja de aceptar licencias DEV)
-      1. TypeScript ──▶ JavaScript            (transpilar)
-      2. bundle + MINIFICAR todo el código    (esbuild/webpack)   ← IP general protegida
-      3. el MÓDULO DE LICENCIA crítico ──▶ BYTECODE V8 / nativo   (bytenode)  ← anti-tamper reforzado
-      4. ensamblar la imagen Docker con el resultado
-      5. FIRMAR la imagen (cosign)            ← integridad de cadena de suministro
-      6. publicar en el registro privado (por digest)
+      1. TypeScript ──▶ JavaScript            (tsc — ✅ real)
+      2. bundle + MINIFICAR + MANGLE          (esbuild — ✅ real desde L5)   ← IP + módulo de licencia
+         · UN dist/main.js minificado, nombres license-críticos DESTRUIDOS
+         · @lyra/licensing INLINEADO; se borra el fuente TS y su copia legible
+      3. SELLAR la integridad                 (seal-integrity.mjs — ✅ real desde L5) ← SHA-256 embebido
+         · el runtime lo releé en ≥2 puntos; adulterar ⇒ BLOQUEADA (no destructivo)
+         · [descartado bytecode V8/bytenode: ata a la versión exacta de Node y
+            se desensambla igual — DECISIONS 2026-07-06 L5-a]
+      4. ensamblar la imagen Docker con el resultado   (✅ real)
+      5. FIRMAR la imagen (cosign)            ← épico §2(4) cadena de suministro (PENDIENTE)
+      6. publicar en el registro privado (por digest)   (✅ real; digest-pinning = §2(4))
    ─────────────────────────────────────────────────────────────
    [Cliente]  solo recibe la imagen YA compilada. No tiene el fuente,
               no corre ofuscación, no tiene herramientas de build.
@@ -314,17 +321,22 @@ imagen Docker** que se publica:
 ### Reglas y matices honestos
 - **Se hace una vez por versión, para todos.** No hay una "imagen ofuscada especial por cliente". La
   misma imagen protegida sirve a los 10 clientes; lo que los diferencia es el `license.lic` (§0).
-- **Dos niveles de intensidad:**
-  - *Todo el código de la app* → minificado/bundled (protege tu IP, sube el listón general).
-  - *El módulo de licencia* → además bytecode/nativo, porque es el que un atacante querría editar para
-    saltarse el chequeo.
-- **La verificación es DISTRIBUIDA**, no un solo `if` (arranque, gating de módulos, generación del acta
-  PDF, tareas programadas). Hay que romperlas todas, no una. Ver `LICENSING_STRATEGY.md §5`.
-- **Honestidad (de la investigación):** la ofuscación/bytecode **encarece y retrasa** al atacante, no
-  lo hace imposible (el bytecode V8 se puede desensamblar; Node SEA por sí solo es débil). Por eso es
-  una **capa de refuerzo**, nunca el candado principal. El candado real es la firma asimétrica (no
-  pueden fabricar licencias) + el node-lock + la dependencia de updates/soporte. La ofuscación
-  simplemente evita que el socio con un dev edite un `if` en una tarde.
+- **Dos niveles de intensidad (✅ ambos reales desde L5):**
+  - *Todo el código de la app* → **bundle único minificado con nombres destruidos** (esbuild): protege
+    tu IP y sube el listón general.
+  - *El módulo de licencia* → además **INLINEADO** en ese bundle (deja de ser un `.js` propio editable)
+    y con su fuente TS y su copia legible **borrados de la imagen**; más un **sello de integridad**
+    (SHA-256) que el runtime re-verifica. NO bytecode V8 (`bytenode` se descartó por riesgo operacional
+    real: ata el artefacto a la versión exacta de Node y se desensambla igual — DECISIONS 2026-07-06 L5-a).
+- **La verificación es DISTRIBUIDA**, no un solo `if` (arranque, gating de módulos, worker, linaje) — y
+  desde L5 cada punto además **auto-verifica la integridad** del artefacto. Hay que romperlas todas, no
+  una. Ver `LICENSING_STRATEGY.md §5` y `LICENSING.md §7.4`.
+- **Honestidad (de la investigación, intacta):** la minificación/mangle **encarece y retrasa** al
+  atacante, NO lo hace imposible (quien entienda el bundle minificado puede re-sellar o extirpar el
+  chequeo; el bytecode V8 igual se desensambla, por eso se descartó). Es una **capa de refuerzo**,
+  nunca el candado principal. El candado real es la firma asimétrica (no pueden fabricar licencias) +
+  el node-lock + la dependencia de updates/soporte. El anti-tamper simplemente evita que el socio con
+  un dev edite un `if` en una tarde.
 - **El cliente nunca ve el fuente.** Recibe imágenes compiladas. Nunca le entregas el repo. La marca
   blanca se logra por **configuración en runtime** (temas, nombre de producto), no tocando código.
 

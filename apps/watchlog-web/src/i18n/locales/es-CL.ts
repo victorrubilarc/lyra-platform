@@ -143,6 +143,8 @@ export const esCL = {
         "La licencia de esta instalación no es válida — modo solo lectura. Tus datos siguen disponibles para consulta y exportación. Contacta a tu proveedor.",
       lineage:
         "Esta licencia no corresponde a esta instalación — modo solo lectura. Contacta a tu proveedor para regularizar la activación. Tus datos siguen disponibles para consulta y exportación.",
+      integrity:
+        "El software de esta instalación no superó la verificación de integridad — modo solo lectura. Reinstala la versión original distribuida por tu proveedor o contáctalo para regularizar. Tus datos siguen disponibles para consulta y exportación.",
       pending:
         "Instalación pendiente de activación. Aún no se ha cargado una licencia; se generó una solicitud de activación para enviar a tu proveedor. Mientras tanto la plataforma opera en solo lectura.",
       limits:
@@ -167,6 +169,8 @@ export const esCL = {
       LIMITS_EXCEEDED: "La instalación supera los límites contratados (nodos o usuarios).",
       LICENSE_FILE_MISSING: "No hay archivo de licencia: la instalación aún no se activa.",
       LINEAGE_MISMATCH: "La licencia no corresponde a esta instalación — contacta a tu proveedor.",
+      INTEGRITY_MISMATCH:
+        "El software no superó la verificación de integridad — reinstala la versión original de tu proveedor.",
       FINGERPRINT_MISMATCH: "La licencia no corresponde a este servidor.",
       INVALID_SIGNATURE: "La firma de la licencia no es válida.",
       MALFORMED_JWS: "El archivo de licencia está dañado.",

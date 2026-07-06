@@ -57,6 +57,14 @@ describe("licenseBannerFor (presentación del banner L6)", () => {
     expect(p?.dismissible).toBe(false);
   });
 
+  it("BLOQUEADA por INTEGRITY_MISMATCH tiene texto humano propio (L5)", () => {
+    const p = licenseBannerFor(dto({ status: "BLOQUEADA", reason: "INTEGRITY_MISMATCH" }));
+    expect(p?.key).toBe("integrity");
+    expect(p?.tone).toBe("error");
+    expect(p?.audience).toBe("all");
+    expect(p?.dismissible).toBe(false);
+  });
+
   it("LIMITE_EXCEDIDO: warning solo admins, descartable", () => {
     expect(licenseBannerFor(dto({ status: "LIMITE_EXCEDIDO", reason: "LIMITS_EXCEEDED" }))).toMatchObject({
       key: "limits",
