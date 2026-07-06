@@ -5,7 +5,16 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-07-05** — **🔐 Licenciamiento L3 · CLI de emisión + custodia + pública PROD ✅** (`feat/licenciamiento-l3`):
+> actualización: **2026-07-05** — **🔐 Licenciamiento L4 · renovación challenge-response + linaje rotatorio ✅**
+> (`feat/licenciamiento-l4`, PoC T6 EN VIVO): la app deja/refresca **`renovacion.lreq`** (linaje local counter+nonce,
+> nonce jamás viaja hasta la solicitud) · CLI **`lyra-license renew`** (valida linaje contra el LEDGER: linaje
+> repetido = **CLON DETECTADO ⇒ deniega**, override `--force-duplicate` auditado; hereda términos comerciales; ata la
+> respuesta al linaje presentado = importable UNA sola vez) · runtime rota linaje al importar (`evaluateLineage`
+> ADITIVO en L0; no-calza ⇒ **BLOQUEADA `LINEAGE_MISMATCH`**, también en el worker) · retrocompat dura counter=0
+> (EC2 demo intacto) · ciclo corto 90d canal documentado (PROCEDURE §4). SIN migración/permiso. licensing 50 + CLI 38
+> + API 292 + smoke-licencia-renovacion **29/29** + regresión 28/28+23/23+20/20. **SIGUE: L6 (UI de estado) o L5
+> (anti-tamper) o L2b (límites)**; prueba de fuego = renovar el EC2 demo con v0.1.14 (§2(1)). — Antes:
+> **🔐 Licenciamiento L3 · CLI de emisión + custodia + pública PROD ✅** (`feat/licenciamiento-l3`):
 > paquete `@lyra/licensing-cli` (`pnpm license keygen|issue|inspect|ledger`; privado, jamás en la imagen) — privada de
 > emisión PROD **generada y CIFRADA** (PKCS#8+passphrase) en `~/.lyra-license/` (fuera del repo), pública PROD
 > **committeada** (`scripts/license/prod-keys/`, no-secreto) + codegen `embed-public-key.mjs` en `release.yml` ⇒ **la
@@ -829,8 +838,24 @@ nunca queda más de una sesión atrás.
             generado (privada cifrada en la custodia del dueño; passphrase en su gestor). CLI 22 tests +
             smoke-licencia-emision **20/20** (keygen atacante BLOQUEADO end-to-end). Decisiones a–f en
             DECISIONS 2026-07-05 (L3).
-      - [ ] **L4 (PRÓXIMA):** flujo challenge-response por USB (`solicitud.lreq`→`license.lic`) + linaje rotatorio
-            (detección de clon; invariante ya protegido por test en L0 `lineage.spec.ts`).
+      - [x] **L4 · challenge-response de RENOVACIÓN + linaje rotatorio (detección de clon)** ✅ 2026-07-05
+            (`feat/licenciamiento-l4`, PoC T6 EN VIVO): la app deja/refresca **`renovacion.lreq`** junto a la licencia
+            (linaje local `counter`+`nonce` de `LicenseInstallation` — nonce inicializado perezoso, JAMÁS viaja hasta
+            la solicitud) · CLI **`lyra-license renew`** (valida linaje CONTRA EL LEDGER: linaje repetido/desfasado =
+            **CLON DETECTADO ⇒ DENIEGA** con override humano `--force-duplicate` auditado; huella distinta exige
+            `--accept-new-fingerprint`; **hereda términos comerciales** de la última emisión, mismo licenseId,
+            `counter=presentado+1` + `nonce=presentado` = respuesta importable UNA sola vez) · runtime: helper puro
+            ADITIVO **`evaluateLineage`** en L0 (CURRENT/ROTATE/MISMATCH) ⇒ al importar ROTA (counter nuevo + nonce
+            local FRESCO + `lastRenewalAt`, auditoría `license.renewed`) y un linaje que no calza ⇒ **BLOQUEADA
+            `LINEAGE_MISMATCH`** (también en el chequeo distribuido del worker) · **retrocompat dura**: counter=0
+            jamás renovada evalúa EXACTO como L3 (EC2 demo intacto) · ciclo corto 90d canal / anual directo =
+            política documentada (PROCEDURE §4). SIN migración (columnas L1) ni permiso. licensing 50 + CLI 38 +
+            API 292 tests + smoke-licencia-renovacion **29/29** + regresión 28/28+23/23+20/20. Decisiones a–f en
+            DECISIONS 2026-07-05 (L4).
+      - [ ] **Pendiente L4 (operacional, prueba de fuego):** con el primer tag `v*` post-L4 (v0.1.14) desplegado,
+            hacer la **primera renovación REAL del EC2 demo** (`lic_2026_demo_ec2_001`, counter 0→1): bajar su
+            `renovacion.lreq`, `pnpm license renew` con la custodia PROD, importar y verificar VALIDA + linaje rotado
+            (decisión (f) L4: no se hizo contra el demo en esta sesión porque v0.1.13 es pre-L4 y no ejercita nada).
       - [ ] **L5:** anti-tamper en CI (bytecode V8/nativo del módulo crítico + verificación distribuida + integridad).
       - [ ] **L6:** UI de estado/avisos (banner POR_VENCER/EN_GRACIA/SOLO_LECTURA; DTO delgado en contracts) + marca
             blanca gobernada por `whiteLabel`.

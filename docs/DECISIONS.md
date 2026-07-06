@@ -4,6 +4,56 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-05 · Licenciamiento L4 · challenge-response de RENOVACIÓN + linaje rotatorio / detección de clon (decisiones a–f, aprobadas por el dueño antes de codificar)
+Sesión L4 (`feat/licenciamiento-l4`): la capa 4 de la defensa (LICENSING_STRATEGY §4, patrón CodeMeter, PoC T6) quedó
+REAL — la licencia se renueva por archivos y el clon de la instalación queda DETECTADO al renovar. Decisiones:
+- **(a) Solicitud de renovación = archivo APARTE `renovacion.lreq`** (misma carpeta que `license.lic`), escrito y
+  refrescado por `LicenseService` **SIEMPRE que haya payload verificado** (no solo en POR_VENCER — mejora aprobada:
+  un upgrade a mitad de ciclo usa la misma ceremonia sin esperar la degradación). Formato = base de la activación +
+  `type:"renewal"` + `licenseId` + linaje (`renewalCounter` + `nonce` local). Los parsers se RECHAZAN cruzado
+  (`issue` no acepta renovaciones ni `renew` activaciones — a prueba de errores del emisor). El **nonce local se
+  inicializa perezoso** al escribir la primera solicitud (instalaciones L1–L3 tienen `nonce=null`) y **JAMÁS viaja**
+  salvo dentro de la solicitud; no va al front (decisión L2c) ni a la auditoría.
+- **(b) Comando DEDICADO `lyra-license renew --request renovacion.lreq --expires <ISO>`** (no `issue --renew`):
+  validación y flags de seguridad propios sin mezclar ceremonias. **Hereda los términos comerciales de la última
+  emisión del ledger** para esa instalación (mismo `licenseId`, edición/módulos/límites/gracia — renovar = "misma
+  licencia, nuevo vencimiento"; cualquier flag explícito = upgrade). Exige el ledger íntegro (sin `--no-ledger` a
+  propósito: el control ES el ledger). Reusa `issueLicense`/`signLicense` — cero criptografía ni emisión nueva.
+- **(c) Linaje repetido = DENEGAR por defecto + override humano `--force-duplicate` AUDITADO** (patrón PoC T6/Wibu:
+  escalar a humano es el punto del control; emitir-con-alerta degradaría la capa 4 a un log que nadie mira). Tres
+  controles: renovación ya registrada con el MISMO counter presentado (⇒ **CLON DETECTADO**, cita la entrada del
+  ledger), counter desfasado vs. última emisión, y `licenseId` que no calza. El bypass queda MARCADO en la entrada
+  (`forcedDuplicate:true` — la evidencia contractual). **Huella distinta = flag separado `--accept-new-fingerprint`**
+  (migración de hardware legítima, también auditada): un solo flag para todo sería un botón de "sáltate los controles".
+- **(d) Verificación pura del linaje = helper ADITIVO en L0**: `evaluateLineage(payload, linajeLocal)` →
+  `CURRENT | ROTATE | MISMATCH` en `@lyra/licensing` (los congelados `signLicense`/`verifyLicense`/`evaluateLicense`
+  no se tocaron). La consumen DOS rutas independientes (verificación distribuida): `LicenseService.evaluateNow` (la
+  rotación/auditoría `license.renewed` es efecto de L1; NO se rota si la evaluación bloquea, p. ej. huella ajena) y
+  `workersOperational` (el worker re-verifica firma desde disco Y contrasta linaje con la copia en memoria refrescada
+  en cada rotación). `MISMATCH` ⇒ **BLOQUEADA con reason nuevo `LINEAGE_MISMATCH`** (en `LicenseRuntimeReason` de L1,
+  NO en el enum L0; restringido = solo lectura + exportación, jamás destructivo). `lineage.spec.ts` pasó de
+  simulación a testear el helper real.
+- **(e) Ciclo corto = POLÍTICA COMERCIAL DOCUMENTADA** (PROCEDURE §4): default 90 días para instalaciones vía socio
+  de canal (la detección del clon solo ocurre AL RENOVAR ⇒ 4 chequeos/año vs 1) y anual para directos/confiables; el
+  contrato puede pactar otra cosa. Solo mecanismo + tabla en el runbook — sin scheduler nuevo (avisos POR_VENCER ya
+  existen en L1; aviso rico = L6).
+- **(f) Prueba del clon SOLO LOCAL en esta sesión** (smoke 29/29 en :3403 con snapshot/restore del linaje dev): el
+  EC2 demo corre v0.1.13 (pre-L4) — renovar hoy la licencia real no ejercitaría nada del código nuevo. La **primera
+  renovación REAL de `lic_2026_demo_ec2_001` queda como prueba de fuego del primer tag post-L4 (v0.1.14)**, registrada
+  en BACKLOG §2(1). Retrocompatibilidad dura verificada: counter=0 jamás renovada evalúa EXACTO como L3.
+- **Desviación registrada sobre el prompt de sesión (challenge-dont-please):** el prompt pedía emitir la renovación
+  con "nonce NUEVO" del emisor; se implementó lo que el PoC T6 y `lineage.spec.ts` ya definían — **el payload lleva
+  el nonce PRESENTADO** (el binding de importación única: `counter === local+1 ∧ nonce === nonce local`) y **el nonce
+  NUEVO lo genera la instalación LOCALMENTE al rotar** ("el nonce nuevo nunca sale de su máquina"). Ventajas: cero
+  campos nuevos en el payload (sin bump de `schemaVersion`, reusa `renewalCounter`/`nonce` declarados en L0) y el
+  nonce vigente solo existe en la BD local. **SIN migración** (columnas de linaje declaradas desde L1) y **SIN
+  permiso nuevo** ⇒ sin `db:seed`/FLUSHALL; el DTO de `GET /license/status` no cambió (el reason es string).
+Verde: typecheck/lint/build/test (licensing 50 = +8 linaje real · CLI 38 = +16 renew/parsers/ledger · API 292 = +6
+servicio) + **smoke-licencia-renovacion.py 29/29 NUEVO** (:3403 — T6 EN VIVO: activación→renovación con herencia y
+rotación → re-import viejo BLOQUEADA `LINEAGE_MISMATCH` con lectura viva → clon acusado por el emisor con evidencia →
+`--force-duplicate` marcado → ledger íntegro) + regresión smoke-licencia 28/28 · smoke-licencia-modulos 23/23 ·
+smoke-licencia-emision 20/20 (el flujo de activación no cambió).
+
 ### 2026-07-05 · Licenciamiento L3 · CLI de emisión + custodia de clave privada + pública PROD embebida (decisiones a–f, aprobadas por el dueño antes de codificar)
 Sesión L3 (`feat/licenciamiento-l3`): ITESICWS ya puede **emitir licencias reales** y la imagen de release **por fin
 es apta para venderse**. Decisiones:

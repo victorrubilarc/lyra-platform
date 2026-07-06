@@ -6,14 +6,16 @@
 > tope de instalaciones/nodos/usuarios y módulos habilitados. Es un **ítem de desarrollo cerrado**,
 > aún no construido.
 >
-> Última actualización: **2026-07-05**. Estado: **L0 + L1 + L2 + L3 construidos** — el núcleo puro (firma/verificación
-> Ed25519, huella, máquina de estados §5) existe como **`@lyra/licensing`** (`packages/licensing`, 42 tests), la
+> Última actualización: **2026-07-05**. Estado: **L0 + L1 + L2 + L3 + L4 construidos** — el núcleo puro (firma/verificación
+> Ed25519, huella, máquina de estados §5, linaje) existe como **`@lyra/licensing`** (`packages/licensing`, 50 tests), la
 > API **vive la licencia en runtime** (L1: `LicenseService` + guard global + chequeo distribuido en el worker +
 > auditoría; ver §4/§5), el **gating de módulos por entitlement está ACTIVO** (L2: catálogo canónico §5.1 +
-> `@RequireModule`/`ModuleEntitlementGuard` + `GET /license/status` + ocultamiento en la web) y la **emisión REAL
+> `@RequireModule`/`ModuleEntitlementGuard` + `GET /license/status` + ocultamiento en la web), la **emisión REAL
 > existe** (L3: CLI `lyra-license` en `@lyra/licensing-cli` + custodia de la privada de PROD + ledger append-only +
-> pública de PROD embebida por el build de release ⇒ **la imagen del primer tag post-L3 es distribuible**; ver §4/§6).
-> Pendientes L4–L6 (linaje/challenge-response, anti-tamper, UI de estado). Estimación total: ~80–160 HH.
+> pública de PROD embebida por el build de release ⇒ **la imagen del primer tag post-L3 es distribuible**; ver §4/§6)
+> y la **renovación challenge-response con LINAJE ROTATORIO está ACTIVA** (L4: `renovacion.lreq` + `lyra-license
+> renew` + rotación/`LINEAGE_MISMATCH` en runtime ⇒ **el clon de la instalación queda DETECTADO al renovar**; ver
+> §4.1/§5). Pendientes L5–L6 (anti-tamper, UI de estado). Estimación total: ~80–160 HH.
 
 ---
 
@@ -96,7 +98,12 @@ El archivo es un **payload JSON firmado** (JWS/Ed25519, §4). Ejemplo del payloa
 > **Nota (L0, 2026-07-04):** el payload **no lleva campo de algoritmo** (`signatureAlg` se eliminó del ejemplo
 > original): el algoritmo vive SOLO en la cabecera JWS y el **verificador lo fija a EdDSA** — la cabecera del archivo
 > no se obedece, se valida (mitiga la confusión de algoritmo, RFC 8725 §3.1). Se agregaron al esquema `fingerprint`
-> (node-lock, capa 2) y los campos de **linaje** `renewalCounter`/`nonce` (capa 4; su flujo se construye en L4).
+> (node-lock, capa 2) y los campos de **linaje** `renewalCounter`/`nonce` (capa 4).
+>
+> **Nota (L4, 2026-07-05):** el linaje está ACTIVO. En una **activación**, `renewalCounter=0` y `nonce` es un
+> aleatorio inerte para el runtime. En una **renovación**, `renewalCounter = counter presentado + 1` y `nonce = el
+> nonce PRESENTADO` en la solicitud — el *binding* que hace la respuesta **importable UNA sola vez y solo en la
+> instalación que la pidió** (el nonce NUEVO lo genera la instalación LOCALMENTE al rotar y jamás viaja; ver §4.1).
 
 **Campos clave:**
 - `expiresAt` + `graceDays` → vencimiento y periodo de gracia (§5).
@@ -149,6 +156,37 @@ El archivo es un **payload JSON firmado** (JWS/Ed25519, §4). Ejemplo del payloa
   cuando haga falta, el verificador puede probar N públicas embebidas en orden — `verifyLicense` recibe el PEM por
   parámetro, así que es retrocompatible sin tocar el formato JWS (DECISIONS 2026-07-05 L3, decisión d).
 
+### 4.1 Renovación challenge-response con linaje rotatorio (✅ construida en L4)
+
+La renovación usa el **mismo baile por archivos** de la activación (air-gap intacto), con la capa 4 encima
+(LICENSING_STRATEGY §4, patrón CodeMeter, PoC T6). Piezas:
+
+- **Solicitud (lado producto):** mientras exista una licencia verificada, `LicenseService` deja/refresca
+  **`renovacion.lreq`** junto a `license.lic` (misma carpeta): `{ type:"renewal", installationId, fingerprint,
+  licenseId, renewalCounter, nonce }`. El `nonce` es el **linaje local** de `LicenseInstallation` — se genera en la
+  máquina (init perezosa la primera vez) y **jamás viaja** salvo dentro de esta solicitud. Se escribe SIEMPRE que hay
+  payload (no solo en POR_VENCER): un upgrade a mitad de ciclo usa la misma ceremonia. Idempotente entre re-evaluaciones.
+- **Emisión (lado emisor):** `pnpm license renew --request renovacion.lreq --expires <ISO>` — valida el linaje
+  **contra el ledger**: una renovación ya registrada para ese `installationId` con el MISMO counter presentado =
+  **dos solicitudes con el mismo linaje = CLON DETECTADO ⇒ SE DENIEGA** (exit ≠ 0) y se escala a humano; el override
+  explícito `--force-duplicate` queda **marcado en el ledger** (evidencia contractual). Un counter desfasado o un
+  `licenseId` que no calza también se deniegan; una huella distinta exige `--accept-new-fingerprint` (migración de
+  hardware legítima, auditada). Sin flags comerciales, `renew` **hereda los términos de la última emisión** del
+  ledger (mismo `licenseId`, misma edición/módulos/límites — cualquier flag = upgrade) y emite con
+  `renewalCounter = presentado + 1` y `nonce = presentado`. Reusa `issueLicense`/`signLicense` — cero criptografía nueva.
+- **Importación única (lado producto):** el helper puro **`evaluateLineage(payload, linajeLocal)`** (ADITIVO en L0;
+  `signLicense`/`verifyLicense`/`evaluateLicense` siguen congelados) da tres veredictos:
+  `CURRENT` (la licencia ya aceptada — incluye el caso retrocompatible counter 0 === 0: una licencia L3 sobre una
+  instalación que jamás renovó evalúa EXACTAMENTE como antes de L4), `ROTATE` (respuesta legítima vista por primera
+  vez ⇒ la app **rota su linaje**: persiste el counter y un nonce local FRESCO + `lastRenewalAt`, audita
+  `license.renewed`) y `MISMATCH` (⇒ **BLOQUEADA con reason `LINEAGE_MISMATCH`** — restringido, jamás destructivo).
+  Tras rotar, **ni la licencia anterior ni una respuesta re-importada calzan** en ninguna instalación. El chequeo es
+  DISTRIBUIDO: el worker re-verifica firma desde disco **y** contrasta el linaje con el mismo helper.
+- **Límite honesto (STRATEGY §4/§9):** un clon byte-a-byte es indistinguible hasta que los linajes divergen — la
+  PRIMERA respuesta tras el clonado calza en ambas copias. La detección de esa ronda es del **EMISOR** (linaje
+  repetido en el ledger); desde la siguiente renovación el clon ya no calza nunca más. Por eso el **ciclo corto**
+  (30–90 días) es el parámetro comercial que hace que la detección ocurra seguido (política en PROCEDURE §4).
+
 ---
 
 ## 5. Comportamiento en runtime (máquina de estados)
@@ -158,7 +196,7 @@ El archivo es un **payload JSON firmado** (JWS/Ed25519, §4). Ejemplo del payloa
 | **VÁLIDA** | Firma OK, vigente, dentro de límites | Funciona normal. |
 | **POR VENCER** | Faltan ≤ N días para `expiresAt` | Funciona normal + **banner de aviso** a administradores (y notificación). |
 | **EN GRACIA** | `expiresAt` pasó pero dentro de `graceDays` | Funciona + **aviso prominente** "licencia vencida, renovar en X días". No corta la operación (no dejar una planta a ciegas de golpe). |
-| **VENCIDA / BLOQUEADA** | Pasó la gracia, o firma inválida, o falta el archivo | **Modo restringido**: bloquea el ingreso de datos nuevos y las funciones premium; permite **solo lectura/exportación** para no secuestrar los datos del cliente. Mensaje claro de renovación. |
+| **VENCIDA / BLOQUEADA** | Pasó la gracia, o firma inválida, o falta el archivo, o el **linaje no calza** (`LINEAGE_MISMATCH`, L4: licencia anterior tras una renovación, respuesta re-importada o instalación clonada) | **Modo restringido**: bloquea el ingreso de datos nuevos y las funciones premium; permite **solo lectura/exportación** para no secuestrar los datos del cliente. Mensaje claro de renovación. |
 | **LÍMITE EXCEDIDO** | Supera `maxNodes`/`maxNamedUsers`/`maxInstallations` | Bloquea **crear** por encima del límite (no rompe lo existente); avisa al admin. |
 | **MÓDULO NO LICENCIADO** | Se usa un módulo fuera de `modules` | **✅ construido en L2:** las **MUTACIONES** del módulo se rechazan en el backend con `403 { code: "MODULE_NOT_LICENSED", module }`; la **lectura y exportación de sus datos SIGUEN disponibles** (GET pasa — jamás se secuestran datos, ni por downgrade de edición). La web además lo **oculta** (sidebar/Inicio/⌘K: visible = licenciado ∧ permiso). Aplica con la licencia OPERATIVA; es un eje distinto del permiso de usuario (ambos guards corren). |
 
@@ -241,10 +279,11 @@ campanita): **visible = módulo licenciado ∧ permiso del usuario**; el candado
 ## 6. Emisión y ciclo de vida (proceso ITESICWS)
 
 1. Se acuerda una instalación con el socio → generas `installationId` y emites `license.lic` con la
-   CLI (vencimiento = 1 año, `modules`/`limits` según edición comprada).
+   CLI (vencimiento según ciclo pactado, `modules`/`limits` según edición comprada).
 2. El socio la despliega (monta el archivo en el stack).
-3. **Renovación anual:** emites una licencia nueva con `expiresAt` +1 año (y ajustas banda/edición).
-   El socio la reemplaza; la app la toma en el próximo arranque o recarga.
+3. **Renovación (✅ real desde L4):** la instalación entrega su `renovacion.lreq` (con linaje) y emites con
+   `lyra-license renew` (valida el linaje contra el ledger — clon detectado se deniega; hereda los términos; ver
+   §4.1). El socio la reemplaza; la app la toma en el próximo arranque o recarga y **rota su linaje**.
 4. **Upgrade de edición/módulos:** nueva licencia con más `modules` o `limits`.
 5. **Baja:** no renuevas → la instalación entra en POR VENCER → GRACIA → BLOQUEADA (solo lectura).
 
@@ -289,6 +328,7 @@ chequeo. No se puede volver imposible al 100%, pero se encarece por capas:
 | Formato de licencia + firma/verificación (Ed25519, JWS) — **✅ hecho en L0 (`@lyra/licensing`)** | 15–25 |
 | CLI de emisión + custodia de clave privada — **✅ hecho en L3** (`@lyra/licensing-cli`: keygen/issue/inspect/ledger; privada PROD cifrada bajo custodia; pública PROD embebida por el release ⇒ imagen vendible; ledger hash-chain; CLI 22 tests + smoke-emisión 20/20) | 10–20 |
 | `LicenseService` + máquina de estados + caché + re-evaluación — **✅ hecho en L1** (+ guard global, señales estables bajo Docker, `LicenseInstallation`, auditoría, `solicitud.lreq`, licencia dev `pnpm license:dev`, smoke 28/28) | 20–35 |
+| Renovación challenge-response + linaje rotatorio (detección de clon) — **✅ hecho en L4** (`renovacion.lreq` + `lyra-license renew` + `evaluateLineage`/rotación/`LINEAGE_MISMATCH`; ciclo corto como política del runbook; smoke-renovación 29/29 — PoC T6 en vivo) | 10–20 |
 | Gating de módulos por entitlement (backend + web) — **✅ hecho en L2** (catálogo canónico en contracts, `@RequireModule`/guard 5.º, `GET /license/status` DTO delgado, ocultamiento sidebar/Inicio/⌘K, workers module-aware; smoke 23/23). La UI RICA de estado/avisos queda para L6 | 15–30 |
 | Enforcement de límites (nodos/usuarios/instalaciones) | 10–20 |
 | Empaquetado anti-tamper (bytecode/native del módulo crítico) | 10–30 |

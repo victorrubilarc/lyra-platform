@@ -47,7 +47,7 @@ describe("LicenseService", () => {
   let licPath: string;
   let audit: { record: ReturnType<typeof vi.fn> };
   let prisma: {
-    licenseInstallation: { upsert: ReturnType<typeof vi.fn> };
+    licenseInstallation: { upsert: ReturnType<typeof vi.fn>; update: ReturnType<typeof vi.fn> };
     orgNode: { count: ReturnType<typeof vi.fn> };
     user: { count: ReturnType<typeof vi.fn> };
   };
@@ -97,7 +97,13 @@ describe("LicenseService", () => {
     audit = { record: vi.fn(async () => undefined) };
     prisma = {
       licenseInstallation: {
-        upsert: vi.fn(async () => ({ id: "system", installationId: "inst_local_1" })),
+        upsert: vi.fn(async () => ({
+          id: "system",
+          installationId: "inst_local_1",
+          renewalCounter: 0,
+          nonce: null,
+        })),
+        update: vi.fn(async () => ({})),
       },
       orgNode: { count: vi.fn(async () => 10) },
       user: { count: vi.fn(async () => 5) },
@@ -249,5 +255,122 @@ describe("LicenseService", () => {
     expect(prisma.licenseInstallation.upsert).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: "system" } }),
     );
+  });
+
+  describe("linaje rotatorio (L4)", () => {
+    function withLocalLineage(renewalCounter: number, nonce: string | null): void {
+      prisma.licenseInstallation.upsert = vi.fn(async () => ({
+        id: "system",
+        installationId: "inst_local_1",
+        renewalCounter,
+        nonce,
+      }));
+      service = build();
+    }
+
+    it("RETROCOMPATIBILIDAD: counter=0 sobre instalación que jamás renovó ⇒ VALIDA como antes de L4, sin rotación", async () => {
+      writeFileSync(licPath, signLicense(payload(), DEV_PRIVATE_KEY));
+      await boot(service);
+      expect(service.getEvaluation().status).toBe("VALIDA");
+      // Sin rotación ni auditoría de renovación; solo la init perezosa del nonce local.
+      expect(audit.record).not.toHaveBeenCalledWith(
+        expect.objectContaining({ action: "license.renewed" }),
+      );
+      const rotations = prisma.licenseInstallation.update.mock.calls.filter(
+        (call) => (call[0] as { data: Record<string, unknown> }).data.renewalCounter !== undefined,
+      );
+      expect(rotations).toHaveLength(0);
+    });
+
+    it("deja/refresca renovacion.lreq junto a la licencia, con el linaje LOCAL vigente (nonce inicializado perezoso)", async () => {
+      writeFileSync(licPath, signLicense(payload(), DEV_PRIVATE_KEY));
+      await boot(service);
+      const req = JSON.parse(readFileSync(join(dir, "renovacion.lreq"), "utf8"));
+      expect(req.type).toBe("renewal");
+      expect(req.installationId).toBe("inst_local_1");
+      expect(req.fingerprint).toBe(FINGERPRINT);
+      expect(req.licenseId).toBe("lic_test_001");
+      expect(req.renewalCounter).toBe(0);
+      expect(typeof req.nonce).toBe("string"); // nonce local, NO el del payload
+      // La init perezosa quedó persistida con ese mismo nonce.
+      expect(prisma.licenseInstallation.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { nonce: req.nonce } }),
+      );
+    });
+
+    it("renovación (counter+1 atada al nonce local): rota UNA vez, audita license.renewed y queda CURRENT", async () => {
+      withLocalLineage(0, "nonce-presentado");
+      writeFileSync(
+        licPath,
+        signLicense(payload({ renewalCounter: 1, nonce: "nonce-presentado" }), DEV_PRIVATE_KEY),
+      );
+      await boot(service);
+      expect(service.getEvaluation().status).toBe("VALIDA");
+
+      // Rotación persistida: counter emitido + nonce local FRESCO + lastRenewalAt.
+      const rotation = prisma.licenseInstallation.update.mock.calls.find(
+        (call) => (call[0] as { data: Record<string, unknown> }).data.renewalCounter === 1,
+      );
+      expect(rotation).toBeDefined();
+      const data = (rotation![0] as { data: Record<string, unknown> }).data;
+      expect(data.nonce).not.toBe("nonce-presentado");
+      expect(data.lastRenewalAt).toBeInstanceOf(Date);
+      expect(audit.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: "license.renewed",
+          before: { renewalCounter: 0 },
+          after: expect.objectContaining({ renewalCounter: 1, licenseId: "lic_test_001" }),
+        }),
+      );
+      // La solicitud nueva presenta el linaje ROTADO (counter=1, nonce fresco).
+      const req = JSON.parse(readFileSync(join(dir, "renovacion.lreq"), "utf8"));
+      expect(req.renewalCounter).toBe(1);
+      expect(req.nonce).toBe(data.nonce);
+
+      // Re-evaluación con la MISMA licencia: CURRENT, sin segunda rotación.
+      const updatesBefore = prisma.licenseInstallation.update.mock.calls.length;
+      await service.refresh("tick");
+      expect(service.getEvaluation().status).toBe("VALIDA");
+      expect(prisma.licenseInstallation.update.mock.calls.length).toBe(updatesBefore);
+    });
+
+    it("la licencia ANTERIOR (counter=0) tras haber rotado ⇒ BLOQUEADA LINEAGE_MISMATCH y el worker tampoco opera", async () => {
+      withLocalLineage(1, "nonce-fresco-local");
+      writeFileSync(licPath, signLicense(payload({ renewalCounter: 0 }), DEV_PRIVATE_KEY));
+      await boot(service);
+      const snap = service.getEvaluation();
+      expect(snap.status).toBe("BLOQUEADA");
+      expect(snap.reason).toBe("LINEAGE_MISMATCH");
+      expect(service.isModuleLicensed("incidents")).toBe(false); // sin payload aceptado
+      expect(await service.workersOperational("test")).toBe(false); // chequeo distribuido
+    });
+
+    it("una renovada (counter>0) movida a una instalación que jamás pidió renovar ⇒ BLOQUEADA (no calza)", async () => {
+      writeFileSync(
+        licPath,
+        signLicense(payload({ renewalCounter: 1, nonce: "nonce-de-otra" }), DEV_PRIVATE_KEY),
+      );
+      await boot(service);
+      expect(service.getEvaluation().status).toBe("BLOQUEADA");
+      expect(service.getEvaluation().reason).toBe("LINEAGE_MISMATCH");
+    });
+
+    it("NO rota si la evaluación la BLOQUEA (p. ej. huella ajena): el linaje no se quema en vano", async () => {
+      withLocalLineage(0, "nonce-presentado");
+      writeFileSync(
+        licPath,
+        signLicense(
+          payload({ renewalCounter: 1, nonce: "nonce-presentado", fingerprint: "huella-ajena" }),
+          DEV_PRIVATE_KEY,
+        ),
+      );
+      await boot(service);
+      expect(service.getEvaluation().status).toBe("BLOQUEADA");
+      expect(service.getEvaluation().reason).toBe("FINGERPRINT_MISMATCH");
+      const rotations = prisma.licenseInstallation.update.mock.calls.filter(
+        (call) => (call[0] as { data: Record<string, unknown> }).data.renewalCounter !== undefined,
+      );
+      expect(rotations).toHaveLength(0);
+    });
   });
 });

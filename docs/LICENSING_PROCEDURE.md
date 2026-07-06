@@ -6,14 +6,14 @@
 > la estrategia está en [`LICENSING_STRATEGY.md`](./LICENSING_STRATEGY.md); el **cómo técnico interno**
 > en [`LICENSING.md`](./LICENSING.md); el modelo comercial en [`estrategia-canal.md`](./estrategia-canal.md).
 >
-> Fecha: **2026-07-05**. Estado: **OPERATIVO para la primera emisión** — L0 (núcleo `@lyra/licensing`), **L1
-> (runtime en la API)**, L2 (gating por entitlement) y **L3 (emisión real)** están construidos: la app arranca en
-> PENDIENTE_DE_ACTIVACIÓN sin licencia, **genera `solicitud.lreq` sola** (§2 Fase B paso 2 = real), verifica
-> firma/huella, hace cumplir la máquina de estados, y **ITESICWS ya emite con `lyra-license`** (`pnpm license
-> keygen|issue|inspect|ledger` — §2 paso 4 y §5-bis = reales; primera emisión real: el EC2 demo). La imagen de
-> release **embebe la pública de PROD** desde el primer tag post-L3 (antes de eso, solo aceptaba licencias DEV).
-> Falta el challenge-response de renovación con linaje (L4), el anti-tamper (L5) y la UI de estado (L6).
-> Plan L0–L6 en `BACKLOG.md §2(1)`.
+> Fecha: **2026-07-05**. Estado: **OPERATIVO para emisión Y renovación** — L0 (núcleo `@lyra/licensing`), **L1
+> (runtime en la API)**, L2 (gating por entitlement), **L3 (emisión real)** y **L4 (renovación con linaje)** están
+> construidos: la app arranca en PENDIENTE_DE_ACTIVACIÓN sin licencia, **genera `solicitud.lreq` sola** (§2 Fase B
+> paso 2 = real), verifica firma/huella, hace cumplir la máquina de estados, **ITESICWS ya emite con `lyra-license`**
+> (`pnpm license keygen|issue|renew|inspect|ledger` — §2 paso 4 y §5-bis = reales; primera emisión real: el EC2 demo)
+> y la **renovación por archivos con detección de clon es REAL** (§4 = real: la app deja `renovacion.lreq` sola y
+> `renew` acusa el linaje repetido). La imagen de release **embebe la pública de PROD** desde el primer tag post-L3.
+> Falta el anti-tamper (L5) y la UI de estado (L6). Plan L0–L6 en `BACKLOG.md §2(1)`.
 
 ---
 
@@ -172,20 +172,53 @@ Ese campo es un tope *interno* de esa licencia; el control de "cuántas licencia
 
 ---
 
-## 4. Renovación (anual, o más corta para anti-clon)
+## 4. Renovación (✅ REAL desde L4 — anual, o más corta para anti-clon)
 
-Las licencias **vencen** y se renuevan con el **mismo baile** de solicitud→emisión→importación:
+Las licencias **vencen** y se renuevan con el **mismo baile** de solicitud→emisión→importación (por
+archivos; cero internet exigido en la planta):
 
-1. Antes del vencimiento, la app avisa (estado POR VENCER) a los admins.
-2. Se genera una **solicitud de renovación** que incluye el **linaje** de esa instalación (un contador
-   + un *nonce* que rota en cada renovación — ver `LICENSING_STRATEGY.md §4`).
-3. Tú emites la renovación (nuevo `expiresAt`), atada al linaje presentado.
-4. Se importa. Sigue operando.
+1. Antes del vencimiento, la app avisa (estado POR VENCER) a los admins (aviso rico en L6; hoy log +
+   auditoría + estado en `GET /license/status`).
+2. **La app ya generó la solicitud sola:** mientras haya licencia, `LicenseService` deja/refresca
+   **`renovacion.lreq`** junto a `license.lic` (misma carpeta `./license` del stack). Contiene el
+   **linaje** de esa instalación (`renewalCounter` + un *nonce* que rota en cada renovación — ver
+   `LICENSING_STRATEGY.md §4`) + huella + `licenseId`. Se lleva a ITESICWS igual que la activación
+   (portal o USB→web).
+3. **Tú emites la renovación** con la CLI y la custodia (§5-bis):
+   ```bash
+   pnpm license ledger                       # revisa el historial de esa instalación
+   pnpm license renew --request renovacion.lreq \
+     --expires 2026-10-05T00:00:00Z --out license.lic
+   ```
+   - **Sin flags comerciales HEREDA los términos de la última emisión** del ledger (mismo `licenseId`,
+     misma edición/módulos/límites). Cualquier flag explícito (`--modules`, `--edition`,
+     `--max-named-users`, …) = upgrade en la misma renovación.
+   - **Control anti-clon (deniega por defecto):** si el ledger ya registra una renovación de esa
+     instalación con el MISMO counter presentado ⇒ **`CLON DETECTADO`, no emite** (exit ≠ 0); lo mismo
+     con un counter desfasado o un `licenseId` que no calza. Investiga con el socio; si un humano lo
+     autoriza (p. ej. restore legítimo de respaldo), repite con `--force-duplicate` — la emisión queda
+     **marcada en el ledger** (`forcedDuplicate:true`, evidencia contractual).
+   - **Cambio de servidor/hardware:** la huella presentada difiere de la emitida ⇒ se niega salvo
+     `--accept-new-fingerprint` (migración legítima verificada; también queda auditado).
+4. **Se importa** (reemplaza `license.lic`): la app la acepta **una sola vez y solo en esa
+   instalación** (rota su linaje: counter nuevo + nonce fresco local + `lastRenewalAt`, auditado como
+   `license.renewed`). Desde ahí, ni la licencia anterior ni una copia de la respuesta calzan en
+   ninguna parte (`LINEAGE_MISMATCH` ⇒ BLOQUEADA = solo lectura + exportación). Sigue operando.
 
 **Por qué el linaje importa:** si el socio **clonó** la instalación para un segundo cliente, ambas
 copias tienen el mismo linaje. Cuando las dos pidan renovar, **verás dos solicitudes con el mismo
-linaje = sobre-despliegue detectado**, con evidencia. Las licencias cortas (ej. 90 días) hacen que esa
-detección ocurra seguido. Esto convierte el clon en algo **detectable y con rastro contractual**.
+linaje = sobre-despliegue detectado**, con evidencia. Y si una renueva primero, la otra queda con un
+linaje viejo que ya no calza. Honestidad (STRATEGY §9): el clon es indistinguible hasta la primera
+renovación — por eso el ciclo corto.
+
+**Política de ciclo (parámetro comercial por defecto, decisión (e) L4):**
+
+| Canal | `--expires` recomendado | Por qué |
+|---|---|---|
+| **Instalaciones vía socio de canal** | **90 días** | La detección del clon ocurre 4×/año (el linaje solo se contrasta AL RENOVAR); la renovación es un archivo por correo/USB, fricción mínima. |
+| Cliente directo / socio de confianza probada | Anual | Menos ceremonia; el riesgo de sobre-despliegue es menor y el contrato lo cubre. |
+
+El contrato puede pactar otra cosa; esto es el default documentado, no un límite del mecanismo.
 
 **Baja de un cliente:** simplemente **no renuevas**. La instalación entra en POR VENCER → GRACIA →
 SOLO-LECTURA. **Nunca se borran los datos** (el cliente puede exportar). Es un apagado gradual y ético,
@@ -304,10 +337,13 @@ imagen Docker** que se publica:
 - [ ] Registrar la emisión (quién, cuándo, qué instalación).
 - [ ] Importar `license.lic` en la instalación → VÁLIDA.
 
-**Renovar (anual o por ciclo corto):**
-- [ ] Solicitud de renovación con linaje.
-- [ ] Revisar que no haya **dos solicitudes con el mismo linaje** (señal de clon).
-- [ ] Emitir renovación → importar.
+**Renovar (anual o por ciclo corto — §4):**
+- [ ] Recibir `renovacion.lreq` de la instalación (la app lo mantiene junto a `license.lic`).
+- [ ] `pnpm license renew --request renovacion.lreq --expires <ISO> --out license.lic` — la CLI
+      **acusa sola** el linaje repetido/desfasado (señal de clon ⇒ NO emitir; investigar con el socio;
+      override humano `--force-duplicate` queda auditado) y hereda los términos del ledger.
+- [ ] Si cambió el hardware: verificar la migración y repetir con `--accept-new-fingerprint`.
+- [ ] Enviar `license.lic` → importar en la instalación → confirmar VALIDA (el linaje rota solo).
 
 **Publicar una versión nueva (una vez, en CI):**
 - [ ] Build con minificación + bytecode del módulo crítico.

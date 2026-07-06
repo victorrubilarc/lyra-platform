@@ -17,11 +17,18 @@ import type { LicenseStatus } from "@lyra/contracts";
 export const PENDING_ACTIVATION = "PENDIENTE_ACTIVACION" as const;
 export type LicenseRuntimeStatus = LicenseState | typeof PENDING_ACTIVATION;
 
-/** Motivo del estado runtime: los de evaluación/verificación de L0 + ausencia. */
+/**
+ * Motivo del estado runtime: los de evaluación/verificación de L0 + ausencia
+ * de archivo + linaje que no calza (L4: la respuesta de renovación solo se
+ * importa UNA vez y solo en la instalación que la pidió; una licencia cuyo
+ * linaje no corresponde al local ⇒ BLOQUEADA con este motivo — restringido,
+ * jamás destructivo).
+ */
 export type LicenseRuntimeReason =
   | EvaluationReason
   | VerifyFailureReason
-  | "LICENSE_FILE_MISSING";
+  | "LICENSE_FILE_MISSING"
+  | "LINEAGE_MISMATCH";
 
 /**
  * Estados en los que la instalación queda RESTRINGIDA: se bloquean las

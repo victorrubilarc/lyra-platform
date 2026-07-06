@@ -1,5 +1,39 @@
 # Progreso — Lyra WatchLog
 
+**2026-07-05 — 🔐 Licenciamiento L4 · challenge-response de RENOVACIÓN + linaje rotatorio (detección de clon) ✅**
+(`feat/licenciamiento-l4`). La capa 4 de la defensa (STRATEGY §4, patrón CodeMeter, **PoC T6 ahora EN VIVO**): la
+licencia se **renueva por archivos** (air-gap intacto) y el **clon de la instalación queda DETECTADO al renovar**.
+**(1) Solicitud (producto):** `LicenseService` deja/refresca **`renovacion.lreq`** junto a `license.lic` SIEMPRE que
+haya payload verificado (decisión a — upgrade a mitad de ciclo usa la misma ceremonia): `type:"renewal"` +
+`licenseId` + linaje local (`renewalCounter` + `nonce` de `LicenseInstallation`; **nonce inicializado perezoso y
+JAMÁS viaja** salvo en la solicitud — ni al front [L2c] ni a la auditoría); idempotente entre re-evaluaciones.
+**(2) Emisión:** comando dedicado **`lyra-license renew --request renovacion.lreq --expires <ISO>`** (decisión b):
+exige el ledger íntegro, **valida el linaje contra él** — renovación previa con el MISMO counter presentado ⇒
+**CLON DETECTADO, DENIEGA** (decisión c; cita la entrada del ledger como evidencia; override humano
+`--force-duplicate` queda MARCADO en la entrada), counter desfasado / licenseId ajeno también deniegan, huella
+distinta exige `--accept-new-fingerprint` (migración legítima auditada); **hereda los términos comerciales de la
+última emisión** (mismo licenseId — renovar = misma licencia con nuevo vencimiento; flags = upgrade); emite
+`counter=presentado+1` + `nonce=presentado` (el binding) reusando `issueLicense`/`signLicense` (cero criptografía
+nueva). **(3) Runtime (importación única):** helper puro **ADITIVO `evaluateLineage` en L0** (decisión d;
+congelados intactos) → `CURRENT` / `ROTATE` (primera importación: persiste counter + **nonce local FRESCO** +
+`lastRenewalAt`, audita `license.renewed`; NO rota si la evaluación bloquea) / `MISMATCH` ⇒ **BLOQUEADA con reason
+nuevo `LINEAGE_MISMATCH`** (solo lectura + exportación, jamás destructivo) — tras rotar, ni la licencia anterior ni
+una respuesta re-importada calzan; el **worker** re-verifica firma desde disco Y contrasta linaje (verificación
+distribuida, misma regla pura). **RETROCOMPAT DURA verificada:** counter=0 jamás renovada evalúa EXACTO como L3
+(el EC2 demo con `lic_2026_demo_ec2_001` no se tocó y sigue VALIDA). **(4) Ciclo corto = política documentada**
+(decisión e): 90 días vía canal / anual directo (PROCEDURE §4; la detección solo ocurre AL RENOVAR). **SIN
+migración** (columnas de linaje declaradas en L1) **ni permiso nuevo. Desviación registrada** (challenge-dont-please):
+el nonce NUEVO lo genera la instalación LOCALMENTE (PoC T6: "nunca sale de su máquina"), el payload lleva el
+PRESENTADO — cero campos nuevos ⇒ sin bump de schemaVersion. **Verde:** typecheck/lint/build/test (licensing **50**
+= +8 linaje real · CLI **38** = +16 · API **292** = +6 · contracts 513/web 11 intactos) + **smoke-licencia-renovacion.py
+29/29 NUEVO** (:3403, T6 en vivo: activación→renew con herencia→rotación → re-import viejo BLOQUEADA con lectura
+viva y DTO sin fugas → **clon acusado por el emisor** → force-duplicate marcado → ledger íntegro; snapshot/restore
+del linaje dev) + regresión **28/28 · 23/23 · 20/20**. **No probado:** renovación contra el EC2 demo en vivo
+(decisión f: v0.1.13 es pre-L4 — **prueba de fuego = renovar `lic_2026_demo_ec2_001` con el primer tag v0.1.14**,
+BACKLOG §2(1)); prompt interactivo de passphrase (flujos automatizados usan env). Decisiones a–f en DECISIONS
+2026-07-05 (L4). **Siguiente: Licenciamiento L6 (UI de estado/avisos) — propuesto antes que L5/L2b: el banner
+POR_VENCER es lo que hace OPERABLE la renovación L4 por un admin de planta.**
+
 **2026-07-05 — 🔐 Licenciamiento L3 · CLI de emisión + custodia de clave privada + pública PROD embebida ✅**
 (`feat/licenciamiento-l3`). ITESICWS ya **emite licencias reales** y la imagen de release **queda vendible**.
 **(1) `@lyra/licensing-cli`** (decisión a — `packages/licensing-cli`, privado, `pnpm license <cmd>`, JAMÁS en la

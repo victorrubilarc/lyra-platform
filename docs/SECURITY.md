@@ -529,6 +529,11 @@ GxP: MHRA Data Integrity 2018 / FDA DI Q&A (corrección tardía justificada + at
 ### 9.4 Anti-manipulación / antipirateo (honesto)
 - El módulo de licencia se empaqueta **anti-tamper** (bytecode V8 / binario nativo) y la verificación es **distribuida**
   (no un solo `if` desactivable). **No se entrega código fuente** al socio (imágenes compiladas, no repo).
+- **Detección de sobre-despliegue por linaje rotatorio** — **✅ implementada en L4 (2026-07-05):** la renovación
+  challenge-response por archivos ata cada respuesta al linaje presentado (counter + nonce de la instalación) ⇒
+  **importable UNA sola vez y solo en esa instalación**; el emisor deniega el linaje repetido (**clon detectado**,
+  con evidencia en el ledger append-only; override humano auditado). El nonce local jamás viaja ni se expone
+  (ni al front — decisión L2c — ni a la auditoría). Ver `LICENSING.md §4.1` y `LICENSING_PROCEDURE.md §4`.
 - **Verdad explícita:** ningún candado en máquina ajena es inviolable ⇒ es **disuasión por capas + dependencia de
   updates/soporte**, no una bóveda (ver `LICENSING.md §7`). La firma asimétrica sí cierra el frente de **falsificar
   licencias** (el socio no tiene la clave privada).

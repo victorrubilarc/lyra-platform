@@ -7,10 +7,13 @@ import { SchedulerRegistry } from "@nestjs/schedule";
 import {
   deriveFingerprint,
   evaluateLicense,
+  evaluateLineage,
   isModuleLicensed,
+  LicenseState,
   verifyLicense,
   type LicenseActuals,
   type LicensePayload,
+  type LocalLineage,
 } from "@lyra/licensing";
 import type { LicensedModuleKey } from "@lyra/contracts";
 import type { Env } from "../config/env.schema";
@@ -27,6 +30,8 @@ import {
 const RECHECK_INTERVAL_NAME = "license-recheck";
 /** Nombre del archivo de solicitud de activación (runbook LICENSING_PROCEDURE §2). */
 const REQUEST_FILE_NAME = "solicitud.lreq";
+/** Nombre del archivo de solicitud de RENOVACIÓN con linaje (L4, runbook §4). */
+const RENEWAL_REQUEST_FILE_NAME = "renovacion.lreq";
 
 /**
  * Runtime de la licencia en la API (Licenciamiento L1). Al ARRANQUE y luego
@@ -53,6 +58,13 @@ export class LicenseService implements OnApplicationBootstrap {
   private payload?: LicensePayload;
   private fingerprint = "";
   private installationId = "";
+  /**
+   * Linaje rotatorio local (L4, espejo en memoria de `LicenseInstallation`):
+   * el nonce vigente se genera AQUÍ y jamás viaja hasta la próxima
+   * `renovacion.lreq`. Se contrasta contra el linaje del payload en cada
+   * evaluación y en el chequeo distribuido del worker.
+   */
+  private localLineage: LocalLineage = { renewalCounter: 0, nonce: null };
   /** Para loguear una sola vez cada transición del chequeo de los workers. */
   private workersWereOperational?: boolean;
 
@@ -133,7 +145,11 @@ export class LicenseService implements OnApplicationBootstrap {
       const raw = await this.readLicenseFile();
       if (raw !== undefined) {
         const verified = verifyLicense(raw, LICENSE_PUBLIC_KEY_PEM);
-        if (verified.ok) {
+        // El linaje también participa del chequeo distribuido (L4): una
+        // licencia cuyo linaje no calza (respuesta re-importada / clon que
+        // quedó atrás) no habilita trabajo de fondo. MISMA regla pura que la
+        // evaluación principal (`evaluateLineage`), segunda ruta de código.
+        if (verified.ok && evaluateLineage(verified.payload, this.localLineage) !== "MISMATCH") {
           const evaluation = evaluateLicense(verified.payload, {
             now: this.clock(),
             fingerprint: this.fingerprint,
@@ -230,6 +246,24 @@ export class LicenseService implements OnApplicationBootstrap {
       return { ...base, status: "BLOQUEADA", reason: verified.reason };
     }
 
+    // --- Linaje rotatorio (L4): la respuesta de renovación solo calza UNA vez
+    // --- y solo aquí. Una licencia counter=0 sobre una instalación que jamás
+    // --- renovó da CURRENT y evalúa EXACTAMENTE como antes de L4.
+    const lineage = evaluateLineage(verified.payload, this.localLineage);
+    if (lineage === "MISMATCH") {
+      this.payload = undefined;
+      this.logger.error(
+        `Licencia con LINAJE que no calza (payload counter=${verified.payload.renewalCounter}, ` +
+          `local counter=${this.localLineage.renewalCounter}): licencia anterior tras una ` +
+          "renovación, respuesta re-importada o instalación clonada. BLOQUEADA (solo lectura + " +
+          "exportación; los datos no se tocan). Genere la renovación con la solicitud vigente.",
+      );
+      // Camino de escalamiento: la solicitud con el linaje LOCAL vigente queda
+      // disponible igual — al presentarla, el emisor ve el desfase y resuelve.
+      await this.writeRenewalRequest(verified.payload.licenseId);
+      return { ...base, status: "BLOQUEADA", reason: "LINEAGE_MISMATCH" };
+    }
+
     this.payload = verified.payload;
     const evaluation = evaluateLicense(verified.payload, {
       now: this.clock(),
@@ -237,6 +271,12 @@ export class LicenseService implements OnApplicationBootstrap {
       actuals: await this.collectActuals(),
       warnDays: this.config.get("LICENSE_WARN_DAYS", { infer: true }),
     });
+    if (lineage === "ROTATE" && evaluation.state !== LicenseState.BLOQUEADA) {
+      // Primera importación de una renovación legítima: rotar el linaje local.
+      // (Si la evaluación la BLOQUEA — p. ej. huella ajena — NO se rota.)
+      await this.rotateLineage(verified.payload);
+    }
+    await this.writeRenewalRequest(verified.payload.licenseId);
     return {
       ...base,
       status: evaluation.state,
@@ -277,6 +317,53 @@ export class LicenseService implements OnApplicationBootstrap {
       create: { id: "system", installationId: `inst_${randomUUID()}` },
     });
     this.installationId = row.installationId;
+    this.localLineage = {
+      renewalCounter: row.renewalCounter ?? 0,
+      nonce: row.nonce ?? null,
+    };
+  }
+
+  /**
+   * Rota el linaje local al aceptar por PRIMERA vez una renovación (L4):
+   * persiste el counter emitido, un nonce local FRESCO (jamás viaja hasta la
+   * próxima solicitud) y `lastRenewalAt`. Desde aquí, ni la licencia anterior
+   * ni una re-importación de esta respuesta calzan en ninguna instalación.
+   */
+  private async rotateLineage(payload: LicensePayload): Promise<void> {
+    const previousCounter = this.localLineage.renewalCounter;
+    const freshNonce = randomUUID();
+    try {
+      await this.prisma.licenseInstallation.update({
+        where: { id: "system" },
+        data: {
+          renewalCounter: payload.renewalCounter,
+          nonce: freshNonce,
+          lastRenewalAt: this.clock(),
+        },
+      });
+    } catch (err) {
+      // Sin BD no se rota: ROTATE es re-aplicable en la próxima evaluación.
+      this.logger.error(`No se pudo rotar el linaje local: ${String(err)}`);
+      return;
+    }
+    this.localLineage = { renewalCounter: payload.renewalCounter, nonce: freshNonce };
+    this.logger.log(
+      `Renovación importada: linaje rotado (counter ${previousCounter} → ` +
+        `${payload.renewalCounter}). La respuesta ya no es importable en otra instalación.`,
+    );
+    // El nonce JAMÁS se audita ni se expone (mínimo privilegio, decisión L2c).
+    await this.audit.record({
+      action: "license.renewed",
+      actorEmail: "system@license",
+      entityType: "LicenseInstallation",
+      entityId: this.installationId,
+      before: { renewalCounter: previousCounter },
+      after: {
+        renewalCounter: payload.renewalCounter,
+        licenseId: payload.licenseId,
+        expiresAt: payload.expiresAt,
+      },
+    });
   }
 
   /**
@@ -331,6 +418,61 @@ export class LicenseService implements OnApplicationBootstrap {
       this.logger.log(`Solicitud de activación escrita en ${path} (llevar al emisor).`);
     } catch (err) {
       this.logger.error(`No se pudo escribir la solicitud de activación: ${String(err)}`);
+    }
+  }
+
+  /**
+   * Mientras exista una licencia verificada, deja/refresca `renovacion.lreq`
+   * junto a ella (L4, runbook §4): la mitad "challenge" de la renovación por
+   * archivos. Presenta el LINAJE local vigente (counter + nonce) + huella +
+   * licenseId — el emisor lo contrasta con su ledger (clon = linaje repetido).
+   * Se escribe SIEMPRE que haya payload (decisión (a) L4): así un upgrade a
+   * mitad de ciclo usa la misma ceremonia. Idempotente entre re-evaluaciones
+   * (solo reescribe si cambió algo más que la fecha). Nunca lanza.
+   */
+  private async writeRenewalRequest(licenseId: string): Promise<void> {
+    try {
+      if (this.localLineage.nonce === null) {
+        // Primer uso del linaje (instalaciones activadas antes de L4): se
+        // inicializa el nonce local de forma perezosa y se persiste.
+        const nonce = randomUUID();
+        await this.prisma.licenseInstallation.update({
+          where: { id: "system" },
+          data: { nonce },
+        });
+        this.localLineage = { ...this.localLineage, nonce };
+      }
+      const path = join(dirname(this.licenseFilePath()), RENEWAL_REQUEST_FILE_NAME);
+      const body = {
+        product: "lyra-watchlog",
+        schemaVersion: 1,
+        type: "renewal" as const,
+        installationId: this.installationId,
+        fingerprint: this.fingerprint,
+        licenseId,
+        renewalCounter: this.localLineage.renewalCounter,
+        nonce: this.localLineage.nonce,
+        generatedAt: this.clock().toISOString(),
+      };
+      try {
+        const existing = JSON.parse(await readFile(path, "utf8")) as Record<string, unknown>;
+        const unchanged =
+          existing.installationId === body.installationId &&
+          existing.fingerprint === body.fingerprint &&
+          existing.licenseId === body.licenseId &&
+          existing.renewalCounter === body.renewalCounter &&
+          existing.nonce === body.nonce;
+        if (unchanged) return;
+      } catch {
+        // no existe o ilegible: se escribe abajo
+      }
+      await mkdir(dirname(path), { recursive: true });
+      await writeFile(path, JSON.stringify(body, null, 2), "utf8");
+      this.logger.log(
+        `Solicitud de renovación escrita en ${path} (linaje counter=${body.renewalCounter}).`,
+      );
+    } catch (err) {
+      this.logger.error(`No se pudo escribir la solicitud de renovación: ${String(err)}`);
     }
   }
 

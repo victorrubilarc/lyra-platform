@@ -20,16 +20,26 @@ export {
   type IssueParams,
   type IssuedLicense,
 } from "./issue.js";
+export { renewLicense, type RenewParams, type RenewedLicense } from "./renew.js";
 export { inspectLicense, type InspectResult } from "./inspect.js";
 export {
   appendLedgerEntry,
+  findDuplicateLineage,
+  lastEntryForInstallation,
   readLedger,
   summarizeByPartner,
   verifyLedgerChain,
   type LedgerEntry,
   type LedgerEntryInput,
 } from "./ledger.js";
-export { parseActivationRequest, readActivationRequest, type ActivationRequest } from "./request.js";
+export {
+  parseActivationRequest,
+  parseRenewalRequest,
+  readActivationRequest,
+  readRenewalRequest,
+  type ActivationRequest,
+  type RenewalRequest,
+} from "./request.js";
 export {
   LICENSE_HOME_ENV,
   PASSPHRASE_ENV,
