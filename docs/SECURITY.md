@@ -616,6 +616,12 @@ GxP: MHRA Data Integrity 2018 / FDA DI Q&A (corrección tardía justificada + at
   `INTEGRITY_MISMATCH`**, restringido = solo lectura + exportación, jamás destructivo, auditado). El horneado ocurre
   **una vez por versión en el build de imagen** (Dockerfile.api; dev/ci.yml no lo corren). **No se entrega código
   fuente** al socio (imágenes compiladas, no repo). Ver `LICENSING.md §7/§7.4`.
+  - **Corrección E2 (2026-07-07):** la verificación de empaquetado descubrió que la imagen **`migrate`** (construida
+    `FROM build` = `COPY . .`) cargaba casi todo el monorepo en claro (frontend `watchlog-web/src`, `packages/*/src`,
+    scripts de licencia con la llave DEV, docs, prototipo) — la de `api` solo 13 `.ts` de seeds. Se **podó el stage
+    `migrate`** a lo mínimo del seed/migración y se limpiaron los `prisma/*.ts` del `api` (v0.1.18). El backend api
+    `src/` y la clave privada de PRODUCCIÓN nunca estuvieron en las imágenes. Verificado: **0 fuente Lyra fuera de
+    `node_modules`** en ambas imágenes tras la corrección.
 - **Detección de sobre-despliegue por linaje rotatorio** — **✅ implementada en L4 (2026-07-05):** la renovación
   challenge-response por archivos ata cada respuesta al linaje presentado (counter + nonce de la instalación) ⇒
   **importable UNA sola vez y solo en esa instalación**; el emisor deniega el linaje repetido (**clon detectado**,
@@ -629,6 +635,19 @@ GxP: MHRA Data Integrity 2018 / FDA DI Q&A (corrección tardía justificada + at
 Que un **cliente o su auditor de seguridad** pueda comprobar, sin confiar a ciegas: (a) que la imagen que corre **vino
 de ITESICWS y no fue alterada** (firma + digest), (b) **qué contiene** (SBOM) y que fue **escaneada**, (c) que sus
 **datos y secretos** están cifrados y aislados, y (d) que la **licencia** no puede secuestrar ni borrar sus datos.
+
+### 9.6 Paquete de instalación OFFLINE (E2 — ✅ 2026-07-07)
+Entregable para planta **air-gapped** vía socio de canal: un único `.tar.gz` autocontenido (`scripts/make-bundle.sh`;
+job `bundle` de `release.yml` lo adjunta al GitHub Release). Guía de operación en `docs/INSTALL_OFFLINE.md`.
+- **Sin `git clone` / sin GHCR en planta:** imágenes por `docker save` (nombre **neutro** `lyra-watchlog-*`, sin owner
+  GHCR — marca blanca) + infra (postgres/redis/minio/caddy). El host de la planta nunca contacta un registro.
+- **Sin fuga de fuente:** imágenes con bundle sellado L5 y `src/` borrado (§9.4 + corrección E2 del stage `migrate`).
+  El paquete **no** incluye el repositorio. Verificado: 0 fuente Lyra fuera de `node_modules`.
+- **Integridad por SHA256:** `SHA256SUMS` cubre todo el contenido; `install.sh` lo verifica **antes** de `docker load`.
+  El Release publica el hash del `.tar.gz` para verificar la descarga. Firma cosign = H2/E3 (aún no).
+- **Secretos generados en el host:** `install.sh` (idempotente) genera BD/JWT/cifrado con `openssl`, `.env` `chmod 600`,
+  sin rotarlos en re-ejecuciones; el operador solo completa dominio + modo de borde. No crea usuarios (eso es `/setup`).
+- **Reporte de vulnerabilidades adjunto:** Trivy de las imágenes en `SECURITY/` del paquete (`scripts/scan-images.sh`).
 
 ## Estado
 - **Fase 0:** cabeceras (Helmet) y validación de entorno activas.

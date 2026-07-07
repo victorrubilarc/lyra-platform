@@ -3543,6 +3543,32 @@ Iteración de inspección visual del dueño del producto sobre la pantalla fisca
   reopen exige MFA → cerrar 201 / reabrir sin creds 401 / con password sin MFA 400); historial con `mfaVerified=false`;
   periodKey preservado; limpieza (0 períodos). **Pendiente**: smoke VISUAL del usuario (en curso).
 
+## Hecho en E2 — Paquete instalable AIR-GAPPED (2026-07-07, `feat/e2-paquete-instalable`)
+Sub-épico "software a prueba de balas" §2(5)/§2(6), desbloqueado por H1. Produce el ENTREGABLE de canal: un `.tar.gz`
+offline autocontenido que el socio lleva por USB a una planta sin internet, SIN `git clone` (que entregaba el repo
+completo) y SIN GHCR en planta. Decisiones (a)–(h) en DECISIONS 2026-07-07.
+- **`scripts/make-bundle.sh`** — retag NEUTRO (`lyra-watchlog-*:<tag>`, sin owner GHCR = marca blanca) + `docker save`
+  de app + infra (postgres/redis/minio/caddy) + compose standalone + `install.sh` + guía + reporte Trivy + `SHA256SUMS`
+  → un `.tar.gz`. Corre en local y como job `bundle` de `release.yml` (adjunta el paquete al GitHub Release del tag).
+- **`deploy/standalone/install.sh`** — instalador OFFLINE idempotente: verifica `SHA256SUMS` → `docker load` → genera
+  `.env` con secretos openssl (`chmod 600`, NO rota en re-ejecución) → `up` por modo de borde (a/b) → espera healthcheck
+  → guía licencia + `/setup`. No crea usuarios ni imprime secretos.
+- **`deploy/standalone/.env.standalone.example`** + `WL_IMAGE_PREFIX` en el compose standalone (vacío = air-gap neutro).
+- **Trivy** (`scripts/scan-images.sh` vía `aquasec/trivy`) sobre v0.1.17 + infra → reporte clasificado en el paquete
+  `SECURITY/`. Hallazgos = solo imagen BASE (perl/zlib fix_deferred, Go stdlib, `minio:latest` 6 CRÍT) — anotados en
+  BACKLOG H2 (E2 mide; H2 arregla + gatea). Ningún crítico es código de app.
+- **`docs/INSTALL_OFFLINE.md`** — guía del socio/cliente (requisitos, instalación offline, modos de borde, licencia,
+  `/setup`, verificación, actualización offline, backup/restore, seguridad del paquete).
+- **🔴 Fuga de fuente corregida (hallazgo de la verificación):** la imagen `migrate` (`FROM build` = `COPY . .`) cargaba
+  frontend `watchlog-web/src` + `packages/*/src` + scripts de licencia (llave DEV) + docs en claro. Se **podó el stage
+  `migrate`** a lo mínimo del seed (solo `@lyra/contracts` + prisma seeds) y se limpiaron los `prisma/*.ts` del `api`.
+  Verificado en imágenes reconstruidas: **0 fuente Lyra fuera de `node_modules`** en `api`; en `migrate` solo prisma
+  seeds (payload legítimo) + `@lyra/contracts` `.d.ts`. Backend api `src/` y clave privada de PROD nunca estuvieron.
+  Requirió **tag v0.1.18** (reabrió (g) con OK del dueño).
+- **Verificación:** bundle real generado (1 GB), extraído en dir limpio, `SHA256SUMS` OK, `docker load` OK, 0 `.ts` en
+  el árbol del paquete; `install.sh` probado end-to-end (genera .env → exige sitio → up → migrate/seed → healthcheck →
+  idempotente). Prueba contra VM air-gapped REAL = la hace el dueño.
+
 ## Próximo paso
 **Fase 2.7.1.1 (núcleo + afinamiento UX) completa y publicada.** **Sesión siguiente: 2.7.2 — Ventana de edición configurable (#6)**: por plantilla
 (fallback global) `{ancla RECORDED|EFFECTIVE, duración}`; fuera de ventana solo privilegio explícito con motivo

@@ -212,6 +212,15 @@ depender de Let's Encrypt), o autónomo. Matriz de puertos lista para entregar a
 **Beneficio:** el cuestionario de proveedor y la revisión de arquitectura **se responden con
 evidencia**, no con promesas — menos fricción para entrar a faena.
 
+### 📦 Instalable OFFLINE, sin exponer el código, verificable (2026-07)
+Se entrega como **un solo paquete** que se copia por USB a una planta **sin internet** y se instala con
+**un comando** — sin clonar repositorios, sin descargar imágenes desde un registro externo. El paquete
+**no contiene el código fuente** (viaja compilado y sellado) y su integridad se **verifica por hash**
+antes de instalar; incluye el **reporte de vulnerabilidades** de sus componentes para el auditor del
+cliente. El instalador **genera los secretos** en el propio host (nada de contraseñas de fábrica) y es
+**re-ejecutable** sin riesgo. **Beneficio:** el socio de canal instala en faena **sin internet y sin ver
+el código**, y el cliente recibe un artefacto **auditable** — encaja con air-gap y con marca blanca.
+
 ### 🔔 Avisos por correo
 Notificaciones configurables (p. ej. rondas vencidas, vencimientos de flujo) con plantillas propias.
 **Beneficio:** lo importante **llega a quien corresponde** sin depender de que alguien "mire la pantalla".
