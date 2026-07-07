@@ -19,8 +19,9 @@
 | Formularios | React Hook Form + **Zod** | Zod se comparte con el backend como contrato de validación. |
 | Auth | Local (Argon2id, refresh rotativo, MFA TOTP) **tras abstracción enchufable** | Ranura OIDC (Azure/Entra, Google…) y LDAP por configuración por despliegue. Ver `SECURITY.md`. |
 | IA | Interfaz `LlmProvider` abstracta (backend) | Nube (Anthropic/OpenAI/Gemini/Deepseek) o local (Ollama/vLLM). Nunca desde el frontend. |
-| Contenedores | Docker multi-stage + Compose (dev/prod) · **Caddy** (TLS auto) | Portabilidad on-premise. |
-| Evidencias | **MinIO** (S3-compatible) | Firmas, fotos y adjuntos fuera de la BD. |
+| Contenedores | Docker multi-stage + Compose (dev/prod) · **Caddy interno** (SPA + proxy `/api`, no expuesto) · **borde DESACOPLABLE en 3 modos** (H1: detrás del proxy del cliente / borde propio con cert corporativo sin ACME / compartido del demo — `deploy/standalone/`) | Portabilidad on-premise + planta air-gapped con PKI corporativa. Ver `DEPLOYMENT.md`. |
+| Evidencias | **MinIO** (S3-compatible), **100 % interno**: subida Y descarga PROXIED por la API (H1 2026-07-07 — el navegador jamás lo alcanza; sin URLs presigned) | Firmas, fotos y adjuntos fuera de la BD; superficie de red = solo el borde. |
+| Fuentes web | **Self-hosted** (`@fontsource` woff2, H1) | Cero egress del navegador (air-gap/SOC); mismos pesos Sora/Inter. |
 | Monorepo | **pnpm workspaces** (sin Turborepo por ahora) | Simplicidad; se reevalúa Turborepo si el repo crece. |
 | Calidad | ESLint + Prettier + tsconfig estrictos · Vitest | Config compartida en `packages/config`. |
 

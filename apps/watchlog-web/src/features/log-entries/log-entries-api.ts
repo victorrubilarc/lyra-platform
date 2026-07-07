@@ -1,6 +1,5 @@
 import { z } from "zod";
 import {
-  attachmentDownloadResponseSchema,
   createLogEntryRequestSchema,
   executeTransitionRequestSchema,
   fileDescriptorSchema,
@@ -12,7 +11,6 @@ import {
   templateEligibleNodesSchema,
   templateListItemSchema,
   voidLogEntryRequestSchema,
-  type AttachmentDownloadResponse,
   type CreateLogEntryRequest,
   type ExecuteTransitionRequest,
   type FileDescriptor,
@@ -26,7 +24,7 @@ import {
   type TemplateListItem,
   type VoidLogEntryRequest,
 } from "@lyra/contracts";
-import { apiJson, apiUpload } from "../../lib/api-client.js";
+import { apiBlob, apiJson, apiUpload } from "../../lib/api-client.js";
 
 /**
  * Sube un archivo de EVIDENCIA a un campo ATTACHMENT (Ola 3). Subida PROXIED por
@@ -48,13 +46,21 @@ export function uploadAttachment(
   );
 }
 
-/** URL prefirmada de un adjunto (vida corta, ABAC de getDetail). `inline` la sirve
- *  para PREVISUALIZAR en el navegador (imagen/audio/video/PDF) en vez de descargar. */
-export function fetchAttachmentUrl(entryId: string, descriptorId: string, inline = false): Promise<AttachmentDownloadResponse> {
-  return apiJson(
-    `/log-entries/${entryId}/attachments/${encodeURIComponent(descriptorId)}/url${inline ? "?inline=1" : ""}`,
-    attachmentDownloadResponseSchema,
+/**
+ * Descarga un adjunto PROXIED por la API (H1 2026-07-07: fetch autenticado con
+ * Bearer → blob → object URL; el navegador jamás toca MinIO ni viajan tokens en
+ * la URL). `inline` pide disposición de previsualización (la API solo la honra
+ * para tipos inline-safe). El llamador debe `URL.revokeObjectURL` al terminar.
+ */
+export async function fetchAttachmentObjectUrl(
+  entryId: string,
+  descriptorId: string,
+  inline = false,
+): Promise<{ url: string }> {
+  const blob = await apiBlob(
+    `/log-entries/${entryId}/attachments/${encodeURIComponent(descriptorId)}${inline ? "?inline=1" : ""}`,
   );
+  return { url: URL.createObjectURL(blob) };
 }
 
 /**

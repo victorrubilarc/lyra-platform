@@ -1,0 +1,147 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Lyra WatchLog — stack de producción STANDALONE para planta/cliente (H1
+# 2026-07-07). Es el compose BASE, auto-contenido y SIN BORDE: ningún servicio
+# publica puertos (para un escaneo de red los servicios internos NO EXISTEN,
+# no es que estén "cerrados"). El borde se elige con UN override según lo que
+# la planta tenga (matriz de puertos en README.md / docs/DEPLOYMENT.md):
+#
+#   modo (a) — detrás del proxy DEL CLIENTE (F5/NetScaler/NGINX/IIS termina TLS):
+#     docker compose -f docker-compose.yml -f mode-a.behind-proxy.yml up -d
+#     → watchlog-web queda en 127.0.0.1:${EDGE_LOCAL_PORT} (loopback, no sale del host)
+#
+#   modo (b) — borde PROPIO con certificado corporativo (sin ACME, air-gap ok):
+#     docker compose -f docker-compose.yml -f mode-b.own-edge.yml up -d
+#     → solo 443/tcp queda LISTEN (edge/Caddyfile.edge + certs/ montados)
+#
+#   modo (c) — borde compartido del demo: usa deploy/docker-compose.prod.yml
+#     (red externa `edge` de ruta-bus), NO este compose.
+#
+# El compose del demo (deploy/docker-compose.prod.yml) queda INTACTO; este
+# stack es el que se entrega a clientes. Deuda anotada (BACKLOG): unificarlos
+# cuando el empaquetado (make-bundle) absorba el del demo.
+# ─────────────────────────────────────────────────────────────────────────────
+name: lyra-watchlog
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    # Topes de memoria = techos de cgroup (no reservas): si un servicio se fuga,
+    # el kernel OOM-mata SOLO su contenedor y el resto del host no lo siente.
+    mem_limit: 512m
+    mem_reservation: 256m
+    environment:
+      POSTGRES_USER: "${POSTGRES_USER}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      POSTGRES_DB: "${POSTGRES_DB}"
+      TZ: "${TZ:-America/Santiago}"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [internal]
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # 384m (no 256m): el --maxmemory interno ya es 256mb; el fork del bgsave
+    # (appendonly) necesita aire por encima.
+    mem_limit: 384m
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [internal]
+
+  # MinIO es 100 % INTERNO: la subida Y la descarga de adjuntos van proxied por
+  # la API (H1) — el navegador jamás lo alcanza; ni console ni S3 se publican.
+  # TODO(H2): pin a versión fija/digest (tag mutable = hallazgo de reproducibilidad).
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    mem_limit: 384m
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: "${MINIO_ROOT_USER}"
+      MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD}"
+    volumes:
+      - miniodata:/data
+    networks: [internal]
+
+  # Init container: migraciones (migrate deploy) + seed de CATÁLOGO en cada
+  # deploy (idempotente; JAMÁS crea usuarios — el primer admin lo crea el
+  # asistente /setup con su token; ver docs/DEPLOYMENT.md).
+  migrate:
+    image: ${WL_REGISTRY:-ghcr.io}/${WL_OWNER}/lyra-watchlog-migrate:${WL_VERSION:-stable}
+    restart: "no"
+    mem_limit: 512m
+    env_file: .env
+    environment:
+      NODE_ENV: "production"
+      TZ: "${TZ:-America/Santiago}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [internal]
+
+  api:
+    image: ${WL_REGISTRY:-ghcr.io}/${WL_OWNER}/lyra-watchlog-api:${WL_VERSION:-stable}
+    restart: unless-stopped
+    mem_limit: 512m
+    env_file: .env
+    environment:
+      NODE_ENV: "production"
+      API_PORT: "3000"
+      # V8 hace GC antes del tope del cgroup (el OOM-kill de cgroup es SIGKILL).
+      NODE_OPTIONS: "--max-old-space-size=384"
+      TZ: "${TZ:-America/Santiago}"
+      LICENSE_FILE: "/app/license/license.lic"
+    volumes:
+      # Huella node-lock (L1): el machine-id del HOST, no el del contenedor.
+      - /etc/machine-id:/etc/machine-id:ro
+      # Carpeta de licencia (rw): license.lic importado + solicitud.lreq de la
+      # ceremonia de activación air-gapped.
+      - ./license:/app/license
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks: [internal]
+
+  # Caddy INTERNO (decisión 2026-07-07: se mantiene — Go memory-safe, config de
+  # 15 líneas, NO expuesto): sirve la SPA + proxea /api → api:3000, HTTP :80 en
+  # la red interna. El TLS lo pone el BORDE del modo elegido, nunca este servicio.
+  watchlog-web:
+    image: ${WL_REGISTRY:-ghcr.io}/${WL_OWNER}/lyra-watchlog-web:${WL_VERSION:-stable}
+    restart: unless-stopped
+    mem_limit: 128m
+    environment:
+      SITE_ADDRESS: ":80"
+      TZ: "${TZ:-America/Santiago}"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks: [internal]
+
+volumes:
+  pgdata:
+  redisdata:
+  miniodata:
+
+networks:
+  # Red privada del stack: SOLO los servicios de WatchLog se ven entre sí.
+  internal: {}

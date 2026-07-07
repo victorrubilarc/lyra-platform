@@ -4,6 +4,44 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-07 · H1 "planta restrictiva ready" — decisiones (a)–(g) aprobadas por el dueño antes de codificar
+Sesión `feat/hardening-h1-planta-restrictiva` (Tanda A del sub-épico "a prueba de balas", BACKLOG §2(5)). Cierra los
+P1/P2 de aplicación y host del pre-pentest v0.1.16. Hallazgos NUEVOS de la investigación, sumados al alcance con OK:
+la SPA **no tenía CSP** (helmet solo cubre `/api`) · `req.ip` era la IP del Caddy interno (**sin `trustProxy`** ⇒ el
+rate limit por IP habría contado a toda la planta como una sola Y la auditoría registraba la IP equivocada) · la web
+autentica por header Bearer ⇒ la descarga proxied va por fetch → blob (no `window.open` a la API).
+- **(a) La URL presigned se RETIRA por completo (sin fallback):** muere `presignedGetUrl` (StorageService/MinIO), el
+  endpoint `/url` y el schema del contrato. Un fallback mantendría vivo un camino roto-en-prod y la única razón para
+  exponer MinIO. Nuevo `getObject` streaming + `GET :id/attachments/:descriptorId` con la MISMA ABAC/auditoría;
+  `MINIO_PRESIGN_TTL` retirado del env. La web usa fetch autenticado → blob → object URL (sin tokens en URLs, ASVS V3).
+  **MinIO queda 100 % interno por construcción.**
+- **(b) Rate limiting:** `@nestjs/throttler` + Redis; `default` 300/60 s por IP + estrictos por ruta vía `skipIf`
+  (los límites vienen del env — los decoradores se evalúan antes de que ConfigModule cargue el .env): auth 10/60 s ·
+  públicos 30/60 s · subida 30/300 s; todo configurable (`THROTTLE_*`). **Exentos: salud** (Docker/update.sh sondean
+  cada 2 s ⇒ un 429 = rollback falso) **y los 2 SSE** (conexión larga; reconexión en ráfaga tras reinicio).
+  `Retry-After` ESTÁNDAR vía guard propio (el paquete lo sufija `Retry-After-<name>` en los no-default, no estándar).
+  Pre-requisito cumplido: `trustProxy: true` en Fastify.
+- **(c) Magic bytes:** helper compartido `storage/content-sniff.ts` (extraído del branding S3 y ampliado). Ejecutables
+  (PE/ELF/Mach-O) rechazados SIEMPRE; declarado imagen/PDF sin confirmación de bytes ⇒ 400; firma conocida ⇒ el
+  content-type EFECTIVO es el sniffeado (office zip-based conserva el declarado); **no-sniffables (csv/txt/office) se
+  aceptan por declarado pero JAMÁS inline** — la descarga proxied fuerza `attachment` + `nosniff` (OWASP File Upload:
+  esa es la mitigación real; restringirlos rompería evidencia legítima de terreno). SVG como evidencia: se acepta,
+  nunca inline (a diferencia del logo, que se sirve inline pre-auth y por eso lo rechaza).
+- **(d) Fuentes:** `@fontsource/sora` + `@fontsource/inter` (woff2, pesos idénticos 600/700/800 · 400/500/600) como
+  deps de la web — estándar Vite, versionado, licencia OFL incluida, procedencia verificable para el SBOM de H2; el
+  egress de build es el registry npm que el build ya usa. Descartado: commitear los woff2 (pierde versionado). CSP
+  nueva de la SPA en `Caddyfile.web` (font-src 'self'; sin `https:`).
+- **(e) Borde standalone = compose NUEVO en `deploy/standalone/`** (base auto-contenida sin `ports:` + 2
+  mini-overrides `mode-a.behind-proxy.yml` / `mode-b.own-edge.yml` + `edge/Caddyfile.edge` + variante NGINX de
+  ejemplo + README con la MATRIZ DE PUERTOS). El compose del demo NO SE TOCA (su update.sh lo carga por defecto;
+  "el EC2 no se toca"). Deuda anotada: unificarlos cuando make-bundle absorba el del demo.
+- **(f) Tag v0.1.17 al cierre = SÍ** (recomendación aceptada, contra la presunción inicial): el fix de adjuntos
+  corrige un bug 🔴 VISIBLE en el demo hoy (evidencia rota) y el rate limiting protege la única instalación expuesta
+  a internet. El deploy es el pipeline de siempre; modo (c) intacto.
+- **(g) Smokes:** `smoke-adjuntos-proxied.py` :3409 y `smoke-rate-limit.py` :3410 (límites bajos por process env —
+  gana al .env). El `.env` dev (gitignored) gana `THROTTLE_*` relajados para que los smokes de regresión que
+  martillan auth/públicos no choquen con los buckets compartidos del Redis dev.
+
 ### 2026-07-07 · Estrategia de proxy/borde para planta industrial (Caddy interno se mantiene; borde DESACOPLABLE en 3 modos)
 Pregunta del dueño: ¿se usa Caddy? ¿hay algo más estable/potente/usado en la industria? **Hallazgo:** Caddy cumple DOS
 roles distintos — **(1) interno** (imagen `watchlog-web`, `docker/Dockerfile.web` → `caddy:2-alpine` con

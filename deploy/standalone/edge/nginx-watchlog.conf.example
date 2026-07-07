@@ -1,0 +1,45 @@
+# Borde NGINX para Lyra WatchLog — VARIANTE COMERCIAL del modo (b), para el
+# cliente que estandariza NGINX (decisión 2026-07-07: NGINX no da más seguridad
+# que el Caddy de borde, da menos fricción en el cuestionario de proveedor).
+#
+# Uso típico: el equipo de redes lo instala en SU NGINX (host o appliance) y
+# apunta al stack en modo (a) (watchlog-web publicado en 127.0.0.1:8080).
+# Si corre en el MISMO host: proxy_pass http://127.0.0.1:8080;
+#
+# Certificados: emitidos por la CA corporativa (sin ACME — air-gap).
+
+server {
+    listen 80;
+    server_name watchlog.planta.cliente.local;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name watchlog.planta.cliente.local;
+
+    ssl_certificate     /etc/nginx/certs/watchlog-cert.pem;   # leaf + intermedias
+    ssl_certificate_key /etc/nginx/certs/watchlog-key.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+
+    # Subida de evidencia: el tope fino lo aplica la API (100 MB duro);
+    # este límite del borde debe ser >= para no cortar antes.
+    client_max_body_size 100m;
+
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+
+        # La API usa X-Forwarded-For para el rate limit por IP y la IP real
+        # de la auditoría — NO omitir estos headers.
+        proxy_set_header Host              $host;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # SSE (campanita + resumen IA en vivo): sin buffering ni timeout corto.
+        proxy_set_header Connection "";
+        proxy_buffering off;
+        proxy_read_timeout 3600s;
+    }
+}

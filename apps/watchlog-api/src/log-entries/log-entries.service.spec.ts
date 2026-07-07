@@ -136,7 +136,7 @@ function makeService(
     removeObject: vi.fn().mockResolvedValue(undefined),
     removePrefix: vi.fn().mockResolvedValue(undefined),
     listObjects: vi.fn().mockResolvedValue([]),
-    presignedGetUrl: vi.fn().mockResolvedValue({ url: "http://minio/presigned", expiresAt: "2026-06-15T00:05:00.000Z" }),
+    getObject: vi.fn().mockResolvedValue({ stream: null, size: 1, contentType: "image/jpeg" }),
     ...opts.storage,
   } as unknown as StorageService;
   const notifications = {

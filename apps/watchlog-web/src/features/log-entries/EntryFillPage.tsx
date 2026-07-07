@@ -49,7 +49,7 @@ import { FieldGrid } from "../templates/FieldGrid.js";
 import { ExceptionReviewPanel } from "../exceptions/ExceptionReviewPanel.js";
 import { EXCEPTION_KEYS, useExceptionSummary } from "../exceptions/exceptions-queries.js";
 import excStyles from "../exceptions/exceptions.module.css";
-import { createLogEntry, executeTransition as executeTransitionApi, fetchAttachmentUrl, saveLogEntrySection, submitLogEntry, uploadAttachment } from "./log-entries-api.js";
+import { createLogEntry, executeTransition as executeTransitionApi, fetchAttachmentObjectUrl, saveLogEntrySection, submitLogEntry, uploadAttachment } from "./log-entries-api.js";
 import {
   LOG_ENTRY_KEYS,
   useExecuteTransition,
@@ -750,7 +750,7 @@ export function EntryFillPage({ embedded = false, entryId, onClose }: EntryFillP
                             return uploadAttachment(id, section.key, f.key, file);
                           },
                           getDownloadUrl: (descriptorId: string, inline?: boolean) =>
-                            fetchAttachmentUrl(activeId ?? materializedId ?? "", descriptorId, inline),
+                            fetchAttachmentObjectUrl(activeId ?? materializedId ?? "", descriptorId, inline),
                         }
                       : undefined;
                   return (

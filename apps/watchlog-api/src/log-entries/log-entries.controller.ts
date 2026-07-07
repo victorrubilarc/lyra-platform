@@ -304,20 +304,38 @@ export class LogEntriesController {
   }
 
   /**
-   * URL prefirmada de DESCARGA (GET de vida corta) de un adjunto, resuelta por
-   * `descriptorId` desde los valores persistidos con la MISMA ABAC que `getDetail`.
-   * El navegador nunca recibe credenciales de MinIO. Gate = `logentry:view`.
+   * DESCARGA de un adjunto, PROXIED por la API (H1 2026-07-07: reemplaza la URL
+   * presigned de MinIO, que firmaba contra el hostname interno del compose y el
+   * navegador jamás resolvía fuera de Docker). Resuelve `descriptorId` desde los
+   * valores persistidos con la MISMA ABAC que `getDetail`; MinIO queda 100 %
+   * interno. `?inline=1` solo se honra para tipos verificados inline-safe (jamás
+   * SVG/HTML). Binario ⇒ `@Res` reply, patrón del acta PDF. Gate = `logentry:view`.
    */
-  @Get(":id/attachments/:descriptorId/url")
+  @Get(":id/attachments/:descriptorId")
   @RequirePermission("logentry:view")
-  attachmentUrl(
+  async downloadAttachment(
     @Param("id") id: string,
     @Param("descriptorId") descriptorId: string,
     @CurrentUser() user: RequestUser,
     @Req() req: FastifyRequest,
+    @Res() reply: FastifyReply,
     @Query("inline") inline?: string,
-  ) {
-    return this.entries.getAttachmentDownloadUrl(user.id, id, descriptorId, this.ctx(user, req), inline === "1" || inline === "true");
+  ): Promise<void> {
+    const file = await this.entries.getAttachmentObject(
+      user.id,
+      id,
+      descriptorId,
+      this.ctx(user, req),
+      inline === "1" || inline === "true",
+    );
+    const safeName = file.filename.replace(/["\\\r\n]/g, "_");
+    await reply
+      .header("Content-Type", file.contentType)
+      .header("Content-Disposition", `${file.disposition}; filename="${safeName}"`)
+      .header("Content-Length", String(file.size))
+      .header("X-Content-Type-Options", "nosniff")
+      .header("Cache-Control", "private, no-store")
+      .send(file.stream);
   }
 
   @Post(":id/submit")

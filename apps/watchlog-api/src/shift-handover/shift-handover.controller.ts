@@ -1,6 +1,7 @@
 import { Body, Controller, Get, HttpCode, MessageEvent, Param, Patch, Post, Query, Req, Res, Sse } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
+import { SkipThrottle } from "@nestjs/throttler";
 import { from, interval, map, merge, switchMap, takeWhile, type Observable } from "rxjs";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import {
@@ -123,6 +124,9 @@ export class ShiftHandoverController {
    * cliente cierra el `EventSource`, el `close` aborta la generación con el proveedor.
    */
   @Public()
+  // Exento del rate limit (H1), como el SSE de la campanita: conexión larga,
+  // reconexión en ráfaga tras reinicio. El token y el ABAC se verifican igual.
+  @SkipThrottle()
   @Sse(":id/summary/stream")
   streamSummary(
     @Param("id") id: string,

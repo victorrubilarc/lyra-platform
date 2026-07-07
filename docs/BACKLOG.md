@@ -1030,38 +1030,24 @@ nunca queda más de una sesión atrás.
 >
 > **Regla de corte:** NO someter a pentest formal de cliente sin cerrar al menos la Tanda A (los P1/P2 de app y host).
 >
-> - [ ] **(H1 · Tanda A — "planta restrictiva ready", ~30–50 HH) — PRÓXIMA SESIÓN(ES), pre-requisito de pruebas reales:**
->   - [ ] **P1 · Descarga de adjuntos PROXIED por la API** (mata el bug de MinIO presigned `http://minio:9000` que el
->         navegador jamás resuelve fuera de Docker — adjuntos ROTOS en prod hoy): `getObject` streaming en
->         `StorageService` + endpoint con la MISMA ABAC que `getDetail`. Efecto colateral: MinIO deja de necesitar
->         exposición alguna ⇒ superficie sigue en 1 puerto real. Smoke.
->   - [ ] **P1 · Rate limiting GLOBAL de API** (`@nestjs/throttler`): hoy solo hay lockout en login/MFA/setup + throttle
->         en password-reset; cualquier endpoint autenticado o el `/api/branding` público admite fuerza de volumen (un
->         pentest lo marca DoS de aplicación). Límite generoso global + estricto en `/auth/*` y públicos; almacenado en
->         Redis (multi-instancia). Cabezal `Retry-After`.
->   - [ ] **P2 · Magic bytes en adjuntos de evidencia** (hoy validan mimetype DECLARADO por el cliente,
->         `log-entries.service.ts:1354` — archivo malicioso renombrado pasa el `accept`): extender el sniffing del
->         branding (S3) a los adjuntos para los tipos declarados. Un pentester lo lista "stored malware delivery".
->   - [ ] **P2 · Fuentes Sora/Inter SELF-HOSTED** (hoy `@import` a `fonts.googleapis.com` en `main.css:2` = egress del
->         navegador que dispara el SOC del cliente + degrada en air-gap): hornear los TTF en la imagen web (mismo
->         patrón que el acta PDF ya usa). Ajustar la CSP (quitar `https:` de font-src/style-src si se puede).
->   - [ ] **P2 · Modo de borde DESACOPLABLE** (el defecto real NO es la marca del proxy sino el ACOPLAMIENTO al Caddy
->         compartido del EC2 demo, cuyo TLS es ACME/Let's Encrypt = imposible air-gapped; decisión de borde en DECISIONS
->         2026-07-07). El **Caddy INTERNO** (imagen `watchlog-web`: sirve la SPA + proxea `/api`, HTTP :80 sin exponer)
->         **SE MANTIENE** (Go memory-safe, config de 15 líneas, no expuesto ⇒ SecOps escanea la imagen no la marca). Se
->         desacopla el BORDE con compose STANDALONE en 3 modos: **(a) detrás de TU proxy** — publicar `watchlog-web` en
->         `127.0.0.1:<port>` para que el F5/NetScaler/NGINX/IIS del cliente termine TLS (modo preferido cuando ya tiene
->         appliance; nosotros NO proveemos borde) · **(b) nuestro borde con CERTIFICADO CORPORATIVO** montado
->         (`tls /certs/cert.pem /certs/key.pem`, sin ACME) para el cliente sin appliance · **(c)** el compartido del demo
->         (actual). **Variante NGINX del borde documentada** (decisión COMERCIAL no técnica: NGINX no da más seguridad,
->         da menos fricción en el cuestionario del cliente que ya lo estandariza). Matriz de puertos por modo;
->         `COOKIE_SECURE=true` + `APP_PUBLIC_URL` https se respetan en los tres. **Entregable: MATRIZ DE PUERTOS por
->         modo** para el equipo de REDES del cliente — qué queda `LISTEN` en el host por modo (modo (a) detrás de su
->         proxy = `127.0.0.1:<port>` loopback, nada sale del host; modo (b) borde propio = solo `443/tcp`; interno
->         Postgres/Redis/MinIO/api = **CERO** `ports:` en prod ⇒ inexistentes para un escaneo de red, no solo cerrados).
->         Recordatorio de diseño: en DEV (`docker-compose.dev.yml`) SÍ se publican 5432/6379/9000-9001/1025-8025 a
->         propósito (herramientas locales); en PROD (`deploy/docker-compose.prod.yml`) NINGÚN servicio de WatchLog tiene
->         `ports:` — mantenerlo así.
+> - [x] **(H1 · Tanda A — "planta restrictiva ready") — ✅ CERRADA 2026-07-07** (`feat/hardening-h1-planta-restrictiva`,
+>       decisiones a–g en DECISIONS; smokes 23/23 adjuntos proxied :3409 + 10/10 rate limit :3410 + regresiones en
+>       verde; extras que salieron de la investigación y se cerraron con OK: **CSP de la SPA** —no existía— en
+>       Caddyfile.web, **trustProxy** —el rate limit por IP y la IP de auditoría eran incorrectos detrás del proxy—,
+>       e inline solo para tipos verificados):
+>   - [x] **P1 · Descarga de adjuntos PROXIED por la API** ✅ (`getObject` streaming + `GET :id/attachments/:descriptorId`
+>         con la MISMA ABAC/auditoría; presigned RETIRADO por completo — MinIO 100 % interno; web por fetch → blob).
+>   - [x] **P1 · Rate limiting GLOBAL de API** ✅ (`@nestjs/throttler` + Redis: default 300/60s + auth 10/60s +
+>         públicos 30/60s + subida 30/300s por IP, configurable `THROTTLE_*`; salud y SSE exentos; `Retry-After`
+>         estándar vía guard propio; `trustProxy` habilitado).
+>   - [x] **P2 · Magic bytes en adjuntos de evidencia** ✅ (helper compartido `storage/content-sniff.ts`; ejecutables
+>         siempre rechazados; imagen/PDF declarados deben confirmarse; no-sniffables jamás inline).
+>   - [x] **P2 · Fuentes Sora/Inter SELF-HOSTED** ✅ (`@fontsource` woff2, mismos pesos; CSP nueva de la SPA
+>         `default-src 'self'` sin `https:`; cero egress del navegador).
+>   - [x] **P2 · Modo de borde DESACOPLABLE** ✅ (`deploy/standalone/`: base sin `ports:` + overrides modo a/b +
+>         Caddyfile.edge cert corporativo + variante NGINX + README con MATRIZ DE PUERTOS para el equipo de redes;
+>         el compose del demo quedó INTACTO — deuda: unificar demo→standalone cuando make-bundle lo absorba. La spec
+>         completa quedó materializada en `deploy/standalone/README.md` + `DEPLOYMENT.md` + `SECURITY.md §5.1`).
 > - [ ] **(H2 · Tanda B — CIS Benchmark + cadena de suministro, ~35–70 HH) — pre-firma de canal, se solapa con §2(4):**
 >   - [ ] **Contenedores NON-ROOT** (`USER` en Dockerfiles api/web/migrate; ningún Dockerfile lo tiene hoy) +
 >         `read_only: true` donde se pueda + `security_opt: [no-new-privileges]` + `cap_drop: [ALL]` en compose —
@@ -1102,20 +1088,11 @@ nunca queda más de una sesión atrás.
       en código). Meta MEDIBLE (no "invulnerable", que no existe): **pasar pentest sin críticos/altos + cuestionario
       de proveedor de minera + CIS Docker Benchmark + IEC 62443-4-2 mapeado + cadena de suministro verificable.**
       Orden de ejecución E1→E5 (E2 = ítem (3c)+(5), E3 = ítem (4); se listan aquí para el ORDEN):
-      - [ ] **E1 · "Planta restrictiva ready" (código, PRÓXIMA SESIÓN):**
-            **(i)** 🔴 descarga de adjuntos **PROXIED por la API** (hallazgo P1: presigned firma contra
-            `http://minio:9000`, hostname interno — el navegador JAMÁS lo resuelve ⇒ evidencia ROTA en prod; agregar
-            `getObject` streaming a `StorageService` + endpoint con la MISMA ABAC ⇒ MinIO queda 100% interno,
-            superficie = 1 puerto) ·
-            **(ii)** 🔴 **rate limiting GLOBAL** (`@nestjs/throttler`: generoso por defecto, estricto en `/auth/*` y
-            públicos `/branding` `/setup/status`; hoy solo hay lockouts de login/MFA/setup y throttle de reset) ·
-            **(iii)** 🟡 **magic bytes en adjuntos de evidencia** (hoy validan por mimetype DECLARADO —
-            `log-entries.service.ts` `acceptMatches(cfg, file.mimetype)`; extender el sniffing del branding) ·
-            **(iv)** 🟡 **fuentes self-hosted** (main.css importa fonts.googleapis.com ⇒ egress del navegador que
-            dispara el SOC del cliente en air-gap; mismo patrón TTF local del acta PDF) ·
-            **(v)** 🟡 compose **standalone** (borde propio con `tls cert.pem key.pem` corporativo — sin ACME) +
-            modo "detrás del proxy del cliente" (publicar watchlog-web en 127.0.0.1:puerto) + matriz de puertos ·
-            **(vi)** 🟢 pin de `minio/minio:latest` a versión fija (tag mutable en infra).
+      - [x] **E1 · "Planta restrictiva ready" ✅ CERRADO 2026-07-07** (= H1 · Tanda A de §2(5), detalle arriba):
+            (i) adjuntos proxied ✅ · (ii) rate limiting global ✅ · (iii) magic bytes ✅ · (iv) fuentes
+            self-hosted ✅ · (v) compose standalone + matriz de puertos ✅ · **EXCEPTO (vi) pin de
+            `minio/minio:latest`** — queda en H2 (donde ya estaba listado con el resto de pins; TODO anotado en
+            `deploy/standalone/docker-compose.yml`).
       - [ ] **E2 · Paquete instalable** = ítems (3c) bundle air-gapped + (5) install.sh: `make-bundle.sh` (imágenes
             tar + compose + install.sh SIN git-clone [hoy la instalación entrega el REPO COMPLETO = fuga de fuente] +
             Caddyfile ejemplo + guía + SHA256SUMS) probado contra VM limpia sin internet. **Correr Trivy sobre las

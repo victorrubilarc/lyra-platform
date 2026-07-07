@@ -10,14 +10,15 @@ subida PROXIED a MinIO con ABAC y la inmutabilidad GxP:
      config.scan VIAJARON en la versión inmutable (clonado al publicar);
   3. crea una entrada y SUBE un PNG real a MinIO (POST /attachments) ⇒ descriptor
      (key bajo entries/{id}/foto/, contentType, checksum sha256);
-  4. guarda la sección con el descriptor ⇒ 2xx; el valor persiste; descarga vía
-     presigned GET (ABAC) ⇒ 200 y los BYTES coinciden;
+  4. guarda la sección con el descriptor ⇒ 2xx; el valor persiste; descarga
+     PROXIED por la API (GET /attachments/{id} con Bearer + ABAC — H1: el
+     navegador jamás toca MinIO) ⇒ 200 y los BYTES coinciden;
   5. negativos: subir fuera de TIPO (text a foto) ⇒ 400; fuera de TAMAÑO (>1 MB) ⇒
      400; guardar con una KEY AJENA (otra entrada) ⇒ 400;
   6. INMUTABILIDAD: sella la entrada (submit) ⇒ subir a una entrada sellada ⇒ 400 y
      el objeto SIGUE descargable;
   7. HUÉRFANOS: una 2.ª entrada se ANULA (VOID) ⇒ su objeto se LIMPIA de MinIO
-     (la URL prefirmada del objeto borrado responde 404).
+     (la descarga proxied del objeto borrado responde 404).
 
 CREA su propia plantilla + 1–2 entradas y LIMPIA TODO por ID (el AuditLog inmutable
 conserva el rastro; los objetos de MinIO los limpia el VOID / el borrado de prueba).
@@ -83,9 +84,15 @@ def upload(path, tok, filename, content, content_type):
         return e.code, e.read().decode()
 
 
-def fetch_url(url):
+def fetch_attachment(entry_id, descriptor_id, tok, inline=False):
+    """Descarga PROXIED por la API (H1): GET con Bearer; devuelve (status, bytes)."""
+    r = urllib.request.Request(
+        BASE + f"/log-entries/{entry_id}/attachments/{descriptor_id}" + ("?inline=1" if inline else ""),
+        method="GET",
+    )
+    r.add_header("Authorization", "Bearer " + tok)
     try:
-        with urllib.request.urlopen(url) as resp:
+        with urllib.request.urlopen(r) as resp:
             return resp.status, resp.read()
     except urllib.error.HTTPError as e:
         return e.code, e.read()
@@ -204,11 +211,8 @@ def main():
             persisted = pg_q(f"SELECT value::text FROM \"LogEntryValue\" WHERE \"logEntryId\"='{entry_id}' AND \"fieldKey\"='foto';")
             check("valor FILE_ARRAY persistido con la key", desc["key"] in persisted, persisted[:60])
 
-            s, dl = call("GET", f"/log-entries/{entry_id}/attachments/{desc['id']}/url", atok)
-            check("URL de descarga prefirmada (2xx)", s == 200 and isinstance(dl, dict) and dl.get("url"), s)
-            if s == 200 and dl.get("url"):
-                fs, content = fetch_url(dl["url"])
-                check("presigned GET ⇒ 200 y los BYTES coinciden", fs == 200 and content == PNG, f"{fs} {len(content) if content else 0}b")
+            fs, content = fetch_attachment(entry_id, desc["id"], atok)
+            check("descarga PROXIED ⇒ 200 y los BYTES coinciden", fs == 200 and content == PNG, f"{fs} {len(content) if content else 0}b")
 
             # Negativos.
             s, _ = upload(f"/log-entries/{entry_id}/attachments/s1/foto", atok, "nota.txt", b"hola", "text/plain")
@@ -230,8 +234,8 @@ def main():
             if sealed:
                 s, _ = upload(f"/log-entries/{entry_id}/attachments/s1/foto", atok, "tarde.png", PNG, "image/png")
                 check("subir a entrada SELLADA ⇒ 400 (inmutable)", s == 400, s)
-                fs, content = fetch_url(dl["url"]) if dl.get("url") else (0, b"")
-                check("objeto de entrada sellada PERMANECE (presigned 200)", fs == 200 and content == PNG, fs)
+                fs, content = fetch_attachment(entry_id, desc["id"], atok)
+                check("objeto de entrada sellada PERMANECE (descarga 200)", fs == 200 and content == PNG, fs)
 
         # --- Entrada B: subir + VOID ⇒ huérfano limpiado de MinIO ---
         entry2_id, _, s = new_entry(atok, tpl_id, node_id)
@@ -241,14 +245,12 @@ def main():
         if isinstance(desc2, dict) and desc2.get("id"):
             ver = section_version(atok, entry2_id)
             call("PUT", f"/log-entries/{entry2_id}/sections/s1", atok, {"expectedVersion": ver, "values": [{"fieldKey": "doc", "value": [desc2]}]})
-            s, dl2 = call("GET", f"/log-entries/{entry2_id}/attachments/{desc2['id']}/url", atok)
-            url_b = dl2.get("url") if isinstance(dl2, dict) else None
-            check("entrada B: objeto descargable antes de anular", s == 200 and url_b and fetch_url(url_b)[0] == 200, s)
+            fs, _ = fetch_attachment(entry2_id, desc2["id"], atok)
+            check("entrada B: objeto descargable antes de anular", fs == 200, fs)
             s, _ = call("POST", f"/log-entries/{entry2_id}/void", atok, {"reason": "smoke de limpieza de huérfanos"})
             check("anular borrador B (2xx)", s in (200, 201), s)
-            if url_b:
-                fs, _ = fetch_url(url_b)
-                check("objeto del borrador anulado LIMPIADO de MinIO (404)", fs in (403, 404), fs)
+            fs, _ = fetch_attachment(entry2_id, desc2["id"], atok)
+            check("objeto del borrador anulado LIMPIADO de MinIO (404)", fs in (403, 404), fs)
     finally:
         for eid in (entry_id, entry2_id):
             if eid:
