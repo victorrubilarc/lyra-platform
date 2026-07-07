@@ -184,6 +184,15 @@ transiciones de flujo y **alcance de datos por nodo/plantilla**), contraseñas c
 **MFA**, y **auditoría inmutable** de la configuración sensible.
 **Beneficio:** cada quien hace **solo lo que le corresponde**, y todo queda registrado.
 
+### 🚀 Primer arranque profesional (asistente de instalación)
+La primera pantalla de una instalación nueva no es un login pelado: es un **asistente de
+configuración** de marca (como los grandes: GitLab, Atlassian) protegido por un **token de un solo
+uso** que solo tiene quien administra el servidor. Crea la cuenta de administrador real (sin
+contraseñas "de fábrica"), captura la identidad y apariencia de la empresa y acompaña la activación
+de la licencia en la misma visita.
+**Beneficio:** entrega **lista para auditoría desde el minuto uno** — nadie más puede tomarse la
+instalación y no existen credenciales preinstaladas que olvidar cambiar.
+
 ### 🖥️ On-premise: tus datos, en tu casa
 Se instala en la **infraestructura del cliente** (servidores propios / datacenter), con base de
 datos PostgreSQL y almacenamiento de evidencia propio. **No depende de un SaaS** ni saca los datos
@@ -332,6 +341,10 @@ Preséntalo como evolución, no como funcionalidad actual:
 
 > Una línea por hito, en lenguaje de cliente. Lo más reciente arriba.
 
+- **2026-07-06** — **Primer arranque profesional 🚀 (disponible):** una instalación nueva se entrega con un
+  **asistente de configuración inicial** (token de un solo uso + cuenta de administrador real + identidad/apariencia
+  + activación de licencia guiada) en vez de credenciales de fábrica — la entrega comercial queda impecable y **sin
+  el riesgo de contraseñas preinstaladas**; el asistente se autodestruye al terminar.
 - **2026-07-06** — **Licencia visible y renovación sin sorpresas 🔔 (disponible):** la plataforma ahora **avisa sola**
   antes de que la licencia venza — banner en pantalla para los administradores, recordatorios por correo y campanita
   (semanal por vencer, diario en gracia) y una pestaña **Configuración › Licencia** con el estado en lenguaje claro y

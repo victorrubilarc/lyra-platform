@@ -221,8 +221,11 @@ La renovación usa el **mismo baile por archivos** de la activación (air-gap in
   (SOLO_LECTURA · BLOQUEADA · PENDIENTE_ACTIVACION) bloquea las **MUTACIONES** (POST/PUT/PATCH/DELETE) con
   `403 { code: "LICENSE_RESTRICTED", licenseStatus }`; **GET/HEAD/OPTIONS pasan SIEMPRE** (toda exportación del
   producto es GET: acta PDF, presigned de adjuntos, export de auditoría). **Lista blanca explícita** (constante
-  testeada, sin regex): prefijo `/api/auth/` (login/refresh/logout/contraseña/MFA — sin ellos ni se podría leer)
-  y `/api/health` exacto. EN_GRACIA / POR_VENCER / LIMITE_EXCEDIDO **no** bloquean en L1 (se registran; el
+  testeada, sin regex): prefijo `/api/auth/` (login/refresh/logout/contraseña/MFA — sin ellos ni se podría leer),
+  prefijo `/api/setup/` (asistente de PRIMER ARRANQUE, OOBE 2026-07-06: el setup ocurre típicamente en
+  PENDIENTE_ACTIVACION — sin la entrada la instalación virgen sería inconfigurable; tiene su PROPIO candado, un
+  token de instalación de un solo uso con lockout, y muere en 404 al completarse) y `/api/health` exacto.
+  EN_GRACIA / POR_VENCER / LIMITE_EXCEDIDO **no** bloquean en L1 (se registran; el
   gating por módulo es L2 y el enforcement fino "no crear por encima del límite" es L2b, §5.3 — ambos ✅).
 - **`PENDIENTE_ACTIVACION`** = variante presentable de BLOQUEADA cuando **no hay archivo de licencia**
   (instalación recién desplegada): mismo enforcement, estado/mensaje propio. Es un estado del RUNTIME de la API
@@ -311,6 +314,12 @@ El banner INFORMA; el candado real sigue siendo el guard del backend (L1/L2).
 estado + motivo humanizado, edición, módulos (chips), vencimiento + días y las instrucciones de renovación del
 runbook §4 en texto guía. Gate = `module:settings:view` (SIN permiso nuevo, decisión L6b: el DTO ya es visible para
 todo autenticado). NO expone ni sube archivos de licencia.
+**Excepción ACOTADA a L6b (OOBE 2026-07-06): el asistente de PRIMER ARRANQUE (`/setup`, paso Licencia) SÍ puede
+importar `license.lic`** — es la ceremonia del implementador (protegida por el token de instalación de un solo
+uso), no la UI operativa. Salvaguardas: `LicenseService.importLicenseFile` verifica **firma Ed25519 + linaje +
+evaluación con la huella real ANTES de persistir** (nada no verificado toca el disco), tope 64 KB, auditado
+(`license.imported`, actor `system@setup`). El asistente también descarga `solicitud.lreq`. Al completarse el
+setup, esos endpoints mueren (404) y L6b vuelve a regir sin excepciones.
 
 **Avisos por el motor de notificaciones (Bloque N — cierra el pendiente L1(iii)):** 3 eventos del catálogo
 (plantillas default en el seed; preferencias por canal EMAIL/INAPP como todos):

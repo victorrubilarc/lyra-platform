@@ -109,3 +109,6 @@ export * from "./work-orders/dashboard.js";
 // (el payload completo de la licencia NUNCA viaja aquí: vive en @lyra/licensing)
 export * from "./licensing/modules.js";
 export * from "./licensing/license-status.js";
+
+// Asistente de primer arranque (OOBE S1/S2)
+export * from "./setup/setup.js";

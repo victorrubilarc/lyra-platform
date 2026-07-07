@@ -25,6 +25,27 @@ Construida **detrás de una abstracción con métodos enchufables**, para que ca
 
 Keycloak **descartado** para el MVP (complejidad operacional); si un cliente lo pide, entra como "otro proveedor OIDC" sin cambios en la app.
 
+### 1.1 Primer arranque — token de instalación de un solo uso (OOBE, 2026-07-06)
+
+Una instalación **VIRGEN** (0 usuarios) no tiene a quién autenticar: el primer administrador lo crea el
+**asistente de primer arranque** (`/setup`), protegido por un **token de instalación de UN SOLO USO** (patrón
+Jenkins `initialAdminPassword` / GitLab root):
+
+- La API lo genera al arrancar (32 bytes aleatorios) y lo deja en **`./license/setup-token`** — la carpeta a la
+  que solo accede quien administra el despliegue; el log anuncia **solo la RUTA**, jamás el token (los logs pueden
+  rotarse/centralizarse). En BD (`SystemSetup`, singleton) vive **solo su hash SHA-256**.
+- Sin token válido, los endpoints `/api/setup/*` rechazan (403) con **lockout persistente** (5 intentos / 15 min,
+  patrón del login) y comparación en **tiempo constante**. `GET /setup/status` es lo único público: un booleano
+  (`setupRequired`), mínimo privilegio — nada más se filtra a anónimos.
+- La **finalización es ATÓMICA** (una transacción con candado anti-carrera): crea el admin real (política de
+  contraseñas aplicada; opcionalmente exige MFA a administradores vía `requireMfa` del rol), guarda identidad y
+  apariencia, marca `setupCompleted`, **anula el hash y borra el archivo del token**, y audita
+  `system.setup.completed`. Después, los endpoints responden **404** (no revelan que el módulo existió).
+- Instalaciones EXISTENTES quedan **completadas retroactivamente** por la migración (`EXISTS(usuarios)`): el
+  asistente jamás aparece sobre una instalación con gente adentro, ni tras un reinicio.
+- El seed de producción (**catálogo**) **no crea usuarios** — `BOOTSTRAP_ADMIN_*` (contraseña en texto plano en el
+  `.env`) fue eliminado. El usuario demo solo nace en el seed de alcance **demo** (dev/smokes).
+
 ## 2. Autorización — RBAC + ABAC, 4 dimensiones
 
 100% en base de datos y **administrable desde la UI** (nada hardcodeado). Permisos atómicos agrupados en roles + alcance de datos:

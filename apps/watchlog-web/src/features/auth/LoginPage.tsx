@@ -1,14 +1,15 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Link, Navigate, useLocation } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { AlertTriangle, CheckCircle2, Eye, EyeOff, LogIn, ShieldCheck } from "lucide-react";
 import { Button, FormField, Input, useToast } from "@lyra/ui";
 import { emailSchema, totpCodeSchema } from "@lyra/contracts";
 import { ApiError } from "../../lib/api-client.js";
 import { completeMfaChallenge, login } from "../../auth/auth-api.js";
 import { useAuthStore } from "../../auth/auth-store.js";
+import { fetchSetupStatus } from "../setup/setup-api.js";
 import { AuthLayout } from "./AuthLayout.js";
 import styles from "./AuthLayout.module.css";
 
@@ -39,8 +40,26 @@ export function LoginPage() {
   const setSession = useAuthStore((s) => s.setSession);
   const toast = useToast();
   const location = useLocation();
+  const navigate = useNavigate();
   /** Aviso persistente tras una redirección (ej. contraseña restablecida). */
   const notice = (location.state as { notice?: string } | null)?.notice ?? null;
+
+  // Instalación VIRGEN (0 usuarios): el primer arranque no es un login, es el
+  // asistente de configuración (OOBE). El endpoint es público y devuelve solo
+  // un booleano; si falla (API caída) se queda en el login normal.
+  useEffect(() => {
+    let cancelled = false;
+    fetchSetupStatus()
+      .then((s) => {
+        if (!cancelled && s.setupRequired) navigate("/setup", { replace: true });
+      })
+      .catch(() => {
+        /* sin señal de setup: el login sigue siendo el camino */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [navigate]);
 
   const [serverError, setServerError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);

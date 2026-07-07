@@ -65,6 +65,17 @@ describe("LicenseEnforcementGuard", () => {
     const guard = build("BLOQUEADA");
     expect(blocked(guard, "POST", "/api/authz-fake/login")).toBe(true);
     expect(blocked(guard, "POST", "/api/log-entries?path=/api/auth/login")).toBe(true);
+    expect(blocked(guard, "POST", "/api/setup-fake/finalize")).toBe(true);
+  });
+
+  it("lista blanca: el setup (OOBE) opera en PENDIENTE_ACTIVACION — sin él la instalación virgen sería inconfigurable", () => {
+    const guard = build("PENDIENTE_ACTIVACION");
+    expect(blocked(guard, "POST", "/api/setup/finalize")).toBe(false);
+    expect(blocked(guard, "POST", "/api/setup/license")).toBe(false);
+    expect(blocked(guard, "GET", "/api/setup/status")).toBe(false);
+    // También en los demás estados restringidos (misma regla que /api/auth/).
+    expect(blocked(build("BLOQUEADA"), "POST", "/api/setup/finalize")).toBe(false);
+    expect(blocked(build("SOLO_LECTURA"), "POST", "/api/setup/finalize")).toBe(false);
   });
 
   it("BLOQUEADA se comporta igual que SOLO_LECTURA (nunca peor que solo lectura)", () => {
