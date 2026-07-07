@@ -1293,6 +1293,14 @@ model SystemSettings {
   // Modo de tema por defecto ("dark" | "light" | "auto", validado por Zod en el
   // borde, patrón AiSettings.provider). null = sin default ⇒ dark (marca).
   defaultThemeMode                        String?
+  // --- Logo de la instalación (OOBE S3) ---------------------------------------
+  // Bytes EN BD (decisión 2026-07-06, NO MinIO): singleton ≤512KB que el login
+  // sirve SIN sesión (un presigned expira y ataría el login a MinIO) y que
+  // pg_dump respalda junto al resto de la identidad. PNG/JPEG/WebP validado por
+  // MAGIC BYTES en el borde; SVG rechazado (XSS). Lo sirve GET /api/branding/logo.
+  logoData                                Bytes?
+  logoContentType                         String?
+  logoUpdatedAt                           DateTime?
   updatedById                             String?
   updatedAt                               DateTime         @updatedAt
 }

@@ -338,8 +338,16 @@ lleva licenseId/customer/huella/linaje; el deep link de la campanita usa el id f
 restringida silenciaría su propia alarma. Los eventos de licencia tampoco se gatean por el módulo `notifications`
 (avisar la licencia es función de sistema, no una feature comprada).
 
-**Gate latente de marca blanca (decisión L6d):** `LicenseService.isWhiteLabelEnabled()` lee `whiteLabel` del payload
-verificado; hoy sin efecto visible y sin viajar al DTO — el épico de marca blanca (BACKLOG §2(2)) lo cablea después.
+**Gate de marca blanca (decisión L6d — CABLEADO en OOBE S3, 2026-07-06):** `LicenseService.isWhiteLabelEnabled()` lee
+`whiteLabel` del payload VERIFICADO (sin payload no se afirma ⇒ co-branding). Desde S3 gobierna la **presentación** de
+la marca en la web vía el endpoint PÚBLICO `GET /api/branding` (el DTO delgado autenticado sigue SIN el campo):
+- `whiteLabel:false` ⇒ **co-branding**: Lyra WatchLog domina el login + "Licenciado para {empresa}" con su logo.
+- `whiteLabel:true` + nombre configurado ⇒ **marca blanca de presentación**: la marca del CLIENTE toma el lugar
+  dominante en login/sidebar, el pie no menciona ITESICWS y Lyra queda en el "Operado con Lyra WatchLog" discreto;
+  `document.title` = solo la empresa.
+Hoy gobierna login/Topbar/sidebar/título. **Pendiente del épico §2(2):** correos salientes, acta PDF (Part 11 — no se
+toca sin su propia sesión) y nombre de producto configurable. La licencia degradada NO desmarca (el branding es un GET,
+sigue vivo en todos los estados); lo que un estado restringido bloquea (L1) es RE-marcar (subir/quitar logo = mutación).
 
 ### 5.3 Enforcement de límites numéricos (✅ construido en L2b)
 

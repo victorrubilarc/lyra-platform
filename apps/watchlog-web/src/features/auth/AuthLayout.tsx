@@ -9,7 +9,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cx } from "@lyra/ui";
-import { licensee, licenseeInitials } from "../../branding.js";
+import { licenseeInitials, useBranding, type Branding } from "../../branding.js";
 import { BrandScene } from "./BrandScene.js";
 import styles from "./AuthLayout.module.css";
 
@@ -35,14 +35,15 @@ const FEATURES: Feature[] = [
 ];
 
 /**
- * Identidad de la empresa licenciataria: muestra su logo sobre una placa clara
- * (legible para cualquier color de logo) o, si no hay logo o falla la carga, un
- * monograma con sus iniciales.
+ * Identidad de la empresa (branding RUNTIME): logo sobre una placa clara
+ * (legible para cualquier color de logo) o, si no hay logo o falla la carga,
+ * un monograma con sus iniciales.
  */
-function LicenseeMark({ variant }: { variant: "panel" | "card" }) {
+function CompanyMark({ branding, variant }: { branding: Branding; variant: "panel" | "card" }) {
   const [logoFailed, setLogoFailed] = useState(false);
+  const name = branding.companyName ?? "";
 
-  if (licensee.logoUrl && !logoFailed) {
+  if (branding.logoUrl && !logoFailed) {
     return (
       <div
         className={cx(
@@ -52,8 +53,8 @@ function LicenseeMark({ variant }: { variant: "panel" | "card" }) {
       >
         <img
           className={styles.logoImg}
-          src={licensee.logoUrl}
-          alt={licensee.name}
+          src={branding.logoUrl}
+          alt={name}
           onError={() => setLogoFailed(true)}
         />
       </div>
@@ -65,35 +66,61 @@ function LicenseeMark({ variant }: { variant: "panel" | "card" }) {
       className={cx(styles.mark, variant === "panel" ? styles.markLg : styles.markSm)}
       aria-hidden="true"
     >
-      {licenseeInitials(licensee.name)}
+      {licenseeInitials(name)}
+    </div>
+  );
+}
+
+/** Lockup del producto (marca Lyra WatchLog). */
+function ProductLockup() {
+  return (
+    <div className={styles.productLockup}>
+      <div className={styles.logoTile}>
+        <Boxes size={25} color="#fff" />
+      </div>
+      <div>
+        <div className={styles.wordmark}>
+          Lyra <span className={styles.wordmarkAccent}>WatchLog</span>
+        </div>
+        <div className={styles.wordmarkSub}>Bitácoras operacionales</div>
+      </div>
+    </div>
+  );
+}
+
+/** Lockup dominante de la empresa (modo marca blanca): su logo/monograma + nombre. */
+function CompanyLockup({ branding }: { branding: Branding }) {
+  return (
+    <div className={styles.productLockup}>
+      <CompanyMark branding={branding} variant="card" />
+      <div>
+        <div className={styles.wordmark}>{branding.companyName}</div>
+        <div className={styles.wordmarkSub}>Bitácoras operacionales</div>
+      </div>
     </div>
   );
 }
 
 /**
- * Entrada de producto co-marcada: a la izquierda, panel de marca de Lyra
- * WatchLog con propuesta de valor de bitácoras operacionales y la identidad de
- * la empresa licenciataria; a la derecha, la tarjeta de autenticación (que
- * también lleva el co-branding para verse en móvil/tablet).
+ * Entrada de producto con branding RUNTIME (OOBE S3, matriz decisión (b)):
+ *  - `lyra` (sin nombre configurado): marca Lyra a secas.
+ *  - `cobrand` (whiteLabel:false): panel Lyra dominante + "Licenciado para
+ *    {empresa}" con su logo; la card también se co-marca (móvil/tablet).
+ *  - `whitelabel` (whiteLabel:true, gate L6d): la marca del cliente toma el
+ *    lugar dominante; Lyra queda en el "Operado con Lyra WatchLog" discreto y
+ *    el pie NO menciona ITESICWS (regla: jamás ITESICWS en textos de cliente).
  */
 export function AuthLayout({ title, subtitle, children, footer }: AuthLayoutProps) {
+  const branding = useBranding();
+  const whitelabel = branding.mode === "whitelabel";
+
   return (
-    // La entrada co-marcada es siempre OSCURA (experiencia de marca), sin importar
+    // La entrada es siempre OSCURA (experiencia de marca), sin importar
     // el tema del workspace.
     <div className={styles.screen} data-theme="dark">
       <aside className={styles.brandPane}>
         <BrandScene />
-        <div className={styles.productLockup}>
-          <div className={styles.logoTile}>
-            <Boxes size={25} color="#fff" />
-          </div>
-          <div>
-            <div className={styles.wordmark}>
-              Lyra <span className={styles.wordmarkAccent}>WatchLog</span>
-            </div>
-            <div className={styles.wordmarkSub}>Bitácoras operacionales</div>
-          </div>
-        </div>
+        {whitelabel ? <CompanyLockup branding={branding} /> : <ProductLockup />}
 
         <div className={styles.brandHero}>
           <span className={styles.heroEyebrow}>
@@ -126,19 +153,20 @@ export function AuthLayout({ title, subtitle, children, footer }: AuthLayoutProp
           </div>
         </div>
 
-        <div className={styles.licenseeLockup}>
-          <LicenseeMark variant="panel" />
-          <div className={styles.licenseeInfo}>
-            <span className={styles.licenseeLabel}>Licenciado para</span>
-            <span className={styles.licenseeName}>{licensee.name}</span>
-            {licensee.industry ? (
-              <span className={styles.licenseeIndustry}>{licensee.industry}</span>
-            ) : null}
+        {branding.mode === "cobrand" && (
+          <div className={styles.licenseeLockup}>
+            <CompanyMark branding={branding} variant="panel" />
+            <div className={styles.licenseeInfo}>
+              <span className={styles.licenseeLabel}>Licenciado para</span>
+              <span className={styles.licenseeName}>{branding.companyName}</span>
+            </div>
           </div>
-        </div>
+        )}
 
         <div className={styles.brandFoot}>
-          © {new Date().getFullYear()} ITESICWS · Ecosistema Lyra
+          {whitelabel
+            ? `© ${new Date().getFullYear()} ${branding.companyName}`
+            : `© ${new Date().getFullYear()} ITESICWS · Ecosistema Lyra`}
         </div>
       </aside>
 
@@ -146,21 +174,31 @@ export function AuthLayout({ title, subtitle, children, footer }: AuthLayoutProp
         <div className={styles.panel}>
           <div className={styles.card}>
             <div className={styles.cardBrand}>
-              <LicenseeMark variant="card" />
-              <div className={styles.cardBrandText}>
-                {licensee.logoUrl ? (
-                  <span className={styles.cardBrandIndustry}>
-                    {licensee.industry ?? "Bitácoras operacionales"}
-                  </span>
-                ) : (
-                  <>
-                    <span className={styles.cardBrandName}>{licensee.name}</span>
-                    <span className={styles.cardBrandIndustry}>
-                      {licensee.industry ?? "Bitácoras operacionales"}
-                    </span>
-                  </>
-                )}
-              </div>
+              {branding.mode === "lyra" ? (
+                <>
+                  <div className={styles.logoTile}>
+                    <Boxes size={19} color="#fff" />
+                  </div>
+                  <div className={styles.cardBrandText}>
+                    <span className={styles.cardBrandName}>Lyra WatchLog</span>
+                    <span className={styles.cardBrandIndustry}>Bitácoras operacionales</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <CompanyMark branding={branding} variant="card" />
+                  <div className={styles.cardBrandText}>
+                    {branding.logoUrl ? (
+                      <span className={styles.cardBrandIndustry}>Bitácoras operacionales</span>
+                    ) : (
+                      <>
+                        <span className={styles.cardBrandName}>{branding.companyName}</span>
+                        <span className={styles.cardBrandIndustry}>Bitácoras operacionales</span>
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
 
             <div className={styles.divider} />

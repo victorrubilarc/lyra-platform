@@ -15,6 +15,7 @@ import { AuthzModule } from "./authz/authz.module";
 import { AuthModule } from "./auth/auth.module";
 import { LicenseModule } from "./licensing/license.module";
 import { SetupModule } from "./setup/setup.module";
+import { BrandingModule } from "./branding/branding.module";
 import { StructureModule } from "./structure/structure.module";
 import { EquipmentModule } from "./equipment/equipment.module";
 import { TemplatesModule } from "./templates/templates.module";
@@ -76,6 +77,9 @@ import { WorkOrdersModule } from "./work-orders/work-orders.module";
     // Asistente de primer arranque (OOBE): endpoints @Public con candado de
     // token propio; solo vive mientras la instalación esté virgen.
     SetupModule,
+    // Branding runtime (OOBE S3): GET públicos (login pre-auth), mutaciones
+    // con settings:manage; el gate whiteLabel (L6d) decide qué marca domina.
+    BrandingModule,
     StructureModule,
     EquipmentModule,
     TemplatesModule,

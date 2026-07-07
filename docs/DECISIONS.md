@@ -4,6 +4,48 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-06 · OOBE S3 · Branding RUNTIME (identidad aplicada + logo + gate whiteLabel L6d cableado) (decisiones a–f, aprobadas por el dueño antes de codificar)
+Sesión `feat/oobe-s3-branding`, BACKLOG §2(5) S3 (primera rebanada del épico marca blanca §2(2)). El co-branding del
+login deja de ser BUILD-TIME (`VITE_LICENSEE_*`) y pasa a RUNTIME por instalación (`GET /api/branding` público) — la
+misma imagen Docker sirve a N clientes del canal sin rebuild. Hallazgo de la sesión: `Dockerfile.web` **nunca** horneó
+`VITE_LICENSEE_*` (la imagen de canal siempre habría mostrado "Empresa Demo") — el modelo build-time estaba roto de
+fábrica para distribución.
+- **(a) El logo vive EN POSTGRES (bytea en `SystemSettings`), NO en MinIO** — desviación deliberada del "logoRef
+  (MinIO)" anotado en BACKLOG: (1) el login lo necesita SIN sesión y las URLs presigned expiran/apuntan al host MinIO
+  (pésimo para un asset público cacheable; proxearlo exigiría `getObject` en `StorageService` y ataría la pantalla de
+  login a que MinIO esté vivo); (2) `pg_dump` respalda la identidad con el resto de la config (un restore = instalación
+  íntegra); (3) es un singleton ≤512KB — exactamente el caso donde bytea es correcto (Grafana/GitLab guardan branding
+  de instancia en BD/config, no en object storage). Servido por `GET /api/branding/logo` con ETag sha256 + 304 +
+  `Cache-Control: public, max-age=86400` + `nosniff`. Validación por **MAGIC BYTES** (PNG/JPEG/WebP), **SVG RECHAZADO**
+  (clase entera de XSS por scripts embebidos; sanitizarlo es complejidad innecesaria y todo logo corporativo existe en
+  PNG), tope 512KB, se almacena TAL CUAL (sin `sharp`: cero deps nativas por un asset único). Subida/retiro auditados
+  (`branding.logo.updated`/`.removed`, sin bytes en la auditoría).
+- **(b) Matriz whiteLabel (L6d gobierna por PRIMERA vez):** `lyra` (sin nombre configurado) = marca Lyra a secas ·
+  `cobrand` (nombre + `whiteLabel:false`) = Lyra domina el login + "Licenciado para {empresa}" con su logo/monograma ·
+  `whitelabel` (nombre + `whiteLabel:true` del payload VERIFICADO) = la marca del CLIENTE toma el lugar dominante
+  (login, wordmark del sidebar) y el pie NO menciona ITESICWS (regla "jamás ITESICWS en textos de cliente"); Lyra queda
+  en el "Operado con Lyra WatchLog" discreto. Topbar muestra la identidad de empresa en AMBOS modos. `document.title`:
+  "{empresa} · Lyra WatchLog" en cobrand, solo "{empresa}" en whitelabel. Sin payload verificado ⇒ whiteLabel NO se
+  afirma (co-branding). Correos y acta PDF quedan FUERA (épico §2(2); el acta es Part 11). El nombre del PRODUCTO sigue
+  fijo (el "nombre de producto configurable" es del épico completo).
+- **(c) `VITE_LICENSEE_*` MUERE del todo (sin fallback de transición):** un fallback build-time mantiene dos fuentes de
+  verdad y contradice el objetivo ("misma imagen para N clientes"). `VITE_LICENSEE_INDUSTRY` muere sin reemplazo (el
+  subtítulo cae al genérico); si el rubro importa comercialmente se agrega a Identidad después. `.env.example`,
+  `deploy/.env.prod.example`, `vite-env.d.ts` y `public/branding/` limpiados.
+- **(d) Permiso = REUSAR `settings:manage`** (sin permiso nuevo ⇒ sin seed/FLUSHALL): la identidad de la instalación es
+  configuración de sistema (misma dueña que SMTP/política); `theme:manage` (tab Apariencia) es el eje del diseñador de
+  paletas, rol distinto. Tab nueva "Identidad" en /configuracion. El wizard captura el logo en el paso Identidad vía
+  `POST /api/setup/logo` (token-gated, MISMO `BrandingService`); aditivo — el wizard sigue funcionando sin logo.
+- **(e) Tag v0.1.16 al cierre = SÍ** (diferido desde L2b): L2b + OOBE S1–S3 + branding runtime = primera imagen
+  VENDIBLE con entrega digna (instalar → wizard → identidad aplicada, sin rebuild). El EC2 demo se auto-despliega con
+  el tag (su licencia tiene whiteLabel:true pero `companyDisplayName` null ⇒ sin cambio visual hasta configurarlo).
+- **(f) Fallback de tema:** `theme-store` gana `explicit` (persistido, migración v0→v1: storage previo = elección
+  explícita): `defaultThemeMode` de la instalación aplica SOLO mientras el usuario no elija; si el admin cambia el
+  default, los usuarios sin elección lo siguen. El login sigue SIEMPRE oscuro (identidad de marca).
+- Verificación: smoke NUEVO `smoke-branding.py` **28/28** (:3408; DTO mínimo con lista CERRADA de claves · ciclo del
+  logo · rechazos · whiteLabel on/off con `gen-dev-license --no-white-label` NUEVO · sin licencia = branding vivo,
+  re-marcado bloqueado por L1) + `smoke-setup.py` **30/30** (5 casos nuevos de logo del wizard).
+
 ### 2026-07-06 · Asistente de PRIMER ARRANQUE (OOBE) S1+S2 · seed split + token de un solo uso + wizard `/setup` (decisiones a–f, aprobadas por el dueño antes de codificar)
 Sesión OOBE (`feat/setup-wizard-oobe`), BACKLOG §2(5). Mata el hoyo de la entrega: el bootstrap prod ya NO crea ningún
 usuario (hallazgo afinado de la sesión: con `NODE_ENV=production` el seed nunca creó `demo@watchlog.local` en prod —

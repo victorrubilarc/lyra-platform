@@ -40,7 +40,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 - ✅ **Pantalla de Inicio (cockpit del turno)** — «Mi trabajo hoy» con conteos en vivo y accesos a los módulos operativos (§ El espacio de trabajo ▸ Pantalla de Inicio)
 - ✅ **Menú lateral por grupos** (Operación · Diseño y datos · Administración) + **Favoritos en el topbar** (§ El espacio de trabajo ▸ Menú lateral)
 - ✅ **Filtros de las grillas** (chips de filtros activos removibles, «Limpiar filtros», «Refrescar», «← Volver al dashboard», atajos de fecha) — comunes a Órdenes de trabajo, Incidencias, Excepciones y Bitácoras (§ El espacio de trabajo ▸ Filtros de las grillas)
-- ✍️ Pestañas, búsqueda ⌘K, idioma, densidad, tema claro/oscuro
+- ✅ **Búsqueda ⌘K, pestañas, idioma, densidad y tema claro/oscuro** (preferencias personales del workspace; el tema por defecto lo define la instalación) (§ El espacio de trabajo ▸ Búsqueda, pestañas, idioma, densidad y tema)
 
 ### 3. Estructura organizacional  [Configurador/Admin]
 - ✅ **Asistente: crear una nueva área** (wizard de 3 pasos: identidad → niveles → nodo raíz, deja el área operativa de una vez) (§ Estructura organizacional ▸ Asistente: crear una nueva área)
@@ -113,6 +113,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 - ✅ **Servidor de correo (SMTP)**: proveedor, credenciales cifradas, probar (§ Configuración ▸ Servidor de correo)
 - ✅ **Inteligencia Artificial**: proveedor (ninguno/Anthropic/local), clave cifrada, "Probar" en vivo (§ Configuración ▸ Inteligencia Artificial)
 - ✅ **Apariencia / Temas**: construir paletas de marca (claro+oscuro) **desde una plantilla curada o duplicando otra**, publicar, elegir la por defecto; vista previa en vivo y contraste WCAG (§ Configuración ▸ Apariencia / Temas)
+- ✅ **Identidad y logo de la empresa** (nombre visible + logo aplicados EN VIVO al acceso, la barra superior y el título; defaults de tema/zona horaria/idioma de la instalación; marca blanca según licencia) (§ Configuración ▸ Identidad y logo de la empresa)
 
 ### 13. Rondas  [Planificador · Operador]
 - ✅ **Programación de rondas** (horario por turno/intervalo/calendario + rol responsable) (§ Rondas ▸ Programación de rondas)
@@ -167,7 +168,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 - ✅ **Enlace con incidencias** (crear una OT desde una incidencia con los datos pre-rellenados; ver las OT relacionadas —folio, estado, criticidad, semáforo— en la ficha de la incidencia; volver desde la OT a la incidencia de origen) (§ Órdenes de trabajo ▸ Enlace con incidencias)
 
 ### 20. Primer arranque (instalación nueva)  [Admin / Implementador]
-- ✅ **Asistente de configuración inicial** (instalación recién desplegada: token de instalación de un solo uso, cuenta de administrador real, identidad, apariencia y activación de licencia — nunca vuelve a aparecer) (§ Primer arranque ▸ Asistente de configuración inicial)
+- ✅ **Asistente de configuración inicial** (instalación recién desplegada: token de instalación de un solo uso, cuenta de administrador real, identidad **con logo de la empresa**, apariencia y activación de licencia — nunca vuelve a aparecer) (§ Primer arranque ▸ Asistente de configuración inicial)
 
 ---
 
@@ -1284,6 +1285,36 @@ solo cómo consultas lo que ya puedes ver.
 - Los filtros que llegan desde un dashboard (rango de fechas, nodo, origen, equipo) ahora se pueden **quitar**
   igual que cualquier otro (antes quedaban "pegados" sin control visible).
 - **Bitácoras** ya tenía estos controles; ahora Órdenes de trabajo, Incidencias y Excepciones los comparten.
+
+---
+
+## El espacio de trabajo ▸ Búsqueda, pestañas, idioma, densidad y tema  [todos]
+
+**Para qué sirve.** La barra superior concentra las herramientas transversales del espacio de
+trabajo: saltar a cualquier pantalla sin recorrer menús, trabajar con varias pantallas abiertas,
+y ajustar la apariencia (idioma, densidad de la información y tema claro/oscuro) a tu gusto.
+
+**Cómo se usa.**
+- **Búsqueda / paleta de comandos (⌘K o Ctrl+K):** abre un buscador de pantallas; escribe parte del
+  nombre ("inci…", "usuar…") y Enter te lleva. Es la forma más rápida de navegar.
+- **Pestañas de trabajo:** cada pantalla que visitas se abre como pestaña sobre el contenido, y su
+  estado (filtros, scroll) se conserva al volver. Puedes fijar las que uses siempre y cerrar el resto.
+- **Idioma:** menú del globo — Español (Chile) disponible; English en preparación.
+- **Densidad:** alterna entre **Cómoda** (más aire, uso en tablet/terreno) y **Compacta** (más filas
+  por pantalla, uso en escritorio).
+- **Tema:** menú de la luna/sol — **Oscuro**, **Claro** o **Automático** (sigue al sistema operativo).
+  Ahí mismo puedes elegir la **paleta de colores** si el administrador publicó más de una.
+- **Favoritos:** la estrella del menú lateral fija pantallas al menú de favoritos del topbar.
+
+**Quién puede.** Todos los usuarios; son preferencias personales (viven en tu navegador) y no
+afectan a nadie más.
+
+**Importante.**
+- Si **nunca** has elegido tema, usas el **tema por defecto de la instalación** (lo define el
+  administrador en Configuración ▸ Identidad). En cuanto eliges uno propio, tu elección manda y el
+  default ya no te afecta.
+- La pantalla de **acceso** (login) es siempre oscura: es la identidad de marca, independiente del
+  tema del workspace.
 
 ---
 
@@ -2534,7 +2565,9 @@ al asistente de instalación de Jenkins/GitLab/Atlassian.
 3. **Crea la cuenta de administrador.** Correo, nombre y contraseña (el medidor muestra en vivo los
    requisitos de la política real: largo mínimo, mayúscula, número…). Puedes marcar **"Exigir MFA a los
    administradores"**: al primer inicio de sesión el sistema te hará enrolar el segundo factor.
-4. **Identidad de la empresa** (saltable): nombre visible, zona horaria e idioma. Si la licencia ya está
+4. **Identidad de la empresa** (saltable): nombre visible, zona horaria, idioma y — desde OOBE S3 — el
+   **logo de la empresa** (PNG/JPEG/WebP, máx. 512 KB; se aplica de inmediato a la pantalla de acceso y
+   a la barra superior; sin logo se usa un monograma con las iniciales). Si la licencia ya está
    activada, el nombre viene pre-llenado desde ella.
 5. **Apariencia** (saltable): modo por defecto (oscuro/claro/automático) y paleta de colores desde las
    plantillas curadas. Define el tema **de la instalación**; cada usuario puede elegir el suyo después.
@@ -2557,6 +2590,45 @@ del despliegue: el implementador o el administrador de TI). No requiere usuario 
   ceremonia normal de archivos). Los pasos del token y de la cuenta de administrador NO.
 - La instalación puede configurarse **sin licencia** (queda pendiente de activación: se puede consultar
   pero no operar). El asistente nunca es requisito para importar la licencia, solo un atajo.
+
+---
+
+## Configuración ▸ Identidad y logo de la empresa  [Admin]
+
+**Para qué sirve.** Que la instalación se vea **de tu empresa** — sin tocar el servidor ni reinstalar
+nada. El nombre y el logo configurados aparecen en la **pantalla de acceso**, en la **barra superior**
+y en el **título de la pestaña** del navegador, al instante. También define los **valores por defecto
+de la instalación**: tema (oscuro/claro/automático), zona horaria e idioma — lo que reciben los
+usuarios que aún no han elegido una preferencia propia.
+
+**Cómo se usa (caso de uso, paso a paso).**
+1. Entra a **Configuración → pestaña Identidad**.
+2. **Nombre visible**: escribe el nombre de la empresa (ej. "Minera Los Andes SpA") y presiona
+   **Guardar**. Al instante aparece junto al selector de estructura en la barra superior y el título de
+   la pestaña pasa a "Minera Los Andes SpA · Lyra WatchLog". Déjalo vacío y guarda para volver a la
+   marca base.
+3. **Logo**: presiona **Subir logo** y elige un PNG, JPEG o WebP de hasta 512 KB (ideal: fondo
+   transparente, ~512px de ancho). Se muestra de inmediato en el acceso y la barra superior; **Quitar**
+   vuelve al monograma con las iniciales del nombre.
+4. **Valores por defecto**: elige el tema, la zona horaria y el idioma de la instalación. El tema por
+   defecto solo afecta a quienes **nunca** han elegido el suyo en el menú de tema — una preferencia
+   personal ya elegida jamás se pisa.
+
+**Quién puede.** Administradores con el permiso **Configuración del sistema (gestionar)**
+(`settings:manage`) — el mismo que gobierna el resto de /configuracion. Ver la pantalla de acceso
+co-marcada no requiere permiso: es pública por diseño (el login ocurre antes de iniciar sesión).
+
+**Importante.**
+- **SVG no está permitido** para el logo, por seguridad (un SVG puede contener código ejecutable). El
+  sistema valida el contenido real del archivo, no su extensión.
+- **Marca del producto vs. marca del cliente:** con una licencia estándar la pantalla de acceso muestra
+  la marca Lyra WatchLog con tu empresa como "Licenciado para" (co-branding). Si tu licencia incluye
+  **marca blanca**, tu nombre y logo toman el lugar dominante en el acceso y el menú lateral, y Lyra
+  queda solo en la mención discreta "Operado con Lyra WatchLog". Eso lo determina la licencia, no una
+  opción de configuración.
+- Todo cambio de identidad queda **auditado** (quién subió/quitó el logo, con fecha).
+- Con la licencia en estado restringido (solo lectura) la identidad **se sigue mostrando** con
+  normalidad; lo que no se puede es cambiarla hasta regularizar la licencia.
 
 ---
 

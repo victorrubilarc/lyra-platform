@@ -10,13 +10,16 @@ import {
   Eye,
   EyeOff,
   FileKey2,
+  ImageUp,
   KeyRound,
   Rocket,
   ShieldCheck,
+  Trash2,
   Upload,
 } from "lucide-react";
 import { Button, Checkbox, Chip, FormField, Input, Select, Spinner, Stepper } from "@lyra/ui";
 import {
+  BRANDING_LOGO_MAX_BYTES,
   THEME_PRESETS,
   emailSchema,
   type SetupContextDto,
@@ -32,6 +35,8 @@ import {
   fetchSetupStatus,
   finalizeSetup,
   importSetupLicense,
+  removeSetupLogo,
+  uploadSetupLogo,
 } from "./setup-api.js";
 import styles from "./SetupWizardPage.module.css";
 
@@ -100,6 +105,47 @@ export function SetupWizardPage() {
   const [company, setCompany] = useState("");
   const [timezone, setTimezone] = useState("America/Santiago");
   const [locale, setLocale] = useState<SetupLocale>("es-CL");
+  // Logo (OOBE S3): se sube DE INMEDIATO (token-gated) — el finalize no lo toca.
+  const logoFileRef = useRef<HTMLInputElement>(null);
+  const [logoUploaded, setLogoUploaded] = useState(false);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoBusy, setLogoBusy] = useState(false);
+  const [logoError, setLogoError] = useState<string | null>(null);
+
+  const onLogoFile = async (file: File) => {
+    setLogoError(null);
+    if (file.size > BRANDING_LOGO_MAX_BYTES) {
+      setLogoError("El archivo supera el máximo de 512 KB.");
+      return;
+    }
+    setLogoBusy(true);
+    try {
+      await uploadSetupLogo(token, file);
+      if (logoPreview) URL.revokeObjectURL(logoPreview);
+      setLogoPreview(URL.createObjectURL(file));
+      setLogoUploaded(true);
+    } catch (err) {
+      setLogoError(err instanceof ApiError ? err.message : "No se pudo subir el logo.");
+    } finally {
+      setLogoBusy(false);
+      if (logoFileRef.current) logoFileRef.current.value = "";
+    }
+  };
+
+  const onLogoRemove = async () => {
+    setLogoBusy(true);
+    setLogoError(null);
+    try {
+      await removeSetupLogo(token);
+      if (logoPreview) URL.revokeObjectURL(logoPreview);
+      setLogoPreview(null);
+      setLogoUploaded(false);
+    } catch (err) {
+      setLogoError(err instanceof ApiError ? err.message : "No se pudo quitar el logo.");
+    } finally {
+      setLogoBusy(false);
+    }
+  };
 
   // Paso 4 — apariencia (global de la instalación).
   const [themeMode, setThemeMode] = useState<SetupThemeMode>("dark");
@@ -566,6 +612,58 @@ export function SetupWizardPage() {
                 )}
               </FormField>
             </div>
+            <FormField
+              label="Logo de la empresa (opcional)"
+              hint="PNG, JPEG o WebP · máx. 512 KB. Se aplica al acceso y a la barra superior; sin logo se usa un monograma."
+              error={logoError ?? undefined}
+            >
+              {() => (
+                <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                  {logoPreview && (
+                    <img
+                      src={logoPreview}
+                      alt="Logo de la empresa"
+                      style={{
+                        height: 44,
+                        maxWidth: 180,
+                        objectFit: "contain",
+                        background: "rgba(255,255,255,0.92)",
+                        borderRadius: 8,
+                        padding: "4px 8px",
+                      }}
+                    />
+                  )}
+                  <input
+                    ref={logoFileRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    hidden
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) void onLogoFile(file);
+                    }}
+                  />
+                  <Button
+                    variant="secondary"
+                    loading={logoBusy}
+                    leftIcon={<ImageUp size={15} />}
+                    onClick={() => logoFileRef.current?.click()}
+                  >
+                    {logoUploaded ? "Cambiar logo" : "Subir logo"}
+                  </Button>
+                  {logoUploaded && (
+                    <Button
+                      variant="secondary"
+                      disabled={logoBusy}
+                      leftIcon={<Trash2 size={15} />}
+                      onClick={() => void onLogoRemove()}
+                    >
+                      Quitar
+                    </Button>
+                  )}
+                </div>
+              )}
+            </FormField>
             <div className={styles.actions}>
               <button
                 type="button"
@@ -790,6 +888,12 @@ export function SetupWizardPage() {
                 <span className={styles.infoLabel}>Zona horaria · idioma</span>
                 <span className={styles.infoValue}>
                   {timezone} · {LOCALE_OPTIONS.find((o) => o.value === locale)?.label}
+                </span>
+              </div>
+              <div className={styles.infoRow}>
+                <span className={styles.infoLabel}>Logo</span>
+                <span className={styles.infoValue}>
+                  {logoUploaded ? "Cargado" : "Sin logo (se usará un monograma)"}
                 </span>
               </div>
               <div className={styles.infoRow}>

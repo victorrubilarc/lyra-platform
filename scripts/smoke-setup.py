@@ -15,11 +15,14 @@ en PENDIENTE_ACTIVACION real (prueba la whitelist L1 de verdad).
     (política + installationId/huella, estado PENDIENTE_ACTIVACION — los POST
     de /setup PASAN el guard L1 en ese estado); descarga de solicitud.lreq;
     import de licencia BASURA rechazado (400, nada se persiste) e import de
-    licencia DEV VÁLIDA aceptado (→VALIDA); finalize con contraseña débil 400;
-    finalize OK crea el admin real (+ MFA por rol + settings + paleta), BORRA
-    el setup-token del disco y responde {ok}. Después: status=false, contexto
-    404, re-finalize 404 (no duplica), login del admin nuevo OK, y el seed de
-    catálogo NO dejó estructura de demo. Reinicio de la API sobre la misma BD:
+    licencia DEV VÁLIDA aceptado (→VALIDA); logo del wizard (OOBE S3): token
+    inválido 403, PNG válido 204 y el branding PÚBLICO lo refleja ANTES del
+    finalize; finalize con contraseña débil 400; finalize OK crea el admin real
+    (+ MFA por rol + settings + paleta), BORRA el setup-token del disco y
+    responde {ok}. Después: status=false, contexto 404, re-finalize 404 (no
+    duplica), POST /setup/logo 404 (el módulo murió) pero el logo y el nombre
+    SOBREVIVEN en /branding, login del admin nuevo OK, y el seed de catálogo NO
+    dejó estructura de demo. Reinicio de la API sobre la misma BD:
     no re-emite token ni re-expone el setup. Seed SEED_SCOPE=demo sobre la BD
     efímera: el usuario demo dev sigue naciendo igual (dev intacto).
 
@@ -75,6 +78,34 @@ def call(method, path, body=None, token=None, bearer=None):
                 return resp.status, json.loads(txt) if txt else None
             except Exception:
                 return resp.status, txt
+    except urllib.error.HTTPError as e:
+        b = e.read().decode()
+        try:
+            return e.code, json.loads(b)
+        except Exception:
+            return e.code, b
+    except urllib.error.URLError:
+        return 0, None
+
+
+def upload_logo(content, filename, token=None):
+    """Multipart de un archivo al endpoint token-gated del wizard (OOBE S3)."""
+    import uuid
+
+    boundary = uuid.uuid4().hex
+    body = (
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'
+        f"Content-Type: application/octet-stream\r\n\r\n"
+    ).encode() + content + f"\r\n--{boundary}--\r\n".encode()
+    r = urllib.request.Request(BASE + "/setup/logo", data=body, method="POST")
+    r.add_header("Content-Type", f"multipart/form-data; boundary={boundary}")
+    if token is not None:
+        r.add_header("x-setup-token", token)
+    try:
+        with urllib.request.urlopen(r) as resp:
+            txt = resp.read().decode()
+            return resp.status, json.loads(txt) if txt else None
     except urllib.error.HTTPError as e:
         b = e.read().decode()
         try:
@@ -280,6 +311,16 @@ def main():
         check("B6 licencia dev VÁLIDA importada desde el wizard → VALIDA",
               st == 200 and (body or {}).get("status") == "VALIDA" and LICENSE_FILE.exists())
 
+        # Logo del wizard (OOBE S3): mismo validador que /configuracion, candado = token.
+        png = b"\x89PNG\r\n\x1a\n" + b"logo-oobe-smoke" * 3
+        st, _ = upload_logo(png, "logo.png", token="token-invalido")
+        check("B6b logo con token inválido: 403", st == 403)
+        st, _ = upload_logo(png, "logo.png", token=token)
+        check("B6c logo del wizard subido (204, validación de branding)", st == 204)
+        st, body = call("GET", "/branding")
+        check("B6d el branding PÚBLICO refleja el logo antes del finalize",
+              st == 200 and (body or {}).get("hasLogo") is True)
+
         st, body = call("POST", "/setup/finalize", token=token, body={
             "admin": {"email": ADMIN_EMAIL, "displayName": "Admin OOBE", "password": "corta"}})
         check("B7 contraseña débil: 400 de la política", st == 400)
@@ -302,6 +343,12 @@ def main():
         st, _ = call("POST", "/setup/finalize", token=token, body={
             "admin": {"email": "otro@watchlog.local", "displayName": "X", "password": ADMIN_PASS}})
         check("B12 re-finalize: 404, no duplica admins", st == 404)
+        st, _ = upload_logo(png, "logo.png", token=token)
+        check("B12b logo tras completar: 404 (el módulo murió)", st == 404)
+        st, body = call("GET", "/branding")
+        check("B12c nombre y logo SOBREVIVEN al finalize en el branding público",
+              st == 200 and (body or {}).get("companyName") == "Empresa Smoke OOBE"
+              and (body or {}).get("hasLogo") is True)
 
         st, body = call("POST", "/auth/login", body={"email": ADMIN_EMAIL, "password": ADMIN_PASS})
         tok = (body or {}).get("accessToken") if st in (200, 201) else None

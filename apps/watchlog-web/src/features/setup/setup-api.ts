@@ -9,7 +9,7 @@ import {
   type SetupLicenseImportResponse,
   type SetupStatusDto,
 } from "@lyra/contracts";
-import { apiBlob, apiJson } from "../../lib/api-client.js";
+import { apiBlob, apiJson, apiUploadVoid, apiVoid } from "../../lib/api-client.js";
 
 /** Header del token de instalación (un solo uso; espejo del backend). */
 const TOKEN_HEADER = "x-setup-token";
@@ -39,6 +39,21 @@ export function importSetupLicense(
     body: { content },
     headers: { [TOKEN_HEADER]: token },
   });
+}
+
+/**
+ * Logo de la empresa (OOBE S3, paso Identidad). Mismo servicio y validación
+ * (magic bytes, ≤512KB, sin SVG) que la edición post-setup; el candado aquí es
+ * el token de instalación.
+ */
+export function uploadSetupLogo(token: string, file: File): Promise<void> {
+  const form = new FormData();
+  form.append("file", file);
+  return apiUploadVoid("/setup/logo", form, { headers: { [TOKEN_HEADER]: token } });
+}
+
+export function removeSetupLogo(token: string): Promise<void> {
+  return apiVoid("/setup/logo", { method: "DELETE", headers: { [TOKEN_HEADER]: token } });
 }
 
 /** Finalización atómica: crea el admin real y cierra el asistente para siempre. */

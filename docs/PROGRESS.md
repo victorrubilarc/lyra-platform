@@ -1,5 +1,39 @@
 # Progreso — Lyra WatchLog
 
+**2026-07-06 — 🎨 OOBE S3 · BRANDING RUNTIME ✅ ⇒ épico §2(5) COMPLETO, §2(2) avanzado, tag v0.1.16** (`feat/oobe-s3-branding`).
+La identidad que el wizard PERSISTE por fin se VE — y sin rebuild: muere el co-branding BUILD-TIME (`VITE_LICENSEE_*`
+RETIRADO de .env/.env.prod/vite-env/public; hallazgo: `Dockerfile.web` **nunca** lo horneó, la imagen de canal siempre
+habría mostrado "Empresa Demo"). **(1) Endpoint público `GET /api/branding`** (el login se marca SIN sesión; GET pasa
+L1 solo): DTO **MÍNIMO con lista CERRADA** de 5 claves (`companyName/hasLogo/logoVersion/defaultThemeMode/whiteLabel`)
+— nada de licencia/installationId/huella; el smoke lo afirma con asserts negativos y SECURITY §1.2 exige pasar por ahí
+antes de agregar campos. **(2) Logo por instalación** (decisión (a): **bytea en Postgres**, NO MinIO — pre-auth sin
+presigned, pg_dump respalda la identidad, singleton ≤512KB; desviación del BACKLOG registrada): `PUT/DELETE
+/api/branding/logo` con `settings:manage`, validación por **MAGIC BYTES** (PNG/JPEG/WebP; **SVG RECHAZADO** = XSS),
+servido público cacheable (ETag sha256 + 304 + max-age 86400 + nosniff), auditado (`branding.logo.updated/removed`).
+**(3) Gate `whiteLabel` (L6d) CABLEADO por primera vez** (matriz decisión (b)): `lyra` (sin nombre) · `cobrand`
+(Lyra domina + "Licenciado para {empresa}") · `whitelabel` (payload verificado ⇒ la marca del CLIENTE domina
+login/sidebar, pie SIN ITESICWS, "Operado con Lyra WatchLog" discreto queda); Topbar con chip de identidad en AMBOS
+modos; `document.title` por modo. Correos/acta PDF quedan en §2(2). **(4) Web:** `useBranding()` (query pública) +
+AuthLayout/Sidebar/Topbar runtime + `useBrandingEffects` (título + fallback de tema); **theme-store v1** con
+`explicit` (migración: storage previo = elección explícita) — `defaultThemeMode` de la instalación aplica SOLO a
+quien nunca eligió. **(5) /configuracion ▸ Identidad** (tab NUEVA, decisión (d): reusa `settings:manage`, sin
+seed/FLUSHALL): nombre + logo + defaults tema/zona horaria/idioma editables post-setup (PATCH /settings ganó los 4
+campos con `.nullable().optional()` — null = limpiar). **(6) Wizard:** paso Identidad gana el logo (`POST/DELETE
+/api/setup/logo` token-gated, MISMO `BrandingService`; sobrevive al finalize). **(7) Tooling:** `gen-dev-license
+--no-white-label` (el emisor default es whiteLabel:true). **Verde:** typecheck/lint(0 nuevos)/build/test (API **330**
+= +11 branding · web **26** = +8 theme-store/matriz · contracts intactos) + **smoke-branding.py 28/28 NUEVO** (:3408,
+3 escenarios: whiteLabel on / off / SIN licencia ⇒ branding vivo y re-marcado 403 LICENSE_RESTRICTED) +
+**smoke-setup.py 30/30** (+5: logo wizard con token inválido/válido, visible pre-finalize, 404 post-finalize,
+sobrevive) + regresión licencia **28/24** + **integridad 35/35** + temas **23/11** + estructura **33**. Migración
+aditiva `oobe_s3_branding_logo` (fix de paso: checksum de la migración OOBE en la BD dev, editada post-aplicación la
+sesión anterior — se actualizó el registro al archivo committeado, sin reset). **No probado:** smoke VISUAL
+(dueño): login co-marcado/marca blanca, tab Identidad, chip del Topbar, wizard con logo (requiere BD virgen).
+Docs: DECISIONS (a–f S3), LICENSING §5.2 (L6d cableado), SECURITY §1.2 (superficie pública + subida), BACKLOG
+(§2(5) CERRADO · §2(2) restan correos/acta/nombre de producto), USER_GUIDE (§21 Identidad nueva + §20 wizard),
+SALES_GUIDE (marca blanca runtime). **Tag v0.1.16** (decisión (e): primera imagen VENDIBLE con entrega digna; el EC2
+demo se auto-despliega — su licencia es whiteLabel:true sin companyDisplayName ⇒ sin cambio visual). **Siguiente:
+QA del dueño / reversa GxP / épico §2(2) restante (correos+acta+nombre de producto) o §2(4) cadena de suministro.**
+
 **2026-07-06 — 🚀 Asistente de PRIMER ARRANQUE (OOBE) · S1 núcleo seguro + S2 wizard UI ✅** (`feat/setup-wizard-oobe`).
 Épico distribución §2(5): una instalación VIRGEN (0 usuarios) ya no se bootstrapea con credenciales en el `.env` — al
 abrir la web muestra el **asistente de configuración inicial** (`/setup`, fullscreen DARK, `Stepper` de L3b) protegido

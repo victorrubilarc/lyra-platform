@@ -8,6 +8,7 @@
  *   pnpm --filter @lyra/watchlog-api run license:dev -- --modules=core,incidents
  *   pnpm --filter @lyra/watchlog-api run license:dev -- --expires-in-days=10   # POR_VENCER (banner L6)
  *   pnpm --filter @lyra/watchlog-api run license:dev -- --max-nodes=50 --max-named-users=10   # topes L2b
+ *   pnpm --filter @lyra/watchlog-api run license:dev -- --no-white-label   # co-branding (S3: whiteLabel=false)
  *
  * Desde L3 es un ENVOLTORIO DELGADO sobre `@lyra/licensing-cli` (`issueLicense`):
  * una sola implementación de emisión para DEV y PROD, sin copiar/pegar. Lo único
@@ -31,6 +32,9 @@ const DEV_PRIVATE_KEY = readFileSync(
 
 async function main(): Promise<void> {
   const expired = process.argv.includes("--expired");
+  // --no-white-label ⇒ whiteLabel=false (smoke del gate L6d/S3). El default del
+  // emisor es whiteLabel=true (modelo de canal: el socio re-marca).
+  const noWhiteLabel = process.argv.includes("--no-white-label");
   // --modules=core,incidents ⇒ entitlement ACOTADO (smoke del gating L2).
   const modulesArg = process.argv.find((a) => a.startsWith("--modules="));
   // --max-nodes=N / --max-named-users=N ⇒ topes ACOTADOS (smoke del
@@ -106,6 +110,7 @@ async function main(): Promise<void> {
       licenseId: `lic_dev_${new Date(now).toISOString().slice(0, 10)}`,
       issuer: "ITESICWS (DEV)",
       supportTier: "DEV",
+      whiteLabel: noWhiteLabel ? false : undefined,
       allowPast: expired || (expiresInDays !== undefined && expiresInDays < 0),
     },
   });
@@ -122,6 +127,7 @@ async function main(): Promise<void> {
         : "VALIDA";
   console.log(`✅ Licencia DEV escrita en ${resolve(licenseFile)}`);
   console.log(`   estado esperado: ${expectedState}`);
+  console.log(`   whiteLabel: ${issued.payload.whiteLabel}`);
   console.log(`   huella: ${request.fingerprint}`);
   console.log(`   vence:  ${issued.payload.expiresAt}`);
 }
