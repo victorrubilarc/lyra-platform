@@ -1099,10 +1099,15 @@ nunca queda más de una sesión atrás.
             self-hosted ✅ · (v) compose standalone + matriz de puertos ✅ · **EXCEPTO (vi) pin de
             `minio/minio:latest`** — queda en H2 (donde ya estaba listado con el resto de pins; TODO anotado en
             `deploy/standalone/docker-compose.yml`).
-      - [ ] **E2 · Paquete instalable** = ítems (3c) bundle air-gapped + (5) install.sh: `make-bundle.sh` (imágenes
-            tar + compose + install.sh SIN git-clone [hoy la instalación entrega el REPO COMPLETO = fuga de fuente] +
-            Caddyfile ejemplo + guía + SHA256SUMS) probado contra VM limpia sin internet. **Correr Trivy sobre las
-            imágenes ANTES de las pruebas reales del dueño** y adjuntar el reporte al paquete.
+      - [x] **E2 · Paquete instalable ✅ CERRADO 2026-07-07, tag v0.1.18** (`feat/e2-paquete-instalable`; a–h en
+            DECISIONS): `scripts/make-bundle.sh` (retag NEUTRO + docker save app+infra + compose standalone +
+            `install.sh` + guía + Trivy + `SHA256SUMS` → `.tar.gz`, adjuntado al GitHub Release por el job `bundle`
+            de `release.yml`) · `deploy/standalone/install.sh` OFFLINE idempotente (verify SHA256 + docker load + `.env`
+            openssl chmod 600 + up por modo a/b + healthcheck) · `WL_IMAGE_PREFIX` en el compose · `docs/INSTALL_OFFLINE.md`.
+            **Trivy corrido (`scripts/scan-images.sh`), reporte en `SECURITY/`; CVEs = solo base, anotados en H2.**
+            **🔴 Fix de la fuga real:** la imagen `migrate` (`FROM build`) filtraba frontend + `packages/*/src` + llave DEV
+            en claro ⇒ poda agresiva del stage `migrate` + strip `prisma/*.ts` del `api` (verificado 0 fuente Lyra fuera
+            de node_modules). Probado local (up/seed/health/idempotencia :3411). Prueba contra VM air-gapped REAL = dueño.
       - [ ] **E3 · Cadena de suministro** = ítem (4) completo (cosign + digest + Trivy gate CI + SBOM CycloneDX +
             backups CIFRADOS + registry privado read-only por cliente).
       - [ ] **E4 · Hardening de contenedores/host (CIS Docker Benchmark):** `USER` non-root en Dockerfiles (hoy TODO
