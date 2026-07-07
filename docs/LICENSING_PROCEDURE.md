@@ -140,6 +140,13 @@ Esto se repite **una vez por cada servidor** que el socio levanta (una por licen
 6. **La app verifica** la firma (con la clave pública embebida) + que la huella calce + vencimiento →
    estado **VÁLIDA**. **Operando.** Con la marca del socio.
 
+> **El asistente de primer arranque ABRAZA esta ceremonia (OOBE 2026-07-06):** en una instalación
+> virgen, el paso "Licencia" del wizard `/setup` (protegido por el token de instalación) muestra el
+> `installationId` + huella, permite **descargar `solicitud.lreq`** y —si el implementador ya tiene el
+> `license.lic`— **importarlo desde el navegador** (la app lo verifica ANTES de persistirlo; excepción
+> acotada a L6b, ver `LICENSING.md §5.2`). Los pasos 2–6 de arriba siguen siendo el camino canónico y
+> el ÚNICO tras completar el setup.
+
 ```
   [Servidor del cliente]              [PC con internet]            [ITESICWS]
         │  arranca sin licencia            (puente)                    │

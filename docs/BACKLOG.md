@@ -946,39 +946,29 @@ nunca queda más de una sesión atrás.
       queda con marca Lyra** (ver memoria `theme-system`). Falta: **nombre de producto configurable** en toda la app,
       **login personalizable**, branding en el **acta PDF** y en los **correos** salientes. Sin rebuild (runtime),
       gobernado por la licencia (`whiteLabel:true`). Reusa el sistema de temas EST-TEMAS.
-- [ ] **(5) Asistente de PRIMER ARRANQUE (OOBE / setup wizard)** (~30–60 HH) — **registrado 2026-07-06 a pedido del
-      dueño** ("la entrega del paquete no queda profesional si la primera pantalla es un login con credenciales
-      seed"). **Además CIERRA UN HOYO DE SEGURIDAD REAL de la entrega:** hoy el bootstrap de una instalación
-      productiva corre `RUN_SEED=true` y el primer admin es **`demo@watchlog.local / Demo!Pass2026`** (hardcodeado y
-      público en el repo) — inaceptable para un cliente real. Patrón industria: Jenkins (`initialAdminPassword` en
-      logs), GitLab (pantalla de root en primer arranque), Atlassian/Grafana/Proxmox (setup wizard). Diseño propuesto:
-      - **S1 · Núcleo seguro (backend):** (i) **separar el seed**: seed de CATÁLOGO (permisos, plantillas de
-        notificación, workflows base — corre SIEMPRE en prod) vs seed DEMO (usuarios/datos de demo — SOLO dev/smokes;
-        OJO: todos los smokes dependen del admin demo ⇒ dev no cambia); (ii) estado `setupCompleted` single-row
-        (patrón `LicenseInstallation`) + detección de instalación virgen (0 usuarios); (iii) **token de instalación
-        de UN SOLO USO** impreso en el log del api al primer arranque (patrón Jenkins) — sin él, cualquiera en la red
-        de planta podría hacerse admin antes que el implementador; (iv) endpoints `/api/setup/*` vivos SOLO mientras
-        `!setupCompleted` (guard; después 404) + **finalización ATÓMICA** (crea admin real validando política de
-        contraseñas + marca completado + audita `system.setup.completed`); (v) whitelist del guard L1: el setup debe
-        operar en `PENDIENTE_ACTIVACION` (la instalación puede aún no tener licencia — el implementador hace setup y
-        activación en la misma visita); módulo = `core` (jamás gateado). (vi) migración de instalaciones EXISTENTES
-        (EC2 demo): con usuarios ⇒ `setupCompleted=true` retroactivo.
-      - **S2 · Wizard UI (web, premium):** ruta `/setup` fullscreen DARK (identidad de marca; el login es siempre
-        oscuro), reusa el `Stepper` de packages/ui (L3b). Pasos: **1. Bienvenida** (+ token de instalación) →
-        **2. Cuenta de administrador** (email/nombre/contraseña con medidor de la política; ofrecer enrolar MFA ya)
-        → **3. Identidad de la empresa** (nombre visible — PREFILL desde `customer` del payload de licencia si ya
-        está activada; zona horaria; idioma) → **4. Apariencia** (claro/oscuro/auto + paleta de `THEME_PRESETS` +
-        **logo** a MinIO) → **5. Licencia** (condicional: si PENDIENTE_ACTIVACION muestra installationId + huella +
-        descarga de `solicitud.lreq` + instrucciones del runbook) → **6. Resumen → Finalizar** → login. Lo opcional
-        se puede saltar y rellenar después en /configuracion. Nunca vuelve a aparecer.
-      - **S3 · Branding real** (empalma con (2) marca blanca): Settings gana `companyDisplayName` + `logoRef`
-        aplicados a Topbar/login/correos; el gate latente `whiteLabel` (L6d) gobierna hasta dónde se re-marca.
-      - **Decisiones ABIERTAS para la sesión:** (a) token por log del contenedor vs archivo `setup-token` en
-        `./license/` (pro archivo: el implementador ya trabaja en esa carpeta; contra: queda en disco); (b) ¿subir
-        `license.lic` DESDE el wizard? (hoy la decisión L6b dice que la UI NO sube archivos de licencia — habría que
-        reabrirla con fundamento: Atlassian/GitLab SÍ lo permiten y reduce fricción de la ceremonia); (c) ¿el paso de
-        apariencia escribe la paleta global o solo la preferencia del admin?; (d) alcance exacto del logo (Topbar +
-        login vs también acta PDF — el acta es Part 11, cuidado con tocarla).
+- [ ] **(5) Asistente de PRIMER ARRANQUE (OOBE / setup wizard)** — **S1+S2 COMPLETOS ✅ 2026-07-06**
+      (`feat/setup-wizard-oobe`; decisiones a–f en DECISIONS 2026-07-06); **queda SOLO S3**. Hallazgo AFINADO en la
+      sesión: en prod (`NODE_ENV=production`) el seed nunca creó al demo — el hoyo real era `BOOTSTRAP_ADMIN_PASSWORD`
+      en texto plano en el `.env` (con `__CAMBIAR_FUERTE__` público como contraseña si no se cambiaba); **eliminado**.
+      - [x] **S1 · Núcleo seguro (backend) ✅:** seed split `SEED_SCOPE=catalog|demo` (catálogo corre SIEMPRE en el
+            init-container — de paso los permisos nuevos ya llegan a instalaciones existentes, gap que `RUN_SEED=false`
+            dejaba abierto; dev/CI/smokes sin cambios); singleton `SystemSetup` + retro-completado EN LA MIGRACIÓN
+            (EC2/dev jamás ven el wizard); token de un solo uso en `./license/setup-token` (hash SHA-256 en BD,
+            lockout 5/15 min, tiempo constante; el log anuncia solo la RUTA); `/api/setup/*` `@Public` con candado
+            propio, 404 tras completar, whitelist L1 (`/api/setup/`); finalize ATÓMICO (admin real + política +
+            MFA-por-rol + settings + paleta + auditoría `system.setup.completed`); import de `license.lic` verificado
+            ANTES de persistir (excepción acotada a L6b) + descarga de `solicitud.lreq`. Smoke `smoke-setup.py`
+            **25/25** (:3407, **BD efímera propia** `watchlog_setup_smoke`).
+      - [x] **S2 · Wizard UI (web, premium) ✅:** ruta `/setup` fullscreen DARK con `Stepper` (L3b): Bienvenida+token →
+            Cuenta (medidor contra la política real + checkbox MFA) → Identidad (prefill `customer`; zona horaria;
+            idioma) → Apariencia (modo + `THEME_PRESETS` con `PaletteSwatch`) → Licencia (condicional
+            PENDIENTE_ACTIVACION: estado/installationId/huella + descarga `.lreq` + import `.lic`) → Resumen →
+            Finalizar → login con aviso. Pasos 3–5 saltables; `/login` redirige a `/setup` si `setupRequired`.
+            (El logo a MinIO se DIFIRIÓ a S3 a propósito: capturarlo sin aplicarlo no aporta.)
+      - [ ] **S3 · Branding real** (empalma con (2) marca blanca): aplicar `companyDisplayName` (ya persistido por el
+            wizard en SystemSettings, junto a `defaultTimezone`/`defaultLocale`/`defaultThemeMode`) a Topbar/título,
+            captura de `logoRef` (MinIO) y re-marcado de login/correos/acta PDF gobernado por el gate `whiteLabel`
+            (L6d). Cablear también el fallback global `defaultThemeMode` en la web (hoy solo se persiste).
 - [ ] **(3) Orquestación de flota / actualización multi-cliente** (~75–160 HH) — **runbook en `DEPLOYMENT.md`.**
       Hoy el pipeline actualiza UNA instalación (`update.sh`: backup→pull→migrate→healthcheck→rollback→prune). Para
       N clientes falta: **(3a) inventario/reporte de versión** por instalación (endpoint `/version` o *heartbeat* del

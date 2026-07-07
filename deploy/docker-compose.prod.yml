@@ -65,8 +65,9 @@ services:
       - miniodata:/data
     networks: [internal]
 
-  # Init container: aplica migraciones (migrate deploy) de forma determinista. El
-  # seed solo corre en el bootstrap (RUN_SEED=true la primera vez; ver DEPLOYMENT.md).
+  # Init container: aplica migraciones (migrate deploy) + seed de CATÁLOGO en
+  # cada deploy (idempotente; JAMÁS crea usuarios — el primer admin lo crea el
+  # asistente de primer arranque /setup con su token; ver DEPLOYMENT.md).
   migrate:
     image: ${WL_REGISTRY:-ghcr.io}/${WL_OWNER}/lyra-watchlog-migrate:${WL_VERSION:-stable}
     restart: "no"
@@ -75,7 +76,6 @@ services:
     environment:
       NODE_ENV: "production"
       TZ: "${TZ:-America/Santiago}"
-      RUN_SEED: "${RUN_SEED:-false}"
     depends_on:
       postgres:
         condition: service_healthy

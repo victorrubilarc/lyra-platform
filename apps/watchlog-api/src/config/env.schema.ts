@@ -83,10 +83,6 @@ export const envSchema = z.object({
   // para abrir/descargar, corto para no dejar enlaces reusables).
   MINIO_PRESIGN_TTL: z.coerce.number().int().positive().default(300),
 
-  // --- Admin de arranque (seed idempotente) ---
-  BOOTSTRAP_ADMIN_EMAIL: z.string().email().optional(),
-  BOOTSTRAP_ADMIN_PASSWORD: z.string().optional(),
-
   // --- Licenciamiento (L1) ---
   // Ruta del archivo de licencia firmado (license.lic). En contenedor se monta
   // como volumen (/app/license/license.lic); en dev lo genera `pnpm license:dev`.

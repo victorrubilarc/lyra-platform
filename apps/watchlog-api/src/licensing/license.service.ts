@@ -48,6 +48,14 @@ function dayKey(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
+/**
+ * Resultado de la importación de una licencia (asistente de primer arranque).
+ * `reason` es legible-por-máquina (mismo vocabulario que LicenseSnapshot.reason).
+ */
+export type LicenseImportResult =
+  | { ok: true; snapshot: LicenseSnapshot }
+  | { ok: false; reason: string; detail?: string };
+
 /** Clave de semana ISO-8601 (cadencia SEMANAL del re-aviso POR_VENCER, decisión L6c). */
 function isoWeekKey(date: Date): string {
   const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
@@ -350,6 +358,61 @@ export class LicenseService implements OnApplicationBootstrap {
       daysToExpiry: snap.evaluation?.daysToExpiry ?? null,
       graceDaysRemaining: snap.graceDaysRemaining ?? null,
     };
+  }
+
+  /**
+   * Importa un `license.lic` recibido por el ASISTENTE de primer arranque
+   * (decisión 2026-07-06: reabre L6b SOLO para el setup, con salvaguardas).
+   * VERIFICA ANTES DE PERSISTIR: firma Ed25519 con la clave pública embebida,
+   * linaje (L4) y evaluación con la huella real — un archivo que evaluaría
+   * BLOQUEADA jamás toca el disco (p. ej. licencia de otra máquina). Si pasa,
+   * se escribe en LICENSE_FILE y se re-evalúa de inmediato (el estado nuevo
+   * queda auditado por la cañería normal de `refresh`).
+   */
+  async importLicenseFile(raw: string): Promise<LicenseImportResult> {
+    const content = raw.trim();
+    const verified = verifyLicense(content, LICENSE_PUBLIC_KEY_PEM);
+    if (!verified.ok) {
+      this.logger.warn(`Importación de licencia rechazada (${verified.reason}).`);
+      return { ok: false, reason: verified.reason, detail: verified.detail };
+    }
+    if (evaluateLineage(verified.payload, this.localLineage) === "MISMATCH") {
+      this.logger.warn("Importación de licencia rechazada: linaje no calza (LINEAGE_MISMATCH).");
+      return { ok: false, reason: "LINEAGE_MISMATCH" };
+    }
+    const evaluation = evaluateLicense(verified.payload, {
+      now: this.clock(),
+      fingerprint: this.fingerprint,
+      warnDays: this.config.get("LICENSE_WARN_DAYS", { infer: true }),
+    });
+    if (evaluation.state === LicenseState.BLOQUEADA) {
+      this.logger.warn(
+        `Importación de licencia rechazada: evaluaría BLOQUEADA (${evaluation.reason ?? "sin motivo"}).`,
+      );
+      return { ok: false, reason: evaluation.reason ?? "BLOQUEADA" };
+    }
+    try {
+      await mkdir(dirname(this.licenseFilePath()), { recursive: true });
+      await writeFile(this.licenseFilePath(), `${content}\n`, "utf8");
+    } catch (err) {
+      this.logger.error(`No se pudo escribir la licencia importada: ${String(err)}`);
+      return { ok: false, reason: "WRITE_FAILED", detail: String(err) };
+    }
+    const snapshot = await this.refresh("importada desde el asistente de primer arranque");
+    return { ok: true, snapshot };
+  }
+
+  /**
+   * Contenido de `solicitud.lreq` (ceremonia de activación, runbook §2) para
+   * que el asistente lo ofrezca como descarga; `undefined` si aún no existe.
+   */
+  async readActivationRequest(): Promise<string | undefined> {
+    try {
+      return await readFile(join(dirname(this.licenseFilePath()), REQUEST_FILE_NAME), "utf8");
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+      throw err;
+    }
   }
 
   // --- internos ---------------------------------------------------------------

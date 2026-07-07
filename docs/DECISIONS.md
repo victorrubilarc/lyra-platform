@@ -4,6 +4,47 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-06 · Asistente de PRIMER ARRANQUE (OOBE) S1+S2 · seed split + token de un solo uso + wizard `/setup` (decisiones a–f, aprobadas por el dueño antes de codificar)
+Sesión OOBE (`feat/setup-wizard-oobe`), BACKLOG §2(5). Mata el hoyo de la entrega: el bootstrap prod ya NO crea ningún
+usuario (hallazgo afinado de la sesión: con `NODE_ENV=production` el seed nunca creó `demo@watchlog.local` en prod —
+el hoyo real era `BOOTSTRAP_ADMIN_PASSWORD` en texto plano en el `.env`, con el placeholder público
+`__CAMBIAR_FUERTE__` como contraseña si el implementador no lo cambiaba; `seedBootstrapAdmin` y sus variables fueron
+**ELIMINADOS**). Una instalación VIRGEN (0 usuarios) muestra el asistente `/setup` (patrón Jenkins/GitLab/Atlassian).
+- **(a) Canal del token = archivo `./license/setup-token`** (no el log): el implementador ya trabaja en esa carpeta
+  (ceremonia §2) y un token en el log puede rotar/centralizarse fuera de control. El log anuncia SOLO la ruta. El
+  "persiste en disco" se mitiga doble: el archivo se BORRA al finalizar y en BD solo vive su hash SHA-256 (anulado al
+  completar) — un residuo es inerte. Lockout persistente 5 intentos/15 min (patrón del login), comparación en tiempo
+  constante. Si el archivo se pierde (volumen nuevo), el arranque re-emite UNO nuevo (sigue habiendo un solo vigente).
+- **(b) Importar `license.lic` DESDE el wizard = SÍ — reabre L6b SOLO para el setup:** el wizard ES la ceremonia del
+  implementador (token-gated), Atlassian/GitLab lo permiten y el paso 5 ya ofrecía la descarga del `.lreq`.
+  Salvaguardas: `LicenseService.importLicenseFile` verifica **Ed25519 + linaje + evaluación con la huella real ANTES
+  de persistir** (un archivo que evaluaría BLOQUEADA jamás toca el disco), tope 64 KB, auditado (`license.imported`).
+  **L6b sigue intacta post-setup** (Configuración › Licencia no sube archivos).
+- **(c) Apariencia = GLOBAL de la instalación:** el wizard configura la INSTALACIÓN, no a la persona. Escribe
+  `SystemSettings.defaultPaletteId` (materializando el preset elegido de `THEME_PRESETS` como paleta PUBLICADA, tokens
+  resueltos por el SERVIDOR) + columna nueva `defaultThemeMode` (dark/light/auto) como fallback documentado; el
+  usuario sigue pudiendo elegir su paleta después. (El cableado del fallback de modo en la web queda con S3.)
+- **(d) Identidad:** `SystemSettings` gana `companyDisplayName` + `defaultTimezone` + `defaultLocale` (aditivos,
+  capturados en el paso 3 con prefill desde `customer` del payload verificado). En esta sesión solo se ALMACENAN;
+  mostrarlos en Topbar/título y el branding completo (login/correos/acta) = S3 con marca blanca §2(2).
+- **(e) Seed split = UN `seed.ts` con `SEED_SCOPE=catalog|demo`** (demo ⊃ catálogo); sin la variable cae al
+  comportamiento histórico por NODE_ENV ⇒ dev/CI/smokes CERO cambios. El init-container corre el seed **SIEMPRE** con
+  `SEED_SCOPE=catalog` (`RUN_SEED` retirado de Dockerfile/compose/update.sh/.envs) — de paso cierra un gap real: con
+  `RUN_SEED=false` en cada update, los PERMISOS nuevos de cada versión jamás llegaban a una instalación existente.
+  `seedWorkOrderChecklists` queda en alcance demo (en prod virgen ya se omitía por no haber nodos).
+- **(f) Estado + verificación:** tabla singleton NUEVA `SystemSetup` (patrón LicenseInstallation; separada de
+  SystemSettings porque es estado de BOOTSTRAP con token-hash/lockout) con **retro-completado EN LA MIGRACIÓN**
+  (`setupCompleted = EXISTS(usuarios)` ⇒ el EC2 demo y el dev jamás ven el wizard). `GET /setup/status` responde
+  SIEMPRE `{setupRequired}` (mínimo privilegio: un booleano); el resto de `/api/setup/*` muere en **404** al
+  completar (no revela que existió). Whitelist L1 gana el prefijo `/api/setup/` (el setup opera en
+  PENDIENTE_ACTIVACION; spec del guard lo afirma). Finalize ATÓMICO (1 transacción con candado anti-carrera) que
+  aplica la política de contraseñas real; MFA del wizard = `requireMfa` del rol admin (+ sube `mfaMode` a
+  REQUIRED_BY_ROLE si estaba OPTIONAL) ⇒ el enrolamiento lo fuerza el gate existente en el primer login (cero código
+  MFA nuevo). Smoke NUEVO **`smoke-setup.py` 25/25** en :3407 con **BD EFÍMERA PROPIA** `watchlog_setup_smoke`
+  (drop/create + migrate + seed catálogo por el arnés — primera vez que un smoke no comparte la BD dev): lockout ·
+  whitelist L1 en vivo · import basura rechazado/licencia dev aceptada · finalize atómico y muerte del wizard ·
+  reinicio sin re-exponer · seed demo intacto.
+
 ### 2026-07-06 · Licenciamiento L2b · enforcement de límites numéricos (decisiones a–f, aprobadas por el dueño antes de codificar) — CIERRA EL PLAN L0–L6
 Sesión L2b (`feat/licenciamiento-l2b`): el ítem diferido en L2 (decisión d, 2026-07-05). Crear un nodo o un usuario
 por encima de `maxNodes`/`maxNamedUsers` se rechaza en el backend; **jamás se rompe lo existente** (una instalación

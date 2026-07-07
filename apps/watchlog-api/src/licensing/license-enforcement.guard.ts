@@ -24,10 +24,15 @@ export const READ_METHODS: ReadonlySet<string> = new Set(["GET", "HEAD", "OPTION
  *    forgot/reset. Son operaciones de SEGURIDAD del usuario, no operación de
  *    planta; bloquearlas dejaría fuera hasta al administrador que debe
  *    importar la licencia nueva.
+ *  - /api/setup/* : asistente de PRIMER ARRANQUE (OOBE). El setup ocurre
+ *    típicamente en PENDIENTE_ACTIVACION (el implementador configura y activa
+ *    en la misma visita): sin esta entrada la instalación virgen sería
+ *    inconfigurable. Tiene su PROPIO candado (token de instalación de un solo
+ *    uso + lockout) y muere en 404 al completarse — no es un agujero abierto.
  *  - /api/health : monitoreo (GET, incluido por claridad).
  * Nada de regex: prefijos/rutas literales, testeados en license-enforcement.guard.spec.
  */
-export const LICENSE_WHITELIST_PREFIXES: readonly string[] = ["/api/auth/"];
+export const LICENSE_WHITELIST_PREFIXES: readonly string[] = ["/api/auth/", "/api/setup/"];
 export const LICENSE_WHITELIST_EXACT: readonly string[] = ["/api/health"];
 
 /**

@@ -1,5 +1,39 @@
 # Progreso — Lyra WatchLog
 
+**2026-07-06 — 🚀 Asistente de PRIMER ARRANQUE (OOBE) · S1 núcleo seguro + S2 wizard UI ✅** (`feat/setup-wizard-oobe`).
+Épico distribución §2(5): una instalación VIRGEN (0 usuarios) ya no se bootstrapea con credenciales en el `.env` — al
+abrir la web muestra el **asistente de configuración inicial** (`/setup`, fullscreen DARK, `Stepper` de L3b) protegido
+por un **token de instalación de UN SOLO USO**, y al finalizar crea el administrador REAL y no vuelve a aparecer jamás.
+**Hallazgo AFINADO:** en prod (`NODE_ENV=production` en el migrate) el seed nunca creó al demo; el hoyo real era
+`BOOTSTRAP_ADMIN_PASSWORD` en texto plano (placeholder público `__CAMBIAR_FUERTE__` como contraseña si no se cambiaba)
+— `seedBootstrapAdmin` + vars **ELIMINADOS**: en prod el seed crea CERO usuarios. **(1) Seed split (decisión e):** un
+solo `seed.ts` con `SEED_SCOPE=catalog|demo` (sin la var = comportamiento histórico por NODE_ENV ⇒ dev/CI/smokes
+INTACTOS); el init-container corre el seed **SIEMPRE** con `SEED_SCOPE=catalog` (`RUN_SEED` retirado de
+Dockerfile.api/compose/update.sh/.envs) — de paso cierra el gap "los permisos nuevos no llegaban a instalaciones
+existentes". **(2) Estado + token (decisiones a/f):** singleton NUEVO `SystemSetup` (migración con **retro-completado
+SQL** `EXISTS(usuarios)` ⇒ EC2/dev jamás ven el wizard) + token de 32 bytes en `./license/setup-token` (el log anuncia
+solo la RUTA; en BD solo el hash SHA-256; lockout 5/15 min en tiempo constante; se borra + anula al finalizar; se
+re-emite si se pierde). **(3) Endpoints `/api/setup/*`** `@Public` con candado propio (`x-setup-token`): `status`
+público mínimo (`{setupRequired}`), `context` (política + installationId/huella + prefill `customer`),
+`license-request` (descarga `solicitud.lreq`), `license` (import verificado) y `finalize` **ATÓMICO** (tx con candado
+anti-carrera: admin real con política aplicada + MFA vía `requireMfa` del rol admin ⇒ enrolamiento forzado existente +
+`SystemSettings` gana `companyDisplayName`/`defaultTimezone`/`defaultLocale`/`defaultThemeMode` + preset de
+`THEME_PRESETS` materializado como paleta publicada/default por el SERVIDOR + auditoría `system.setup.completed`);
+tras completar TODO responde 404 (no revela que existió). **Whitelist L1 gana `/api/setup/`** (el setup opera en
+PENDIENTE_ACTIVACION; spec 8/8). **(4) Import de licencia (decisión b):** excepción ACOTADA a L6b solo para el wizard —
+`LicenseService.importLicenseFile` verifica **Ed25519 + linaje + huella ANTES de persistir** (64 KB, audita
+`license.imported`); post-setup L6b intacta. **(5) Web:** `features/setup/` + redirect `/login`→`/setup` vía status
+público; pasos 3–5 saltables; api-client gana `headers`. **Verde:** typecheck/lint(0 nuevos)/build/test (API **319**
+= +1 caso del guard L1 · web 18) + **smoke-setup.py 25/25 NUEVO** (:3407, primera **BD efímera propia**
+`watchlog_setup_smoke`: lockout · whitelist L1 en vivo · import basura rechazado/licencia dev VALIDA · finalize
+atómico + muerte del wizard + no-duplica · reinicio no re-expone · seed demo intacto) + regresión COMPLETA licencia
+**28/24/20/29/25/35/30** + notif **18/22/18** + estructura/seguridad **33/14**. **No probado:** smoke VISUAL del wizard
+(dueño; requiere BD virgen — el dev NO lo muestra por diseño). Docs: DEPLOYMENT (bootstrap sin credenciales),
+SECURITY §1.1, AUTH_FLOW §3.1, LICENSING §5 (whitelist + excepción L6b), LICENSING_PROCEDURE §2 (nota wizard),
+DECISIONS (a–f), BACKLOG §2(5) (S1+S2 ✅), USER_GUIDE §20 nueva + backfill (contraseña forzada, política/MFA),
+SALES_GUIDE. **Tag NO** (S3 branding pendiente completa el flujo de cara al cliente). **Siguiente: S3 branding
+(Topbar/título + logo, empalma con marca blanca §2(2)) o roadmap del dueño (QA / reversa GxP).**
+
 **2026-07-06 — 🔐 Licenciamiento L2b · enforcement de límites numéricos ✅ ⇒ PLAN L0–L6 COMPLETO** (`feat/licenciamiento-l2b`).
 El ítem diferido en L2 (decisión d): crear un **nodo** o un **usuario** por encima de `maxNodes`/`maxNamedUsers` de la
 licencia ahora se **rechaza en el backend** con `403 { code:"LICENSE_LIMIT_EXCEEDED", limit, max, current, requested }`

@@ -46,6 +46,8 @@ interface RequestOptions {
   /** Manda el header CSRF de doble envío (para endpoints que usan la cookie). */
   csrf?: boolean;
   signal?: AbortSignal;
+  /** Headers adicionales (p. ej. `x-setup-token` del asistente de primer arranque). */
+  headers?: Record<string, string>;
 }
 
 /** Refresh en vuelo compartido: varias 401 simultáneas usan un solo refresh. */
@@ -84,6 +86,9 @@ function buildHeaders(options: RequestOptions): Headers {
   if (options.csrf) {
     const csrf = readCookie(CSRF_COOKIE);
     if (csrf) headers.set(CSRF_HEADER, csrf);
+  }
+  for (const [name, value] of Object.entries(options.headers ?? {})) {
+    headers.set(name, value);
   }
   return headers;
 }

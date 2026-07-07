@@ -1282,6 +1282,17 @@ model SystemSettings {
   // una. Ref BLANDA (sin FK, como emailConfiguredById): el servicio tolera un id colgante
   // (paleta borrada ⇒ se trata como "sin default" ⇒ marca base). null = marca Lyra base.
   defaultPaletteId                        String?
+  // --- Identidad de la instalación (OOBE S1/S2) -------------------------------
+  // Nombre visible de la empresa (Topbar/título; el branding completo de login/
+  // correos/acta llega con marca blanca S3). null = sin personalizar (marca Lyra).
+  companyDisplayName                      String?
+  // Defaults de la instalación capturados en el primer arranque. Son FALLBACK:
+  // no pisan preferencias por usuario/por calendario ya existentes.
+  defaultTimezone                         String?
+  defaultLocale                           String?
+  // Modo de tema por defecto ("dark" | "light" | "auto", validado por Zod en el
+  // borde, patrón AiSettings.provider). null = sin default ⇒ dark (marca).
+  defaultThemeMode                        String?
   updatedById                             String?
   updatedAt                               DateTime         @updatedAt
 }
@@ -1334,6 +1345,29 @@ model LicenseInstallation {
   nonce          String?
   lastRenewalAt  DateTime?
   updatedAt      DateTime  @updatedAt
+}
+
+// ===========================================================================
+//  Primer arranque (OOBE) — estado del asistente de configuración
+// ===========================================================================
+// Singleton (id="system", patrón LicenseInstallation). Estado de BOOTSTRAP, no
+// configuración de negocio (por eso NO vive en SystemSettings): completado del
+// asistente + candado del token de instalación de UN SOLO USO. Del token solo
+// se persiste el hash SHA-256 (el texto plano vive en ./license/setup-token y
+// se borra al completar). La migración que crea la tabla marca completado
+// RETROACTIVO si la instalación ya tiene usuarios (jamás re-muestra el wizard).
+model SystemSetup {
+  id               String    @id @default("system")
+  setupCompleted   Boolean   @default(false)
+  completedAt      DateTime?
+  // Hash SHA-256 (hex) del token de instalación vigente. null = sin token
+  // emitido (instalación completada o aún no arrancada).
+  tokenHash        String?
+  // Lockout de intentos de token (patrón User.failedLoginCount/lockedUntil).
+  tokenFailedCount Int       @default(0)
+  tokenLockedUntil DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 }
 
 // Registro de cada GENERACIÓN de IA para gobernanza de costo (proveedor/modelo/tokens/

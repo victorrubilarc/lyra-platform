@@ -85,8 +85,11 @@ CMD ["node", "dist/main.js"]
 # migraciones + el seed). La imagen runtime de arriba se arma con `pnpm deploy
 # --prod` y NO incluye el CLI de Prisma, por eso las migraciones van en una
 # imagen aparte (patrón "migrate" init container). Aplica `migrate deploy`
-# (idempotente, no destructivo) y, solo en el bootstrap (RUN_SEED=true), siembra
-# catálogos + el admin de arranque (BOOTSTRAP_ADMIN_*). El entorno llega por env.
+# (idempotente, no destructivo) y el seed de CATÁLOGO en CADA deploy
+# (SEED_SCOPE=catalog: permisos/plantillas/flujos base; idempotente y JAMÁS
+# crea usuarios — así los permisos nuevos de cada versión llegan a las
+# instalaciones existentes). El primer administrador lo crea el asistente de
+# primer arranque (/setup), no el seed (OOBE 2026-07-06; RUN_SEED retirado).
 FROM build AS migrate
 ENV NODE_ENV=production
 WORKDIR /repo/apps/watchlog-api
@@ -106,4 +109,4 @@ RUN rm -rf /repo/packages/licensing \
 # intenta reconciliar node_modules a solo-producción (poda tsx/prisma CLI) y, sin
 # TTY, aborta con ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY. Los .bin ya existen
 # en la imagen (deps instaladas en el stage build).
-CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy && { [ \"$RUN_SEED\" != \"true\" ] || node_modules/.bin/tsx prisma/seed.ts; }"]
+CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy && SEED_SCOPE=catalog node_modules/.bin/tsx prisma/seed.ts"]

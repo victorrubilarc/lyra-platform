@@ -10,7 +10,7 @@
 > funcionalidades existentes** aunque su detalle aún esté por redactar (✍️): así nada se
 > olvida; el backfill de lo ya construido se llena de a poco (incremental).
 >
-> Última actualización: **2026-07-03** (OT · Slice 7b — enlace Incidencia↔OT bidireccional: crear una OT desde una incidencia con datos pre-rellenados, ver las OT relacionadas en la ficha de la incidencia, y volver desde la OT a su incidencia de origen).
+> Última actualización: **2026-07-06** (Primer arranque OOBE S1+S2 — asistente de configuración inicial con token de un solo uso; + backfill: cambio de contraseña forzado y política de contraseñas/MFA global).
 
 ## Convención de cada sección
 Cada funcionalidad se documenta con estas cuatro partes fijas:
@@ -33,7 +33,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 - ✅ **Iniciar sesión (correo + contraseña)** (ingreso, MFA, contraseña temporal, olvido, salir) (§ Acceso ▸ Iniciar sesión)
 - ✍️ Segundo factor (MFA / código TOTP) y códigos de recuperación
 - ✍️ Recuperar contraseña (autoservicio por correo)
-- ✍️ Cambio de contraseña forzado en el primer ingreso
+- ✅ **Cambio de contraseña forzado en el primer ingreso** (contraseña temporal → definitiva antes de operar) (§ Acceso ▸ Cambio de contraseña forzado)
 - ✍️ Mi seguridad (activar/regenerar/desactivar MFA)
 
 ### 2. El espacio de trabajo  [todos]
@@ -58,7 +58,7 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 - ✅ **Administración delegada por estructura** — un rol/usuario administra SOLO las estructuras que se le delegan; el super-admin, todas; red anti-bloqueo del último administrador (§ Seguridad ▸ Administración delegada por estructura)
 - ✅ **Usuarios** (alta con contraseña temporal, roles, alcance por nodo/plantilla, habilitar/deshabilitar) (§ Seguridad ▸ Usuarios)
 - ✍️ Roles y matriz de permisos (4 dimensiones), `requireMfa` por rol
-- ✍️ Política de contraseñas y modo de MFA global
+- ✅ **Política de contraseñas y modo de MFA global** (largo/complejidad/expiración/historial, bloqueo por fuerza bruta, MFA opcional/por rol/para todos) (§ Seguridad ▸ Política de contraseñas y MFA global)
 - ✍️ Reset de contraseña / reset de MFA por administrador
 - ✍️ Lectura de auditoría (quién hizo qué, antes/después)
 
@@ -165,6 +165,9 @@ Leyenda de estado de redacción: ✅ redactada · ✍️ por redactar (backfill 
 - ✅ **Administrar los catálogos** (tipos de OT, especialidades y **reglas de checklist con su momento**) (§ Órdenes de trabajo ▸ Catálogos) [solo administrador]
 - ✅ **Dashboard de órdenes de trabajo** (tendencias e indicadores: abiertas/vencidas/estancadas, MTTR, cumplimiento de SLA, Pareto por tipo, distribución por criticidad/nodo/especialidad/estado/prioridad/origen; con rango de fechas, export CSV y clic-para-filtrar) (§ Órdenes de trabajo ▸ Dashboard)
 - ✅ **Enlace con incidencias** (crear una OT desde una incidencia con los datos pre-rellenados; ver las OT relacionadas —folio, estado, criticidad, semáforo— en la ficha de la incidencia; volver desde la OT a la incidencia de origen) (§ Órdenes de trabajo ▸ Enlace con incidencias)
+
+### 20. Primer arranque (instalación nueva)  [Admin / Implementador]
+- ✅ **Asistente de configuración inicial** (instalación recién desplegada: token de instalación de un solo uso, cuenta de administrador real, identidad, apariencia y activación de licencia — nunca vuelve a aparecer) (§ Primer arranque ▸ Asistente de configuración inicial)
 
 ---
 
@@ -2508,3 +2511,105 @@ Las demás pestañas (Correo saliente, IA, Apariencia, Licencia) tienen su propi
 - Estos ajustes aplican de inmediato, sin reiniciar.
 - Endurecer con MFA una acción NO la quita a nadie: solo agrega la verificación en el momento (el
   permiso de la acción sigue gobernado por los roles).
+
+---
+
+## Primer arranque ▸ Asistente de configuración inicial  [Admin / Implementador]
+
+**Para qué sirve.** Una instalación de Lyra WatchLog recién desplegada **no tiene usuarios**: no hay
+con quién iniciar sesión ni credenciales "de fábrica" (a propósito — una contraseña preinstalada es un
+hoyo de seguridad). El asistente de primer arranque convierte esa instalación vacía en una operativa:
+crea la **cuenta de administrador real**, registra la identidad de la empresa, define la apariencia por
+defecto y acompaña la **activación de la licencia**, todo en una sola pasada guiada. Es el equivalente
+al asistente de instalación de Jenkins/GitLab/Atlassian.
+
+**Cómo se usa (caso de uso completo, paso a paso).**
+1. **Obtén el token de instalación.** Al arrancar por primera vez, el sistema deja un archivo llamado
+   `setup-token` en la **carpeta de licencia** del despliegue (la misma donde va `license.lic`; en el
+   servidor: `./license/setup-token`). El log del servicio api indica la ruta. Ese token es la llave del
+   asistente: sin él, nadie en la red puede configurar la instalación.
+2. **Abre la web.** La pantalla de acceso detecta que la instalación está sin configurar y te lleva a
+   `/setup` (pantalla oscura de marca). Pega el token y presiona **Validar y comenzar**. Ojo: 5 intentos
+   fallidos bloquean el asistente por 15 minutos.
+3. **Crea la cuenta de administrador.** Correo, nombre y contraseña (el medidor muestra en vivo los
+   requisitos de la política real: largo mínimo, mayúscula, número…). Puedes marcar **"Exigir MFA a los
+   administradores"**: al primer inicio de sesión el sistema te hará enrolar el segundo factor.
+4. **Identidad de la empresa** (saltable): nombre visible, zona horaria e idioma. Si la licencia ya está
+   activada, el nombre viene pre-llenado desde ella.
+5. **Apariencia** (saltable): modo por defecto (oscuro/claro/automático) y paleta de colores desde las
+   plantillas curadas. Define el tema **de la instalación**; cada usuario puede elegir el suyo después.
+6. **Licencia** (aparece solo si la instalación está *pendiente de activación*): muestra el ID de
+   instalación y la huella de la máquina, permite **descargar `solicitud.lreq`** (se envía al proveedor)
+   e **importar `license.lic`** cuando lo recibas — el archivo se verifica (firma y huella) antes de
+   guardarse. También puedes saltarlo y activar después dejando el archivo en la carpeta de licencia.
+7. **Resumen → Finalizar.** Se crea la cuenta, se aplica todo de una vez y el asistente **desaparece
+   para siempre**. Te lleva al login para entrar con tu cuenta nueva.
+
+**Quién puede.** Solo quien tenga el **token de instalación** (es decir, quien administra el servidor
+del despliegue: el implementador o el administrador de TI). No requiere usuario previo — por diseño.
+
+**Importante.**
+- El token es de **UN SOLO USO**: al finalizar, el archivo se borra y el token queda invalidado. Si el
+  archivo se pierde antes de completar el asistente, reinicia el servicio api: se emite uno nuevo.
+- El asistente **solo existe en una instalación virgen** (0 usuarios). Una instalación en uso —o ya
+  configurada— responde "no encontrado": no se puede re-ejecutar ni usar para crear cuentas extra.
+- Los pasos 4–6 son saltables: todo se puede terminar después en Configuración (y la licencia, por la
+  ceremonia normal de archivos). Los pasos del token y de la cuenta de administrador NO.
+- La instalación puede configurarse **sin licencia** (queda pendiente de activación: se puede consultar
+  pero no operar). El asistente nunca es requisito para importar la licencia, solo un atajo.
+
+---
+
+## Acceso ▸ Cambio de contraseña forzado en el primer ingreso  [todos]
+
+**Para qué sirve.** Cuando un administrador te crea la cuenta, te entrega una **contraseña temporal**
+que él conoce. Para que nadie más que tú conozca tu contraseña definitiva, el sistema te obliga a
+cambiarla ANTES de poder usar cualquier pantalla: es un requisito de auditoría (la contraseña es solo
+tuya desde el primer minuto de uso real).
+
+**Cómo se usa.**
+1. Inicia sesión con el correo y la contraseña temporal que te entregaron.
+2. El sistema te lleva directo a la pantalla **"Cambiar contraseña"** (no puedes navegar a otra parte).
+3. Ingresa la contraseña temporal como actual, y tu contraseña nueva dos veces. Debe cumplir la
+   política (largo mínimo y complejidad; la pantalla te lo indica) y no puede repetir una reciente.
+4. Al guardar, entras al sistema normalmente. Los siguientes ingresos ya usan tu contraseña nueva.
+
+**Quién puede.** Cualquier usuario cuya cuenta esté marcada "debe cambiar contraseña" (alta nueva o
+reset hecho por un administrador). El administrador creado por el asistente de primer arranque NO pasa
+por aquí: su contraseña la eligió él mismo.
+
+**Importante.**
+- No hay forma de "saltarse" el cambio: toda la aplicación queda bloqueada hasta completarlo.
+- Si olvidaste la temporal antes de entrar, pide un nuevo reset al administrador (o usa "¿Olvidaste tu
+  contraseña?" si el correo saliente está configurado).
+
+---
+
+## Seguridad ▸ Política de contraseñas y modo de MFA global  [Admin]
+
+**Para qué sirve.** Define, para TODA la instalación, qué contraseñas son aceptables y cuándo el
+segundo factor (MFA) es obligatorio — sin tocar código: es configuración auditada, pensada para pasar
+auditorías de seguridad (largo/complejidad, bloqueo por fuerza bruta, reutilización).
+
+**Cómo se usa.**
+1. Ve a **Seguridad ▸ Política** (`/seguridad/politica`).
+2. Ajusta las reglas de contraseña: **largo mínimo** (por defecto 12), exigir **mayúscula**, **número**
+   y/o **símbolo**, **expiración** en días (vacío = no expiran) y cuántas contraseñas recientes no se
+   pueden **reutilizar** (historial).
+3. Ajusta la defensa de fuerza bruta: **intentos fallidos máximos** antes de bloquear (por defecto 5) y
+   **minutos de bloqueo** (por defecto 15). El bloqueo es temporal y se libera solo.
+4. Elige el **modo de MFA global**: **Opcional** (cada quien decide; cualquiera puede auto-enrolarse),
+   **Requerido por rol** (obligatorio para los roles marcados con "exigir MFA" — p. ej. administradores)
+   o **Requerido para todos**.
+5. Guarda: aplica de inmediato, sin reiniciar.
+
+**Quién puede.** Administradores con el permiso de gestión de la política de seguridad. Todo cambio
+queda en la auditoría (quién, cuándo, antes/después).
+
+**Importante.**
+- La política se aplica al **crear o cambiar** una contraseña (no invalida las existentes de golpe);
+  el asistente de primer arranque y las altas de usuario la respetan desde el primer día.
+- Con "Requerido por rol" / "para todos", quien no tenga MFA activo es llevado al **enrolamiento
+  forzado** en su siguiente ingreso: no puede operar hasta activar su segundo factor.
+- El bloqueo por intentos fallidos de contraseña y el del código MFA son contadores **separados**
+  (estándar NIST): acertar la contraseña no "limpia" los intentos fallidos del segundo factor.

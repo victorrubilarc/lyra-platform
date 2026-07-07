@@ -20,8 +20,8 @@ echo "▶ Actualizando WatchLog ${PREV:-?} → ${NEW}"
 deploy() {
   sed -i "s|^WL_VERSION=.*|WL_VERSION=${1}|" .env
   $COMPOSE pull
-  echo "  · migrate deploy…"
-  RUN_SEED=false $COMPOSE run --rm migrate
+  echo "  · migrate deploy + seed de catálogo…"
+  $COMPOSE run --rm migrate
   $COMPOSE up -d
 }
 

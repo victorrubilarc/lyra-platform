@@ -85,6 +85,22 @@ Hay además una tercera pieza, **no es un token de identidad**: la cookie **CSRF
 
 ---
 
+## 3.1 Antes del primer login — asistente de primer arranque (OOBE, 2026-07-06)
+
+En una instalación **VIRGEN** (0 usuarios) el flujo de auth ni siquiera puede empezar: no hay a quién autenticar.
+El camino previo es el **asistente de primer arranque**:
+
+1. La web (`LoginPage` y la propia ruta `/setup`) consulta `GET /api/setup/status` — **público**, devuelve SOLO
+   `{ setupRequired: boolean }`. Si es `true`, `/login` redirige a **`/setup`**.
+2. El wizard opera **sin JWT ni permisos** (endpoints `@Public()`): su candado es el **token de instalación de un
+   solo uso** (`x-setup-token`, archivo `./license/setup-token`; hash en BD, lockout 5/15 min — ver
+   `SECURITY.md §1.1`). Además, `/api/setup/` está en la whitelist del guard L1 (el setup corre típicamente en
+   `PENDIENTE_ACTIVACION`).
+3. `POST /api/setup/finalize` crea el administrador REAL en una transacción (política de contraseñas aplicada;
+   `forcePasswordChange=false` — la eligió él mismo). Si se marcó "exigir MFA a administradores", se activa
+   `requireMfa` en el rol admin ⇒ el **gate de enrolamiento existente (§4.1)** fuerza el enrolamiento TOTP en el
+   primer login. Después del finalize, el asistente muere (404) y el flujo normal de abajo es el único camino.
+
 ## 4. Login (paso a paso, con bifurcación MFA)
 
 ```mermaid

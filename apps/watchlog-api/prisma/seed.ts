@@ -1,8 +1,17 @@
 /**
- * Seed idempotente de la Fase 1. Inserta el catálogo de permisos, el rol de
- * sistema "Administrador" (con todos los permisos), la política de contraseñas
- * por defecto y, si se configura, un usuario administrador de arranque que
- * deberá cambiar su contraseña en el primer login.
+ * Seed idempotente con DOS alcances (OOBE S1, 2026-07-06):
+ *
+ *  - CATÁLOGO: permisos, rol de sistema "Administrador", política de contraseñas,
+ *    plantillas de notificación, flujos/catálogos base. Corre SIEMPRE (también en
+ *    producción, en cada deploy) y JAMÁS crea usuarios: el primer administrador
+ *    real lo crea el asistente de primer arranque (/setup) con su token de un
+ *    solo uso — el seed dejó de conocer credenciales.
+ *  - DEMO: usuario demo, estructura/equipos/listas/calendarios/checklists de
+ *    ejemplo. SOLO desarrollo y smokes.
+ *
+ * El alcance se elige con SEED_SCOPE=catalog|demo (demo incluye catálogo). Sin la
+ * variable, cae al comportamiento histórico: producción = catálogo, dev = todo,
+ * así `pnpm db:seed`, CI y smokes no cambian.
  *
  * Ejecutar: `pnpm --filter @lyra/watchlog-api run db:seed`
  */
@@ -65,38 +74,6 @@ async function seedPasswordPolicy(): Promise<void> {
     update: {},
   });
   console.log("✔ Política de contraseñas por defecto");
-}
-
-async function seedBootstrapAdmin(): Promise<void> {
-  const email = process.env.BOOTSTRAP_ADMIN_EMAIL?.trim().toLowerCase();
-  const password = process.env.BOOTSTRAP_ADMIN_PASSWORD;
-  if (!email || !password) {
-    console.log("• Sin BOOTSTRAP_ADMIN_EMAIL/PASSWORD: no se crea admin de arranque");
-    return;
-  }
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) {
-    console.log(`• El usuario ${email} ya existe: no se recrea`);
-    return;
-  }
-  const role = await prisma.role.findUniqueOrThrow({ where: { key: ADMIN_ROLE_KEY } });
-  const passwordHash = await argon2.hash(password, {
-    type: argon2.argon2id,
-    memoryCost: 19_456,
-    timeCost: 2,
-    parallelism: 1,
-  });
-  const user = await prisma.user.create({
-    data: {
-      email,
-      displayName: "Administrador",
-      passwordHash,
-      forcePasswordChange: true,
-      roles: { create: { roleId: role.id } },
-    },
-  });
-  await prisma.passwordHistory.create({ data: { userId: user.id, passwordHash } });
-  console.log(`✔ Admin de arranque creado: ${email} (debe cambiar la contraseña al ingresar)`);
 }
 
 /**
@@ -842,24 +819,48 @@ async function reconcileWorkOrderFolioCounters(): Promise<void> {
   if (fixed > 0) console.log(`✔ Contador global de folio de OT reconciliado (${fixed} año/s)`);
 }
 
+type SeedScope = "catalog" | "demo";
+
+/**
+ * Alcance del seed. Explícito por SEED_SCOPE; sin la variable se conserva el
+ * comportamiento histórico (producción = solo catálogo, resto = todo), para que
+ * dev/CI/smokes sigan EXACTO igual. Valor desconocido = error duro (mejor que
+ * sembrar lo que no corresponde en una instalación productiva).
+ */
+function resolveScope(): SeedScope {
+  const raw = process.env.SEED_SCOPE?.trim().toLowerCase();
+  if (raw === "catalog" || raw === "demo") return raw;
+  if (raw) throw new Error(`SEED_SCOPE inválido: "${raw}" (use "catalog" o "demo")`);
+  return process.env.NODE_ENV === "production" ? "catalog" : "demo";
+}
+
 async function main(): Promise<void> {
+  const scope = resolveScope();
+  console.log(`Seed en alcance "${scope}"${scope === "catalog" ? " (no crea usuarios ni datos de demo)" : ""}`);
+
+  // ── CATÁLOGO (siempre, idempotente, también en producción) ────────────────
   await seedPermissions();
   await seedAdminRole();
   await seedNotificationTemplates();
   await seedPasswordPolicy();
-  await seedBootstrapAdmin();
-  await seedDemoUser();
-  await seedDemoStructure();
   await seedEquipmentCategories();
-  await seedDemoEquipment();
-  await seedReferenceData();
-  await seedOperationalCalendar();
   await seedIncidentWorkflow();
   await seedIncidentCatalog();
   await seedWorkOrderWorkflow();
   await seedWorkOrderCatalog();
-  await seedWorkOrderChecklists();
   await reconcileWorkOrderFolioCounters();
+
+  if (scope !== "demo") return;
+
+  // ── DEMO (solo dev/smokes) ─────────────────────────────────────────────────
+  await seedDemoUser();
+  await seedDemoStructure();
+  await seedDemoEquipment();
+  await seedReferenceData();
+  await seedOperationalCalendar();
+  // Ancla sus plantillas al primer nodo de la estructura de demo (en producción
+  // virgen igual se omitía por no haber nodos — el cliente crea sus checklists).
+  await seedWorkOrderChecklists();
 }
 
 main()

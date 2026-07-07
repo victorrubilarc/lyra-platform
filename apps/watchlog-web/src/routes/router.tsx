@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate } from "react-router-dom";
 import { ProtectedRoute } from "../auth/ProtectedRoute.js";
 import { AppShell } from "../shell/AppShell.js";
 import { LoginPage } from "../features/auth/LoginPage.js";
+import { SetupWizardPage } from "../features/setup/SetupWizardPage.js";
 import { ForgotPasswordPage } from "../features/auth/ForgotPasswordPage.js";
 import { ResetPasswordPage } from "../features/auth/ResetPasswordPage.js";
 import { ForcePasswordChangePage } from "../features/auth/ForcePasswordChangePage.js";
@@ -50,6 +51,9 @@ import { PersonsPage } from "../features/work-orders/PersonsPage.js";
  * `AppShell`; los módulos cuelgan del shell premium (sidebar + topbar + pestañas).
  */
 export const router = createBrowserRouter([
+  // Primer arranque (OOBE): pública y fullscreen; solo existe en una
+  // instalación virgen (la propia página redirige a /login si no aplica).
+  { path: "/setup", element: <SetupWizardPage /> },
   { path: "/login", element: <LoginPage /> },
   { path: "/recuperar-contrasena", element: <ForgotPasswordPage /> },
   { path: "/restablecer-contrasena", element: <ResetPasswordPage /> },

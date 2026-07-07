@@ -174,23 +174,38 @@ echo "<PAT>" | docker login ghcr.io -u <usuario-github> --password-stdin
 
 ---
 
-## Primer despliegue (bootstrap con seed)
+## Primer despliegue (bootstrap con asistente de primer arranque)
 
-1. En `/opt/watchlog/deploy/.env`, pon **`RUN_SEED=true`** (solo esta vez) y revisa
-   `BOOTSTRAP_ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_PASSWORD`.
-2. Corta la primera versión y empújala:
+> **OOBE 2026-07-06:** `RUN_SEED` y `BOOTSTRAP_ADMIN_*` fueron **RETIRADOS**. El init
+> container `migrate` corre en **cada deploy** `prisma migrate deploy` + el **seed de
+> CATÁLOGO** (`SEED_SCOPE=catalog`: permisos, plantillas de notificación, flujos y
+> catálogos base — idempotente y **jamás crea usuarios**; así los permisos nuevos de
+> cada versión llegan solos a las instalaciones existentes). El primer administrador
+> lo crea el **asistente de primer arranque** (`/setup`) protegido por un **token de
+> instalación de un solo uso**.
+
+1. Corta la primera versión y empújala:
    ```bash
    git tag v0.1.0 && git push origin v0.1.0
    ```
    El workflow construye las imágenes, las sube a GHCR y corre `update.sh` por SSH
-   (migrate deploy + seed + up + healthcheck).
-3. Cuando termine, **vuelve a poner `RUN_SEED=false`** en el `.env` del host (el seed
-   es solo de arranque; las migraciones siguen corriendo en cada deploy).
-4. Entra a `https://lyra.watchlog.itesicws.com`, inicia con el admin de arranque
-   (te pedirá cambiar la contraseña).
+   (migrate deploy + seed de catálogo + up + healthcheck).
+2. La API detecta la instalación VIRGEN (0 usuarios) y deja el **token de
+   instalación** en `./license/setup-token` (misma carpeta de la ceremonia de
+   licencia; el log del contenedor anuncia la RUTA, nunca el token):
+   ```bash
+   cat /opt/watchlog/deploy/license/setup-token
+   ```
+3. Abre `https://<dominio>` → la web redirige a **`/setup`**: pega el token, crea la
+   cuenta de administrador real, define identidad/apariencia y —si la instalación
+   está `PENDIENTE_ACTIVACION`— descarga `solicitud.lreq` e importa `license.lic`
+   desde el propio asistente (runbook `LICENSING_PROCEDURE.md §2`).
+4. Al finalizar, el asistente **borra el token, invalida su hash y muere** (los
+   endpoints `/api/setup/*` responden 404): nunca vuelve a aparecer. Inicia sesión
+   con la cuenta recién creada.
 
-> Si prefieres no exponer el seed en el flujo automático, puedes correr el primer
-> bootstrap a mano en el host: `RUN_SEED=true docker compose -f docker-compose.prod.yml --env-file .env run --rm migrate`.
+> Instalaciones EXISTENTES (con usuarios) quedan marcadas **completadas
+> retroactivamente** por la migración: el asistente jamás se les muestra.
 
 ## Despliegues siguientes
 ```bash
