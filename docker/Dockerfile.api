@@ -63,8 +63,13 @@ RUN cp apps/watchlog-api/dist-bundle/main.js /tmp/main.sealed.js \
  && rm -rf /app/dist /app/dist-bundle /app/src /app/tools /app/nest-cli.json \
            /app/tsconfig.json /app/tsconfig.build.json /app/vitest.config.ts \
            /app/eslint.config.mjs /app/node_modules/@lyra/licensing \
+ && find /app/prisma -name '*.ts' -delete \
  && mkdir /app/dist \
  && mv /tmp/main.sealed.js /app/dist/main.js
+# --- E2 · sin fuga de fuente: el runtime del api NO siembra (eso es la imagen
+# --- `migrate`), así que los seeds/backfills TypeScript de prisma/ son fuente
+# --- muerta aquí. Se borran (se conservan schema.prisma + migrations/ para el
+# --- `prisma generate` de runtime). Verificado: 0 .ts fuera de node_modules.
 
 # ---- Imagen final ----
 FROM base AS runtime
@@ -93,18 +98,44 @@ CMD ["node", "dist/main.js"]
 FROM build AS migrate
 ENV NODE_ENV=production
 WORKDIR /repo/apps/watchlog-api
-# --- L5 · la imagen migrate es un toolchain (prisma CLI + tsx + seed); NO hace
-# --- cumplir la licencia (no es el punto de enforcement) pero igual viaja al
-# --- cliente. Se elimina el fuente legible del módulo crítico (no lo necesita
-# --- para migrar/sembrar: el seed no importa @lyra/licensing) para no repartir
-# --- la lógica de licencia en texto claro. El resto del toolchain (contracts,
-# --- prisma) permanece porque el seed sí lo usa. `; true`: idempotente aunque
-# --- alguna ruta no exista.
+# --- L5 + E2 · la imagen migrate es un toolchain (prisma CLI + tsx + seed) que
+# --- viaja al cliente pero se construye `FROM build` (que hizo `COPY . .`) ⇒ sin
+# --- poda, cargaría CASI TODO el monorepo en claro (frontend watchlog-web,
+# --- packages/*/src, scripts de licencia con la llave DEV, docs, prototipo…). Se
+# --- PODA AGRESIVAMENTE a lo mínimo que necesitan `migrate deploy` + `seed.ts`:
+# ---   · el fuente del módulo crítico @lyra/licensing (no lo importa el seed)
+# ---   · TODO el frontend `watchlog-web` (el seed jamás lo toca)
+# ---   · el `src` de cada package (se conserva su `dist` compilado, que es lo que
+# ---     resuelven los imports @lyra/* del seed; @lyra/contracts es el único que usa)
+# ---   · `scripts/` (bundle/seal/embed + dev-private.pem), `tools/gen-dev-license`,
+# ---     docs, deploy, docker, prototipo, notas, y los backfills/one-off de prisma
+# ---     que el seed NO importa (backfill-*, migrate-fiscal) + specs/tests.
+# --- Se CONSERVA: prisma/ (seed.ts + *-seed-data.ts + structure-descriptions +
+# --- report-order que el seed SÍ importa), schema + migrations, node_modules,
+# --- package.json/tsconfig del api, y el `dist` de cada package. `; true`:
+# --- idempotente aunque una ruta no exista. Verificado: 0 fuente Lyra fuera de
+# --- node_modules tras la poda (E2 2026-07-07).
 RUN rm -rf /repo/packages/licensing \
            /repo/apps/watchlog-api/src /repo/apps/watchlog-api/dist \
            /repo/apps/watchlog-api/dist-bundle \
            /repo/node_modules/@lyra/licensing \
-           /repo/apps/watchlog-api/node_modules/@lyra/licensing 2>/dev/null; true
+           /repo/apps/watchlog-api/node_modules/@lyra/licensing \
+           /repo/apps/watchlog-web \
+           /repo/packages/contracts/src \
+           /repo/packages/config /repo/packages/llm /repo/packages/permissions \
+           /repo/packages/ui /repo/packages/licensing-cli \
+           /repo/scripts /repo/docs /repo/deploy /repo/docker \
+           /repo/apps/watchlog-api/tools /repo/apps/watchlog-api/test \
+           /repo/apps/watchlog-api/vitest.config.ts \
+           /repo/prototipo.tsx /repo/ideas.txt /repo/prompt_x_sesion.md \
+           /repo/README.md /repo/claude.md /repo/CLAUDE.md \
+           /repo/apps/watchlog-api/prisma/backfill-node-descriptions.ts \
+           /repo/apps/watchlog-api/prisma/backfill-report-order.ts \
+           /repo/apps/watchlog-api/prisma/backfill-threshold-bands.ts \
+           /repo/apps/watchlog-api/prisma/migrate-fiscal.ts 2>/dev/null; \
+    find /repo -name '*.spec.ts' -delete 2>/dev/null; \
+    find /repo -name '*.test.ts' -delete 2>/dev/null; \
+    true
 # Invoca los binarios DIRECTO (no `pnpm exec`): con NODE_ENV=production, `pnpm exec`
 # intenta reconciliar node_modules a solo-producción (poda tsx/prisma CLI) y, sin
 # TTY, aborta con ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY. Los .bin ya existen

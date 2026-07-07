@@ -21,6 +21,7 @@ coverage/
 .env.*
 !.env.example
 !deploy/.env.prod.example
+!deploy/standalone/.env.standalone.example
 
 # Logs
 *.log

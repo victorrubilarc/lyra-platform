@@ -17,8 +17,15 @@
 #     (red externa `edge` de ruta-bus), NO este compose.
 #
 # El compose del demo (deploy/docker-compose.prod.yml) queda INTACTO; este
-# stack es el que se entrega a clientes. Deuda anotada (BACKLOG): unificarlos
-# cuando el empaquetado (make-bundle) absorba el del demo.
+# stack es el que se entrega a clientes.
+#
+# Nombre de imagen — un solo knob `WL_IMAGE_PREFIX` (E2 2026-07-07):
+#   · Paquete AIR-GAPPED (make-bundle → install.sh): prefijo VACÍO ⇒ las imágenes
+#     tienen nombre NEUTRO `lyra-watchlog-{api,web,migrate}:<tag>` (sin registry ni
+#     owner; el `docker load` de los tar deja exactamente esos tags). Así el host
+#     de la planta jamás imprime el owner GHCR de ITESICWS (modelo marca blanca).
+#   · Flujo GHCR (pull con internet): `WL_IMAGE_PREFIX=ghcr.io/<owner>/` ⇒ resuelve
+#     a la imagen publicada. `WL_VERSION` fija el tag (vX.Y.Z) en ambos casos.
 # ─────────────────────────────────────────────────────────────────────────────
 name: lyra-watchlog
 
@@ -79,7 +86,7 @@ services:
   # deploy (idempotente; JAMÁS crea usuarios — el primer admin lo crea el
   # asistente /setup con su token; ver docs/DEPLOYMENT.md).
   migrate:
-    image: ${WL_REGISTRY:-ghcr.io}/${WL_OWNER}/lyra-watchlog-migrate:${WL_VERSION:-stable}
+    image: ${WL_IMAGE_PREFIX-}lyra-watchlog-migrate:${WL_VERSION:-stable}
     restart: "no"
     mem_limit: 512m
     env_file: .env
@@ -92,7 +99,7 @@ services:
     networks: [internal]
 
   api:
-    image: ${WL_REGISTRY:-ghcr.io}/${WL_OWNER}/lyra-watchlog-api:${WL_VERSION:-stable}
+    image: ${WL_IMAGE_PREFIX-}lyra-watchlog-api:${WL_VERSION:-stable}
     restart: unless-stopped
     mem_limit: 512m
     env_file: .env
@@ -126,7 +133,7 @@ services:
   # 15 líneas, NO expuesto): sirve la SPA + proxea /api → api:3000, HTTP :80 en
   # la red interna. El TLS lo pone el BORDE del modo elegido, nunca este servicio.
   watchlog-web:
-    image: ${WL_REGISTRY:-ghcr.io}/${WL_OWNER}/lyra-watchlog-web:${WL_VERSION:-stable}
+    image: ${WL_IMAGE_PREFIX-}lyra-watchlog-web:${WL_VERSION:-stable}
     restart: unless-stopped
     mem_limit: 128m
     environment:

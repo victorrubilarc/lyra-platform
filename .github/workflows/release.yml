@@ -81,6 +81,39 @@ jobs:
             VITE_GIT_SHA=${{ github.sha }}
             VITE_BUILD_DATE=${{ steps.bd.outputs.iso }}
 
+  # ── Paquete OFFLINE air-gapped (E2) ─────────────────────────────────────────
+  # Tras publicar las imágenes, arma el `.tar.gz` autocontenido (imágenes como
+  # tar con NOMBRE NEUTRO + infra + compose standalone + install.sh + guía +
+  # reporte Trivy + SHA256SUMS) y lo ADJUNTA al GitHub Release del tag. El SOCIO
+  # de canal lo descarga UNA vez (con internet) y lo lleva por USB a la planta.
+  # Cero fuente: las imágenes ya vienen selladas (L5) y sin `src/`.
+  bundle:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # crear/actualizar el Release y subir el asset
+      packages: read     # pull de las imágenes recién publicadas
+    steps:
+      - uses: actions/checkout@v4
+      - name: Login a GHCR (pull de las imágenes del tag)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      # Trivy sobre las imágenes del tag → dist/trivy/ (make-bundle lo copia a
+      # SECURITY/). NO es un gate (el gate en CI es H2/E3): mide y adjunta.
+      - name: Escaneo de vulnerabilidades (Trivy, reporte adjunto — NO gate)
+        continue-on-error: true
+        run: SRC_PREFIX=ghcr.io/${{ github.repository_owner }}/ bash scripts/scan-images.sh ${{ github.ref_name }}
+      - name: Generar paquete offline
+        run: SRC_PREFIX=ghcr.io/${{ github.repository_owner }}/ bash scripts/make-bundle.sh ${{ github.ref_name }}
+      - name: Adjuntar el paquete al GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/lyra-watchlog-${{ github.ref_name }}.tar.gz
+          fail_on_unmatched_files: true
+
   # ── Deploy automático al EC2 (máquina compartida con ruta-bus) ───────────────
   # Tras publicar las imágenes, entra por SSH y corre update.sh (pull → migrate
   # deploy → up -d → healthcheck con rollback). Requiere los secrets del repo:

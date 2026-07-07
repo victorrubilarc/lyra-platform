@@ -1059,10 +1059,16 @@ nunca queda más de una sesión atrás.
 >         hardening del host + `DOCKER_OPTS`/`iptables=false` si el cliente gestiona su propio firewall. Va junto a la
 >         matriz de puertos de H1.
 >   - [ ] **Pin de imágenes de infra** (`minio/minio:latest` → digest/tag fijo; `postgres:16-alpine`/`redis:7-alpine`
->         → digest) — tag mutable en infra es hallazgo de reproducibilidad.
->   - [ ] **Trivy/Grype en CI con gate** (no publicar imagen con CVE crítico sin excepción documentada) + **correrlo
->         AHORA sobre v0.1.16** para saber qué sale de `node:22-bookworm-slim`/`caddy:2-alpine`/`minio:latest` ANTES de
->         las pruebas reales. Reporte adjuntable al cliente.
+>         → digest) — tag mutable en infra es hallazgo de reproducibilidad. **PRIORIZAR `minio:latest`:** el Trivy de E2
+>         (2026-07-07) lo marcó como el PEOR foco (**6 CRÍT / 70 ALTO**) — es el único con criticales explotables sin pin.
+>   - [ ] **Trivy/Grype en CI con gate** (no publicar imagen con CVE crítico sin excepción documentada). **✅ CORRIDO en
+>         E2 (2026-07-07) sobre v0.1.17** (reporte en el paquete `SECURITY/` + `scripts/scan-images.sh` regenerable).
+>         **Hallazgos a cerrar para pasar el gate (todos de imagen BASE, ningún código de app):**
+>         · `api` 3 CRÍT / 11 ALTO — `perl-base` CVE-2026-42496 (fix_deferred), `zlib1g` CVE-2023-45853 (sin fix Debian);
+>         · `migrate` 4 CRÍT / 32 ALTO — ídem + Go `stdlib` CVE-2025-68121 (crypto/tls, FIXED en Go 1.24.13+);
+>         · `postgres:16-alpine` 1 CRÍT / 12 ALTO; `minio:latest` **6 CRÍT / 70 ALTO** (el pin de arriba lo cierra);
+>         · `redis` limpio; `caddy`/`web` 0 CRÍT. **Fix probable:** bumpear/cambiar la base (`node:22-bookworm-slim` →
+>         base con fix o `apt-get upgrade` en build; evaluar distroless) + pins de infra. E2 midió; H2 arregla + gatea.
 >   - [ ] **SBOM CycloneDX por release** (§9.1) + **backups CIFRADOS** (`pg_dump -Fc` hoy plano; §9.3) + doc de
 >         **cifrado at-rest del host** (LUKS/dm-crypt para `pgdata`, es del host no de la app — documentarlo).
 >   - [ ] **Firma de imágenes cosign + verificación en host + pull por DIGEST** (§9.1; núcleo de §2(4)).

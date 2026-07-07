@@ -4,6 +4,53 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-07 · E2 "paquete instalable air-gapped" — decisiones (a)–(h) aprobadas por el dueño antes de codificar
+Sesión `feat/e2-paquete-instalable` (E2 del programa "a prueba de balas", BACKLOG §2(5)/§2(6); desbloqueada por H1).
+Produce el ENTREGABLE que faltaba: un paquete OFFLINE autocontenido que el SOCIO de canal lleva por USB a una planta
+air-gapped, **sin `git clone` (hoy la instalación entregaba el REPO COMPLETO = fuga de fuente) y sin exigir GHCR**.
+Auditoría previa confirmada: el stage `runtime` de `Dockerfile.api` borra `/app/src`, `/app/tools`, tsconfig y el
+`@lyra/licensing` legible y sirve solo el `dist/main.js` sellado (L5) ⇒ las imágenes NO cargan TypeScript; `Dockerfile.web`
+runtime = `caddy:2-alpine` con solo `/srv`. El único camino que filtraba fuente era el clone, que E2 elimina.
+- **(a) make-bundle LOCAL *y* job de release.yml:** un solo `scripts/make-bundle.sh` (lógica única) corre en local sobre
+  el daemon Y como job `bundle` de `release.yml` que, tras publicar las imágenes, arma el `.tar.gz` y lo **adjunta al
+  GitHub Release** del tag (`softprops/action-gh-release`). El socio lo descarga UNA vez con internet y lo lleva a la
+  planta. No se elige "uno u otro": el script es la fuente de verdad, CI solo lo invoca.
+- **(b) install.sh en bash** (no POSIX sh estricto: usa arrays para los `-f` del compose, ubicuos en Linux server).
+  Asume: Docker Engine ≥ 20.10 + plugin `docker compose` v2, `openssl`, `sha256sum`, ~4GB RAM / ~10GB disco. Verifica
+  todo en preflight y avisa (RAM/disco = warning, no bloqueante).
+- **(c) imágenes por tag (retag NEUTRO) → `docker save` a tar.** El job de release las pullea del tag publicado; en local
+  se toman del daemon. Air-gap ⇒ van como tar sí o sí. **Retag a nombre NEUTRO `lyra-watchlog-{api,web,migrate}:<tag>`
+  (sin `ghcr.io/<owner>/`)** para que la planta del cliente del socio JAMÁS imprima el owner GHCR de ITESICWS (marca
+  blanca). Se parametrizó el `image:` del compose standalone con **`WL_IMAGE_PREFIX`** (vacío en air-gap; `ghcr.io/<owner>/`
+  para el flujo GHCR) — cambio contenido al compose de H1, el del demo intacto.
+- **(d) Trivy = reporte generado UNA vez y adjuntado** (`scripts/scan-images.sh` vía contenedor `aquasec/trivy`, sin
+  instalarlo), copiado al paquete en `SECURITY/`. NO se embebe el binario; el reporte es regenerable. El **gate** en CI
+  es H2/E3 (aquí no bloquea el release: `continue-on-error`).
+- **(e) install.sh GENERA los secretos con openssl** (Postgres/MinIO por `-hex 24` URL-safe; JWT×2 `-base64 48`;
+  `APP_ENC_KEY`/`DATA_SOURCE_ENC_KEY` `-base64 32`), escribe `.env` con `chmod 600` y exige al operador SOLO lo del sitio
+  (`APP_PUBLIC_URL` + `EDGE_MODE`). Es más a prueba de operador que dejar `__GENERAR__` (el hoyo que OOBE cerró con la
+  pass del admin). **Idempotente: si el `.env` ya existe NO rota secretos** (los reusa) — reejecutable sin romper datos.
+- **(f) SHA256SUMS sí; cosign NO** (firma criptográfica = H2/E3, anotado). El instalador verifica `sha256sum -c` antes
+  de cargar imágenes; el Release publica el hash del `.tar.gz` para verificar la descarga.
+- **(g) SIN tag al cierre:** E2 es tooling de empaquetado, no cambia el runtime de la app (el compose standalone sí se
+  tocó, pero es config de despliegue, no imagen). El paquete se arma DESDE v0.1.17. El próximo tag (cuando lo haya)
+  activará el job `bundle` automáticamente.
+- **(h) Prueba local** del ciclo `docker load` → verify SHA → `compose config`/`up` → healthcheck → idempotencia ×2;
+  la prueba contra VM air-gapped REAL la hace el dueño. Puerto de smoke ≥3411 (3409–3410 tomados por H1).
+- **Mejora aprobada además del alcance:** el nombre neutro + `WL_IMAGE_PREFIX` (era la deuda "unificar demo→standalone
+  cuando make-bundle lo absorba" del header del compose).
+- **🔴 Hallazgo crítico durante la verificación + reapertura aprobada de (g):** al inspeccionar las imágenes v0.1.17
+  reales, la de **`migrate`** (construida `FROM build` = `COPY . .`) cargaba **casi todo el monorepo en claro**: 263
+  archivos del frontend `watchlog-web/src`, 117 de `packages/*/src`, `tools/gen-dev-license.ts`, `scripts/license/`
+  (incl. la llave **DEV** `dev-private.pem`), docs y `prototipo.tsx`. La imagen **`api`** solo filtraba 13 `.ts` de
+  `prisma/` (seeds/backfills). Tranquiliza: **el backend api `src/` NO filtra** (0, ya se removía) y **la clave privada
+  de PRODUCCIÓN NO está** (`prod-keys/` solo trae la pública). Defecto **preexistente** (viene de H1/release); E2 solo
+  lo expuso al empaquetar. Con OK del dueño se **reabrió (g)**: se poda agresivamente el stage `migrate` (borra
+  frontend + `packages/*/src` [se conserva su `dist`] + scripts/tools/docs/prototipo + backfills que el seed no importa)
+  y se limpia `prisma/*.ts` del `api`; **rebuild + tag v0.1.18** para tener imágenes distribuibles sin fuga. La `dev-key`
+  filtrada es de bajo riesgo (la app distribuida embebe la pública de PROD ⇒ una licencia firmada con la dev se rechaza),
+  pero igual sale del paquete. `docker/Dockerfile.api` es doc VIVO — la poda queda documentada en el propio stage.
+
 ### 2026-07-07 · H1 "planta restrictiva ready" — decisiones (a)–(g) aprobadas por el dueño antes de codificar
 Sesión `feat/hardening-h1-planta-restrictiva` (Tanda A del sub-épico "a prueba de balas", BACKLOG §2(5)). Cierra los
 P1/P2 de aplicación y host del pre-pentest v0.1.16. Hallazgos NUEVOS de la investigación, sumados al alcance con OK:
