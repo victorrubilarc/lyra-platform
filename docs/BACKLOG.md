@@ -1055,11 +1055,23 @@ nunca queda más de una sesión atrás.
 >         (`tls /certs/cert.pem /certs/key.pem`, sin ACME) para el cliente sin appliance · **(c)** el compartido del demo
 >         (actual). **Variante NGINX del borde documentada** (decisión COMERCIAL no técnica: NGINX no da más seguridad,
 >         da menos fricción en el cuestionario del cliente que ya lo estandariza). Matriz de puertos por modo;
->         `COOKIE_SECURE=true` + `APP_PUBLIC_URL` https se respetan en los tres.
+>         `COOKIE_SECURE=true` + `APP_PUBLIC_URL` https se respetan en los tres. **Entregable: MATRIZ DE PUERTOS por
+>         modo** para el equipo de REDES del cliente — qué queda `LISTEN` en el host por modo (modo (a) detrás de su
+>         proxy = `127.0.0.1:<port>` loopback, nada sale del host; modo (b) borde propio = solo `443/tcp`; interno
+>         Postgres/Redis/MinIO/api = **CERO** `ports:` en prod ⇒ inexistentes para un escaneo de red, no solo cerrados).
+>         Recordatorio de diseño: en DEV (`docker-compose.dev.yml`) SÍ se publican 5432/6379/9000-9001/1025-8025 a
+>         propósito (herramientas locales); en PROD (`deploy/docker-compose.prod.yml`) NINGÚN servicio de WatchLog tiene
+>         `ports:` — mantenerlo así.
 > - [ ] **(H2 · Tanda B — CIS Benchmark + cadena de suministro, ~35–70 HH) — pre-firma de canal, se solapa con §2(4):**
 >   - [ ] **Contenedores NON-ROOT** (`USER` en Dockerfiles api/web/migrate; ningún Dockerfile lo tiene hoy) +
 >         `read_only: true` donde se pueda + `security_opt: [no-new-privileges]` + `cap_drop: [ALL]` en compose —
 >         hallazgos CIS Docker garantizados.
+>   - [ ] **Doc: bypass de firewall de Docker (iptables) para el equipo de REDES** — en Linux, publicar un puerto con
+>         `- "8080:80"` abre en `0.0.0.0` y Docker inserta reglas iptables que **saltan `ufw`/`firewalld`** (el cliente
+>         cree estar protegido y no lo está — hallazgo típico de auditoría). Mitigación por diseño ya presente (prod no
+>         publica nada de datos; modo detrás-de-proxy usa `127.0.0.1:`), pero documentarlo explícito en la guía de
+>         hardening del host + `DOCKER_OPTS`/`iptables=false` si el cliente gestiona su propio firewall. Va junto a la
+>         matriz de puertos de H1.
 >   - [ ] **Pin de imágenes de infra** (`minio/minio:latest` → digest/tag fijo; `postgres:16-alpine`/`redis:7-alpine`
 >         → digest) — tag mutable en infra es hallazgo de reproducibilidad.
 >   - [ ] **Trivy/Grype en CI con gate** (no publicar imagen con CVE crítico sin excepción documentada) + **correrlo
