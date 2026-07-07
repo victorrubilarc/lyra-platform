@@ -27,6 +27,8 @@ import { AuditService } from "../audit/audit.service";
 import { PasswordService } from "../crypto/password.service";
 import { PasswordPolicyService } from "../auth/password-policy.service";
 import { LicenseService } from "../licensing/license.service";
+import { BrandingService, type LogoUpload } from "../branding/branding.service";
+import { isValidTimezone } from "../common/timezone";
 
 const SETUP_ID = "system";
 const ADMIN_ROLE_KEY = "admin";
@@ -70,6 +72,7 @@ export class SetupService implements OnApplicationBootstrap {
     private readonly passwords: PasswordService,
     private readonly passwordPolicy: PasswordPolicyService,
     private readonly license: LicenseService,
+    private readonly branding: BrandingService,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -160,6 +163,24 @@ export class SetupService implements OnApplicationBootstrap {
       userAgent: meta.userAgent,
     });
     return { status: result.snapshot.status, customer: result.snapshot.customer };
+  }
+
+  /**
+   * Logo de la empresa desde el wizard (OOBE S3, paso Identidad). Reusa el
+   * MISMO servicio (validación magic bytes + tope + auditoría) que la edición
+   * post-setup; el candado aquí es el token de instalación. Se persiste de
+   * inmediato en el singleton `SystemSettings`: en una instalación virgen es
+   * inocuo y `finalize` no lo pisa (no toca las columnas del logo).
+   */
+  async uploadLogo(token: string | undefined, upload: LogoUpload, meta: SetupRequestMeta): Promise<void> {
+    await this.assertToken(token);
+    await this.branding.setLogo(upload, { email: "system@setup", ip: meta.ip, userAgent: meta.userAgent });
+  }
+
+  /** Quita el logo subido durante el wizard (mismo candado de token). */
+  async removeLogo(token: string | undefined, meta: SetupRequestMeta): Promise<void> {
+    await this.assertToken(token);
+    await this.branding.removeLogo({ email: "system@setup", ip: meta.ip, userAgent: meta.userAgent });
   }
 
   /**
@@ -433,11 +454,4 @@ export class SetupService implements OnApplicationBootstrap {
 
 function sha256(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
-}
-
-/** Valida IANA timezone contra el runtime (Node ≥ 22 soporta supportedValuesOf). */
-let timezoneSet: Set<string> | undefined;
-function isValidTimezone(tz: string): boolean {
-  timezoneSet ??= new Set(Intl.supportedValuesOf("timeZone"));
-  return timezoneSet.has(tz);
 }

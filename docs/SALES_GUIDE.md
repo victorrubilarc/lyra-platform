@@ -341,6 +341,12 @@ Preséntalo como evolución, no como funcionalidad actual:
 
 > Una línea por hito, en lenguaje de cliente. Lo más reciente arriba.
 
+- **2026-07-06** — **La plataforma con TU marca, al instante 🎨 (disponible):** el nombre y el logo de la empresa se
+  configuran en el asistente de instalación (o después, en Configuración ▸ Identidad) y se aplican **en vivo** a la
+  pantalla de acceso, la barra superior y el título — **sin reinstalar ni recompilar nada**. Para el **socio de
+  canal** es el argumento clave: la MISMA versión del software sirve a N clientes, cada uno con su identidad, y con
+  la opción de **marca blanca** (gobernada por la licencia) donde la marca del cliente/socio toma el lugar dominante.
+  Cierra el ciclo de entrega: instalar → asistente → plataforma operativa **y con la marca del cliente** el día uno.
 - **2026-07-06** — **Primer arranque profesional 🚀 (disponible):** una instalación nueva se entrega con un
   **asistente de configuración inicial** (token de un solo uso + cuenta de administrador real + identidad/apariencia
   + activación de licencia guiada) en vez de credenciales de fábrica — la entrega comercial queda impecable y **sin

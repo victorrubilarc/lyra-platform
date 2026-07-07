@@ -46,6 +46,25 @@ Jenkins `initialAdminPassword` / GitLab root):
 - El seed de producción (**catálogo**) **no crea usuarios** — `BOOTSTRAP_ADMIN_*` (contraseña en texto plano en el
   `.env`) fue eliminado. El usuario demo solo nace en el seed de alcance **demo** (dev/smokes).
 
+### 1.2 Branding público de la instalación (OOBE S3, 2026-07-06)
+
+La pantalla de login se co-marca **SIN sesión**, así que existe una superficie pública acotada y auditable:
+
+- **`GET /api/branding`** (`@Public`): devuelve **exactamente** `{companyName, hasLogo, logoVersion,
+  defaultThemeMode, whiteLabel}` — la lista CERRADA de lo presentable. Nada de licencia (estado/edición/módulos),
+  ni `installationId`/huella, ni versión de la app. El smoke (`smoke-branding.py`) afirma la lista de claves con
+  asserts negativos; cualquier campo nuevo pasa primero por esta sección. `whiteLabel` es solo presentación
+  (qué marca domina), no revela datos de la licencia.
+- **`GET /api/branding/logo`** (`@Public`): sirve los bytes del logo con ETag fuerte (sha256) + 304 +
+  `Cache-Control: public, max-age=86400` + `X-Content-Type-Options: nosniff`.
+- **Subida del logo** (`PUT /api/branding/logo`, gate `settings:manage`; y `POST /api/setup/logo` token-gated en el
+  wizard — MISMO servicio): validación por **MAGIC BYTES** (PNG/JPEG/WebP reales; el content-type declarado no se
+  confía), **SVG RECHAZADO** (XSS por scripts embebidos — sin sanitizador no se sirve), tope **512 KB**, un archivo
+  por request. Los bytes viven en Postgres (`SystemSettings`, singleton) — respaldados por `pg_dump`, sin exponer
+  MinIO pre-auth. Subir/quitar queda **auditado** (`branding.logo.updated`/`.removed`, tipo+tamaño, jamás los bytes).
+- Al ser GET, el branding sobrevive los estados restringidos de licencia (el login se marca igual); **re-marcar**
+  (mutación) sí queda bloqueado por el guard L1 (`LICENSE_RESTRICTED`).
+
 ## 2. Autorización — RBAC + ABAC, 4 dimensiones
 
 100% en base de datos y **administrable desde la UI** (nada hardcodeado). Permisos atómicos agrupados en roles + alcance de datos:

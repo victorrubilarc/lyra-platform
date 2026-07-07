@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { Boxes, ChevronDown, ChevronLeft, ChevronRight, Star } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cx } from "@lyra/ui";
+import { licenseeInitials, useBranding, type Branding } from "../branding.js";
 import { usePermissions } from "../auth/use-permissions.js";
 import { useLicensedModules } from "../auth/use-license.js";
 import { useUIStore } from "./ui-store.js";
@@ -75,6 +76,29 @@ function RailNavItem({ route, label, isActive }: { route: NavRoute; label: strin
  * un tooltip por portal. Los FAVORITOS se fijan aquí (estrella por ítem) pero se
  * ACCEDEN desde el menú de favoritos del topbar (`FavoritesMenu`).
  */
+/**
+ * Marca del riel (OOBE S3): con `whiteLabel` (L6d) la marca del CLIENTE toma el
+ * lugar dominante — su logo (placa clara) o monograma; sin marca blanca, la
+ * tesela Lyra de siempre.
+ */
+function BrandMark({ branding }: { branding: Branding }) {
+  if (branding.mode === "whitelabel" && branding.logoUrl) {
+    return (
+      <div className={cx(styles.brandLogo, styles.brandLogoPlate)}>
+        <img className={styles.brandLogoImg} src={branding.logoUrl} alt="" />
+      </div>
+    );
+  }
+  if (branding.mode === "whitelabel" && branding.companyName) {
+    return <div className={styles.brandLogo}>{licenseeInitials(branding.companyName)}</div>;
+  }
+  return (
+    <div className={styles.brandLogo}>
+      <Boxes size={19} color="#fff" aria-hidden="true" />
+    </div>
+  );
+}
+
 export function Sidebar() {
   const { t } = useTranslation();
   const perms = usePermissions();
@@ -87,6 +111,8 @@ export function Sidebar() {
   const toggleNavGroup = useUIStore((s) => s.toggleNavGroup);
   const favorites = useFavoritesStore((s) => s.favorites);
   const toggleFavorite = useFavoritesStore((s) => s.toggleFavorite);
+  const branding = useBranding();
+  const whitelabel = branding.mode === "whitelabel";
 
   // Visible = módulo LICENCIADO (entitlement de la instalación, L2) ∧ permiso
   // del USUARIO (RBAC). Ambos ejes solo OCULTAN aquí; el backend decide.
@@ -128,9 +154,7 @@ export function Sidebar() {
     return (
       <aside className={cx(styles.sidebar, styles.sidebarCollapsed, styles.collapsed)}>
         <div className={styles.brand}>
-          <div className={styles.brandLogo}>
-            <Boxes size={19} color="#fff" aria-hidden="true" />
-          </div>
+          <BrandMark branding={branding} />
           <button
             type="button"
             className={styles.collapseBtn}
@@ -164,14 +188,23 @@ export function Sidebar() {
   return (
     <aside className={styles.sidebar}>
       <div className={styles.brand}>
-        <div className={styles.brandLogo}>
-          <Boxes size={19} color="#fff" aria-hidden="true" />
-        </div>
+        <BrandMark branding={branding} />
         <div className={styles.brandText}>
-          <div className={styles.brandWordmark}>
-            Lyra <span className={styles.brandProduct}>WatchLog</span>
-          </div>
-          <div className={styles.brandTagline}>{t("shell.brandTagline")}</div>
+          {whitelabel ? (
+            <>
+              <div className={cx(styles.brandWordmark, styles.brandWordmarkCompany)}>
+                {branding.companyName}
+              </div>
+              <div className={styles.brandTagline}>{t("shell.poweredByLyra")}</div>
+            </>
+          ) : (
+            <>
+              <div className={styles.brandWordmark}>
+                Lyra <span className={styles.brandProduct}>WatchLog</span>
+              </div>
+              <div className={styles.brandTagline}>{t("shell.brandTagline")}</div>
+            </>
+          )}
         </div>
         <button
           type="button"

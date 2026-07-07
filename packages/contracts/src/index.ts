@@ -112,3 +112,6 @@ export * from "./licensing/license-status.js";
 
 // Asistente de primer arranque (OOBE S1/S2)
 export * from "./setup/setup.js";
+
+// Branding runtime de la instalación (OOBE S3 — DTO PÚBLICO, solo lo presentable)
+export * from "./branding/branding.js";

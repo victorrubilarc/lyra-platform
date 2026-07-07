@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { setupLocaleSchema, setupThemeModeSchema } from "../setup/setup.js";
 import { editWindowAnchorSchema, editWindowMinutesSchema } from "../templates/templates.js";
 
 /**
@@ -40,6 +41,16 @@ export const systemSettingsSchema = z.object({
    * transición sin config no notifica. Lo lee el `NotificationResolverService`.
    */
   notifyTransitionDefaultDestinationRoles: z.boolean(),
+  /**
+   * Identidad de la instalación (OOBE S3): capturada por el wizard de primer
+   * arranque y editable post-setup en /configuracion ▸ Identidad. Son FALLBACK
+   * de instalación: no pisan preferencias por usuario. null = sin personalizar.
+   * El logo NO viaja aquí (bytes servidos por `GET /api/branding/logo`).
+   */
+  companyDisplayName: z.string().nullable(),
+  defaultTimezone: z.string().nullable(),
+  defaultLocale: setupLocaleSchema.nullable(),
+  defaultThemeMode: setupThemeModeSchema.nullable(),
   updatedAt: z.string(),
   updatedByName: z.string().nullable(),
 });
@@ -55,6 +66,12 @@ export const updateSystemSettingsRequestSchema = z.object({
   editWindowMinutes: editWindowMinutesSchema.nullable().optional(),
   requireMfaEditWindowOverride: z.boolean().optional(),
   notifyTransitionDefaultDestinationRoles: z.boolean().optional(),
+  // Identidad (OOBE S3): clave omitida = sin cambio; null EXPLÍCITO = limpiar.
+  // (Recordar el gotcha Zod: `.optional()` a secas RECHAZA null.)
+  companyDisplayName: z.string().trim().min(1).max(120).nullable().optional(),
+  defaultTimezone: z.string().trim().min(1).max(64).nullable().optional(),
+  defaultLocale: setupLocaleSchema.nullable().optional(),
+  defaultThemeMode: setupThemeModeSchema.nullable().optional(),
 });
 export type UpdateSystemSettingsRequest = z.infer<typeof updateSystemSettingsRequestSchema>;
 

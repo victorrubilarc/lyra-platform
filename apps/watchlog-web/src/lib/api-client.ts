@@ -163,14 +163,43 @@ export async function apiBlob(path: string, options: RequestOptions = {}): Promi
  * setea a mano). Mantiene Bearer + CSRF + un refresh transparente ante 401.
  */
 export async function apiUpload<T>(path: string, form: FormData, schema: ZodType<T>): Promise<T> {
+  const res = await uploadRequest(path, form, {});
+  if (!res.ok) throw await toApiError(res);
+  return schema.parse(await res.json());
+}
+
+/**
+ * Subida multipart que espera 204/cuerpo vacío (logo de branding, OOBE S3).
+ * Admite método PUT y headers extra (p. ej. el token de instalación del wizard).
+ */
+export async function apiUploadVoid(
+  path: string,
+  form: FormData,
+  options: { method?: "POST" | "PUT"; headers?: Record<string, string> } = {},
+): Promise<void> {
+  const res = await uploadRequest(path, form, options);
+  if (!res.ok) throw await toApiError(res);
+}
+
+/** Núcleo compartido de las subidas multipart: Bearer + CSRF + un refresh ante 401. */
+async function uploadRequest(
+  path: string,
+  form: FormData,
+  options: { method?: "POST" | "PUT"; headers?: Record<string, string> },
+): Promise<Response> {
   const doFetch = (): Promise<Response> => {
-    const headers = new Headers();
+    const headers = new Headers(options.headers);
     headers.set("Accept", "application/json");
     const token = getAccessToken();
     if (token) headers.set("Authorization", `Bearer ${token}`);
     const csrf = readCookie(CSRF_COOKIE);
     if (csrf) headers.set(CSRF_HEADER, csrf);
-    return fetch(`${API_BASE}${path}`, { method: "POST", credentials: "include", headers, body: form });
+    return fetch(`${API_BASE}${path}`, {
+      method: options.method ?? "POST",
+      credentials: "include",
+      headers,
+      body: form,
+    });
   };
   let res = await doFetch();
   if (res.status === 401 && getAccessToken() !== null) {
@@ -178,8 +207,7 @@ export async function apiUpload<T>(path: string, form: FormData, schema: ZodType
     if (ok) res = await doFetch();
     else notifySessionExpired();
   }
-  if (!res.ok) throw await toApiError(res);
-  return schema.parse(await res.json());
+  return res;
 }
 
 /** Petición que devuelve JSON validado con un esquema Zod del contrato. */

@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Headers, HttpCode, Post, Req, Res } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Delete, Get, Headers, HttpCode, Post, Req, Res } from "@nestjs/common";
+import type { MultipartFile } from "@fastify/multipart";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import {
   setupFinalizeRequestSchema,
@@ -60,6 +61,34 @@ export class SetupController {
     @Req() req: FastifyRequest,
   ): Promise<SetupLicenseImportResponse> {
     return this.setup.importLicense(token, dto, meta(req));
+  }
+
+  /** Logo de la empresa (OOBE S3, paso Identidad): multipart, token-gated. */
+  @Post("logo")
+  @HttpCode(204)
+  async uploadLogo(
+    @Headers(TOKEN_HEADER) token: string | undefined,
+    @Req() req: FastifyRequest,
+  ): Promise<void> {
+    const data = await (
+      req as FastifyRequest & { file: () => Promise<MultipartFile | undefined> }
+    ).file();
+    if (!data) throw new BadRequestException("No se recibió ningún archivo.");
+    const buffer = await data.toBuffer();
+    await this.setup.uploadLogo(
+      token,
+      { buffer, filename: data.filename, truncated: data.file.truncated },
+      meta(req),
+    );
+  }
+
+  @Delete("logo")
+  @HttpCode(204)
+  removeLogo(
+    @Headers(TOKEN_HEADER) token: string | undefined,
+    @Req() req: FastifyRequest,
+  ): Promise<void> {
+    return this.setup.removeLogo(token, meta(req));
   }
 
   @Post("finalize")

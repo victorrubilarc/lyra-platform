@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Bell, Check, Info, Languages, LogOut, Monitor, Moon, Palette, Rows3, Search, Sun, UserCog } from "lucide-react";
 import { Breadcrumb, Menu, MenuItem, MenuLabel, MenuSeparator, Tooltip, type Crumb } from "@lyra/ui";
+import { licenseeInitials, useBranding } from "../branding.js";
 import { FavoritesMenu } from "./FavoritesMenu.js";
 import { NotificationBell } from "./NotificationBell.js";
 import { StructureSwitcher } from "./StructureSwitcher.js";
@@ -43,6 +44,9 @@ export function Topbar({ onOpenSearch }: TopbarProps) {
   const setThemePref = useThemeStore((s) => s.setPreference);
   const ThemeIcon = THEME_OPTIONS.find((o) => o.value === themePref)?.icon ?? Moon;
   const [aboutOpen, setAboutOpen] = useState(false);
+  // Identidad de la instalación (branding runtime, OOBE S3): logo/monograma +
+  // nombre junto al selector de estructura, en AMBOS modos de marca.
+  const branding = useBranding();
 
   // Paletas (EST-TEMAS): el usuario elige entre las publicadas; "Por defecto" delega a la
   // instalación. La sección solo aparece si hay paletas publicadas (evita ruido).
@@ -77,6 +81,18 @@ export function Topbar({ onOpenSearch }: TopbarProps) {
       </button>
 
       <div className={styles.topRight}>
+        {branding.companyName && (
+          <div className={styles.companyChip} title={branding.companyName}>
+            {branding.logoUrl ? (
+              <img className={styles.companyChipLogo} src={branding.logoUrl} alt="" />
+            ) : (
+              <span className={styles.companyChipMark} aria-hidden="true">
+                {licenseeInitials(branding.companyName)}
+              </span>
+            )}
+            <span className={styles.companyChipName}>{branding.companyName}</span>
+          </div>
+        )}
         <StructureSwitcher />
 
         <Tooltip

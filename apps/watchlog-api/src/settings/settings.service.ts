@@ -1,12 +1,15 @@
-import { Injectable } from "@nestjs/common";
-import type {
-  EditWindowAnchor,
-  PeriodGovernanceAction,
-  PeriodReauthMap,
-  SystemSettingsDto,
-  UpdateSystemSettingsRequest,
+import { BadRequestException, Injectable } from "@nestjs/common";
+import {
+  setupLocaleSchema,
+  setupThemeModeSchema,
+  type EditWindowAnchor,
+  type PeriodGovernanceAction,
+  type PeriodReauthMap,
+  type SystemSettingsDto,
+  type UpdateSystemSettingsRequest,
 } from "@lyra/contracts";
 import { AuditService, type AuditContext } from "../audit/audit.service";
+import { isValidTimezone } from "../common/timezone";
 import { PrismaService } from "../prisma/prisma.service";
 
 const SINGLETON_ID = "system";
@@ -72,6 +75,12 @@ export class SettingsService {
       editWindowMinutes: row.editWindowMinutes,
       requireMfaEditWindowOverride: row.requireMfaEditWindowOverride,
       notifyTransitionDefaultDestinationRoles: row.notifyTransitionDefaultDestinationRoles,
+      // Identidad (OOBE S3): los valores del wizard, editables post-setup. Los
+      // enums se sanean en el borde de salida (BD anómala ⇒ null, jamás revienta).
+      companyDisplayName: row.companyDisplayName,
+      defaultTimezone: row.defaultTimezone,
+      defaultLocale: enumOrNull(setupLocaleSchema, row.defaultLocale),
+      defaultThemeMode: enumOrNull(setupThemeModeSchema, row.defaultThemeMode),
       updatedAt: row.updatedAt.toISOString(),
       updatedByName,
     };
@@ -113,6 +122,11 @@ export class SettingsService {
   }
 
   async update(dto: UpdateSystemSettingsRequest, actorId: string, ctx: AuditContext): Promise<SystemSettingsDto> {
+    // La forma la valida Zod en el borde; la zona horaria IANA exige el runtime
+    // (misma regla que el wizard — una sola fuente de verdad).
+    if (dto.defaultTimezone != null && !isValidTimezone(dto.defaultTimezone)) {
+      throw new BadRequestException(`Zona horaria desconocida: "${dto.defaultTimezone}".`);
+    }
     const before = await this.get();
     await this.prisma.systemSettings.upsert({
       where: { id: SINGLETON_ID },
@@ -142,6 +156,10 @@ export class SettingsService {
       editWindowMinutes: dto.editWindowMinutes,
       requireMfaEditWindowOverride: dto.requireMfaEditWindowOverride,
       notifyTransitionDefaultDestinationRoles: dto.notifyTransitionDefaultDestinationRoles,
+      companyDisplayName: dto.companyDisplayName,
+      defaultTimezone: dto.defaultTimezone,
+      defaultLocale: dto.defaultLocale,
+      defaultThemeMode: dto.defaultThemeMode,
     };
   }
 
@@ -152,4 +170,11 @@ export class SettingsService {
     });
     return row ?? SETTINGS_DEFAULTS;
   }
+}
+
+/** Saneo de enums leídos de columnas String (BD anómala ⇒ null, jamás revienta). */
+function enumOrNull<T>(schema: { safeParse: (v: unknown) => { success: boolean; data?: T } }, value: string | null): T | null {
+  if (value === null) return null;
+  const parsed = schema.safeParse(value);
+  return parsed.success ? (parsed.data as T) : null;
 }

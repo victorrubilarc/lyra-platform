@@ -5,7 +5,22 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-07-06 (2)** — **🔐 Licenciamiento L2b · enforcement de límites numéricos ✅ ⇒ PLAN L0–L6
+> actualización: **2026-07-06 (4)** — **🎨 OOBE S3 · BRANDING RUNTIME ✅ ⇒ ÉPICO §2(5) COMPLETO + §2(2) AVANZADO**
+> (`feat/oobe-s3-branding`): la identidad configurada por el wizard por fin se VE, sin rebuild — `GET /api/branding`
+> **PÚBLICO y MÍNIMO** (5 claves cerradas: companyName/hasLogo/logoVersion/defaultThemeMode/whiteLabel; asserts
+> negativos en smoke) alimenta login/Topbar/sidebar/título EN VIVO · **logo por instalación** (bytea en Postgres —
+> decisión (a), NO MinIO; magic bytes PNG/JPEG/WebP, **SVG rechazado**, ≤512KB, ETag+304, auditado) subible desde
+> /configuracion ▸ **Identidad** (tab nueva, reusa `settings:manage`) y desde el wizard (`POST /setup/logo`
+> token-gated, MISMO servicio) · **gate `whiteLabel` (L6d) CABLEADO por primera vez**: matriz lyra/cobrand/whitelabel
+> (marca del cliente dominante + pie sin ITESICWS con whiteLabel:true del payload VERIFICADO) · fallback
+> `defaultThemeMode` en theme-store (persistencia v1 con `explicit`; jamás pisa elecciones) · **`VITE_LICENSEE_*`
+> RETIRADO** (hallazgo: Dockerfile.web nunca lo horneó — el build-time estaba roto para canal) · `gen-dev-license
+> --no-white-label`. API 330 (+11) + web 26 (+8) + **smoke-branding 28/28 NUEVO** (:3408) + **smoke-setup 30/30**
+> (+5 logo wizard) + regresión licencia 28/24 + integridad 35 + temas 23/11 + estructura 33. Migración aditiva
+> (logoData/logoContentType/logoUpdatedAt), SIN permiso nuevo. **Tag v0.1.16 PUBLICADO** (primera imagen con entrega
+> digna: instalar → wizard → identidad aplicada). Correos/acta PDF quedan en §2(2). **SIGUE: QA del dueño / reversa
+> GxP / épico §2(2) restante o §2(4) cadena de suministro.**
+> — Antes: **🔐 Licenciamiento L2b · enforcement de límites numéricos ✅ ⇒ PLAN L0–L6
 > COMPLETO** (`feat/licenciamiento-l2b`): crear nodo/usuario sobre `maxNodes`/`maxNamedUsers` = **403
 > `LICENSE_LIMIT_EXCEEDED`** (+limit/max/current/requested, mensaje es-CL) vía `LicenseLimitsService.assertHeadroom`
 > en los 4 puntos de creación (createNode · provision con LOTE pre-transacción · createUser · **REACTIVACIÓN** de
@@ -942,12 +957,15 @@ nunca queda más de una sesión atrás.
             **CERRADO en L6 (2026-07-06):** `license.state.changed` (tx en caliente) + `license.expiring`/
             `license.restricted` (derived con re-aviso) vía el motor del Bloque N, EMAIL+INAPP, destinatarios por
             permiso `settings:manage` (configurable), con carve-out del worker para estados restringidos.
-- [ ] **(2) Modo marca blanca COMPLETO** (~60–120 HH) — hoy los temas son override PARCIAL en runtime y el **login
-      queda con marca Lyra** (ver memoria `theme-system`). Falta: **nombre de producto configurable** en toda la app,
-      **login personalizable**, branding en el **acta PDF** y en los **correos** salientes. Sin rebuild (runtime),
-      gobernado por la licencia (`whiteLabel:true`). Reusa el sistema de temas EST-TEMAS.
-- [ ] **(5) Asistente de PRIMER ARRANQUE (OOBE / setup wizard)** — **S1+S2 COMPLETOS ✅ 2026-07-06**
-      (`feat/setup-wizard-oobe`; decisiones a–f en DECISIONS 2026-07-06); **queda SOLO S3**. Hallazgo AFINADO en la
+- [ ] **(2) Modo marca blanca COMPLETO** (~60–120 HH, **restan ~30–60 HH**) — **AVANZADO por OOBE S3 ✅ 2026-07-06:**
+      la PRESENTACIÓN web ya es marca blanca runtime gobernada por `whiteLabel` del payload (L6d cableado): login
+      co-marcado/re-marcado + Topbar + wordmark del sidebar + `document.title` + logo por instalación, sin rebuild
+      (`GET /api/branding` público; DECISIONS 2026-07-06 S3). **Falta:** **nombre de producto configurable** en toda
+      la app, branding en el **acta PDF** (Part 11 — sesión propia) y en los **correos** salientes (plantillas del
+      Bloque N). Reusa el sistema de temas EST-TEMAS.
+- [x] ~~**(5) Asistente de PRIMER ARRANQUE (OOBE / setup wizard)**~~ — **ÉPICO COMPLETO ✅ 2026-07-06** (S1+S2
+      `feat/setup-wizard-oobe` + S3 `feat/oobe-s3-branding`; decisiones a–f de ambas sesiones en DECISIONS
+      2026-07-06). Hallazgo AFINADO en la
       sesión: en prod (`NODE_ENV=production`) el seed nunca creó al demo — el hoyo real era `BOOTSTRAP_ADMIN_PASSWORD`
       en texto plano en el `.env` (con `__CAMBIAR_FUERTE__` público como contraseña si no se cambiaba); **eliminado**.
       - [x] **S1 · Núcleo seguro (backend) ✅:** seed split `SEED_SCOPE=catalog|demo` (catálogo corre SIEMPRE en el
@@ -965,10 +983,14 @@ nunca queda más de una sesión atrás.
             PENDIENTE_ACTIVACION: estado/installationId/huella + descarga `.lreq` + import `.lic`) → Resumen →
             Finalizar → login con aviso. Pasos 3–5 saltables; `/login` redirige a `/setup` si `setupRequired`.
             (El logo a MinIO se DIFIRIÓ a S3 a propósito: capturarlo sin aplicarlo no aporta.)
-      - [ ] **S3 · Branding real** (empalma con (2) marca blanca): aplicar `companyDisplayName` (ya persistido por el
-            wizard en SystemSettings, junto a `defaultTimezone`/`defaultLocale`/`defaultThemeMode`) a Topbar/título,
-            captura de `logoRef` (MinIO) y re-marcado de login/correos/acta PDF gobernado por el gate `whiteLabel`
-            (L6d). Cablear también el fallback global `defaultThemeMode` en la web (hoy solo se persiste).
+      - [x] **S3 · Branding runtime ✅ 2026-07-06** (`feat/oobe-s3-branding`): `companyDisplayName` aplicado a
+            Topbar/título/login/sidebar EN VIVO vía `GET /api/branding` PÚBLICO (DTO mínimo, lista cerrada de claves);
+            logo por instalación (bytea en Postgres — decisión (a): NO MinIO, el login lo pide sin sesión y pg_dump lo
+            respalda; magic bytes PNG/JPEG/WebP, SVG rechazado, ≤512KB, auditado) capturable desde /configuracion ▸
+            Identidad (`settings:manage`) y desde el wizard (`POST /setup/logo` token-gated); gate `whiteLabel` (L6d)
+            CABLEADO (matriz lyra/cobrand/whitelabel, pie sin ITESICWS en marca blanca); fallback `defaultThemeMode`
+            en theme-store (no pisa elecciones explícitas); `VITE_LICENSEE_*` RETIRADO (runtime, sin rebuild).
+            Correos/acta PDF quedaron en §2(2). Smokes: `smoke-branding.py` 28/28 (:3408) + `smoke-setup.py` 30/30.
 - [ ] **(3) Orquestación de flota / actualización multi-cliente** (~75–160 HH) — **runbook en `DEPLOYMENT.md`.**
       Hoy el pipeline actualiza UNA instalación (`update.sh`: backup→pull→migrate→healthcheck→rollback→prune). Para
       N clientes falta: **(3a) inventario/reporte de versión** por instalación (endpoint `/version` o *heartbeat* del

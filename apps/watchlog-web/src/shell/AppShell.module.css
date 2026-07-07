@@ -45,6 +45,28 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  /* Monograma (marca blanca sin logo): iniciales blancas sobre el gradiente. */
+  color: #fff;
+  font-family: var(--font-brand);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+/* Placa clara para el LOGO del cliente (marca blanca): legible con cualquier color. */
+.brandLogoPlate {
+  background: rgba(255, 255, 255, 0.92);
+  padding: 3px;
+}
+.brandLogoImg {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* Nombre de empresa como wordmark (marca blanca): una línea, sin desbordar. */
+.brandWordmarkCompany {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .brandText {
@@ -371,6 +393,54 @@ button.navGroupHeader:hover {
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
+}
+
+/* Identidad de la empresa en el topbar (branding runtime, OOBE S3). */
+.companyChip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 12px 0 4px;
+  margin-right: 4px;
+  border-right: 1px solid var(--color-border-subtle);
+  min-width: 0;
+}
+.companyChipLogo {
+  height: 22px;
+  max-width: 96px;
+  object-fit: contain;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.92);
+  padding: 2px 4px;
+}
+.companyChipMark {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  background: var(--gradient-brand);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-brand);
+  font-weight: 700;
+  font-size: 10px;
+}
+.companyChipName {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (max-width: 1100px) {
+  .companyChipName {
+    display: none;
+  }
 }
 
 .iconBtn {
