@@ -2,7 +2,7 @@ import { Injectable, Logger, type OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Client as MinioClient } from "minio";
 import type { Env } from "../config/env.schema";
-import { StorageService, type StoredObjectStat } from "./storage.service";
+import { StorageService, type StoredObject, type StoredObjectStat } from "./storage.service";
 
 /**
  * Implementación MinIO/S3 de `StorageService` (SDK oficial `minio`). On-premise:
@@ -17,14 +17,12 @@ export class MinioStorageService extends StorageService implements OnModuleInit 
   private readonly client: MinioClient;
   private readonly bucket: string;
   private readonly region: string;
-  private readonly presignTtl: number;
 
   constructor(private readonly config: ConfigService<Env, true>) {
     super();
     const endpoint = new URL(this.config.get("MINIO_ENDPOINT", { infer: true }));
     this.bucket = this.config.get("MINIO_BUCKET", { infer: true });
     this.region = this.config.get("MINIO_REGION", { infer: true });
-    this.presignTtl = this.config.get("MINIO_PRESIGN_TTL", { infer: true });
     const useSSL = endpoint.protocol === "https:";
     this.client = new MinioClient({
       endPoint: endpoint.hostname,
@@ -84,16 +82,15 @@ export class MinioStorageService extends StorageService implements OnModuleInit 
     if (keys.length > 0) await this.client.removeObjects(this.bucket, keys);
   }
 
-  async presignedGetUrl(
-    key: string,
-    downloadName: string,
-    opts?: { inline?: boolean },
-  ): Promise<{ url: string; expiresAt: string }> {
-    const safe = downloadName.replace(/["\\\r\n]/g, "_");
-    const disposition = opts?.inline ? "inline" : "attachment";
-    const url = await this.client.presignedGetObject(this.bucket, key, this.presignTtl, {
-      "response-content-disposition": `${disposition}; filename="${safe}"`,
-    });
-    return { url, expiresAt: new Date(Date.now() + this.presignTtl * 1000).toISOString() };
+  async getObject(key: string): Promise<StoredObject> {
+    // statObject primero: valida existencia y entrega size/contentType reales
+    // (getObject de MinIO no trae la metadata completa en el stream).
+    const stat = await this.client.statObject(this.bucket, key);
+    const stream = await this.client.getObject(this.bucket, key);
+    return {
+      stream,
+      size: stat.size,
+      contentType: stat.metaData?.["content-type"] ?? "application/octet-stream",
+    };
   }
 }

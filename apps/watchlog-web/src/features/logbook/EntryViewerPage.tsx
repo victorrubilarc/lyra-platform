@@ -37,7 +37,7 @@ import { FieldControl } from "../templates/FieldControl.js";
 import { FieldGrid } from "../templates/FieldGrid.js";
 import { ExceptionReviewPanel } from "../exceptions/ExceptionReviewPanel.js";
 import { useLogEntry } from "../log-entries/log-entries-queries.js";
-import { fetchAttachmentUrl } from "../log-entries/log-entries-api.js";
+import { fetchAttachmentObjectUrl } from "../log-entries/log-entries-api.js";
 import {
   useLogbookChanges,
   useLogbookRelated,
@@ -533,10 +533,10 @@ export function EntryViewerPage() {
                 fields={visible}
                 renderCell={(f) => {
                   const band = fieldBand(f);
-                  // Adjuntos (Ola 3): el visor lista + descarga (presigned GET con ABAC); read-only.
+                  // Adjuntos (Ola 3): el visor lista + descarga (proxied por la API con ABAC); read-only.
                   const attachments =
                     f.type === "ATTACHMENT"
-                      ? { upload: async () => Promise.reject(new Error("read-only")), getDownloadUrl: (id: string, inline?: boolean) => fetchAttachmentUrl(entry.id, id, inline) }
+                      ? { upload: async () => Promise.reject(new Error("read-only")), getDownloadUrl: (id: string, inline?: boolean) => fetchAttachmentObjectUrl(entry.id, id, inline) }
                       : undefined;
                   return (
                     <>

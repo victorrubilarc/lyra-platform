@@ -12,6 +12,19 @@ export const envSchema = z.object({
   DATABASE_URL: z.string().min(1, "DATABASE_URL es obligatoria"),
   REDIS_URL: z.string().optional(),
 
+  // --- Rate limiting global (H1 2026-07-07; contadores en Redis, por IP real) ---
+  // `default` generoso para toda la API; `auth`/`public`/`upload` estrictos solo
+  // en sus rutas. Configurables para instalaciones atípicas y para los smokes
+  // (límites bajos = gatillar 429 sin martillar; altos = regresiones sin ruido).
+  THROTTLE_DEFAULT_LIMIT: z.coerce.number().int().positive().default(300),
+  THROTTLE_DEFAULT_TTL_S: z.coerce.number().int().positive().default(60),
+  THROTTLE_AUTH_LIMIT: z.coerce.number().int().positive().default(10),
+  THROTTLE_AUTH_TTL_S: z.coerce.number().int().positive().default(60),
+  THROTTLE_PUBLIC_LIMIT: z.coerce.number().int().positive().default(30),
+  THROTTLE_PUBLIC_TTL_S: z.coerce.number().int().positive().default(60),
+  THROTTLE_UPLOAD_LIMIT: z.coerce.number().int().positive().default(30),
+  THROTTLE_UPLOAD_TTL_S: z.coerce.number().int().positive().default(300),
+
   // --- Autenticación (Fase 1) ---
   // Proveedores activos, separados por coma. "local" es el único implementado.
   AUTH_PROVIDERS: z.string().default("local"),
@@ -72,16 +85,14 @@ export const envSchema = z.object({
   // --- Object storage (MinIO / S3, adjuntos de evidencia — Ola 3) ---
   // Interfaz abstracta StorageService → implementación MinIO (SDK `minio`). On-prem,
   // sin SaaS. El navegador NUNCA recibe credenciales ni accede directo: la API es el
-  // choke-point de subida (proxied) y firma las descargas (presigned GET de vida corta).
+  // choke-point de subida Y de descarga (ambas proxied) — el storage no se expone
+  // fuera de la red interna del compose (H1 2026-07-07: muere el presigned GET).
   // ENDPOINT como URL (http(s)://host:puerto): el servicio deriva host/puerto/TLS.
   MINIO_ENDPOINT: z.string().url().default("http://localhost:9000"),
   MINIO_ACCESS_KEY: z.string().default("watchlog"),
   MINIO_SECRET_KEY: z.string().default("watchlogsecret"),
   MINIO_BUCKET: z.string().default("watchlog-evidence"),
   MINIO_REGION: z.string().default("us-east-1"),
-  // Vida (segundos) de las URLs prefirmadas de descarga (def. 5 min: suficiente
-  // para abrir/descargar, corto para no dejar enlaces reusables).
-  MINIO_PRESIGN_TTL: z.coerce.number().int().positive().default(300),
 
   // --- Licenciamiento (L1) ---
   // Ruta del archivo de licencia firmado (license.lic). En contenedor se monta

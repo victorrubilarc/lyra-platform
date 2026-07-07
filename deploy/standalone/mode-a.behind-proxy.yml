@@ -1,0 +1,17 @@
+# Modo (a) — DETRÁS DEL PROXY DEL CLIENTE (preferido si la planta ya tiene
+# appliance: F5 BIG-IP / NetScaler / NGINX corporativo / IIS-ARR).
+#
+#   docker compose -f docker-compose.yml -f mode-a.behind-proxy.yml up -d
+#
+# Publica watchlog-web SOLO en loopback: el proxy del cliente (en el mismo host
+# o vía túnel/ssh-forward que el equipo de redes decida) termina TLS con SU
+# certificado corporativo y reenvía a http://127.0.0.1:${EDGE_LOCAL_PORT}.
+# NADA queda LISTEN hacia la red — un escaneo externo no ve este host.
+#
+# El proxy DEBE mandar X-Forwarded-For (la API lo usa para rate limit + auditoría)
+# y servir HTTPS al usuario: COOKIE_SECURE=true y APP_PUBLIC_URL=https://… se
+# mantienen (la cookie Secure la evalúa el navegador contra el origen HTTPS).
+services:
+  watchlog-web:
+    ports:
+      - "127.0.0.1:${EDGE_LOCAL_PORT:-8080}:80"

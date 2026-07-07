@@ -15,6 +15,7 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
+import { SkipThrottle } from "@nestjs/throttler";
 import { from, interval, map, merge, switchMap, type Observable } from "rxjs";
 import type { FastifyRequest } from "fastify";
 import {
@@ -186,6 +187,10 @@ export class NotificationsController {
    * notificación in-app + un `ping` periódico para mantener viva la conexión.
    */
   @Public()
+  // Exento del rate limit (H1): conexión LARGA (1 request = N minutos) y tras un
+  // reinicio de la API todos los EventSource reconectan en ráfaga — contarlos
+  // agotaría el presupuesto de requests legítimos. El token se verifica igual.
+  @SkipThrottle()
   @Sse("inbox/stream")
   stream(@Query("access_token") token: string): Observable<MessageEvent> {
     return from(this.verifySseToken(token)).pipe(

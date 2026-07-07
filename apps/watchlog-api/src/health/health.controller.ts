@@ -1,4 +1,5 @@
 import { Controller, Get } from "@nestjs/common";
+import { SkipThrottle } from "@nestjs/throttler";
 import type { HealthStatus } from "@lyra/contracts";
 import { Public } from "../authz/authz.decorators";
 import { PrismaService } from "../prisma/prisma.service";
@@ -11,8 +12,12 @@ const VERSION = process.env.npm_package_version ?? "0.0.0";
  * exigir token):
  *  - GET /api/health        → liveness (¿el proceso responde?)
  *  - GET /api/health/ready  → readiness (¿las dependencias están sanas?)
+ *
+ * EXENTOS del rate limit (H1): el healthcheck de Docker y `update.sh` sondean
+ * cada 2 s — un 429 aquí dispararía rollbacks falsos. El costo es trivial.
  */
 @Public()
+@SkipThrottle()
 @Controller("health")
 export class HealthController {
   constructor(private readonly prisma: PrismaService) {}

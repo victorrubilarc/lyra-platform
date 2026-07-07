@@ -1,5 +1,49 @@
 # Progreso — Lyra WatchLog
 
+**2026-07-07 — 🛡️ HARDENING H1 · "PLANTA RESTRICTIVA READY" ✅ (Tanda A del sub-épico a prueba de balas) ⇒ tag v0.1.17**
+(`feat/hardening-h1-planta-restrictiva`). Cierra los P1/P2 de aplicación y host del pre-pentest v0.1.16 — pre-requisito
+del empaquetado (make-bundle) y de las pruebas reales en planta (red OT/IT Purdue N3/3.5, sin internet, PKI corporativa).
+Decisiones (a)–(g) aprobadas antes de codificar (DECISIONS 2026-07-07 H1) + 3 hallazgos NUEVOS de la investigación,
+cerrados: la SPA NO tenía CSP (helmet solo cubre /api) · `req.ip` era la IP del Caddy interno (rate limit y AUDITORÍA
+con IP equivocada) · la web autentica por Bearer ⇒ descarga por fetch→blob. **(1) 🔴 Adjuntos PROXIED (P1-a):** muere el
+presigned de MinIO (firmaba `http://minio:9000` ⇒ evidencia ROTA en prod) SIN fallback — `getObject` streaming en
+`StorageService` + `GET :id/attachments/:descriptorId` (misma ABAC/auditoría que getDetail, `@Res` como el acta PDF,
+nosniff + private + Content-Length; NotFound de storage ⇒ 404 honesto); `MINIO_PRESIGN_TTL` retirado; web fetch
+autenticado → object URL (revoke en modal/descarga; ancla `download` conserva el nombre). **MinIO queda 100 % interno**
+⇒ superficie = 1 flujo. **(2) 🔴 Rate limiting GLOBAL (P1-b):** `@nestjs/throttler` + Redis (`@nest-lab/
+throttler-storage-redis`); default 300/60s + estrictos por RUTA vía `skipIf` (auth 10/60s NIST 800-63B · públicos
+30/60s · subida 30/300s), todo por env `THROTTLE_*`; **salud y los 2 SSE exentos** (healthcheck cada 2s ⇒ 429 =
+rollback falso; SSE = conexión larga + ráfaga de reconexión); guard propio ⇒ **`Retry-After` ESTÁNDAR** (el paquete lo
+sufija en los no-default); **`trustProxy: true`** (fix lateral: la auditoría ya registra la IP real). **(3) 🟡 Magic
+bytes (P2-c):** helper compartido `storage/content-sniff.ts` (el sniffer del logo S3, extraído y ampliado: PNG/JPEG/
+WebP/GIF/PDF/WAV/MP3/OGG/WebM/MP4/ZIP): ejecutables (MZ/ELF/Mach-O) SIEMPRE 400 · declarado imagen/PDF sin confirmación
+de bytes ⇒ 400 · firma conocida ⇒ el contentType EFECTIVO es el sniffeado (office zip-based conserva el declarado) ·
+no-sniffables (csv/txt) pasan por declarado pero **JAMÁS inline** (el `?inline=1` solo se honra para tipos inline-safe;
+SVG/HTML nunca — anti stored-XSS). **(4) 🟡 Fuentes SELF-HOSTED (P2-d):** `@fontsource/{sora,inter}` woff2 mismos pesos
+(600/700/800 · 400/500/600), muere el `@import` a Google (egress del navegador/SOC); **CSP NUEVA de la SPA en
+`Caddyfile.web`** (`default-src 'self'`, blob: solo para preview de adjuntos, unsafe-inline solo style, frame-ancestors
+none, Permissions-Policy cámara/mic self, sin banner Server); CLAUDE.md §Tipografía corregido (jamás Google Fonts).
+**(5) 🟡 Borde DESACOPLABLE (P2-e):** `deploy/standalone/` NUEVO (el compose del demo INTACTO): base auto-contenida con
+CERO `ports:` + `mode-a.behind-proxy.yml` (127.0.0.1:$EDGE_LOCAL_PORT, su appliance termina TLS) + `mode-b.own-edge.yml`
+(caddy-edge `tls /certs/cert.pem /certs/key.pem` SIN ACME, solo 443 LISTEN) + `edge/Caddyfile.edge` + **variante NGINX**
+(`nginx-watchlog.conf.example`, con X-Forwarded-For + SSE sin buffering) + **README con MATRIZ DE PUERTOS** por modo
+para el equipo de redes (interno sin `ports:` ⇒ INEXISTENTE en un escaneo); los 3 combos validados con `compose config`.
+**Verde:** typecheck/lint(0)/build/test (API **330** · web **26** · contracts **519** · licensing 50 · CLI 38) +
+**smoke-adjuntos-proxied.py 23/23 NUEVO** (:3409 — sniffed manda sobre declarado · EXE 400 · CSV jamás inline · 401/403/
+404 · /url retirado) + **smoke-rate-limit.py 10/10 NUEVO** (:3410 — 429+Retry-After en público y auth · health exento ·
+recuperación tras TTL · flujo normal no se bloquea) + regresiones: **objetos-ola3 25/25** (migrado al endpoint proxied)
+· licencia 28 · notificaciones 18 + inapp/SSE 18 · setup 30 · branding 28 · ia-stream 13. **SIN migración de BD.**
+Gotchas de smoke: Fastify emite headers en minúscula (dict() case-sensitive) · un TTL de throttle menor que el martilleo
+expira la ventana a mitad de loop (jamás 429) · los buckets del throttler viven en el Redis dev COMPARTIDO ⇒ un 429
+residual cruza instancias (FLUSHALL o esperar TTL; `.env` dev quedó con `THROTTLE_*` relajados para los smokes).
+**No probado:** smoke VISUAL (dueño): subir/previsualizar/descargar evidencia en la web, look de fuentes idéntico
+(self-hosted), y el deploy real del standalone modo a/b (validado solo con `compose config`). Docs: DECISIONS (a–g),
+SECURITY §5 + §5.1 (superficie/borde) + adjuntos, ARCHITECTURE (stack), DEPLOYMENT (modos de borde + matriz),
+BACKLOG (H1 ✅ · E1 ✅ salvo (vi) pin minio→H2). **Tag v0.1.17** (decisión f: el fix de adjuntos es un bug visible en
+el demo y el rate limiting protege la única instalación expuesta a internet). **Siguiente: E2 empaquetado
+(make-bundle.sh + install.sh + Trivy sobre las imágenes) o Tanda B (H2 · non-root/Trivy CI/SBOM/pins) si se prefiere
+seguir endureciendo antes de empacar.**
+
 **2026-07-06 — 🎨 OOBE S3 · BRANDING RUNTIME ✅ ⇒ épico §2(5) COMPLETO, §2(2) avanzado, tag v0.1.16** (`feat/oobe-s3-branding`).
 La identidad que el wizard PERSISTE por fin se VE — y sin rebuild: muere el co-branding BUILD-TIME (`VITE_LICENSEE_*`
 RETIRADO de .env/.env.prod/vite-env/public; hallazgo: `Dockerfile.web` **nunca** lo horneó, la imagen de canal siempre

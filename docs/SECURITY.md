@@ -192,10 +192,40 @@ La pantalla de login se co-marca **SIN sesión**, así que existe una superficie
 - Toda configuración por variables de entorno; `.env` fuera del repo (`.env.example` versionado).
 
 ## 5. Endurecimiento (transversal)
-- Cabeceras de seguridad (Helmet ya activo), CSP/HSTS en producción (Caddy).
-- Rate limiting (Redis), validación de entrada en backend con Zod (no se confía en el cliente).
+- Cabeceras de seguridad: **Helmet** en `/api/*` + **CSP propia de la SPA en el Caddy interno** (H1 2026-07-07 —
+  hallazgo: la página no tenía CSP; helmet solo cubre las respuestas de la API). `docker/Caddyfile.web`:
+  `default-src 'self'` (todo same-origin: fuentes self-hosted, API por `/api`, SSE), `blob:` solo para la
+  previsualización de adjuntos, `'unsafe-inline'` SOLO en style (atributos de React), `frame-ancestors 'none'`,
+  `object-src 'none'`, `nosniff`, `Referrer-Policy`, `Permissions-Policy` (cámara/micrófono solo self — la app los
+  usa para evidencia), sin banner `Server`. HSTS lo pone el BORDE (que termina TLS).
+- **Rate limiting GLOBAL** (H1 2026-07-07, `@nestjs/throttler` + contadores en **Redis** — correcto multi-instancia):
+  throttler `default` **generoso** (300 req/60 s por IP; un operador real no lo toca) + estrictos por ruta vía
+  `skipIf`: **`/auth/*` 10/60 s** (NIST 800-63B §5.2.2: throttling por IP ADEMÁS del lockout por cuenta — anti
+  password-spraying horizontal), **públicos** (`/api/branding*`, `/api/setup/*`) 30/60 s, **subida de adjuntos**
+  30/300 s. Configurable por env (`THROTTLE_*`). **Exentos** (`@SkipThrottle`): salud (los healthchecks de
+  Docker/update.sh sondean cada 2 s; un 429 = rollback falso) y los 2 SSE (conexiones largas; reconexión en ráfaga
+  tras reinicio). El 429 emite **`Retry-After` estándar** (guard propio: el paquete lo sufija en los no-default).
+  Complementa (no reemplaza) los lockouts por cuenta de login/MFA/setup y el throttle de password-reset.
+- **IP real detrás del proxy** (`trustProxy` en Fastify, H1): sin esto `req.ip` era la IP del Caddy interno —
+  rompía el rate limit por IP Y registraba la IP equivocada en la auditoría GxP. Los bordes/proxies deben mandar
+  `X-Forwarded-For` (documentado en los ejemplos de borde).
+- **Cero egress del navegador** (H1): fuentes Sora/Inter **self-hosted** vía `@fontsource` (woff2 desde nuestro
+  origen; muere el `@import` a fonts.googleapis.com que disparaba el SOC del cliente y degradaba en air-gap).
+- Validación de entrada en backend con Zod (no se confía en el cliente).
 - CSRF para flujos basados en cookies.
 - Logs redactan `authorization`, `cookie`, `set-cookie`.
+
+### 5.1 Superficie de red y modos de borde (H1 2026-07-07)
+El compose de producción **no publica ningún puerto** de datos: Postgres/Redis/MinIO/API/Caddy interno viven SOLO en
+la red Docker `internal` sin `ports:` ⇒ para un escaneo de red **no existen** (no hay socket en el host; distinto de
+"cerrado"). El **borde es desacoplable en 3 modos** (decisión 2026-07-07; el Caddy INTERNO se mantiene): **(a)**
+detrás del proxy del cliente (`watchlog-web` en `127.0.0.1:<port>` loopback; su F5/NetScaler/NGINX/IIS termina TLS) ·
+**(b)** borde propio con **certificado corporativo montado** (`tls /certs/cert.pem /certs/key.pem`, SIN ACME —
+imposible air-gapped) ⇒ solo `443/tcp` LISTEN · **(c)** borde compartido del demo (EC2). Variante **NGINX del borde
+documentada** (decisión comercial). **Matriz de puertos completa por modo + archivos:** `deploy/standalone/`
+(README con la matriz para el equipo de redes) y `docs/DEPLOYMENT.md`. `COOKIE_SECURE=true` + `APP_PUBLIC_URL`
+https se respetan en los tres modos. Recordatorio: dev publica 5432/6379/9000-9001/1025-8025 **a propósito**
+(herramientas locales); ese compose jamás va a planta.
 
 ## 6. Recuperación de contraseña (self-service)
 
@@ -360,15 +390,25 @@ GxP: MHRA Data Integrity 2018 / FDA DI Q&A (corrección tardía justificada + at
   El navegador **NUNCA** recibe credenciales del bucket ni accede directo: la API es el **choke-point**. Bucket creado de
   forma idempotente al arrancar; credenciales por env (`MINIO_*`), nada en el repo.
 - **Subida PROXIED (`POST /log-entries/:id/attachments/:sectionKey/:fieldKey`, `logentry:fill`).** `@fastify/multipart`
-  con tope DURO (100 MB) en el borde; el servicio valida **tamaño** (config `maxSizeMb`) y **tipo** (`accept` por kind)
-  ANTES de persistir en MinIO, calcula `sha256`, y aplica las MISMAS guardas que `saveSection` (DRAFT no sellado · ABAC
-  nodo×plantilla · sección editable en el estado × rol de sección × override de rol por campo). Auditado
-  (`logentry.attachment.uploaded`). *Estándar:* OWASP file-upload (validación server-side, nombre saneado, sin servir el
-  byte desde la API). **Antivirus (ClamAV) = diferido (BACKLOG).**
-- **Descarga = presigned GET de vida corta, ABAC server-side** (`GET /log-entries/:id/attachments/:descriptorId/url`,
-  `logentry:view`). El descriptor se resuelve por `id` desde los valores PERSISTIDOS (el cliente nunca presigna una key
-  arbitraria); la URL caduca (`MINIO_PRESIGN_TTL`, def. 5 min) y fuerza `Content-Disposition: attachment`. Acceso auditado
-  (`logentry.attachment.downloaded`: quién accedió a la evidencia = valor GxP).
+  con tope DURO (100 MB) en el borde; el servicio valida **tamaño** (config `maxSizeMb`) y **tipo por MAGIC BYTES del
+  CONTENIDO** (H1 2026-07-07; antes solo el mimetype declarado — "stored malware delivery" en el pre-pentest) ANTES de
+  persistir en MinIO, calcula `sha256`, y aplica las MISMAS guardas que `saveSection` (DRAFT no sellado · ABAC
+  nodo×plantilla · sección editable en el estado × rol de sección × override de rol por campo). Política del sniffing
+  (helper compartido `storage/content-sniff.ts`, el mismo del logo S3): **ejecutables (PE/ELF/Mach-O) se rechazan
+  SIEMPRE**; si los bytes tienen firma conocida (imagen bitmap/PDF/audio/video/zip) ese es el content-type EFECTIVO
+  (para office zip-based se conserva el declarado); si el declarado afirma imagen o PDF y los bytes no lo confirman ⇒
+  400; tipos sin firma (csv/txt/office legado) pasan por el declarado **pero jamás se sirven inline**. Auditado
+  (`logentry.attachment.uploaded`). *Estándar:* OWASP File Upload Cheat Sheet. **Antivirus (ClamAV) = diferido (H3).**
+- **Descarga PROXIED por la API con ABAC server-side** (`GET /log-entries/:id/attachments/:descriptorId`,
+  `logentry:view`) — H1 2026-07-07 **reemplaza la URL presigned** (hallazgo 🔴: firmaba contra `http://minio:9000`,
+  hostname interno que el navegador jamás resuelve fuera de Docker ⇒ adjuntos ROTOS en prod; además obligaba a
+  considerar exponer MinIO). La API **streamea** el objeto (sin bufferizarlo entero) con `Content-Type` real,
+  `Content-Length`, `X-Content-Type-Options: nosniff` y `Cache-Control: private, no-store`. El descriptor se resuelve
+  por `id` desde los valores PERSISTIDOS (el cliente nunca alcanza una key arbitraria). `?inline=1` (previsualización)
+  **solo se honra para content-types inline-safe** (imagen bitmap/PDF/audio/video); SVG/HTML/XML y todo lo no
+  verificado bajan `attachment` SIEMPRE (anti stored-XSS). La web consume con fetch autenticado (Bearer) → blob →
+  object URL: **sin tokens en URLs** (ASVS V3). Acceso auditado (`logentry.attachment.downloaded` = valor GxP).
+  **Consecuencia de red: MinIO no necesita exposición ALGUNA** — vive solo en la red interna del compose.
 - **Pertenencia del objeto (anti-fabricación).** Al guardar, cada descriptor NUEVO debe (a) tener su `key` bajo el prefijo
   `entries/{logEntryId}/{fieldKey}/` y (b) existir en el storage (`statObject`) — análogo a `allowedRefIds` pero por
   prefijo. Una key ajena/fabricada ⇒ 400. **delete-on-remove**: quitar un adjunto borra el objeto; **VOID** de un borrador

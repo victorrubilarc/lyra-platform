@@ -1,5 +1,15 @@
-/* Fuentes del Design System Lyra (Sora + Inter). */
-@import url("https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap");
+/* Fuentes del Design System Lyra (Sora + Inter) — SELF-HOSTED vía @fontsource
+   (H1 2026-07-07): woff2 servido desde nuestro propio origen. El @import a
+   fonts.googleapis.com se retiró: en una planta air-gapped era egress del
+   navegador (alerta en el SOC del cliente) y degradaba a fuentes de sistema.
+   Mismos pesos exactos que antes (Sora 600/700/800 · Inter 400/500/600);
+   @fontsource trae font-display: swap. Licencia SIL OFL 1.1 (en cada paquete). */
+@import "@fontsource/sora/600.css";
+@import "@fontsource/sora/700.css";
+@import "@fontsource/sora/800.css";
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
 
 /* Tailwind v4. */
 @import "tailwindcss";

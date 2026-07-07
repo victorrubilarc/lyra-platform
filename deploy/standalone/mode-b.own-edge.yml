@@ -1,0 +1,33 @@
+# Modo (b) — BORDE PROPIO con CERTIFICADO CORPORATIVO (para la planta sin
+# appliance de proxy). Sin ACME/Let's Encrypt: en una red air-gapped no hay
+# internet saliente y la PKI es corporativa — el cert/key los emite la CA del
+# cliente y se montan como archivos.
+#
+#   docker compose -f docker-compose.yml -f mode-b.own-edge.yml up -d
+#
+# Único puerto LISTEN del host: 443/tcp (+ 80/tcp SOLO como redirect a https,
+# quitarlo si el equipo de redes no lo quiere). Certificados esperados:
+#   ./certs/cert.pem  (cadena completa: leaf + intermedias de la CA corporativa)
+#   ./certs/key.pem   (clave privada; permisos 600, dueño root)
+# Config del borde: ./edge/Caddyfile.edge (ajustar el dominio interno).
+services:
+  caddy-edge:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    mem_limit: 128m
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      - ./edge/Caddyfile.edge:/etc/caddy/Caddyfile:ro
+      - ./certs:/certs:ro
+      - caddyedgedata:/data
+    environment:
+      TZ: "${TZ:-America/Santiago}"
+    depends_on:
+      watchlog-web:
+        condition: service_started
+    networks: [internal]
+
+volumes:
+  caddyedgedata:

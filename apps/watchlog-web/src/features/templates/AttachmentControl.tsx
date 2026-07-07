@@ -15,7 +15,11 @@ import styles from "./AttachmentControl.module.css";
 /** Handlers de subida/descarga ligados a una entrada+sección+campo por el llamador. */
 export interface AttachmentHandlers {
   upload: (file: File) => Promise<FileDescriptor>;
-  /** `inline` = URL para PREVISUALIZAR (disposición inline); sin él, para descargar. */
+  /**
+   * Object URL del adjunto (descarga PROXIED por la API con fetch autenticado —
+   * el navegador no toca el storage). `inline` = para PREVISUALIZAR. El widget
+   * revoca la URL cuando termina de usarla.
+   */
   getDownloadUrl: (descriptorId: string, inline?: boolean) => Promise<{ url: string }>;
 }
 
@@ -98,7 +102,16 @@ export function AttachmentControl({
     if (!handlers) return;
     try {
       const { url } = await handlers.getDownloadUrl(d.id);
-      window.open(url, "_blank", "noopener,noreferrer");
+      // Ancla con `download`: conserva el nombre real del archivo (un object URL
+      // abierto con window.open descargaría con un nombre aleatorio).
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = d.filename;
+      anchor.rel = "noopener";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch {
       setError(t("templates.attachment.downloadError"));
     }
@@ -217,9 +230,9 @@ export function AttachmentControl({
 }
 
 /**
- * Vista previa de un adjunto: resuelve la URL prefirmada (ABAC) y la muestra según
- * el tipo (imagen / audio / video / PDF / otros). Permite corroborar que el archivo
- * subido es el correcto sin descargarlo. La URL es de vida corta y se firma server-side.
+ * Vista previa de un adjunto: obtiene el contenido PROXIED por la API (fetch
+ * autenticado + ABAC → object URL) y lo muestra según el tipo (imagen / audio /
+ * video / PDF / otros). El object URL se revoca al cerrar el modal.
  */
 function PreviewModal({
   descriptor,
@@ -237,11 +250,17 @@ function PreviewModal({
 
   useEffect(() => {
     let alive = true;
+    let objectUrl: string | null = null;
     getUrl(descriptor.id, true)
-      .then(({ url }) => alive && setUrl(url))
+      .then(({ url }) => {
+        objectUrl = url;
+        if (alive) setUrl(url);
+        else URL.revokeObjectURL(url);
+      })
       .catch(() => alive && setFailed(true));
     return () => {
       alive = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [descriptor.id, getUrl]);
 

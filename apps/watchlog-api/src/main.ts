@@ -18,7 +18,11 @@ const UPLOAD_HARD_LIMIT_BYTES = 100 * 1024 * 1024;
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
-    new FastifyAdapter(),
+    // trustProxy: la API SIEMPRE corre detrás de un proxy (Caddy interno en
+    // prod; Vite en dev) — sin esto `req.ip` es la IP del proxy, lo que rompe
+    // el rate limit por IP (toda la planta contaría como una sola) y registra
+    // la IP equivocada en la auditoría (H1 2026-07-07).
+    new FastifyAdapter({ trustProxy: true }),
     { bufferLogs: true },
   );
 

@@ -3,11 +3,28 @@
 {$SITE_ADDRESS::80} {
 	encode gzip zstd
 
+	# Sin banner de servidor (fingerprinting).
+	header -Server
+
 	handle /api/* {
 		reverse_proxy api:3000
 	}
 
 	handle {
+		# Cabeceras de seguridad de la SPA (H1 2026-07-07 — antes la página NO
+		# tenía CSP: helmet solo cubre las respuestas /api). Todo es same-origin:
+		# fuentes self-hosted (@fontsource), API por /api, SSE same-origin.
+		# blob: = previsualización de adjuntos (object URLs del fetch autenticado).
+		# 'unsafe-inline' SOLO en style (atributos style de React); scripts jamás.
+		# Permissions-Policy: la app SÍ usa cámara (evidencia foto) y micrófono
+		# (nota de voz) en su propio origen.
+		header {
+			Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; frame-src 'self' blob:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+			X-Content-Type-Options "nosniff"
+			X-Frame-Options "DENY"
+			Referrer-Policy "strict-origin-when-cross-origin"
+			Permissions-Policy "camera=(self), microphone=(self), geolocation=()"
+		}
 		root * /srv
 		try_files {path} /index.html
 		file_server

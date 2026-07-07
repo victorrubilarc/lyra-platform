@@ -164,7 +164,7 @@ function makeServices(prismaOver: Record<string, unknown> = {}, scopeOver: Parti
     statObject: vi.fn().mockResolvedValue(null),
     removeObject: vi.fn().mockResolvedValue(undefined),
     removePrefix: vi.fn().mockResolvedValue(undefined),
-    presignedGetUrl: vi.fn().mockResolvedValue("https://minio.local/x"),
+    getObject: vi.fn().mockResolvedValue({ stream: null, size: 1, contentType: "application/octet-stream" }),
   } as unknown as import("../storage/storage.service").StorageService;
   const notifications = {
     emit: vi.fn().mockResolvedValue(undefined),

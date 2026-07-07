@@ -4,6 +4,7 @@ import { ScheduleModule } from "@nestjs/schedule";
 import { LoggerModule } from "nestjs-pino";
 import { validateEnv } from "./config/env.schema";
 import { PrismaModule } from "./prisma/prisma.module";
+import { ThrottlingModule } from "./throttling/throttling.module";
 import { HealthModule } from "./health/health.module";
 import { CryptoModule } from "./crypto/crypto.module";
 import { CacheModule } from "./redis/cache.module";
@@ -63,6 +64,10 @@ import { WorkOrdersModule } from "./work-orders/work-orders.module";
       },
     }),
     PrismaModule,
+    // Antes de AuthzModule a propósito: el rate limit corre PRIMERO (un
+    // atacante de volumen recibe 429 antes de gastar verificación de JWT).
+    // Salud y SSE quedan exentos con @SkipThrottle en sus controllers.
+    ThrottlingModule,
     CryptoModule,
     CacheModule,
     AuditModule,

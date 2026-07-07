@@ -70,8 +70,10 @@ import {
   type AttachmentFieldConfig,
 } from "@lyra/contracts";
 import { createHash, randomUUID } from "node:crypto";
+import type { Readable } from "node:stream";
 import { Prisma } from "@prisma/client";
 import { StorageService } from "../storage/storage.service";
+import { declaredRequiresSniff, isExecutable, isInlineSafe, isZipBased, sniffContentType } from "../storage/content-sniff";
 import { ReauthService } from "../auth/reauth.service";
 import { AuditService, type AuditContext } from "../audit/audit.service";
 import { PermissionService } from "../authz/permission.service";
@@ -1345,15 +1347,34 @@ export class LogEntriesService {
       throw new ForbiddenException(`El campo "${def.label}" está reservado a otro rol: no puede adjuntar`);
     }
 
-    // Validación en el choke-point: tamaño (config o default) y tipo (accept del kind).
+    // Validación en el choke-point: tamaño (config o default) y tipo. El tipo se
+    // valida contra los MAGIC BYTES del CONTENIDO, no solo el mimetype declarado
+    // (H1 2026-07-07, hallazgo "stored malware delivery"): ejecutables se rechazan
+    // siempre; si los bytes tienen firma conocida, ESE es el content-type efectivo
+    // (para office zip-based se conserva el declarado, más específico); si el
+    // declarado afirma imagen/PDF y los bytes no lo confirman, se rechaza. Tipos
+    // sin firma (csv/txt/office legado) pasan por el declarado, pero la descarga
+    // proxied jamás los sirve inline.
     if (file.truncated) throw new BadRequestException("El archivo supera el tamaño máximo permitido");
     const cfg = def.config as AttachmentFieldConfig;
     const size = file.buffer.length;
     if (size === 0) throw new BadRequestException("El archivo está vacío");
     if (size > maxAttachmentBytes(cfg)) throw new BadRequestException("El archivo supera el tamaño máximo permitido");
-    const contentType = (file.mimetype || "application/octet-stream").toLowerCase();
+    if (isExecutable(file.buffer)) {
+      throw new BadRequestException("No se permiten archivos ejecutables como evidencia");
+    }
+    const declared = (file.mimetype || "application/octet-stream").toLowerCase();
+    const sniffed = sniffContentType(file.buffer);
+    if (sniffed === null && declaredRequiresSniff(declared)) {
+      throw new BadRequestException("El contenido del archivo no corresponde al tipo declarado");
+    }
+    const contentType = sniffed === null || (sniffed === "application/zip" && isZipBased(declared)) ? declared : sniffed;
     if (!acceptMatches(effectiveAccept(cfg), contentType)) {
-      throw new BadRequestException("El tipo de archivo no está permitido para este campo");
+      throw new BadRequestException(
+        sniffed !== null && sniffed !== declared
+          ? "El contenido real del archivo no está permitido para este campo"
+          : "El tipo de archivo no está permitido para este campo",
+      );
     }
 
     const id = randomUUID();
@@ -1383,17 +1404,20 @@ export class LogEntriesService {
   }
 
   /**
-   * URL prefirmada de descarga (GET de vida corta) de un adjunto, con la MISMA ABAC
-   * que `getDetail`. El descriptor se resuelve por `id` desde los valores PERSISTIDOS
-   * (el cliente nunca presigna una key arbitraria). Se audita el acceso (GxP).
+   * Contenido de un adjunto para la descarga PROXIED por la API (H1 2026-07-07:
+   * reemplaza la URL presigned — MinIO queda 100 % interno), con la MISMA ABAC
+   * que `getDetail`. El descriptor se resuelve por `id` desde los valores
+   * PERSISTIDOS (el cliente nunca alcanza una key arbitraria). `inline` solo se
+   * honra para content-types inline-safe (jamás SVG/HTML: stored XSS); el resto
+   * baja como `attachment`. Se audita el acceso (GxP).
    */
-  async getAttachmentDownloadUrl(
+  async getAttachmentObject(
     userId: string,
     entryId: string,
     descriptorId: string,
     ctx: AuditContext,
     inline = false,
-  ): Promise<{ url: string; filename: string; expiresAt: string }> {
+  ): Promise<{ stream: Readable; filename: string; contentType: string; size: number; disposition: "inline" | "attachment" }> {
     const entry = await this.loadEntry(entryId);
     await this.assertNodeInScope(userId, entry.orgNodeId);
     await this.scope.assertTemplateInScope(userId, entry.templateId);
@@ -1429,7 +1453,18 @@ export class LogEntriesService {
     }
     if (!found) throw new NotFoundException("Adjunto no encontrado en la entrada");
 
-    const { url, expiresAt } = await this.storage.presignedGetUrl(found.key, found.filename, { inline });
+    let object;
+    try {
+      object = await this.storage.getObject(found.key);
+    } catch (err) {
+      // El descriptor persiste pero el objeto ya no está (p. ej. limpieza de un
+      // borrador anulado): 404 honesto, no un 500 del SDK.
+      if ((err as { code?: string }).code === "NotFound") {
+        throw new NotFoundException("El adjunto ya no existe en el almacenamiento");
+      }
+      throw err;
+    }
+    const disposition: "inline" | "attachment" = inline && isInlineSafe(object.contentType) ? "inline" : "attachment";
     await this.audit.record({
       ...ctx,
       action: "logentry.attachment.downloaded",
@@ -1437,7 +1472,13 @@ export class LogEntriesService {
       entityId: entryId,
       metadata: { descriptorId, filename: found.filename },
     });
-    return { url, filename: found.filename, expiresAt };
+    return {
+      stream: object.stream,
+      filename: found.filename,
+      contentType: object.contentType,
+      size: object.size,
+      disposition,
+    };
   }
 
   /**

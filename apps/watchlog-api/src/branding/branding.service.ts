@@ -9,6 +9,7 @@ import {
 import { AuditService } from "../audit/audit.service";
 import { LicenseService } from "../licensing/license.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { sniffContentType } from "../storage/content-sniff";
 
 const SINGLETON_ID = "system";
 
@@ -194,26 +195,14 @@ export class BrandingService {
 }
 
 /**
- * Deriva el content-type REAL desde los magic bytes; null = no permitido.
- * PNG `89 50 4E 47 0D 0A 1A 0A` · JPEG `FF D8 FF` · WebP `RIFF....WEBP`.
- * SVG (texto XML) jamás calza aquí — rechazo por diseño.
+ * Deriva el content-type REAL desde los magic bytes; null = no permitido para un
+ * LOGO (lista cerrada PNG/JPEG/WebP: se sirve inline pre-auth). SVG (texto XML)
+ * jamás calza — rechazo por diseño. El sniffing vive en el helper compartido
+ * `storage/content-sniff.ts` (H1 lo extendió a los adjuntos de evidencia).
  */
 export function sniffLogoContentType(buffer: Buffer): BrandingLogoContentType | null {
-  if (
-    buffer.length >= 8 &&
-    buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
-  ) {
-    return "image/png";
-  }
-  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
-    return "image/jpeg";
-  }
-  if (
-    buffer.length >= 12 &&
-    buffer.subarray(0, 4).toString("latin1") === "RIFF" &&
-    buffer.subarray(8, 12).toString("latin1") === "WEBP"
-  ) {
-    return "image/webp";
-  }
-  return null;
+  const sniffed = sniffContentType(buffer);
+  return sniffed === "image/png" || sniffed === "image/jpeg" || sniffed === "image/webp"
+    ? (sniffed as BrandingLogoContentType)
+    : null;
 }

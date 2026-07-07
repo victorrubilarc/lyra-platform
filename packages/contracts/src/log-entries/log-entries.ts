@@ -941,17 +941,9 @@ export const signatureVerifyResultSchema = z.object({
 });
 export type SignatureVerifyResult = z.infer<typeof signatureVerifyResultSchema>;
 
-/**
- * Respuesta de la URL prefirmada de descarga de un adjunto (Ola 3): URL de vida
- * corta + nombre de archivo + expiración. El navegador nunca recibe la key cruda
- * ni credenciales de MinIO; la API firma con la misma ABAC que `getDetail`.
- */
-export const attachmentDownloadResponseSchema = z.object({
-  url: z.string(),
-  filename: z.string(),
-  expiresAt: z.string(),
-});
-export type AttachmentDownloadResponse = z.infer<typeof attachmentDownloadResponseSchema>;
+// La descarga de adjuntos es PROXIED por la API desde H1 (2026-07-07): el
+// endpoint streamea los bytes con la misma ABAC que `getDetail` — ya no existe
+// respuesta de "URL prefirmada" (el navegador jamás alcanza el storage).
 
 // === Lógica compartida (fuente única backend + frontend) =====================
 

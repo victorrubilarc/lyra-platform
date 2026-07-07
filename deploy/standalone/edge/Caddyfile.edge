@@ -1,0 +1,23 @@
+# Borde PROPIO de Lyra WatchLog (modo b) — TLS con CERTIFICADO CORPORATIVO.
+# Sin ACME: el cert lo emite la CA de la planta y se monta en /certs (ro).
+# Ajustar el dominio al DNS interno del cliente.
+{
+	# Air-gap: sin ACME, sin telemetría, sin puertos de administración.
+	auto_https off
+	admin off
+}
+
+# Redirect 80 → 443 (quitar este bloque si el equipo de redes no quiere :80).
+http://watchlog.planta.cliente.local {
+	redir https://{host}{uri} permanent
+}
+
+https://watchlog.planta.cliente.local {
+	tls /certs/cert.pem /certs/key.pem
+
+	encode gzip zstd
+
+	# X-Forwarded-For lo agrega Caddy automáticamente (la API lo usa para el
+	# rate limit por IP y la IP real de la auditoría).
+	reverse_proxy watchlog-web:80
+}

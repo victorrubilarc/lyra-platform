@@ -129,8 +129,10 @@ No es una app genérica: es software industrial de alto estándar.
 - Títulos y marca:    Sora (weights: 600, 700, 800)
 - UI y cuerpo:        Inter (weights: 400, 500, 600)
 - Código y monospace: ui-monospace, Menlo, monospace
-- Importar siempre desde Google Fonts:
-  @import url('https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap')
+- Fuentes SELF-HOSTED vía @fontsource (H1 2026-07-07 — JAMÁS importar de Google Fonts:
+  es egress del navegador que dispara el SOC del cliente y degrada en air-gap):
+  @import "@fontsource/sora/{600,700,800}.css" + "@fontsource/inter/{400,500,600}.css"
+  (el acta PDF embebe sus propios TTF por ruta; ver docs/SECURITY.md §5)
 
 ### Principios visuales (obligatorios)
 - **Dark mode es el modo por defecto** y la identidad de marca (la entrada/login es SIEMPRE oscura).

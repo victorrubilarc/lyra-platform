@@ -200,6 +200,18 @@ fuera.
 **Beneficio:** **soberanía y control total del dato**, requisito de muchas operaciones críticas y de
 áreas de seguridad de la información.
 
+### 🏰 Diseñado para redes de planta restrictivas (2026-07)
+Pensado para pasar la revisión del equipo de ciberseguridad de una minera: **un solo flujo de
+entrada** (la base de datos, la caché y el almacén de evidencia **no existen para un escaneo de
+red** — no publican puertos), **cero salidas a internet obligatorias** (ni siquiera las fuentes
+tipográficas del navegador: todo se sirve desde la instalación), **límite de tráfico por IP**
+(anti fuerza bruta y anti abuso de volumen), validación del **contenido real** de cada archivo que
+se sube (un ejecutable disfrazado de foto se rechaza), y **despliegue adaptable al borde del
+cliente**: detrás de su propio proxy corporativo (F5/NGINX/IIS), con certificado de su PKI (sin
+depender de Let's Encrypt), o autónomo. Matriz de puertos lista para entregar al equipo de redes.
+**Beneficio:** el cuestionario de proveedor y la revisión de arquitectura **se responden con
+evidencia**, no con promesas — menos fricción para entrar a faena.
+
 ### 🔔 Avisos por correo
 Notificaciones configurables (p. ej. rondas vencidas, vencimientos de flujo) con plantillas propias.
 **Beneficio:** lo importante **llega a quien corresponde** sin depender de que alguien "mire la pantalla".

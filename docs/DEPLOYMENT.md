@@ -87,6 +87,28 @@ Ambas apps comparten EC2 + borde Caddy, ambas en deploy continuo. Blindado para 
 - El **único** que escucha 80/443 es el Caddy de ruta-bus (= "borde"). WatchLog **no** publica puertos.
 - El borde alcanza a WatchLog por la red docker externa **`edge`** (alias `watchlog-web`).
 - Postgres/Redis/MinIO de WatchLog son **dedicados** (aislados de ruta-bus).
+- **MinIO no necesita exposición alguna** (desde H1 2026-07-07 la subida Y la descarga de adjuntos van
+  PROXIED por la API): el navegador jamás lo alcanza. Superficie de entrada = 1 solo flujo HTTP(S).
+
+## Modos de borde para PLANTA / cliente (H1 2026-07-07) — `deploy/standalone/`
+
+El diagrama de arriba es el **modo (c)**: el borde compartido del EC2 demo (TLS ACME — **imposible
+air-gapped**). Para una instalación en planta restrictiva existe el stack **standalone**
+(`deploy/standalone/`, compose base SIN `ports:` + un override por modo; el compose del demo no se toca):
+
+| Modo | Cuándo | Cómo | Qué queda `LISTEN` en el host |
+|---|---|---|---|
+| **(a) detrás del proxy del cliente** (preferido si tiene appliance) | La planta ya tiene F5 BIG-IP / NetScaler / NGINX corp / IIS | `-f docker-compose.yml -f mode-a.behind-proxy.yml` ⇒ `watchlog-web` en `127.0.0.1:${EDGE_LOCAL_PORT}`; su appliance termina TLS con cert corporativo | solo el loopback (nada sale del host) |
+| **(b) borde propio con cert corporativo** | Sin appliance; PKI corporativa emite cert/key | `-f docker-compose.yml -f mode-b.own-edge.yml` ⇒ Caddy de borde con `tls /certs/cert.pem /certs/key.pem` (SIN ACME); config en `deploy/standalone/edge/Caddyfile.edge` | `443/tcp` (+ `80` solo redirect, quitable) |
+| **(c) borde compartido del demo** | El EC2 demo | `deploy/docker-compose.prod.yml` + red externa `edge` (esta sección de arriba) | 80/443 del Caddy de ruta-bus |
+
+- **Variante NGINX del borde** (decisión comercial 2026-07-07): `deploy/standalone/edge/nginx-watchlog.conf.example`
+  — para el cliente que estandariza NGINX; funcionalmente equivalente al modo (b) o como appliance del modo (a).
+- En los TRES modos: `COOKIE_SECURE=true` + `APP_PUBLIC_URL=https://…` (el usuario siempre llega por HTTPS), y el
+  borde DEBE mandar `X-Forwarded-For` (rate limit por IP + IP real de auditoría) y no bufferizar SSE.
+- **Matriz de puertos completa para el equipo de redes** (incl. la nota de que lo interno tiene CERO `ports:` ⇒
+  inexistente para un escaneo, y el aviso del bypass iptables de Docker): `deploy/standalone/README.md` y
+  `docs/SECURITY.md §5.1`.
 
 ## Piezas en el repo (ya creadas en esta rama)
 
@@ -99,6 +121,7 @@ Ambas apps comparten EC2 + borde Caddy, ambas en deploy continuo. Blindado para 
 | `deploy/onprem/update.sh` | backup → pull → migrate deploy → up -d → healthcheck + rollback + auto-prune |
 | `deploy/onprem/backup.sh` | `pg_dump -Fc` del Postgres dedicado a `deploy/backups/`, retención 14d/piso 10; pre-deploy (bloqueante) + cron diario |
 | `deploy/.env.prod.example` | plantilla del `.env` de producción |
+| `deploy/standalone/` | stack para planta/cliente: compose base sin `ports:` + overrides modo (a)/(b) + Caddyfile de borde + NGINX ejemplo + README con matriz de puertos |
 
 ---
 
