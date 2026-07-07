@@ -4,6 +4,30 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-07 · Programa "software a prueba de balas" + pre-pentest (foto del punto de partida antes de empaquetar)
+El dueño fija como mandato de producto que la plataforma quede **profesional a prueba de balas**, sometible a pentest /
+cuestionario de proveedor de minera / CIS Benchmark / EDR-antivirus / estándares de industria, ANTES de empaquetar para
+pruebas reales en planta. **Objetivo redefinido con honestidad técnica** (a prueba de balas absoluto = imposible, máquina
+hostil): meta MEDIBLE = pentest sin CRÍTICOS/ALTOS · cuestionario ISO 27001 / IEC 62443-4-1 · CIS Docker sin fallos altos ·
+Trivy sin CVE crítico sin justificar · cero egress obligatorio. Programa completo (3 tandas H1/H2/H3, ~90–170 HH) en
+**BACKLOG §2(5) sub-épico "SOFTWARE A PRUEBA DE BALAS"**. **Pre-pentest de esta sesión (foto 2026-07-07, v0.1.16):**
+- **Fuerte hoy:** superficie de **1 solo puerto** (compose prod no publica Postgres/Redis/MinIO; todo entra por
+  `watchlog-web:80` tras el borde) · **cero egress obligatorio** (licencia air-gap, IA opcional/local, SMTP opcional,
+  bundle `docker save` sin registry) · TLS delegado al borde ⇒ agnóstico al proxy del cliente · IEC 62443 **CR1**
+  (Argon2id + MFA TOTP con lockout + política NIST 800-63B), **CR2** (RBAC/ABAC 4D backend-authoritative + step-up +
+  segregación), **CR5** (flujo restringido) FUERTES · anti-tamper L5 · headers helmet completos (verificado en vivo) ·
+  licencia jamás secuestra datos (diferenciador para el cuestionario).
+- **Hallazgos (priorizados en el sub-épico):** 🔴 **MinIO presigned roto en prod** (`http://minio:9000` no lo resuelve
+  el navegador ⇒ adjuntos ROTOS; fix = descarga proxied por API) · 🔴 **sin rate limiting global** (solo lockouts
+  login/MFA/setup; verificado) · 🔴 **sin Trivy/SBOM/dependabot en CI** (verificado) · 🟡 **adjuntos validan mimetype
+  DECLARADO no contenido** (`log-entries.service.ts:1354`; el logo S3 ya usa magic bytes — extender) · 🟡 **fuentes
+  Google en `main.css:2`** (egress del navegador, alerta SOC + degrada air-gap) · 🟡 **contenedores root** (ningún
+  `USER` en Dockerfiles; hallazgo CIS) · 🟡 **backups sin cifrar**, **at-rest de BD** del host · 🟡 **`minio:latest`
+  sin pin** · 🟢 sin SSO/AD (roadmap; defensa auth local + MFA) · 🟢 sin puente SIEM (pino→stdout ya existe) · 🟢 sin
+  hook AV para archivos subidos. **Veredicto:** aprobaría revisión de arquitectura de planta con notas; NO pasaría
+  limpio pentest ni cuestionario formal sin cerrar Tanda A+B. **Orden acordado:** H1 (planta restrictiva ready) es la
+  próxima sesión — pre-requisito de las pruebas reales del dueño.
+
 ### 2026-07-06 · OOBE S3 · Branding RUNTIME (identidad aplicada + logo + gate whiteLabel L6d cableado) (decisiones a–f, aprobadas por el dueño antes de codificar)
 Sesión `feat/oobe-s3-branding`, BACKLOG §2(5) S3 (primera rebanada del épico marca blanca §2(2)). El co-branding del
 login deja de ser BUILD-TIME (`VITE_LICENSEE_*`) y pasa a RUNTIME por instalación (`GET /api/branding` público) — la

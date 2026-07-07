@@ -1014,6 +1014,110 @@ nunca queda más de una sesión atrás.
       (ya hechos), y checklist de **hardening del host** entregable al cliente/socio (firewall, actualizaciones de SO,
       backups verificados, rotación de secretos).
 
+#### 🛡️ SUB-ÉPICO — "SOFTWARE A PRUEBA DE BALAS" (planta industrial restrictiva + auditoría de ciberseguridad)
+> **Registrado 2026-07-07** (mandato del dueño: la plataforma debe quedar como **software profesional a prueba de
+> balas**, sometible a **pentest, cuestionario de proveedor de minera, CIS Benchmark, EDR/antivirus y estándares de
+> industria**). **Honestidad técnica (regla permanente):** "a prueba de balas" ABSOLUTO no existe (máquina hostil =
+> teorema, igual que anti-pirateo). El objetivo MEDIBLE y alcanzable es: **pentest sin hallazgos CRÍTICOS/ALTOS ·
+> pasar cuestionario ISO 27001 / IEC 62443-4-1 de proveedor · CIS Docker Benchmark sin fallos altos · Trivy sin CVEs
+> críticos sin excepción justificada · cero egress obligatorio desde la planta**. Escenario de referencia = red OT/IT
+> segmentada (Purdue N3/3.5), sin internet saliente, firewall con whitelist por flujo, PKI corporativa (no ACME),
+> proxy reverso corporativo propio (F5/NGINX/IIS), SIEM, AD. **Pre-pentest hecho 2026-07-07** (ver DECISIONS): lo
+> fuerte hoy = superficie de 1 puerto + BD/Redis/MinIO sin exposición + air-gap nativo + IEC 62443 CR1/CR2/CR5
+> fuertes + licencia jamás secuestra datos. Los hallazgos concretos, priorizados abajo. Estándares guía: OWASP ASVS
+> L2, OWASP WSTG, IEC 62443-4-1/-4-2, CIS Docker/Benchmark, NIST 800-63B (ya seguido en auth), SLSA (cadena). Orden
+> de magnitud: **~90–170 HH** repartidas en 3 tandas.
+>
+> **Regla de corte:** NO someter a pentest formal de cliente sin cerrar al menos la Tanda A (los P1/P2 de app y host).
+>
+> - [ ] **(H1 · Tanda A — "planta restrictiva ready", ~30–50 HH) — PRÓXIMA SESIÓN(ES), pre-requisito de pruebas reales:**
+>   - [ ] **P1 · Descarga de adjuntos PROXIED por la API** (mata el bug de MinIO presigned `http://minio:9000` que el
+>         navegador jamás resuelve fuera de Docker — adjuntos ROTOS en prod hoy): `getObject` streaming en
+>         `StorageService` + endpoint con la MISMA ABAC que `getDetail`. Efecto colateral: MinIO deja de necesitar
+>         exposición alguna ⇒ superficie sigue en 1 puerto real. Smoke.
+>   - [ ] **P1 · Rate limiting GLOBAL de API** (`@nestjs/throttler`): hoy solo hay lockout en login/MFA/setup + throttle
+>         en password-reset; cualquier endpoint autenticado o el `/api/branding` público admite fuerza de volumen (un
+>         pentest lo marca DoS de aplicación). Límite generoso global + estricto en `/auth/*` y públicos; almacenado en
+>         Redis (multi-instancia). Cabezal `Retry-After`.
+>   - [ ] **P2 · Magic bytes en adjuntos de evidencia** (hoy validan mimetype DECLARADO por el cliente,
+>         `log-entries.service.ts:1354` — archivo malicioso renombrado pasa el `accept`): extender el sniffing del
+>         branding (S3) a los adjuntos para los tipos declarados. Un pentester lo lista "stored malware delivery".
+>   - [ ] **P2 · Fuentes Sora/Inter SELF-HOSTED** (hoy `@import` a `fonts.googleapis.com` en `main.css:2` = egress del
+>         navegador que dispara el SOC del cliente + degrada en air-gap): hornear los TTF en la imagen web (mismo
+>         patrón que el acta PDF ya usa). Ajustar la CSP (quitar `https:` de font-src/style-src si se puede).
+>   - [ ] **P2 · Modo de borde flexible** (compose STANDALONE, no solo el Caddy compartido del EC2): (a) borde propio
+>         con **certificado corporativo** (`tls /certs/...`, ACME imposible sin internet) y (b) modo "**detrás de TU
+>         proxy**" (publicar `watchlog-web` en `127.0.0.1:<port>` para que el F5/NGINX/IIS del cliente termine TLS).
+>         Matriz de puertos documentada. `COOKIE_SECURE=true` se respeta en ambos.
+> - [ ] **(H2 · Tanda B — CIS Benchmark + cadena de suministro, ~35–70 HH) — pre-firma de canal, se solapa con §2(4):**
+>   - [ ] **Contenedores NON-ROOT** (`USER` en Dockerfiles api/web/migrate; ningún Dockerfile lo tiene hoy) +
+>         `read_only: true` donde se pueda + `security_opt: [no-new-privileges]` + `cap_drop: [ALL]` en compose —
+>         hallazgos CIS Docker garantizados.
+>   - [ ] **Pin de imágenes de infra** (`minio/minio:latest` → digest/tag fijo; `postgres:16-alpine`/`redis:7-alpine`
+>         → digest) — tag mutable en infra es hallazgo de reproducibilidad.
+>   - [ ] **Trivy/Grype en CI con gate** (no publicar imagen con CVE crítico sin excepción documentada) + **correrlo
+>         AHORA sobre v0.1.16** para saber qué sale de `node:22-bookworm-slim`/`caddy:2-alpine`/`minio:latest` ANTES de
+>         las pruebas reales. Reporte adjuntable al cliente.
+>   - [ ] **SBOM CycloneDX por release** (§9.1) + **backups CIFRADOS** (`pg_dump -Fc` hoy plano; §9.3) + doc de
+>         **cifrado at-rest del host** (LUKS/dm-crypt para `pgdata`, es del host no de la app — documentarlo).
+>   - [ ] **Firma de imágenes cosign + verificación en host + pull por DIGEST** (§9.1; núcleo de §2(4)).
+> - [ ] **(H3 · Tanda C — enterprise / integración corporativa, ~25–50 HH) — por cliente, cuando aparezca el requisito:**
+>   - [ ] **Integración SIEM** (documentar + probar logging driver Docker syslog/gelf al colector del cliente; eventos
+>         de seguridad específicos: N logins fallidos, cambio de licencia, acceso denegado repetido) — la app ya loguea
+>         pino→stdout y audita inmutable; falta el puente y los eventos.
+>   - [ ] **Hook de ANTIVIRUS para archivos subidos** (interfaz `UploadScanner` opcional, patrón EmailService/Storage;
+>         adapter ClamAV en contenedor + ICAP para el que ya tenga appliance). Honestidad air-gap: las firmas ClamAV
+>         viajan en el paquete de update, no se auto-actualizan. Política minera común: "todo archivo que entra se
+>         escanea".
+>   - [ ] **SSO corporativo** (LDAP/SAML/OIDC contra AD) — IT lo pedirá; defensa v1 = auth local Argon2id + MFA +
+>         política administrable + "auth enchufable" ya decidido. Módulo grande, va cuando un cliente lo exija.
+>   - [ ] **EDR / antivirus del HOST:** documentar en la guía de hardening las **exclusiones de I/O** para volúmenes
+>         `pgdata`/`miniodata` (los EDR degradan la BD si escanean en caliente) y compatibilidad con Defender for
+>         Linux / CrowdStrike / SentinelOne (el bundle es JS minificado, no binario empacado ⇒ bajo riesgo de falso
+>         positivo heurístico, pero declararlo).
+> - [ ] **Cierre del programa:** contratar/ejecutar un **pentest de tercero** contra una instalación de referencia y
+>       cerrar sus hallazgos; publicar `security.txt` + canal de divulgación de vulnerabilidades; dejar el **paquete de
+>       evidencia** (SBOM + reporte Trivy + resultado pentest + matriz 62443/ASVS) que el socio entrega al cliente.
+- [ ] **(6) 🎯 PROGRAMA "PRODUCTO A PRUEBA DE BALAS" (endurecimiento AppSec pre-pentest)** — **mandato del dueño
+      2026-07-07** tras el pre-pentest interno (auto-auditoría registrada en esta conversación; hallazgos verificados
+      en código). Meta MEDIBLE (no "invulnerable", que no existe): **pasar pentest sin críticos/altos + cuestionario
+      de proveedor de minera + CIS Docker Benchmark + IEC 62443-4-2 mapeado + cadena de suministro verificable.**
+      Orden de ejecución E1→E5 (E2 = ítem (3c)+(5), E3 = ítem (4); se listan aquí para el ORDEN):
+      - [ ] **E1 · "Planta restrictiva ready" (código, PRÓXIMA SESIÓN):**
+            **(i)** 🔴 descarga de adjuntos **PROXIED por la API** (hallazgo P1: presigned firma contra
+            `http://minio:9000`, hostname interno — el navegador JAMÁS lo resuelve ⇒ evidencia ROTA en prod; agregar
+            `getObject` streaming a `StorageService` + endpoint con la MISMA ABAC ⇒ MinIO queda 100% interno,
+            superficie = 1 puerto) ·
+            **(ii)** 🔴 **rate limiting GLOBAL** (`@nestjs/throttler`: generoso por defecto, estricto en `/auth/*` y
+            públicos `/branding` `/setup/status`; hoy solo hay lockouts de login/MFA/setup y throttle de reset) ·
+            **(iii)** 🟡 **magic bytes en adjuntos de evidencia** (hoy validan por mimetype DECLARADO —
+            `log-entries.service.ts` `acceptMatches(cfg, file.mimetype)`; extender el sniffing del branding) ·
+            **(iv)** 🟡 **fuentes self-hosted** (main.css importa fonts.googleapis.com ⇒ egress del navegador que
+            dispara el SOC del cliente en air-gap; mismo patrón TTF local del acta PDF) ·
+            **(v)** 🟡 compose **standalone** (borde propio con `tls cert.pem key.pem` corporativo — sin ACME) +
+            modo "detrás del proxy del cliente" (publicar watchlog-web en 127.0.0.1:puerto) + matriz de puertos ·
+            **(vi)** 🟢 pin de `minio/minio:latest` a versión fija (tag mutable en infra).
+      - [ ] **E2 · Paquete instalable** = ítems (3c) bundle air-gapped + (5) install.sh: `make-bundle.sh` (imágenes
+            tar + compose + install.sh SIN git-clone [hoy la instalación entrega el REPO COMPLETO = fuga de fuente] +
+            Caddyfile ejemplo + guía + SHA256SUMS) probado contra VM limpia sin internet. **Correr Trivy sobre las
+            imágenes ANTES de las pruebas reales del dueño** y adjuntar el reporte al paquete.
+      - [ ] **E3 · Cadena de suministro** = ítem (4) completo (cosign + digest + Trivy gate CI + SBOM CycloneDX +
+            backups CIFRADOS + registry privado read-only por cliente).
+      - [ ] **E4 · Hardening de contenedores/host (CIS Docker Benchmark):** `USER` non-root en Dockerfiles (hoy TODO
+            corre root), `read_only` + `no-new-privileges` + `cap_drop` en compose, `.env` chmod 600 documentado,
+            LUKS at-rest del host + NTP interno + exclusiones EDR para volúmenes de BD (guía del cliente), puente
+            SIEM vía logging driver syslog/gelf (documentado, sin sacar datos sin consentimiento).
+      - [ ] **E5 · AppSec formal:** proceso de gestión de vulnerabilidades + `security.txt`/canal de reporte ·
+            `pnpm audit`/dependabot u OSV en CI · DAST baseline (ZAP) en CI · interfaz **`UploadScanner`** opcional
+            (patrón EmailService) con adapter ClamAV en contenedor para plantas que exigen escaneo AV de archivos
+            subidos (firmas viajan en el paquete de update, air-gap compatible) · pentest EXTERNO antes de firmar
+            canal.
+      - [ ] **E6 · Identidad corporativa (SSO LDAP/OIDC/SAML)** — lo pedirá TODO cliente enterprise; la decisión
+            "auth local enchufable" ya lo previó. Módulo propio, DESPUÉS de E1–E4 (defensa v1: local + MFA + política).
+      Lo que YA defiende bien (evidencia para el cuestionario): superficie 1 puerto + cero egress obligatorio +
+      air-gap nativo · Argon2id/MFA/lockouts/política NIST 800-63B · RBAC/ABAC 4D server-side · auditoría inmutable ·
+      anti-tamper L5 · helmet CSP/HSTS verificados en vivo · C
+
 ### 🟢 ÉPICO — MÓDULO DE ÓRDENES DE TRABAJO (OT / Permiso de Trabajo · PTW) 🏗️ **PRIORIDAD (oportunidad de cliente)**
 > **Registrado 2026-07-01** (planificación aprobada por el dueño; **diseño formal detallado = Sesión 0**). Contexto:
 > hay una **oportunidad real de cliente en MINERÍA** para absorber con Lyra WatchLog un flujo de **Solicitud de Trabajo
