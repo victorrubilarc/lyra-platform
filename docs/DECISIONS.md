@@ -4,6 +4,28 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-07 · Estrategia de proxy/borde para planta industrial (Caddy interno se mantiene; borde DESACOPLABLE en 3 modos)
+Pregunta del dueño: ¿se usa Caddy? ¿hay algo más estable/potente/usado en la industria? **Hallazgo:** Caddy cumple DOS
+roles distintos — **(1) interno** (imagen `watchlog-web`, `docker/Dockerfile.web` → `caddy:2-alpine` con
+`docker/Caddyfile.web`): sirve la SPA + proxea `/api`→`api:3000`, **HTTP :80 sin exponer** (vive detrás del borde);
+**(2) borde** (Caddy compartido de ruta-bus en el EC2 demo): TLS + subdominio, con **ACME/Let's Encrypt**.
+- **Challenge a la premisa (challenge-dont-please):** Caddy NO es menos estable/potente que NGINX — es Go (memory-safe,
+  sin la clase de CVEs de corrupción de memoria de C), TLS automático, producción masiva. El punto real NO es
+  estabilidad sino **(a) reconocimiento por el SecOps del cliente** (NGINX = estándar de facto en minería; Caddy = "¿qué
+  es esto?") y **(b) encaje con lo que la planta YA tiene**. Traefik = sobreingeniería (pensado para orquestación
+  dinámica/K8s, más superficie); HAProxy = gran LB pero NO sirve estáticos. Ninguno mejora este caso single-tenant.
+- **El defecto real NO es la marca del proxy, es el ACOPLAMIENTO al borde del demo**, cuyo TLS ACME es imposible
+  air-gapped (sin internet + PKI corporativa propia, no Let's Encrypt). En una planta pasa 1 de 2: el cliente YA tiene
+  borde (F5 BIG-IP / NetScaler / NGINX corp / IIS) ⇒ NO proveemos borde, solo exponemos `127.0.0.1:<port>` y su
+  appliance termina TLS; o NO lo tiene ⇒ entregamos borde con **cert corporativo montado** (no ACME).
+- **DECISIÓN:** (1) **mantener el Caddy INTERNO** — config de 15 líneas, memory-safe, no expuesto (SecOps escanea la
+  IMAGEN vía Trivy, no la marca) ⇒ cambiarlo = trabajo con riesgo y ganancia marginal. (2) **Desacoplar el BORDE**
+  (ítem P2 de H1) con compose standalone en 3 modos: (a) detrás del proxy del cliente [preferido si tiene appliance],
+  (b) nuestro borde con cert corporativo, (c) el compartido del demo. (3) **Documentar una variante NGINX del borde**
+  como decisión COMERCIAL (no técnica): NGINX no da más seguridad, da menos fricción en el cuestionario del cliente que
+  lo estandariza. Reevaluar cambiar el Caddy interno a NGINX SOLO si la experiencia comercial muestra que el "¿por qué
+  Caddy y no NGINX?" cuesta más que migrar. Ver BACKLOG §2(5) sub-épico "a prueba de balas" H1.
+
 ### 2026-07-07 · Programa "software a prueba de balas" + pre-pentest (foto del punto de partida antes de empaquetar)
 El dueño fija como mandato de producto que la plataforma quede **profesional a prueba de balas**, sometible a pentest /
 cuestionario de proveedor de minera / CIS Benchmark / EDR-antivirus / estándares de industria, ANTES de empaquetar para

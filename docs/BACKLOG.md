@@ -1045,10 +1045,17 @@ nunca queda más de una sesión atrás.
 >   - [ ] **P2 · Fuentes Sora/Inter SELF-HOSTED** (hoy `@import` a `fonts.googleapis.com` en `main.css:2` = egress del
 >         navegador que dispara el SOC del cliente + degrada en air-gap): hornear los TTF en la imagen web (mismo
 >         patrón que el acta PDF ya usa). Ajustar la CSP (quitar `https:` de font-src/style-src si se puede).
->   - [ ] **P2 · Modo de borde flexible** (compose STANDALONE, no solo el Caddy compartido del EC2): (a) borde propio
->         con **certificado corporativo** (`tls /certs/...`, ACME imposible sin internet) y (b) modo "**detrás de TU
->         proxy**" (publicar `watchlog-web` en `127.0.0.1:<port>` para que el F5/NGINX/IIS del cliente termine TLS).
->         Matriz de puertos documentada. `COOKIE_SECURE=true` se respeta en ambos.
+>   - [ ] **P2 · Modo de borde DESACOPLABLE** (el defecto real NO es la marca del proxy sino el ACOPLAMIENTO al Caddy
+>         compartido del EC2 demo, cuyo TLS es ACME/Let's Encrypt = imposible air-gapped; decisión de borde en DECISIONS
+>         2026-07-07). El **Caddy INTERNO** (imagen `watchlog-web`: sirve la SPA + proxea `/api`, HTTP :80 sin exponer)
+>         **SE MANTIENE** (Go memory-safe, config de 15 líneas, no expuesto ⇒ SecOps escanea la imagen no la marca). Se
+>         desacopla el BORDE con compose STANDALONE en 3 modos: **(a) detrás de TU proxy** — publicar `watchlog-web` en
+>         `127.0.0.1:<port>` para que el F5/NetScaler/NGINX/IIS del cliente termine TLS (modo preferido cuando ya tiene
+>         appliance; nosotros NO proveemos borde) · **(b) nuestro borde con CERTIFICADO CORPORATIVO** montado
+>         (`tls /certs/cert.pem /certs/key.pem`, sin ACME) para el cliente sin appliance · **(c)** el compartido del demo
+>         (actual). **Variante NGINX del borde documentada** (decisión COMERCIAL no técnica: NGINX no da más seguridad,
+>         da menos fricción en el cuestionario del cliente que ya lo estandariza). Matriz de puertos por modo;
+>         `COOKIE_SECURE=true` + `APP_PUBLIC_URL` https se respetan en los tres.
 > - [ ] **(H2 · Tanda B — CIS Benchmark + cadena de suministro, ~35–70 HH) — pre-firma de canal, se solapa con §2(4):**
 >   - [ ] **Contenedores NON-ROOT** (`USER` en Dockerfiles api/web/migrate; ningún Dockerfile lo tiene hoy) +
 >         `read_only: true` donde se pueda + `security_opt: [no-new-privileges]` + `cap_drop: [ALL]` en compose —
