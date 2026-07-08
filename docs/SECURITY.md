@@ -576,13 +576,14 @@ GxP: MHRA Data Integrity 2018 / FDA DI Q&A (corrección tardía justificada + at
 
 ### 9.1 Integridad de la imagen (que corra solo lo que ITESICWS publicó)
 - **Firma de imágenes** con **cosign/Sigstore**: cada imagen `lyra-watchlog-*` se firma en CI al publicar; el host
-  **verifica la firma** antes de correrla. Sin firma válida ⇒ no arranca.
+  **verifica la firma** antes de correrla. Sin firma válida ⇒ no arranca. **(pendiente E3.)**
 - **Pull por DIGEST inmutable** (`@sha256:…`), no solo por tag mutable (un tag se puede re-apuntar; un digest, no) →
-  reproducibilidad e integridad del artefacto exacto.
-- **Escaneo de vulnerabilidades** (Trivy/Grype) **antes de publicar**, con **gate en CI** (no se publica una imagen con
-  CVEs críticos sin excepción justificada).
-- **SBOM** (CycloneDX) por release: inventario de dependencias entregable al **auditor del cliente** (trazabilidad de
-  qué hay dentro de la imagen).
+  reproducibilidad e integridad del artefacto exacto. **✅ H2 (2026-07-07):** infra (postgres/redis/minio/caddy) pineada
+  por digest en el compose **demo/prod** (con internet). En el compose **air-gapped** se pinea por TAG **+ el tar del
+  bundle es el pin real** (ver §9.7: `docker save/load` no preserva RepoDigests). App por digest = E3 (cosign).
+- **Escaneo de vulnerabilidades** (Trivy) **con GATE en CI — ✅ H2 (2026-07-07):** `release.yml` job `scan` bloquea
+  `bundle`+`deploy` si hay CRÍTICO fuera de `.trivyignore` (excepciones justificadas por CVE). Ver §9.7.
+- **SBOM** (CycloneDX) por release: inventario de dependencias entregable al **auditor del cliente**. **(pendiente E3.)**
 
 ### 9.2 Control de acceso a la distribución
 - **Registro privado** (no público). **Tokens read-only por cliente/socio**, revocables (si un cliente sale o un token
@@ -648,6 +649,37 @@ job `bundle` de `release.yml` lo adjunta al GitHub Release). Guía de operación
 - **Secretos generados en el host:** `install.sh` (idempotente) genera BD/JWT/cifrado con `openssl`, `.env` `chmod 600`,
   sin rotarlos en re-ejecuciones; el operador solo completa dominio + modo de borde. No crea usuarios (eso es `/setup`).
 - **Reporte de vulnerabilidades adjunto:** Trivy de las imágenes en `SECURITY/` del paquete (`scripts/scan-images.sh`).
+
+### 9.7 Endurecimiento CIS Docker Benchmark + gate de suministro (H2 — ✅ 2026-07-07)
+Endurecimiento del runtime de contenedores a estándar **CIS Docker Benchmark** y del pipeline de publicación. Verificado
+en vivo (`docker inspect` + smoke mode-a/mode-b). Ninguna feature exige egress; no toca la máquina de estados de licencia
+ni el sello L5.
+- **Contenedores NON-ROOT (CIS 5.31/4.1):** `api`, `migrate` (uid 1000 `node`) y `web`/edge (uid 1000 `app`) corren sin
+  root (baked en `Dockerfile.api`/`Dockerfile.web`). La infra oficial baja de privilegios en su entrypoint
+  (postgres→`postgres`, redis→`redis`). La ceremonia de licencia funciona non-root: la API (uid 1000, root FS de
+  solo-lectura) **escribe `solicitud.lreq`/`setup-token`** en el bind `./license`, cedido a uid 1000 por
+  `install.sh`/`onprem/update.sh`.
+- **Sin nuevos privilegios (CIS 5.25):** `security_opt:[no-new-privileges:true]` en TODOS los servicios.
+- **Capabilities mínimas (CIS 5.3):** `cap_drop:[ALL]` en app + infra. `cap_add` SOLO lo imprescindible: web/edge
+  `[NET_BIND_SERVICE]` (Caddy bindea :80/:443; su binario oficial lleva la file-cap y con bounding set vacío el `execve`
+  daría EPERM), postgres/redis las 4–5 caps que su entrypoint usa para chown + drop de privilegios. El bind de puertos
+  bajos como no-root usa el sysctl `net.ipv4.ip_unprivileged_port_start=0`.
+- **Root FS de solo-lectura (CIS 5.12):** `read_only:true` en api/migrate/web/edge/redis/minio; escrituras acotadas a
+  `tmpfs` (`/tmp`, y `/config`+`/data` mode 1777 para Caddy) y volúmenes de datos. postgres queda RW (su entrypoint
+  escribe PGDATA).
+- **Pins de infra + GATE Trivy:** ver §9.1 y §9.7-bis. `minio` sale de `latest` al RELEASE inmutable
+  `RELEASE.2025-09-07T16-13-09Z`.
+- **Delta Trivy vs E2 (honesto):** el pin de MinIO **no baja** sus CVE (ya era la última release, sin fix): da
+  reproducibilidad. Los criticales restantes (7 IDs) son TODOS de imagen base / binario Go de tercero que no compilamos
+  (esbuild, postgres, minio) / MinIO interno no alcanzable — **0 de código de app**, todos justificados en `.trivyignore`.
+  El valor de H2 es el **gate + clasificación** (ningún crítico DESCONOCIDO viaja en silencio), no un menor conteo.
+
+### 9.7-bis GOTCHA de pin air-gapped (`docker save/load` vs `@digest`)
+`docker save`/`load` **NO preserva RepoDigests**. Un `image:…@sha256:` en el compose de la planta forzaría un `pull` que
+en air-gap no existe ⇒ arranque roto. Por eso el compose **standalone/mode-b** referencia por **TAG** y el pin real es el
+**tar del bundle**: `make-bundle.sh` pullea la infra **por digest**, la **retaguea** al tag y hace `docker save`; el
+`SHA256SUMS` sella el conjunto e `install.sh` lo verifica antes de `docker load`. Es un pin MÁS fuerte que un `@digest`
+suelto (cubre imágenes + compose + instalador juntos). El compose **demo/prod** (con registro) sí usa `@digest`.
 
 ## Estado
 - **Fase 0:** cabeceras (Helmet) y validación de entorno activas.

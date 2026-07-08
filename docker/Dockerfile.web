@@ -20,4 +20,12 @@ RUN pnpm --filter @lyra/contracts build \
 FROM caddy:2-alpine AS runtime
 COPY docker/Caddyfile.web /etc/caddy/Caddyfile
 COPY --from=build /repo/apps/watchlog-web/dist /srv
+# CIS Docker 4.1 (H2 2026-07-07) — Caddy como uid 1000 NON-ROOT. Caddy escribe en
+# /data y /config (XDG del image oficial), que el compose provee por tmpfs (el Caddy
+# interno es stateless: no hace ACME, el TLS lo pone el borde). El bind de :80/:443
+# NO usa CAP_NET_BIND_SERVICE: el compose habilita el sysctl
+# net.ipv4.ip_unprivileged_port_start=0 ⇒ compatible con cap_drop:[ALL] +
+# no-new-privileges (una file-capability con setcap la bloquearía no-new-privileges).
+RUN addgroup -g 1000 -S app && adduser -u 1000 -S -G app -H app
+USER app
 EXPOSE 80 443

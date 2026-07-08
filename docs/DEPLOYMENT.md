@@ -110,6 +110,35 @@ air-gapped**). Para una instalación en planta restrictiva existe el stack **sta
   inexistente para un escaneo, y el aviso del bypass iptables de Docker): `deploy/standalone/README.md` y
   `docs/SECURITY.md §5.1`.
 
+## Endurecimiento del host (CIS · para el equipo de redes) — H2 2026-07-07
+
+Los contenedores ya vienen endurecidos (CIS Docker: non-root, `no-new-privileges`,
+`cap_drop:[ALL]`, root FS de solo-lectura, pins de infra — ver `SECURITY.md §9.7`).
+Lo que queda del lado del **host** (responsabilidad del cliente/planta):
+
+- **⚠ Docker salta el firewall del host (iptables bypass).** En Linux, publicar un
+  puerto con `- "8080:80"` hace que Docker inserte reglas en la cadena `DOCKER` de
+  iptables que se evalúan **antes** que `ufw`/`firewalld` ⇒ el puerto queda abierto
+  en `0.0.0.0` **aunque el firewall del host lo tenga "cerrado"**. Es un hallazgo de
+  auditoría clásico. **Mitigación por diseño (ya aplicada):** el stack standalone no
+  publica NADA salvo el borde elegido; el **modo (a) publica en `127.0.0.1:` (loopback)**,
+  no en `0.0.0.0`, y el **modo (b)** publica solo `443` (+`80` redirect, quitable).
+  Postgres/Redis/MinIO/API **no tienen `ports:`** (inexistentes para un escaneo).
+- **Si el cliente gestiona su propio firewall de host:** dos caminos —
+  (1) mantener el diseño (nada en `0.0.0.0` salvo el `443` del borde, que su firewall
+  perimetral ya controla), o (2) arrancar el daemon con **`iptables=false`**
+  (`/etc/docker/daemon.json: {"iptables": false}`) y gestionar TODAS las reglas a mano
+  (avanzado: rompe el NAT saliente de los contenedores si no se replica). Recomendado el
+  (1) salvo política explícita del SOC.
+- **Cifrado at-rest del host (fuera de la app):** LUKS/dm-crypt para el disco/volumen de
+  `pgdata` y `miniodata`. Es del **host**, no del contenedor; documentarlo en el runbook
+  del cliente. (Backups cifrados de la app = E3.)
+- **NTP interno + `machine-id` estable:** la huella de licencia (L1) usa `/etc/machine-id`
+  del host (bind `:ro`); no regenerarlo. Hora sincronizada contra el NTP corporativo.
+- **EDR/antivirus del host:** excluir de escaneo en caliente los volúmenes `pgdata`/
+  `miniodata` (un EDR escaneándolos degrada la BD). El bundle es JS minificado (no binario
+  empacado) ⇒ bajo riesgo de falso positivo heurístico. (Detalle en BACKLOG §2(5) H3.)
+
 ## Piezas en el repo (ya creadas en esta rama)
 
 | Archivo | Qué hace |

@@ -4,6 +4,53 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-07 · H2 "CIS Docker + gate de suministro" (Tanda B) — decisiones (a)–(h) aprobadas antes de codificar
+Sesión `feat/h2-cis-hardening` (H2/E4 del programa "a prueba de balas", BACKLOG §2(5)/§2(6); tras E2). Endurecer el
+runtime de contenedores a estándar **CIS Docker Benchmark** + convertir Trivy en **gate real**, sin romper la ceremonia
+air-gapped ni el sello L5. Verificado en vivo (smoke mode-a :3412 + mode-b :8443, `docker inspect`, gate Trivy verde,
+typecheck/lint/build/test 330/330).
+- **(a) NON-ROOT por Dockerfile.** `USER node` (uid 1000, ya presente en `node:22-bookworm-slim`) en `Dockerfile.api`
+  stages `runtime` **y** `migrate`; `USER app` (uid 1000 creado) en `Dockerfile.web`. El gotcha `license/` RW se resuelve
+  cediendo el bind a uid 1000 en `install.sh` (planta) y `onprem/update.sh` (demo) — best-effort, no falla sin root. La
+  API (uid 1000, read_only) **escribió `solicitud.lreq` + `setup-token`** en el smoke ✅ (la ceremonia funciona non-root).
+  `machine-id` se monta `:ro` world-readable (cualquier uid lo lee). `prisma generate` corre en build (root); el runtime
+  solo lee. `migrate` (read_only + cap_drop ALL + non-root) corrió `migrate deploy` + `tsx seed` (esbuild) con `TMPDIR=/tmp`
+  sobre tmpfs — exit 0 ✅ (era el mayor riesgo).
+- **(b) read_only + tmpfs.** `read_only:true` en api/migrate/web/edge/redis/minio (escriben solo tmpfs + volúmenes). Web
+  (Caddy stateless, sin ACME): tmpfs `/tmp` + `/config`,`/data` con **mode 1777** (uid 1000 escribe su autosave/storage;
+  sin el mode explícito Docker los deja root-owned y Caddy loguea permission-denied). **postgres read_only:false** (su
+  entrypoint escribe PGDATA/config en el data dir) + tmpfs socket. `no-new-privileges:true` en TODOS.
+- **(b-bis) GOTCHA Caddy file-capability × cap_drop.** El binario oficial de Caddy lleva `cap_net_bind_service` como
+  **file-capability**; con `cap_drop:[ALL]` (bounding set vacío) el `execve` falla con **EPERM** (`operation not permitted`).
+  Solución CIS "drop all, add back only what's needed": `cap_drop:[ALL]` + `cap_add:[NET_BIND_SERVICE]` (única cap) + el
+  sysctl `net.ipv4.ip_unprivileged_port_start=0` (hace el bind de :80/:443 efectivo bajo no-new-privileges, que enmascara
+  la file-cap). Aplica a web interno (imagen propia) y edge mode-b (imagen raw, `user:"1000:1000"`).
+- **(c/d) Gate en release.yml, CRÍTICO-solo.** Job `scan` (needs `build`) corre `GATE=critical scan-images.sh` y **bloquea
+  `bundle` y `deploy`** (un crítico nuevo detiene tanto el paquete como el auto-deploy EC2). ALTO se reporta, no bloquea
+  (los ALTO de base Debian/Go son fix_deferred; gatearlos = no poder publicar). El job sube el reporte como artefacto y
+  `bundle` lo reusa (sin re-escanear).
+- **(d-bis) `.trivyignore` justificado por CVE.** 7 IDs, TODOS de imagen base / binario Go de tercero que NO compilamos /
+  MinIO interno no alcanzable — 0 de código de app: perl `CVE-2026-42496`+`CVE-2026-8376`, zlib `CVE-2023-45853`, Go stdlib
+  `CVE-2025-68121` (esbuild/postgres/minio), MinIO `CVE-2026-33186`/`-33322`/`-33419`. Un crítico NUEVO fuera de la lista
+  BLOQUEA a propósito (revisión humana). `scan-images.sh` ahora usa `SRC_PREFIX-` (single-dash: prefijo vacío = nombre
+  neutro local, paridad con `WL_IMAGE_PREFIX-` del compose).
+- **(e) Pins de infra + GOTCHA docker save/load.** `docker save`/`load` **NO preserva RepoDigests** ⇒ un `image:…@sha256:`
+  en el compose air-gapped forzaría un `pull` inexistente en planta. Diseño: **compose standalone/mode-b por TAG** (el pin
+  es el **tar del bundle**: `make-bundle` PULLEA por digest → RETAGUEA al tag → `save`; SHA256SUMS lo sella; `install.sh`
+  lo verifica antes de `docker load` — reproducibilidad más fuerte que un @digest suelto). **Compose demo/prod (con
+  internet) SÍ por @digest.** MinIO sale de `latest` (mutable) al RELEASE **inmutable** `RELEASE.2025-09-07T16-13-09Z`.
+  Digests: postgres `7a396fd…`, redis `b1addbe…`, caddy `98eb57d…`, minio `9966a92…`.
+- **(e-bis) HONESTIDAD (challenge-dont-please): pinear MinIO NO baja sus CVE.** `latest` YA ES la última release y no hay
+  una con fix ⇒ el pin da REPRODUCIBILIDAD, no menos criticales. Delta real vs E2: postgres se mantiene 1 CRÍT (Go stdlib),
+  MinIO **6→4 CRÍT** (release pineada + DB Trivy al día), redis/caddy/web limpios, api 3 / migrate 4 (todos base, sin fix).
+  El win de H2 NO es "menos CVE" (son upstream sin parche) sino **non-root/read_only/cap_drop + gate + clasificación**: ya
+  no viaja ningún crítico DESCONOCIDO en silencio (objetivo H2 = "sin crítico sin excepción justificada").
+- **(f) Demo endurecido (Opción A, aprobada).** `docker-compose.prod.yml` recibe la MISMA postura (non-root, cap_drop,
+  read_only, tmpfs, sysctl web, pins @digest) para que el demo sea representativo. `update.sh` cede `./license` a uid 1000.
+  El tag auto-despliega el EC2 ⇒ el push del tag se CONSULTA al dueño antes (decisión g).
+- **(g) Tag v0.1.19 en LOCAL, sin pushear** hasta OK del dueño (el tag dispara build GHCR + bundle + auto-deploy EC2).
+- **(h) Smoke en :3412 (mode-a) + :8443 (mode-b)**; puertos siguientes libres ≥3413/8444.
+
 ### 2026-07-07 · E2 "paquete instalable air-gapped" — decisiones (a)–(h) aprobadas por el dueño antes de codificar
 Sesión `feat/e2-paquete-instalable` (E2 del programa "a prueba de balas", BACKLOG §2(5)/§2(6); desbloqueada por H1).
 Produce el ENTREGABLE que faltaba: un paquete OFFLINE autocontenido que el SOCIO de canal lleva por USB a una planta

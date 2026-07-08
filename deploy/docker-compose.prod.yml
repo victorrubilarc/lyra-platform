@@ -14,15 +14,30 @@
 # ─────────────────────────────────────────────────────────────────────────────
 name: lyra-watchlog
 
+# ── Endurecimiento CIS Docker Benchmark (H2 2026-07-07) ──────────────────────
+# MISMA postura que el compose standalone (deploy/standalone/docker-compose.yml):
+# non-root, no-new-privileges, cap_drop, read_only + tmpfs y pins por digest. Se
+# mantiene en paridad para que el demo sea representativo de lo que se entrega.
+x-no-new-privs: &no-new-privs
+  security_opt:
+    - no-new-privileges:true
+
 services:
   postgres:
-    image: postgres:16-alpine
+    # Pin por DIGEST (índice multi-arch) — reproducibilidad/SLSA (H2).
+    image: postgres:16-alpine@sha256:7a396fd264a2067788b6551122b50f162bf6136312c7fc9d74381cb92c648382
     restart: unless-stopped
     # Tope de memoria por servicio (aislamiento por cgroup): si una app se fuga, el
     # kernel OOM-mata SOLO su contenedor (se reinicia solo) y no toca a la app vecina
     # del EC2 compartido. Los topes son TECHOS, no reservas; el uso real es ~10× menor.
     mem_limit: 512m
     mem_reservation: 256m
+    # CIS 5.25/5.3: el entrypoint arranca root para chownear PGDATA y baja a
+    # `postgres` con gosu — solo esas 5 capabilities se conservan.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
     environment:
       POSTGRES_USER: "${POSTGRES_USER}"
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
@@ -30,6 +45,9 @@ services:
       TZ: "${TZ:-America/Santiago}"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    tmpfs:
+      - /tmp
+      - /var/run/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
@@ -38,11 +56,18 @@ services:
     networks: [internal]
 
   redis:
-    image: redis:7-alpine
+    image: redis:7-alpine@sha256:b1addbe72465a718643cff9e60a58e6df1841e29d6d7d60c9a85d8d72f08d1a7
     restart: unless-stopped
     # 384m (no 256m): el --maxmemory interno ya es 256mb; un tope de 256m mataría a
     # Redis al sumar overhead + el fork del bgsave (appendonly). 384m da aire.
     mem_limit: 384m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, SETGID, SETUID]
+    read_only: true
+    tmpfs:
+      - /tmp
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - redisdata:/data
@@ -54,9 +79,17 @@ services:
     networks: [internal]
 
   minio:
-    image: minio/minio:latest
+    # Pin por DIGEST a la release más reciente (H2): reproducibilidad; los CVE
+    # residuales van en .trivyignore (MinIO 100% interno, no alcanzable).
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z@sha256:9966a92a734f9411e32f4f41d7d9d826fcdc0f68c4e20b70295bd4e7c11f8a2f
     restart: unless-stopped
     mem_limit: 384m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs:
+      - /tmp
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: "${MINIO_ROOT_USER}"
@@ -72,6 +105,13 @@ services:
     image: ${WL_REGISTRY:-ghcr.io}/${WL_OWNER}/lyra-watchlog-migrate:${WL_VERSION:-stable}
     restart: "no"
     mem_limit: 512m
+    # CIS 5.25/5.3/5.12: non-root (uid 1000 horneado), sin nuevos privilegios,
+    # sin capabilities, root FS de solo-lectura (escribe solo /tmp).
+    <<: *no-new-privs
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs:
+      - /tmp
     env_file: .env
     environment:
       NODE_ENV: "production"
@@ -85,6 +125,14 @@ services:
     image: ${WL_REGISTRY:-ghcr.io}/${WL_OWNER}/lyra-watchlog-api:${WL_VERSION:-stable}
     restart: unless-stopped
     mem_limit: 512m
+    # CIS 5.25/5.3/5.12: non-root (uid 1000), sin nuevos privilegios, sin
+    # capabilities, root FS de solo-lectura. Escribe SOLO /app/license (bind rw,
+    # el host lo deja a uid 1000 vía onprem/update.sh) y /tmp (tmpfs).
+    <<: *no-new-privs
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs:
+      - /tmp
     env_file: .env
     environment:
       NODE_ENV: "production"
@@ -124,6 +172,27 @@ services:
     image: ${WL_REGISTRY:-ghcr.io}/${WL_OWNER}/lyra-watchlog-web:${WL_VERSION:-stable}
     restart: unless-stopped
     mem_limit: 128m
+    # CIS 5.25/5.3/5.12: Caddy como uid 1000 (horneado), sin nuevos privilegios,
+    # root FS de solo-lectura. cap_drop:[ALL] + cap_add:[NET_BIND_SERVICE] (la
+    # única cap, mínima para bindear :80: el binario oficial de Caddy la lleva como
+    # file-cap y con bounding set vacío el execve daría EPERM; el sysctl hace el
+    # bind bajo no-new-privileges). H2 Opción A: paridad con el standalone.
+    # Stateless (no ACME): /tmp, /config, /data por tmpfs (últimos con mode 1777).
+    <<: *no-new-privs
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    read_only: true
+    sysctls:
+      net.ipv4.ip_unprivileged_port_start: "0"
+    tmpfs:
+      - /tmp
+    volumes:
+      - type: tmpfs
+        target: /config
+        tmpfs: { mode: 0o1777 }
+      - type: tmpfs
+        target: /data
+        tmpfs: { mode: 0o1777 }
     environment:
       # TLS lo hace el Caddy de borde; aquí solo HTTP interno en :80 (sin publicar puerto).
       SITE_ADDRESS: ":80"

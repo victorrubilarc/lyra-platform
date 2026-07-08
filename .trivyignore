@@ -1,0 +1,44 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Lyra WatchLog — excepciones de Trivy para el GATE CRÍTICO (H2 2026-07-07).
+#
+# Cada CVE listado aquí NO bloquea el release (scripts/scan-images.sh GATE=critical
+# lo pasa a `--ignorefile`). REGLA: solo se exceptúa un CRÍTICO si (a) es de imagen
+# BASE / binario de un tercero que NO compilamos, sin fix aplicable de nuestro lado,
+# O (b) no es alcanzable en ESTA arquitectura (servicio 100% interno, sin exposición
+# de red), y SIEMPRE con la justificación escrita. Ningún CVE de CÓDIGO DE APP va
+# aquí: eso se arregla, no se exceptúa. Un CRÍTICO NUEVO que no esté en esta lista
+# BLOQUEA el release a propósito (revisión humana). Revisar en cada bump de base/infra.
+#
+# Formato Trivy: un VulnerabilityID POR LÍNEA, sin comentario en la MISMA línea
+# (Trivy no lo recorta de forma fiable) — los comentarios van en su propia línea.
+# El GATE es CRÍTICO-solo (los ALTO se reportan, no bloquean). IDs reconciliados
+# contra el escaneo real de v0.1.19 (Trivy DB 2026-07-07); delta vs E2 en
+# docs/SECURITY.md §9.2. Re-verificar: `GATE=critical scripts/scan-images.sh <tag>`.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Base Debian de api + migrate (node:22-bookworm-slim) ─────────────────────
+# perl-archive-tar (path traversal) — Debian fix_deferred (sin paquete con fix).
+# Perl NO se invoca desde el runtime del api ni del seed; superficie nula.
+CVE-2026-42496
+# perl-base — sin fix aguas arriba (status=affected). Mismo razonamiento: la base
+# arrastra perl pero el runtime no lo ejecuta.
+CVE-2026-8376
+# zlib1g (integer overflow) — Debian will_not_fix para bookworm. El vector (params
+# de compresión atacante-controlados) no aplica a nuestro uso.
+CVE-2023-45853
+
+# ── Go stdlib (crypto/tls) en binarios de TERCEROS que NO compilamos ─────────
+# Fixed en Go 1.24.13+, pero viaja en binarios Go que empaquetan terceros:
+# `esbuild` (tsx, imagen migrate), el binario `postgres`, y componentes de MinIO.
+# No lo compilamos nosotros; se retira cuando cada proveedor recompile con Go
+# parcheado. postgres/minio no se publican (solo red interna del stack).
+CVE-2025-68121
+
+# ── MinIO (RELEASE.2025-09-07, la más reciente; imagen 100% INTERNA) ─────────
+# No alcanzable desde la red de la planta (H1): ni consola (9001) ni API S3 (9000)
+# se publican; toda subida/descarga va PROXIED por la API. No hay release con fix.
+# grpc (fix 1.79.3, pendiente de recompilación del proveedor):
+CVE-2026-33186
+# github.com/minio/minio (sin fix aguas arriba):
+CVE-2026-33322
+CVE-2026-33419

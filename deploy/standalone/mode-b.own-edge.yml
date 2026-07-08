@@ -12,22 +12,43 @@
 # Config del borde: ./edge/Caddyfile.edge (ajustar el dominio interno).
 services:
   caddy-edge:
+    # Air-gap (H2): tag, NO @digest (docker save/load no preserva RepoDigests;
+    # el pin es el tar del bundle). Imagen oficial (no la nuestra).
     image: caddy:2-alpine
     restart: unless-stopped
     mem_limit: 128m
+    # CIS 5.25/5.3/5.12 (H2): borde como uid 1000 non-root, sin nuevos
+    # privilegios, root FS de solo-lectura. cap_drop:[ALL] + cap_add:
+    # [NET_BIND_SERVICE] (única cap, mínima para bindear 80/443: el binario oficial
+    # de Caddy la lleva como file-cap y con bounding set vacío el execve daría
+    # EPERM; el sysctl hace el bind bajo no-new-privileges). No hace ACME (cert
+    # corporativo montado :ro) ⇒ /data y /config son efímeros: tmpfs con mode 1777
+    # (uid 1000 escribe; evita un volumen root-owned no escribible en el 1er arranque).
+    user: "1000:1000"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    read_only: true
+    sysctls:
+      net.ipv4.ip_unprivileged_port_start: "0"
+    tmpfs:
+      - /tmp
     ports:
       - "443:443"
       - "80:80"
     volumes:
       - ./edge/Caddyfile.edge:/etc/caddy/Caddyfile:ro
       - ./certs:/certs:ro
-      - caddyedgedata:/data
+      - type: tmpfs
+        target: /config
+        tmpfs: { mode: 0o1777 }
+      - type: tmpfs
+        target: /data
+        tmpfs: { mode: 0o1777 }
     environment:
       TZ: "${TZ:-America/Santiago}"
     depends_on:
       watchlog-web:
         condition: service_started
     networks: [internal]
-
-volumes:
-  caddyedgedata:

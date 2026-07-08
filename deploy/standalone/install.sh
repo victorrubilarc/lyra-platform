@@ -125,6 +125,15 @@ esac
 
 # ── 7) Directorios de estado (licencia / certs) ──────────────────────────────
 mkdir -p "$HERE/license" "$HERE/certs"
+# CIS 5.12 (H2): el api corre NON-ROOT (uid 1000) y ESCRIBE ./license
+# (solicitud.lreq / renovacion.lreq / setup-token / license.lic importada). El
+# bind-mount conserva el dueño del host, así que se cede a uid 1000. Best-effort:
+# si el instalador ya corre como ese uid (o sin privilegios de chown) no falla —
+# solo avisa cómo corregirlo si el api no pudiera escribir la licencia.
+if ! chown -R 1000:1000 "$HERE/license" "$HERE/certs" 2>/dev/null; then
+  warn "No pude ceder ./license a uid 1000 (¿sin root?). Si el API no escribe la licencia,"
+  echo "     ejecuta:  sudo chown -R 1000:1000 \"$HERE/license\" \"$HERE/certs\""
+fi
 
 # ── 8) Levantar el stack ─────────────────────────────────────────────────────
 step "Arranque del stack"

@@ -81,14 +81,43 @@ jobs:
             VITE_GIT_SHA=${{ github.sha }}
             VITE_BUILD_DATE=${{ steps.bd.outputs.iso }}
 
-  # ── Paquete OFFLINE air-gapped (E2) ─────────────────────────────────────────
-  # Tras publicar las imágenes, arma el `.tar.gz` autocontenido (imágenes como
-  # tar con NOMBRE NEUTRO + infra + compose standalone + install.sh + guía +
-  # reporte Trivy + SHA256SUMS) y lo ADJUNTA al GitHub Release del tag. El SOCIO
-  # de canal lo descarga UNA vez (con internet) y lo lleva por USB a la planta.
-  # Cero fuente: las imágenes ya vienen selladas (L5) y sin `src/`.
-  bundle:
+  # ── GATE de vulnerabilidades (H2) ───────────────────────────────────────────
+  # Escanea las imágenes recién publicadas con Trivy y BLOQUEA el release si queda
+  # algún CRÍTICO sin excepción documentada en .trivyignore. `bundle` y `deploy`
+  # dependen de este job ⇒ un crítico nuevo detiene TANTO el paquete offline como
+  # el auto-deploy al EC2. El reporte (dist/trivy/) se sube como artefacto para que
+  # `bundle` lo adjunte al paquete sin re-escanear. Ver docs/SECURITY.md §9.2.
+  scan:
     needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Login a GHCR (pull de las imágenes del tag)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Trivy GATE (CRÍTICO bloquea; excepciones en .trivyignore)
+        run: GATE=critical SRC_PREFIX=ghcr.io/${{ github.repository_owner }}/ bash scripts/scan-images.sh ${{ github.ref_name }}
+      - name: Subir reporte Trivy (para el paquete offline)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-report
+          path: dist/trivy/
+          retention-days: 30
+
+  # ── Paquete OFFLINE air-gapped (E2) ─────────────────────────────────────────
+  # Tras el GATE, arma el `.tar.gz` autocontenido (imágenes como tar con NOMBRE
+  # NEUTRO + infra + compose standalone + install.sh + guía + reporte Trivy +
+  # SHA256SUMS) y lo ADJUNTA al GitHub Release del tag. El SOCIO de canal lo
+  # descarga UNA vez (con internet) y lo lleva por USB a la planta. Cero fuente:
+  # las imágenes ya vienen selladas (L5) y sin `src/`.
+  bundle:
+    needs: [build, scan]
     runs-on: ubuntu-latest
     permissions:
       contents: write   # crear/actualizar el Release y subir el asset
@@ -101,11 +130,13 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      # Trivy sobre las imágenes del tag → dist/trivy/ (make-bundle lo copia a
-      # SECURITY/). NO es un gate (el gate en CI es H2/E3): mide y adjunta.
-      - name: Escaneo de vulnerabilidades (Trivy, reporte adjunto — NO gate)
-        continue-on-error: true
-        run: SRC_PREFIX=ghcr.io/${{ github.repository_owner }}/ bash scripts/scan-images.sh ${{ github.ref_name }}
+      # Reusa el reporte del job `scan` (ya pasó el gate) → dist/trivy/, que
+      # make-bundle copia a SECURITY/. Evita re-escanear.
+      - name: Descargar reporte Trivy del gate
+        uses: actions/download-artifact@v4
+        with:
+          name: trivy-report
+          path: dist/trivy/
       - name: Generar paquete offline
         run: SRC_PREFIX=ghcr.io/${{ github.repository_owner }}/ bash scripts/make-bundle.sh ${{ github.ref_name }}
       - name: Adjuntar el paquete al GitHub Release
@@ -119,7 +150,7 @@ jobs:
   # deploy → up -d → healthcheck con rollback). Requiere los secrets del repo:
   # DEPLOY_SSH_HOST, DEPLOY_SSH_USER, DEPLOY_SSH_KEY, DEPLOY_DIR.
   deploy:
-    needs: build
+    needs: [build, scan]
     runs-on: ubuntu-latest
     concurrency:
       group: deploy-watchlog-prod

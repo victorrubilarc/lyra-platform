@@ -69,10 +69,13 @@ Notas para el cuestionario de redes:
 - En **dev** (`docker-compose.dev.yml`) sí se publican 5432/6379/9000-9001/
   1025-8025 **a propósito** (herramientas locales). Ese compose jamás va a planta.
 - Docker + firewall del host (Linux): publicar un puerto con `"8080:80"` abre
-  `0.0.0.0` e inserta reglas iptables que **saltan ufw/firewalld**. Este stack
-  lo mitiga por diseño (nada publicado salvo el borde elegido; el modo (a) usa
-  `127.0.0.1:`), pero si el cliente gestiona su propio firewall de host debe
-  saberlo (detalle en `docs/SECURITY.md` y guía de hardening, H2).
+  `0.0.0.0` e inserta reglas iptables en la cadena `DOCKER` que **saltan
+  ufw/firewalld** (el cliente cree estar protegido y no lo está — hallazgo
+  típico de auditoría). Este stack lo mitiga por diseño (nada publicado salvo el
+  borde elegido; el modo (a) usa `127.0.0.1:` = loopback, no `0.0.0.0`), pero si
+  el cliente gestiona su propio firewall de host debe conocerlo. Mitigaciones y
+  la opción `iptables=false` de Docker: **`docs/DEPLOYMENT.md` §"Endurecimiento
+  del host (CIS · para el equipo de redes)"** (H2 2026-07-07).
 
 ## Operación
 
