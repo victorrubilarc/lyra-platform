@@ -29,6 +29,13 @@ Flujo de una línea:
 `descargar paquete → copiar a la VM → instalar → la VM genera solicitud.lreq → tú
 emites license.lic → copiar a la VM → /setup crea el admin → entras y usas`.
 
+> **⚠️ ¿Dónde corre cada comando?** Importa por la sintaxis del shell:
+> - **En TU ESTACIÓN (Windows / PowerShell):** Fase 1 (descargar/verificar) y Fase 4
+>   (emitir la licencia con `pnpm`). PowerShell **no** acepta `&&` ni `\` de
+>   continuación de línea — usa los bloques marcados `powershell` de esta guía.
+> - **En la VM del cliente (Linux / bash):** Fases 0, 2, 3, 5 y 6. Ahí la sintaxis bash
+>   (`&&`, `\`) funciona tal cual.
+
 ---
 
 ## 1. Requisitos
@@ -83,20 +90,18 @@ docker version && docker compose version               # verifica: Server + Comp
      > Si `gh` "no se reconoce" en PowerShell tras instalarlo, **reabre la consola** (el
      > PATH se refresca al reiniciarla) o agrégalo a la sesión:
      > `$env:Path += ";C:\Program Files\GitHub CLI"`.
-2. (Recomendado) **Verifica la firma** antes de moverlo — prueba que vino de ITESICWS y
-   no fue alterado. Extrae los 3 archivos de firma y valida offline (con cosign nativo o
-   por Docker):
-   ```bash
-   mkdir vf && tar -xzf lyra-watchlog-v0.1.20.tar.gz -C vf \
-     lyra-watchlog-v0.1.20/SHA256SUMS \
-     lyra-watchlog-v0.1.20/SHA256SUMS.cosign.bundle \
-     lyra-watchlog-v0.1.20/cosign.pub
-   cd vf/lyra-watchlog-v0.1.20
-   docker run --rm -v "$PWD:/w" -w /w gcr.io/projectsigstore/cosign:v2.4.3 \
-     verify-blob --key cosign.pub --bundle SHA256SUMS.cosign.bundle \
-     --insecure-ignore-tlog=true SHA256SUMS      # → "Verified OK"
-   cd ../..
+2. (**Opcional**) **Verifica la firma** antes de moverlo — prueba que vino de ITESICWS y
+   no fue alterado. Puedes saltarte este paso: la firma ya se verificó al construir
+   v0.1.20 y `install.sh` revalida la integridad (SHA256SUMS) en la VM antes de cargar.
+   En **PowerShell** (tu estación):
+   ```powershell
+   mkdir vf -Force | Out-Null
+   tar -xf lyra-watchlog-v0.1.20.tar.gz -C vf "lyra-watchlog-v0.1.20/SHA256SUMS" "lyra-watchlog-v0.1.20/SHA256SUMS.cosign.bundle" "lyra-watchlog-v0.1.20/cosign.pub"
+   cd vf\lyra-watchlog-v0.1.20
+   docker run --rm -v "${PWD}:/w" -w /w gcr.io/projectsigstore/cosign:v2.4.3 verify-blob --key cosign.pub --bundle SHA256SUMS.cosign.bundle --insecure-ignore-tlog=true SHA256SUMS
+   cd ..\..
    ```
+   Debe imprimir **`Verified OK`**.
 
 ---
 
@@ -196,17 +201,13 @@ El arranque dejó en la VM `./license/solicitud.lreq` (la huella de ESA instalac
    ```
 
 2. **Emite la licencia** contra esa solicitud (habilitando TODOS los módulos y con un
-   vencimiento corto por ser prueba). Desde la raíz del repo:
-   ```bash
-   pnpm license issue --request solicitud.lreq \
-     --customer "Cliente Prueba" --channel-partner PILOTO \
-     --edition enterprise \
-     --modules core,structure,templates,logbook,schedules,incidents,exceptions,work-orders,shift-handover,notifications,themes,ai,dashboards \
-     --max-nodes 50 --max-named-users 25 \
-     --expires 2026-10-08T00:00:00Z \
-     --grace-days 14 \
-     --out license.lic
+   vencimiento corto por ser prueba). Desde la raíz del repo, en **PowerShell** (una sola
+   línea; PowerShell no usa `\` de continuación):
+   ```powershell
+   pnpm license issue --request solicitud.lreq --customer "Cliente Prueba" --channel-partner PILOTO --edition enterprise --modules core,structure,templates,logbook,schedules,incidents,exceptions,work-orders,shift-handover,notifications,themes,ai,dashboards --max-nodes 50 --max-named-users 25 --expires 2026-10-08T00:00:00Z --grace-days 14 --out license.lic
    ```
+   (Si prefieres multilínea legible en PowerShell, usar backtick `` ` `` al final de cada
+   línea en vez de `\`.)
    - La CLI **pide la passphrase** de tu privada PROD (prompt sin eco) y la descifra solo
      en memoria. Queda **registrada en tu ledger** (`~/.lyra-license/ledger.jsonl`).
    - ⚠️ **Emite SIEMPRE contra la `solicitud.lreq` que generó la app** (no inventes un
