@@ -2502,10 +2502,17 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
 > - **P0 ✅ Smoke de instalación en host limpio** — `scripts/smoke-install.sh` + `.github/workflows/install-smoke.yml`:
 >   make-bundle → install.sh (modo a Y b) → health + HTTPS (hostname con SNI e IP sin SNI). Corre en cada push que toca
 >   `deploy/`, `docker/`, `make-bundle.sh` o el propio smoke, y por `workflow_dispatch`. Habría atrapado los 4 bugs.
+> - **P0 ✅ Smoke VERDE 2026-07-08** (run 28980866830): modo a (health 200) + modo b (HTTPS por hostname con SNI **y** por IP
+>   con default_sni, 200/200). En el camino el smoke ENCONTRÓ Y ARREGLAMOS 3 bugs reales del producto que le habrían pegado
+>   a clientes: (i) `make-bundle` sin `assert_arch` (MinIO arm64) → ahora aborta si ≠ amd64; (ii) `install.sh` no cedía
+>   `./license` a uid 1000 sin root → el API crasheaba con EACCES (setup-token) → ahora `sudo -n` fallback; (iii) editar
+>   `edge/Caddyfile.edge` (como pide la guía) rompía el `SHA256SUMS` → ahora el manifiesto excluye `edge/`+`certs/` (config
+>   del operador). **El smoke ya justificó su existencia.**
 > - **P0 PENDIENTE · install.sh autoreparable + `doctor`:** que el instalador (a) **autogenere el cert self-signed** para el
->   `APP_PUBLIC_URL` (hostname o IP) si falta y **ponga `default_sni` solo cuando es IP** (mata el drama del modo b);
->   (b) valide arquitectura del host vs imágenes, puertos 80/443 libres, cert↔llave, `.env` completo; (c) un `doctor.sh` /
->   `install.sh --check` con reporte PASA/FALLA (arch, docker, puertos, cert, DNS/SNI, salud por contenedor).
+>   `APP_PUBLIC_URL` (hostname o IP) si falta y **ponga `default_sni` solo cuando es IP** (elimina el editar Caddyfile a mano
+>   — el smoke lo hace por script, pero el usuario final no debería); (b) valide arquitectura del host vs imágenes, puertos
+>   80/443 libres, cert↔llave, `.env` completo; (c) un `doctor.sh` / `install.sh --check` con reporte PASA/FALLA (arch,
+>   docker, puertos, cert, DNS/SNI, salud por contenedor).
 > - **P1 PENDIENTE · Windows track:** `install.ps1` (o guía WSL2) + resolver `/etc/machine-id` (huella de licencia en Windows)
 >   + permisos (chown uid 1000 no aplica en FS Windows) + su propio smoke (CI Windows+contenedores-Linux es delicado; quizá
 >   self-hosted/manual). **Caveat honesto:** Windows Server como destino productivo es atípico en industria; validar bien.
