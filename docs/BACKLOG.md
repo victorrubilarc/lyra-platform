@@ -792,6 +792,60 @@ nunca queda más de una sesión atrás.
 
 ## 2. Pendiente por HACER (módulos / submódulos)
 
+### 🟢 ÉPICO — OT A GRADO DE MERCADO (capa de gestión de mantenimiento y confiabilidad) 🎯
+> **Registrado 2026-07-08.** Meta del dueño: **"debemos llegar hasta allá"** — que el módulo de Órdenes de Trabajo
+> no le tenga nada que envidiar a un CMMS/EAM de mercado (categoría SAP PM / IBM Maximo / Fiix / Limble), **acotado
+> al dominio de OTs** (no ERP, no inventario/compras completos). Análisis de brecha hecho **verificando el esquema
+> real**, no de memoria. Orden de magnitud total: **~830–1.270 HH · ≈ 415–635 UF · ~2,5–4 meses** (asistido por IA).
+> Estimaciones de referencia en `g:\tmp\Estimacion_OT_DesdeCero.md` (grado de mercado desde cero) y
+> `Estimacion_OT_Cliente.md` (alcance acotado).
+>
+> **Lo que Lyra YA tiene (no rehacer):** registro de activos (`Equipment`/`EquipmentCategory`, patrón SAP PM
+> FunctionalLocation 1:N Equipment, criticidad 1–5 ISO 14224, OT↔equipo), modelo integration-ready (`ExternalReference`
+> SAP_PM/MAXIMO/PI/OPC), motor de flujo configurable, folio correlativo, firmas Part 11, plan de actividades con línea
+> base + avance, checklists por momento / permisos de trabajo gobernados, dotación con competencias y acreditación de
+> contratistas, notificaciones, acta PDF, dashboard, SLA/semáforos, enlace incidencia↔OT, RBAC/ABAC por alcance.
+> **En varios ejes Lyra está POR ENCIMA del CMMS promedio** (firmas Part 11, gobierno de verificaciones por momento,
+> gating de competencias/acreditación). La brecha es **una capa concreta: gestión de mantenimiento y confiabilidad.**
+>
+> **La brecha se cierra AGREGANDO capa sobre lo construido, no rehaciendo.** Parte de la infraestructura de recurrencia
+> ya existe (hoy sirve a rondas/`LogSchedule`; adaptable a PM). Cada sesión = un slice cerrable con el checklist §0
+> (typecheck/lint/build/test verdes + smoke + docs vivos). Prioridad de valor: **PM (M1+M2) es lo primero** — es la
+> pregunta #1 de un comprador industrial ("¿genera solo las OT preventivas?"); hoy la respuesta es NO.
+
+**Desglose en sesiones (10 núcleo + 1 opcional). Dependencias entre paréntesis:**
+
+- **M1 · Mantenimiento preventivo — Fase A (modelo + recurrencia por calendario).** `MaintenancePlan` (plan preventivo
+  por activo y/o tipo de OT; recurrencia reusando `RecurrenceKind`/`recurrenceConfig`) + acción manual "generar OT
+  ahora" + vínculo plan→OT generada + `nextDueAt` derivado. ~120–160 HH parte del total de PM. **Entitlement-aware.**
+- **M2 · Mantenimiento preventivo — Fase B (auto-generación programada).** Worker (`@nestjs/schedule`) que **genera la
+  OT automáticamente al vencer** + anti-duplicado (no re-generar si el plan ya tiene una OT abierta) + evento +
+  notificación (Bloque N). **Cierra el "genera solo las OT preventivas".** *(dep. M1)*
+- **M3 · Disparo por medidores/lecturas.** `Meter`/`MeterReading` por activo + captura de lecturas + disparo de PM por
+  umbral/uso (horómetro/contador), no solo por calendario. *(dep. M1/M2)*
+- **M4 · Planes de trabajo / job plans.** Biblioteca reutilizable de planes de tareas (decidir: reusar `Template` o
+  nuevo `WorkPlanTemplate`; ver adenda `OT_DESIGN_ARCHITECTURE.md §11` "job plans / SAP task list") + "aplicar plan"
+  en el asistente de plan de actividades y en el plan PM (M1). *(independiente; sinergia con M1)*
+- **M5 · Mano de obra y tiempo.** Activar `WorkActivity.estimatedHours`/`actualHours` (hoy columnas "reservadas S8") +
+  registro de **horas reales** por actividad/persona en la ejecución (labor entries append-only) + rollup a la OT.
+- **M6 · Costos.** Costo de mano de obra (tarifa × horas) + costos varios + **presupuesto vs. real** a nivel de OT +
+  visualización. *(dep. M5)*
+- **M7 · Materiales/repuestos (consumo en la OT).** Catálogo simple de materiales + líneas de consumo en la OT + costo
+  al rollup. **LIGERO**: sin almacén/stock/compras (eso queda FUERA de alcance, sería otro módulo). *(sinergia M6)*
+- **M8 · Códigos de falla ISO 14224.** Catálogo data-driven falla/causa/remedio + captura en el **cierre de la OT
+  correctiva** (insumo para análisis de confiabilidad). *(independiente)*
+- **M9 · KPIs de confiabilidad.** **MTTR, MTBF, disponibilidad**, cumplimiento de PM, backlog, en el dashboard de OT.
+  *(dep. M2 para cumplimiento PM + M8 para fallas)*
+- **M10 · Programación / Gantt — Fase A.** Tablero de carga + **Gantt de actividades** (baseline vs. plan vs. real +
+  dependencias); botón en la pestaña Plan (ya registrado como idea del dueño). *(independiente)*
+- **M11 (OPCIONAL) · Programación — Fase B.** Capacidad y asignación de recursos por cuadrilla + nivelación. Solo si un
+  cliente lo requiere. *(dep. M10)*
+
+> **Orden recomendado por valor + dependencias:** M1 → M2 → M3 · M4 · M5 → M6 → M7 · M8 → M9 · M10 (→ M11).
+> **Total: 10 sesiones núcleo** para grado de mercado + **1 opcional** (M11). No todo es imprescindible para TODO
+> cliente (correctivo-solo con permisos firmados no necesita medidores ni Gantt); pero PM + costos + KPIs de
+> confiabilidad son la parte **no negociable** para venderse como "software de OTs de mercado" sin asteriscos.
+
 ### ✅ Pantalla de INICIO · Rediseño a cockpit enterprise — CERRADO 2026-07-03 (`feat/inicio-enterprise`)
 > **Hecho.** Se eliminó la lista HARDCODEADA (`MODULES`/`STATUS_LABEL`/`STATUS_CLASS`). El Inicio es ahora un **cockpit del turno**
 > (patrón SAP Fiori "My Home"), NO el directorio completo (eso vive en el sidebar):
