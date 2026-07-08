@@ -159,6 +159,13 @@ propósito** para que completes dos datos del sitio.
 ```
 - El instalador verifica el paquete, carga las imágenes y crea un archivo de
   configuración llamado `.env`.
+- ⚠️ **Verás un aviso amarillo sobre `cosign`** ("Paquete FIRMADO pero 'cosign' no está en
+  este host… firma NO verificada aquí"). **Es NORMAL, no es un error.** La herramienta que
+  verifica la firma no está instalada en el servidor, así que ese chequeo (opcional) se
+  salta. El chequeo importante de **integridad (SHA256SUMS) sí se ejecuta**.
+- ⏳ **El paso "Verificación de integridad (SHA256SUMS)" puede tardar 1–2 minutos** (está
+  revisando ~1 GB). El cursor parpadeando ahí **no** significa que esté colgado: espera,
+  no presiones nada.
 - ✅ **Es NORMAL que termine con un aviso** parecido a *"COMPLETA lo específico del sitio
   en .env y vuelve a ejecutar"*. No es un error: significa "ahora ve al Paso 6".
 
