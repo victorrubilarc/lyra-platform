@@ -125,9 +125,10 @@ cp "$STANDALONE/mode-b.own-edge.yml"       "$STAGE/compose/"
 cp "$STANDALONE/edge/Caddyfile.edge"                "$STAGE/edge/"
 cp "$STANDALONE/edge/nginx-watchlog.conf.example"   "$STAGE/edge/"
 
-# ── 4) Instalador + plantilla de entorno + guía ─────────────────────────────
+# ── 4) Instalador + doctor + plantilla de entorno + guía ─────────────────────
 cp "$STANDALONE/install.sh"                "$STAGE/install.sh"
-chmod +x "$STAGE/install.sh"
+cp "$STANDALONE/doctor.sh"                 "$STAGE/doctor.sh"
+chmod +x "$STAGE/install.sh" "$STAGE/doctor.sh"
 cp "$STANDALONE/.env.standalone.example"   "$STAGE/.env.example"
 if [ -f "$REPO_ROOT/docs/INSTALL_OFFLINE.md" ]; then
   cp "$REPO_ROOT/docs/INSTALL_OFFLINE.md"  "$STAGE/INSTALL_OFFLINE.md"

@@ -171,42 +171,13 @@ propósito** para que completes dos datos del sitio.
 
 ---
 
-## Paso 6 — Configura el acceso (certificado + datos del sitio)
+## Paso 6 — Dile a la app su dirección (edita SOLO `.env`)
 
-Para poder abrir la app en el navegador **por HTTPS**, creamos un certificado de prueba y
-le decimos a la app cuál es su dirección. Usaremos directamente la **IP del servidor**
-(lo más simple; no hay que tocar DNS ni nada).
-
-### 6.1 Crea el certificado de prueba
-
-🐧 **EN EL SERVIDOR (bash):** (reemplaza `IP_DEL_SERVIDOR` por la IP real, en los DOS lugares)
-```bash
-mkdir -p certs
-openssl req -x509 -newkey rsa:2048 -nodes -days 365 \
-  -keyout certs/key.pem -out certs/cert.pem \
-  -subj "/CN=IP_DEL_SERVIDOR" \
-  -addext "subjectAltName=IP:IP_DEL_SERVIDOR"
-chmod 600 certs/key.pem
-```
-- ✅ **Deberías ver** que se crean `certs/cert.pem` y `certs/key.pem` (sin errores).
-
-### 6.2 Dile a la app su dirección (edita el borde)
-
-🐧 **EN EL SERVIDOR (bash):** primero asegura que exista el archivo del borde en la raíz
-del paquete (en el paquete v0.1.20 viene bajo `compose/edge/`; este comando lo deja en su
-sitio correcto — es inofensivo repetirlo):
-```bash
-mkdir -p edge
-[ -f edge/Caddyfile.edge ] || cp compose/edge/Caddyfile.edge edge/Caddyfile.edge
-```
-Ahora escribe tu IP en la config del borde (reemplaza `IP_DEL_SERVIDOR`):
-```bash
-sed -i "s/watchlog\.planta\.cliente\.local/IP_DEL_SERVIDOR/g" edge/Caddyfile.edge
-grep IP_DEL_SERVIDOR edge/Caddyfile.edge      # comprueba: deben salir 2 líneas con tu IP
-```
-- ✅ **Deberías ver** dos líneas con tu IP (una `http://` y una `https://`).
-
-### 6.3 Completa el archivo de configuración `.env`
+> **Buenas noticias (paquete v0.1.21+):** ya **no** tienes que crear el certificado a
+> mano ni editar el archivo del borde. El instalador **genera el certificado de prueba
+> y la configuración del borde solo**, a partir de la dirección que pongas en `.env`.
+> Tú solo completas **dos** líneas. Usaremos la **IP del servidor** (lo más simple; no
+> hay que tocar DNS).
 
 Hay que fijar **dos** valores en `.env`: el modo de borde (`b`) y la dirección pública.
 Lo más seguro es hacerlo con estos dos comandos (dejan cada línea **limpia, sin
@@ -230,20 +201,35 @@ grep -E '^EDGE_MODE=|^APP_PUBLIC_URL=' .env
 > comentario** de esas dos líneas (todo lo que va después del valor, incluido el `#`).
 > Guardar en `nano`: **Ctrl+O**, **Enter**, **Ctrl+X**.
 
+> **¿Tienes un certificado corporativo?** (opcional, avanzado) Si el cliente ya tiene un
+> certificado emitido por su CA, colócalo en `certs/cert.pem` (cadena completa) y
+> `certs/key.pem` **antes** del Paso 7: el instalador lo detecta y lo usa en vez del de
+> prueba. Si no, no hagas nada: el instalador crea uno de prueba automáticamente.
+
 ---
 
 ## Paso 7 — Segunda pasada del instalador (en el servidor)
 
-Ahora sí, el instalador levanta todo.
+Ahora sí, el instalador **genera el certificado de prueba + la config del borde** y
+levanta todo.
 
 🐧 **EN EL SERVIDOR (bash):**
 ```bash
 ./install.sh
 ```
-- Verifica de nuevo el paquete, enciende la aplicación y espera a que esté "sana".
+- Verifica de nuevo el paquete; si no pusiste certificado, **crea uno de prueba** para
+  tu IP; **genera** `edge/Caddyfile.edge` desde tu `APP_PUBLIC_URL` (con `default_sni`
+  porque entras por IP); enciende la aplicación y espera a que esté "sana".
+- ⚠️ **Verás un aviso amarillo** de "Certificado SELF-SIGNED generado" — **es normal**:
+  significa que creó el certificado de prueba (por eso el navegador avisará luego que la
+  conexión "no es privada").
 - ✅ **Deberías ver** al final `API saludable` y una lista de "próximos pasos"
   (licencia y `/setup`).
-- ❌ Si dice que la API **no** quedó sana, mira el Paso *"Si algo sale mal"* más abajo.
+- ❌ Si dice que la API **no** quedó sana, corre el **diagnóstico** (te dice exactamente
+  qué falló) y mira el Paso *"Si algo sale mal"* más abajo:
+  ```bash
+  ./install.sh --check      # (o ./doctor.sh) — reporte PASA/FALLA
+  ```
 
 En este momento la aplicación **ya está corriendo**, pero está en modo **solo lectura**
 hasta que le pongas una licencia (Paso 8). Es a propósito: la licencia nunca borra ni
@@ -344,6 +330,11 @@ licenciada y operativa en el servidor del cliente.
 ---
 
 ## 🆘 Si algo sale mal
+
+> **Primer reflejo: corre el diagnóstico.** 🐧 En el servidor, dentro de la carpeta del
+> paquete: `./install.sh --check` (o `./doctor.sh`). Te da un reporte **PASA/FALLA** de
+> lo esencial (arquitectura, Docker, puertos 80/443, certificado, salud de cada
+> contenedor) y convierte errores crípticos en una acción concreta.
 
 - **"El término 'gh'/'pnpm'/'docker' no se reconoce"** (en PowerShell): esa herramienta no
   está en el PATH o la consola es vieja. **Cierra y abre PowerShell de nuevo**, o instala
