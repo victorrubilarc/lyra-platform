@@ -152,13 +152,26 @@ esac
 # ── 7) Directorios de estado (licencia / certs) ──────────────────────────────
 mkdir -p "$HERE/license" "$HERE/certs"
 # CIS 5.12 (H2): el api corre NON-ROOT (uid 1000) y ESCRIBE ./license
-# (solicitud.lreq / renovacion.lreq / setup-token / license.lic importada). El
-# bind-mount conserva el dueño del host, así que se cede a uid 1000. Best-effort:
-# si el instalador ya corre como ese uid (o sin privilegios de chown) no falla —
-# solo avisa cómo corregirlo si el api no pudiera escribir la licencia.
-if ! chown -R 1000:1000 "$HERE/license" "$HERE/certs" 2>/dev/null; then
-  warn "No pude ceder ./license a uid 1000 (¿sin root?). Si el API no escribe la licencia,"
-  echo "     ejecuta:  sudo chown -R 1000:1000 \"$HERE/license\" \"$HERE/certs\""
+# (solicitud.lreq / renovacion.lreq / setup-token / license.lic importada) — si el
+# bind ./license NO es escribible por uid 1000, el API CRASHEA al arrancar con
+# EACCES (setup-token) y nunca queda healthy. El bind-mount conserva el dueño del
+# host, así que hay que cederlo a uid 1000. Como quien corre install.sh casi nunca
+# es root (docker se usa vía el grupo `docker`), intentamos: (1) chown directo (si
+# somos root); (2) `sudo -n` (root sin contraseña, típico en VMs/cloud/CI); (3) si
+# ninguno, ERROR claro con el comando exacto (el instalador NO puede dejar un API
+# que va a crashear). Detectado en el smoke de instalación 2026-07-08.
+_own_ok=false
+if chown -R 1000:1000 "$HERE/license" "$HERE/certs" 2>/dev/null; then
+  _own_ok=true
+elif command -v sudo >/dev/null 2>&1 && sudo -n chown -R 1000:1000 "$HERE/license" "$HERE/certs" 2>/dev/null; then
+  _own_ok=true; ok "Permisos de ./license y ./certs cedidos a uid 1000 (vía sudo)."
+fi
+if [ "$_own_ok" != true ]; then
+  warn "No pude ceder ./license y ./certs al uid 1000 del contenedor (no soy root y"
+  echo "     'sudo' pide contraseña o no está). El API NO podrá escribir su licencia y"
+  echo "     FALLARÁ al arrancar. Ejecuta esto y reintenta ./install.sh:"
+  echo "       sudo chown -R 1000:1000 \"$HERE/license\" \"$HERE/certs\""
+  die "Permisos de ./license/./certs pendientes (ver arriba)."
 fi
 
 # ── 8) Levantar el stack ─────────────────────────────────────────────────────

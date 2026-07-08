@@ -81,7 +81,9 @@ first_pass "$A"
 sed -i 's/^EDGE_MODE=.*/EDGE_MODE=a/'                       "$A/.env"
 sed -i 's#^APP_PUBLIC_URL=.*#APP_PUBLIC_URL=http://127.0.0.1:8080#' "$A/.env"
 sed -i 's/^EDGE_LOCAL_PORT=.*/EDGE_LOCAL_PORT=8080/'        "$A/.env"
-sudo chown -R 1000:1000 "$A/license" 2>/dev/null || true
+# NO hacemos chown manual: install.sh debe cederlo a uid 1000 por sí mismo
+# (vía sudo -n en un host con root sin contraseña, como este runner). Así el
+# smoke valida que seguir la guía tal cual (solo ./install.sh) FUNCIONA.
 if install2 "$A" mode-a.behind-proxy.yml; then
   if curl -sf -o /dev/null --max-time 15 http://127.0.0.1:8080/api/health; then
     ok "MODO A: /api/health responde 200"
@@ -95,7 +97,9 @@ down "$A" mode-a.behind-proxy.yml
 say "MODO B — borde propio TLS (:443)"
 B="$WORK/inst-b"
 first_pass "$B"
-# Certificado self-signed que cubre el hostname Y la IP loopback.
+# Certificado self-signed que cubre el hostname Y la IP loopback. certs/ aún no
+# existe (install.sh la crea en su 2ª pasada), así que la creamos para el openssl.
+mkdir -p "$B/certs"
 openssl req -x509 -newkey rsa:2048 -nodes -days 3 \
   -keyout "$B/certs/key.pem" -out "$B/certs/cert.pem" \
   -subj "/CN=$HOSTN" -addext "subjectAltName=DNS:$HOSTN,IP:127.0.0.1" 2>/dev/null
@@ -104,7 +108,7 @@ sed -i "s/watchlog\.planta\.cliente\.local/$HOSTN/g" "$B/edge/Caddyfile.edge"
 sed -i "/auto_https off/a default_sni $HOSTN"        "$B/edge/Caddyfile.edge"
 sed -i 's/^EDGE_MODE=.*/EDGE_MODE=b/'                "$B/.env"
 sed -i "s#^APP_PUBLIC_URL=.*#APP_PUBLIC_URL=https://$HOSTN#" "$B/.env"
-sudo chown -R 1000:1000 "$B/license" "$B/certs" "$B/edge" 2>/dev/null || true
+# install.sh cede license/ y certs/ a uid 1000 por sí mismo (sudo -n).
 if ! install2 "$B" mode-b.own-edge.yml; then
   down "$B" mode-b.own-edge.yml
   say "RESULTADO DEL SMOKE"; printf '\033[31m✗ SMOKE: falló la instalación modo b\033[0m\n'; exit 1
