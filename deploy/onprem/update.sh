@@ -17,9 +17,59 @@ PREV="$(grep '^WL_VERSION=' .env | cut -d= -f2)"
 NEW="${1:-$PREV}"
 echo "▶ Actualizando WatchLog ${PREV:-?} → ${NEW}"
 
+# Login al registro PRIVADO (E3, control de acceso a la distribución). Best-effort:
+# si el .env trae un token READ-ONLY por cliente/socio (revocable), se autentica; si
+# no, se asume registro público o sesión ya iniciada (flujo actual intacto). El token
+# NO tiene permiso de escritura: si se filtra, solo permite pull y se REVOCA sin tocar
+# a los demás clientes. Ver docs/DEPLOYMENT.md §"Registro privado + tokens revocables".
+registry_login() {
+  local reg user tok
+  reg="$(grep '^WL_REGISTRY=' .env | cut -d= -f2)"; reg="${reg:-ghcr.io}"
+  user="$(grep '^WL_REGISTRY_USER=' .env | cut -d= -f2 || true)"
+  tok="$(grep '^WL_REGISTRY_TOKEN=' .env | cut -d= -f2 || true)"
+  if [ -n "$user" ] && [ -n "$tok" ]; then
+    echo "  · login a registro privado ($reg) con token read-only…"
+    echo "$tok" | docker login "$reg" -u "$user" --password-stdin >/dev/null \
+      || { echo "❌ Login al registro falló (¿token revocado/expirado?)." >&2; exit 1; }
+  fi
+}
+registry_login
+
+# Verificación de firma cosign de las imágenes de APP por DIGEST (E3, camino con
+# registro). Best-effort: solo si cosign y la clave pública están presentes en el
+# host (no rompe el demo, que hoy no los trae). Si el toolchain SÍ está y la firma
+# FALLA, aborta el deploy: una imagen que no verifica es una bandera roja. Resuelve
+# el objetivo "que corra solo lo que ITESICWS firmó" sin hard-pinear @digest en el
+# compose (que exigiría reescribir el digest en cada release; la verificación por
+# digest da la MISMA garantía de integridad). Standalone air-gap verifica el bundle
+# (install.sh), no por registro (gotcha docker save/load, SECURITY §9.7-bis).
+COSIGN_PUB="${COSIGN_PUB:-../scripts/license/cosign/cosign.pub}"
+verify_signatures() {
+  local ver="$1" owner reg pub
+  command -v cosign >/dev/null 2>&1 || { echo "  · cosign no presente — verificación de firma OMITIDA (best-effort)."; return 0; }
+  [ -f "$COSIGN_PUB" ] || { echo "  · sin cosign.pub ($COSIGN_PUB) — verificación de firma OMITIDA."; return 0; }
+  owner="$(grep '^WL_OWNER=' .env | cut -d= -f2)"
+  reg="$(grep '^WL_REGISTRY=' .env | cut -d= -f2)"; reg="${reg:-ghcr.io}"
+  [ -n "$owner" ] || { echo "  · sin WL_OWNER — verificación de firma OMITIDA."; return 0; }
+  local img digest ref
+  for img in api web migrate; do
+    # Digest EXACTO de lo que se acaba de pullear (no un tag mutable).
+    digest="$(docker inspect --format '{{index .RepoDigests 0}}' "${reg}/${owner}/lyra-watchlog-${img}:${ver}" 2>/dev/null || true)"
+    [ -n "$digest" ] || { echo "  · sin RepoDigest de ${img} — omitido."; continue; }
+    ref="${reg}/${owner}/lyra-watchlog-${img}@${digest##*@}"
+    if cosign verify --key "$COSIGN_PUB" --insecure-ignore-tlog=true "$ref" >/dev/null 2>&1; then
+      echo "  ✓ firma OK: lyra-watchlog-${img}@${digest##*@}"
+    else
+      echo "❌ FIRMA INVÁLIDA de lyra-watchlog-${img} (${ref}). Aborto el deploy." >&2
+      exit 1
+    fi
+  done
+}
+
 deploy() {
   sed -i "s|^WL_VERSION=.*|WL_VERSION=${1}|" .env
   $COMPOSE pull
+  verify_signatures "$1"
   # CIS 5.12 (H2): desde v0.1.19 el api corre NON-ROOT (uid 1000) y escribe
   # ./license (solicitud/renovacion/setup-token/license.lic). El bind conserva el
   # dueño del host ⇒ se cede a 1000 (idempotente; best-effort si no hay root).

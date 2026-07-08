@@ -44,7 +44,29 @@ if command -v free >/dev/null; then
 fi
 avail="$(df -Pm "$HERE" | awk 'NR==2{print $4}')"; [ "${avail:-99999}" -lt 8000 ] && warn "Espacio libre ${avail}MB (<8GB recomendado)."
 
-# ── 2) Verificar integridad del paquete ──────────────────────────────────────
+# ── 2) Verificar AUTENTICIDAD (firma cosign) + INTEGRIDAD (SHA256SUMS) ────────
+# Orden: primero la FIRMA sobre el SHA256SUMS (¿vino de ITESICWS?), luego el
+# SHA256SUMS sobre el contenido (¿está intacto?). La firma es best-effort en el
+# host (decisión E3): si la planta air-gapped no trae el binario cosign, se avisa y
+# el AUDITOR la verifica en su estación (con tooling) ANTES de traer el USB.
+step "Verificación de autenticidad (firma cosign)"
+if [ -f "$HERE/cosign.pub" ] && [ -f "$HERE/SHA256SUMS.cosign.bundle" ]; then
+  if command -v cosign >/dev/null 2>&1; then
+    if cosign verify-blob --key "$HERE/cosign.pub" --bundle "$HERE/SHA256SUMS.cosign.bundle" \
+         --insecure-ignore-tlog=true "$HERE/SHA256SUMS" >/dev/null 2>&1; then
+      ok "Firma ITESICWS VERIFICADA (el paquete es auténtico y no fue alterado)."
+    else
+      die "❌ FIRMA INVÁLIDA sobre SHA256SUMS — el paquete NO es auténtico o fue manipulado. Aborto."
+    fi
+  else
+    warn "Paquete FIRMADO pero 'cosign' no está en este host ⇒ firma NO verificada aquí (best-effort)."
+    echo "     Verifícala en tu estación antes de instalar (ver INSTALL_OFFLINE.md §Verificar la firma):"
+    echo "       cosign verify-blob --key cosign.pub --bundle SHA256SUMS.cosign.bundle --insecure-ignore-tlog=true SHA256SUMS"
+  fi
+else
+  warn "Paquete SIN firma cosign (¿versión previa a E3?) — solo se comprobará integridad SHA256."
+fi
+
 step "Verificación de integridad (SHA256SUMS)"
 if [ -f "$HERE/SHA256SUMS" ]; then
   ( cd "$HERE" && sha256sum -c SHA256SUMS --quiet ) || die "SHA256SUMS NO coincide — paquete corrupto o alterado. Aborto."

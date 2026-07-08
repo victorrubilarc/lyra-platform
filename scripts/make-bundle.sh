@@ -36,6 +36,15 @@ OUTPUT_DIR="${OUTPUT_DIR:-dist}"
 PULL="${PULL:-true}"                 # false en CI si ya se construyeron/pullearon
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 STANDALONE="$REPO_ROOT/deploy/standalone"
+ONPREM="$REPO_ROOT/deploy/onprem"
+
+# Herramienta `age` (cifrado de backups, E3) embarcada para la planta AIR-GAPPED:
+# el host de terreno cifra sus respaldos con la clave PÚBLICA del cliente y no
+# puede depender de internet para instalar age. Se descarga en tiempo de bundle
+# (el SOCIO tiene internet) y se PINEA por sha256 (cadena de suministro auditable).
+AGE_VERSION="${AGE_VERSION:-v1.3.1}"
+AGE_LINUX_SHA256="bdc69c09cbdd6cf8b1f333d372a1f58247b3a33146406333e30c0f26e8f51377"
+AGE_URL="https://github.com/FiloSottile/age/releases/download/${AGE_VERSION}/age-${AGE_VERSION}-linux-amd64.tar.gz"
 
 APP_IMAGES="api web migrate"
 # Imágenes de infra que el compose levanta en runtime → deben viajar en el paquete
@@ -59,7 +68,7 @@ TARBALL="$OUTPUT_DIR/lyra-watchlog-$TAG.tar.gz"
 
 echo "▶ make-bundle $TAG  (src=$SRC_PREFIX  pull=$PULL)"
 rm -rf "$STAGE"
-mkdir -p "$STAGE/images" "$STAGE/compose/edge" "$STAGE/SECURITY"
+mkdir -p "$STAGE/images" "$STAGE/compose/edge" "$STAGE/SECURITY" "$STAGE/onprem" "$STAGE/tools"
 
 # ── 1) Imágenes de la app: pull (opcional) → retag NEUTRO → save ─────────────
 for img in $APP_IMAGES; do
@@ -103,9 +112,35 @@ if [ -f "$REPO_ROOT/docs/INSTALL_OFFLINE.md" ]; then
   cp "$REPO_ROOT/docs/INSTALL_OFFLINE.md"  "$STAGE/INSTALL_OFFLINE.md"
 fi
 
+# ── 4-bis) Respaldo/restauración CIFRADOS + binario age (E3) ─────────────────
+# Scripts de backup/restore (detectan el compose standalone por sí solos) + el
+# binario `age` pineado, para que la planta pueda cifrar sus respaldos con la
+# clave PÚBLICA del cliente sin depender de internet ni de host tooling.
+cp "$ONPREM/backup.sh"  "$STAGE/onprem/backup.sh"
+cp "$ONPREM/restore.sh" "$STAGE/onprem/restore.sh"
+chmod +x "$STAGE/onprem/backup.sh" "$STAGE/onprem/restore.sh"
+echo "  · age $AGE_VERSION (pin sha256) → tools/age"
+AGE_TGZ="$OUTPUT_DIR/age-${AGE_VERSION}-linux-amd64.tar.gz"
+curl -fsSL -o "$AGE_TGZ" "$AGE_URL"
+echo "${AGE_LINUX_SHA256}  ${AGE_TGZ}" | sha256sum -c - \
+  || { echo "❌ sha256 de age NO coincide — descarga corrupta/alterada. Aborto." >&2; exit 1; }
+tar -xzf "$AGE_TGZ" -C "$OUTPUT_DIR"           # extrae age/age + age/age-keygen
+cp "$OUTPUT_DIR/age/age" "$OUTPUT_DIR/age/age-keygen" "$STAGE/tools/"
+chmod +x "$STAGE/tools/age" "$STAGE/tools/age-keygen"
+rm -rf "$OUTPUT_DIR/age" "$AGE_TGZ"
+
 # ── 5) Reporte de vulnerabilidades (si se generó con scripts/scan-images.sh) ─
 if [ -d "$REPO_ROOT/dist/trivy" ]; then
   cp -r "$REPO_ROOT/dist/trivy/." "$STAGE/SECURITY/" 2>/dev/null || true
+fi
+
+# ── 5-bis) Clave PÚBLICA de firma (E3 · cosign) ──────────────────────────────
+# La pública (no-secreto) viaja en el paquete para que la planta pueda verificar
+# la firma del SHA256SUMS OFFLINE. Se copia ANTES del SHA256SUMS (queda cubierta
+# por él); la FIRMA se genera después (capa de autenticidad, fuera del SHA256SUMS).
+COSIGN_PUB="$REPO_ROOT/scripts/license/cosign/cosign.pub"
+if [ -f "$COSIGN_PUB" ]; then
+  cp "$COSIGN_PUB" "$STAGE/cosign.pub"
 fi
 
 # ── 6) VERSION + SHA256SUMS de TODO ─────────────────────────────────────────
@@ -119,6 +154,25 @@ EOF
 
 echo "  · SHA256SUMS"
 ( cd "$STAGE" && find . -type f ! -name SHA256SUMS | sort | xargs sha256sum > SHA256SUMS )
+
+# ── 6-bis) FIRMA cosign del SHA256SUMS (E3, verificable OFFLINE) ─────────────
+# Como el SHA256SUMS sella TODO el contenido (imágenes + compose + instalador),
+# firmarlo = firmar el paquete entero con AUTENTICIDAD, sin registro. Key-based
+# (--tlog-upload=false) ⇒ la planta verifica con la pública sin internet. GUARDADA:
+# sin cosign o sin COSIGN_KEY/COSIGN_KEY_FILE, se OMITE (deuda E3, no rompe). El
+# bundle de firma NO entra al SHA256SUMS (es la capa que lo autentica). cosign v2.x.
+if command -v cosign >/dev/null 2>&1 && { [ -n "${COSIGN_KEY:-}" ] || [ -n "${COSIGN_KEY_FILE:-}" ]; } && [ -f "$STAGE/cosign.pub" ]; then
+  echo "  · firma cosign del SHA256SUMS"
+  KEYFILE="${COSIGN_KEY_FILE:-}"
+  CLEANUP_KEY=false
+  if [ -z "$KEYFILE" ]; then KEYFILE="$OUTPUT_DIR/.cosign.key.tmp"; printf '%s' "$COSIGN_KEY" > "$KEYFILE"; CLEANUP_KEY=true; fi
+  cosign sign-blob --yes --key "$KEYFILE" --tlog-upload=false \
+    --bundle "$STAGE/SHA256SUMS.cosign.bundle" "$STAGE/SHA256SUMS"
+  [ "$CLEANUP_KEY" = true ] && rm -f "$KEYFILE"
+  echo "    ✅ SHA256SUMS.cosign.bundle (verificar: cosign verify-blob --key cosign.pub --bundle … --insecure-ignore-tlog=true SHA256SUMS)"
+else
+  echo "  · firma cosign OMITIDA (sin cosign/COSIGN_KEY/cosign.pub) — deuda E3, el paquete sigue con integridad SHA256."
+fi
 
 # ── 7) Empaquetar ───────────────────────────────────────────────────────────
 echo "  · tar.gz → $TARBALL"

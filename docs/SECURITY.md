@@ -575,19 +575,38 @@ GxP: MHRA Data Integrity 2018 / FDA DI Q&A (corrección tardía justificada + at
 > Referencia: SLSA (niveles de integridad de cadena de suministro), OWASP, Sigstore.
 
 ### 9.1 Integridad de la imagen (que corra solo lo que ITESICWS publicó)
-- **Firma de imágenes** con **cosign/Sigstore**: cada imagen `lyra-watchlog-*` se firma en CI al publicar; el host
-  **verifica la firma** antes de correrla. Sin firma válida ⇒ no arranca. **(pendiente E3.)**
-- **Pull por DIGEST inmutable** (`@sha256:…`), no solo por tag mutable (un tag se puede re-apuntar; un digest, no) →
-  reproducibilidad e integridad del artefacto exacto. **✅ H2 (2026-07-07):** infra (postgres/redis/minio/caddy) pineada
-  por digest en el compose **demo/prod** (con internet). En el compose **air-gapped** se pinea por TAG **+ el tar del
-  bundle es el pin real** (ver §9.7: `docker save/load` no preserva RepoDigests). App por digest = E3 (cosign).
-- **Escaneo de vulnerabilidades** (Trivy) **con GATE en CI — ✅ H2 (2026-07-07):** `release.yml` job `scan` bloquea
-  `bundle`+`deploy` si hay CRÍTICO fuera de `.trivyignore` (excepciones justificadas por CVE). Ver §9.7.
-- **SBOM** (CycloneDX) por release: inventario de dependencias entregable al **auditor del cliente**. **(pendiente E3.)**
+- **Firma de imágenes con cosign/Sigstore — ✅ E3 (2026-07-08):** **key-based** (NO keyless: keyless exige internet ⇒
+  rompe el air-gap). cosign **v2.4.3** (pin; v3 rompió `--tlog-upload=false`). Dos superficies: (i) `release.yml` firma
+  cada imagen `lyra-watchlog-*` **por DIGEST** en GHCR (`cosign sign --tlog-upload=false`, artefacto OCI junto a la
+  imagen); (ii) `make-bundle` firma el **`SHA256SUMS`** del paquete offline con `sign-blob` (como el SHA256SUMS sella todo
+  el contenido, firmarlo autentica el paquete ENTERO sin registro). **Verificación:** air-gap → `install.sh` valida la
+  firma sobre SHA256SUMS con la pública embarcada, `--insecure-ignore-tlog=true`, **antes** del `docker load` (best-effort:
+  si el host no trae cosign, avisa y el auditor verifica en su estación); demo/prod → `update.sh` verifica las imágenes de
+  app **por digest** tras el pull (best-effort, aborta si el toolchain está y la firma falla). Clave PRIVADA bajo custodia
+  L3 (§9.2); la PÚBLICA se commitea (`scripts/license/cosign/cosign.pub`) y viaja en el bundle. Sin el secret de CI la
+  firma se OMITE sin romper (deuda hasta la ceremonia de keygen del dueño, `scripts/license/cosign/README.md`).
+- **Pull por DIGEST inmutable** (`@sha256:…`), no solo por tag mutable → reproducibilidad e integridad del artefacto
+  exacto. **✅ H2:** infra pineada por digest en el compose **demo/prod**. **✅ E3:** las imágenes de **app** en demo/prod
+  se verifican **por digest** en `update.sh` (equivalente a pinear, sin reescribir el digest en cada release). En el
+  compose **air-gapped** se pinea por TAG **+ el tar del bundle es el pin real** (§9.7-bis: `docker save/load` no preserva
+  RepoDigests) y la FIRMA del bundle es la autenticidad.
+- **Escaneo de vulnerabilidades** (Trivy) **con GATE en CI — ✅ H2:** `release.yml` job `scan` bloquea `bundle`+`deploy`
+  si hay CRÍTICO fuera de `.trivyignore`. Ver §9.7.
+- **SBOM (CycloneDX) por release — ✅ E3 (2026-07-08):** `scan-images.sh` emite un CycloneDX JSON **por imagen** (7)
+  reusando Trivy (`--format cyclonedx`). Viaja DENTRO del paquete (`SECURITY/sbom/`) **y** adjunto suelto al GitHub
+  Release (`lyra-watchlog-<tag>-sbom.tar.gz`), entregable al **auditor del cliente**. Inventario COMPLETO de componentes
+  (no solo lo vulnerable), formato estándar CycloneDX 1.7.
 
 ### 9.2 Control de acceso a la distribución
-- **Registro privado** (no público). **Tokens read-only por cliente/socio**, revocables (si un cliente sale o un token
-  se filtra, se corta sin afectar a los demás).
+- **Registro privado + tokens read-only revocables — ✅ E3 (2026-07-08, auth-ready):** el tamaño correcto para el modelo
+  de canal (entrega por **tar air-gapped**; la planta NUNCA contacta un registro) es **GHCR en visibilidad privada +
+  tokens fine-grained READ-ONLY por socio/cliente** (revocables sin afectar a los demás), **no** un registro self-hosted
+  (superficie/mantenimiento que el cliente final no usa; queda como upgrade futuro si un cliente exige su mirror).
+  `update.sh` hace **login best-effort** con `WL_REGISTRY_USER`/`WL_REGISTRY_TOKEN` del `.env` (sin ellos = flujo público
+  actual intacto). El **flip de visibilidad de GHCR a privado es acción GATED del dueño** (rompería el auto-deploy del EC2
+  si se hace sin configurar el login) — runbook de emisión/revocación en `DEPLOYMENT.md §"Registro privado + tokens"`.
+- **Firma de cadena (cosign):** la clave PRIVADA de firma vive en custodia L3 (§9.4/README cosign); su fuga permitiría
+  falsificar imágenes "de ITESICWS", por eso se trata como la privada de emisión.
 - **Custodia de la clave privada de licencias** (Ed25519, ver `LICENSING.md`) — **✅ implementada en L3
   (2026-07-05):** la privada de PROD vive **PKCS#8 CIFRADA** (aes-256-cbc) con **passphrase generada de alta
   entropía** (en el gestor de contraseñas del dueño) en `~/.lyra-license/` (`LYRA_LICENSE_HOME`), FUERA del repo —
@@ -601,8 +620,14 @@ GxP: MHRA Data Integrity 2018 / FDA DI Q&A (corrección tardía justificada + at
   clientes — refuerza el aislamiento single-tenant).
 
 ### 9.3 Integridad de los datos del cliente
-- **Backups cifrados** (hoy `pg_dump -Fc` **sin** cifrar; a cifrar antes de distribuir a terceros) + retención +
-  restauración verificada. El backup pre-update es la red ante migraciones forward-only (ver `DEPLOYMENT.md`).
+- **Backups CIFRADOS — ✅ E3 (2026-07-08):** `onprem/backup.sh` cifra el `pg_dump -Fc` con **age asimétrico** cuando se
+  define `BACKUP_AGE_RECIPIENT` (clave pública) en el `.env`: el claro NUNCA toca el disco (pipe `pg_dump | age`), y solo
+  la **identidad PRIVADA que el cliente custodia FUERA del host** descifra (un disco/backup robado es inútil; un host
+  comprometido no lee sus propios respaldos). `age` estático (v1.3.1, pin sha256) viaja en el paquete (`tools/age`) →
+  air-gap sin dependencia de red. **Restauración verificada:** `onprem/restore.sh --test` descifra y restaura a una BD
+  descartable (sin tocar lo vivo) — ciclo completo probado (42/42 filas; identidad equivocada falla). Retención cubre
+  `.dump` y `.dump.age`. **Sin destinatario ⇒ dump en claro + aviso** (retrocompat demo/dev). Cifrado at-rest del host
+  (LUKS) sigue siendo del host (§DEPLOYMENT host).
 - **Licencia vencida = SOLO LECTURA**, nunca borrado ni secuestro de datos (los datos son del cliente; ver
   `LICENSING.md §5`). Todo cambio de estado de licencia se **audita**.
 - **TLS** obligatorio en todo el tráfico (ya vía Caddy de borde).
@@ -680,6 +705,21 @@ en air-gap no existe ⇒ arranque roto. Por eso el compose **standalone/mode-b**
 **tar del bundle**: `make-bundle.sh` pullea la infra **por digest**, la **retaguea** al tag y hace `docker save`; el
 `SHA256SUMS` sella el conjunto e `install.sh` lo verifica antes de `docker load`. Es un pin MÁS fuerte que un `@digest`
 suelto (cubre imágenes + compose + instalador juntos). El compose **demo/prod** (con registro) sí usa `@digest`.
+
+### 9.8 Cadena de suministro verificable de punta a punta (E3 — ✅ 2026-07-08)
+Cierra §9.5(a)(b)(c): el cliente/auditor verifica autenticidad, contenido e integridad de datos **sin confiar a ciegas**.
+No toca la máquina de estados de licencia, el sello L5 ni el air-gap (todo funciona offline; ninguna clave privada en
+repo/imagen/`.env`). Decisiones (a)–(h) en `DECISIONS.md 2026-07-08`.
+- **Autenticidad (firma cosign key-based, offline):** imágenes GHCR firmadas por digest + `SHA256SUMS` del bundle firmado
+  con `sign-blob`; verificación `--insecure-ignore-tlog=true` sin internet. Privada en custodia L3, pública distribuida.
+- **Contenido (SBOM CycloneDX):** un inventario por imagen, en el paquete y en el Release, para el auditor.
+- **Datos (backups age asimétrico):** respaldos ilegibles sin la identidad privada que custodia el cliente; ciclo de
+  restauración verificado.
+- **Acceso a la distribución:** GHCR privado + tokens read-only revocables por socio (auth-ready; flip de visibilidad =
+  acción gated del dueño).
+- **Honestidad:** la firma de imagen es best-effort en el host de planta (si no trae cosign, la verifica el auditor en su
+  estación); el registro self-hosted se difirió (la planta air-gapped no usa registro); la generación del par PROD de
+  cosign es ceremonia del dueño (sin ella, el pipeline omite la firma sin romper — deuda como L1 pre-L3).
 
 ## Estado
 - **Fase 0:** cabeceras (Helmet) y validación de entorno activas.

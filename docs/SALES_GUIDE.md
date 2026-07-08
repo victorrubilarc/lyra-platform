@@ -225,6 +225,13 @@ el código**, y el cliente recibe un artefacto **auditable** — encaja con air-
   **CIS Docker**), y **ninguna versión se publica** si su escaneo de vulnerabilidades encuentra un fallo crítico
   no justificado (**control automático en el pipeline**). **Beneficio:** pasa el **cuestionario de proveedor** y el
   **CIS Benchmark** de una minera sin sorpresas — el endurecimiento viene de fábrica, no como parche posterior.
+- **Cadena de suministro verificable de punta a punta (2026-07):** el cliente/auditor puede comprobar, **sin confiarse**,
+  que (a) el software **vino de ITESICWS y no fue alterado** (imágenes y paquete **firmados** criptográficamente,
+  verificables **incluso sin internet**), (b) **qué contiene** (un **inventario de componentes / SBOM** por cada
+  imagen, entregable para su auditoría), y (c) que sus **respaldos están cifrados** — si le roban el disco, la base de
+  datos es ilegible sin la llave que **custodia el propio cliente**. **Beneficio:** responde la parte más dura del
+  cuestionario de ciberseguridad (integridad de la cadena de suministro, tipo SLSA) con **pruebas verificables**, no con
+  una carta de confianza — una ventaja real frente a un SaaS que solo dice "confía en nosotros".
 
 ### 🔔 Avisos por correo
 Notificaciones configurables (p. ej. rondas vencidas, vencimientos de flujo) con plantillas propias.
