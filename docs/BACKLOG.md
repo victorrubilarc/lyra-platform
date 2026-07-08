@@ -2491,6 +2491,27 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
 > v0.1.21+**; para el bundle v0.1.20 el workaround (host con internet) = `docker pull minio/minio:RELEASE.2025-09-07T16-13-09Z`
 > + borrar `images/infra-minio-*.tar` + reejecutar install.sh. **TODO:** validar la ARQUITECTURA de cada
 > imagen del bundle en make-bundle (fallar si alguna ≠ amd64) — habría atajado esto en el build.
+> **✅ HECHO 2026-07-08:** `make-bundle.sh` ahora hace `assert_arch` por imagen (aborta si ≠ `EXPECTED_ARCH`, def. amd64).
+
+### PROGRAMA "instalación limpia y sin errores" (raíz de los 4 bugs del piloto) — 2026-07-08
+> La causa común de los 4 bugs fue **que el camino del paquete offline nunca se ejecutó de punta a punta en una máquina
+> limpia**. Decisiones y plan tras la 1ª prueba piloto real (dueño 2026-07-08):
+> - **Matriz de plataformas SOPORTADA (decidida por el dueño):** **Linux x86-64** (Ubuntu 22.04/24.04, Debian 12, RHEL/Rocky
+>   8/9; Docker Engine ≥20.10 + compose v2; acceso por hostname o IP) **+ Windows** (Docker Desktop/WSL2 con contenedores
+>   Linux — track aparte). ARM64/Raspberry Pi/Apple Silicon = fuera de alcance por ahora (requeriría build multi-arch).
+> - **P0 ✅ Smoke de instalación en host limpio** — `scripts/smoke-install.sh` + `.github/workflows/install-smoke.yml`:
+>   make-bundle → install.sh (modo a Y b) → health + HTTPS (hostname con SNI e IP sin SNI). Corre en cada push que toca
+>   `deploy/`, `docker/`, `make-bundle.sh` o el propio smoke, y por `workflow_dispatch`. Habría atrapado los 4 bugs.
+> - **P0 PENDIENTE · install.sh autoreparable + `doctor`:** que el instalador (a) **autogenere el cert self-signed** para el
+>   `APP_PUBLIC_URL` (hostname o IP) si falta y **ponga `default_sni` solo cuando es IP** (mata el drama del modo b);
+>   (b) valide arquitectura del host vs imágenes, puertos 80/443 libres, cert↔llave, `.env` completo; (c) un `doctor.sh` /
+>   `install.sh --check` con reporte PASA/FALLA (arch, docker, puertos, cert, DNS/SNI, salud por contenedor).
+> - **P1 PENDIENTE · Windows track:** `install.ps1` (o guía WSL2) + resolver `/etc/machine-id` (huella de licencia en Windows)
+>   + permisos (chown uid 1000 no aplica en FS Windows) + su propio smoke (CI Windows+contenedores-Linux es delicado; quizá
+>   self-hosted/manual). **Caveat honesto:** Windows Server como destino productivo es atípico en industria; validar bien.
+> - **P1 PENDIENTE · Documentar la Matriz de Plataformas Soportadas** en repo (SUPPORTED_PLATFORMS.md) + guía del socio.
+> - **Corregidos como parte del programa:** el default_sni por IP quedó documentado en la guía; falta cablearlo AUTO en
+>   install.sh (P0 de arriba) y en el Caddyfile del repo (hoy asume hostname con SNI).
 
 ### DATA demo · Rondas del seed 100% vencidas (2026-07-03)
 > Detectado al revisar «Mis rondas no filtra» (`feat/inicio-enterprise`): el demo tiene **289 rondas todas vencidas** (programadas

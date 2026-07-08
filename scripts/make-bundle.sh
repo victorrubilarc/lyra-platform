@@ -38,6 +38,19 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 STANDALONE="$REPO_ROOT/deploy/standalone"
 ONPREM="$REPO_ROOT/deploy/onprem"
 
+# Arquitectura objetivo del paquete. TODA imagen que entre al bundle debe calzar,
+# o se ABORTA: un digest de otra arquitectura (p.ej. el de MinIO copiado en arm64,
+# bug del 2026-07-08) reventaba recién en el host del cliente con un error críptico
+# de "platform mismatch". Aquí falla temprano, en el build, con un mensaje claro.
+EXPECTED_ARCH="${EXPECTED_ARCH:-amd64}"
+assert_arch() {  # $1 = imagen local ya presente
+  local got; got="$(docker image inspect --format '{{.Architecture}}' "$1" 2>/dev/null || echo '?')"
+  [ "$got" = "$EXPECTED_ARCH" ] || {
+    echo "❌ ARQUITECTURA: '$1' es '$got', se esperaba '$EXPECTED_ARCH'. Pin/imagen equivocada. Aborto." >&2
+    exit 1
+  }
+}
+
 # Herramienta `age` (cifrado de backups, E3) embarcada para la planta AIR-GAPPED:
 # el host de terreno cifra sus respaldos con la clave PÚBLICA del cliente y no
 # puede depender de internet para instalar age. Se descarga en tiempo de bundle
@@ -78,6 +91,7 @@ for img in $APP_IMAGES; do
     echo "  · pull $src"; docker pull "$src" >/dev/null
   fi
   echo "  · retag → $neutral"; docker tag "$src" "$neutral"
+  assert_arch "$neutral"
   echo "  · save  → images/$(basename "$neutral" | tr ':' '-').tar"
   docker save "$neutral" -o "$STAGE/images/lyra-watchlog-${img}-${TAG}.tar"
 done
@@ -92,6 +106,7 @@ for pin in $INFRA_PINS; do
     echo "  · pull $ref"; docker pull "$ref" >/dev/null
   fi
   echo "  · retag → $tag"; docker tag "$ref" "$tag"
+  assert_arch "$tag"
   fname="infra-$(echo "$tag" | tr '/:' '--').tar"
   echo "  · save  → images/$fname"
   docker save "$tag" -o "$STAGE/images/$fname"

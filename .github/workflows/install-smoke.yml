@@ -1,0 +1,42 @@
+name: Install smoke
+
+# Instala el PAQUETE OFFLINE real en un host LIMPIO (runner amd64) y verifica el
+# camino completo del cliente: make-bundle → install.sh (modo a y b) → health +
+# HTTPS (por hostname con SNI y por IP sin SNI). Guarda contra la clase de bugs de
+# la 1ª prueba piloto (edge/ mal ubicado, EDGE_MODE inline, MinIO arm64, default_sni).
+# Ver scripts/smoke-install.sh y docs/PRUEBA_PILOTO.md.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag de imágenes a instalar (ej: v0.1.20 o stable)'
+        default: 'stable'
+  push:
+    branches: [main]
+    paths:
+      - 'deploy/**'
+      - 'docker/**'
+      - 'scripts/make-bundle.sh'
+      - 'scripts/smoke-install.sh'
+      - '.github/workflows/install-smoke.yml'
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Login a GHCR (pull de las imágenes de la app)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Smoke de instalación (modo a + modo b · hostname + IP)
+        run: |
+          TAG="${{ github.event.inputs.tag }}"
+          SRC_PREFIX=ghcr.io/${{ github.repository_owner }}/ \
+            bash scripts/smoke-install.sh "${TAG:-stable}"
