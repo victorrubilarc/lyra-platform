@@ -164,7 +164,7 @@ if [ -f "$COSIGN_PUB" ]; then
   cp "$COSIGN_PUB" "$STAGE/cosign.pub"
 fi
 
-# ── 6) VERSION + SHA256SUMS de TODO ─────────────────────────────────────────
+# ── 6) VERSION + SHA256SUMS del PAYLOAD SELLADO ─────────────────────────────
 cat > "$STAGE/VERSION" <<EOF
 Lyra WatchLog — paquete de instalación offline
 version:    $TAG
@@ -173,8 +173,15 @@ images:     lyra-watchlog-{api,web,migrate}:$TAG (nombre neutro) + infra pineada
 verify:     cd al directorio y  sha256sum -c SHA256SUMS
 EOF
 
-echo "  · SHA256SUMS"
-( cd "$STAGE" && find . -type f ! -name SHA256SUMS | sort | xargs sha256sum > SHA256SUMS )
+# El SHA256SUMS sella el PAYLOAD INMUTABLE (imágenes, instalador, compose, scripts,
+# guía). Se EXCLUYE la config que el OPERADOR personaliza por sitio, que si no
+# rompería la verificación al editarla: `edge/` (Caddyfile: dominio/IP del cliente)
+# y `certs/` (cert corporativo que provee el cliente). No son código ni imágenes; su
+# autenticidad no es lo que protege la cadena de suministro. (bug del smoke 2026-07-08:
+# editar edge/Caddyfile.edge —como pide la guía en modo b— abortaba install.sh por
+# "SHA256SUMS no coincide"). El `.env` tampoco se sella (se genera en el host).
+echo "  · SHA256SUMS (payload sellado; excluye edge/ y certs/ = config del operador)"
+( cd "$STAGE" && find . -type f ! -name SHA256SUMS ! -path './edge/*' ! -path './certs/*' | sort | xargs sha256sum > SHA256SUMS )
 
 # ── 6-bis) FIRMA cosign del SHA256SUMS (E3, verificable OFFLINE) ─────────────
 # Como el SHA256SUMS sella TODO el contenido (imágenes + compose + instalador),
