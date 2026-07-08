@@ -132,7 +132,7 @@ Lo que queda del lado del **host** (responsabilidad del cliente/planta):
   (1) salvo política explícita del SOC.
 - **Cifrado at-rest del host (fuera de la app):** LUKS/dm-crypt para el disco/volumen de
   `pgdata` y `miniodata`. Es del **host**, no del contenedor; documentarlo en el runbook
-  del cliente. (Backups cifrados de la app = E3.)
+  del cliente. (Backups cifrados de la app = **✅ E3**, age asimétrico — ver "Backups CIFRADOS".)
 - **NTP interno + `machine-id` estable:** la huella de licencia (L1) usa `/etc/machine-id`
   del host (bind `:ro`); no regenerarlo. Hora sincronizada contra el NTP corporativo.
 - **EDR/antivirus del host:** excluir de escaneo en caliente los volúmenes `pgdata`/
@@ -269,23 +269,55 @@ git tag v1.0.0 && git push origin v1.0.0     # build → GHCR → deploy + rollb
 ## Notas importantes
 - **HTTPS / cookies:** el borde hace TLS; `COOKIE_SECURE=true` y `APP_PUBLIC_URL=https://lyra.watchlog.itesicws.com` son obligatorios. La API es same-origin (CORS off en prod).
 - **Migraciones:** corren en la imagen `migrate` (init container con Prisma CLI), NO en la imagen `api` (que se arma con `pnpm deploy --prod` sin el CLI).
-- **Datos persistentes:** volúmenes `pgdata`, `redisdata`, `miniodata` (de WatchLog, aislados). **Backup de Postgres ✅** (`deploy/onprem/backup.sh`): automático **antes de cada deploy** (bloqueante) + **cron diario 03:30**; restaurar con `pg_restore`. Para upgrades mayores, correrlo a mano primero (`bash onprem/backup.sh`).
+- **Datos persistentes:** volúmenes `pgdata`, `redisdata`, `miniodata` (de WatchLog, aislados). **Backup de Postgres ✅** (`deploy/onprem/backup.sh`, con **cifrado age opcional E3** — ver "Backups CIFRADOS"): automático **antes de cada deploy** (bloqueante) + **cron diario 03:30**; restaurar con `onprem/restore.sh`. Para upgrades mayores, correrlo a mano primero (`bash onprem/backup.sh`).
 - **Aislamiento:** WatchLog y ruta-bus NO comparten BD ni red `internal`; solo comparten el Caddy de borde vía la red `edge`.
 - **MinIO/SMTP:** MinIO interno (no expuesto). SMTP se administra en la app; el `.env` es solo fallback de arranque.
+
+### Backups CIFRADOS (age asimétrico — E3)
+En infra de un tercero, un `.dump` en claro **es la base de datos del cliente** legible con solo copiar el archivo. Con un
+destinatario **age** configurado, `backup.sh` cifra el respaldo (asimétrico: el host solo tiene la clave PÚBLICA; descifrar
+exige la identidad PRIVADA que **custodia el cliente FUERA del host**). Ceremonia una sola vez:
+```bash
+# 1) Generar el par (el binario 'age' viaja en el paquete offline: tools/age-keygen).
+./tools/age-keygen -o backup-identity.txt          # → contiene la identidad PRIVADA + el destinatario público
+grep 'public key' backup-identity.txt              # copia el  age1...  →  BACKUP_AGE_RECIPIENT del .env
+# 2) CUSTODIA backup-identity.txt fuera del host (gestor/USB). SIN ella los respaldos
+#    son IRRECUPERABLES. Luego BÓRRALA del host (el host solo necesita el destinatario).
+# 3) A partir de ahí, backup.sh escribe  watchlog_*.dump.age  (cifrado en el pipe, el claro nunca toca disco).
+```
+> En el EC2 demo/laboratorio se dejan en CLARO a propósito (no hay datos de cliente): sin `BACKUP_AGE_RECIPIENT`,
+> `backup.sh` avisa y sigue. La retención cubre `.dump` y `.dump.age`.
 
 ### Restaurar desde un backup (procedimiento)
 ```bash
 cd /opt/watchlog/deploy
-COMPOSE="docker compose -f docker-compose.prod.yml --env-file .env"
-DUMP="backups/watchlog_YYYYMMDD_HHMM.dump"            # elige el deseado (ls -lt backups/)
-# Inspeccionar SIN aplicar:
-$COMPOSE exec -T postgres sh -c 'pg_restore --list' < "$DUMP" | less
-# Restauración REAL (DESTRUCTIVA — sobre la BD viva): detén el api primero y usa --clean.
-# $COMPOSE stop api watchlog-web
-# $COMPOSE exec -T postgres sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --no-owner --no-acl' < "$DUMP"
-# $COMPOSE up -d
+# VERIFICACIÓN SEGURA (defecto): descifra (si aplica) y restaura a una BD DESCARTABLE, cuenta tablas y la borra.
+BACKUP_AGE_IDENTITY=/ruta/backup-identity.txt bash onprem/restore.sh --test backups/watchlog_YYYYMMDD_HHMM.dump.age
+# RESTAURACIÓN REAL sobre la BD viva (DESTRUCTIVA; pide confirmación escrita 'RESTAURAR'):
+# BACKUP_AGE_IDENTITY=/ruta/backup-identity.txt bash onprem/restore.sh --live backups/watchlog_*.dump.age
 ```
-> Para validar un dump sin riesgo, restáuralo a una BD descartable (`createdb watchlog_restore_test` → `pg_restore --schema-only -d watchlog_restore_test` → `dropdb`).
+> `restore.sh` autodetecta el stack (demo/prod ↔ standalone) y descifra con la identidad del cliente. Un dump en claro
+> (`.dump`) se restaura igual sin identidad. Inspección manual sin aplicar sigue disponible:
+> `$COMPOSE exec -T postgres sh -c 'pg_restore --list' < backups/watchlog_*.dump`.
+
+### Verificación de firma (cosign — E3)
+Para comprobar que una imagen/paquete **vino de ITESICWS y no fue alterado** (la pública está en el repo/paquete:
+`scripts/license/cosign/cosign.pub`; cosign **v2.x**):
+```bash
+# Paquete offline (planta, sin internet) — install.sh ya lo hace best-effort al instalar:
+cosign verify-blob --key cosign.pub --bundle SHA256SUMS.cosign.bundle --insecure-ignore-tlog=true SHA256SUMS
+# Imagen publicada por digest (auditor, con acceso al registro):
+cosign verify --key cosign.pub --insecure-ignore-tlog=true ghcr.io/<owner>/lyra-watchlog-api@sha256:<digest>
+```
+
+### Registro privado + tokens revocables (E3, auth-ready)
+Entrega de imágenes controlada por acceso sin registro self-hosted (la planta air-gapped no usa registro; recibe el tar):
+- **GHCR en visibilidad PRIVADA** (acción del dueño en GitHub → *Packages* → *Change visibility*). **⚠ GATED:** hacerlo sin
+  configurar login en los hosts que jalan (EC2) **rompe el auto-deploy**. Coordinar antes.
+- **Token READ-ONLY por socio/cliente** (revocable sin afectar a los demás): GitHub *fine-grained PAT* con permiso
+  **`read:packages`** (o *Packages: Read-only*), un token por socio. Revocar = borrar el PAT en GitHub.
+- **Config en el `.env`** del host que jala: `WL_REGISTRY_USER=<socio>` + `WL_REGISTRY_TOKEN=<pat>`; `update.sh` hace login
+  best-effort antes del pull (sin esas vars = registro público / sesión ya iniciada, flujo actual intacto).
 
 ## Distribución multi-cliente y actualización de flota (preparación de canal) 🔒
 > **Diseño registrado 2026-07-01 — NO construido aún.** Hoy el pipeline actualiza **UNA** instalación (el EC2

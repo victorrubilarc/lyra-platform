@@ -4,6 +4,59 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-08 · E3 "cadena de suministro verificable" (backups cifrados + SBOM + firma cosign) — decisiones (a)–(h) aprobadas antes de codificar
+Sesión `feat/e3-cadena-suministro` (E3 del programa "a prueba de balas", BACKLOG §2(4)/§2(6); tras H2/E4). Cierra el
+objetivo de `SECURITY §9.5`: que un cliente/auditor compruebe **sin confiar a ciegas** que la imagen/paquete (a) vino de
+ITESICWS y no fue alterado, (b) qué contiene, (c) que sus respaldos están cifrados. **Ningún cambio rompe el air-gap, el
+sello L5 ni la máquina de estados de licencia; ninguna clave privada entra al repo/imagen/.env.** Orden ejecutado
+(aprobado): (3) backups + (2) SBOM primero (bajo riesgo, valor de auditoría inmediato), (1) cosign al final.
+- **(a) cosign KEY-BASED, no keyless.** Keyless (Fulcio/Rekor/OIDC) exige internet ⇒ mata el air-gap. Con par propio se
+  firma `--tlog-upload=false` y se verifica `--insecure-ignore-tlog=true`, **100 % offline** (probado en vivo: "Verified
+  OK" auténtico, rechazo del manipulado). **Pin cosign v2.4.3** (v3 rompió `--tlog-upload=false`: exige signing-config sin
+  Rekor). Dos superficies: (i) imágenes GHCR firmadas **por DIGEST** (camino demo/prod con registro, firma como artefacto
+  OCI); (ii) **`sign-blob` sobre el `SHA256SUMS`** del paquete offline (camino air-gap: el SHA256SUMS ya sella cada tar de
+  imagen+compose+instalador ⇒ firmarlo = firmar el paquete entero, sin registro). Resuelve el gotcha H2 (`save/load` no
+  preserva RepoDigests): en air-gap la firma va sobre el ARTEFACTO/bundle, no por registro.
+- **(b) Clave PRIVADA de cosign = modelo L3.** Vive cifrada en `~/.lyra-license/cosign/cosign.key` (fuera del repo),
+  passphrase de alta entropía en el gestor; en CI como GitHub Secrets `COSIGN_PRIVATE_KEY` + `COSIGN_PASSWORD`. La PÚBLICA
+  (`scripts/license/cosign/cosign.pub`) SÍ se commitea (no es secreto) y viaja en el bundle. `.gitignore` endurecido
+  (`cosign.key`, `*.cosign.key`). **Sin el secret la firma se OMITE sin romper** (deuda registrada, igual que L1 antes de
+  L3): la ceremonia de keygen la ejecuta el dueño (`scripts/license/cosign/README.md`). En esta sesión NO se generó el par
+  PROD (custodia del dueño, como la de emisión): el flujo se validó con llaves desechables vía imagen cosign v2.4.3.
+- **(c) Verificación en el host = best-effort + verify del auditor.** `install.sh` (air-gap) verifica la firma sobre el
+  `SHA256SUMS` **antes** del `docker load` SI el host trae cosign; si no, avisa y documenta que el AUDITOR la verifica en
+  su estación (con internet/tooling) antes de traer el USB. `SHA256SUMS` sigue dando integridad siempre. NO se embarca el
+  binario cosign (a diferencia de age): la verificación es puntual (instalar), no continua. Descartado embarcar cosign
+  (+~100 MB y otra pieza que pinear) para una verificación que el auditor hace en su estación.
+- **(d) SBOM = Trivy `--format cyclonedx`** (ya en el pipeline; syft sería dependencia nueva sin ganancia). Un CycloneDX
+  JSON por imagen (7), en `dist/trivy/sbom/` ⇒ viaja al paquete (`SECURITY/sbom/`) **y** se adjunta suelto al GitHub
+  Release (`*-sbom.tar.gz`) para el auditor. Validado: CycloneDX 1.7 bien formado, 20 componentes en redis. `SBOM=false`
+  lo omite (gate rápido).
+- **(e) Backups cifrados = age ASIMÉTRICO.** El host cifra con la clave PÚBLICA (destinatario `age1…`); descifrar exige la
+  identidad PRIVADA que el **CLIENTE custodia FUERA del host** (modelo L3). Un disco/backup robado NO se descifra y un host
+  comprometido **no puede leer sus propios respaldos** (best practice). Descartado openssl simétrico (más simple pero un
+  host comprometido con la keyfile descifra) y gpg (gestión de llaves pesada). `age` es binario nuevo ⇒ **se embarca
+  estático (linux-amd64, v1.3.1, pin sha256) en el bundle** (`tools/age`), air-gap sin dependencia de red. Opt-in por
+  `BACKUP_AGE_RECIPIENT` en el `.env`: **sin destinatario ⇒ dump en CLARO + aviso** (retrocompat: demo/dev/EC2 intactos —
+  el EC2 no tiene datos de cliente). `restore.sh` NUEVO con modo `--test` (restaura a BD descartable y la borra, sin tocar
+  lo vivo) — probado el ciclo COMPLETO cifrar→descifrar→restaurar: **42/42 filas** íntegras; identidad equivocada FALLA.
+- **(f) App por DIGEST en demo/prod = verify-by-digest best-effort en `update.sh`**, NO hard-pin `@digest` en el compose.
+  Tras el `pull`, resuelve el RepoDigest real de cada imagen de app y `cosign verify` (best-effort: solo si cosign+pub
+  presentes; si el toolchain está y la firma FALLA, aborta el deploy). Da la MISMA garantía de integridad que un `@digest`
+  en el compose sin exigir reescribir el digest en cada release ni complicar el rollback. **Standalone air-gap sigue por
+  TAG** + verificación del bundle (gotcha `save/load`, §9.7-bis).
+- **(g) Registro privado = GHCR privado + tokens READ-ONLY revocables por socio/cliente, NO registro self-hosted.**
+  Objeción de honestidad técnica (aprobada): en un modelo de entrega por **tar air-gapped** la planta nunca contacta un
+  registro ⇒ un Harbor/Zot self-hosted es superficie y mantenimiento que el cliente final no usa. El tamaño correcto:
+  GHCR privado + `gh` fine-grained PAT read-only por socio (revocable sin afectar a los demás) + `update.sh` **auth-ready**
+  (login best-effort con `WL_REGISTRY_USER/WL_REGISTRY_TOKEN` del `.env`; sin ellos = flujo público actual intacto).
+  **El FLIP de visibilidad de GHCR es acción GATED del dueño** (rompería el auto-deploy del EC2 si se hace sin configurar
+  login): se entrega el modelo+runbook+código listo, no se ejecuta el flip. Registro self-hosted = upgrade futuro si un
+  cliente exige su propio mirror.
+- **(h) Tag v0.1.20 al cierre** (firma+SBOM se generan en CI con el secret; local se probó con llaves desechables). **El
+  tag auto-despliega el EC2 ⇒ se CONSULTA al dueño antes de pushear.** Pendiente EC2 de H2 (compose antiguo) sigue
+  AGENDADO (no se toca el EC2 esta sesión). Puertos de smoke ≥3413/8444 (no se usaron: E3 es scripts/CI, sin servidor).
+
 ### 2026-07-07 · H2 "CIS Docker + gate de suministro" (Tanda B) — decisiones (a)–(h) aprobadas antes de codificar
 Sesión `feat/h2-cis-hardening` (H2/E4 del programa "a prueba de balas", BACKLOG §2(5)/§2(6); tras E2). Endurecer el
 runtime de contenedores a estándar **CIS Docker Benchmark** + convertir Trivy en **gate real**, sin romper la ceremonia

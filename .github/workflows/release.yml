@@ -14,6 +14,10 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # HAS_COSIGN gobierna si se firma (sin el secret, la firma se omite sin romper).
+    # A nivel de job para que lo vean tanto el paso de instalar cosign como el de firmar.
+    env:
+      HAS_COSIGN: ${{ secrets.COSIGN_PRIVATE_KEY != '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -64,6 +68,7 @@ jobs:
         run: echo "iso=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
 
       - name: Build & push
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -80,6 +85,35 @@ jobs:
             VITE_APP_VERSION=${{ github.ref_name }}
             VITE_GIT_SHA=${{ github.sha }}
             VITE_BUILD_DATE=${{ steps.bd.outputs.iso }}
+
+      # Firma de imagen con cosign por DIGEST (E3 · cadena de suministro). Key-based
+      # (NO keyless): `--tlog-upload=false` ⇒ verificable OFFLINE con la pública
+      # committeada (scripts/license/cosign/README.md). La firma queda como artefacto
+      # OCI junto a la imagen en GHCR. GUARDADA por el secret: sin COSIGN_PRIVATE_KEY
+      # la firma se OMITE (deuda, como L1 antes de L3) y el release sigue. cosign v2.x
+      # (v3 rompió --tlog-upload=false). Ver docs/DECISIONS.md 2026-07-08 E3.
+      - name: Instalar cosign (v2, air-gap-compatible)
+        if: ${{ env.HAS_COSIGN == 'true' }}
+        uses: sigstore/cosign-installer@v3
+        with:
+          cosign-release: 'v2.4.3'
+      - name: Firmar la imagen por digest
+        if: ${{ env.HAS_COSIGN == 'true' }}
+        env:
+          COSIGN_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          if [ -z "$COSIGN_KEY" ]; then
+            echo "⏭  Sin COSIGN_PRIVATE_KEY — firma de imagen OMITIDA (deuda E3; completar ceremonia de custodia)."
+            exit 0
+          fi
+          printf '%s' "$COSIGN_KEY" > /tmp/cosign.key
+          IMG="ghcr.io/${{ github.repository_owner }}/lyra-watchlog-${{ matrix.name }}@${DIGEST}"
+          echo "▶ firmando $IMG"
+          cosign sign --yes --key /tmp/cosign.key --tlog-upload=false "$IMG"
+          rm -f /tmp/cosign.key
+          echo "✅ imagen firmada (verificable offline con la pública)."
 
   # ── GATE de vulnerabilidades (H2) ───────────────────────────────────────────
   # Escanea las imágenes recién publicadas con Trivy y BLOQUEA el release si queda
@@ -119,6 +153,9 @@ jobs:
   bundle:
     needs: [build, scan]
     runs-on: ubuntu-latest
+    # Firma del paquete offline (E3): igual que el build, gobernada por el secret.
+    env:
+      HAS_COSIGN: ${{ secrets.COSIGN_PRIVATE_KEY != '' }}
     permissions:
       contents: write   # crear/actualizar el Release y subir el asset
       packages: read     # pull de las imágenes recién publicadas
@@ -137,12 +174,32 @@ jobs:
         with:
           name: trivy-report
           path: dist/trivy/
-      - name: Generar paquete offline
+      # cosign para firmar el SHA256SUMS del paquete (sign-blob, verificable OFFLINE).
+      # Sin el secret, make-bundle omite la firma sin romper (deuda E3).
+      - name: Instalar cosign (v2, air-gap-compatible)
+        if: ${{ env.HAS_COSIGN == 'true' }}
+        uses: sigstore/cosign-installer@v3
+        with:
+          cosign-release: 'v2.4.3'
+      - name: Generar paquete offline (firmado si hay clave)
+        env:
+          COSIGN_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
         run: SRC_PREFIX=ghcr.io/${{ github.repository_owner }}/ bash scripts/make-bundle.sh ${{ github.ref_name }}
-      - name: Adjuntar el paquete al GitHub Release
+      # SBOM CycloneDX por imagen (E3): además de viajar DENTRO del paquete
+      # (SECURITY/sbom/), se adjunta suelto al Release para que el auditor del
+      # cliente lo descargue sin desempacar el bundle. Ver docs/SECURITY.md §9.1.
+      - name: Empaquetar SBOMs (CycloneDX) para el Release
+        run: |
+          if [ -d dist/trivy/sbom ]; then
+            tar -czf dist/lyra-watchlog-${{ github.ref_name }}-sbom.tar.gz -C dist/trivy sbom
+          fi
+      - name: Adjuntar paquete + SBOM al GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/lyra-watchlog-${{ github.ref_name }}.tar.gz
+          files: |
+            dist/lyra-watchlog-${{ github.ref_name }}.tar.gz
+            dist/lyra-watchlog-${{ github.ref_name }}-sbom.tar.gz
           fail_on_unmatched_files: true
 
   # ── Deploy automático al EC2 (máquina compartida con ruta-bus) ───────────────

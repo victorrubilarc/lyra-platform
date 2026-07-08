@@ -21,8 +21,11 @@ host **sin internet saliente**, sin `git clone` y **sin exponer código fuente**
 | `install.sh` | Instalador **idempotente offline**. |
 | `.env.example` | Plantilla de configuración (los secretos los genera el instalador). |
 | `INSTALL_OFFLINE.md` | Esta guía. |
-| `SECURITY/` | Reporte de vulnerabilidades (Trivy) de las imágenes empaquetadas. |
+| `SECURITY/` | Reporte de vulnerabilidades (Trivy) + **`sbom/`** (inventario CycloneDX por imagen, para tu auditor). |
+| `onprem/` | `backup.sh` + `restore.sh` (respaldo/restauración, con **cifrado age** opcional). |
+| `tools/` | `age` + `age-keygen` (cifrado de respaldos, estáticos; sin dependencia de red). |
 | `SHA256SUMS` | Hash de **todo** el contenido (el instalador lo verifica). |
+| `cosign.pub` + `SHA256SUMS.cosign.bundle` | Clave pública + **firma cosign** del manifiesto (autenticidad; presentes si la versión viene firmada). |
 | `VERSION` | Versión y fecha de build. |
 
 **Sin código fuente:** las imágenes vienen con el bundle sellado (anti-tamper L5)
@@ -145,20 +148,35 @@ Detalle completo en `docs/LICENSING.md`.
 
 ---
 
-## 10. Respaldo y restauración
+## 10. Respaldo y restauración (con cifrado age)
 
-- **Respaldo** (programar en cron del host): el `pg_dump -Fc` de arriba. Guarda
-  también los volúmenes `miniodata` (evidencias) si tu política lo exige.
-- **Restore** en una instalación limpia:
-  ```bash
-  cat backup_YYYYMMDD.dump | docker compose ... exec -T postgres \
-    sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists'
-  ```
-- El **branding** (logo) y la configuración viven en Postgres → un restore de la
-  BD reconstituye la identidad de la instalación.
+**Respaldos CIFRADOS (recomendado en producción).** Tus respaldos contienen TODA la
+base de datos. Cífralos con **age asimétrico**: el servidor solo tiene la clave PÚBLICA;
+descifrar exige la identidad PRIVADA que **tú custodias fuera del host**.
 
-> Cifrado at-rest del host (LUKS/dm-crypt para los volúmenes) y backups cifrados
-> son parte del hardening del host (guía H2); documentados aparte.
+```bash
+# Ceremonia (una sola vez):
+./tools/age-keygen -o backup-identity.txt      # identidad PRIVADA + destinatario público
+grep 'public key' backup-identity.txt          # copia el  age1...  →  BACKUP_AGE_RECIPIENT del .env
+#  ⚠ GUARDA backup-identity.txt fuera del host (gestor/USB). SIN ella, tus respaldos
+#     son IRRECUPERABLES. Bórrala del host tras custodiarla.
+
+# Respaldar (programar en cron del host):
+bash onprem/backup.sh                           # → backups/watchlog_*.dump.age (cifrado)
+
+# Restaurar — VERIFICACIÓN SEGURA (no toca los datos vivos):
+BACKUP_AGE_IDENTITY=/ruta/backup-identity.txt bash onprem/restore.sh --test backups/watchlog_*.dump.age
+# Restauración REAL sobre la BD viva (destructiva; confirma con 'RESTAURAR'):
+# BACKUP_AGE_IDENTITY=/ruta/backup-identity.txt bash onprem/restore.sh --live backups/watchlog_*.dump.age
+```
+
+- Sin `BACKUP_AGE_RECIPIENT`, `backup.sh` genera el dump **en claro** y avisa (válido en
+  laboratorio; **no** en producción con datos reales). Guarda también `miniodata`
+  (evidencias) si tu política lo exige.
+- El **branding** (logo) y la configuración viven en Postgres → un restore reconstituye
+  la identidad de la instalación.
+- **Cifrado at-rest del host** (LUKS/dm-crypt para los volúmenes) es del host; ver la
+  guía de hardening en `docs/DEPLOYMENT.md`.
 
 ---
 
@@ -169,6 +187,13 @@ Detalle completo en `docs/LICENSING.md`.
 - **Sin fuga de fuente:** las imágenes no contienen TypeScript (bundle sellado L5,
   `src/` borrado). El paquete no trae el repositorio.
 - **Vulnerabilidades conocidas:** el reporte Trivy de las imágenes va en
-  `SECURITY/` (regenerable con `scripts/scan-images.sh`).
-- **Firma criptográfica del paquete (cosign):** en el roadmap de cadena de
-  suministro (H2/E3); hoy la verificación es por SHA256.
+  `SECURITY/` (regenerable con `scripts/scan-images.sh`). El **SBOM CycloneDX**
+  por imagen (`SECURITY/sbom/`) es el inventario para tu auditor.
+- **Firma criptográfica del paquete (cosign — E3):** si el paquete trae `cosign.pub`
+  y `SHA256SUMS.cosign.bundle`, `install.sh` verifica la **autenticidad** (que vino de
+  ITESICWS y no fue alterado) antes de cargar las imágenes. Si este host no tiene el
+  binario `cosign`, la verificación se omite con aviso: verifícala en tu estación:
+  ```bash
+  cosign verify-blob --key cosign.pub --bundle SHA256SUMS.cosign.bundle \
+    --insecure-ignore-tlog=true SHA256SUMS       # cosign v2.x
+  ```

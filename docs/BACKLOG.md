@@ -5,10 +5,15 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-07-07 (H2)** — **🛡️ HARDENING H2 · CIS DOCKER + GATE ✅ (Tanda B/E4) ⇒ tag v0.1.19 (LOCAL, sin
-> pushear hasta OK)** (`feat/h2-cis-hardening`): contenedores non-root + read_only + cap_drop + pins de infra + Trivy GATE
-> en release.yml + `.trivyignore` justificado + doc iptables del host. Verificado en vivo (smoke mode-a/mode-b + docker
-> inspect + gate verde + 330/330). Detalle en §2(5) H2 y §2(6) E4. **Sigue: E3 (cosign + SBOM + backups cifrados).**
+> actualización: **2026-07-08 (E3)** — **🔗 E3 · CADENA DE SUMINISTRO VERIFICABLE ✅ ⇒ tag v0.1.20 (LOCAL, sin pushear
+> hasta OK — auto-despliega EC2)** (`feat/e3-cadena-suministro`): **backups CIFRADOS** age asimétrico (ciclo 42/42 filas) +
+> **SBOM CycloneDX** por imagen (paquete+Release) + **firma cosign** key-based offline v2.4.3 (imágenes GHCR por digest +
+> `sign-blob` del SHA256SUMS; verify install.sh best-effort + update.sh por digest) + **registro privado auth-ready**
+> (GHCR privado + PAT read-only revocable; flip = gated). Verde 330/330 + pruebas reales. Deuda: keygen PROD de cosign
+> (custodia del dueño). Detalle en §2(4)/§2(5)/§2(6). **Sigue: H3 enterprise (SIEM/AV/SSO/EDR) o cierre del programa
+> (pentest de tercero + security.txt + paquete de evidencia).**
+> _(anterior: **2026-07-07 (H2)** — 🛡️ HARDENING H2 · CIS DOCKER + GATE ✅ ⇒ tag v0.1.19; non-root + read_only +
+> cap_drop + pins + Trivy GATE + doc iptables. Detalle en §2(5) H2 y §2(6) E4.)_
 > _(anterior: **2026-07-06 (4)** — **🎨 OOBE S3 · BRANDING RUNTIME ✅ ⇒ ÉPICO §2(5) COMPLETO + §2(2) AVANZADO**_
 > (`feat/oobe-s3-branding`): la identidad configurada por el wizard por fin se VE, sin rebuild — `GET /api/branding`
 > **PÚBLICO y MÍNIMO** (5 claves cerradas: companyName/hasLogo/logoVersion/defaultThemeMode/whiteLabel; asserts
@@ -1004,14 +1009,13 @@ nunca queda más de una sesión atrás.
       minería) ~15–30 HH · **(3d) despliegue por ANILLOS (canary)**: actualizar 1–2 clientes conejillo → verificar →
       resto (NO los N de golpe). Recordatorio: migraciones `prisma migrate deploy` son **solo-hacia-adelante**; el
       rollback revierte imágenes, NO el esquema ⇒ el **backup pre-update es la red** (ya existe en `backup.sh`).
-- [ ] **(4) Distribución SEGURA / cadena de suministro** (~40–100 HH) 🔒 — **requisitos en `SECURITY.md` §9.** Software
-      que corre en infra ajena y lo despliega un tercero ⇒ blindar la cadena: **firma de imágenes** (cosign/Sigstore)
-      + **verificación de firma** en el host antes de correr · **pull por DIGEST fijo** (no solo por tag mutable,
-      reproducibilidad e integridad) · **registro privado** con credenciales/tokens **read-only por cliente**
-      (revocables) · **escaneo de vulnerabilidades** de imágenes (Trivy/Grype) **antes de publicar** + gate en CI ·
-      **SBOM** (CycloneDX) por release para auditoría del cliente · **backups cifrados** (hoy `pg_dump -Fc` sin
-      cifrar) · **secrets por instalación cifrados** en reposo · **TLS** en todo (ya vía Caddy). Objetivo: que un
-      cliente/auditor pueda **verificar** que la imagen que corre vino de ITESICWS y no fue alterada.
+- [x] **(4) Distribución SEGURA / cadena de suministro ✅ CERRADO 2026-07-08** (E3, `feat/e3-cadena-suministro`) —
+      requisitos en `SECURITY.md §9`: **firma cosign** key-based offline (v2.4.3, imágenes GHCR por digest + `sign-blob`
+      del SHA256SUMS del bundle) + **verificación en host** (install.sh best-effort + update.sh por digest) · **pull por
+      DIGEST** (infra en H2; app verificada por digest en E3) · **registro privado** GHCR + tokens read-only revocables
+      por socio (auth-ready; flip de visibilidad = acción gated del dueño) · **escaneo Trivy + gate CI** (H2) · **SBOM
+      CycloneDX** por release (E3) · **backups CIFRADOS** age asimétrico (E3) · secrets por instalación (install.sh) ·
+      TLS (Caddy). **Deuda:** ceremonia keygen del par PROD de cosign (custodia del dueño). Registro self-hosted diferido.
 - [ ] **(5) Hardening del stack de producción para distribución** (parte hereda deuda Fase 7) — `install.sh`
       idempotente (hoy bootstrap manual), healthcheck del `web`/borde, observabilidad/logs centralizados **opt-in por
       cliente** (sin sacar datos de la planta salvo consentimiento), `pull_policy`/digests fijos, límites de recursos
@@ -1073,9 +1077,12 @@ nunca queda más de una sesión atrás.
 >         con 7 CVE justificados, TODOS base/binario-Go-de-tercero(esbuild/postgres/minio)/MinIO-interno-no-alcanzable,
 >         0 de código de app:** perl `CVE-2026-42496`+`CVE-2026-8376`, zlib `CVE-2023-45853`, Go stdlib `CVE-2025-68121`,
 >         minio `CVE-2026-33186`/`-33322`/`-33419`. Un crítico NUEVO fuera de la lista BLOQUEA (revisión humana). Gate VERDE.
->   - [ ] **SBOM CycloneDX por release** (§9.1) + **backups CIFRADOS** (`pg_dump -Fc` hoy plano; §9.3) + doc de
->         **cifrado at-rest del host** (LUKS/dm-crypt para `pgdata`, es del host no de la app — documentarlo).
->   - [ ] **Firma de imágenes cosign + verificación en host + pull por DIGEST** (§9.1; núcleo de §2(4)).
+>   - [x] **SBOM CycloneDX por release** (§9.1) + **backups CIFRADOS** (§9.3) — **✅ CERRADO en E3 2026-07-08**
+>         (`feat/e3-cadena-suministro`): SBOM CycloneDX por imagen (Trivy) al paquete+Release; backups age asimétrico
+>         (`backup.sh`/`restore.sh`, ciclo 42/42 filas). Doc de cifrado at-rest del host (LUKS) en DEPLOYMENT §host.
+>   - [x] **Firma de imágenes cosign + verificación en host + pull por DIGEST** (§9.1) — **✅ CERRADO en E3 2026-07-08**:
+>         key-based offline (v2.4.3), imágenes GHCR por digest + `sign-blob` del SHA256SUMS del bundle, verify en
+>         install.sh (best-effort) y update.sh (por digest). Ceremonia de keygen PROD = pendiente del dueño (deuda como L1 pre-L3).
 > - [ ] **(H3 · Tanda C — enterprise / integración corporativa, ~25–50 HH) — por cliente, cuando aparezca el requisito:**
 >   - [ ] **Integración SIEM** (documentar + probar logging driver Docker syslog/gelf al colector del cliente; eventos
 >         de seguridad específicos: N logins fallidos, cambio de licencia, acceso denegado repetido) — la app ya loguea
@@ -1111,8 +1118,15 @@ nunca queda más de una sesión atrás.
             **🔴 Fix de la fuga real:** la imagen `migrate` (`FROM build`) filtraba frontend + `packages/*/src` + llave DEV
             en claro ⇒ poda agresiva del stage `migrate` + strip `prisma/*.ts` del `api` (verificado 0 fuente Lyra fuera
             de node_modules). Probado local (up/seed/health/idempotencia :3411). Prueba contra VM air-gapped REAL = dueño.
-      - [ ] **E3 · Cadena de suministro** = ítem (4) completo (cosign + digest + Trivy gate CI + SBOM CycloneDX +
-            backups CIFRADOS + registry privado read-only por cliente).
+      - [x] **E3 · Cadena de suministro ✅ CERRADO 2026-07-08** (`feat/e3-cadena-suministro`, tag v0.1.20 pendiente
+            OK del dueño; decisiones a–h en DECISIONS): **firma cosign** key-based offline v2.4.3 (imágenes GHCR por
+            digest + `sign-blob` del SHA256SUMS del bundle; verify en install.sh best-effort + update.sh por digest) +
+            **SBOM CycloneDX** por imagen (Trivy → paquete `SECURITY/sbom/` + Release) + **backups CIFRADOS** age
+            asimétrico (`backup.sh`/`restore.sh`, `age` en el bundle; ciclo 42/42 filas) + **registro privado auth-ready**
+            (GHCR privado + PAT read-only revocable por socio; `update.sh` login best-effort; flip de visibilidad =
+            acción GATED del dueño). Trivy gate CI ya venía de H2. **Deuda:** ceremonia de keygen del par PROD de cosign
+            (custodia del dueño, como la de emisión L3; sin ella el pipeline OMITE la firma sin romper). Registro
+            self-hosted DIFERIDO (la planta air-gapped no usa registro; upgrade si un cliente exige su mirror).
       - [x] **E4 · Hardening de contenedores/host (CIS Docker Benchmark) ✅ CERRADO 2026-07-07** (= H2 de §2(5), detalle
             arriba; `feat/h2-cis-hardening`, tag v0.1.19, decisiones a–h en DECISIONS): `USER` non-root en los 3
             Dockerfiles + `read_only`+`tmpfs`+`no-new-privileges`+`cap_drop:[ALL]`(+cap_add mínimo) en compose standalone

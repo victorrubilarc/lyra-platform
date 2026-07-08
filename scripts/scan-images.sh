@@ -63,12 +63,21 @@ trivy() {
     aquasec/trivy:latest "$@"
 }
 
+# SBOM CycloneDX por imagen (E3): inventario de dependencias entregable al AUDITOR
+# del cliente. Reusa Trivy (ya montado), formato estándar CycloneDX JSON. Se generan
+# en dist/trivy/sbom/ y viajan al paquete offline (make-bundle → SECURITY/sbom/) y al
+# GitHub Release. SBOM=false los omite (p.ej. un gate rápido que solo mide criticales).
+SBOM="${SBOM:-true}"
+SBOM_DIR="$OUT/sbom"
+[ "$SBOM" = true ] && mkdir -p "$SBOM_DIR"
+
 SUMMARY="$OUT/SUMMARY.md"
 {
   echo "# Reporte Trivy — Lyra WatchLog $TAG"
   echo
   echo "Escaneo de vulnerabilidades (SO + librerías) de las imágenes del paquete."
   echo "Severidades CRITICAL/HIGH/MEDIUM. Generado con \`aquasec/trivy\`."
+  [ "$SBOM" = true ] && echo "SBOM CycloneDX por imagen en \`sbom/\` (inventario para auditoría)."
   echo
   echo "| Imagen | CRÍTICO | ALTO | MEDIO |"
   echo "|---|---:|---:|---:|"
@@ -84,6 +93,11 @@ for img in $IMAGES; do
   # JSON para conteo/auditoría.
   trivy image --scanners vuln --severity CRITICAL,HIGH,MEDIUM --no-progress \
     --format json --output "/out/trivy-${safe}.json" "$img" || true
+  # SBOM CycloneDX (inventario COMPLETO de componentes, no solo lo vulnerable).
+  if [ "$SBOM" = true ]; then
+    trivy image --format cyclonedx --no-progress \
+      --output "/out/sbom/${safe}.cdx.json" "$img" || true
+  fi
   # Conteo por severidad desde el JSON. El `|| true` evita que grep (exit 1 cuando
   # hay CERO coincidencias) mate el script bajo `set -o pipefail`.
   count() { { grep -o "\"Severity\": *\"$2\"" "$1" 2>/dev/null || true; } | wc -l | tr -d ' '; }

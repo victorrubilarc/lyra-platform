@@ -52,3 +52,13 @@ docker/volumes/
 prod-private*
 .lyra-license/
 ledger.jsonl
+
+# Firma de imágenes (E3 · cosign): la clave PRIVADA de firma vive FUERA del repo
+# (~/.lyra-license/cosign/) y como GitHub Secret; JAMÁS committeada. La PÚBLICA
+# (cosign.pub) SÍ va al repo — no es secreto, sirve para verificar. Red de seguridad:
+cosign.key
+*.cosign.key
+# Backups cifrados (E3 · age): la identidad PRIVADA la custodia el CLIENTE fuera
+# del host; si alguna quedara en el árbol por error, no debe committearse.
+backup-identity*.txt
+*.age
