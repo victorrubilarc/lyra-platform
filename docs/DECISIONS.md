@@ -57,6 +57,17 @@ sello L5 ni la máquina de estados de licencia; ninguna clave privada entra al r
   tag auto-despliega el EC2 ⇒ se CONSULTA al dueño antes de pushear.** Pendiente EC2 de H2 (compose antiguo) sigue
   AGENDADO (no se toca el EC2 esta sesión). Puertos de smoke ≥3413/8444 (no se usaron: E3 es scripts/CI, sin servidor).
 
+**CEREMONIA EJECUTADA (2026-07-08, cierre) — realiza (b) y (h):** completada la ceremonia de custodia del par cosign de
+PRODUCCIÓN (no es una decisión nueva, es la ejecución de (b)+(h) ya aprobadas). Par **cosign v2.4.3** generado vía imagen
+Docker `gcr.io/projectsigstore/cosign:v2.4.3` en la máquina del dueño → `~/.lyra-license/cosign/` FUERA del repo; privada
+cifrada con passphrase `openssl rand -base64 32` (custodia del dueño en su gestor + Secret `COSIGN_PASSWORD`). Solo la
+pública committeada (`scripts/license/cosign/cosign.pub`); `cosign.key` NUNCA tocó el árbol. Secrets `COSIGN_PRIVATE_KEY`
++ `COSIGN_PASSWORD` cargados. **Tag v0.1.20 pusheado con OK explícito del dueño** ⇒ `release.yml` **success** (6 jobs;
+firma por digest ✓, gate Trivy ✓, bundle firmado+SBOM ✓, deploy EC2 ✓). **Verificación real:** 3/3 imágenes por digest
+válidas vs `cosign.pub`; paquete offline `verify-blob` con `--network none` = "Verified OK"; prueba negativa (SHA256SUMS
+alterado) = rechazado; 7/7 SBOM CycloneDX 1.7. Gotcha operativo: GHCR privado ⇒ `cosign verify` con
+`--registry-username/--registry-password` (el `--registry-token` pasa el PAT como Bearer y GHCR lo rechaza).
+
 ### 2026-07-07 · H2 "CIS Docker + gate de suministro" (Tanda B) — decisiones (a)–(h) aprobadas antes de codificar
 Sesión `feat/h2-cis-hardening` (H2/E4 del programa "a prueba de balas", BACKLOG §2(5)/§2(6); tras E2). Endurecer el
 runtime de contenedores a estándar **CIS Docker Benchmark** + convertir Trivy en **gate real**, sin romper la ceremonia

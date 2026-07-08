@@ -5,13 +5,17 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-07-08 (E3)** — **🔗 E3 · CADENA DE SUMINISTRO VERIFICABLE ✅ ⇒ tag v0.1.20 (LOCAL, sin pushear
-> hasta OK — auto-despliega EC2)** (`feat/e3-cadena-suministro`): **backups CIFRADOS** age asimétrico (ciclo 42/42 filas) +
-> **SBOM CycloneDX** por imagen (paquete+Release) + **firma cosign** key-based offline v2.4.3 (imágenes GHCR por digest +
-> `sign-blob` del SHA256SUMS; verify install.sh best-effort + update.sh por digest) + **registro privado auth-ready**
-> (GHCR privado + PAT read-only revocable; flip = gated). Verde 330/330 + pruebas reales. Deuda: keygen PROD de cosign
-> (custodia del dueño). Detalle en §2(4)/§2(5)/§2(6). **Sigue: H3 enterprise (SIEM/AV/SSO/EDR) o cierre del programa
-> (pentest de tercero + security.txt + paquete de evidencia).**
+> actualización: **2026-07-08 (cierre)** — **🔏 CEREMONIA cosign PROD + PRIMER RELEASE FIRMADO ✅ ⇒ tag v0.1.20 PUSHEADO**:
+> completada la ceremonia de custodia del par cosign de PRODUCCIÓN (keygen v2.4.3 vía Docker, privada cifrada en
+> `~/.lyra-license/cosign/` FUERA del repo; pública committeada; Secrets `COSIGN_PRIVATE_KEY`/`COSIGN_PASSWORD` cargados).
+> Tag v0.1.20 pusheado con OK del dueño ⇒ `release.yml` **success** (build+firma por digest · gate Trivy · bundle firmado+SBOM ·
+> deploy EC2). **Prueba de fuego REAL:** 3/3 imágenes verifican por digest vs `cosign.pub`, paquete offline `verify-blob`
+> = "Verified OK" con `--network none`, prueba negativa (SHA256SUMS alterado) rechazada, 7/7 SBOM CycloneDX 1.7 adjuntos.
+> **Deuda de E3 CERRADA.** **Sigue: H3 enterprise (SIEM/AV/SSO/EDR) o cierre del programa (pentest de tercero +
+> security.txt + paquete de evidencia).** El pendiente EC2 de H2 sigue AGENDADO.
+> _(anterior: **2026-07-08 (E3)** — 🔗 E3 · CADENA DE SUMINISTRO VERIFICABLE ✅ ⇒ tag v0.1.20 (backups CIFRADOS age
+> asimétrico ciclo 42/42 + SBOM CycloneDX + firma cosign key-based offline v2.4.3 + registro privado auth-ready).
+> Detalle en §2(4)/§2(5)/§2(6).)_
 > _(anterior: **2026-07-07 (H2)** — 🛡️ HARDENING H2 · CIS DOCKER + GATE ✅ ⇒ tag v0.1.19; non-root + read_only +
 > cap_drop + pins + Trivy GATE + doc iptables. Detalle en §2(5) H2 y §2(6) E4.)_
 > _(anterior: **2026-07-06 (4)** — **🎨 OOBE S3 · BRANDING RUNTIME ✅ ⇒ ÉPICO §2(5) COMPLETO + §2(2) AVANZADO**_
@@ -1015,7 +1019,9 @@ nunca queda más de una sesión atrás.
       DIGEST** (infra en H2; app verificada por digest en E3) · **registro privado** GHCR + tokens read-only revocables
       por socio (auth-ready; flip de visibilidad = acción gated del dueño) · **escaneo Trivy + gate CI** (H2) · **SBOM
       CycloneDX** por release (E3) · **backups CIFRADOS** age asimétrico (E3) · secrets por instalación (install.sh) ·
-      TLS (Caddy). **Deuda:** ceremonia keygen del par PROD de cosign (custodia del dueño). Registro self-hosted diferido.
+      TLS (Caddy). **Deuda CERRADA 2026-07-08:** ceremonia keygen del par PROD de cosign ✅ (par v2.4.3 generado fuera del
+      repo, Secrets cargados, **primer release v0.1.20 FIRMADO y verificado de verdad** — 3/3 imágenes por digest +
+      paquete offline `verify-blob` con `--network none` + prueba negativa rechazada). Registro self-hosted diferido.
 - [ ] **(5) Hardening del stack de producción para distribución** (parte hereda deuda Fase 7) — `install.sh`
       idempotente (hoy bootstrap manual), healthcheck del `web`/borde, observabilidad/logs centralizados **opt-in por
       cliente** (sin sacar datos de la planta salvo consentimiento), `pull_policy`/digests fijos, límites de recursos
@@ -1118,14 +1124,16 @@ nunca queda más de una sesión atrás.
             **🔴 Fix de la fuga real:** la imagen `migrate` (`FROM build`) filtraba frontend + `packages/*/src` + llave DEV
             en claro ⇒ poda agresiva del stage `migrate` + strip `prisma/*.ts` del `api` (verificado 0 fuente Lyra fuera
             de node_modules). Probado local (up/seed/health/idempotencia :3411). Prueba contra VM air-gapped REAL = dueño.
-      - [x] **E3 · Cadena de suministro ✅ CERRADO 2026-07-08** (`feat/e3-cadena-suministro`, tag v0.1.20 pendiente
-            OK del dueño; decisiones a–h en DECISIONS): **firma cosign** key-based offline v2.4.3 (imágenes GHCR por
+      - [x] **E3 · Cadena de suministro ✅ CERRADO 2026-07-08 (tag v0.1.20 PUSHEADO + PRIMER RELEASE FIRMADO)**
+            (`feat/e3-cadena-suministro`; decisiones a–h en DECISIONS): **firma cosign** key-based offline v2.4.3 (imágenes GHCR por
             digest + `sign-blob` del SHA256SUMS del bundle; verify en install.sh best-effort + update.sh por digest) +
             **SBOM CycloneDX** por imagen (Trivy → paquete `SECURITY/sbom/` + Release) + **backups CIFRADOS** age
             asimétrico (`backup.sh`/`restore.sh`, `age` en el bundle; ciclo 42/42 filas) + **registro privado auth-ready**
             (GHCR privado + PAT read-only revocable por socio; `update.sh` login best-effort; flip de visibilidad =
-            acción GATED del dueño). Trivy gate CI ya venía de H2. **Deuda:** ceremonia de keygen del par PROD de cosign
-            (custodia del dueño, como la de emisión L3; sin ella el pipeline OMITE la firma sin romper). Registro
+            acción GATED del dueño). Trivy gate CI ya venía de H2. **Deuda CERRADA 2026-07-08 (cierre):** ceremonia de
+            keygen del par PROD de cosign ✅ (par v2.4.3 generado en la máquina del dueño FUERA del repo, Secrets cargados;
+            v0.1.20 pusheado con OK ⇒ release **success**; verificado de verdad: 3/3 imágenes por digest + paquete offline
+            `verify-blob` con `--network none` "Verified OK" + prueba negativa rechazada + 7/7 SBOM CycloneDX 1.7). Registro
             self-hosted DIFERIDO (la planta air-gapped no usa registro; upgrade si un cliente exige su mirror).
       - [x] **E4 · Hardening de contenedores/host (CIS Docker Benchmark) ✅ CERRADO 2026-07-07** (= H2 de §2(5), detalle
             arriba; `feat/h2-cis-hardening`, tag v0.1.19, decisiones a–h en DECISIONS): `USER` non-root en los 3
