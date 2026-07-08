@@ -68,7 +68,7 @@ TARBALL="$OUTPUT_DIR/lyra-watchlog-$TAG.tar.gz"
 
 echo "▶ make-bundle $TAG  (src=$SRC_PREFIX  pull=$PULL)"
 rm -rf "$STAGE"
-mkdir -p "$STAGE/images" "$STAGE/compose/edge" "$STAGE/SECURITY" "$STAGE/onprem" "$STAGE/tools"
+mkdir -p "$STAGE/images" "$STAGE/compose" "$STAGE/edge" "$STAGE/SECURITY" "$STAGE/onprem" "$STAGE/tools"
 
 # ── 1) Imágenes de la app: pull (opcional) → retag NEUTRO → save ─────────────
 for img in $APP_IMAGES; do
@@ -98,11 +98,17 @@ for pin in $INFRA_PINS; do
 done
 
 # ── 3) Compose standalone (H1) + borde, tal cual ────────────────────────────
+# Los .yml van bajo compose/ (se referencian con -f compose/…). El directorio
+# edge/ va en la RAÍZ del paquete (NO bajo compose/): las rutas de bind del
+# compose son `./edge/Caddyfile.edge` y `./certs`, relativas al PROJECT-DIRECTORY
+# que install.sh fija en la raíz del paquete (igual que ./license y ./certs). Si
+# edge/ quedara bajo compose/, el modo (b) montaría una ruta inexistente y Caddy
+# no cargaría su config (bug corregido 2026-07-08).
 cp "$STANDALONE/docker-compose.yml"        "$STAGE/compose/"
 cp "$STANDALONE/mode-a.behind-proxy.yml"   "$STAGE/compose/"
 cp "$STANDALONE/mode-b.own-edge.yml"       "$STAGE/compose/"
-cp "$STANDALONE/edge/Caddyfile.edge"                "$STAGE/compose/edge/"
-cp "$STANDALONE/edge/nginx-watchlog.conf.example"   "$STAGE/compose/edge/"
+cp "$STANDALONE/edge/Caddyfile.edge"                "$STAGE/edge/"
+cp "$STANDALONE/edge/nginx-watchlog.conf.example"   "$STAGE/edge/"
 
 # ── 4) Instalador + plantilla de entorno + guía ─────────────────────────────
 cp "$STANDALONE/install.sh"                "$STAGE/install.sh"

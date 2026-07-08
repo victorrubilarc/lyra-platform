@@ -2458,6 +2458,18 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
 
 > Items con fundamento ya discutidos; aquí para que no se diluyan en `DECISIONS.md`.
 
+### BUG empaquetado · modo (b) borde: `edge/` anidado bajo `compose/` (corregido 2026-07-08)
+> Detectado durante la 1ª prueba piloto real (VM cliente, v0.1.20). `make-bundle.sh` copiaba
+> `edge/Caddyfile.edge` a `$STAGE/compose/edge/`, pero los binds del compose son `./edge/Caddyfile.edge`
+> relativos al PROJECT-DIRECTORY que `install.sh` fija en la RAÍZ del paquete (igual que `./certs` y
+> `./license`). Efecto: en modo (b) del BUNDLE, Caddy-edge montaba una ruta inexistente ⇒ no cargaba
+> config (la API quedaba sana pero el navegador no llegaba). **Nunca se detectó antes** porque mode-b se
+> probó solo desde `deploy/standalone/` (repo, donde `edge/` sí está junto al compose) y el smoke de
+> install.sh usó mode-a (sin borde). **Fix:** `make-bundle.sh` ahora deja `edge/` en la raíz del paquete.
+> **Aplica a v0.1.21+**; el bundle v0.1.20 ya distribuido necesita el workaround manual
+> (`mkdir -p edge && cp compose/edge/Caddyfile.edge edge/`), documentado en `docs/PRUEBA_PILOTO.md §6.2`.
+> **TODO:** un smoke de install.sh en **mode-b desde el bundle** (no solo desde el repo) para blindar esto.
+
 ### DATA demo · Rondas del seed 100% vencidas (2026-07-03)
 > Detectado al revisar «Mis rondas no filtra» (`feat/inicio-enterprise`): el demo tiene **289 rondas todas vencidas** (programadas
 > el 16-jun; a 3-jul = 17 días atrás). NO es bug de la pantalla: el horizonte acota solo lo que VIENE y las vencidas siempre se

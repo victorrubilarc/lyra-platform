@@ -192,10 +192,19 @@ chmod 600 certs/key.pem
 
 ### 6.2 Dile a la app su dirección (edita el borde)
 
-🐧 **EN EL SERVIDOR (bash):** (reemplaza `IP_DEL_SERVIDOR`)
+🐧 **EN EL SERVIDOR (bash):** primero asegura que exista el archivo del borde en la raíz
+del paquete (en el paquete v0.1.20 viene bajo `compose/edge/`; este comando lo deja en su
+sitio correcto — es inofensivo repetirlo):
+```bash
+mkdir -p edge
+[ -f edge/Caddyfile.edge ] || cp compose/edge/Caddyfile.edge edge/Caddyfile.edge
+```
+Ahora escribe tu IP en la config del borde (reemplaza `IP_DEL_SERVIDOR`):
 ```bash
 sed -i "s/watchlog\.planta\.cliente\.local/IP_DEL_SERVIDOR/g" edge/Caddyfile.edge
+grep IP_DEL_SERVIDOR edge/Caddyfile.edge      # comprueba: deben salir 2 líneas con tu IP
 ```
+- ✅ **Deberías ver** dos líneas con tu IP (una `http://` y una `https://`).
 
 ### 6.3 Completa el archivo de configuración `.env`
 
