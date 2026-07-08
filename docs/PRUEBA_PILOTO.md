@@ -69,12 +69,20 @@ docker version && docker compose version               # verifica: Server + Comp
 
 ## 3. Fase 1 — Obtener y verificar el paquete (tu estación)
 
-1. Descarga el bundle offline del Release **v0.1.20** (repo `victorrubilarc/lyra-platform`):
-   - Desde la web del Release, o con `gh`:
+1. Descarga el bundle offline del Release **v0.1.20** (repo **privado** `victorrubilarc/lyra-platform`).
+   Elige una vía:
+   - **Navegador (la más simple, sin herramientas):** entra logueado a
+     `https://github.com/victorrubilarc/lyra-platform/releases/tag/v0.1.20` y baja el asset
+     **`lyra-watchlog-v0.1.20.tar.gz`** (~1.09 GB).
+   - **Con `gh` (requiere estar autenticado):**
      ```bash
+     gh auth login       # una vez, si no lo has hecho
      gh release download v0.1.20 --repo victorrubilarc/lyra-platform \
        --pattern "lyra-watchlog-v0.1.20.tar.gz"
      ```
+     > Si `gh` "no se reconoce" en PowerShell tras instalarlo, **reabre la consola** (el
+     > PATH se refresca al reiniciarla) o agrégalo a la sesión:
+     > `$env:Path += ";C:\Program Files\GitHub CLI"`.
 2. (Recomendado) **Verifica la firma** antes de moverlo — prueba que vino de ITESICWS y
    no fue alterado. Extrae los 3 archivos de firma y valida offline (con cosign nativo o
    por Docker):
