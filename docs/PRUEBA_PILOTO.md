@@ -208,20 +208,27 @@ grep IP_DEL_SERVIDOR edge/Caddyfile.edge      # comprueba: deben salir 2 líneas
 
 ### 6.3 Completa el archivo de configuración `.env`
 
-🐧 **EN EL SERVIDOR (bash):** abre el archivo con un editor de texto simple:
-```bash
-nano .env
-```
-Dentro del editor, busca y deja estas dos líneas así (reemplaza la IP):
-```
-EDGE_MODE=b
-APP_PUBLIC_URL=https://IP_DEL_SERVIDOR
-```
-Para **guardar y salir de `nano`**: presiona **Ctrl+O**, luego **Enter**, luego
-**Ctrl+X**.
+Hay que fijar **dos** valores en `.env`: el modo de borde (`b`) y la dirección pública.
+Lo más seguro es hacerlo con estos dos comandos (dejan cada línea **limpia, sin
+comentarios** — un comentario en la misma línea rompe el instalador):
 
-> Si `nano` no está en el servidor, usa `vi .env` (para guardar en vi: pulsa `Esc`,
-> escribe `:wq` y Enter). O instálalo: `sudo apt-get install -y nano`.
+🐧 **EN EL SERVIDOR (bash):** (reemplaza `IP_DEL_SERVIDOR` en el segundo comando)
+```bash
+sed -i 's/^EDGE_MODE=.*/EDGE_MODE=b/' .env
+sed -i 's#^APP_PUBLIC_URL=.*#APP_PUBLIC_URL=https://IP_DEL_SERVIDOR#' .env
+grep -E '^EDGE_MODE=|^APP_PUBLIC_URL=' .env
+```
+- ✅ El `grep` debe mostrar **exactamente** dos líneas, cada una con solo su valor:
+  ```
+  EDGE_MODE=b
+  APP_PUBLIC_URL=https://IP_DEL_SERVIDOR
+  ```
+  (sin ningún `#` ni texto extra después). Si ves un `#` al final, vuelve a correr los
+  dos `sed`.
+
+> **¿Prefieres editar a mano?** Puedes usar `nano .env`, pero entonces **borra el
+> comentario** de esas dos líneas (todo lo que va después del valor, incluido el `#`).
+> Guardar en `nano`: **Ctrl+O**, **Enter**, **Ctrl+X**.
 
 ---
 

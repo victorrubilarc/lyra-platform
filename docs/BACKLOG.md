@@ -2470,6 +2470,15 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
 > (`mkdir -p edge && cp compose/edge/Caddyfile.edge edge/`), documentado en `docs/PRUEBA_PILOTO.md §6.2`.
 > **TODO:** un smoke de install.sh en **mode-b desde el bundle** (no solo desde el repo) para blindar esto.
 
+### BUG install.sh · EDGE_MODE/APP_URL no ignoraban comentario inline del .env (corregido 2026-07-08)
+> También en la 1ª prueba piloto. `install.sh` leía `EDGE_MODE` con `cut -d= -f2 | tr -d space`, sin
+> descartar el comentario inline que la plantilla `.env` documenta en esa misma línea
+> (`EDGE_MODE=b   # a | b ← COMPLETAR`). Si el usuario fijaba el valor pero dejaba el comentario, el modo
+> se leía como `b#a|b←COMPLETAR` ⇒ "EDGE_MODE inválido". **Fix:** el parseo ahora hace
+> `sed 's/[[:space:]]#.*//'` antes de recortar (EDGE_MODE y APP_URL). Docker sí tolera el comentario inline
+> en `env_file` (compose reciente), por eso solo afectaba a las 2 variables que install.sh lee a mano.
+> Workaround para v0.1.20: `sed -i 's/^EDGE_MODE=.*/EDGE_MODE=b/' .env` (guía §6.3 ya usa sed en vez de nano).
+
 ### DATA demo · Rondas del seed 100% vencidas (2026-07-03)
 > Detectado al revisar «Mis rondas no filtra» (`feat/inicio-enterprise`): el demo tiene **289 rondas todas vencidas** (programadas
 > el 16-jun; a 3-jul = 17 días atrás). NO es bug de la pantalla: el horizonte acota solo lo que VIENE y las vencidas siempre se

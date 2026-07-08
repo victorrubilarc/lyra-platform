@@ -133,7 +133,11 @@ ok ".env presente y completo (secretos intactos)."
 
 # ── 6) Modo de borde → archivos de compose ───────────────────────────────────
 step "Modo de borde"
-EDGE_MODE="$(grep -E '^EDGE_MODE=' "$ENV" | head -1 | cut -d= -f2 | tr -d '[:space:]')"
+# Lee el valor tras el '=', DESCARTA un comentario inline ('  # …') y recorta
+# espacios: la plantilla .env documenta EDGE_MODE con un comentario en la misma
+# línea; sin este strip, dejarlo convierte el valor en 'b#a|b…' y el modo se
+# rechaza (bug detectado en la 1ª prueba piloto, 2026-07-08).
+EDGE_MODE="$(grep -E '^EDGE_MODE=' "$ENV" | head -1 | cut -d= -f2- | sed 's/[[:space:]]#.*//' | tr -d '[:space:]')"
 DC=(docker compose --project-directory "$HERE" --env-file "$ENV" -f "$COMPOSE_DIR/docker-compose.yml")
 case "$EDGE_MODE" in
   a) DC+=(-f "$COMPOSE_DIR/mode-a.behind-proxy.yml"); say "modo (a): detrás del proxy del cliente (loopback)";;
@@ -178,7 +182,7 @@ ok "API saludable."
 
 # ── 10) Próximos pasos ───────────────────────────────────────────────────────
 step "Instalación OK — próximos pasos"
-APP_URL="$(grep -E '^APP_PUBLIC_URL=' "$ENV" | head -1 | cut -d= -f2)"
+APP_URL="$(grep -E '^APP_PUBLIC_URL=' "$ENV" | head -1 | cut -d= -f2- | sed 's/[[:space:]]#.*//' | tr -d '[:space:]')"
 cat <<EOF
 
   1) LICENCIA (ceremonia air-gapped, ver INSTALL_OFFLINE.md):
