@@ -2479,6 +2479,19 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
 > en `env_file` (compose reciente), por eso solo afectaba a las 2 variables que install.sh lee a mano.
 > Workaround para v0.1.20: `sed -i 's/^EDGE_MODE=.*/EDGE_MODE=b/' .env` (guía §6.3 ya usa sed en vez de nano).
 
+### BUG 🔴 pin de MinIO en ARM64 (no amd64) — corregido 2026-07-08
+> El más grave de la 1ª prueba piloto. El digest pineado de `minio/minio:RELEASE.2025-09-07T16-13-09Z`
+> (`sha256:9966a92a…`) era la variante **linux/arm64**, no amd64 (postgres/redis/caddy sí estaban amd64 — se
+> copió mal solo el de minio, probablemente de la página de Docker Hub). Al pinear por DIGEST exacto,
+> `docker pull` trae ESA arquitectura sin importar el host ⇒ el bundle llevó minio ARM64 y en un host
+> amd64 minio da `Error` (platform mismatch) y el `api` queda **unhealthy** (el app crea/verifica el
+> bucket S3 al arrancar). **Digest amd64 correcto: `sha256:a1a8bd4ac40ad7881a245bab97323e18f971e4d4cba2c2007ec1bedd21cbaba2`.**
+> Corregido en **3 sitios**: `scripts/make-bundle.sh`, `deploy/docker-compose.prod.yml` (⚠ el EC2 no
+> reventó porque corre el compose viejo por TAG, no el pin) y `scripts/scan-images.sh`. **Aplica a
+> v0.1.21+**; para el bundle v0.1.20 el workaround (host con internet) = `docker pull minio/minio:RELEASE.2025-09-07T16-13-09Z`
+> + borrar `images/infra-minio-*.tar` + reejecutar install.sh. **TODO:** validar la ARQUITECTURA de cada
+> imagen del bundle en make-bundle (fallar si alguna ≠ amd64) — habría atajado esto en el build.
+
 ### DATA demo · Rondas del seed 100% vencidas (2026-07-03)
 > Detectado al revisar «Mis rondas no filtra» (`feat/inicio-enterprise`): el demo tiene **289 rondas todas vencidas** (programadas
 > el 16-jun; a 3-jul = 17 días atrás). NO es bug de la pantalla: el horizonte acota solo lo que VIENE y las vencidas siempre se
