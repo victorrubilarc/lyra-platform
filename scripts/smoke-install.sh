@@ -35,6 +35,23 @@ down() {  # $1 = dir, $2 = archivo de modo
   docker compose --project-directory "$1" --env-file "$1/.env" \
     -f "$1/compose/docker-compose.yml" -f "$1/compose/$2" down -v 2>/dev/null || true
 }
+dump_logs() {  # $1 = dir, $2 = archivo de modo — diagnóstico ante fallo
+  echo "······ estado de contenedores ······"
+  docker compose --project-directory "$1" --env-file "$1/.env" \
+    -f "$1/compose/docker-compose.yml" -f "$1/compose/$2" ps -a 2>&1 || true
+  echo "······ logs migrate ······"
+  docker compose --project-directory "$1" --env-file "$1/.env" \
+    -f "$1/compose/docker-compose.yml" -f "$1/compose/$2" logs --no-color --tail 60 migrate 2>&1 | tail -60 || true
+  echo "······ logs api ······"
+  docker compose --project-directory "$1" --env-file "$1/.env" \
+    -f "$1/compose/docker-compose.yml" -f "$1/compose/$2" logs --no-color --tail 80 api 2>&1 | tail -80 || true
+}
+install2() {  # $1 = dir, $2 = archivo de modo — 2ª pasada; vuelca logs si falla
+  local rc=0
+  ( cd "$1" && ./install.sh ) || rc=$?
+  [ "$rc" = 0 ] || { bad "install.sh (2ª pasada) falló (rc=$rc)"; dump_logs "$1" "$2"; }
+  return "$rc"
+}
 cleanup() {
   [ -d "$WORK/inst-a" ] && down "$WORK/inst-a" mode-a.behind-proxy.yml
   [ -d "$WORK/inst-b" ] && down "$WORK/inst-b" mode-b.own-edge.yml
@@ -65,11 +82,12 @@ sed -i 's/^EDGE_MODE=.*/EDGE_MODE=a/'                       "$A/.env"
 sed -i 's#^APP_PUBLIC_URL=.*#APP_PUBLIC_URL=http://127.0.0.1:8080#' "$A/.env"
 sed -i 's/^EDGE_LOCAL_PORT=.*/EDGE_LOCAL_PORT=8080/'        "$A/.env"
 sudo chown -R 1000:1000 "$A/license" 2>/dev/null || true
-( cd "$A" && ./install.sh )
-if curl -sf -o /dev/null --max-time 15 http://127.0.0.1:8080/api/health; then
-  ok "MODO A: /api/health responde 200"
-else
-  bad "MODO A: /api/health NO respondió"
+if install2 "$A" mode-a.behind-proxy.yml; then
+  if curl -sf -o /dev/null --max-time 15 http://127.0.0.1:8080/api/health; then
+    ok "MODO A: /api/health responde 200"
+  else
+    bad "MODO A: /api/health NO respondió"; dump_logs "$A" mode-a.behind-proxy.yml
+  fi
 fi
 down "$A" mode-a.behind-proxy.yml
 
@@ -87,7 +105,10 @@ sed -i "/auto_https off/a default_sni $HOSTN"        "$B/edge/Caddyfile.edge"
 sed -i 's/^EDGE_MODE=.*/EDGE_MODE=b/'                "$B/.env"
 sed -i "s#^APP_PUBLIC_URL=.*#APP_PUBLIC_URL=https://$HOSTN#" "$B/.env"
 sudo chown -R 1000:1000 "$B/license" "$B/certs" "$B/edge" 2>/dev/null || true
-( cd "$B" && ./install.sh )
+if ! install2 "$B" mode-b.own-edge.yml; then
+  down "$B" mode-b.own-edge.yml
+  say "RESULTADO DEL SMOKE"; printf '\033[31m✗ SMOKE: falló la instalación modo b\033[0m\n'; exit 1
+fi
 # (a) por HOSTNAME → el cliente manda SNI → Caddy matchea el sitio.
 if curl -sk -o /dev/null --max-time 15 --resolve "$HOSTN:443:127.0.0.1" "https://$HOSTN/api/health"; then
   ok "MODO B: HTTPS por hostname (con SNI) responde 200"
