@@ -2494,6 +2494,10 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
 > **✅ HECHO 2026-07-08:** `make-bundle.sh` ahora hace `assert_arch` por imagen (aborta si ≠ `EXPECTED_ARCH`, def. amd64).
 
 ### PROGRAMA "instalación limpia y sin errores" (raíz de los 4 bugs del piloto) — 2026-07-08
+> **▶ PRÓXIMA SESIÓN (decidido por el dueño 2026-07-08): AMBOS — (1) `install.sh` autoreparable + `doctor`, LUEGO
+> (2) track Windows.** Orden: el instalador autoreparable va PRIMERO (el `install.ps1`/WSL2 de Windows debe reflejar su
+> comportamiento final, no rehacerse después); cada uno extiende el smoke (`install-smoke.yml`). Si el contexto se llena,
+> consolidar tras terminar (1) y abrir sesión nueva para (2).
 > La causa común de los 4 bugs fue **que el camino del paquete offline nunca se ejecutó de punta a punta en una máquina
 > limpia**. Decisiones y plan tras la 1ª prueba piloto real (dueño 2026-07-08):
 > - **Matriz de plataformas SOPORTADA (decidida por el dueño):** **Linux x86-64** (Ubuntu 22.04/24.04, Debian 12, RHEL/Rocky
