@@ -1,295 +1,362 @@
-# Lyra WatchLog — Guía de PRUEBA PILOTO en una VM Linux desnuda
+# Guía para principiantes — Probar Lyra WatchLog en un servidor
 
-Objetivo: instalar Lyra WatchLog **v0.1.20** en el servidor de un *cliente de prueba*
-(una VM Linux sin nada instalado) y **verlo funcionando** de punta a punta, para
-comprobar la eficacia de todo lo construido (paquete offline firmado, endurecimiento
-CIS, ceremonia de licencia air-gapped, primer arranque `/setup`).
+Esta guía te lleva **de la mano**, paso por paso, para instalar Lyra WatchLog en un
+servidor Linux de prueba y **verlo funcionando en el navegador**. No necesitas ser
+experto: solo copiar y pegar los comandos **en el lugar correcto**.
 
-> **Alcance.** Esto es una **prueba/piloto controlado**, no un go-live productivo en
-> una planta real (eso exige el pentest de tercero + paquete de evidencia, pendiente
-> del programa "a prueba de balas"). Para una demo/piloto interno es exactamente el
-> camino previsto por el paquete air-gapped (E2/E3).
-
-Referencias: `docs/INSTALL_OFFLINE.md` (guía canónica), `docs/DEPLOYMENT.md`
-(runbook), `docs/LICENSING.md` / `docs/LICENSING_PROCEDURE.md` (ceremonia de licencia),
-`deploy/standalone/README.md` (modos de borde y matriz de puertos).
+> **¿Para qué sirve esta prueba?** Comprobar, en una máquina real de un cliente de
+> prueba, que todo lo construido funciona: el instalador, la seguridad, la licencia y la
+> aplicación. Es un **piloto de demostración**, no todavía una puesta en producción
+> definitiva (eso viene después, con la auditoría de seguridad externa).
 
 ---
 
-## 0. Mapa del piloto (quién hace qué)
+## 🧭 Lo mínimo que debes entender antes de empezar
 
-Participan **dos máquinas**:
+Vas a trabajar con **dos computadores**:
 
-| Máquina | Rol | Necesita internet |
+1. **TU PC** — tu computador Windows de siempre. Desde aquí descargas el instalador,
+   te conectas al servidor y (si eres el dueño) generas la licencia.
+2. **EL SERVIDOR** — la máquina Linux del cliente de prueba, "en la nube" o en su red.
+   No tiene pantalla ni mouse para ti: la controlas **escribiendo comandos** desde tu PC
+   a través de una conexión llamada **SSH** (como un control remoto por texto).
+
+Cada comando de esta guía tiene una **etiqueta de color** que te dice dónde escribirlo:
+
+| Etiqueta | Dónde y cómo |
+|---|---|
+| 💻 **EN TU PC (PowerShell)** | En tu Windows. Abre el menú Inicio, escribe **PowerShell**, ábrelo. |
+| 🐧 **EN EL SERVIDOR (bash)** | Dentro del servidor Linux, **después de conectarte por SSH** (Paso 1). |
+| 🌐 **EN TU NAVEGADOR** | Chrome/Edge/Firefox en tu PC. |
+
+> **Regla de oro:** PowerShell (tu PC) y bash (el servidor) son **idiomas distintos**. Un
+> comando de bash pegado en PowerShell da error (y al revés). Fíjate SIEMPRE en la
+> etiqueta antes de pegar.
+
+---
+
+## 📝 Antes de empezar: anota estos datos
+
+Pídeselos al cliente (o a quien creó la VM) y tenlos a mano. Los usarás varias veces:
+
+| Dato | Ejemplo | El tuyo |
 |---|---|---|
-| **Tu estación** (esta, con el repo) | Descargas el paquete, verificas la firma y **emites la licencia de prueba** con tu clave PROD | Sí (solo para descargar el paquete) |
-| **VM del cliente de prueba** (Linux desnuda) | Corre la plataforma. Instalas Docker + el paquete | **No** (air-gapped; solo recibe archivos por `scp`/USB) |
+| **IP del servidor** | `200.100.50.10` | `________________` |
+| **Usuario del servidor** | `ubuntu` | `________________` |
+| **Contraseña o llave SSH** | (te la da el cliente) | `________________` |
 
-Flujo de una línea:
-`descargar paquete → copiar a la VM → instalar → la VM genera solicitud.lreq → tú
-emites license.lic → copiar a la VM → /setup crea el admin → entras y usas`.
+En los comandos verás cosas como `USUARIO` e `IP_DEL_SERVIDOR`. **Reemplázalas** por tus
+datos reales (sin los signos `<` `>` si los hubiera). Ejemplo: si tu usuario es `ubuntu`
+y la IP es `200.100.50.10`, entonces `USUARIO@IP_DEL_SERVIDOR` se escribe
+`ubuntu@200.100.50.10`.
 
-> **⚠️ ¿Dónde corre cada comando?** Importa por la sintaxis del shell:
-> - **En TU ESTACIÓN (Windows / PowerShell):** Fase 1 (descargar/verificar) y Fase 4
->   (emitir la licencia con `pnpm`). PowerShell **no** acepta `&&` ni `\` de
->   continuación de línea — usa los bloques marcados `powershell` de esta guía.
-> - **En la VM del cliente (Linux / bash):** Fases 0, 2, 3, 5 y 6. Ahí la sintaxis bash
->   (`&&`, `\`) funciona tal cual.
+**Requisitos del servidor** (para que la prueba corra bien): Linux (Ubuntu/Debian
+recomendado), **4 GB de RAM** (8 mejor), **10 GB de disco libre**.
 
 ---
 
-## 1. Requisitos
+## Paso 1 — Conéctate al servidor e instálale Docker
 
-**VM del cliente (mínimos):**
-- Linux de servidor: Ubuntu 22.04+/Debian 12+/RHEL 8+ (cualquiera con `bash`).
-- **4 GB RAM** (8 GB recomendado), **~10 GB de disco libre**, 2 vCPU.
-- Acceso `ssh` con un usuario con `sudo`.
-- Reloj en hora (para TLS y auditoría).
+Docker es el motor que hace correr la aplicación. La VM "no tiene nada", así que primero
+se lo instalamos.
 
-**Tu estación:**
-- Este repositorio (`g:\Development\BitacorasInteligentes`) con `pnpm` instalado.
-- Tu custodia de emisión en `~/.lyra-license/` (`prod-private.enc.pem` + passphrase en
-  tu gestor). **Ya la tienes** (es la misma con la que se emitió el demo del EC2).
-- `cosign` (opcional, para verificar la firma del paquete) — vía Docker sirve.
+### 1.1 Conéctate al servidor por SSH
 
----
-
-## 2. Fase 0 — Preparar la VM (instalar Docker)
-
-Conéctate por SSH a la VM y instala Docker Engine + el plugin `compose` v2. En
-Ubuntu/Debian, el instalador oficial es lo más simple:
-
-```bash
-# En la VM del cliente
-curl -fsSL https://get.docker.com | sudo sh          # Docker Engine + compose plugin
-sudo usermod -aG docker "$USER"                       # correr docker sin sudo
-newgrp docker                                          # aplica el grupo en esta sesión
-docker version && docker compose version               # verifica: Server + Compose v2
+💻 **EN TU PC (PowerShell):**
+```powershell
+ssh USUARIO@IP_DEL_SERVIDOR
 ```
+- La **primera vez** te preguntará `Are you sure you want to continue connecting?` →
+  escribe **`yes`** y Enter.
+- Te pedirá la **contraseña** del servidor (al escribirla no se ve nada en pantalla, es
+  normal) → Enter.
+- ✅ **Sabrás que entraste** porque el texto al inicio de la línea cambia a algo como
+  `usuario@servidor:~$`. **A partir de aquí estás DENTRO del servidor**: los comandos
+  siguientes son 🐧 bash.
 
-> Si la VM ya está air-gapped y no puede usar `get.docker.com`, instala Docker desde el
-> repositorio interno/paquetes `.deb`/`.rpm` del cliente. `install.sh` exige
-> `docker`, `docker compose` v2, `openssl` y `sha256sum` (estos tres suelen venir de
-> base). No necesita nada más.
+### 1.2 Instala Docker
 
----
-
-## 3. Fase 1 — Obtener y verificar el paquete (tu estación)
-
-1. Descarga el bundle offline del Release **v0.1.20** (repo **privado** `victorrubilarc/lyra-platform`).
-   Elige una vía:
-   - **Navegador (la más simple, sin herramientas):** entra logueado a
-     `https://github.com/victorrubilarc/lyra-platform/releases/tag/v0.1.20` y baja el asset
-     **`lyra-watchlog-v0.1.20.tar.gz`** (~1.09 GB).
-   - **Con `gh` (requiere estar autenticado):**
-     ```bash
-     gh auth login       # una vez, si no lo has hecho
-     gh release download v0.1.20 --repo victorrubilarc/lyra-platform \
-       --pattern "lyra-watchlog-v0.1.20.tar.gz"
-     ```
-     > Si `gh` "no se reconoce" en PowerShell tras instalarlo, **reabre la consola** (el
-     > PATH se refresca al reiniciarla) o agrégalo a la sesión:
-     > `$env:Path += ";C:\Program Files\GitHub CLI"`.
-2. (**Opcional**) **Verifica la firma** antes de moverlo — prueba que vino de ITESICWS y
-   no fue alterado. Puedes saltarte este paso: la firma ya se verificó al construir
-   v0.1.20 y `install.sh` revalida la integridad (SHA256SUMS) en la VM antes de cargar.
-   En **PowerShell** (tu estación):
-   ```powershell
-   mkdir vf -Force | Out-Null
-   tar -xf lyra-watchlog-v0.1.20.tar.gz -C vf "lyra-watchlog-v0.1.20/SHA256SUMS" "lyra-watchlog-v0.1.20/SHA256SUMS.cosign.bundle" "lyra-watchlog-v0.1.20/cosign.pub"
-   cd vf\lyra-watchlog-v0.1.20
-   docker run --rm -v "${PWD}:/w" -w /w gcr.io/projectsigstore/cosign:v2.4.3 verify-blob --key cosign.pub --bundle SHA256SUMS.cosign.bundle --insecure-ignore-tlog=true SHA256SUMS
-   cd ..\..
-   ```
-   Debe imprimir **`Verified OK`**.
-
----
-
-## 4. Fase 2 — Copiar el paquete a la VM
-
+🐧 **EN EL SERVIDOR (bash):**
 ```bash
-# Desde tu estación
-scp lyra-watchlog-v0.1.20.tar.gz USUARIO@IP_DE_LA_VM:/home/USUARIO/
+curl -fsSL https://get.docker.com | sudo sh
+sudo usermod -aG docker $USER
 ```
-
-En la VM, desempaca:
-
+Cierra la sesión y vuelve a entrar para que el permiso tome efecto:
 ```bash
-# En la VM
+exit
+```
+💻 **EN TU PC (PowerShell):** vuelve a conectarte:
+```powershell
+ssh USUARIO@IP_DEL_SERVIDOR
+```
+🐧 **EN EL SERVIDOR (bash):** comprueba que Docker quedó bien:
+```bash
+docker version
+docker compose version
+```
+- ✅ **Deberías ver** un número de versión en cada uno (no un error "command not found").
+
+> Si el servidor NO tiene internet (algunas plantas lo bloquean), pídele al cliente que
+> instale Docker desde su repositorio interno. Es lo único que la app necesita de base.
+
+---
+
+## Paso 2 — Descarga el instalador (en tu PC)
+
+El instalador es **un solo archivo** de ~1 GB llamado `lyra-watchlog-v0.1.20.tar.gz`.
+
+🌐 **EN TU NAVEGADOR:** entra (con tu cuenta de GitHub) a esta dirección:
+```
+https://github.com/victorrubilarc/lyra-platform/releases/tag/v0.1.20
+```
+Busca la sección **Assets** y haz clic en **`lyra-watchlog-v0.1.20.tar.gz`** para
+descargarlo. Normalmente cae en tu carpeta **Descargas**.
+
+- ✅ **Deberías tener** el archivo `lyra-watchlog-v0.1.20.tar.gz` en `Descargas`.
+
+---
+
+## Paso 3 — Copia el instalador al servidor (desde tu PC)
+
+💻 **EN TU PC (PowerShell):** primero ve a la carpeta donde quedó el archivo:
+```powershell
+cd ~\Downloads
+```
+Ahora cópialo al servidor (reemplaza USUARIO e IP por los tuyos):
+```powershell
+scp lyra-watchlog-v0.1.20.tar.gz USUARIO@IP_DEL_SERVIDOR:/home/USUARIO/
+```
+- Te pedirá la contraseña otra vez. La copia de 1 GB **tarda varios minutos** (verás una
+  barra de progreso).
+- ✅ **Deberías ver** que llega al 100 %.
+
+---
+
+## Paso 4 — Desempaqueta el instalador (en el servidor)
+
+💻 **EN TU PC (PowerShell):** conéctate al servidor:
+```powershell
+ssh USUARIO@IP_DEL_SERVIDOR
+```
+🐧 **EN EL SERVIDOR (bash):** descomprime y entra a la carpeta:
+```bash
 tar -xzf lyra-watchlog-v0.1.20.tar.gz
 cd lyra-watchlog-v0.1.20
+ls
 ```
+- ✅ **Deberías ver** archivos como `install.sh`, `images`, `compose`, `SHA256SUMS`.
 
 ---
 
-## 5. Fase 3 — Instalar (dos ejecuciones + certificado de prueba)
+## Paso 5 — Primera pasada del instalador (en el servidor)
 
-El instalador es **idempotente**: la 1ª ejecución genera secretos y se detiene pidiendo
-lo específico del sitio; editas `.env`; la 2ª ejecución levanta el stack.
+Esta primera pasada carga la aplicación y prepara la configuración. **Se detiene a
+propósito** para que completes dos datos del sitio.
 
-### 5.1 Primera ejecución (genera `.env` con secretos)
-
+🐧 **EN EL SERVIDOR (bash):**
 ```bash
 ./install.sh
 ```
-Termina con "COMPLETA lo específico del sitio en .env y vuelve a ejecutar" (exit 2).
-Ya cargó las imágenes (`docker load`) y creó `.env` (chmod 600, secretos openssl).
+- El instalador verifica el paquete, carga las imágenes y crea un archivo de
+  configuración llamado `.env`.
+- ✅ **Es NORMAL que termine con un aviso** parecido a *"COMPLETA lo específico del sitio
+  en .env y vuelve a ejecutar"*. No es un error: significa "ahora ve al Paso 6".
 
-### 5.2 Elegir el modo de borde
+---
 
-Para una prueba donde quieres **abrir la plataforma en un navegador**, lo más simple es
-**modo (b) — borde propio con certificado**, con un **certificado autofirmado de prueba**
-(en producción real sería el cert de la CA del cliente). Elige un nombre de host para la
-prueba, p. ej. `watchlog.piloto.local`.
+## Paso 6 — Configura el acceso (certificado + datos del sitio)
 
+Para poder abrir la app en el navegador **por HTTPS**, creamos un certificado de prueba y
+le decimos a la app cuál es su dirección. Usaremos directamente la **IP del servidor**
+(lo más simple; no hay que tocar DNS ni nada).
+
+### 6.1 Crea el certificado de prueba
+
+🐧 **EN EL SERVIDOR (bash):** (reemplaza `IP_DEL_SERVIDOR` por la IP real, en los DOS lugares)
 ```bash
-# En la VM, dentro de lyra-watchlog-v0.1.20/
-HOST=watchlog.piloto.local
-VM_IP=<IP_DE_LA_VM>          # p.ej. 10.0.0.20
 mkdir -p certs
-# Certificado autofirmado con el hostname y la IP en el SAN (válido 1 año):
 openssl req -x509 -newkey rsa:2048 -nodes -days 365 \
   -keyout certs/key.pem -out certs/cert.pem \
-  -subj "/CN=${HOST}" \
-  -addext "subjectAltName=DNS:${HOST},IP:${VM_IP}"
+  -subj "/CN=IP_DEL_SERVIDOR" \
+  -addext "subjectAltName=IP:IP_DEL_SERVIDOR"
 chmod 600 certs/key.pem
 ```
+- ✅ **Deberías ver** que se crean `certs/cert.pem` y `certs/key.pem` (sin errores).
 
-Ajusta el **dominio en el Caddyfile del borde** (viene con un dominio de ejemplo):
+### 6.2 Dile a la app su dirección (edita el borde)
 
+🐧 **EN EL SERVIDOR (bash):** (reemplaza `IP_DEL_SERVIDOR`)
 ```bash
-sed -i "s/watchlog\.planta\.cliente\.local/${HOST}/g" edge/Caddyfile.edge
+sed -i "s/watchlog\.planta\.cliente\.local/IP_DEL_SERVIDOR/g" edge/Caddyfile.edge
 ```
 
-Edita `.env` y completa las dos líneas del sitio:
+### 6.3 Completa el archivo de configuración `.env`
 
+🐧 **EN EL SERVIDOR (bash):** abre el archivo con un editor de texto simple:
 ```bash
-nano .env      # o vi
-#   EDGE_MODE=b
-#   APP_PUBLIC_URL=https://watchlog.piloto.local
-#   (COOKIE_SECURE=true ya viene por defecto — el borde da HTTPS)
+nano .env
 ```
+Dentro del editor, busca y deja estas dos líneas así (reemplaza la IP):
+```
+EDGE_MODE=b
+APP_PUBLIC_URL=https://IP_DEL_SERVIDOR
+```
+Para **guardar y salir de `nano`**: presiona **Ctrl+O**, luego **Enter**, luego
+**Ctrl+X**.
 
-> **Alternativa sin certificado (modo a):** si prefieres no lidiar con certs, deja
-> `EDGE_MODE=a`; la app queda en `127.0.0.1:8080` de la VM y la ves por un túnel SSH:
-> `ssh -L 8080:127.0.0.1:8080 USUARIO@IP_DE_LA_VM` y abres `http://localhost:8080`.
-> **Ojo:** con HTTP las cookies `Secure` no se setean; para ese modo pon
-> `COOKIE_SECURE=false` en `.env` **solo para la prueba**. El modo (b) es más fiel a
-> producción; recomendado.
+> Si `nano` no está en el servidor, usa `vi .env` (para guardar en vi: pulsa `Esc`,
+> escribe `:wq` y Enter). O instálalo: `sudo apt-get install -y nano`.
 
-### 5.3 Segunda ejecución (levanta el stack)
+---
 
+## Paso 7 — Segunda pasada del instalador (en el servidor)
+
+Ahora sí, el instalador levanta todo.
+
+🐧 **EN EL SERVIDOR (bash):**
 ```bash
 ./install.sh
 ```
-Verifica firma + integridad, levanta el stack por el modo elegido y espera el
-healthcheck. Al terminar imprime los "próximos pasos" (licencia + `/setup`).
+- Verifica de nuevo el paquete, enciende la aplicación y espera a que esté "sana".
+- ✅ **Deberías ver** al final `API saludable` y una lista de "próximos pasos"
+  (licencia y `/setup`).
+- ❌ Si dice que la API **no** quedó sana, mira el Paso *"Si algo sale mal"* más abajo.
 
-En este punto, un escaneo de red de la VM solo ve el **puerto 443** (modo b); Postgres,
-Redis, MinIO y la API **no existen** como socket del host (viven en la red Docker interna).
-
----
-
-## 6. Fase 4 — Emitir la licencia de prueba (tu estación)
-
-El arranque dejó en la VM `./license/solicitud.lreq` (la huella de ESA instalación).
-
-1. **Trae la solicitud a tu estación:**
-   ```bash
-   # Desde tu estación
-   scp USUARIO@IP_DE_LA_VM:/home/USUARIO/lyra-watchlog-v0.1.20/license/solicitud.lreq .
-   ```
-
-2. **Emite la licencia** contra esa solicitud (habilitando TODOS los módulos y con un
-   vencimiento corto por ser prueba). Desde la raíz del repo, en **PowerShell** (una sola
-   línea; PowerShell no usa `\` de continuación):
-   ```powershell
-   pnpm license issue --request solicitud.lreq --customer "Cliente Prueba" --channel-partner PILOTO --edition enterprise --modules core,structure,templates,logbook,schedules,incidents,exceptions,work-orders,shift-handover,notifications,themes,ai,dashboards --max-nodes 50 --max-named-users 25 --expires 2026-10-08T00:00:00Z --grace-days 14 --out license.lic
-   ```
-   (Si prefieres multilínea legible en PowerShell, usar backtick `` ` `` al final de cada
-   línea en vez de `\`.)
-   - La CLI **pide la passphrase** de tu privada PROD (prompt sin eco) y la descifra solo
-     en memoria. Queda **registrada en tu ledger** (`~/.lyra-license/ledger.jsonl`).
-   - ⚠️ **Emite SIEMPRE contra la `solicitud.lreq` que generó la app** (no inventes un
-     `installationId` a mano: quedaría sin historial y el `renew` te sería denegado).
-   - QA opcional: `pnpm license inspect license.lic --request solicitud.lreq`
-     (debe VALIDAR contra esa huella).
-
-3. **Devuelve la licencia a la VM:**
-   ```bash
-   scp license.lic USUARIO@IP_DE_LA_VM:/home/USUARIO/lyra-watchlog-v0.1.20/license/
-   ```
-   La app la toma automáticamente (o la importas desde `/setup` en el paso siguiente).
+En este momento la aplicación **ya está corriendo**, pero está en modo **solo lectura**
+hasta que le pongas una licencia (Paso 8). Es a propósito: la licencia nunca borra ni
+secuestra datos.
 
 ---
 
-## 7. Fase 5 — Primer arranque `/setup` (crear el administrador)
+## Paso 8 — Crea la licencia de prueba
 
-1. Si usaste un hostname, **apunta tu navegador a la VM**. En tu laptop añade al archivo
-   de hosts la línea (Windows: `C:\Windows\System32\drivers\etc\hosts`; Linux/Mac:
-   `/etc/hosts`):
-   ```
-   <IP_DE_LA_VM>   watchlog.piloto.local
-   ```
-2. Abre **`https://watchlog.piloto.local/setup`** (acepta la advertencia del certificado
-   autofirmado — es esperado en la prueba).
-3. Ingresa el **token de un solo uso**. Lo obtienes de la VM:
-   ```bash
-   cat /home/USUARIO/lyra-watchlog-v0.1.20/license/setup-token
-   ```
-4. El asistente: crea el **administrador** (correo + contraseña), aplica identidad/tema y
-   confirma la **licencia** (si no la copiaste por archivo, aquí la importas). Al terminar,
-   el token y el archivo se invalidan.
+> **¿Quién hace este paso?** Lo hace **el dueño del producto** (tú, ITESICWS), en tu PC de
+> desarrollo donde está el proyecto y tu **llave de emisión**. El servidor del cliente
+> **nunca** necesita internet: solo viajan dos archivos pequeños (uno de ida y uno de
+> vuelta).
+
+Al encenderse, el servidor dejó un archivo de **solicitud** con la "huella" de esa
+instalación. El flujo es: **traer la solicitud → generar la licencia → devolver la
+licencia**.
+
+### 8.1 Trae la solicitud a tu PC
+
+💻 **EN TU PC (PowerShell):** (reemplaza USUARIO e IP)
+```powershell
+scp USUARIO@IP_DEL_SERVIDOR:/home/USUARIO/lyra-watchlog-v0.1.20/license/solicitud.lreq .
+```
+- ✅ Ahora tienes `solicitud.lreq` en tu carpeta actual.
+
+### 8.2 Genera la licencia con tu llave
+
+💻 **EN TU PC (PowerShell):** ve a la carpeta del proyecto y ejecuta (todo en **una sola
+línea**):
+```powershell
+cd G:\Development\BitacorasInteligentes
+pnpm license issue --request solicitud.lreq --customer "Cliente Prueba" --channel-partner PILOTO --edition enterprise --modules core,structure,templates,logbook,schedules,incidents,exceptions,work-orders,shift-handover,notifications,themes,ai,dashboards --max-nodes 50 --max-named-users 25 --expires 2026-10-08T00:00:00Z --grace-days 14 --out license.lic
+```
+- Te pedirá la **contraseña (passphrase)** de tu llave de emisión. Escríbela (no se ve al
+  teclear) y Enter.
+- ✅ **Deberías obtener** un archivo `license.lic` en la carpeta.
+
+### 8.3 Devuelve la licencia al servidor
+
+💻 **EN TU PC (PowerShell):** (reemplaza USUARIO e IP)
+```powershell
+scp license.lic USUARIO@IP_DEL_SERVIDOR:/home/USUARIO/lyra-watchlog-v0.1.20/license/
+```
+- ✅ La app tomará la licencia automáticamente en unos segundos.
 
 ---
 
-## 8. Fase 6 — Verificar que funciona
+## Paso 9 — Crea tu usuario administrador (en el navegador)
 
-Con el admin creado, entra por `https://watchlog.piloto.local` y recorre el camino feliz:
+La primera vez, la app te deja crear al administrador con un **código de un solo uso**.
 
-1. **Login** con el administrador.
-2. **Estructura** → crea un nodo (área/planta) — comprueba estructura organizacional.
-3. **Plantillas** → crea una plantilla de bitácora con un par de campos (número con
-   rango, texto, selección) — comprueba el form builder.
-4. **Bitácoras** → registra una entrada de turno en esa plantilla — comprueba captura.
-5. **Incidencias** → abre una incidencia y muévela por su flujo — comprueba workflow.
-6. **Configuración › Licencia** → verifica estado **VÁLIDA**, edición y módulos.
+### 9.1 Consigue el código
 
-Salud interna (en la VM):
+💻 **EN TU PC (PowerShell):** conéctate al servidor y léelo:
+```powershell
+ssh USUARIO@IP_DEL_SERVIDOR
+```
+🐧 **EN EL SERVIDOR (bash):**
 ```bash
-docker compose --project-directory . --env-file .env \
-  -f compose/docker-compose.yml -f compose/mode-b.own-edge.yml ps
-# la 'api' debe verse healthy; solo 443 LISTEN en el host
+cat lyra-watchlog-v0.1.20/license/setup-token
+```
+- ✅ Copia el texto largo que aparece (ese es tu código).
+
+### 9.2 Abre el asistente y crea el admin
+
+🌐 **EN TU NAVEGADOR:** entra a (reemplaza la IP):
+```
+https://IP_DEL_SERVIDOR/setup
+```
+- El navegador mostrará una **advertencia de seguridad** ("la conexión no es privada").
+  Es **normal** porque el certificado es de prueba (autofirmado). Haz clic en
+  **"Avanzado" → "Continuar de todos modos"**.
+- Pega el **código** del paso anterior.
+- Sigue el asistente: crea tu **correo y contraseña** de administrador, elige la
+  identidad/tema y confirma la licencia. Al terminar, el código se desactiva solo.
+
+---
+
+## Paso 10 — Entra y prueba la plataforma
+
+🌐 **EN TU NAVEGADOR:** entra a:
+```
+https://IP_DEL_SERVIDOR
+```
+Inicia sesión con el correo y contraseña que creaste. Para comprobar que todo funciona,
+recorre este camino:
+
+1. **Estructura** → crea un área o planta.
+2. **Plantillas** → crea una plantilla de bitácora con un par de campos.
+3. **Bitácoras** → registra una entrada de turno.
+4. **Incidencias** → abre una incidencia y muévela por su flujo.
+5. **Configuración → Licencia** → verifica que diga **VÁLIDA**.
+
+🎉 Si puedes hacer todo eso, **la prueba fue exitosa**: la plataforma está instalada,
+licenciada y operativa en el servidor del cliente.
+
+---
+
+## 🆘 Si algo sale mal
+
+- **"El término 'gh'/'pnpm'/'docker' no se reconoce"** (en PowerShell): esa herramienta no
+  está en el PATH o la consola es vieja. **Cierra y abre PowerShell de nuevo**, o instala
+  la herramienta que falte.
+- **`&&` no es un separador válido** (en PowerShell): copiaste un comando de bash. Usa el
+  recuadro marcado 💻 PowerShell, o ejecuta los comandos **uno por línea**.
+- **`install.sh` dice que la API no quedó sana:** revisa los registros para ver el motivo.
+  🐧 En el servidor: `docker compose --project-directory . --env-file .env -f compose/docker-compose.yml -f compose/mode-b.own-edge.yml logs api`.
+  Causa típica: poca RAM (necesita ≥4 GB libres).
+- **El navegador no abre la página:** confirma que escribiste `https://` (no `http://`) y
+  la IP correcta; pídele al cliente que **abra el puerto 443** en su firewall.
+- **La app queda en "solo lectura":** falta la licencia (Paso 8) o no calza con esa
+  instalación. Asegúrate de haber generado la licencia contra la `solicitud.lreq` de ESTE
+  servidor.
+- **La API no puede guardar la licencia** (permisos): 🐧 en el servidor, dentro de la
+  carpeta del paquete: `sudo chown -R 1000:1000 license certs` y repite el Paso 8.3.
+
+---
+
+## 🧹 Apagar o borrar la prueba (opcional)
+
+🐧 **EN EL SERVIDOR (bash):** dentro de `lyra-watchlog-v0.1.20/`:
+```bash
+# Apagar (conserva los datos):
+docker compose --project-directory . --env-file .env -f compose/docker-compose.yml -f compose/mode-b.own-edge.yml down
+
+# Apagar Y BORRAR TODOS los datos de la prueba:
+docker compose --project-directory . --env-file .env -f compose/docker-compose.yml -f compose/mode-b.own-edge.yml down -v
 ```
 
 ---
 
-## 9. Anexos
+## 📚 Para profundizar
 
-### 9.1 Respaldo cifrado (opcional en la prueba)
-El paquete trae `onprem/backup.sh`/`restore.sh` + `tools/age`. Para una prueba puedes
-omitir el cifrado (deja `BACKUP_AGE_RECIPIENT=` vacío → respaldo en claro + aviso). En un
-servidor de tercero con datos reales, cífralos (ver `INSTALL_OFFLINE.md §10`).
-
-### 9.2 Actualizar a un paquete nuevo
-Lleva el nuevo `.tar.gz`, desempácalo, **copia tu `.env`, `license/` y `certs/`** al
-directorio nuevo y corre `./install.sh` (respalda la BD antes; la migración es
-forward-only). Ver `INSTALL_OFFLINE.md §9`.
-
-### 9.3 Desmontar la prueba
-```bash
-# En la VM, dentro de lyra-watchlog-v0.1.20/
-docker compose --project-directory . --env-file .env \
-  -f compose/docker-compose.yml -f compose/mode-b.own-edge.yml down -v   # -v borra los datos
-```
-
-### 9.4 Problemas frecuentes
-- **`install.sh` aborta "FIRMA INVÁLIDA"**: el paquete se corrompió al copiar — re-copia el
-  `.tar.gz` y re-verifica el SHA256 del Release.
-- **La API no queda healthy**: `docker compose ... logs api` (revisa RAM libre ≥4 GB).
-- **La API no puede escribir la licencia** (uid non-root): `sudo chown -R 1000:1000
-  license certs` en el directorio del paquete y reintenta.
-- **El navegador no llega**: confirma la línea en tu archivo de hosts y que 443 esté
-  LISTEN (`sudo ss -ltnp | grep :443` en la VM); revisa el firewall del cliente.
-- **Estado de licencia "solo lectura"**: falta importar `license.lic` o la huella no calza
-  (¿emitiste contra la `solicitud.lreq` de ESTA instalación?).
+- `docs/INSTALL_OFFLINE.md` — la guía técnica completa (respaldos, actualizaciones, modos
+  de borde avanzados).
+- `docs/LICENSING_PROCEDURE.md` — la ceremonia de licencia en detalle.
+- `docs/DEPLOYMENT.md` — endurecimiento del servidor y matriz de puertos para el equipo de
+  redes del cliente.
