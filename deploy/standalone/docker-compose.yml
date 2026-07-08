@@ -29,14 +29,36 @@
 # ─────────────────────────────────────────────────────────────────────────────
 name: lyra-watchlog
 
+# ── Endurecimiento CIS Docker Benchmark (H2 2026-07-07) ──────────────────────
+# Anclas reutilizables (DRY): posturas de seguridad que se aplican a varios
+# servicios. `no-new-privileges` impide que un proceso GANE privilegios vía
+# execve (setuid/file-caps) — CIS 5.25. `cap_drop:[ALL]` deja el contenedor sin
+# capabilities de kernel (CIS 5.3): válido para nuestras apps (no las necesitan);
+# la infra que hace privilege-drop en su entrypoint recibe un cap_add mínimo.
+x-no-new-privs: &no-new-privs
+  security_opt:
+    - no-new-privileges:true
+
 services:
   postgres:
+    # Air-gap (H2): tag, NO @digest. `docker save`/`load` NO preserva RepoDigests
+    # ⇒ un `image: …@sha256:` forzaría un `pull` que en planta no existe. Aquí el
+    # PIN es el tar del bundle (make-bundle lo trae por digest y lo sella en
+    # SHA256SUMS; install.sh lo verifica antes de `docker load`) — reproducibilidad
+    # más fuerte que un @digest suelto. El flujo GHCR/demo sí usa @digest.
     image: postgres:16-alpine
     restart: unless-stopped
     # Topes de memoria = techos de cgroup (no reservas): si un servicio se fuga,
     # el kernel OOM-mata SOLO su contenedor y el resto del host no lo siente.
     mem_limit: 512m
     mem_reservation: 256m
+    # CIS 5.25/5.3: sin nuevos privilegios y capabilities MÍNIMAS. El entrypoint
+    # oficial arranca root para chownear PGDATA (CHOWN/FOWNER/DAC_OVERRIDE) y
+    # luego baja a `postgres` con gosu (SETUID/SETGID) — solo esas 5 se conservan.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
     environment:
       POSTGRES_USER: "${POSTGRES_USER}"
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
@@ -44,6 +66,11 @@ services:
       TZ: "${TZ:-America/Santiago}"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    # read_only NO en postgres: escribe PGDATA (volumen) + socket + config dentro
+    # del data dir. tmpfs para el socket y temporales que no deben tocar el volumen.
+    tmpfs:
+      - /tmp
+      - /var/run/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
@@ -52,11 +79,20 @@ services:
     networks: [internal]
 
   redis:
+    # Air-gap: tag (el pin es el tar del bundle; ver nota en `postgres`).
     image: redis:7-alpine
     restart: unless-stopped
     # 384m (no 256m): el --maxmemory interno ya es 256mb; el fork del bgsave
     # (appendonly) necesita aire por encima.
     mem_limit: 384m
+    # CIS 5.25/5.3: el entrypoint chownea /data y baja a `redis` con su-exec.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, SETGID, SETUID]
+    read_only: true
+    tmpfs:
+      - /tmp
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - redisdata:/data
@@ -69,11 +105,23 @@ services:
 
   # MinIO es 100 % INTERNO: la subida Y la descarga de adjuntos van proxied por
   # la API (H1) — el navegador jamás lo alcanza; ni console ni S3 se publican.
-  # TODO(H2): pin a versión fija/digest (tag mutable = hallazgo de reproducibilidad).
+  # H2: se sale de `latest` (mutable) al tag de RELEASE INMUTABLE más reciente —
+  # gana reproducibilidad aun air-gapped. NOTA HONESTA: NO baja los CVE de Trivy,
+  # porque esta release YA es la última y no hay una con fix; los criticales
+  # residuales van en .trivyignore justificados (MinIO no alcanzable desde la red).
+  # Ver docs/SECURITY.md §9.2. (Air-gap: tag, no @digest — el pin es el tar.)
   minio:
-    image: minio/minio:latest
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
     restart: unless-stopped
     mem_limit: 384m
+    # MinIO es un binario Go estático; bindea 9000/9001 (>1024, no privilegiados)
+    # ⇒ no necesita capabilities. Escribe /data/.minio.sys (volumen) + temporales.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs:
+      - /tmp
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: "${MINIO_ROOT_USER}"
@@ -89,6 +137,13 @@ services:
     image: ${WL_IMAGE_PREFIX-}lyra-watchlog-migrate:${WL_VERSION:-stable}
     restart: "no"
     mem_limit: 512m
+    # CIS 5.25/5.3/5.12: non-root (uid 1000 horneado en la imagen), sin nuevos
+    # privilegios, sin capabilities y root FS de solo-lectura (escribe solo /tmp).
+    <<: *no-new-privs
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs:
+      - /tmp
     env_file: .env
     environment:
       NODE_ENV: "production"
@@ -102,6 +157,14 @@ services:
     image: ${WL_IMAGE_PREFIX-}lyra-watchlog-api:${WL_VERSION:-stable}
     restart: unless-stopped
     mem_limit: 512m
+    # CIS 5.25/5.3/5.12: non-root (uid 1000), sin nuevos privilegios, sin
+    # capabilities, root FS de solo-lectura. Escribe SOLO /app/license (bind rw)
+    # y /tmp (tmpfs). El bind del host lo deja a uid 1000 (install.sh/update.sh).
+    <<: *no-new-privs
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs:
+      - /tmp
     env_file: .env
     environment:
       NODE_ENV: "production"
@@ -136,6 +199,30 @@ services:
     image: ${WL_IMAGE_PREFIX-}lyra-watchlog-web:${WL_VERSION:-stable}
     restart: unless-stopped
     mem_limit: 128m
+    # CIS 5.25/5.3/5.12: Caddy como uid 1000 (horneado), sin nuevos privilegios,
+    # root FS de solo-lectura. cap_drop:[ALL] + cap_add:[NET_BIND_SERVICE]: la
+    # ÚNICA capability es la mínima para bindear :80 (patrón CIS "drop all, add
+    # back only what's needed"). Es OBLIGATORIA aquí porque el binario oficial de
+    # Caddy lleva esa file-capability y con el bounding set VACÍO (cap_drop ALL sin
+    # add) el `execve` falla con EPERM. El sysctl hace el bind efectivo bajo
+    # no-new-privileges (que enmascara la file-cap). Caddy interno es stateless
+    # (no ACME): /tmp, /config y /data van por tmpfs (los dos últimos con mode 1777
+    # para que uid 1000 pueda escribir su autosave/storage).
+    <<: *no-new-privs
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    read_only: true
+    sysctls:
+      net.ipv4.ip_unprivileged_port_start: "0"
+    tmpfs:
+      - /tmp
+    volumes:
+      - type: tmpfs
+        target: /config
+        tmpfs: { mode: 0o1777 }
+      - type: tmpfs
+        target: /data
+        tmpfs: { mode: 0o1777 }
     environment:
       SITE_ADDRESS: ":80"
       TZ: "${TZ:-America/Santiago}"

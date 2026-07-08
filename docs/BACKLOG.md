@@ -5,7 +5,11 @@
 > que se complete. `PROGRESS.md` narra lo **hecho**; este archivo lista lo **abierto**.
 >
 > **Regla:** al cerrar cada sesión, revisa y actualiza este archivo (ver §0). Última
-> actualización: **2026-07-06 (4)** — **🎨 OOBE S3 · BRANDING RUNTIME ✅ ⇒ ÉPICO §2(5) COMPLETO + §2(2) AVANZADO**
+> actualización: **2026-07-07 (H2)** — **🛡️ HARDENING H2 · CIS DOCKER + GATE ✅ (Tanda B/E4) ⇒ tag v0.1.19 (LOCAL, sin
+> pushear hasta OK)** (`feat/h2-cis-hardening`): contenedores non-root + read_only + cap_drop + pins de infra + Trivy GATE
+> en release.yml + `.trivyignore` justificado + doc iptables del host. Verificado en vivo (smoke mode-a/mode-b + docker
+> inspect + gate verde + 330/330). Detalle en §2(5) H2 y §2(6) E4. **Sigue: E3 (cosign + SBOM + backups cifrados).**
+> _(anterior: **2026-07-06 (4)** — **🎨 OOBE S3 · BRANDING RUNTIME ✅ ⇒ ÉPICO §2(5) COMPLETO + §2(2) AVANZADO**_
 > (`feat/oobe-s3-branding`): la identidad configurada por el wizard por fin se VE, sin rebuild — `GET /api/branding`
 > **PÚBLICO y MÍNIMO** (5 claves cerradas: companyName/hasLogo/logoVersion/defaultThemeMode/whiteLabel; asserts
 > negativos en smoke) alimenta login/Topbar/sidebar/título EN VIVO · **logo por instalación** (bytea en Postgres —
@@ -1048,27 +1052,27 @@ nunca queda más de una sesión atrás.
 >         Caddyfile.edge cert corporativo + variante NGINX + README con MATRIZ DE PUERTOS para el equipo de redes;
 >         el compose del demo quedó INTACTO — deuda: unificar demo→standalone cuando make-bundle lo absorba. La spec
 >         completa quedó materializada en `deploy/standalone/README.md` + `DEPLOYMENT.md` + `SECURITY.md §5.1`).
-> - [ ] **(H2 · Tanda B — CIS Benchmark + cadena de suministro, ~35–70 HH) — pre-firma de canal, se solapa con §2(4):**
->   - [ ] **Contenedores NON-ROOT** (`USER` en Dockerfiles api/web/migrate; ningún Dockerfile lo tiene hoy) +
->         `read_only: true` donde se pueda + `security_opt: [no-new-privileges]` + `cap_drop: [ALL]` en compose —
->         hallazgos CIS Docker garantizados.
->   - [ ] **Doc: bypass de firewall de Docker (iptables) para el equipo de REDES** — en Linux, publicar un puerto con
->         `- "8080:80"` abre en `0.0.0.0` y Docker inserta reglas iptables que **saltan `ufw`/`firewalld`** (el cliente
->         cree estar protegido y no lo está — hallazgo típico de auditoría). Mitigación por diseño ya presente (prod no
->         publica nada de datos; modo detrás-de-proxy usa `127.0.0.1:`), pero documentarlo explícito en la guía de
->         hardening del host + `DOCKER_OPTS`/`iptables=false` si el cliente gestiona su propio firewall. Va junto a la
->         matriz de puertos de H1.
->   - [ ] **Pin de imágenes de infra** (`minio/minio:latest` → digest/tag fijo; `postgres:16-alpine`/`redis:7-alpine`
->         → digest) — tag mutable en infra es hallazgo de reproducibilidad. **PRIORIZAR `minio:latest`:** el Trivy de E2
->         (2026-07-07) lo marcó como el PEOR foco (**6 CRÍT / 70 ALTO**) — es el único con criticales explotables sin pin.
->   - [ ] **Trivy/Grype en CI con gate** (no publicar imagen con CVE crítico sin excepción documentada). **✅ CORRIDO en
->         E2 (2026-07-07) sobre v0.1.17** (reporte en el paquete `SECURITY/` + `scripts/scan-images.sh` regenerable).
->         **Hallazgos a cerrar para pasar el gate (todos de imagen BASE, ningún código de app):**
->         · `api` 3 CRÍT / 11 ALTO — `perl-base` CVE-2026-42496 (fix_deferred), `zlib1g` CVE-2023-45853 (sin fix Debian);
->         · `migrate` 4 CRÍT / 32 ALTO — ídem + Go `stdlib` CVE-2025-68121 (crypto/tls, FIXED en Go 1.24.13+);
->         · `postgres:16-alpine` 1 CRÍT / 12 ALTO; `minio:latest` **6 CRÍT / 70 ALTO** (el pin de arriba lo cierra);
->         · `redis` limpio; `caddy`/`web` 0 CRÍT. **Fix probable:** bumpear/cambiar la base (`node:22-bookworm-slim` →
->         base con fix o `apt-get upgrade` en build; evaluar distroless) + pins de infra. E2 midió; H2 arregla + gatea.
+> - [~] **(H2 · Tanda B — CIS Benchmark + cadena de suministro, ~35–70 HH) — ✅ CIS Docker CERRADO 2026-07-07
+>       (`feat/h2-cis-hardening`, tag v0.1.19); SBOM/backups/cosign PASAN A E3:**
+>   - [x] **Contenedores NON-ROOT ✅** (`USER node` uid 1000 en Dockerfile.api runtime+migrate; `USER app` uid 1000 en
+>         Dockerfile.web) + `read_only:true` (api/migrate/web/edge/redis/minio) + tmpfs + `no-new-privileges` (todos) +
+>         `cap_drop:[ALL]` (app+infra; `cap_add` mínimo: web/edge NET_BIND_SERVICE, postgres/redis las de su entrypoint).
+>         GOTCHA Caddy: su binario lleva `cap_net_bind_service` file-cap ⇒ con bounding vacío el execve daba EPERM ⇒
+>         `cap_add:[NET_BIND_SERVICE]` + sysctl `ip_unprivileged_port_start=0`. `chown ./license`→1000 en install/update.sh.
+>         Verificado en vivo (`docker inspect` + smoke: la ceremonia de licencia y el seed corren non-root + read_only).
+>   - [x] **Doc bypass iptables de Docker para REDES ✅** — `DEPLOYMENT.md §"Endurecimiento del host (CIS)"` (mitigación
+>         por diseño: nada en `0.0.0.0` salvo el borde; modo (a)=loopback) + opción `iptables=false` + LUKS at-rest + EDR;
+>         referenciado desde `deploy/standalone/README.md` (matriz de puertos H1).
+>   - [x] **Pin de imágenes de infra ✅** — demo/prod por `@digest` (postgres/redis/minio/caddy); standalone por TAG (**el
+>         pin real es el tar del bundle**: `docker save/load` NO preserva RepoDigests ⇒ `@digest` en compose air-gapped
+>         forzaría pull; `make-bundle` pullea por digest→retag→save, `SHA256SUMS` sella). `minio:latest`→RELEASE inmutable
+>         `RELEASE.2025-09-07T16-13-09Z`. **HONESTIDAD: el pin NO baja los CVE de MinIO** (ya era la última release, sin
+>         fix): da reproducibilidad. Delta Trivy vs E2: MinIO 6→4 CRÍT; resto sin cambio (base sin parche upstream).
+>   - [x] **Trivy GATE en CI ✅** — `release.yml` job `scan` (needs build) corre `GATE=critical scan-images.sh`, bloquea
+>         `bundle`+`deploy` si hay CRÍTICO fuera de `.trivyignore`. Gate CRÍTICO-solo (ALTO se reporta). **`.trivyignore`
+>         con 7 CVE justificados, TODOS base/binario-Go-de-tercero(esbuild/postgres/minio)/MinIO-interno-no-alcanzable,
+>         0 de código de app:** perl `CVE-2026-42496`+`CVE-2026-8376`, zlib `CVE-2023-45853`, Go stdlib `CVE-2025-68121`,
+>         minio `CVE-2026-33186`/`-33322`/`-33419`. Un crítico NUEVO fuera de la lista BLOQUEA (revisión humana). Gate VERDE.
 >   - [ ] **SBOM CycloneDX por release** (§9.1) + **backups CIFRADOS** (`pg_dump -Fc` hoy plano; §9.3) + doc de
 >         **cifrado at-rest del host** (LUKS/dm-crypt para `pgdata`, es del host no de la app — documentarlo).
 >   - [ ] **Firma de imágenes cosign + verificación en host + pull por DIGEST** (§9.1; núcleo de §2(4)).
@@ -1096,9 +1100,8 @@ nunca queda más de una sesión atrás.
       Orden de ejecución E1→E5 (E2 = ítem (3c)+(5), E3 = ítem (4); se listan aquí para el ORDEN):
       - [x] **E1 · "Planta restrictiva ready" ✅ CERRADO 2026-07-07** (= H1 · Tanda A de §2(5), detalle arriba):
             (i) adjuntos proxied ✅ · (ii) rate limiting global ✅ · (iii) magic bytes ✅ · (iv) fuentes
-            self-hosted ✅ · (v) compose standalone + matriz de puertos ✅ · **EXCEPTO (vi) pin de
-            `minio/minio:latest`** — queda en H2 (donde ya estaba listado con el resto de pins; TODO anotado en
-            `deploy/standalone/docker-compose.yml`).
+            self-hosted ✅ · (v) compose standalone + matriz de puertos ✅ · (vi) pin de `minio` ✅ **CERRADO en H2
+            2026-07-07** (salió de `latest` al RELEASE inmutable `RELEASE.2025-09-07T16-13-09Z`; TODO del compose resuelto).
       - [x] **E2 · Paquete instalable ✅ CERRADO 2026-07-07, tag v0.1.18** (`feat/e2-paquete-instalable`; a–h en
             DECISIONS): `scripts/make-bundle.sh` (retag NEUTRO + docker save app+infra + compose standalone +
             `install.sh` + guía + Trivy + `SHA256SUMS` → `.tar.gz`, adjuntado al GitHub Release por el job `bundle`
@@ -1110,10 +1113,12 @@ nunca queda más de una sesión atrás.
             de node_modules). Probado local (up/seed/health/idempotencia :3411). Prueba contra VM air-gapped REAL = dueño.
       - [ ] **E3 · Cadena de suministro** = ítem (4) completo (cosign + digest + Trivy gate CI + SBOM CycloneDX +
             backups CIFRADOS + registry privado read-only por cliente).
-      - [ ] **E4 · Hardening de contenedores/host (CIS Docker Benchmark):** `USER` non-root en Dockerfiles (hoy TODO
-            corre root), `read_only` + `no-new-privileges` + `cap_drop` en compose, `.env` chmod 600 documentado,
-            LUKS at-rest del host + NTP interno + exclusiones EDR para volúmenes de BD (guía del cliente), puente
-            SIEM vía logging driver syslog/gelf (documentado, sin sacar datos sin consentimiento).
+      - [x] **E4 · Hardening de contenedores/host (CIS Docker Benchmark) ✅ CERRADO 2026-07-07** (= H2 de §2(5), detalle
+            arriba; `feat/h2-cis-hardening`, tag v0.1.19, decisiones a–h en DECISIONS): `USER` non-root en los 3
+            Dockerfiles + `read_only`+`tmpfs`+`no-new-privileges`+`cap_drop:[ALL]`(+cap_add mínimo) en compose standalone
+            Y demo (Opción A) + pins de infra (@digest demo / tar del bundle en air-gap) + Trivy GATE en release.yml +
+            `.trivyignore` justificado + doc iptables/LUKS/EDR del host (DEPLOYMENT §host). El `.env` chmod 600 ya lo hacía
+            install.sh (E2). **Faltan de E4 y PASAN a E3/H3:** puente SIEM (syslog/gelf), NTP interno (doc del cliente).
       - [ ] **E5 · AppSec formal:** proceso de gestión de vulnerabilidades + `security.txt`/canal de reporte ·
             `pnpm audit`/dependabot u OSV en CI · DAST baseline (ZAP) en CI · interfaz **`UploadScanner`** opcional
             (patrón EmailService) con adapter ClamAV en contenedor para plantas que exigen escaneo AV de archivos

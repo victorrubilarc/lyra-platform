@@ -220,6 +220,11 @@ antes de instalar; incluye el **reporte de vulnerabilidades** de sus componentes
 cliente. El instalador **genera los secretos** en el propio host (nada de contraseñas de fábrica) y es
 **re-ejecutable** sin riesgo. **Beneficio:** el socio de canal instala en faena **sin internet y sin ver
 el código**, y el cliente recibe un artefacto **auditable** — encaja con air-gap y con marca blanca.
+- **Contenedores sin privilegios, escaneados con control de calidad (2026-07):** todos los servicios corren
+  **sin root**, con permisos de sistema **al mínimo** y el disco del contenedor de **solo lectura** (estándar
+  **CIS Docker**), y **ninguna versión se publica** si su escaneo de vulnerabilidades encuentra un fallo crítico
+  no justificado (**control automático en el pipeline**). **Beneficio:** pasa el **cuestionario de proveedor** y el
+  **CIS Benchmark** de una minera sin sorpresas — el endurecimiento viene de fábrica, no como parche posterior.
 
 ### 🔔 Avisos por correo
 Notificaciones configurables (p. ej. rondas vencidas, vencimientos de flujo) con plantillas propias.

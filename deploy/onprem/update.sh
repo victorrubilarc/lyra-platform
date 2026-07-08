@@ -20,6 +20,10 @@ echo "▶ Actualizando WatchLog ${PREV:-?} → ${NEW}"
 deploy() {
   sed -i "s|^WL_VERSION=.*|WL_VERSION=${1}|" .env
   $COMPOSE pull
+  # CIS 5.12 (H2): desde v0.1.19 el api corre NON-ROOT (uid 1000) y escribe
+  # ./license (solicitud/renovacion/setup-token/license.lic). El bind conserva el
+  # dueño del host ⇒ se cede a 1000 (idempotente; best-effort si no hay root).
+  mkdir -p license && chown -R 1000:1000 license 2>/dev/null || true
   echo "  · migrate deploy + seed de catálogo…"
   $COMPOSE run --rm migrate
   $COMPOSE up -d

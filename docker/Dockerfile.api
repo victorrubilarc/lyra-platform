@@ -82,6 +82,13 @@ COPY --from=build /app ./
 # y el api crasheaba con "@prisma/client did not initialize yet". Regenerar aquí
 # (schema + CLI ya están en /app, openssl en base) lo deja donde el api lo busca.
 RUN node_modules/.bin/prisma generate
+# CIS Docker 4.1 (H2 2026-07-07) — el proceso corre como NON-ROOT. La base
+# node:22-bookworm-slim ya trae el usuario `node` (uid 1000). El runtime SOLO
+# lee /app (root:root 755, legible/ejecutable por node); lo único que ESCRIBE es
+# /app/license (bind-mount rw — el host lo deja a uid 1000 vía install.sh/update.sh)
+# y /tmp (tmpfs del compose). /etc/machine-id se monta :ro (world-readable). El
+# `prisma generate` de arriba corrió como root, así que el cliente ya está listo.
+USER node
 EXPOSE 3000
 CMD ["node", "dist/main.js"]
 
@@ -136,6 +143,13 @@ RUN rm -rf /repo/packages/licensing \
     find /repo -name '*.spec.ts' -delete 2>/dev/null; \
     find /repo -name '*.test.ts' -delete 2>/dev/null; \
     true
+# CIS Docker 4.1 (H2 2026-07-07) — el init de migraciones también corre NON-ROOT
+# (uid 1000 `node`). La poda de arriba fue como root; el CMD solo LEE /repo (root:root
+# 755) y escribe en /tmp (tmpfs + TMPDIR): `prisma migrate deploy` (engine que solo
+# lee node_modules) y `tsx` (compila el seed en memoria/TMPDIR). El seed únicamente
+# hace upserts contra Postgres, no escribe en disco. TMPDIR=/tmp fija dónde escribe tsx.
+ENV TMPDIR=/tmp
+USER node
 # Invoca los binarios DIRECTO (no `pnpm exec`): con NODE_ENV=production, `pnpm exec`
 # intenta reconciliar node_modules a solo-producción (poda tsx/prisma CLI) y, sin
 # TTY, aborta con ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY. Los .bin ya existen

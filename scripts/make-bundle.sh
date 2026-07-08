@@ -39,9 +39,19 @@ STANDALONE="$REPO_ROOT/deploy/standalone"
 
 APP_IMAGES="api web migrate"
 # Imágenes de infra que el compose levanta en runtime → deben viajar en el paquete
-# (sin ellas, `up` en una planta sin internet fallaría al pullear). minio:latest se
-# fija en H2 (deuda anotada); aquí se empaqueta la que esté resuelta.
-INFRA_IMAGES="postgres:16-alpine redis:7-alpine minio/minio:latest caddy:2-alpine"
+# (sin ellas, `up` en una planta sin internet fallaría al pullear). PIN por DIGEST
+# (H2): se PULLEA el digest exacto y se RETAGUEA al tag que el compose standalone
+# espera antes de `docker save`. Así el tar del bundle es reproducible (digest fijo,
+# sellado en SHA256SUMS) pero el compose referencia un TAG — `docker load` NO
+# preserva RepoDigests, así que un `image: …@digest` en el compose forzaría un
+# `pull` inexistente en la planta. minio salió de `latest` al RELEASE inmutable.
+# Formato: "tag|digest". Mantener en paridad con deploy/standalone/docker-compose.yml.
+INFRA_PINS="
+postgres:16-alpine|sha256:7a396fd264a2067788b6551122b50f162bf6136312c7fc9d74381cb92c648382
+redis:7-alpine|sha256:b1addbe72465a718643cff9e60a58e6df1841e29d6d7d60c9a85d8d72f08d1a7
+minio/minio:RELEASE.2025-09-07T16-13-09Z|sha256:9966a92a734f9411e32f4f41d7d9d826fcdc0f68c4e20b70295bd4e7c11f8a2f
+caddy:2-alpine|sha256:98eb57d882ccd5213d1688764db10c1ca2c58a1ca3a6717a3411ad798f7a423a
+"
 
 BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 STAGE="$OUTPUT_DIR/lyra-watchlog-$TAG"
@@ -63,14 +73,19 @@ for img in $APP_IMAGES; do
   docker save "$neutral" -o "$STAGE/images/lyra-watchlog-${img}-${TAG}.tar"
 done
 
-# ── 2) Imágenes de infra: pull (opcional) → save (nombre original) ───────────
-for base in $INFRA_IMAGES; do
+# ── 2) Imágenes de infra: pull por DIGEST → retag al tag → save ──────────────
+for pin in $INFRA_PINS; do
+  [ -n "$pin" ] || continue
+  tag="${pin%%|*}"; digest="${pin##*|}"
+  repo="${tag%%:*}"                  # nombre sin tag (para el ref por digest)
+  ref="${repo}@${digest}"
   if [ "$PULL" = "true" ]; then
-    echo "  · pull $base"; docker pull "$base" >/dev/null
+    echo "  · pull $ref"; docker pull "$ref" >/dev/null
   fi
-  fname="infra-$(echo "$base" | tr '/:' '--').tar"
+  echo "  · retag → $tag"; docker tag "$ref" "$tag"
+  fname="infra-$(echo "$tag" | tr '/:' '--').tar"
   echo "  · save  → images/$fname"
-  docker save "$base" -o "$STAGE/images/$fname"
+  docker save "$tag" -o "$STAGE/images/$fname"
 done
 
 # ── 3) Compose standalone (H1) + borde, tal cual ────────────────────────────
@@ -98,7 +113,7 @@ cat > "$STAGE/VERSION" <<EOF
 Lyra WatchLog — paquete de instalación offline
 version:    $TAG
 built (UTC): $BUILD_DATE
-images:     lyra-watchlog-{api,web,migrate}:$TAG (nombre neutro) + infra ($INFRA_IMAGES)
+images:     lyra-watchlog-{api,web,migrate}:$TAG (nombre neutro) + infra pineada por digest ($(echo $INFRA_PINS | tr '\n' ' '))
 verify:     cd al directorio y  sha256sum -c SHA256SUMS
 EOF
 
