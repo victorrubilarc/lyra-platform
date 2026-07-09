@@ -129,6 +129,11 @@ cp "$STANDALONE/edge/nginx-watchlog.conf.example"   "$STAGE/edge/"
 cp "$STANDALONE/install.sh"                "$STAGE/install.sh"
 cp "$STANDALONE/doctor.sh"                 "$STAGE/doctor.sh"
 chmod +x "$STAGE/install.sh" "$STAGE/doctor.sh"
+# Track WINDOWS (Docker Desktop/WSL2, contenedores Linux): espejo nativo del
+# install.sh (huella anclada al MachineGuid + probe de permisos uid 1000). Va
+# SELLADO en SHA256SUMS igual que el resto (ver DECISIONS/SUPPORTED_PLATFORMS).
+cp "$STANDALONE/install.ps1"               "$STAGE/install.ps1"
+cp "$STANDALONE/doctor.ps1"                "$STAGE/doctor.ps1"
 cp "$STANDALONE/.env.standalone.example"   "$STAGE/.env.example"
 if [ -f "$REPO_ROOT/docs/INSTALL_OFFLINE.md" ]; then
   cp "$REPO_ROOT/docs/INSTALL_OFFLINE.md"  "$STAGE/INSTALL_OFFLINE.md"

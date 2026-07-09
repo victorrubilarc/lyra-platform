@@ -31,17 +31,21 @@ prueba piloto real. Es un documento **VIVO**: se actualiza al cambiar el alcance
 - **`b`** — borde propio con TLS. El instalador **genera** el `Caddyfile` y un cert self-signed
   (o usa el corporativo si lo colocas). Único puerto LISTEN: 443/tcp (+80 redirect).
 
----
+### Windows (Docker Desktop / WSL2 con contenedores Linux) — pilotos/estaciones
 
-## 🚧 En preparación
+| Aspecto | Detalle |
+|---|---|
+| **Arquitectura** | amd64. Los contenedores Linux del paquete corren sobre **WSL2** (Hyper-V) vía Docker Desktop en modo **"Linux containers"** (el preflight aborta si el daemon reporta `windows`). |
+| **SO probado** | Windows 11 Pro (Docker Desktop + WSL2). Windows Server con Docker Desktop/WSL2 = posible, atípico (ver caveat). |
+| **Instalador** | `install.ps1` — **espejo nativo** de `install.sh` (misma lógica; PowerShell 5.1+). `doctor.ps1` = `install.ps1 -Check`. Guía: `docs/INSTALL_OFFLINE.md §12`. |
+| **Huella de licencia (L1)** | **Anclada al `MachineGuid`** del host Windows (`HKLM\…\Cryptography`), escrita en `license\machine-id` + `LICENSE_MACHINE_ID_FILE=/app/license/machine-id`. **NO** se usa `/etc/machine-id` (no fiable bajo Docker Desktop: se regenera al actualizar DD / resetear WSL). Ver `DECISIONS 2026-07-08`. |
+| **Permisos** | El `chown uid 1000` no aplica al FS Windows; `install.ps1` corre un **probe** (`docker run -u 1000:1000`) que valida que el `api` non-root pueda escribir `./license` antes de arrancar. **Recomendado:** paquete en el **FS de WSL2** (ext4) por rendimiento y permisos; o habilitar la unidad en Docker Desktop → File Sharing. |
+| **Utilidades del host** | Docker Desktop (compose v2) · **openssl** en el `PATH` (Git for Windows / portable, misma dependencia que Linux) · `curl.exe`/`tar.exe` (nativos de Windows 10+). |
+| **Estado del smoke** | **Manual/self-hosted** (`scripts/smoke-install-windows.ps1`): CI en `windows-latest` no corre contenedores Linux de forma fiable. El *plumbing* de la huella-por-archivo (lo único compartido) se cubre además en el smoke Linux de CI. Modo a validado en vivo 2026-07-08. |
 
-### Windows (Docker Desktop / WSL2 con contenedores Linux)
-
-- **Estado:** track P1 en curso (`docs/BACKLOG.md §3`). Se documentará aquí `install.ps1`
-  (o guía WSL2), el manejo de la huella de licencia (`/etc/machine-id` bajo WSL) y los
-  permisos de `./license`/`./certs` (el `chown uid 1000` no aplica en FS Windows).
-- **Caveat honesto:** Windows Server como destino **productivo** es atípico en industria;
-  cuando se soporte será principalmente para pilotos/estaciones, con validación reforzada.
+**Caveat honesto:** Windows Server como destino **productivo** es atípico en la industria
+(el estándar es Linux x86-64). Windows se soporta principalmente para **pilotos y
+estaciones**; para producción real usar el destino principal Linux.
 
 ---
 

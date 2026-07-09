@@ -66,6 +66,7 @@ cleanup() {
   [ -d "$WORK/inst-a" ]  && down "$WORK/inst-a"  mode-a.behind-proxy.yml
   [ -d "$WORK/inst-b1" ] && down "$WORK/inst-b1" mode-b.own-edge.yml
   [ -d "$WORK/inst-b2" ] && down "$WORK/inst-b2" mode-b.own-edge.yml
+  [ -d "$WORK/inst-c" ]  && down "$WORK/inst-c"  mode-a.behind-proxy.yml
   rm -rf "$WORK" 2>/dev/null || true
 }
 trap cleanup EXIT
@@ -166,6 +167,33 @@ else
 fi
 doctor_ok "$B2"
 down "$B2" mode-b.own-edge.yml
+
+# ── 5) MODO A + machine-id POR ARCHIVO — valida en CI la ruta que usa Windows ─
+# La huella Windows (install.ps1) apunta LICENSE_MACHINE_ID_FILE a un archivo en
+# ./license (anclado al MachineGuid del host Windows) EN LUGAR de /etc/machine-id,
+# porque bajo Docker Desktop ese bind-mount no es fiable (DECISIONS 2026-07-08).
+# Aqui se ejerce ESE mismo mecanismo en Linux/CI: el API debe leer la huella del
+# archivo montado (via el ./license ya existente) y quedar HEALTHY. Es el unico
+# plumbing del que depende el track Windows, cubierto asi tambien en el smoke Linux.
+say "MODO A + machine-id POR ARCHIVO (simula la huella Windows)"
+C="$WORK/inst-c"
+first_pass "$C"
+sed -i 's/^EDGE_MODE=.*/EDGE_MODE=a/'                       "$C/.env"
+sed -i 's#^APP_PUBLIC_URL=.*#APP_PUBLIC_URL=http://127.0.0.1:8080#' "$C/.env"
+sed -i 's/^EDGE_LOCAL_PORT=.*/EDGE_LOCAL_PORT=8080/'        "$C/.env"
+# Lo que hace install.ps1 en Windows: escribe una huella propia y apunta a ella.
+mkdir -p "$C/license"
+printf 'smoke-windows-fingerprint-0001\n' > "$C/license/machine-id"
+echo 'LICENSE_MACHINE_ID_FILE=/app/license/machine-id' >> "$C/.env"
+if install2 "$C" mode-a.behind-proxy.yml; then
+  if curl -sf -o /dev/null --max-time 15 http://127.0.0.1:8080/api/health; then
+    ok "MODO A/machine-id-archivo: /api/health responde 200 (colector leyo la huella montada)"
+  else
+    bad "MODO A/machine-id-archivo: /api/health NO respondio"; dump_logs "$C" mode-a.behind-proxy.yml
+  fi
+  doctor_ok "$C"
+fi
+down "$C" mode-a.behind-proxy.yml
 
 # ── Resultado ────────────────────────────────────────────────────────────────
 say "RESULTADO DEL SMOKE"

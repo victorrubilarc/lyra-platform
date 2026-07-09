@@ -2548,10 +2548,10 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
 > **✅ HECHO 2026-07-08:** `make-bundle.sh` ahora hace `assert_arch` por imagen (aborta si ≠ `EXPECTED_ARCH`, def. amd64).
 
 ### PROGRAMA "instalación limpia y sin errores" (raíz de los 4 bugs del piloto) — 2026-07-08
-> **▶ ESTADO 2026-07-08: (1) `install.sh` autoreparable + `doctor` = ✅ HECHO (smoke VERDE run 28984487292, en `main`).
-> SIGUIENTE SESIÓN = (2) track Windows.** El instalador autoreparable fue PRIMERO (el `install.ps1`/WSL2 de Windows debe
-> reflejar su comportamiento final); cada uno extiende el smoke (`install-smoke.yml`). Se consolidó tras (1) por límite de
-> contexto — abrir sesión nueva para (2).
+> **▶ ESTADO 2026-07-08: (1) `install.sh` autoreparable + `doctor` = ✅ HECHO. (2) track WINDOWS = ✅ HECHO** (`install.ps1`
+> nativo, espejo del install.sh; smoke Windows MODO A validado EN VIVO sobre Docker Desktop real). El programa "instalación
+> limpia" queda **CERRADO** para la matriz soportada (Linux x86-64 + Windows). Detalle de (2) en el bullet P1 de abajo y en
+> `DECISIONS 2026-07-08 · Track WINDOWS`.
 > La causa común de los 4 bugs fue **que el camino del paquete offline nunca se ejecutó de punta a punta en una máquina
 > limpia**. Decisiones y plan tras la 1ª prueba piloto real (dueño 2026-07-08):
 > - **Matriz de plataformas SOPORTADA (decidida por el dueño):** **Linux x86-64** (Ubuntu 22.04/24.04, Debian 12, RHEL/Rocky
@@ -2576,12 +2576,23 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
 >   `key.pem` 600/uid1000 no es legible por un instalador/doctor no-root ⇒ se gatea la verificación cert↔llave por
 >   legibilidad (`key_readable`; si no, nota). Smoke extendido a la ruta AUTO (modo a + b-hostname con prueba NEGATIVA por IP
 >   + b-IP + doctor x3). Ver `DECISIONS.md 2026-07-08`. **`SUPPORTED_PLATFORMS.md` CREADO** (cierra parte del P1 de abajo).
-> - **▶ P1 PENDIENTE (SIGUIENTE SESIÓN) · Windows track:** `install.ps1` (o guía WSL2) equivalente al install.sh YA afinado
->   + resolver `/etc/machine-id` (huella de licencia L1 en Windows: en WSL existe pero es la del distro — validar
->   estabilidad) + permisos (chown uid 1000 no aplica en FS Windows — ver cómo lo maneja Docker Desktop para
->   `./license`/`./certs`) + su propio smoke (CI Windows+contenedores-Linux es delicado; quizá self-hosted/manual) +
->   completar la sección **Windows** de `docs/SUPPORTED_PLATFORMS.md`. **Caveat honesto:** Windows Server como destino
->   productivo es atípico en industria; validar bien.
+> - **✅ P1 HECHO 2026-07-08 · Windows track** (`feat/install-windows`). `deploy/standalone/install.ps1` + `doctor.ps1`
+>   NATIVOS (espejo del install.sh; el dueño eligió nativo sobre el hand-off a WSL2 que el agente recomendó — objeción de
+>   duplicación registrada en DECISIONS). Resuelto:
+>   - **Huella L1:** validado EN VIVO que `/etc/machine-id` NO es fiable bajo Docker Desktop (el distro `docker-desktop` no
+>     lo tiene; el valor de la VM se regenera al actualizar DD / resetear WSL). Se ancla al **MachineGuid** del host
+>     (`license\machine-id` + `LICENSE_MACHINE_ID_FILE=/app/license/machine-id`). **Cero cambios al compose** (default Linux
+>     `/etc/machine-id` intacto). El plumbing huella-por-archivo se cubre además en el smoke Linux (escenario 4).
+>   - **Permisos:** el chown uid 1000 no aplica en FS Windows; `install.ps1` corre un **probe `docker run -u 1000:1000`**
+>     que valida escritura en `./license` antes de arrancar (no debilita CIS 5.12).
+>   - **Smoke:** `scripts/smoke-install-windows.ps1` (manual/self-hosted; CI `windows-latest` no corre contenedores Linux).
+>     **MODO A validado EN VIVO** sobre Docker Desktop real (2026-07-08): 1ª pasada exit 2, 2ª pasada up + **API healthy** +
+>     `/api/health` 200 + **doctor 14× PASA**. Modos b-host/b-ip: en esta máquina el puerto 80 estaba ocupado (no se pudo
+>     bindear el borde); su lógica es idéntica al install.sh (mode-b cubierto por el smoke Linux) y el script los ejercita
+>     en un host limpio. `docs/SUPPORTED_PLATFORMS.md §Windows`, `INSTALL_OFFLINE.md §12` y `PRUEBA_PILOTO.md §Windows`
+>     redactados. **Caveat honesto documentado:** Windows Server productivo es atípico; soportado para pilotos/estaciones.
+>   - **Pendiente menor (no bloqueante):** correr el smoke Windows completo (a+b-host+b-ip) en un host con 80/443/8080
+>     libres (p. ej. VM limpia) para dejar los 3 modos validados en vivo; hoy solo MODO A quedó ejercido end-to-end.
 
 ### DATA demo · Rondas del seed 100% vencidas (2026-07-03)
 > Detectado al revisar «Mis rondas no filtra» (`feat/inicio-enterprise`): el demo tiene **289 rondas todas vencidas** (programadas

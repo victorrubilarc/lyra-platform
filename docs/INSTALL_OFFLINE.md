@@ -20,6 +20,7 @@ host **sin internet saliente**, sin `git clone` y **sin exponer código fuente**
 | `compose/` | El stack standalone (base sin puertos + modos de borde a/b + config del borde). |
 | `install.sh` | Instalador **idempotente offline** (autoreparable: genera cert + borde). |
 | `doctor.sh` | Diagnóstico **PASA/FALLA** del host (equivale a `install.sh --check`). |
+| `install.ps1` / `doctor.ps1` | **Windows** (Docker Desktop/WSL2, contenedores Linux): espejo nativo del `install.sh` (huella anclada al MachineGuid + probe de permisos uid 1000). Ver §12. |
 | `.env.example` | Plantilla de configuración (los secretos los genera el instalador). |
 | `INSTALL_OFFLINE.md` | Esta guía. |
 | `SECURITY/` | Reporte de vulnerabilidades (Trivy) + **`sbom/`** (inventario CycloneDX por imagen, para tu auditor). |
@@ -207,3 +208,50 @@ BACKUP_AGE_IDENTITY=/ruta/backup-identity.txt bash onprem/restore.sh --test back
   cosign verify-blob --key cosign.pub --bundle SHA256SUMS.cosign.bundle \
     --insecure-ignore-tlog=true SHA256SUMS       # cosign v2.x
   ```
+
+---
+
+## 12. Instalación en Windows (Docker Desktop / WSL2 · contenedores Linux)
+
+Windows es un destino **soportado con salvedades** (ver `docs/SUPPORTED_PLATFORMS.md`).
+El paquete son imágenes **Linux amd64**; en Windows corren sobre **WSL2** vía Docker
+Desktop en modo **"Linux containers"**. En vez de `install.sh` se usa su **espejo
+nativo** `install.ps1` (misma lógica, PowerShell).
+
+**Prerrequisitos del host Windows:**
+- **Docker Desktop** con **WSL2** y el daemon en modo **contenedores Linux** (el
+  preflight aborta si reporta `windows`). `docker compose` v2 incluido.
+- **openssl** en el `PATH` (Git for Windows lo trae, o una build portable) — la
+  MISMA dependencia que exige `install.sh` en Linux.
+- PowerShell 5.1+ (el de Windows) o PowerShell 7.
+
+**Instalar:**
+```powershell
+tar -xzf lyra-watchlog-<versión>.tar.gz
+cd lyra-watchlog-<versión>
+.\install.ps1                     # 1ª pasada: verifica, carga imágenes, crea .env (se detiene)
+# edita .env  (EDGE_MODE = a|b  +  APP_PUBLIC_URL)  — igual que en Linux
+.\install.ps1                     # 2ª pasada: genera cert+borde (modo b), levanta y espera health
+.\install.ps1 -Check              # doctor: reporte PASA/FALLA (o .\doctor.ps1)
+```
+
+**Diferencias específicas de Windows (idénticas en resultado, distintas por debajo):**
+- **Huella de licencia (L1):** bajo Docker Desktop, `/etc/machine-id` **no es fiable**
+  (el distro `docker-desktop` no lo tiene y el valor de la VM se **regenera al
+  actualizar Docker Desktop / resetear WSL**, lo que rompería el node-lock). Por eso
+  `install.ps1` **ancla la huella al `MachineGuid` del host Windows**
+  (`HKLM\SOFTWARE\Microsoft\Cryptography`): lo escribe en `license\machine-id` (re-derivado
+  en cada corrida) y fija `LICENSE_MACHINE_ID_FILE=/app/license/machine-id`. Estable ante
+  reinicios, updates de Docker Desktop y resets de WSL. La ceremonia de licencia (§6) es
+  idéntica: `solicitud.lreq` ya lleva esta huella.
+- **Permisos:** el `chown uid 1000` de Linux no aplica al FS Windows. `install.ps1` corre
+  un **probe** (`docker run -u 1000:1000`) que confirma que el `api` non-root puede escribir
+  `./license` **antes** de arrancar; si falla, revisa **Settings → Resources → File Sharing**
+  de Docker Desktop (incluye la unidad del paquete) o mueve el paquete al **FS de WSL2**
+  (ext4), que es lo recomendado por rendimiento y permisos.
+- **Verificación:** `SHA256SUMS` se comprueba con `Get-FileHash`; la firma **cosign** es
+  best-effort (si `cosign.exe` está en el `PATH`).
+
+> **Honestidad (caveat):** Windows Server como destino **productivo** es atípico en la
+> industria; se soporta principalmente para **pilotos/estaciones**. Para producción real,
+> Linux x86-64 sigue siendo el destino principal.
