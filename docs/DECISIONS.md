@@ -4,6 +4,44 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-08 · Track WINDOWS de la instalación (programa "instalación limpia", P1) — huella, permisos y enfoque
+Sesión `feat/install-windows` (BACKLOG §3, P1). Objetivo: llevar la instalación offline a **Windows (Docker Desktop /
+WSL2 con contenedores Linux)** reflejando el comportamiento del `install.sh` YA afinado. Matriz soportada = Linux x86-64
+**+ Windows** (ARM/macOS/k8s/IPv6 fuera). Decisiones tomadas **con validación empírica en vivo** (Docker Desktop/WSL2
+amd64) antes de codificar:
+
+- **(a) La huella de licencia (L1) NO puede depender de `/etc/machine-id` bajo Docker Desktop.** Validado en vivo: el
+  distro `docker-desktop` **no tiene `/etc/machine-id`**; un contenedor que lo bind-montea igual lee un valor
+  (`82176afc…`) inyectado por la VM interna de Docker Desktop, pero su **procedencia es opaca y NO es la identidad del
+  host Windows**, y **se regenera al recrear la VM/distro** (update de Docker Desktop, "Reset to factory defaults",
+  `wsl --unregister docker-desktop`). Confiar en él ⇒ el node-lock del cliente se **rompería en silencio en un update
+  rutinario de Docker Desktop**. No warrantizable.
+- **(b) Ancla Windows = `MachineGuid`** (`HKLM\SOFTWARE\Microsoft\Cryptography\MachineGuid`): estable ante reinicios,
+  updates de DD y resets de WSL; solo cambia en reinstalación/sysprep. Es el mismo equivalente que el
+  `MachineSignalsCollector` ya usa para "Windows dev". El instalador **re-deriva el MachineGuid vivo en CADA corrida** y
+  lo escribe en `./license/machine-id` (dentro del `./license` ya montado), fijando `LICENSE_MACHINE_ID_FILE=/app/license/machine-id`
+  en el `.env`. El colector (Linux dentro del contenedor) lo lee por esa ruta. **Cero cambios al compose** (el default
+  Linux `/etc/machine-id` queda intacto ⇒ el smoke Linux no se toca). **Node-lock preservado:** copiar la carpeta a otra
+  máquina y reejecutar el instalador re-deriva con el MachineGuid de la máquina #2 ⇒ la huella cambia ⇒ licencia inválida
+  allí; L4 (linaje/ledger) respalda ante clones de BD.
+- **(c) Permisos (`chown 1000:1000`) — validado con probe, no se debilita el non-root.** El `chown` de Linux no aplica al
+  FS Windows. Docker Desktop mapea los bind-mounts Windows de forma permisiva (uid 1000 del `api` puede escribir), pero
+  para no repetir el bug EACCES del piloto el `install.ps1` corre un **probe real** (`docker run -u 1000:1000` que escribe
+  y borra un archivo en `./license`) **antes** de levantar el stack: si falla, aborta con guía. No se relaja CIS 5.12.
+- **(d) Enfoque = `install.ps1` NATIVO completo (decisión del dueño).** El agente **recomendó** un `install.ps1` delgado
+  que hiciera hand-off al `install.sh` existente dentro de WSL2 (cero duplicación de la lógica recién afinada; el `chown`/
+  preflight/doctor funcionan idénticos sobre FS ext4). El dueño **optó por el nativo completo** (independiente de un distro
+  WSL de usuario). **Objeción registrada (regla de honestidad):** el nativo **duplica** la lógica del `install.sh` ⇒ dos
+  bases a mantener en sync (riesgo de deriva; roza "no duplicar" de CLAUDE.md). **Mitigación:** `install.ps1` es un
+  **espejo fiel** (misma estructura de pasos, mismos mensajes, misma herramienta `openssl` que `install.sh` YA exige, misma
+  lógica IP↔`default_sni` y cert self-signed) + deuda de sincronización anotada en BACKLOG §3. Prerrequisito Windows
+  honesto y **simétrico con Linux**: `openssl` en el PATH (Git for Windows / portable) + Docker Desktop en **modo
+  contenedores Linux** (el preflight aborta si el daemon reporta `windows`).
+- **(e) Smoke Windows.** CI en `windows-latest` **no** corre contenedores Linux de forma fiable ⇒ no es viable en Actions.
+  Se entrega un **smoke MANUAL/self-hosted reproducible** (`scripts/smoke-install-windows.ps1`), documentado. La única
+  pieza de **código compartido** tocada (que el colector lea `LICENSE_MACHINE_ID_FILE`) se **cubre en el smoke Linux** con
+  un caso extra (override de la ruta ⇒ API healthy), manteniéndolo VERDE.
+
 ### 2026-07-08 · install.sh AUTOREPARABLE + `doctor` (programa "instalación limpia", P0) — decisiones de diseño
 Sesión `feat/install-autoreparable-doctor` (BACKLOG §3 "PROGRAMA instalación limpia"). Raíz de los 4 bugs del piloto: el
 operador tenía que crear el cert con `openssl` y editar `edge/Caddyfile.edge` a mano (SNI/`default_sni`), pasos frágiles.

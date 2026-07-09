@@ -367,6 +367,33 @@ docker compose --project-directory . --env-file .env -f compose/docker-compose.y
 
 ---
 
+## 🪟 Variante Windows (Docker Desktop / WSL2)
+
+Si el servidor de prueba es **Windows** (no Linux), casi todo es igual pero con estos
+cambios (detalle técnico en `docs/INSTALL_OFFLINE.md §12` y `docs/SUPPORTED_PLATFORMS.md`):
+
+1. **En el servidor Windows** instala **Docker Desktop** con **WSL2** y ponlo en modo
+   **"Linux containers"** (icono de la bandeja → *Switch to Linux containers* si estuviera
+   en Windows). Ten **openssl** en el PATH (lo trae *Git for Windows*).
+2. En vez de `./install.sh` usas su **espejo** en PowerShell:
+   ```powershell
+   tar -xzf lyra-watchlog-<versión>.tar.gz
+   cd lyra-watchlog-<versión>
+   .\install.ps1                 # 1ª pasada (crea .env y se detiene)
+   # edita .env: EDGE_MODE=b  +  APP_PUBLIC_URL=https://IP_DEL_SERVIDOR
+   .\install.ps1                 # 2ª pasada (genera cert + borde, levanta, espera health)
+   .\install.ps1 -Check          # diagnóstico PASA/FALLA (o .\doctor.ps1)
+   ```
+3. **Licencia:** idéntica (Paso 8). La "huella" en Windows se ancla al **MachineGuid** del
+   equipo (lo gestiona `install.ps1`); `license\solicitud.lreq` se genera igual.
+4. **Si el instalador avisa que uid 1000 no puede escribir `./license`:** habilita la
+   unidad del paquete en **Docker Desktop → Settings → Resources → File Sharing**, o mueve
+   el paquete al **disco de WSL2** (ext4), y reejecuta `.\install.ps1`.
+5. **Caveat honesto:** Windows es válido para **pilotos/estaciones**; para producción real
+   el destino principal es Linux x86-64.
+
+---
+
 ## 📚 Para profundizar
 
 - `docs/INSTALL_OFFLINE.md` — la guía técnica completa (respaldos, actualizaciones, modos
