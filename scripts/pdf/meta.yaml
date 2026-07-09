@@ -1,0 +1,18 @@
+---
+title: "Manual de instalación y configuración"
+subtitle: "Lyra WatchLog — guía de instalación paso a paso (Linux y Windows)"
+author: "ITESICWS · Lyra WatchLog"
+date: "Julio 2026"
+lang: es
+titlepage: true
+titlepage-color: "0C1124"
+titlepage-text-color: "E7EAF3"
+titlepage-rule-color: "06B6D4"
+titlepage-rule-height: 4
+toc: true
+toc-own-page: true
+colorlinks: true
+mainfont: "Segoe UI"
+monofont: "Consolas"
+geometry: "margin=2.2cm"
+...
