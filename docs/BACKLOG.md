@@ -672,59 +672,106 @@
 
 ---
 
-## ⭐ Orden de prioridad vigente (actualizado 2026-07-09)
+## ⭐ CATÁLOGO MAESTRO DE PENDIENTES (actualizado 2026-07-09)
 
-> Vista-resumen de TODO lo abierto por desarrollar, priorizado y con estimación en **sesiones**
-> (1 sesión = 1 slice cerrable con el checklist §0 ≈ 35–45 HH). El detalle de cada tema vive en su
-> sección de §2/§3 más abajo. **Los ~30 "smokes visuales" de §4 NO son desarrollo:** los consolida y
-> ejecuta la **ronda de QA humana** con `docs/SMOKE_VISUAL_GLOBAL.pdf` (guía generada 2026-07-09).
+> **Vista-resumen ÚNICA y completa** de TODO lo abierto por desarrollar (nada se queda atrás).
+> 1 sesión = 1 slice cerrable con el checklist §0 ≈ 35–45 HH. Las estimaciones "sin cifra dura" son
+> aproximaciones gruesas. El detalle de cada tema vive en su sección de §2/§3 más abajo. **Los ~30
+> "smokes visuales" de §4 NO son desarrollo:** los consolida la **ronda de QA humana** con
+> `docs/SMOKE_VISUAL_GLOBAL.pdf`.
 
-**Nivel 1 — Producto de alto valor, listo para construir (independiente del QA):**
+### Principios de construcción (premisa permanente — "el espíritu de Lyra")
+1. **Todo conectado y reutilizable, sin forzar al extremo.** Antes de crear una entidad/pantalla, revisar si
+   se puede REUSAR lo que ya existe (Form Builder, checklists, workflow, folio, StorageService, `@lyra/ui`,
+   ABAC, notificaciones). Compartido vive en `packages/`.
+2. **CERO duplicidades de ningún tipo** — ni de captura de datos, ni de UI, ni de lógica. Una captura → varios
+   consumidores (ej. medidores: la lectura se toma en la bitácora/ronda existente y se PROYECTA a la serie del
+   medidor; no hay 2.ª pantalla de captura).
+3. **Bajo estándar de industria** (SAP PM, IBM Maximo, NIST, OWASP/ASVS, ISO 14224/45001/31000, SCIM, OIDC,
+   RFCs, Part 11/ALCOA+). Nada de inventos raros.
+4. **Innovación deliberada BIENVENIDA y proactiva:** cuando aporte algo que las otras plataformas no tienen,
+   proponerlo explícito (ver "Ideas innovadoras" abajo). Enterprise, genérico, potente y fácil de implementar.
+
+### A. Módulos / épicos NUEVOS por construir
+
+| # | Épico / módulo | Qué es (items principales) | Sesiones |
+|---|---|---|---|
+| A1 | **Salud del sistema (observabilidad TI)** | S1 logs estructurados+redacción secretos+/health ampliado+errores agrupados+dashboard · S2 métricas RED+alertas+retención · S3 IA local (@lyra/llm)+scrubber · S4 opcional LGTM | **3–4** (MVP=1) |
+| A2 | **Reversa/Anulación GxP de sellados** (Candidato #1) | Transición inversa firmada de registro sellado (Part 11 §11.200), original intacto + `payloadHash`; S1 bitácoras · S2 incidencias/OT/turno | **2** |
+| A3 | **App móvil de terreno (PWA-first, offline)** | App nueva `apps/watchlog-mobile`; S1 cimientos PWA · S2 terreno offline (rondas+bitácora) · S3 supervisión (incid/OT/aprobaciones) · S4 QR/evidencia · S5 gerencia · (S6 opcional Capacitor+push+MDM) | **8–10 (+2–3)** |
+| A4 | **OT a grado de mercado (CMMS/EAM)** | M1+M2 preventivo auto-genera OT · M3 medidores (REUSA captura de bitácora) · M4 job plans · M5 mano de obra · M6 costos · M7 materiales · M8 fallas ISO 14224 · M9 MTTR/MTBF · M10 Gantt · (M11 capacidad) | **10 + 1 opc.** |
+| A5 | **Autenticación empresarial / Federación** (AD/LDAP/OIDC/SAML) | Set lean de campos usuario (SCIM) · tabla `UserIdentity` + account linking · SCIM inbound+JIT+grupo→rol · MFA delegada al IdP · validez por fechas contratistas | **2–3** |
+| A6 | **Motor de eventos + Webhooks + API pública** (Req-3/Req-4) | Bus de eventos (outbox) · `WebhookSubscription` con firma HMAC+reintentos+log de entregas · API de datos por plantilla + **API Keys m2m**+scoping+rate-limit+OpenAPI | **2–3** |
+| A7 | **Orígenes de datos externos / motor de integración** (Fase 3, Ola 5) | Entidad `ExternalReference` polimórfica (SAP PM/Maximo/PI Web API/OPC UA/ISA-95) · conectar/leer/sync · autocompletar campo desde tag SCADA/PI/OPC | **2–4** |
+| A8 | **Base de conocimiento** (Fase 6) | Artículos + búsqueda full-text (tsvector/OpenSearch) + vínculo a incidencias/OT/equipos | **2–3** |
+| A9 | **IA avanzada** (Req-6 / Req-6b) | RAG: consulta de bitácoras en lenguaje natural (embeddings+recuperar+citar) · Insights IA-asistidos · Predicción de fallas ML (posterior) | **2–4** |
+| A10 | **Consola de licencias central** (back-office del EMISOR) | Panel de licencias + ledger en Postgres + emisión desde UI (hoy CLI). Diferible | **2–3** |
+
+### B. Cerrar módulos casi completos (deudas de paridad / UX / submódulos)
 
 | Tema | Qué es | Sesiones |
 |---|---|---|
-| Salud del sistema (observabilidad TI) | Logs estructurados + /health ampliado + errores agrupados + dashboard; luego RED/alertas, IA local | **MVP 1 · total 3–4** |
-| Reversa/Anulación GxP de sellados (Candidato #1) | Transición inversa firmada de un registro sellado (Part 11 §11.200); original intacto + `payloadHash` | **2** |
-| App móvil de terreno (PWA-first, offline) | PWA sobre el mismo codebase React; terreno+supervisión+gerencia; offline-first + sync; Capacitor opcional | **8–10 (+2–3 Capacitor)** |
-| OT a grado de mercado (CMMS/EAM) | Capa de mantenimiento/confiabilidad: PM auto-genera OT (M1+M2), medidores, costos, ISO 14224, MTTR/MTBF, Gantt | **10 núcleo + 1 opcional** |
+| **OT S7b — enlace Incidencia↔OT** | Vista inversa + botón "Crear OT desde incidencia"; cierra el paquete comercial de OT | ~0.5 |
+| **Vistas guardadas (SavedView)** Incidencias+OT | Persistir filtros/orden/columnas con nombre (ya existe en Bitácoras) | ~0.5–1 |
+| **Incidencias → Object Page** | Detalle drawer → página dedicada + extraer `WorkflowDiagram` a `packages/ui` | ~0.5–1 |
+| **Motor de reglas — 2.º corte** (Req-7) | Límites dinámicos · acciones que disparan módulos · lookups · tablas DMN · obligatoriedad/visibilidad condicional | ~2–3 |
+| **Rondas — Route (fan-out por equipo)** | Horario que cubre varios equipos → una ocurrencia por equipo | ~0.5–1 |
+| **Rondas — "Run Mode" ejecución guiada** | Pantalla paso a paso + progreso + swipe (offline-first) — **converge con la App móvil A3** | (en A3) |
+| **Estructura — ABAC node-centric** | Asignar usuarios/roles desde el árbol ("quién accede a este nodo"); modelo ya existe, falta UI | ~1 |
+| **Panorama multi-módulo** | Extender la vista ejecutiva (hoy solo incidencias) a bitácoras/rondas/turno | ~1 |
+| **Dotación Slice 4** | Esbozo del puerto/adaptador de control de acceso/T&A (sin hardware) | ~0.5–1 |
+| **Bitácoras 2.6.1/2.6.2** | Personalización (SavedView+columnas+densidad) + analítica (facetas con conteo, agrupación, peek) | ~1–2 |
+| **Layouts modernos 2.9.0** | Modo por versión (clásico/pestañas/wizard/colapsable) | ~1–2 |
+| **Deuda OT fina** | Editor UI de `folioScheme`/claves de estado en el mantenedor de tipos (hoy API-only) | ~0.25 |
+| **Visibilidad de calendario efectivo en el nodo** | Badge "Calendario efectivo: <nombre> (heredado/directo)" en el detalle | ~0.25 |
+| **Alcance por plantilla 2.8 (aditiva)** | Flag scope estricto (deny-by-default) + agrupador de plantillas por categoría | ~1 |
 
-**Nivel 2 — Cerrar módulos casi completos (deudas de paridad, chicas):**
-
-| Tema | Qué es | Sesiones |
-|---|---|---|
-| OT S7b — enlace Incidencia↔OT | Vista inversa + botón "Crear OT desde incidencia"; cierra el paquete comercial de OT | **~0.5** (~15 HH) |
-| Vistas guardadas (SavedView) en Incidencias y OT | Persistir filtros+orden+columnas con nombre (ya existe en Bitácoras) | **~0.5–1** (~15–20 HH) |
-| Incidencias a Object Page | Detalle de drawer → página dedicada (paridad OT) + extraer `WorkflowDiagram` a `packages/ui` | **~0.5–1** (~6–10 HH) |
-
-**Nivel 3 — Épico de canal / distribución (licenciamiento y cadena de suministro YA hechos):**
-
-| Tema | Qué es | Sesiones |
-|---|---|---|
-| Marca blanca COMPLETA | Rematar correos, acta PDF y nombre de producto en todos los rincones | **~1** (~30–60 HH) |
-| Cierre del programa de seguridad | H3 enterprise (SIEM/AV/SSO/EDR) + pentest de tercero + security.txt + paquete de evidencia | **~2–3** |
-| Orquestación de flota multi-cliente | Actualizador con aprobación/anillos + inventario (diferible hasta 3–5 clientes) | **~2–4** (~75–160 HH) |
-| SSO/SAML/OIDC (federación, E5) | Módulo de identidad corporativa, tras E1–E4 | **~1–2** |
-
-**Nivel 4 — No construidos aún (visión / menor urgencia):**
+### C. Canal / distribución (bloquea firmar el canal; licenciamiento + cadena de suministro YA hechos)
 
 | Tema | Qué es | Sesiones |
 |---|---|---|
-| Orígenes de datos externos (SCADA/PI/OPC) | Hoy solo modelado (`source=EXTERNAL`); "Ola 5" del Form Builder / Fase 3 | **~2–3** |
-| Base de conocimiento | No existe UI; búsqueda full-text + artículos | **~2–3** |
-| Integración estructura B/C/D | CSV import/export de estructura · API Keys (m2m) · Webhooks | **~1–2** |
-| OT S8 enterprise | Aprobadores dinámicos, ruta crítica, costos/HH — **se solapa con la capa CMMS** (M5/M6/M10) | **~2–3** (opcional) |
-| Dotación Slice 4 | Esbozo del puerto/adaptador de control de acceso/T&A (sin hardware real) | **~0.5–1** |
-| Estructura — ABAC node-centric | Asignar usuarios/roles desde el árbol ("quién accede a este nodo") | **~1** |
+| **Marca blanca COMPLETA** | Nombre de producto configurable + branding en acta PDF + correos salientes | ~1 (30–60 HH) |
+| **Cierre del programa de seguridad** | H3 (SIEM/AV/SSO/EDR) + **pentest de tercero** + `security.txt` + paquete de evidencia (62443/ASVS) | ~2–3 |
+| **Orquestación de flota multi-cliente** | (3a) inventario/versión · (3b) actualizador con aprobación/ventana · (3c) bundle air-gapped · (3d) despliegue por anillos | ~2–4 |
 
-**Dependencias / secuenciación a recordar:**
-- **Reversa GxP antes que la App móvil:** la firma Part 11 **offline** del móvil reutiliza el `payloadHash` que construye Reversa GxP.
-- **App móvil = app nueva `apps/watchlog-mobile`** + extraer capa cliente compartida a `packages/` (ej. `client-core`), versionada por tag con la plataforma (esquema offline versionado aparte). Ver memoria `mobile-app-strategy`.
-- **CMMS absorbe gran parte de OT S8** (M5 mano de obra, M6 costos, M10 Gantt): no hacer ambos por separado.
-- **Ronda de QA (smoke) primero** puede reordenar todo: un hallazgo S1/S2 manda.
+### D. Deuda técnica / hardening / escalabilidad (Fase 7) e híbrida
 
-**Recomendación de arranque (para avanzar durante el QA):** 1) Salud del sistema (MVP, 1 sesión, cero dependencias). 2) Deudas chicas del Nivel 2 (S7b · SavedView · Object Page). 3) Según hallazgos del QA: Reversa GxP (que además pavimenta el móvil) o cimientos PWA del móvil.
+| Tema | Qué es | Sesiones |
+|---|---|---|
+| **Firma con `payloadHash` (transversal)** | Persistir la firma atada al hash del contenido en incidencias/turno/OT — **unifica con A2 (Reversa GxP)** | (en A2) |
+| **Evidencia/adjuntos en CAPA/investigación/reportes** | Reusar `StorageService` (Ola 3) + presigned GET con ABAC | ~0.5–1 |
+| **Escalabilidad Bitácoras a millones** | KPIs sin COUNT (Redis/rollups) · full-text (tsvector/GIN) · particionado por tiempo (pg_partman) · SLA en horas hábiles · export cap | ~2–3 |
+| **Bundle web (~743 KB)** | Code-splitting / `manualChunks` | ~0.25 |
+| **Seguridad — endurecimiento** | Rechazo de contraseñas comprometidas (HIBP k-anon) · anti-replay OTP · throttle re-auth · recovery-code antes de commit · cookie secure HTTPS | ~1 |
+| **Flujos — gobernanza** | Aviso de impacto al editar + visor "¿qué plantillas usan este flujo?" + concurrencia optimista | ~1 |
+| **Notificaciones — deuda diferida (Bloque N)** | Digest/batching · UI de suscripciones (watchers) · plantilla INAPP propia · escalamiento por tiers (PagerDuty) · BullMQ · canal SMS/WhatsApp | ~2–3 |
+| **Incidencias Fase 4 — deuda acumulada** | `role-options` decoplado · métodos de investigación ICAM/Ishikawa · export CSV/facetas/SavedView/kanban drag&drop | ~1–2 |
+| **i18n / multi-idioma** | Segundo idioma completo (base es-CL lista) | ~1–2 |
+| **Manual de uso (USER_GUIDE)** | Backfill incremental de secciones ✍️ (1–2 por sesión) | (continuo) |
+| **Form Builder — limpieza** | Borrar código muerto (`BuilderFieldCard`/`Overlay`) + pulir modal "Ver más" | ~0.25 |
 
-**Totales aproximados:** sin el CMMS ni el móvil ≈ **10–16 sesiones**; con **App móvil** ≈ **18–26**; con **CMMS** además ≈ **28–37 sesiones** de producto (fuera del pentest externo).
+### E. Ideas innovadoras a considerar (proactivo — lo que otros NO tienen)
+- **Medidores enlazados a campos de bitácora + PM basado en uso** (A4/M3): captura única, disparo de OT por horómetro/contador. Genérico y elegante.
+- **"Chatea con tus bitácoras/salud"** (RAG local, A9/A1-S3): lenguaje natural sobre datos on-prem, sin nube.
+- **PWA con auto-actualización desde el servidor on-prem** (A3): actualizar la flota móvil en air-gap sin tiendas.
+- **Predicción de fallas** (A9/Req-6b) y **resumen de turno por IA en streaming** (ya hecho): diferenciadores de venta.
+
+### F. Pruebas (NO desarrollo)
+- **Ronda de QA visual del dueño** con `SMOKE_VISUAL_GLOBAL.pdf` (consolida los ~30 smokes de §4) + corrección de los bugs que arroje (depende de hallazgos).
+
+### Dependencias / secuenciación
+- **A2 Reversa GxP antes que A3 App móvil:** la firma Part 11 offline del móvil reutiliza el `payloadHash` de A2.
+- **A4 CMMS ↔ A3 App móvil:** M3/M5/M7/M8/M4 son **captura de terreno** → se surten por la app móvil y REUSAN la captura existente (bitácoras/checklists), NO pantallas nuevas. **A4 CMMS absorbe casi todo OT S8.**
+- **A5 Federación / A6 API+Webhooks / A7 Integración** comparten el patrón "aditivo tras interfaz abstracta".
+- **Ronda de QA (F) primero** puede reordenar todo: un hallazgo S1/S2 manda.
+
+### Totales aproximados (orden de magnitud)
+- **Cierre de deudas (B+D chicas):** ~10–15 sesiones.
+- **+ Épicos nuevos de producto (A1..A10):** ~35–50 sesiones.
+- **+ Canal/distribución (C):** ~5–10 sesiones (+ pentest externo, tercero).
+- **GRAN TOTAL para "llegar a todo":** **~50–70 sesiones** de producto (≈ **1.900–3.100 HH**, asistido por IA). El **paquete de mayor valor comercial** (Salud + Reversa GxP + App móvil + CMMS PM/M1-M2 + cierre de deudas) es un subconjunto de **~25–35 sesiones**.
+
+**Recomendación de arranque (para avanzar durante el QA):** 1) A1 Salud del sistema (MVP, 1 sesión, cero dependencias). 2) Deudas chicas de B (S7b · SavedView · Object Page). 3) Según hallazgos del QA: A2 Reversa GxP (pavimenta el móvil) o cimientos de A3 App móvil.
 
 ---
 

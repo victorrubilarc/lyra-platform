@@ -5265,3 +5265,21 @@ ya existente; límites iOS conocidos), on-prem (otro cliente del backend licenci
 **Orden de slices (~8–10 sesiones PWA + ~2–3 Capacitor opcional):** cimientos PWA → offline Mis rondas +
 bitácora → offline incidencias/OT/aprobaciones → escaneo/evidencia → vista gerencia → (opcional) Capacitor.
 Supera la nota previa "modo offline terreno (PWA)". Se construye en sesión nueva.
+
+### 2026-07-09 · Principios de construcción permanentes ("espíritu de Lyra") + medidores sin duplicar captura
+**Decisión (dueño):** toda construcción futura se rige por 4 principios permanentes (ver memoria
+`build-principles-lyra`): (1) todo conectado y reutilizable sin forzar; (2) CERO duplicidades (datos/UI/
+lógica), patrón "una captura → varios consumidores"; (3) bajo estándar de industria (SAP PM/Maximo/NIST/
+OWASP/ISO/SCIM/OIDC/Part 11), sin inventos raros; (4) innovación deliberada bienvenida y proactiva
+(proponerla explícita cuando aporte algo que otros no tienen).
+**Aplicación canónica — medidores (CMMS M3):** NO se crea una 2.ª pantalla de captura de lecturas. Hoy
+Bitácoras/Rondas ya capturan lecturas (campo "Contador"/`counterNonDecreasing` y Número con umbrales, en
+`LogEntryValue`, atado a `Equipment` vía `LogEntry.equipmentId`). M3 agrega SOLO lo que falta en backend:
+(a) el **medidor como entidad/atributo del equipo** (tipo/unidad/continuo vs. acumulativo), (b) una **serie
+de tiempo `MeterReading`** consultable (proyectada al SELLAR una entrada cuyo campo está marcado como
+"medidor M del equipo E"), (c) **disparo de PM por uso/umbral** (ej. cada 500 h de horómetro). Una captura,
+dos consumidores. Mismo criterio para M8 (códigos de falla al cierre reusan checklists/Form Builder) y
+M5/M7 (mano de obra/materiales como líneas de la ejecución de OT). **Motivo:** evitar duplicidad y doble
+digitación (el operador no ingresa la lectura dos veces), y mantener la coherencia del producto.
+**Referencia viva:** el "⭐ CATÁLOGO MAESTRO DE PENDIENTES" al inicio de `docs/BACKLOG.md` es la lista única
+de todo lo abierto (mantener al día).
