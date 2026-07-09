@@ -672,6 +672,62 @@
 
 ---
 
+## ⭐ Orden de prioridad vigente (actualizado 2026-07-09)
+
+> Vista-resumen de TODO lo abierto por desarrollar, priorizado y con estimación en **sesiones**
+> (1 sesión = 1 slice cerrable con el checklist §0 ≈ 35–45 HH). El detalle de cada tema vive en su
+> sección de §2/§3 más abajo. **Los ~30 "smokes visuales" de §4 NO son desarrollo:** los consolida y
+> ejecuta la **ronda de QA humana** con `docs/SMOKE_VISUAL_GLOBAL.pdf` (guía generada 2026-07-09).
+
+**Nivel 1 — Producto de alto valor, listo para construir (independiente del QA):**
+
+| Tema | Qué es | Sesiones |
+|---|---|---|
+| Salud del sistema (observabilidad TI) | Logs estructurados + /health ampliado + errores agrupados + dashboard; luego RED/alertas, IA local | **MVP 1 · total 3–4** |
+| Reversa/Anulación GxP de sellados (Candidato #1) | Transición inversa firmada de un registro sellado (Part 11 §11.200); original intacto + `payloadHash` | **2** |
+| App móvil de terreno (PWA-first, offline) | PWA sobre el mismo codebase React; terreno+supervisión+gerencia; offline-first + sync; Capacitor opcional | **8–10 (+2–3 Capacitor)** |
+| OT a grado de mercado (CMMS/EAM) | Capa de mantenimiento/confiabilidad: PM auto-genera OT (M1+M2), medidores, costos, ISO 14224, MTTR/MTBF, Gantt | **10 núcleo + 1 opcional** |
+
+**Nivel 2 — Cerrar módulos casi completos (deudas de paridad, chicas):**
+
+| Tema | Qué es | Sesiones |
+|---|---|---|
+| OT S7b — enlace Incidencia↔OT | Vista inversa + botón "Crear OT desde incidencia"; cierra el paquete comercial de OT | **~0.5** (~15 HH) |
+| Vistas guardadas (SavedView) en Incidencias y OT | Persistir filtros+orden+columnas con nombre (ya existe en Bitácoras) | **~0.5–1** (~15–20 HH) |
+| Incidencias a Object Page | Detalle de drawer → página dedicada (paridad OT) + extraer `WorkflowDiagram` a `packages/ui` | **~0.5–1** (~6–10 HH) |
+
+**Nivel 3 — Épico de canal / distribución (licenciamiento y cadena de suministro YA hechos):**
+
+| Tema | Qué es | Sesiones |
+|---|---|---|
+| Marca blanca COMPLETA | Rematar correos, acta PDF y nombre de producto en todos los rincones | **~1** (~30–60 HH) |
+| Cierre del programa de seguridad | H3 enterprise (SIEM/AV/SSO/EDR) + pentest de tercero + security.txt + paquete de evidencia | **~2–3** |
+| Orquestación de flota multi-cliente | Actualizador con aprobación/anillos + inventario (diferible hasta 3–5 clientes) | **~2–4** (~75–160 HH) |
+| SSO/SAML/OIDC (federación, E5) | Módulo de identidad corporativa, tras E1–E4 | **~1–2** |
+
+**Nivel 4 — No construidos aún (visión / menor urgencia):**
+
+| Tema | Qué es | Sesiones |
+|---|---|---|
+| Orígenes de datos externos (SCADA/PI/OPC) | Hoy solo modelado (`source=EXTERNAL`); "Ola 5" del Form Builder / Fase 3 | **~2–3** |
+| Base de conocimiento | No existe UI; búsqueda full-text + artículos | **~2–3** |
+| Integración estructura B/C/D | CSV import/export de estructura · API Keys (m2m) · Webhooks | **~1–2** |
+| OT S8 enterprise | Aprobadores dinámicos, ruta crítica, costos/HH — **se solapa con la capa CMMS** (M5/M6/M10) | **~2–3** (opcional) |
+| Dotación Slice 4 | Esbozo del puerto/adaptador de control de acceso/T&A (sin hardware real) | **~0.5–1** |
+| Estructura — ABAC node-centric | Asignar usuarios/roles desde el árbol ("quién accede a este nodo") | **~1** |
+
+**Dependencias / secuenciación a recordar:**
+- **Reversa GxP antes que la App móvil:** la firma Part 11 **offline** del móvil reutiliza el `payloadHash` que construye Reversa GxP.
+- **App móvil = app nueva `apps/watchlog-mobile`** + extraer capa cliente compartida a `packages/` (ej. `client-core`), versionada por tag con la plataforma (esquema offline versionado aparte). Ver memoria `mobile-app-strategy`.
+- **CMMS absorbe gran parte de OT S8** (M5 mano de obra, M6 costos, M10 Gantt): no hacer ambos por separado.
+- **Ronda de QA (smoke) primero** puede reordenar todo: un hallazgo S1/S2 manda.
+
+**Recomendación de arranque (para avanzar durante el QA):** 1) Salud del sistema (MVP, 1 sesión, cero dependencias). 2) Deudas chicas del Nivel 2 (S7b · SavedView · Object Page). 3) Según hallazgos del QA: Reversa GxP (que además pavimenta el móvil) o cimientos PWA del móvil.
+
+**Totales aproximados:** sin el CMMS ni el móvil ≈ **10–16 sesiones**; con **App móvil** ≈ **18–26**; con **CMMS** además ≈ **28–37 sesiones** de producto (fuera del pentest externo).
+
+---
+
 ## 0. Definición de "sesión cerrada de forma segura" (checklist)
 
 Antes de declarar una sesión completa, TODO esto debe estar hecho o registrado aquí:
