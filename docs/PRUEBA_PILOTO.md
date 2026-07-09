@@ -103,16 +103,16 @@ docker compose version
 
 ## Paso 2 — Descarga el instalador (en tu PC)
 
-El instalador es **un solo archivo** de ~1 GB llamado `lyra-watchlog-v0.1.20.tar.gz`.
+El instalador es **un solo archivo** de ~1 GB llamado `lyra-watchlog-v0.1.21.tar.gz`.
 
 🌐 **EN TU NAVEGADOR:** entra (con tu cuenta de GitHub) a esta dirección:
 ```
-https://github.com/victorrubilarc/lyra-platform/releases/tag/v0.1.20
+https://github.com/victorrubilarc/lyra-platform/releases/tag/v0.1.21
 ```
-Busca la sección **Assets** y haz clic en **`lyra-watchlog-v0.1.20.tar.gz`** para
+Busca la sección **Assets** y haz clic en **`lyra-watchlog-v0.1.21.tar.gz`** para
 descargarlo. Normalmente cae en tu carpeta **Descargas**.
 
-- ✅ **Deberías tener** el archivo `lyra-watchlog-v0.1.20.tar.gz` en `Descargas`.
+- ✅ **Deberías tener** el archivo `lyra-watchlog-v0.1.21.tar.gz` en `Descargas`.
 
 ---
 
@@ -124,7 +124,7 @@ cd ~\Downloads
 ```
 Ahora cópialo al servidor (reemplaza USUARIO e IP por los tuyos):
 ```powershell
-scp lyra-watchlog-v0.1.20.tar.gz USUARIO@IP_DEL_SERVIDOR:/home/USUARIO/
+scp lyra-watchlog-v0.1.21.tar.gz USUARIO@IP_DEL_SERVIDOR:/home/USUARIO/
 ```
 - Te pedirá la contraseña otra vez. La copia de 1 GB **tarda varios minutos** (verás una
   barra de progreso).
@@ -140,8 +140,8 @@ ssh USUARIO@IP_DEL_SERVIDOR
 ```
 🐧 **EN EL SERVIDOR (bash):** descomprime y entra a la carpeta:
 ```bash
-tar -xzf lyra-watchlog-v0.1.20.tar.gz
-cd lyra-watchlog-v0.1.20
+tar -xzf lyra-watchlog-v0.1.21.tar.gz
+cd lyra-watchlog-v0.1.21
 ls
 ```
 - ✅ **Deberías ver** archivos como `install.sh`, `images`, `compose`, `SHA256SUMS`.
@@ -252,7 +252,7 @@ licencia**.
 
 💻 **EN TU PC (PowerShell):** (reemplaza USUARIO e IP)
 ```powershell
-scp USUARIO@IP_DEL_SERVIDOR:/home/USUARIO/lyra-watchlog-v0.1.20/license/solicitud.lreq .
+scp USUARIO@IP_DEL_SERVIDOR:/home/USUARIO/lyra-watchlog-v0.1.21/license/solicitud.lreq .
 ```
 - ✅ Ahora tienes `solicitud.lreq` en tu carpeta actual.
 
@@ -272,7 +272,7 @@ pnpm license issue --request solicitud.lreq --customer "Cliente Prueba" --channe
 
 💻 **EN TU PC (PowerShell):** (reemplaza USUARIO e IP)
 ```powershell
-scp license.lic USUARIO@IP_DEL_SERVIDOR:/home/USUARIO/lyra-watchlog-v0.1.20/license/
+scp license.lic USUARIO@IP_DEL_SERVIDOR:/home/USUARIO/lyra-watchlog-v0.1.21/license/
 ```
 - ✅ La app tomará la licencia automáticamente en unos segundos.
 
@@ -290,7 +290,7 @@ ssh USUARIO@IP_DEL_SERVIDOR
 ```
 🐧 **EN EL SERVIDOR (bash):**
 ```bash
-cat lyra-watchlog-v0.1.20/license/setup-token
+cat lyra-watchlog-v0.1.21/license/setup-token
 ```
 - ✅ Copia el texto largo que aparece (ese es tu código).
 
@@ -356,7 +356,7 @@ licenciada y operativa en el servidor del cliente.
 
 ## 🧹 Apagar o borrar la prueba (opcional)
 
-🐧 **EN EL SERVIDOR (bash):** dentro de `lyra-watchlog-v0.1.20/`:
+🐧 **EN EL SERVIDOR (bash):** dentro de `lyra-watchlog-v0.1.21/`:
 ```bash
 # Apagar (conserva los datos):
 docker compose --project-directory . --env-file .env -f compose/docker-compose.yml -f compose/mode-b.own-edge.yml down

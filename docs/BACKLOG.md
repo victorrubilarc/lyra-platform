@@ -2551,7 +2551,8 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
 > **▶ ESTADO 2026-07-08: (1) `install.sh` autoreparable + `doctor` = ✅ HECHO. (2) track WINDOWS = ✅ HECHO** (`install.ps1`
 > nativo, espejo del install.sh; smoke Windows MODO A validado EN VIVO sobre Docker Desktop real). El programa "instalación
 > limpia" queda **CERRADO** para la matriz soportada (Linux x86-64 + Windows). Detalle de (2) en el bullet P1 de abajo y en
-> `DECISIONS 2026-07-08 · Track WINDOWS`.
+> `DECISIONS 2026-07-08 · Track WINDOWS`. **PUBLICADO: tag v0.1.21** (release VERDE + deploy EC2; `lyra-watchlog-v0.1.21.tar.gz`
+> con install.ps1 en el GitHub Release).
 > La causa común de los 4 bugs fue **que el camino del paquete offline nunca se ejecutó de punta a punta en una máquina
 > limpia**. Decisiones y plan tras la 1ª prueba piloto real (dueño 2026-07-08):
 > - **Matriz de plataformas SOPORTADA (decidida por el dueño):** **Linux x86-64** (Ubuntu 22.04/24.04, Debian 12, RHEL/Rocky
