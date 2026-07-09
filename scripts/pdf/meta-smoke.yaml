@@ -1,0 +1,26 @@
+---
+title: "Smoke Visual Global"
+subtitle: "Lyra WatchLog · Prueba visual integral de la plataforma, de principio a fin"
+author: "ITESICWS · Lyra WatchLog · Aseguramiento de calidad"
+date: "Julio 2026"
+lang: es
+titlepage: true
+titlepage-color: "06061A"
+titlepage-text-color: "E7EAF3"
+titlepage-rule-color: "06B6D4"
+titlepage-rule-height: 6
+toc-own-page: true
+colorlinks: true
+mainfont: "EB Garamond"
+mainfontfallback:
+  - "Segoe UI Symbol:mode=base;"
+  - "Arial:mode=base;"
+monofont: "Consolas"
+monofontfallback:
+  - "Segoe UI Symbol:mode=base;"
+monofontoptions:
+  - "Scale=0.90"
+geometry: "margin=2.1cm"
+fontsize: 11pt
+linestretch: 1.06
+...

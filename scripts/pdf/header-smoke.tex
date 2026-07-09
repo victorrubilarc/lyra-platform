@@ -1,0 +1,27 @@
+% Header del "Smoke Visual Global" (Pandoc + LuaLaTeX + Eisvogel, cuerpo EB Garamond).
+% Simbolos check/cruz/aviso via pifont; el resto de simbolos (flechas, >=, ., etc.)
+% los cubre la CADENA DE RESPALDO de fuente (Segoe UI Symbol) declarada en meta-smoke.yaml.
+\usepackage{pifont}
+\usepackage{fvextra}
+\fvset{breaklines=true,breakanywhere=true,fontsize=\small}
+\newcommand{\ok}{\textcolor[HTML]{16A34A}{\ding{51}}}
+\newcommand{\nope}{\textcolor[HTML]{DC2626}{\ding{55}}}
+\newcommand{\warn}{\textcolor[HTML]{D97706}{\textbf{!}}}
+
+% Tablas largas (registros de hallazgos, matrices) en cuerpo menor para que quepan.
+\usepackage{etoolbox}
+\AtBeginEnvironment{longtable}{\footnotesize}
+
+% Identidad Lyra: titulos con el color de marca (indigo / cian), legibles sobre papel.
+\definecolor{lyraIndigo}{HTML}{4145C4}
+\definecolor{lyraCyan}{HTML}{0E7C8B}
+\addtokomafont{section}{\color{lyraIndigo}}
+\addtokomafont{subsection}{\color{lyraIndigo}}
+\addtokomafont{subsubsection}{\color{lyraCyan}}
+\addtokomafont{paragraph}{\color{lyraIndigo}}
+
+% Cada "Paso N.M" (nivel 4 = \paragraph) arranca en su propia linea, no en run-in.
+\RedeclareSectionCommand[beforeskip=1.6ex plus 1ex minus .2ex,afterskip=.6ex]{paragraph}
+
+% Filete cian bajo cada apertura de Fase (subsection), aire editorial.
+\RedeclareSectionCommand[beforeskip=2.6ex plus 1ex,afterskip=1.1ex]{subsection}

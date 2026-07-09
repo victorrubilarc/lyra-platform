@@ -3053,3 +3053,16 @@ implementación esperada:
 2. Confirma el objetivo único de la sesión (un módulo/submódulo).
 3. Revisa §1 (git): si hay trabajo sin publicar de la sesión anterior, **resuélvelo primero**.
 4. Al cerrar, ejecuta el checklist §0 y actualiza este archivo.
+
+## Smoke Visual Global — retroalimentación de QA pendiente (2026-07-09)
+
+Se produjo el entregable **`docs/SMOKE_VISUAL_GLOBAL.md` + `.pdf`** (98 págs, EB Garamond, pipeline
+`scripts/build-smoke-pdf.ps1`): prueba visual integral de la plataforma de principio a fin, con 15 fases y
+135 pasos (caso Minera Cerro Áspero). ABIERTO:
+- [ ] **Ronda de QA visual del dueño** siguiendo la guía, pantalla por pantalla, registrando hallazgos
+  (Log maestro de defectos + Matriz de cobertura al final del documento). Su salida define el trabajo para
+  "dejar el sistema al 100%".
+- [ ] Corregir en la app los bugs/faltantes que arroje esa ronda (se abrirán como tareas propias aquí).
+- [ ] **Módulos marcados PENDIENTE/NO DISPONIBLE en la Fase 13**: Orígenes de datos externos y Base de
+  conocimiento — no existen en la UI (solo la etiqueta `nav.dataSources`). Confirmar alcance/roadmap.
+- [ ] Al regenerar el PDF tras cambios: `powershell -ExecutionPolicy Bypass -File scripts\build-smoke-pdf.ps1`.

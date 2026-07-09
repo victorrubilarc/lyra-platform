@@ -3593,3 +3593,38 @@ existe; falta la UI node-centric, complementaria a la asignación de scope por u
 - B: CSV import/export de estructura
 - C: API Keys (m2m para sistemas externos)
 - D: Webhooks en cambios de estructura
+
+## Hecho en "Smoke Visual Global" — entregable de QA/documentación (2026-07-09)
+
+Entregable de documentación (NO se tocó código de la app): una **prueba visual integral** de toda la
+plataforma, de principio a fin, para cazar bugs/faltantes antes de "dejar el sistema al 100%".
+
+- **Fuente**: `docs/SMOKE_VISUAL_GLOBAL.md` (~313 KB, 15 fases, 135 pasos). Un ÚNICO caso de uso continuo
+  ambientado en una faena minera ficticia (**Minera Cerro Áspero**) con 8 personas/roles cuya CREACIÓN es
+  parte del recorrido (Fase 2). Parte del punto cero (solo el admin de `/setup`) y construye TODO en orden:
+  Fase 0 ingreso/cockpit/licencia · 1 configuración (identidad/temas/regional/IA/correo/reglas) · 2 seguridad
+  (roles RBAC/ABAC 4 dimensiones + usuarios + MFA + admin delegada) · 3 estructura (wizard + provisioning
+  atómico + multi-estructura) · 4 equipos + personas/contratistas/competencias · 5 calendarios (turnos +
+  fiscal) + programación de rondas · 6 Form Builder (paleta completa de tipos, reglas, firmas Part 11,
+  folio, versión inmutable) · 7 bitácoras + excepciones · 8 Mis rondas · 9 incidencias (workflow, CAPA,
+  5 Porqués, SLA, reportabilidad, dashboard) · 10 OT/PTW (4 puertas, checklists por momento, dotación,
+  cierre con folio) · 11 cambio de turno (2 partes, IA streaming, acta PDF) · 12 notificaciones (outbox,
+  plantillas, comodines, campanita, carve-out) · 13 orígenes de datos + base de conocimiento (marcados
+  **PENDIENTE/NO DISPONIBLE**, honestamente) · 14 dashboards/Panorama/Inicio · 15 licenciamiento en operación
+  (límites 403, gating de módulos, degradación a solo-lectura+exportación sin secuestrar datos).
+  Cada paso: Contexto · Acción campo por campo con valores concretos · Qué observar · Resultado esperado ·
+  línea de Registro (OK/Falla + severidad). Cierre con **Log maestro de defectos**, **Matriz de cobertura**
+  (módulo × pantalla) y **Glosario + notas de "qué es normal"**.
+- **Exactitud**: el walkthrough se construyó tras INVENTARIAR el producto real (registro de navegación,
+  catálogo de 77 permisos de `@lyra/contracts`, features de `apps/watchlog-web`, `FORM_GUIDE`, flujos) con
+  subagentes en paralelo y verificación de labels es-CL contra `i18n/locales/es-CL.ts`.
+- **PDF de imprenta**: `docs/SMOKE_VISUAL_GLOBAL.pdf` (98 págs A4, 682 KB) vía **Pandoc + LuaLaTeX + Eisvogel**,
+  cuerpo **EB Garamond** (mono Consolas), portada de marca (navy + filete cian), títulos índigo/cian, tablas
+  booktabs, callouts, encabezado/pie con folio. Pipeline versionado reproducible: `scripts/build-smoke-pdf.ps1`
+  + `scripts/pdf/{meta-smoke.yaml, header-smoke.tex}` (reusa `eisvogel.latex`). **Gotcha resuelto**: EB Garamond
+  no trae flechas/símbolos; en vez de reemplazarlos se usó la **cadena de respaldo de fuente** nativa de
+  Eisvogel (`mainfontfallback`/`monofontfallback` a **Segoe UI Symbol**), así → › ≥ ✓ ✗ ∩ ∧ etc. renderizan sin
+  tofu en texto, tablas y código. `linkcolor/urlcolor/toccolor` en hex rompen el template (usar named o quitar).
+  Verificado rasterizando páginas (portada, índice, tablas, pasos, matriz) con `minidocks/poppler`: cero tofu.
+- **Uso**: esta guía es la base de la ronda de QA visual del dueño; su retroalimentación alimenta el objetivo
+  de "dejar el sistema al 100%".
