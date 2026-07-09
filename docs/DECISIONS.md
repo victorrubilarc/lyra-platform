@@ -5248,3 +5248,20 @@ agrupación estilo Sentry) adaptado a los invariantes del proyecto: air-gap (los
 IA local), *entitlement-aware* (clave de módulo licenciable; degradación por licencia = solo lectura, jamás
 borra logs), RBAC nuevo (rol TI + `module:health:view`/`ops:logs:read`/`ops:health:manage`). Concreta la
 recomendación "observabilidad" ya listada. Se construye en sesión nueva (no se inició en la del smoke).
+
+### 2026-07-09 · App móvil de terreno (operador/supervisor) + vista de gerencia — PWA-first offline
+**Decisión (dueño):** construir app móvil para captura en terreno, supervisión/aprobaciones, seguimiento
+y KPIs de gerencia. Conectividad = **offline real** (zonas sin señal) ⇒ **offline-first** (outbox+sync)
+desde el MVP. Distribución = **PWA ahora + Capacitor/MDM después** (PWA instalable sin tiendas, marca
+blanca por manifest dinámico; envoltorio Capacitor para push nativo/MDM cuando un cliente lo exija, sin
+reescribir la UI). Alcance = los **tres roles** (meta del épico; el MVP elige cabecera de playa).
+**Arquitectura:** PWA sobre el **mismo codebase React** (se DESCARTA rewrite React Native/Flutter: bifurca
+UI, dobla mantenimiento, no resuelve marca-blanca+air-gap+tiendas). Reusa el DS responsivo/táctil ya
+existente (44px, captura de foto en `AttachmentControl`). **Motivo:** es como lo hacen los líderes con
+restricción on-prem (SAP Asset Manager, Maximo Mobile: offline-first + sync + escaneo + foto + firma),
+respetando los invariantes: air-gap (push nativo = opcional/aditivo; por LAN sirve la campanita SSE/INAPP
+ya existente; límites iOS conocidos), on-prem (otro cliente del backend licenciado), marca blanca, y firma
+**Part 11 offline con `payloadHash`** (sinergia con el módulo Reversa GxP). Entitlement-aware + RBAC.
+**Orden de slices (~8–10 sesiones PWA + ~2–3 Capacitor opcional):** cimientos PWA → offline Mis rondas +
+bitácora → offline incidencias/OT/aprobaciones → escaneo/evidencia → vista gerencia → (opcional) Capacitor.
+Supera la nota previa "modo offline terreno (PWA)". Se construye en sesión nueva.

@@ -3098,3 +3098,24 @@ Aprobado por el dueño (arquitectura + MVP). Ver DECISIONS 2026-07-09 y memoria 
   "chatea con la salud" (anomalía determinista primero, LLM solo para explicar el resumen).
 - [ ] **(Opcional) Sesión 4:** add-on **LGTM** (Grafana+Loki+Prometheus) en el bundle offline como tier Pro.
 - Invariantes: air-gap (logs no salen de planta), separado del AuditLog, degradación por licencia = solo lectura.
+
+## Épico NUEVO decidido: APP MÓVIL de terreno/supervisión/gerencia (PWA-first offline) — 2026-07-09
+Aprobado por el dueño (ver DECISIONS 2026-07-09 y memoria mobile-app-strategy). Reemplaza/expande la nota
+"modo offline terreno (PWA)". Objetivo: captura en terreno + supervisión/aprobaciones + KPIs de gerencia en
+el móvil, offline-first (zonas sin señal). Arquitectura = PWA sobre el mismo codebase React (NO rewrite
+nativo); Capacitor/MDM como Fase 2 opcional. ~8–10 sesiones (PWA) + ~2–3 (Capacitor opcional).
+- [ ] **Slice 1 — Cimientos PWA (~2 sesiones):** vite-plugin-pwa (service worker + workbox), **manifest
+  dinámico por marca** (marca blanca), app shell offline, instalable ("Agregar a pantalla de inicio"),
+  detección online/offline, base de almacenamiento local (IndexedDB) y estrategia de caché.
+- [ ] **Slice 2 — Terreno offline-first (~2–3 sesiones):** worklist local + **outbox/cola + sync** para
+  **Mis rondas** y **llenado de bitácora** (captura sin señal → sincroniza al reconectar); cámara/foto/QR
+  (identificar equipo por tag) y **firma Part 11 offline con `payloadHash`** (sinergia Reversa GxP).
+- [ ] **Slice 3 — Supervisión offline (~2–3 sesiones):** extender offline a reportar incidencia, avance y
+  checklists de OT, y **aprobaciones** (puertas OT / transiciones firmadas) desde el móvil.
+- [ ] **Slice 4 — Escaneo QR + evidencia pulida (~1 sesión).**
+- [ ] **Slice 5 — Vista móvil de gerencia (~1 sesión):** KPIs (Panorama/Inicio, ya responsive) + bandeja de
+  aprobaciones + campanita SSE/INAPP.
+- [ ] **(Opcional) Slice 6 — Capacitor + push nativo + MDM (~2–3 sesiones):** envolver la MISMA PWA → app
+  instalable por MDM/enterprise + push APNs/FCM (cuando haya internet), sin reescribir la UI.
+- Invariantes: air-gap (push nativo opcional/aditivo; sync por LAN al backend on-prem), marca blanca,
+  entitlement-aware + RBAC, seguridad de datos offline en reposo (cifrado + wipe + sesión corta).
