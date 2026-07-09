@@ -2548,10 +2548,10 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
 > **✅ HECHO 2026-07-08:** `make-bundle.sh` ahora hace `assert_arch` por imagen (aborta si ≠ `EXPECTED_ARCH`, def. amd64).
 
 ### PROGRAMA "instalación limpia y sin errores" (raíz de los 4 bugs del piloto) — 2026-07-08
-> **▶ PRÓXIMA SESIÓN (decidido por el dueño 2026-07-08): AMBOS — (1) `install.sh` autoreparable + `doctor`, LUEGO
-> (2) track Windows.** Orden: el instalador autoreparable va PRIMERO (el `install.ps1`/WSL2 de Windows debe reflejar su
-> comportamiento final, no rehacerse después); cada uno extiende el smoke (`install-smoke.yml`). Si el contexto se llena,
-> consolidar tras terminar (1) y abrir sesión nueva para (2).
+> **▶ ESTADO 2026-07-08: (1) `install.sh` autoreparable + `doctor` = ✅ HECHO (smoke VERDE run 28984487292, en `main`).
+> SIGUIENTE SESIÓN = (2) track Windows.** El instalador autoreparable fue PRIMERO (el `install.ps1`/WSL2 de Windows debe
+> reflejar su comportamiento final); cada uno extiende el smoke (`install-smoke.yml`). Se consolidó tras (1) por límite de
+> contexto — abrir sesión nueva para (2).
 > La causa común de los 4 bugs fue **que el camino del paquete offline nunca se ejecutó de punta a punta en una máquina
 > limpia**. Decisiones y plan tras la 1ª prueba piloto real (dueño 2026-07-08):
 > - **Matriz de plataformas SOPORTADA (decidida por el dueño):** **Linux x86-64** (Ubuntu 22.04/24.04, Debian 12, RHEL/Rocky
@@ -2566,17 +2566,22 @@ llega al nivel, NO se publica: queda aquí con lo que falta.
 >   `./license` a uid 1000 sin root → el API crasheaba con EACCES (setup-token) → ahora `sudo -n` fallback; (iii) editar
 >   `edge/Caddyfile.edge` (como pide la guía) rompía el `SHA256SUMS` → ahora el manifiesto excluye `edge/`+`certs/` (config
 >   del operador). **El smoke ya justificó su existencia.**
-> - **P0 PENDIENTE · install.sh autoreparable + `doctor`:** que el instalador (a) **autogenere el cert self-signed** para el
->   `APP_PUBLIC_URL` (hostname o IP) si falta y **ponga `default_sni` solo cuando es IP** (elimina el editar Caddyfile a mano
->   — el smoke lo hace por script, pero el usuario final no debería); (b) valide arquitectura del host vs imágenes, puertos
->   80/443 libres, cert↔llave, `.env` completo; (c) un `doctor.sh` / `install.sh --check` con reporte PASA/FALLA (arch,
->   docker, puertos, cert, DNS/SNI, salud por contenedor).
-> - **P1 PENDIENTE · Windows track:** `install.ps1` (o guía WSL2) + resolver `/etc/machine-id` (huella de licencia en Windows)
->   + permisos (chown uid 1000 no aplica en FS Windows) + su propio smoke (CI Windows+contenedores-Linux es delicado; quizá
->   self-hosted/manual). **Caveat honesto:** Windows Server como destino productivo es atípico en industria; validar bien.
-> - **P1 PENDIENTE · Documentar la Matriz de Plataformas Soportadas** en repo (SUPPORTED_PLATFORMS.md) + guía del socio.
-> - **Corregidos como parte del programa:** el default_sni por IP quedó documentado en la guía; falta cablearlo AUTO en
->   install.sh (P0 de arriba) y en el Caddyfile del repo (hoy asume hostname con SNI).
+> - **P0 ✅ HECHO 2026-07-08 · install.sh autoreparable + `doctor`** (`feat/install-autoreparable-doctor` → `main`; smoke
+>   VERDE run 28984487292). El operador ahora SOLO fija `EDGE_MODE`+`APP_PUBLIC_URL`. (a) modo b **GENERA**
+>   `edge/Caddyfile.edge` desde `APP_PUBLIC_URL` (host + `default_sni` **solo si es IP**) y **autogenera** cert self-signed
+>   (SAN IP/DNS) si falta — el cert corporativo tiene prioridad; **cero edición manual del borde**. (b) Preflight duro: arch
+>   del daemon (amd64), puertos del modo libres (idempotente), `.env` completo, **cert↔llave coinciden** (die) + SAN/vigencia
+>   (aviso). (c) `doctor` = `install.sh --check` (+ wrapper `doctor.sh`, empacado por make-bundle): PASA/FALLA de arch,
+>   docker/compose, puertos, cert, coherencia `default_sni`, salud por contenedor, alcance HTTP/S. **Gotcha resuelto:**
+>   `key.pem` 600/uid1000 no es legible por un instalador/doctor no-root ⇒ se gatea la verificación cert↔llave por
+>   legibilidad (`key_readable`; si no, nota). Smoke extendido a la ruta AUTO (modo a + b-hostname con prueba NEGATIVA por IP
+>   + b-IP + doctor x3). Ver `DECISIONS.md 2026-07-08`. **`SUPPORTED_PLATFORMS.md` CREADO** (cierra parte del P1 de abajo).
+> - **▶ P1 PENDIENTE (SIGUIENTE SESIÓN) · Windows track:** `install.ps1` (o guía WSL2) equivalente al install.sh YA afinado
+>   + resolver `/etc/machine-id` (huella de licencia L1 en Windows: en WSL existe pero es la del distro — validar
+>   estabilidad) + permisos (chown uid 1000 no aplica en FS Windows — ver cómo lo maneja Docker Desktop para
+>   `./license`/`./certs`) + su propio smoke (CI Windows+contenedores-Linux es delicado; quizá self-hosted/manual) +
+>   completar la sección **Windows** de `docs/SUPPORTED_PLATFORMS.md`. **Caveat honesto:** Windows Server como destino
+>   productivo es atípico en industria; validar bien.
 
 ### DATA demo · Rondas del seed 100% vencidas (2026-07-03)
 > Detectado al revisar «Mis rondas no filtra» (`feat/inicio-enterprise`): el demo tiene **289 rondas todas vencidas** (programadas
