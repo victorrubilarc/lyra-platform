@@ -68,6 +68,9 @@ is_ipv4() {
 # Arquitectura del daemon Docker (amd64 esperado; el bundle es amd64).
 docker_arch() { docker version -f '{{.Server.Arch}}' 2>/dev/null || echo '?'; }
 
+# ¿la clave privada es legible por el usuario actual? Tras el chown a uid 1000
+# (paso 7) queda en 600/uid1000: un instalador/doctor no-root no la lee (esperado).
+key_readable() { [ -r "$HERE/certs/key.pem" ]; }
 # ¿cert.pem y key.pem corresponden? Compara la clave pública (robusto RSA/EC).
 cert_key_match() {
   local a b
@@ -212,7 +215,11 @@ run_doctor() {
   # 6) Certificado (modo b)
   if [ "$EDGE_MODE" = b ]; then
     if [ -f "$HERE/certs/cert.pem" ] && [ -f "$HERE/certs/key.pem" ]; then
-      cert_key_match && pass "cert.pem ↔ key.pem coinciden" || fail "cert.pem y key.pem NO corresponden"
+      if key_readable; then
+        cert_key_match && pass "cert.pem ↔ key.pem coinciden" || fail "cert.pem y key.pem NO corresponden"
+      else
+        note "key.pem no legible por el usuario actual (600/uid 1000) — omito cert↔llave (normal; corre el doctor con sudo para incluirlo)"
+      fi
       if [ -n "$host" ]; then
         cert_covers_host "$host" && pass "el SAN del cert cubre '$host'" || note "el SAN del cert no menciona '$host' (¿wildcard/CA corporativa?)"
       fi
@@ -404,7 +411,13 @@ case "$EDGE_MODE" in
        echo "     Para producción, reemplaza certs/cert.pem y certs/key.pem por el de tu CA corporativa y reejecuta."
      fi
      # (c) Preflight del certificado: cert↔llave (DURO); SAN + vigencia (aviso).
-     cert_key_match || die "certs/cert.pem y certs/key.pem NO corresponden (clave pública distinta). Corrígelos y reejecuta."
+     # Solo si la llave es legible: en una reejecución la habrá cedido a uid 1000
+     # (paso 7) y el instalador no-root no la lee — ya se validó al crearla.
+     if key_readable; then
+       cert_key_match || die "certs/cert.pem y certs/key.pem NO corresponden (clave pública distinta). Corrígelos y reejecuta."
+     else
+       say "cert↔llave: key.pem no legible por el usuario actual (uid 1000 de una corrida previa) — omito la comprobación (ya validada al crearla)."
+     fi
      [ -n "$HOST" ] && { cert_covers_host "$HOST" || warn "El SAN del certificado no menciona '$HOST' (¿wildcard/CA corporativa? verifícalo)."; }
      openssl x509 -in "$HERE/certs/cert.pem" -noout -checkend 0 >/dev/null 2>&1 || warn "El certificado está VENCIDO — el borde igual arrancará, pero el navegador lo rechazará."
      say "modo (b): borde propio con TLS en 443/tcp (host=$HOST)";;
