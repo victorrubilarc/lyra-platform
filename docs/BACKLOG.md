@@ -1024,6 +1024,24 @@ nunca queda más de una sesión atrás.
             **CERRADO en L6 (2026-07-06):** `license.state.changed` (tx en caliente) + `license.expiring`/
             `license.restricted` (derived con re-aviso) vía el motor del Bloque N, EMAIL+INAPP, destinatarios por
             permiso `settings:manage` (configurable), con carve-out del worker para estados restringidos.
+- [ ] **(1b) Consola de Licencias centralizada (back-office del EMISOR)** — **CANDIDATO, registrado 2026-07-09; alcance
+      decidido: SOLO INTERNO de ITESICWS (NO self-service de socios).** Motivación (conversación con el dueño): hoy la
+      emisión es una CLI (`pnpm license issue`) que depende de UN equipo con `~/.lyra-license/` (clave privada cifrada +
+      passphrase + `ledger.jsonl`). Problemas operativos: (a) el ledger es por-máquina ⇒ emitir desde 2 equipos parte la
+      cuenta y ciega la detección de clones de `renew`; (b) no hay panel de "licencias por vencer"; (c) respaldo/DR es
+      manual. La consola centraliza esto en una app pequeña de ITESICWS (reusa `@lyra/licensing-cli` como motor — **NO
+      reimplementar la firma**). **⚠️ Constraint DURO:** esta app es infra del EMISOR, **jamás** se distribuye ni se
+      mezcla con el producto on-prem (igual que la CLI hoy); y la clave privada **NO** vive en `.env`/disco en claro de un
+      server siempre encendido — se descifra solo en memoria al firmar (como la CLI), y si se quiere blindaje extra se
+      migra la firma a AWS KMS/HSM sin tocar el resto (el estándar de code-signing: la clave firma pero nunca se entrega).
+      **Secuencia recomendada en 2 fases (no todo de golpe):** (1) **Dashboard + ledger en Postgres** — migrar el
+      `ledger.jsonl` (archivo → tabla, con importador de lo ya emitido; conservar la cadena de hashes tamper-evident de
+      `ledger.ts`), listar emisiones, filtro por socio (banda de canal), y **vista "por vencer en ≤N días"** ordenada;
+      valor inmediato, CERO riesgo sobre la clave. (2) **Emisión/renovación desde la UI** — subir `solicitud.lreq`/
+      `renovacion.lreq`, parámetros comerciales, firmar; recién cuando (1) esté sólido y decidido cómo entra la
+      passphrase. Necesita: app nueva, migración de ledger, auth (aunque interna, no abierta), decidir dónde corre.
+      **Deuda menor relacionada ya anotada:** flag `pnpm license ledger --expiring <N>` en la CLI (pedido 2026-07-09,
+      diferido) — lo absorbe la fase (1) de este ítem. **NO empezar sin plan aprobado (regla CLAUDE.md).**
 - [ ] **(2) Modo marca blanca COMPLETO** (~60–120 HH, **restan ~30–60 HH**) — **AVANZADO por OOBE S3 ✅ 2026-07-06:**
       la PRESENTACIÓN web ya es marca blanca runtime gobernada por `whiteLabel` del payload (L6d cableado): login
       co-marcado/re-marcado + Topbar + wordmark del sidebar + `document.title` + logo por instalación, sin rebuild
@@ -3066,3 +3084,17 @@ Se produjo el entregable **`docs/SMOKE_VISUAL_GLOBAL.md` + `.pdf`** (98 págs, E
 - [ ] **Módulos marcados PENDIENTE/NO DISPONIBLE en la Fase 13**: Orígenes de datos externos y Base de
   conocimiento — no existen en la UI (solo la etiqueta `nav.dataSources`). Confirmar alcance/roadmap.
 - [ ] Al regenerar el PDF tras cambios: `powershell -ExecutionPolicy Bypass -File scripts\build-smoke-pdf.ps1`.
+
+## Módulo NUEVO decidido: "Salud del sistema" (observabilidad TI) — 2026-07-09
+Aprobado por el dueño (arquitectura + MVP). Ver DECISIONS 2026-07-09 y memoria observability-health-module.
+- [ ] **Sesión 1 (MVP):** logging estructurado (pino/nestjs-pino) + **redacción de secretos** en origen ·
+  `/health` ampliado (API/Postgres/Redis/MinIO/worker notif+reglas/profundidad de colas/migraciones/licencia) ·
+  **feed de errores agrupados por fingerprint** en Postgres con retención/rotación · **UI dashboard de salud**
+  (semáforos + Golden Signals). Rol TI + permisos nuevos (`module:health:view`, `ops:logs:read`,
+  `ops:health:manage`) · clave de **módulo licenciable** (entitlement-aware). SIN IA en este MVP.
+- [ ] **Sesión 2:** métricas **RED** (rate/errors/p50/p95/p99) + **alertas** reusando el motor de notificaciones
+  (ej. worker caído) + afinar retención/rotación.
+- [ ] **Sesión 3:** capa **IA** vía `@lyra/llm` (modelo LOCAL) + scrubber PII: "explícame este error" /
+  "chatea con la salud" (anomalía determinista primero, LLM solo para explicar el resumen).
+- [ ] **(Opcional) Sesión 4:** add-on **LGTM** (Grafana+Loki+Prometheus) en el bundle offline como tier Pro.
+- Invariantes: air-gap (logs no salen de planta), separado del AuditLog, degradación por licencia = solo lectura.

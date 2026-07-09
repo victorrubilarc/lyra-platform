@@ -5231,3 +5231,20 @@ Interfaz `LlmProvider` con implementaciones nube (Anthropic/OpenAI/Gemini/Deepse
 
 ## Recomendaciones registradas para incorporar (fase de endurecimiento u oportuna)
 Mover IA/orígenes al backend (hecho como principio) · adjuntos/evidencias en MinIO · firma con validez probatoria (hash+timestamp) · respaldos Postgres/MinIO · observabilidad (pino/Prometheus/OpenTelemetry/Grafana/Loki) · healthchecks (hechos) · rate-limit + CSP/HSTS · exportación CSV/PDF · notificaciones SMTP (SLA/escalamiento) · búsqueda full-text KB · i18n es-CL + multi-idioma · **modo offline terreno (PWA) como fase posterior** · retención/borrado lógico · tests de lógica crítica desde Fase 1.
+
+### 2026-07-09 · Módulo "Salud del sistema" (observabilidad de app) — núcleo nativo embebido
+**Decisión (dueño):** construir un módulo de observabilidad para TI/mantenimiento de aplicaciones
+(detección de fallos: errores, latencias, colas, jobs, recursos, caídas), **separado del AuditLog**
+(ese es cumplimiento de negocio Part 11; esto es técnico). Arquitectura = **núcleo nativo embebido**
+(dentro de la app, cero infra extra; encaja air-gap y bundle offline); el stack LGTM
+(Grafana+Loki+Prometheus, OSS self-hostable) queda como **add-on Pro opcional futuro**, no en el core.
+**MVP (Sesión 1, sin IA):** logging estructurado JSON (pino) con **redacción de secretos** en origen +
+`/health` ampliado (API/Postgres/Redis/MinIO/worker/colas/migraciones/licencia) + **feed de errores
+agrupados por fingerprint** (estilo Sentry) en Postgres con retención/rotación + UI dashboard de salud.
+Slices siguientes: métricas RED + alertas por notificaciones; luego capa de **IA** vía `@lyra/llm` con
+**modelo LOCAL** + scrubber PII ("explícame/chatea con la salud", determinista primero, LLM para explicar).
+**Motivo:** estándar de industria (3 pilares logs/métricas/trazas, OpenTelemetry, Golden Signals/RED/USE,
+agrupación estilo Sentry) adaptado a los invariantes del proyecto: air-gap (los logs NUNCA salen de planta,
+IA local), *entitlement-aware* (clave de módulo licenciable; degradación por licencia = solo lectura, jamás
+borra logs), RBAC nuevo (rol TI + `module:health:view`/`ops:logs:read`/`ops:health:manage`). Concreta la
+recomendación "observabilidad" ya listada. Se construye en sesión nueva (no se inició en la del smoke).
