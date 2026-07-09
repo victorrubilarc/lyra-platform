@@ -4,6 +4,32 @@ Formato: fecha · decisión · motivo. Las más recientes arriba.
 
 ---
 
+### 2026-07-08 · install.sh AUTOREPARABLE + `doctor` (programa "instalación limpia", P0) — decisiones de diseño
+Sesión `feat/install-autoreparable-doctor` (BACKLOG §3 "PROGRAMA instalación limpia"). Raíz de los 4 bugs del piloto: el
+operador tenía que crear el cert con `openssl` y editar `edge/Caddyfile.edge` a mano (SNI/`default_sni`), pasos frágiles.
+Objetivo: que el usuario final SOLO fije `EDGE_MODE` + `APP_PUBLIC_URL` en `.env`; todo lo demás lo hace el instalador.
+- **(a) El borde se GENERA, no se edita.** `install.sh` (modo b) **regenera `edge/Caddyfile.edge` en cada corrida** desde
+  `APP_PUBLIC_URL` (fuente de verdad), con cabecera "GENERADO, no editar". No rompe integridad: `SHA256SUMS` ya excluye
+  `edge/`+`certs/` (config del operador, decisión del smoke 2026-07-08). Descartado el enfoque "editar por `sed`" de la guía
+  (causó la mitad de los tropiezos) y el "env var en el Caddyfile" (Caddy no permite el `default_sni` **condicional** que
+  requiere el acceso por IP).
+- **(b) `default_sni` SOLO cuando el host es IP.** Por IP el cliente no manda SNI y sin `default_sni` Caddy no matchea el
+  sitio (bug del piloto); por hostname el SNI viaja y el matching estricto es lo deseable (no relajar con default_sni). El
+  instalador detecta IP vs hostname (`is_ipv4`) y también ajusta el SAN del cert (IP: vs DNS:).
+- **(c) Cert self-signed AUTOGENERADO si falta; el corporativo tiene prioridad.** Si hay `certs/cert.pem`+`key.pem`, se
+  usan (CA del cliente); si no, se genera uno self-signed (825 d, SAN correcto) con aviso. **cert↔llave que no coinciden =
+  ERROR DURO** (comparación de clave pública, robusta RSA/EC). **SAN que no cubre el host = AVISO, no error:** un wildcard/CA
+  corporativa legítimo (`*.planta.interna`) no contiene el host literal; hacerlo `die` daría falsos negativos. Vigencia
+  vencida = aviso (el borde arranca; el navegador lo rechaza).
+- **(d) Preflight duro + `doctor`.** Preflight aborta si: arquitectura del daemon ≠ amd64 (matriz `SUPPORTED_PLATFORMS.md`),
+  puerto del modo ocupado por otro proceso (idempotente: si el stack propio ya escucha, se omite), `.env` incompleto,
+  cert↔llave no coinciden. `doctor` = `install.sh --check` (+ wrapper `doctor.sh`): reporte PASA/FALLA no destructivo (arch,
+  docker/compose, puertos, cert, coherencia `default_sni`, salud por contenedor, alcance HTTP/S). Convierte errores
+  crípticos en acciones.
+- **(e) El smoke ejerce la ruta AUTO.** `smoke-install.sh` ya NO crea cert ni edita Caddyfile: valida modo a + modo b
+  **hostname** (SNI 200 + prueba NEGATIVA por IP: `default_sni` ausente ⇒ rechazo) + modo b **IP** (`default_sni` ⇒ 200), y
+  corre `doctor` en los 3. Blinda la condicionalidad de `default_sni` y la autogeneración de cert.
+
 ### 2026-07-08 · E3 "cadena de suministro verificable" (backups cifrados + SBOM + firma cosign) — decisiones (a)–(h) aprobadas antes de codificar
 Sesión `feat/e3-cadena-suministro` (E3 del programa "a prueba de balas", BACKLOG §2(4)/§2(6); tras H2/E4). Cierra el
 objetivo de `SECURITY §9.5`: que un cliente/auditor compruebe **sin confiar a ciegas** que la imagen/paquete (a) vino de

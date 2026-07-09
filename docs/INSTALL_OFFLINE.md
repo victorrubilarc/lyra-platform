@@ -18,7 +18,8 @@ host **sin internet saliente**, sin `git clone` y **sin exponer código fuente**
 |---|---|
 | `images/` | Las imágenes de la app (`lyra-watchlog-{api,web,migrate}`, **nombre neutro**) + infra (`postgres`, `redis`, `minio`, `caddy`) como `.tar` (`docker save`). |
 | `compose/` | El stack standalone (base sin puertos + modos de borde a/b + config del borde). |
-| `install.sh` | Instalador **idempotente offline**. |
+| `install.sh` | Instalador **idempotente offline** (autoreparable: genera cert + borde). |
+| `doctor.sh` | Diagnóstico **PASA/FALLA** del host (equivale a `install.sh --check`). |
 | `.env.example` | Plantilla de configuración (los secretos los genera el instalador). |
 | `INSTALL_OFFLINE.md` | Esta guía. |
 | `SECURITY/` | Reporte de vulnerabilidades (Trivy) + **`sbom/`** (inventario CycloneDX por imagen, para tu auditor). |
@@ -92,10 +93,15 @@ y `deploy/standalone/README.md`):
   NGINX/IIS). La app queda en `127.0.0.1:${EDGE_LOCAL_PORT:-8080}` (loopback); el
   appliance del cliente termina TLS y reenvía. Debe mandar `X-Forwarded-For` y no
   bufferizar SSE.
-- **`EDGE_MODE=b` — borde propio con certificado corporativo.** Coloca
-  `certs/cert.pem` (cadena completa) y `certs/key.pem` (emitidos por la CA
-  corporativa; **sin ACME**) antes de reejecutar. Queda `443/tcp` LISTEN. Ajusta
-  el dominio en `compose/edge/Caddyfile.edge`.
+- **`EDGE_MODE=b` — borde propio con certificado.** Queda `443/tcp` LISTEN.
+  **AUTOREPARABLE (v0.1.21+):** el instalador **genera** `edge/Caddyfile.edge` desde
+  `APP_PUBLIC_URL` (poniendo `default_sni` **solo cuando el host es una IP** — necesario
+  porque el acceso por IP no manda SNI) y, si no encuentra certificado, **crea uno
+  self-signed** con el SAN correcto (IP o DNS). **No edites el Caddyfile a mano.** Si
+  tienes un **certificado corporativo**, colócalo en `certs/cert.pem` (cadena completa) y
+  `certs/key.pem` **antes** de reejecutar y el instalador lo usará en vez del de prueba.
+  El instalador valida que **cert y llave correspondan** (aborta si no) y avisa si el SAN
+  no cubre el host o si el certificado está vencido.
 
 ---
 
@@ -125,6 +131,10 @@ Detalle completo en `docs/LICENSING.md`.
 
 ## 8. Verificación
 
+- **Diagnóstico rápido:** `./install.sh --check` (o `./doctor.sh`) — reporte PASA/FALLA
+  de arquitectura, Docker/compose, puertos, certificado (cert↔llave, SAN, vigencia),
+  coherencia de `default_sni` y salud por contenedor. Úsalo ante cualquier síntoma: no
+  modifica nada y convierte errores crípticos en acciones.
 - `https://<tu-dominio>` responde y permite iniciar sesión con el admin creado.
 - Salud interna: `docker compose ... ps` muestra `api` como `healthy`.
 - Para un escaneo de red del host: **solo** el puerto del borde elegido está

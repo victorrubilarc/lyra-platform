@@ -1,6 +1,10 @@
-# Borde PROPIO de Lyra WatchLog (modo b) — TLS con CERTIFICADO CORPORATIVO.
-# Sin ACME: el cert lo emite la CA de la planta y se monta en /certs (ro).
-# Ajustar el dominio al DNS interno del cliente.
+# Borde PROPIO de Lyra WatchLog (modo b) — TLS con certificado montado en /certs.
+# Sin ACME (air-gap): el cert es self-signed autogenerado o el de la CA de la planta.
+#
+# ⚠ REFERENCIA/EJEMPLO. En el paquete offline, `install.sh` REGENERA este archivo
+#   desde APP_PUBLIC_URL en cada corrida (host + default_sni solo si es IP): el
+#   operador NO lo edita a mano. Para cambiar el dominio, edita APP_PUBLIC_URL en
+#   .env y reejecuta ./install.sh.
 {
 	# Air-gap: sin ACME, sin telemetría, sin puertos de administración.
 	auto_https off
