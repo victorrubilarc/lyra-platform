@@ -560,6 +560,98 @@
 - Estado: NUEVO
 - Notas: Confirmar en procesamiento si la editabilidad del código es intencional. Riesgos: el código suele usarse como clave/enlace estable (referencias, comodines `{{campo.<key>}}`, integraciones); cambiarlo podría romper enlaces. Definir la regla (inmutable tras crear, o editable solo mientras la versión está en borrador/no congelada).
 
+### F-040 · Paso 6.3 · No se muestran los roles para elegir; 3× 403 (roles, users, notif templates) con Planificador
+- Fecha: 2026-07-10
+- Fase/Paso: Paso 6.3
+- Módulo/Pantalla: Plantillas / Form Builder — selección de actores/firmantes (roles/usuarios) y plantilla de notificación por transición
+- Tipo: permiso/ABAC
+- Severidad: S3
+- Qué hice (repro): En el paso 6.3, con el usuario Planificador, intenté elegir los roles; no aparecen para seleccionar.
+- Esperado: Poder ver y elegir roles (y usuarios) y la plantilla de notificación, sin errores de permiso.
+- Real: No se muestran los roles. En el network del navegador, 3 llamadas dan 403 Forbidden.
+- Evidencia: Traza de red del dueño (2026-07-10): `GET /api/security/roles` → 403 ("No tienes permiso para esta acción"); `GET /api/security/users` → 403; `GET /api/notifications/templates?eventKey=entry.transition` → 403.
+- Estado: NUEVO
+- Notas: **CAUSA RAÍZ (acoplamiento entre módulos, mismo patrón que F-038):** el Form Builder lee endpoints de Seguridad y Notificaciones que el Planificador no tiene. Claves exactas: `GET /security/roles`→`role:read` (roles.controller.ts:25-26); `GET /security/users`→`user:read` (users.controller.ts:29-30); `GET /notifications/templates`→`notiftemplate:manage` (notifications.controller.ts:72-73). **OLOR DE DISEÑO:** el GET de notif templates exige un permiso de `manage` para solo LEER (faltaría un `notiftemplate:view`). **OPCIONES (al procesar):** (a) dar al Planificador lecturas `role:read` + `user:read` (razonable: un planificador asigna actores) y resolver notif templates con un permiso de lectura nuevo `notiftemplate:view` (mejor que darle `notiftemplate:manage`); o (b) revisar que el builder no exija manage para leer. Relacionado con F-030/F-036/F-038 (permisos incompletos + acoplamiento del Planificador).
+
+### F-041 · Paso 6.3 · Al guardar borrador aparecen 2 toasts "Guardado" + 1 error rojo de permisos
+- Fecha: 2026-07-10
+- Fase/Paso: Paso 6.3
+- Módulo/Pantalla: Plantillas / Form Builder — guardar borrador
+- Tipo: bug
+- Severidad: S3
+- Qué hice (repro): En el paso 6.3 pulsé "Guardar borrador".
+- Esperado: Un único mensaje de resultado coherente (un "Guardado" si tuvo éxito, o un error claro si falló — no ambos).
+- Real: Aparecen 2 mensajes "Guardado" y además uno en rojo con problema de privilegios.
+- Evidencia:
+- Estado: NUEVO
+- Notas: Dos defectos aquí: (1) toast de éxito DUPLICADO ("Guardado" ×2); (2) mensajes CONTRADICTORIOS (éxito + error de permiso a la vez). El error rojo probablemente proviene de una de las llamadas 403 de F-040 disparada durante el guardado (roles/users/notif templates). En procesamiento: deduplicar el toast de éxito y no mostrar error de permiso si la operación principal (guardar borrador) tuvo éxito; separar el fallo de carga auxiliar del resultado del guardado. Relacionado con F-040.
+
+### F-042 · Paso 6.3 · Al publicar aparecen 2 toasts "Borrador guardado" y luego uno "Publicado"
+- Fecha: 2026-07-10
+- Fase/Paso: Paso 6.3
+- Módulo/Pantalla: Plantillas / Form Builder — publicar versión
+- Tipo: UX
+- Severidad: S4
+- Qué hice (repro): En el paso 6.3 pulsé "Publicar".
+- Esperado: Un único mensaje coherente al publicar (ej. solo "Publicado"), sin toasts intermedios repetidos.
+- Real: Aparecen 2 mensajes "Borrador guardado" (o similar) y luego otro "Publicado".
+- Evidencia:
+- Estado: NUEVO
+- Notas: Toasts redundantes/confusos: la publicación parece guardar borrador (×2) y luego publicar, emitiendo 3 mensajes. Deduplicar y mostrar solo el resultado final relevante. Mismo patrón de toasts duplicados que F-041.
+  · **REGLA GLOBAL DEL DUEÑO (2026-07-10):** por cada acción SIEMPRE debe aparecer UN SOLO mensaje (un único toast de resultado). Aplica de forma transversal a toda la app, no solo a este paso. En procesamiento: tratar F-041 y F-042 bajo esta convención y revisar otros flujos con toasts duplicados. Candidata a convención UI en packages/ui / USER_GUIDE. (Guardada en memoria: single-toast-per-action.)
+
+### F-043 · Paso 6.8 · "Visible when" no aparece — NO es bug: se oculta si no hay campo booleano (+ limitación de alcance)
+- Fecha: 2026-07-10
+- Fase/Paso: Paso 6.8
+- Módulo/Pantalla: Plantillas / Form Builder — lógica condicional (visibilidad condicional del campo)
+- Tipo: UX
+- Severidad: S4
+- Qué hice (repro): En el paso 6.8 busqué la opción "visible when".
+- Esperado: Ver y poder configurar la condición "visible when".
+- Real: No aparece el control "visible when".
+- Evidencia:
+- Estado: TRIAGED
+- Notas: **VERIFICADO EN CÓDIGO (2026-07-10) — la feature EXISTE de punta a punta, NO falta implementar:** contratos `visibleWhen` (packages/contracts/src/templates/field-types.ts:1169; templates.ts:129), evaluación en runtime (packages/contracts/src/log-entries/log-entries.ts:971-977) y editor en el builder (apps/watchlog-web/src/features/templates/BuilderConfigPanel.tsx:1010). **POR QUÉ NO SE VE:** el selector se renderiza solo si `booleanFields.length > 0` (BuilderConfigPanel.tsx:1009): si el template aún no tiene un campo booleano (checkbox/toggle) que sirva de disparador, el control se OCULTA sin aviso. **DOS PUNTOS REALES (no-bug, pero mejorables):** (1) descubribilidad — cuando no hay campo booleano, mostrar un hint tipo "Agrega un campo Sí/No para poder condicionar la visibilidad" en vez de esconder el control; (2) ALCANCE del motor — hoy solo soporta "visible cuando <campo booleano> = true"; no condiciona por otros tipos ni operadores (igual-a-valor, rangos). Evaluar en procesamiento si (2) va al Catálogo maestro como mejora del Form Builder. Cruzar con plan Fase 2 Form Builder y FORM_GUIDE.
+  · **CONFIRMADO (2026-07-10):** el "visible when" aplica a CUALQUIER elemento, incluidos presentacionales (STATIC_TEXT/párrafo, HEADING, NOTICE): el selector del builder no está restringido por tipo (BuilderConfigPanel.tsx render continuo, sin corte por tipo antes de la línea 1009) y el runtime filtra TODOS los fields de la sección con isFieldVisible (EntryFillPage.tsx:703, EntryViewerPage.tsx:510). O sea, SÍ se puede tener un párrafo visible según una condición ("cuando <campo booleano> = true"); solo requiere que exista un campo booleano en el template.
+
+### F-044 · Paso 6.8 · El ejemplo del smoke (condicionar por "Modo de falla") no es posible como está escrito
+- Fecha: 2026-07-10
+- Fase/Paso: Paso 6.8
+- Módulo/Pantalla: Plantillas / Form Builder — campo condicional (visibleWhen) + guion del smoke
+- Tipo: texto/label
+- Severidad: S3
+- Qué hice (repro): Seguí la instrucción del smoke: "agrega un Párrafo 'Detalle de la falla' y configúralo con «Mostrar solo si»: elige el campo Modo de falla (o un Sí/No asociado)…". No encontré cómo hacerlo.
+- Esperado: Poder condicionar el párrafo como describe el guion.
+- Real: El control "Mostrar solo si" no aparecía; y no se puede condicionar directamente sobre "Modo de falla" (desplegable).
+- Evidencia:
+- Estado: NUEVO
+- Notas: DOS causas ya verificadas (ver F-043): (1) el control se oculta si no hay ningún campo Sí/No en el template (guarda `booleanFields.length > 0`); (2) el motor solo condiciona por campo BOOLEANO = true, no por un desplegable como "Modo de falla". El guion del smoke induce a error al sugerir condicionar por "Modo de falla": debería instruir explícitamente crear primero un campo Sí/No (p.ej. "¿Se registró una falla?") y condicionar el párrafo sobre ÉSE. **DOS ACCIONES (al procesar):** (a) corregir el texto del Paso 6.8 en docs/SMOKE_VISUAL_GLOBAL.md; (b) considerar ampliar el motor visibleWhen a operadores sobre listas/valores (mejora del Form Builder → Catálogo maestro). Relacionado con F-043.
+
+### F-045 · (Form Builder) · "Obligar a justificar cuando un valor supera X": SE PUEDE hoy (reglas cruzadas); ocultar por umbral = mejora
+- Fecha: 2026-07-10
+- Fase/Paso: (relacionado con Paso 6.8 — lógica condicional)
+- Módulo/Pantalla: Plantillas / Form Builder — motor de reglas cruzadas (Req-7) vs. visibleWhen
+- Tipo: duda
+- Severidad: S4
+- Qué hice (repro): Pregunta del dueño: cómo obligar a poner un párrafo/explicación cuando un valor supera un umbral (o cualquier condición).
+- Esperado: Poder forzar una justificación condicional y/o mostrar un elemento según una condición numérica.
+- Real: (verificado en código) Ver desglose abajo.
+- Evidencia:
+- Estado: TRIAGED
+- Notas: **VERIFICADO EN CÓDIGO (2026-07-10):** (A) **OBLIGAR A EXPLICAR cuando valor > X → SE PUEDE HOY** con el motor de reglas cruzadas (Req-7, packages/contracts/src/rules/rules.ts): una regla `{ when: and(gt(var:medicion,X), isEmpty(var:motivo)), severity: ERROR, message: "..." }` bloquea el sello mientras el motivo esté vacío y el valor exceda el umbral (operadores gt/gte/lt/lte/eq/and/or/not/isEmpty en expression.ts:34-66; ERROR bloquea, WARN avisa, rules.ts:42-43; opcional `action` abre incidencia/excepción). ⇒ campo "obligatorio condicional" ya soportado. NO es bug ni falta. (B) **MOSTRAR/OCULTAR un elemento según umbral numérico → NO hoy** (visibleWhen solo dispara por Sí/No=true) ⇒ MEJORA: unificar `visibleWhen` con los operadores del motor de expresiones (condicionar visibilidad por valor/rango). Candidata al Catálogo maestro como mejora del Form Builder. Relacionado con F-043/F-044 y [[rules-engine]]. En procesamiento: si el smoke no muestra el motor de reglas para este caso, agregar el ejemplo (regla ERROR de justificación fuera de umbral) al guion/USER_GUIDE/FORM_GUIDE.
+
+### F-046 · MEJORA · "Visible when" general: cualquier objeto visible según una o varias condiciones sobre los campos del formulario
+- Fecha: 2026-07-10
+- Fase/Paso: (Form Builder — lógica condicional)
+- Módulo/Pantalla: Plantillas / Form Builder — visibilidad condicional (visibleWhen)
+- Tipo: mejora
+- Severidad: S3
+- Qué hice (repro): Solicitud de mejora del dueño.
+- Esperado: Que CUALQUIER objeto del formulario (campo, párrafo, encabezado, aviso, sección, etc.) pueda tener un "visible when" que se cumpla cuando UNA o VARIAS condiciones sobre los objetos presentados en el formulario sean verdaderas.
+- Real: Hoy `visibleWhen` solo soporta UNA condición simple y solo con disparador booleano (`<campo Sí/No> = true`); no permite múltiples condiciones ni otros tipos/operadores.
+- Estado: NUEVO → candidato a DIFERIDO→BACKLOG (Catálogo maestro)
+- Notas: **MEJORA de alcance del Form Builder.** Generalizar `visibleWhen` para: (1) condicionar por cualquier tipo de campo y operadores (gt/gte/lt/lte/eq/isEmpty, etc.), (2) combinar varias condiciones (and/or/not), (3) aplicar a cualquier objeto (incluidos presentacionales y, si aplica, secciones). **PRINCIPIO CLAVE (build-principles-lyra, CERO duplicidad):** REUSAR el motor de expresión seguro que YA existe (packages/contracts/src/rules/expression.ts, AST sin eval) en vez de crear un mini-lenguaje nuevo — unificar `visibleWhen` con el mismo motor del Req-7 (reglas cruzadas/formulados). El servidor sigue siendo autoritativo (evalúa visibilidad y required condicional). Consolida F-043 (descubribilidad + límite booleano), F-044 (ejemplo del smoke no factible) y F-045(B) (ocultar por umbral). En procesamiento: enlazar/crear ítem en el ⭐ Catálogo maestro de docs/BACKLOG.md SIN duplicar; considerar también "required when" condicional con el mismo motor (hoy se suple con reglas ERROR, F-045(A)). Relacionado con [[rules-engine]] y [[fase2-formbuilder-plan]].
+
 ---
 
 ## Índice de triage (se completa al PROCESAR)
